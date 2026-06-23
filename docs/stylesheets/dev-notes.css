@@ -1,0 +1,379 @@
+/* SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved. */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+:root {
+  --openshell-green: #76b900;
+  --openshell-ink: #18181a;
+  --openshell-ink-soft: #242529;
+  --openshell-paper: #f7faf3;
+  --openshell-home-hero-bg:
+    linear-gradient(135deg, #fff 0%, var(--openshell-paper) 62%, #eef7e4 100%),
+    var(--md-default-bg-color);
+  --openshell-home-hero-border: color-mix(in srgb, var(--md-default-fg-color) 14%, transparent);
+  --openshell-home-brand-color: var(--openshell-ink);
+  --openshell-card-bg:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent),
+    var(--md-default-bg-color);
+  --openshell-card-shadow: 0 0.55rem 1.6rem rgba(15, 23, 42, 0.11);
+  --md-primary-fg-color: var(--openshell-ink);
+  --md-primary-fg-color--light: #2b2c31;
+  --md-primary-fg-color--dark: #0f1012;
+  --md-accent-fg-color: var(--openshell-green);
+  --md-accent-fg-color--transparent: rgba(118, 185, 0, 0.16);
+}
+
+body[data-md-color-scheme="default"][data-md-color-primary="black"] {
+  --md-typeset-a-color: #356f00;
+}
+
+body[data-md-color-scheme="slate"][data-md-color-primary="black"] {
+  --md-primary-fg-color: var(--openshell-ink);
+  --md-primary-fg-color--light: #2b2c31;
+  --md-primary-fg-color--dark: #0f1012;
+  --md-accent-fg-color: var(--openshell-green);
+  --md-accent-fg-color--transparent: rgba(118, 185, 0, 0.18);
+  --md-typeset-a-color: #9bdc49;
+  --openshell-home-hero-bg:
+    linear-gradient(135deg, #1c1d20 0%, #161a14 58%, #15240d 100%),
+    var(--md-default-bg-color);
+  --openshell-home-hero-border: rgba(255, 255, 255, 0.12);
+  --openshell-home-brand-color: #fff;
+  --openshell-card-bg:
+    linear-gradient(180deg, rgba(118, 185, 0, 0.06), transparent),
+    color-mix(in srgb, var(--md-default-bg-color) 94%, var(--openshell-green));
+  --openshell-card-shadow: 0 0.55rem 1.6rem rgba(0, 0, 0, 0.28);
+}
+
+.md-header {
+  background: var(--openshell-ink);
+  color: #fff;
+}
+
+.md-header__button.md-logo {
+  display: inline-flex;
+  align-items: center;
+}
+
+.md-header__title {
+  color: #fff;
+}
+
+.md-header__button.md-logo img {
+  height: 1.35rem;
+  width: auto;
+}
+
+.md-header__source {
+  display: none !important;
+}
+
+.md-header .md-search__button {
+  background-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.md-header .md-search__button:focus,
+.md-header .md-search__button:hover {
+  background-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.md-header .md-search__button::before {
+  background-color: rgba(255, 255, 255, 0.78);
+}
+
+.md-header .md-search__button::after {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--openshell-ink);
+}
+
+.dev-notes-hero {
+  margin: 1rem 0 1.5rem;
+}
+
+.openshell-home-hero {
+  margin: 1rem 0 1.8rem;
+  padding: clamp(1.15rem, 3.5vw, 2.1rem);
+  border: 1px solid var(--openshell-home-hero-border);
+  border-radius: 8px;
+  background: var(--openshell-home-hero-bg);
+}
+
+.openshell-home-hero,
+.openshell-home-hero *,
+.dev-notes-hero,
+.dev-notes-hero * {
+  box-sizing: border-box;
+}
+
+.openshell-brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  gap: 0.7rem;
+  color: var(--openshell-brand-color, var(--openshell-ink));
+}
+
+.openshell-brand-lockup img {
+  width: clamp(2.35rem, 5vw, 3.6rem);
+  height: auto;
+  flex: 0 0 auto;
+}
+
+.openshell-brand-lockup span {
+  min-width: 0;
+  color: inherit;
+  font-size: clamp(1.45rem, 4.4vw, 2.4rem);
+  font-weight: 400;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.openshell-brand-lockup strong {
+  font-weight: 800;
+}
+
+.openshell-home-hero__brand {
+  --openshell-brand-color: var(--openshell-home-brand-color);
+  margin-bottom: 1rem;
+}
+
+.openshell-home-hero p:last-child {
+  max-width: 39rem;
+  margin-bottom: 0;
+}
+
+.dev-notes-hero {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(140deg, rgba(118, 185, 0, 0.22), transparent 38%),
+    linear-gradient(135deg, var(--openshell-ink), var(--openshell-ink-soft) 58%, #17310f);
+  color: #fff;
+  overflow: hidden;
+}
+
+.dev-notes-hero__brand {
+  position: relative;
+  z-index: 1;
+  --openshell-brand-color: #fff;
+  margin: clamp(1.15rem, 4vw, 2.1rem) 0 0 clamp(1.25rem, 4vw, 2.5rem);
+}
+
+.dev-notes-hero__brand img {
+  width: clamp(2rem, 4vw, 3rem);
+}
+
+.dev-notes-hero__brand span {
+  font-size: clamp(1.35rem, 3.4vw, 2rem);
+}
+
+.dev-notes-hero__body {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: clamp(24rem, 58vw, 58rem);
+  padding: clamp(1rem, 3vw, 1.8rem) clamp(1.25rem, 4vw, 2.5rem) clamp(1.25rem, 4vw, 2.5rem);
+}
+
+.openshell-kicker,
+.dev-notes-kicker,
+.dev-note-card__meta,
+.dev-note-card__tags {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.dev-notes-hero h2 {
+  margin: 0.25rem 0 0.65rem;
+  color: inherit;
+  font-size: clamp(1.55rem, 4vw, 2.35rem);
+  line-height: 1.05;
+  overflow-wrap: break-word;
+}
+
+.dev-notes-hero h2 span {
+  display: inline;
+}
+
+.dev-notes-hero p:last-child {
+  margin-bottom: 0;
+  max-width: 40rem;
+}
+
+.dev-note-byline__authors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+}
+
+.dev-note-byline__author {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.dev-note-byline__author img {
+  width: 3.2rem;
+  height: 3.2rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+  background: color-mix(in srgb, var(--md-default-fg-color) 10%, transparent);
+}
+
+.dev-note-byline__copy {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.dev-note-byline__author strong {
+  color: var(--md-default-fg-color);
+  font-size: 1rem;
+  line-height: 1.15;
+}
+
+.dev-note-byline__copy span {
+  color: color-mix(in srgb, var(--md-default-fg-color) 70%, transparent);
+}
+
+.dev-notes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: 0.9rem;
+  margin: 1rem 0 2rem;
+}
+
+.dev-note-card {
+  min-height: 13.5rem;
+  border: 1px solid color-mix(in srgb, var(--md-default-fg-color) 14%, transparent);
+  border-radius: 8px;
+  background: var(--openshell-card-bg);
+  box-shadow: var(--openshell-card-shadow);
+  overflow: hidden;
+}
+
+.dev-note-card--launch {
+  border-top: 0.35rem solid var(--openshell-green);
+}
+
+.md-typeset .dev-note-card__link {
+  display: flex;
+  min-height: inherit;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 1.1rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.md-typeset .dev-note-card__link:hover {
+  text-decoration: none;
+}
+
+.md-typeset .dev-note-card__link:hover h2 {
+  color: var(--openshell-green);
+}
+
+.dev-note-card h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.18;
+}
+
+.dev-note-card p {
+  margin: 0;
+  color: color-mix(in srgb, var(--md-default-fg-color) 76%, transparent);
+}
+
+.dev-note-card__authors {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+}
+
+.dev-note-card__authors img {
+  width: 1.55rem;
+  height: 1.55rem;
+  border: 2px solid var(--md-default-bg-color);
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.dev-note-card__authors img + img {
+  margin-left: -0.45rem;
+}
+
+.dev-note-card__tags {
+  margin-top: auto;
+  color: color-mix(in srgb, var(--md-typeset-a-color) 76%, var(--md-default-fg-color));
+}
+
+.dev-note-byline {
+  margin: -0.4rem 0 1.4rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--md-default-fg-color) 12%, transparent);
+}
+
+.dev-note-byline__label {
+  margin: 0 0 0.65rem;
+  color: color-mix(in srgb, var(--md-default-fg-color) 58%, transparent);
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+@media (max-width: 76.25em) {
+  .dev-notes-hero h2 span {
+    display: block;
+  }
+
+  .dev-notes-hero h2 {
+    font-size: 1.42rem;
+    line-height: 1.12;
+  }
+}
+
+@media (max-width: 36rem) {
+  .md-typeset .openshell-home-hero,
+  .md-typeset .dev-notes-hero,
+  .md-typeset .dev-notes-grid {
+    width: calc(100vw - 2rem);
+    max-width: calc(100vw - 2rem);
+  }
+
+  .dev-notes-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dev-note-card {
+    min-width: 0;
+  }
+
+  .openshell-home-hero,
+  .dev-notes-hero__body,
+  .dev-note-card__link {
+    padding: 1rem;
+  }
+
+  .dev-notes-hero__body {
+    max-width: 100%;
+  }
+
+  .dev-notes-hero__brand {
+    margin: 1rem 0 0 1rem;
+  }
+
+  .dev-notes-hero p {
+    overflow-wrap: break-word;
+  }
+
+  .dev-notes-hero__brand span {
+    font-size: clamp(1.2rem, 8vw, 1.55rem);
+  }
+}

@@ -1,0 +1,15 @@
+image: python:3.12-slim
+
+pages:
+  tags:
+    - os/linux-arm
+    - type/docker
+  script:
+    - scripts/build-docs.sh
+    - rm -rf public
+    - mv site public
+  artifacts:
+    paths:
+      - public
+  only:
+    - main

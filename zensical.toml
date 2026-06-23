@@ -1,0 +1,52 @@
+[project]
+site_name = "OpenShell Research"
+site_description = "Research engineering notes and applications built on the OpenShell runtime."
+site_author = "OpenShell Research Engineering"
+docs_dir = "docs"
+site_dir = "site"
+extra_css = ["stylesheets/dev-notes.css"]
+nav = [
+  {"Home" = "index.md"},
+  {"Research Engineering" = [
+    "research/index.md",
+    "research/runtime.md",
+    "research/applications.md"
+  ]},
+  {"Dev Notes" = [
+    "dev-notes/index.md",
+    {"Posts" = [
+      # dev-notes:nav:start
+      {"Making Dev Notes Repeatable" = "dev-notes/posts/2026-06-05-making-dev-notes-repeatable.md"},
+      {"Bootstrapping OpenShell Research" = "dev-notes/posts/2026-06-04-bootstrapping-openshell-research.md"}
+      # dev-notes:nav:end
+    ]}
+  ]}
+]
+
+[project.theme]
+favicon = "assets/brand/favicon.svg"
+logo = "assets/brand/openshell-mark.svg"
+features = [
+  "navigation.sections",
+  "navigation.indexes",
+  "navigation.path",
+  "navigation.top",
+  "search.highlight",
+  "toc.follow"
+]
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "black"
+accent = "green"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "black"
+accent = "green"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to light mode"
