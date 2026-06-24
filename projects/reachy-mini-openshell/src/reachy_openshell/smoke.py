@@ -49,11 +49,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--connection-mode",
         choices=["auto", "localhost_only", "network"],
-        default=os.getenv("REACHY_CONNECTION_MODE", _default_connection_mode(default_host)),
+        default=os.getenv("REACHY_CONNECTION_MODE"),
     )
     parser.add_argument("--media-backend", default=os.getenv("REACHY_MEDIA_BACKEND", "no_media"))
     parser.add_argument("--timeout", type=float, default=_env_float("REACHY_TIMEOUT", 5.0))
     return parser
+
+
+def target_from_args(args: argparse.Namespace) -> ReachyTarget:
+    return ReachyTarget(
+        host=args.host,
+        port=args.port,
+        connection_mode=args.connection_mode or _default_connection_mode(args.host),
+        media_backend=args.media_backend,
+        timeout=args.timeout,
+    )
 
 
 def run_motion(target: ReachyTarget) -> None:
@@ -92,13 +102,7 @@ def run_motion(target: ReachyTarget) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    target = ReachyTarget(
-        host=args.host,
-        port=args.port,
-        connection_mode=args.connection_mode,
-        media_backend=args.media_backend,
-        timeout=args.timeout,
-    )
+    target = target_from_args(args)
     try:
         run_motion(target)
     except Exception as exc:

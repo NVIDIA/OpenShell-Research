@@ -28,4 +28,3 @@ Keep the simulator on the host for the first spike so MuJoCo can open its viewer
 - Should the simulator stay host-side for development, or should a headless simulator move into its own OpenShell sandbox later?
 - Which daemon bind flags are stable across Reachy Mini SDK versions and operating systems?
 - Do audio and camera paths need to be disabled or mocked for OpenShell-based backend tests?
-

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import os
 import sys
 import types
 import unittest
 from contextlib import contextmanager, redirect_stdout
 from io import StringIO
+from unittest.mock import patch
 
 from reachy_openshell import backend, smoke
 
@@ -53,13 +55,8 @@ def fake_reachy_modules():
 
 class ReachyConstructorTests(unittest.TestCase):
     def test_backend_smoke_motion_disables_media_by_default(self) -> None:
-        settings = backend.Settings(
-            reachy_host="host.openshell.internal",
-            reachy_port=8000,
-            connection_mode="network",
-            media_backend="no_media",
-            timeout=5.0,
-        )
+        with patch.dict(os.environ, {}, clear=True):
+            settings = backend.Settings.from_env()
 
         with fake_reachy_modules():
             backend.run_smoke_motion(settings)
@@ -67,18 +64,21 @@ class ReachyConstructorTests(unittest.TestCase):
         self.assertEqual(FakeReachyMini.calls[0]["media_backend"], "no_media")
 
     def test_smoke_cli_disables_media_by_default(self) -> None:
-        target = smoke.ReachyTarget(
-            host="localhost",
-            port=8000,
-            connection_mode="localhost_only",
-            media_backend="no_media",
-            timeout=5.0,
-        )
+        with patch.dict(os.environ, {}, clear=True):
+            target = smoke.target_from_args(smoke.build_parser().parse_args([]))
 
         with fake_reachy_modules(), redirect_stdout(StringIO()):
             smoke.run_motion(target)
 
         self.assertEqual(FakeReachyMini.calls[0]["media_backend"], "no_media")
+
+    def test_smoke_cli_uses_network_mode_for_non_local_cli_host(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            target = smoke.target_from_args(
+                smoke.build_parser().parse_args(["--host", "host.openshell.internal"])
+            )
+
+        self.assertEqual(target.connection_mode, "network")
 
 
 if __name__ == "__main__":

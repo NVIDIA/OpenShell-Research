@@ -167,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     parser = argparse.ArgumentParser(description="Run the Reachy Mini OpenShell backend.")
-    parser.add_argument("--host", default=os.getenv("BACKEND_HOST", "0.0.0.0"))
+    parser.add_argument("--host", default=os.getenv("BACKEND_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=_env_int("BACKEND_PORT", 8080))
     parser.add_argument("--reachy-host", default=None)
     parser.add_argument("--reachy-port", type=int, default=None)
