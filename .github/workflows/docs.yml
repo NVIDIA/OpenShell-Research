@@ -2,23 +2,9 @@ name: Docs
 
 "on":
   pull_request:
-    paths:
-      - ".github/workflows/docs.yml"
-      - "docs/**"
-      - "requirements-docs.txt"
-      - "scripts/build-docs.sh"
-      - "scripts/render-dev-notes.py"
-      - "zensical.toml"
   push:
     branches:
       - main
-    paths:
-      - ".github/workflows/docs.yml"
-      - "docs/**"
-      - "requirements-docs.txt"
-      - "scripts/build-docs.sh"
-      - "scripts/render-dev-notes.py"
-      - "zensical.toml"
   workflow_dispatch:
 
 permissions:
