@@ -1,0 +1,1 @@
+"""Locked Reachy OpenShell profile."""
