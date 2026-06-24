@@ -23,6 +23,8 @@ OpenShell as the runtime.
 
 Use Python 3.10 or newer.
 
+To preview the documentation locally:
+
 ```sh
 python3 -m venv .venv
 source .venv/bin/activate
@@ -30,14 +32,21 @@ python -m pip install -r requirements-docs.txt
 zensical serve
 ```
 
-The local preview runs at <http://localhost:8000>. To build the static site:
+The local preview runs at <http://localhost:8000>. To run the same clean build
+used by CI:
 
 ```sh
-python scripts/render-dev-notes.py
-zensical build --clean --strict
+scripts/build-docs.sh
 ```
 
-The generated site is written to `site/`.
+The build script recreates `.venv-docs`, installs `requirements-docs.txt`,
+renders Dev Notes metadata, and runs `zensical build --clean --strict`. The
+generated site is written to `site/`.
+
+GitHub Actions runs the docs workflow for every pull request and `main` push.
+Pull requests validate the generated site without deploying. Pushes to `main`
+and manual workflow dispatches from `main` publish `site/` to GitHub Pages
+after validation passes.
 
 ### Dev Notes
 
