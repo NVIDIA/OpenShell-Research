@@ -1,7 +1,115 @@
+# OS and editor noise
 .DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+*.local
+*.key
+*.pem
+*.crt
+*.csr
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Temporary and cache directories
 .cache/
-.venv/
-.venv-docs/
+.uv-cache/
+.tmp/
+tmp/
+temp/
+
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+.venv-*/
+venv/
+ENV/
+env/
+pip-wheel-metadata/
+*.egg-info/
+.eggs/
+build/
+dist/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.pytype/
+.hypothesis/
+.tox/
+.nox/
+.dmypy.json
+dmypy.json
+.ipynb_checkpoints/
+
+# Rust
+target/
+**/*.rs.bk
+
+# JavaScript and TypeScript
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+dist/
+build/
+coverage/
+.nyc_output/
+*.tsbuildinfo
+*.eslintcache
+.vite/
+.turbo/
+.parcel-cache/
+.angular/cache/
+.next/
+.nuxt/
+.svelte-kit/
+.output/
+.vercel/
+.netlify/
+.serverless/
+out/
+
+# Static site and docs output
 public/
 site/
+.docusaurus/
+.vitepress/cache/
+.vitepress/dist/
+
+# Runtime artifacts
+*.pid
+*.seed
+*.pid.lock
+
+# Package artifacts
+*.tgz
+*.tar.gz
+*.zip
