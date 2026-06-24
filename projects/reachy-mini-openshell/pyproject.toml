@@ -7,14 +7,19 @@ name = "reachy_mini_conversation_app"
 version = "0.3.0"
 description = "OpenShell-oriented fork of the Reachy Mini conversation app."
 readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [ "aiortc>=1.13.0", "fastrtc>=0.0.34", "gradio==5.50.1.dev1", "huggingface-hub==1.3.0", "opencv-python>=4.12.0.88", "python-dotenv", "openai>=2.1", "reachy_mini_dances_library", "reachy_mini_toolbox", "reachy-mini>=1.5.0", "eclipse-zenoh~=1.7.0", "gradio_client>=1.13.3",]
+requires-python = ">=3.10,<3.13"
+dependencies = [ "aiortc>=1.13.0", "fastrtc>=0.0.34", "gradio==5.50.1.dev1", "huggingface-hub==1.3.0", "opencv-python>=4.12.0.88", "python-dotenv", "openai>=2.1", "reachy_mini_dances_library", "reachy_mini_toolbox", "reachy-mini==1.8.0", "eclipse-zenoh~=1.7.0", "gradio_client>=1.13.3",]
 [[project.authors]]
 name = "Pollen Robotics"
 email = "contact@pollen-robotics.com"
 
 [dependency-groups]
 dev = [ "pytest", "pytest-asyncio", "ruff==0.12.0", "mypy==1.18.2", "pre-commit", "types-requests", "python-semantic-release>=10.5.3",]
+
+[tool.uv]
+environments = [
+    "sys_platform == 'darwin'",
+]
 
 [project.optional-dependencies]
 local_vision = [ "torch>=2.1", "transformers==5.0.0rc2", "num2words",]
