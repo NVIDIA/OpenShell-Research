@@ -25,6 +25,7 @@ class Settings:
     reachy_host: str
     reachy_port: int
     connection_mode: str
+    media_backend: str
     timeout: float
 
     @classmethod
@@ -34,6 +35,7 @@ class Settings:
             reachy_host=host,
             reachy_port=_env_int("REACHY_PORT", 8000),
             connection_mode=os.getenv("REACHY_CONNECTION_MODE", _default_connection_mode(host)),
+            media_backend=os.getenv("REACHY_MEDIA_BACKEND", "no_media"),
             timeout=_env_float("REACHY_TIMEOUT", 5.0),
         )
 
@@ -91,7 +93,7 @@ def run_smoke_motion(settings: Settings) -> dict[str, Any]:
         from reachy_mini.utils import create_head_pose
     except ImportError as exc:
         raise RuntimeError(
-            "Reachy Mini SDK is not installed. Install with `uv pip install -e .` "
+            "Reachy Mini SDK is not installed. Install with `uv pip install -e '.[sdk]'` "
             "or include the `sim` extra for local simulator work."
         ) from exc
 
@@ -100,6 +102,7 @@ def run_smoke_motion(settings: Settings) -> dict[str, Any]:
         port=settings.reachy_port,
         connection_mode=settings.connection_mode,
         spawn_daemon=False,
+        media_backend=settings.media_backend,
         timeout=settings.timeout,
     ) as mini:
         mini.goto_target(
@@ -169,6 +172,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reachy-host", default=None)
     parser.add_argument("--reachy-port", type=int, default=None)
     parser.add_argument("--connection-mode", default=None)
+    parser.add_argument("--media-backend", default=None)
     parser.add_argument("--log-level", default=os.getenv("UVICORN_LOG_LEVEL", "info"))
     args = parser.parse_args(argv)
 
@@ -178,6 +182,8 @@ def main(argv: list[str] | None = None) -> int:
         os.environ["REACHY_PORT"] = str(args.reachy_port)
     if args.connection_mode is not None:
         os.environ["REACHY_CONNECTION_MODE"] = args.connection_mode
+    if args.media_backend is not None:
+        os.environ["REACHY_MEDIA_BACKEND"] = args.media_backend
 
     import uvicorn
 
@@ -187,4 +193,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

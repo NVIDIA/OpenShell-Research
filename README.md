@@ -12,8 +12,8 @@ OpenShell as the runtime.
 - `docs/dev-notes/` contains research engineering updates, release notes, and
   build logs worth sharing.
 - `docs/dev-notes/authors.json` contains reusable Dev Notes author metadata.
-- `projects/` contains self-contained research projects and a reusable Python
-  project template.
+- `projects/` contains self-contained research projects, including the reusable
+  Python template and Reachy Mini OpenShell application.
 - `scripts/render-dev-notes.py` renders Dev Notes cards, post bylines, and
   navigation entries from post front matter.
 - `zensical.toml` configures the documentation site.

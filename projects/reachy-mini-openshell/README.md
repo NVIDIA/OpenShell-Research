@@ -7,10 +7,15 @@ Minimal research scaffold for running a Reachy Mini backend inside an OpenShell 
 - Host process: runs `reachy-mini-daemon --sim`, which starts the simulator and exposes the daemon API on port `8000`.
 - OpenShell process: runs this backend in a sandbox and connects to the host daemon through `host.openshell.internal:8000`.
 - First backend surface: `GET /health` for daemon reachability and `POST /moves/smoke` for a small head/antenna motion.
+- Default SDK media mode: `no_media`, so the motion-only smoke path does not require camera, audio, or WebRTC access.
 
 ## Local Simulator Quickstart
 
-On Linux, install the Reachy Mini GStreamer prerequisites before installing the SDK. The upstream guide lists the full package set and notes that Ubuntu 22.04 needs newer GStreamer packages.
+Prerequisites:
+
+- `uv`
+- Python 3.10-3.12. Python 3.12 is recommended by the Reachy Mini docs and used below.
+- On Linux, install the Reachy Mini GStreamer prerequisites before installing the SDK. The upstream guide lists the full package set and notes that Ubuntu 22.04 needs newer GStreamer packages.
 
 ```bash
 cd projects/reachy-mini-openshell
@@ -67,6 +72,7 @@ openshell sandbox create \
   --env REACHY_HOST=host.openshell.internal \
   --env REACHY_PORT=8000 \
   --env REACHY_CONNECTION_MODE=network \
+  --env REACHY_MEDIA_BACKEND=no_media \
   -- python3 -m reachy_openshell.backend --host 0.0.0.0 --port 8080
 ```
 
