@@ -8,3 +8,5 @@ Current projects:
 
 - `python-project-template`: Minimal, production-ready Python project scaffold
   managed with uv.
+- `reachy-mini-openshell`: Reachy Mini simulator/backend research for running
+  the backend inside an OpenShell runtime.

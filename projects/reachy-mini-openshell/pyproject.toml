@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "reachy-mini-openshell"
+version = "0.1.0"
+description = "Research scaffold for running a Reachy Mini backend in OpenShell against a Reachy Mini simulator."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+backend = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.30,<1",
+]
+sdk = [
+  "reachy-mini>=1.8.3,<2",
+]
+sim = [
+  "reachy-mini[mujoco]>=1.8.3,<2",
+]
+dev = [
+  "ruff>=0.8,<1",
+]
+
+[project.scripts]
+reachy-backend = "reachy_openshell.backend:main"
+reachy-smoke = "reachy_openshell.smoke:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/reachy_openshell"]
