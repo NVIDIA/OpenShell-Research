@@ -16,7 +16,8 @@ OpenShell as the runtime.
   navigation entries from post front matter.
 - `zensical.toml` configures the documentation site.
 - `requirements-docs.txt` pins the documentation build toolchain.
-- `.gitlab-ci.yml` builds the documentation site in GitLab CI.
+- `.github/workflows/docs.yml` validates documentation builds in GitHub Actions
+  and deploys the generated site to GitHub Pages.
 
 ## Documentation workflow
 
