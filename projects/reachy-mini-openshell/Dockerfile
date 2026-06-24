@@ -37,4 +37,4 @@ RUN chown -R sandbox:sandbox /sandbox/reachy-mini-openshell /opt/reachy-mini-ope
 
 USER sandbox
 
-CMD ["python3", "-m", "reachy_openshell.backend", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["python3", "-m", "reachy_openshell.backend", "--host", "127.0.0.1", "--port", "8080"]

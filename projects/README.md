@@ -5,4 +5,3 @@ This directory contains self-contained research projects. Each project should li
 Current projects:
 
 - `reachy-mini-openshell`: Reachy Mini simulator/backend research for running the backend inside an OpenShell runtime.
-

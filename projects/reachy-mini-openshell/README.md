@@ -73,7 +73,7 @@ openshell sandbox create \
   --env REACHY_PORT=8000 \
   --env REACHY_CONNECTION_MODE=network \
   --env REACHY_MEDIA_BACKEND=no_media \
-  -- python3 -m reachy_openshell.backend --host 0.0.0.0 --port 8080
+  -- python3 -m reachy_openshell.backend --host 127.0.0.1 --port 8080
 ```
 
 Expose the backend service:
