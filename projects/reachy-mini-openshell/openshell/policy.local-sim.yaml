@@ -12,7 +12,6 @@ filesystem_policy:
     - /opt
   read_write:
     - /sandbox
-    - /workspace
     - /tmp
 
 landlock:
@@ -32,5 +31,3 @@ network_policies:
       - path: /usr/bin/python*
       - path: /usr/local/bin/python*
       - path: /opt/reachy-mini-openshell/bin/python*
-      - path: /sandbox/**/python*
-
