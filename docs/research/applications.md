@@ -5,6 +5,7 @@ OpenShell applications.
 
 ## Candidate skeletons
 
+- [Reachy Mini conversation app simulator tutorial](reachy-mini-conversation-simulator.md)
 - Agent workflow demo
 - Research paper companion
 - Evaluation harness

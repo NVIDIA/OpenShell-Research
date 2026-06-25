@@ -19,6 +19,7 @@
 - [Research engineering](research/index.md)
 - [Runtime notes](research/runtime.md)
 - [Application skeletons](research/applications.md)
+- [Reachy Mini simulator tutorial](research/reachy-mini-conversation-simulator.md)
 - [Dev Notes](dev-notes/index.md)
 
 ## What belongs here

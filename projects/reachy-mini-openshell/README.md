@@ -39,6 +39,7 @@ This project contains:
 
 - a forked Reachy Mini voice conversation app
 - OpenAI Realtime audio conversation support
+- text conversation support through OpenAI-compatible Chat Completions
 - Reachy Mini movement, dance, emotion, and look-around tools
 - a locked OpenShell profile for instructions and tool selection
 - optional camera, local vision, YOLO head-tracking, and MediaPipe head-tracking
@@ -53,7 +54,9 @@ this project. The SDK is pinned to the version compatible with the forked
 conversation-app dependency stack.
 - a running Reachy Mini daemon, either connected to hardware or started in
 simulator mode
-- an OpenAI API key for conversation
+- an API key for conversation. Microphone mode requires an OpenAI-compatible
+Realtime model; text mode can also use OpenAI-compatible Chat Completions
+providers such as NVIDIA NIM.
 
 ## Install
 
@@ -67,11 +70,26 @@ uv sync
 cp .env.example .env
 ```
 
-Then edit `.env` and set:
+Then edit `.env`. For OpenAI Realtime microphone and text input, use:
 
 ```bash
 OPENAI_API_KEY=your_api_key_here
+OPENAI_BASE_URL=https://api.openai.com/v1
+MODEL_NAME=gpt-realtime
 ```
+
+For NVIDIA-hosted text input through an OpenAI-compatible Chat Completions
+endpoint, reference your existing NVIDIA API key environment variable:
+
+```bash
+OPENAI_API_KEY=${NVIDIA_API_KEY}
+OPENAI_BASE_URL=https://inference-api.nvidia.com/v1
+MODEL_NAME=azure/anthropic/claude-opus-4-8
+```
+
+Use the exact model ID exposed by your provider. For example, NVIDIA model IDs
+can look like `nvidia/nemotron-3-super-120b-a12b` or
+`azure/anthropic/claude-opus-4-8`, depending on the endpoint and account.
 
 If you are not using `uv`, install the app in editable mode from the project
 directory:
@@ -119,20 +137,21 @@ workflow starts `reachy-mini-daemon --sim` from this environment.
 
 ## Configuration
 
-The app loads `.env` from the current directory or a parent directory unless
-`REACHY_MINI_SKIP_DOTENV=1` is set.
+The app loads `.env` from the current directory or a parent directory. Provider
+credentials and routing must be configured in `.env`; they are not accepted from
+the browser UI or the Reachy Mini settings UI.
 
-Supported environment variables:
+Supported `.env` values:
 
-- `OPENAI_API_KEY`: API key used by OpenAI Realtime.
-- `MODEL_NAME`: Realtime model name. Defaults to `gpt-realtime`.
+- `OPENAI_API_KEY`: API key used by the configured model provider. This can
+reference another exported environment variable, such as
+`${NVIDIA_API_KEY}`.
+- `OPENAI_BASE_URL`: OpenAI-compatible API base URL.
+- `MODEL_NAME`: provider model ID. Model names containing `realtime` use the
+Realtime path; other model IDs use Chat Completions for text input.
 - `LOCAL_VISION_MODEL`: Hugging Face model used with `--local-vision`.
 - `HF_HOME`: Hugging Face cache directory. Defaults to `./cache`.
 - `HF_TOKEN`: optional Hugging Face token for gated models.
-
-When running with Gradio, the UI also includes an OpenAI API key field. The
-bundled Reachy Mini settings UI can store and validate the key when the app is
-run through the Reachy Mini app shell.
 
 ## Run Locally
 
@@ -165,11 +184,17 @@ In simulator mode, the app auto-enables Gradio. The examples still pass
 at:
 
 ```text
-c
+http://127.0.0.1:7860/
 ```
 
 If port `7860` is busy, Gradio may choose another available local port and print
 that URL in the terminal.
+
+The Gradio UI includes an `Input` selector. Use `Microphone` for the WebRTC
+audio stream with a Realtime-capable model, or switch to `Text` for typed
+messages. Text mode uses Chat Completions when `MODEL_NAME` is a non-Realtime
+model ID. Tool calls are supported in text mode; the app keeps the tool schema
+attached on the post-tool follow-up request for providers that require it.
 
 ## Runtime Flags
 
@@ -233,7 +258,13 @@ Useful local checks:
 python -m compileall src tests
 python -m reachy_mini_conversation_app --help
 reachy-mini-app-assistant check .
+uv run ty check
 ```
+
+`ty` is the selected Python type checker for this project. The current copied
+conversation-app baseline still reports diagnostics in motion, vision, optional
+dependency, and SDK event typing, so use `uv run ty check` as the active audit
+while that baseline is tightened.
 
 Tests require the development dependency group:
 
@@ -250,6 +281,15 @@ name to the app with `--robot-name`.
 
 If `--local-vision`, `--head-tracker yolo`, or `--head-tracker mediapipe` fails
 with an import error, install the matching optional dependency group.
+
+If text mode returns `404 page not found`, check that `OPENAI_BASE_URL` matches
+the provider's OpenAI-compatible endpoint and that `MODEL_NAME` is an exact
+model ID from that provider. A catalog name, marketing page slug, or doubled
+namespace may not be accepted by `/chat/completions`.
+
+If text mode returns `401 Unauthorized` with NVIDIA endpoints, make sure
+`OPENAI_API_KEY=${NVIDIA_API_KEY}` resolves to a key that is authorized for
+generation, not only model listing.
 
 If `uv sync` tries to build `pygobject` or `pycairo` on macOS, the resolver is
 including a Linux media dependency path. This project scopes uv resolution to
