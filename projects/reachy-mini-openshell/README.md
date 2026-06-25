@@ -155,40 +155,46 @@ Realtime path; other model IDs use Chat Completions for text input.
 
 ## Run Locally
 
-Start the Reachy Mini daemon first. For the local simulator baseline:
+Use the local launcher for the simulator baseline:
 
 ```bash
-reachy-mini-daemon --sim --scene minimal --headless --no-media --fastapi-host 127.0.0.1 --fastapi-port 8000 --dataset-update-interval 0
+projects/reachy-mini-openshell/scripts/start-local.sh
 ```
 
-You can verify the daemon separately at:
-
-```text
-http://127.0.0.1:8000/api/daemon/status
-```
-
-Then run the conversation app:
-
-```bash
-python -m reachy_mini_conversation_app --gradio --no-camera
-```
-
-The installed console script is equivalent:
-
-```bash
-reachy-mini-conversation-app --gradio --no-camera
-```
-
-In simulator mode, the app auto-enables Gradio. The examples still pass
-`--gradio` so the expected browser interface is explicit. Gradio usually opens
-at:
+The script creates `.venv` when needed, runs `uv sync`, creates `.env` from
+`.env.example` if missing, starts `reachy-mini-daemon --sim`, launches the
+Gradio app, and prints the browser URL:
 
 ```text
 http://127.0.0.1:7860/
 ```
 
-If port `7860` is busy, Gradio may choose another available local port and print
-that URL in the terminal.
+If port `7860` is busy, the launcher chooses the next free port through `7899`
+and prints that URL instead. Pass app flags after the script name:
+
+```bash
+projects/reachy-mini-openshell/scripts/start-local.sh --debug
+projects/reachy-mini-openshell/scripts/start-local.sh --head-tracker yolo
+```
+
+From inside `projects/reachy-mini-openshell`, the shorter form is:
+
+```bash
+./scripts/start-local.sh --debug
+```
+
+Useful launcher environment variables:
+
+- `APP_PORT=7861`: request a specific Gradio port.
+- `DAEMON_PORT=8001`: use a different Reachy daemon port.
+- `REACHY_SKIP_SYNC=1`: skip `uv sync` after dependencies are already installed.
+
+The manual equivalent, useful for debugging, is:
+
+```bash
+reachy-mini-daemon --sim --scene minimal --headless --no-media --fastapi-host 127.0.0.1 --fastapi-port 8000 --dataset-update-interval 0
+python -m reachy_mini_conversation_app --gradio --no-camera
+```
 
 The Gradio UI includes an `Input` selector. Use `Microphone` for the WebRTC
 audio stream with a Realtime-capable model, or switch to `Text` for typed
