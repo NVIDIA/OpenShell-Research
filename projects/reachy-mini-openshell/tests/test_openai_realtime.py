@@ -20,6 +20,12 @@ def _build_handler(loop: asyncio.AbstractEventLoop) -> OpenaiRealtimeHandler:
     return OpenaiRealtimeHandler(deps)
 
 
+def _set_openai_test_config(monkeypatch: Any) -> None:
+    monkeypatch.setattr(rt_mod.config, "OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(rt_mod.config, "OPENAI_BASE_URL", "https://example.test/v1")
+    monkeypatch.setattr(rt_mod.config, "MODEL_NAME", "test-realtime-model")
+
+
 def test_format_timestamp_uses_wall_clock() -> None:
     """Test that format_timestamp uses wall clock time."""
     loop = asyncio.new_event_loop()
@@ -44,6 +50,7 @@ async def test_start_up_retries_on_abrupt_close(monkeypatch: Any, caplog: Any) -
     Ensures handler clears self.connection at the end.
     """
     caplog.set_level(logging.WARNING)
+    _set_openai_test_config(monkeypatch)
 
     # Use a local Exception as the module's ConnectionClosedError to avoid ws dependency
     FakeCCE = type("FakeCCE", (Exception,), {})
@@ -120,6 +127,330 @@ async def test_start_up_retries_on_abrupt_close(monkeypatch: Any, caplog: Any) -
     warnings = [r for r in caplog.records if r.levelname == "WARNING" and "closed unexpectedly" in r.msg]
     assert len(warnings) == 1
 
+
+@pytest.mark.asyncio
+async def test_start_up_passes_env_base_url_to_openai_client(monkeypatch: Any) -> None:
+    """OPENAI_API_KEY and OPENAI_BASE_URL come from config and are passed to the SDK."""
+    _set_openai_test_config(monkeypatch)
+    client_kwargs: dict[str, Any] = {}
+
+    class FakeConn:
+        async def __aenter__(self) -> "FakeConn": return self
+        async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> bool: return False
+        def __aiter__(self) -> "FakeConn": return self
+        async def __anext__(self) -> None: raise StopAsyncIteration
+
+        class _Session:
+            async def update(self, **_kw: Any) -> None: return None
+        session = _Session()
+
+    class FakeRealtime:
+        def connect(self, **_kw: Any) -> FakeConn:
+            return FakeConn()
+
+    class FakeClient:
+        def __init__(self, **kwargs: Any) -> None:
+            client_kwargs.update(kwargs)
+            self.realtime = FakeRealtime()
+
+    monkeypatch.setattr(rt_mod, "AsyncOpenAI", FakeClient)
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = rt_mod.OpenaiRealtimeHandler(deps)
+
+    await handler.start_up()
+
+    assert client_kwargs == {
+        "api_key": "test-key",
+        "base_url": "https://example.test/v1",
+    }
+
+
+@pytest.mark.asyncio
+async def test_send_text_message_creates_input_text_and_collects_response(monkeypatch: Any) -> None:
+    """Text mode sends a user input_text item and returns chatbot updates."""
+    _set_openai_test_config(monkeypatch)
+    event_queue: asyncio.Queue[Any] = asyncio.Queue()
+    created_items: list[dict[str, Any]] = []
+
+    class FakeEvent:
+        def __init__(self, etype: str, **kwargs: Any) -> None:
+            self.type = etype
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
+    class FakeSession:
+        async def update(self, **_kw: Any) -> None:
+            return None
+
+    class FakeConversationItem:
+        async def create(self, **kwargs: Any) -> None:
+            created_items.append(kwargs["item"])
+
+    class FakeConversation:
+        item = FakeConversationItem()
+
+    class FakeResponse:
+        async def create(self, **_kw: Any) -> None:
+            await event_queue.put(FakeEvent("response.created"))
+            await event_queue.put(FakeEvent("response.output_audio_transcript.done", transcript="Hello from text mode."))
+            await event_queue.put(FakeEvent("response.done", response=MagicMock(usage=None)))
+
+        async def cancel(self, **_kw: Any) -> None:
+            return None
+
+    class FakeInputAudioBuffer:
+        async def append(self, **_kw: Any) -> None:
+            return None
+
+    class FakeConn:
+        session = FakeSession()
+        conversation = FakeConversation()
+        response = FakeResponse()
+        input_audio_buffer = FakeInputAudioBuffer()
+
+        async def __aenter__(self) -> "FakeConn":
+            return self
+
+        async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> bool:
+            return False
+
+        def __aiter__(self) -> "FakeConn":
+            return self
+
+        async def __anext__(self) -> Any:
+            event = await event_queue.get()
+            if event is None:
+                raise StopAsyncIteration
+            return event
+
+        async def close(self) -> None:
+            await event_queue.put(None)
+
+    class FakeRealtime:
+        def connect(self, **_kw: Any) -> FakeConn:
+            return FakeConn()
+
+    class FakeClient:
+        def __init__(self, **_kw: Any) -> None:
+            self.realtime = FakeRealtime()
+
+    monkeypatch.setattr(rt_mod, "AsyncOpenAI", FakeClient)
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = rt_mod.OpenaiRealtimeHandler(deps)
+
+    messages = await handler.send_text_message("Hello typed Reachy")
+    await handler.shutdown()
+    if handler._text_startup_task is not None:
+        await asyncio.wait_for(handler._text_startup_task, timeout=1)
+
+    assert created_items == [
+        {
+            "type": "message",
+            "role": "user",
+            "content": [{"type": "input_text", "text": "Hello typed Reachy"}],
+        }
+    ]
+    assert messages == [
+        {"role": "user", "content": "Hello typed Reachy"},
+        {"role": "assistant", "content": "Hello from text mode."},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_send_text_message_reports_missing_dotenv_key(monkeypatch: Any) -> None:
+    """Text mode reports the actual missing-key problem instead of a generic connection error."""
+    monkeypatch.setattr(rt_mod.config, "OPENAI_API_KEY", "")
+    monkeypatch.setattr(rt_mod.config, "OPENAI_BASE_URL", "https://inference-api.nvidia.com/v1")
+    monkeypatch.setattr(rt_mod.config, "MODEL_NAME", "nvidia/nemotron-3-super-120b-a12b")
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = rt_mod.OpenaiRealtimeHandler(deps)
+
+    messages = await handler.send_text_message("Hello")
+
+    assert len(messages) == 1
+    assert "OPENAI_API_KEY is missing or empty" in messages[0]["content"]
+    assert "NVIDIA_API_KEY" in messages[0]["content"]
+
+
+@pytest.mark.asyncio
+async def test_send_text_message_reports_realtime_startup_failure(monkeypatch: Any) -> None:
+    """Text mode includes model/base URL context when the Realtime provider rejects startup."""
+    monkeypatch.setattr(rt_mod.config, "OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(rt_mod.config, "OPENAI_BASE_URL", "https://inference-api.nvidia.com/v1")
+    monkeypatch.setattr(rt_mod.config, "MODEL_NAME", "gpt-realtime")
+
+    class FakeSession:
+        async def update(self, **_kw: Any) -> None:
+            raise RuntimeError("404 not found")
+
+    class FakeConn:
+        session = FakeSession()
+
+        async def __aenter__(self) -> "FakeConn":
+            return self
+
+        async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> bool:
+            return False
+
+    class FakeRealtime:
+        def connect(self, **_kw: Any) -> FakeConn:
+            return FakeConn()
+
+    class FakeClient:
+        def __init__(self, **_kw: Any) -> None:
+            self.realtime = FakeRealtime()
+
+    monkeypatch.setattr(rt_mod, "AsyncOpenAI", FakeClient)
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = rt_mod.OpenaiRealtimeHandler(deps)
+
+    messages = await handler.send_text_message("Hello")
+
+    assert len(messages) == 1
+    content = messages[0]["content"]
+    assert "Realtime session.update failed" in content
+    assert "gpt-realtime" in content
+    assert "https://inference-api.nvidia.com/v1" in content
+    assert "Chat Completions" in content
+
+
+@pytest.mark.asyncio
+async def test_send_text_message_uses_chat_completions_for_non_realtime_model(monkeypatch: Any) -> None:
+    """Non-Realtime model IDs use Chat Completions instead of the Realtime websocket."""
+    monkeypatch.setattr(rt_mod.config, "OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(rt_mod.config, "OPENAI_BASE_URL", "https://inference-api.nvidia.com/v1")
+    monkeypatch.setattr(rt_mod.config, "MODEL_NAME", "nvidia/nemotron-3-super-120b-a12b")
+    create_calls: list[dict[str, Any]] = []
+
+    class FakeMessage:
+        content = "Hello from Nemotron."
+        tool_calls: list[Any] = []
+
+    class FakeChoice:
+        message = FakeMessage()
+
+    class FakeCompletion:
+        choices = [FakeChoice()]
+
+    class FakeCompletions:
+        async def create(self, **kwargs: Any) -> FakeCompletion:
+            create_calls.append(kwargs)
+            return FakeCompletion()
+
+    class FakeChat:
+        completions = FakeCompletions()
+
+    class FakeClient:
+        def __init__(self, **_kw: Any) -> None:
+            self.chat = FakeChat()
+
+    monkeypatch.setattr(rt_mod, "AsyncOpenAI", FakeClient)
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = rt_mod.OpenaiRealtimeHandler(deps)
+
+    messages = await handler.send_text_message("Hello")
+
+    assert messages == [
+        {"role": "user", "content": "Hello"},
+        {"role": "assistant", "content": "Hello from Nemotron."},
+    ]
+    assert len(create_calls) == 1
+    assert create_calls[0]["model"] == "nvidia/nemotron-3-super-120b-a12b"
+    assert create_calls[0]["messages"][-1] == {"role": "user", "content": "Hello"}
+
+
+@pytest.mark.asyncio
+async def test_chat_completion_tool_follow_up_keeps_tools_param(monkeypatch: Any) -> None:
+    """Anthropic-compatible backends require tools= on the follow-up after a tool result."""
+    monkeypatch.setattr(rt_mod.config, "OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(rt_mod.config, "OPENAI_BASE_URL", "https://inference-api.nvidia.com/v1")
+    monkeypatch.setattr(rt_mod.config, "MODEL_NAME", "azure/anthropic/claude-opus-4-8")
+    monkeypatch.setattr(
+        rt_mod,
+        "get_tool_specs",
+        lambda: [
+            {
+                "type": "function",
+                "name": "dance",
+                "description": "Dance once.",
+                "parameters": {"type": "object", "properties": {}},
+            }
+        ],
+    )
+
+    async def fake_dispatch_tool_call_with_manager(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        return {"ok": True}
+
+    monkeypatch.setattr(rt_mod, "dispatch_tool_call_with_manager", fake_dispatch_tool_call_with_manager)
+    create_calls: list[dict[str, Any]] = []
+
+    class FakeFunction:
+        name = "dance"
+        arguments = "{}"
+
+    class FakeToolCall:
+        id = "call_1"
+        type = "function"
+        function = FakeFunction()
+
+        def model_dump(self) -> dict[str, Any]:
+            return {
+                "id": self.id,
+                "type": self.type,
+                "function": {
+                    "name": self.function.name,
+                    "arguments": self.function.arguments,
+                },
+            }
+
+    class FakeToolMessage:
+        content = ""
+        tool_calls = [FakeToolCall()]
+
+    class FakeFinalMessage:
+        content = "I danced."
+        tool_calls: list[Any] = []
+
+    class FakeChoice:
+        def __init__(self, message: Any) -> None:
+            self.message = message
+
+    class FakeCompletion:
+        def __init__(self, message: Any) -> None:
+            self.choices = [FakeChoice(message)]
+
+    class FakeCompletions:
+        async def create(self, **kwargs: Any) -> FakeCompletion:
+            create_calls.append(kwargs)
+            if len(create_calls) == 1:
+                return FakeCompletion(FakeToolMessage())
+            return FakeCompletion(FakeFinalMessage())
+
+    class FakeChat:
+        completions = FakeCompletions()
+
+    class FakeClient:
+        def __init__(self, **_kw: Any) -> None:
+            self.chat = FakeChat()
+
+    monkeypatch.setattr(rt_mod, "AsyncOpenAI", FakeClient)
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = rt_mod.OpenaiRealtimeHandler(deps)
+
+    messages = await handler.send_text_message("Dance")
+
+    assert messages[-1] == {"role": "assistant", "content": "I danced."}
+    assert len(create_calls) == 2
+    assert create_calls[0]["tools"]
+    assert create_calls[1]["tools"] == create_calls[0]["tools"]
+    assert any(message["role"] == "tool" for message in create_calls[1]["messages"])
+
 # ---- Cost calculation tests ----
 
 
@@ -193,6 +524,7 @@ async def test_response_sender_retries_on_active_response_rejection(monkeypatch:
     processing, not mocked out.
     """
     caplog.set_level(logging.DEBUG)
+    _set_openai_test_config(monkeypatch)
 
     FakeCCE = type("FakeCCE", (Exception,), {})
     monkeypatch.setattr(rt_mod, "ConnectionClosedError", FakeCCE)
