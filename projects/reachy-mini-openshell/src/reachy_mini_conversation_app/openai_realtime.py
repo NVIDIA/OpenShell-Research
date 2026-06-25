@@ -37,7 +37,8 @@ OPEN_AI_INPUT_SAMPLE_RATE: Final[Literal[24000]] = 24000
 OPEN_AI_OUTPUT_SAMPLE_RATE: Final[Literal[24000]] = 24000
 AUDIO_MODE_OPENAI_REALTIME: Final = "openai_realtime"
 AUDIO_MODE_RIVA_STT: Final = "riva_stt"
-AUDIO_INPUT_MODES: Final = {AUDIO_MODE_OPENAI_REALTIME, AUDIO_MODE_RIVA_STT}
+AUDIO_MODE_TEXT: Final = "text"
+AUDIO_INPUT_MODES: Final = {AUDIO_MODE_OPENAI_REALTIME, AUDIO_MODE_RIVA_STT, AUDIO_MODE_TEXT}
 
 # Cost tracking from usage data (pricing as of Feb 2026 https://openai.com/api/pricing/)
 AUDIO_INPUT_COST_PER_1M = 32.0
@@ -56,6 +57,8 @@ def _normalize_audio_input_mode(audio_input_mode: str) -> str:
         return AUDIO_MODE_OPENAI_REALTIME
     if normalized in {"riva", "riva_asr", "riva_stt"}:
         return AUDIO_MODE_RIVA_STT
+    if normalized in {"chat", "chat_completions", "text"}:
+        return AUDIO_MODE_TEXT
     if normalized not in AUDIO_INPUT_MODES:
         logger.warning("Unknown AUDIO_INPUT_MODE=%r; using %s", audio_input_mode, AUDIO_MODE_OPENAI_REALTIME)
         return AUDIO_MODE_OPENAI_REALTIME
@@ -620,6 +623,11 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
 
                 self._last_response_rejected = False
                 try:
+                    # Mark the just-requested response as active immediately.
+                    # The server's response.created event can arrive after
+                    # response.create() returns, so waiting on the old set
+                    # event here would let the next queued response race ahead.
+                    self._response_done_event.clear()
                     await self.connection.response.create(**kwargs)
                 except Exception as e:
                     logger.debug("_response_sender_loop: send failed: %s", e)
@@ -993,6 +1001,8 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
         if self.audio_input_mode == AUDIO_MODE_RIVA_STT:
             await self._receive_riva_stt(frame)
             return
+        if self.audio_input_mode == AUDIO_MODE_TEXT:
+            return
 
         await self._receive_openai_realtime_audio(frame)
 
@@ -1036,9 +1046,21 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
                 on_final_transcript=self._handle_riva_final_transcript,
                 on_partial_transcript=self._handle_riva_partial_transcript,
             )
-            await self._riva_transcriber.start(input_sample_rate)
+            try:
+                await self._riva_transcriber.start(input_sample_rate)
+            except RuntimeError as exc:
+                self._riva_transcriber = None
+                await self._report_microphone_error_once(f"[error] Riva STT stream is not available: {exc}")
+                return
 
-        await self._riva_transcriber.send_audio(audio_frame.tobytes())
+        try:
+            if await self._riva_transcriber.send_audio(audio_frame.tobytes()) is False:
+                self._riva_transcriber = None
+                await self._report_microphone_error_once("[error] Riva STT stream is not running.")
+        except RuntimeError as exc:
+            logger.warning("Riva STT stream stopped: %s", exc)
+            self._riva_transcriber = None
+            await self._report_microphone_error_once(f"[error] Riva STT stream is not available: {exc}")
 
     def _prepare_audio_frame(
         self,

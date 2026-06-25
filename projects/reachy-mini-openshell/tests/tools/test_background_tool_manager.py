@@ -517,6 +517,37 @@ class TestStartUp:
         assert cb1.call_count == 1
         assert cb2.call_count == 1
 
+    @pytest.mark.asyncio
+    async def test_shutdown_waits_for_running_tool_tasks(self, manager: BackgroundToolManager) -> None:
+        """Shutdown should cancel and drain running tool tasks before returning."""
+        started = asyncio.Event()
+        cancelled = asyncio.Event()
+        routine = MagicMock(spec=ToolCallRoutine)
+        routine.tool_name = "long_tool"
+        routine.args_json_str = "{}"
+
+        async def _call(_manager: BackgroundToolManager) -> dict[str, Any]:
+            started.set()
+            try:
+                await asyncio.sleep(10)
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+            return {"ok": True}
+
+        routine.__call__ = _call  # type: ignore[method-assign]
+        routine.side_effect = _call
+
+        bg = await manager.start_tool("c1", routine, is_idle_tool_call=False)
+        await asyncio.wait_for(started.wait(), timeout=1)
+
+        await manager.shutdown()
+
+        assert cancelled.is_set()
+        assert bg._task is not None
+        assert bg._task.done()
+        assert bg.status == ToolState.CANCELLED
+
 
 class TestNotificationQueue:
     """Verify notifications are enqueued on tool completion or failure."""

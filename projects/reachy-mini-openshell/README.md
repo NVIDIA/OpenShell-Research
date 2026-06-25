@@ -77,6 +77,7 @@ Then edit `.env`. For OpenAI Realtime microphone and text input, use:
 OPENAI_API_KEY=your_api_key_here
 OPENAI_BASE_URL=https://api.openai.com/v1
 MODEL_NAME=gpt-realtime
+AUDIO_INPUT_MODE=openai_realtime
 ```
 
 For NVIDIA-hosted text input through an OpenAI-compatible Chat Completions
@@ -86,6 +87,7 @@ endpoint, reference your existing NVIDIA API key environment variable:
 OPENAI_API_KEY=${NVIDIA_API_KEY}
 OPENAI_BASE_URL=https://inference-api.nvidia.com/v1
 MODEL_NAME=azure/anthropic/claude-opus-4-8
+AUDIO_INPUT_MODE=text
 ```
 
 Use the exact model ID exposed by your provider. For example, NVIDIA model IDs
@@ -156,15 +158,14 @@ reference another exported environment variable, such as
 - `OPENAI_BASE_URL`: OpenAI-compatible API base URL.
 - `MODEL_NAME`: provider model ID. Model names containing `realtime` use the
 Realtime path; other model IDs use Chat Completions for text input.
-- `AUDIO_INPUT_MODE`: microphone routing mode. Use `openai_realtime` for the
-template default, where audio goes to an OpenAI-compatible Realtime endpoint.
-Use `riva_stt` to stream microphone audio to Riva ASR and pass final
-transcripts into the text LLM path.
+- `AUDIO_INPUT_MODE`: initial input mode. Use `text` for the default typed
+message path, `openai_realtime` when microphone audio should go to an
+OpenAI-compatible Realtime endpoint, or `riva_stt` to stream microphone audio
+to Riva ASR and pass final transcripts into the text LLM path.
 - `RIVA_SERVER_URI`: Riva ASR server URI, for example `localhost:50051` or
 `http://riva-host:9000`. URL schemes are normalized for the Riva client.
-- `RIVA_USE_SSL`: set to `true` for TLS-enabled Riva endpoints. If
-`RIVA_SERVER_URI` starts with `https://`, TLS is enabled unless this value is
-explicitly set.
+- `RIVA_USE_SSL`: optional override for TLS-enabled Riva endpoints. If this is
+unset and `RIVA_SERVER_URI` starts with `https://`, TLS is enabled.
 - `RIVA_LANGUAGE_CODE`: BCP-47 language code for Riva ASR, such as `en-US`.
 - `RIVA_ASR_MODEL`: optional Riva ASR model name. Leave empty to let Riva
 select a model from the language/configuration.
@@ -193,11 +194,11 @@ http://127.0.0.1:7860/
 ```
 
 If port `7860` is busy, the launcher chooses the next free port through `7899`
-and prints that URL instead. Pass app flags after the script name:
+and prints that URL instead. Pass app flags that are compatible with the
+no-camera simulator baseline after the script name:
 
 ```bash
 projects/reachy-mini-openshell/scripts/start-local.sh --debug
-projects/reachy-mini-openshell/scripts/start-local.sh --head-tracker yolo
 ```
 
 From inside `projects/reachy-mini-openshell`, the shorter form is:
@@ -221,7 +222,7 @@ python -m reachy_mini_conversation_app --gradio --no-camera
 
 The Gradio UI includes an `Input` selector:
 
-- `OpenAI Realtime`: template-default microphone behavior. Audio streams to an
+- `OpenAI Realtime`: Realtime microphone behavior. Audio streams to an
 OpenAI-compatible Realtime endpoint, which handles transcription and response
 generation in one session.
 - `Riva STT`: microphone audio streams to Riva ASR. Final transcripts are sent

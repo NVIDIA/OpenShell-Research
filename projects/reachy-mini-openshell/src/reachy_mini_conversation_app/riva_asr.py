@@ -64,7 +64,6 @@ class RivaStreamingTranscriber:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._sample_rate_hertz: int | None = None
         self._last_partial = ""
-        self._last_final = ""
 
     async def start(self, sample_rate_hertz: int) -> None:
         """Start the background Riva stream."""
@@ -76,10 +75,11 @@ class RivaStreamingTranscriber:
         self._thread = threading.Thread(target=self._run, name="riva-asr-stream", daemon=True)
         self._thread.start()
 
-    async def send_audio(self, audio_bytes: bytes) -> None:
+    async def send_audio(self, audio_bytes: bytes) -> bool:
         """Send one PCM16 audio chunk to the Riva stream."""
         if self._thread is None or not self._thread.is_alive():
-            raise RuntimeError("Riva ASR stream is not running")
+            logger.debug("Dropping Riva audio frame because the ASR stream is not running")
+            return False
 
         try:
             self._audio_queue.put_nowait(audio_bytes)
@@ -89,6 +89,7 @@ class RivaStreamingTranscriber:
             except queue.Empty:
                 pass
             self._audio_queue.put_nowait(audio_bytes)
+        return True
 
     async def stop(self) -> None:
         """Close the stream and wait briefly for the worker to exit."""
@@ -175,9 +176,6 @@ class RivaStreamingTranscriber:
         asyncio.run_coroutine_threadsafe(self._on_partial_transcript(transcript), self._loop)
 
     def _schedule_final(self, transcript: str) -> None:
-        if transcript == self._last_final:
-            return
-        self._last_final = transcript
         if self._loop is None:
             return
         asyncio.run_coroutine_threadsafe(self._on_final_transcript(transcript), self._loop)
@@ -186,6 +184,8 @@ class RivaStreamingTranscriber:
 def _env_flag(name: str, default: bool = False) -> bool:
     raw = os.getenv(name)
     if raw is None:
+        return default
+    if not raw.strip():
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 

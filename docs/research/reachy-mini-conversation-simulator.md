@@ -14,9 +14,9 @@ for the broader app family: [pollen-robotics/reachy_mini_conversation_app](https
 - macOS with Python 3.10, 3.11, or 3.12. Python 3.12 is the recommended local
   version.
 - `uv`.
-- An API key for conversation. Microphone mode requires an OpenAI-compatible
-  Realtime model; text mode can also use OpenAI-compatible Chat Completions
-  providers such as NVIDIA NIM.
+- An API key for conversation. `OpenAI Realtime` microphone mode requires an
+  OpenAI-compatible Realtime model. `Riva STT` and `Text` mode can use
+  OpenAI-compatible Chat Completions providers such as NVIDIA NIM.
 - This repository checked out locally.
 
 The local dependency set includes `reachy-mini[mujoco]==1.8.0`, so the MuJoCo
@@ -40,6 +40,7 @@ Edit `.env`. For OpenAI Realtime microphone and text input, use:
 OPENAI_API_KEY=your_api_key_here
 OPENAI_BASE_URL=https://api.openai.com/v1
 MODEL_NAME=gpt-realtime
+AUDIO_INPUT_MODE=openai_realtime
 ```
 
 For NVIDIA-hosted text input through an OpenAI-compatible Chat Completions
@@ -49,6 +50,7 @@ endpoint, reference your existing NVIDIA API key environment variable:
 OPENAI_API_KEY=${NVIDIA_API_KEY}
 OPENAI_BASE_URL=https://inference-api.nvidia.com/v1
 MODEL_NAME=azure/anthropic/claude-opus-4-8
+AUDIO_INPUT_MODE=text
 ```
 
 Use the exact model ID exposed by your provider. For example, NVIDIA model IDs
@@ -170,9 +172,9 @@ http://127.0.0.1:7860/
 ```
 
 You should see the `Talk with Reachy Mini` page with an empty chat transcript,
-an audio stream panel, and an `Input` selector.
-
-![Gradio conversation UI for Talk with Reachy Mini](../assets/reachy-mini-openshell/screenshots/gradio-home.png)
+an `Input` selector with `OpenAI Realtime`, `Riva STT`, and `Text` options.
+`Text` mode shows the message box and send button. The two microphone modes show
+the audio stream panel.
 
 If the app logs that `OPENAI_API_KEY` is missing, stop the app, update `.env`,
 and restart it. Credentials are intentionally not entered in the browser. If
@@ -181,15 +183,20 @@ exported in the shell that starts the app.
 
 ## 6. Talk To Reachy
 
-Use `Microphone` mode to speak when `MODEL_NAME` points to a Realtime-capable
+Use `OpenAI Realtime` to speak when `MODEL_NAME` points to a Realtime-capable
 model. Click `Click to Access Microphone` in the `Stream` panel and allow
 microphone access in the browser. Once the stream starts, speak naturally.
 
+Use `Riva STT` when you have a Riva ASR endpoint and want speech-to-text before
+sending text to a Chat Completions provider. Set `AUDIO_INPUT_MODE=riva_stt`,
+configure `RIVA_SERVER_URI`, and install the Riva optional dependencies with
+`uv sync --extra riva`.
+
 Use `Text` mode to type instead. Switch `Input` to `Text`, enter a message, and
 send it from the text composer. For non-Realtime model IDs such as NVIDIA NIM
-models, text mode uses Chat Completions. Tool calls are supported in text mode,
-including providers that require the tool schema to remain attached after a tool
-result is returned.
+models, text mode uses Chat Completions. Tool calls are supported in text mode
+and in the Riva STT path, including providers that require the tool schema to
+remain attached after a tool result is returned.
 
 Useful first prompts are:
 

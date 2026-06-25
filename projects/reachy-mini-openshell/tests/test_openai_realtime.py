@@ -413,6 +413,65 @@ def test_handler_copies_share_audio_input_mode() -> None:
 
 
 @pytest.mark.asyncio
+async def test_receive_text_mode_ignores_microphone_frames() -> None:
+    """Text input mode should not open an audio connection when WebRTC is hidden."""
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = rt_mod.OpenaiRealtimeHandler(deps, audio_input_mode=rt_mod.AUDIO_MODE_TEXT)
+
+    await handler.receive((24000, np.array([0, 1000], dtype=np.int16)))
+
+    assert handler.connection is None
+    assert handler.output_queue.empty()
+
+
+@pytest.mark.asyncio
+async def test_receive_riva_mode_does_not_raise_when_transcriber_stops(monkeypatch: Any) -> None:
+    """A failed Riva worker should report through callbacks, not escape from receive()."""
+
+    class StoppedRivaTranscriber:
+        async def start(self, _sample_rate_hertz: int) -> None:
+            return None
+
+        async def send_audio(self, _audio_bytes: bytes) -> None:
+            raise RuntimeError("Riva ASR stream is not running")
+
+    monkeypatch.setattr(rt_mod, "RivaStreamingTranscriber", lambda **_kw: StoppedRivaTranscriber())
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = rt_mod.OpenaiRealtimeHandler(deps, audio_input_mode=rt_mod.AUDIO_MODE_RIVA_STT)
+
+    await handler.receive((16000, np.array([0, 1000], dtype=np.int16)))
+
+    output = await asyncio.wait_for(handler.output_queue.get(), timeout=1)
+    assert isinstance(output, rt_mod.AdditionalOutputs)
+    assert "Riva STT stream is not available" in output.args[0]["content"]
+
+
+@pytest.mark.asyncio
+async def test_receive_riva_mode_resets_dead_transcriber(monkeypatch: Any) -> None:
+    """Dead Riva streams should be cleared so later frames can restart the stream."""
+
+    class DeadRivaTranscriber:
+        async def start(self, _sample_rate_hertz: int) -> None:
+            return None
+
+        async def send_audio(self, _audio_bytes: bytes) -> bool:
+            return False
+
+    monkeypatch.setattr(rt_mod, "RivaStreamingTranscriber", lambda **_kw: DeadRivaTranscriber())
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = rt_mod.OpenaiRealtimeHandler(deps, audio_input_mode=rt_mod.AUDIO_MODE_RIVA_STT)
+
+    await handler.receive((16000, np.array([0, 1000], dtype=np.int16)))
+
+    output = await asyncio.wait_for(handler.output_queue.get(), timeout=1)
+    assert isinstance(output, rt_mod.AdditionalOutputs)
+    assert output.args[0]["content"] == "[error] Riva STT stream is not running."
+    assert handler._riva_transcriber is None
+
+
+@pytest.mark.asyncio
 async def test_send_text_message_reports_missing_dotenv_key(monkeypatch: Any) -> None:
     """Text mode reports the actual missing-key problem instead of a generic connection error."""
     monkeypatch.setattr(rt_mod.config, "OPENAI_API_KEY", "")
@@ -692,7 +751,6 @@ async def test_response_sender_retries_on_active_response_rejection(monkeypatch:
 
     event_queue: asyncio.Queue[Any] = asyncio.Queue()
     response_create_log: list[tuple[int, dict[str, Any]]] = []
-    handler_ref: list[Any] = []
 
     # ---- Fake event / error objects mirroring the OpenAI SDK shapes ----
 
@@ -729,16 +787,15 @@ async def test_response_sender_retries_on_active_response_rejection(monkeypatch:
         def __init__(self) -> None:
             self._call_count = 0
             self._serialization_violations: list[int] = []
+            self._server_active = False
 
         async def create(self, **kwargs: Any) -> None:
             self._call_count += 1
             n = self._call_count
             response_create_log.append((n, kwargs))
 
-            h = handler_ref[0]
-
             # Real backend rejects when a response is already active.
-            if not h._response_done_event.is_set():
+            if self._server_active:
                 self._serialization_violations.append(n)
                 await event_queue.put(
                     FakeEvent(
@@ -757,6 +814,7 @@ async def test_response_sender_retries_on_active_response_rejection(monkeypatch:
                 await event_queue.put(
                     FakeEvent("response.done", response=MagicMock())
                 )
+                self._server_active = False
                 return
 
             # Intentional rejections (simulating a race where another
@@ -777,11 +835,13 @@ async def test_response_sender_retries_on_active_response_rejection(monkeypatch:
                 )
                 await asyncio.sleep(0)
             else:
+                self._server_active = True
                 await event_queue.put(FakeEvent("response.created"))
 
             await event_queue.put(
                 FakeEvent("response.done", response=MagicMock())
             )
+            self._server_active = False
 
 
         async def cancel(self, **_kw: Any) -> None:
@@ -851,7 +911,6 @@ async def test_response_sender_retries_on_active_response_rejection(monkeypatch:
 
     deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
     handler = rt_mod.OpenaiRealtimeHandler(deps)
-    handler_ref.append(handler)
 
     asyncio.create_task(handler.start_up())
 
@@ -919,6 +978,46 @@ async def test_response_sender_retries_on_active_response_rejection(monkeypatch:
 
 
 # ---- Response creation timeout guard tests ----
+
+
+@pytest.mark.asyncio
+async def test_response_sender_marks_response_active_before_create_returns() -> None:
+    """The sender should not wait for response.created before blocking the next response."""
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = rt_mod.OpenaiRealtimeHandler(deps)
+
+    create_started = asyncio.Event()
+    create_returned = asyncio.Event()
+    allow_done = asyncio.Event()
+    event_states_at_create: list[bool] = []
+
+    class FakeResponse:
+        async def create(self, **_kw: Any) -> None:
+            event_states_at_create.append(handler._response_done_event.is_set())
+            create_started.set()
+            await allow_done.wait()
+            handler._response_done_event.set()
+            create_returned.set()
+
+        async def cancel(self, **_kw: Any) -> None:
+            pass
+
+    fake_conn = MagicMock()
+    fake_conn.response = FakeResponse()
+    handler.connection = fake_conn
+
+    await handler._safe_response_create(instructions="req1")
+    sender_task = asyncio.create_task(handler._response_sender_loop())
+
+    await asyncio.wait_for(create_started.wait(), timeout=1)
+    assert event_states_at_create == [False]
+
+    allow_done.set()
+    await asyncio.wait_for(create_returned.wait(), timeout=1)
+
+    handler.connection = None
+    await handler._safe_response_create(instructions="stop")
+    await asyncio.wait_for(sender_task, timeout=1)
 
 
 @pytest.mark.asyncio

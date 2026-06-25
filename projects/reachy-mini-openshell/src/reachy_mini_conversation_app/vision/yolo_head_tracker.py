@@ -18,14 +18,19 @@ from huggingface_hub import hf_hub_download
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_YOLO_FACE_MODEL_REPO = "AdamCodd/YOLOv11n-face-detection"
+DEFAULT_YOLO_FACE_MODEL_REVISION = "0e97fea5eacb1460b35725c929d813c7095841b5"
+DEFAULT_YOLO_FACE_MODEL_FILENAME = "model.onnx"
+
 
 class HeadTracker:
     """Lightweight head tracker using YOLO for face detection."""
 
     def __init__(
         self,
-        model_repo: str = "AdamCodd/YOLOv11n-face-detection",
-        model_filename: str = "model.pt",
+        model_repo: str = DEFAULT_YOLO_FACE_MODEL_REPO,
+        model_filename: str = DEFAULT_YOLO_FACE_MODEL_FILENAME,
+        model_revision: str = DEFAULT_YOLO_FACE_MODEL_REVISION,
         confidence_threshold: float = 0.3,
         device: str = "cpu",
     ) -> None:
@@ -34,6 +39,7 @@ class HeadTracker:
         Args:
             model_repo: HuggingFace model repository
             model_filename: Model file name
+            model_revision: Pinned Hugging Face commit SHA for the model repository
             confidence_threshold: Minimum confidence for face detection
             device: Device to run inference on ('cpu' or 'cuda')
 
@@ -42,9 +48,9 @@ class HeadTracker:
 
         try:
             # Download and load YOLO model
-            model_path = hf_hub_download(repo_id=model_repo, filename=model_filename)
+            model_path = hf_hub_download(repo_id=model_repo, filename=model_filename, revision=model_revision)
             self.model = YOLO(model_path).to(device)
-            logger.info(f"YOLO face detection model loaded from {model_repo}")
+            logger.info("YOLO face detection model loaded from %s@%s", model_repo, model_revision)
         except Exception as e:
             logger.error(f"Failed to load YOLO model: {e}")
             raise
