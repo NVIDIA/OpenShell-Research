@@ -1,5 +1,6 @@
 ---
-title: Reachy OpenShell
+
+## title: Reachy OpenShell
 emoji: 🤖
 colorFrom: purple
 colorTo: gray
@@ -8,7 +9,6 @@ pinned: false
 tags:
   - reachy_mini
   - reachy_mini_python_app
----
 
 # 🤖 Reachy OpenShell
 
@@ -42,16 +42,17 @@ This project contains:
 - Reachy Mini movement, dance, emotion, and look-around tools
 - a locked OpenShell profile for instructions and tool selection
 - optional camera, local vision, YOLO head-tracking, and MediaPipe head-tracking
-  integrations
+integrations
 
 ## Requirements
 
 - Python 3.10, 3.11, or 3.12. The recommended local version is Python 3.12.
 - `uv` for the recommended local workflow
-- Reachy Mini SDK 1.8.0, installed through this project. This is pinned to the
-  version compatible with the forked conversation-app dependency stack.
+- Reachy Mini SDK 1.8.0 with the MuJoCo simulator backend, installed through
+this project. The SDK is pinned to the version compatible with the forked
+conversation-app dependency stack.
 - a running Reachy Mini daemon, either connected to hardware or started in
-  simulator mode
+simulator mode
 - an OpenAI API key for conversation
 
 ## Install
@@ -111,9 +112,10 @@ python -m pip install -e '.[mediapipe_vision]'
 python -m pip install -e '.[all_vision]'
 ```
 
-There are no `backend` or `sim` extras anymore. The previous backend extra
-belonged to the deleted scaffold, and simulator support is provided by the
-Reachy Mini daemon/runtime rather than a project extra.
+There are no project-level `backend` or `sim` extras anymore. The previous
+backend extra belonged to the deleted scaffold. The default dependency set
+includes Reachy Mini's MuJoCo simulator backend because the local development
+workflow starts `reachy-mini-daemon --sim` from this environment.
 
 ## Configuration
 
@@ -163,7 +165,7 @@ In simulator mode, the app auto-enables Gradio. The examples still pass
 at:
 
 ```text
-http://127.0.0.1:7860/
+c
 ```
 
 If port `7860` is busy, Gradio may choose another available local port and print
@@ -175,15 +177,15 @@ Useful app flags:
 
 - `--gradio`: launch the browser conversation UI.
 - `--no-camera`: disable camera usage. This is the recommended simulator
-  baseline.
+baseline.
 - `--head-tracker yolo`: enable YOLO head tracking. Requires the `yolo_vision`
-  extra.
+extra.
 - `--head-tracker mediapipe`: enable MediaPipe head tracking. Requires the
-  `mediapipe_vision` extra.
+`mediapipe_vision` extra.
 - `--local-vision`: use a local vision model instead of Realtime vision.
-  Requires the `local_vision` extra.
+Requires the `local_vision` extra.
 - `--robot-name <name>`: connect to a daemon started with the same
-  `--robot-name`.
+`--robot-name`.
 - `--debug`: enable debug logging.
 
 Examples:
@@ -252,8 +254,7 @@ with an import error, install the matching optional dependency group.
 If `uv sync` tries to build `pygobject` or `pycairo` on macOS, the resolver is
 including a Linux media dependency path. This project scopes uv resolution to
 Darwin for the current local workflow; rerun `uv sync`, and if uv is still using
-old metadata, clear the package cache with `uv cache clean reachy-mini pygobject
-pycairo`.
+old metadata, clear the package cache with `uv cache clean reachy-mini pygobject pycairo`.
 
 If you are running the simulator with `--no-media`, keep `--no-camera` on the
 conversation app.
