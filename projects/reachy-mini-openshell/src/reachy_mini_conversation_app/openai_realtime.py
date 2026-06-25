@@ -18,6 +18,7 @@ from websockets.exceptions import ConnectionClosedError
 
 from reachy_mini_conversation_app.config import LOCKED_PROFILE, config
 from reachy_mini_conversation_app.prompts import get_session_voice, get_session_instructions
+from reachy_mini_conversation_app.riva_asr import RivaAsrConfig, RivaStreamingTranscriber
 from reachy_mini_conversation_app.tools.core_tools import (
     ToolDependencies,
     get_tool_specs,
@@ -34,6 +35,9 @@ logger = logging.getLogger(__name__)
 
 OPEN_AI_INPUT_SAMPLE_RATE: Final[Literal[24000]] = 24000
 OPEN_AI_OUTPUT_SAMPLE_RATE: Final[Literal[24000]] = 24000
+AUDIO_MODE_OPENAI_REALTIME: Final = "openai_realtime"
+AUDIO_MODE_RIVA_STT: Final = "riva_stt"
+AUDIO_INPUT_MODES: Final = {AUDIO_MODE_OPENAI_REALTIME, AUDIO_MODE_RIVA_STT}
 
 # Cost tracking from usage data (pricing as of Feb 2026 https://openai.com/api/pricing/)
 AUDIO_INPUT_COST_PER_1M = 32.0
@@ -43,6 +47,19 @@ TEXT_OUTPUT_COST_PER_1M = 16.0
 IMAGE_INPUT_COST_PER_1M = 5.0
 
 _RESPONSE_DONE_TIMEOUT: Final[float] = 30.0
+
+
+def _normalize_audio_input_mode(audio_input_mode: str) -> str:
+    """Normalize configured audio input mode."""
+    normalized = audio_input_mode.strip().lower().replace("-", "_")
+    if normalized in {"openai", "realtime", "microphone"}:
+        return AUDIO_MODE_OPENAI_REALTIME
+    if normalized in {"riva", "riva_asr", "riva_stt"}:
+        return AUDIO_MODE_RIVA_STT
+    if normalized not in AUDIO_INPUT_MODES:
+        logger.warning("Unknown AUDIO_INPUT_MODE=%r; using %s", audio_input_mode, AUDIO_MODE_OPENAI_REALTIME)
+        return AUDIO_MODE_OPENAI_REALTIME
+    return normalized
 
 
 def _compute_response_cost(usage: Any) -> float:
@@ -63,7 +80,14 @@ def _compute_response_cost(usage: Any) -> float:
 class OpenaiRealtimeHandler(AsyncStreamHandler):
     """An OpenAI realtime handler for fastrtc Stream."""
 
-    def __init__(self, deps: ToolDependencies, gradio_mode: bool = False, instance_path: Optional[str] = None):
+    def __init__(
+        self,
+        deps: ToolDependencies,
+        gradio_mode: bool = False,
+        instance_path: Optional[str] = None,
+        audio_input_mode: str | None = None,
+        audio_input_mode_state: dict[str, str] | None = None,
+    ):
         """Initialize the handler."""
         super().__init__(
             expected_layout="mono",
@@ -76,6 +100,9 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
         self.input_sample_rate: Literal[24000] = self.input_sample_rate
 
         self.deps = deps
+        self._audio_input_mode_state = audio_input_mode_state or {
+            "mode": _normalize_audio_input_mode(audio_input_mode or config.AUDIO_INPUT_MODE)
+        }
 
         # Override type annotations for OpenAI strict typing (only for values used in API)
         self.output_sample_rate = OPEN_AI_OUTPUT_SAMPLE_RATE
@@ -89,6 +116,7 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
         self.is_idle_tool_call = False
         self.gradio_mode = gradio_mode
         self.instance_path = instance_path
+        self._riva_transcriber: RivaStreamingTranscriber | None = None
 
         # Debouncing for partial transcripts
         self.partial_transcript_task: asyncio.Task[None] | None = None
@@ -118,7 +146,21 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
 
     def copy(self) -> "OpenaiRealtimeHandler":
         """Create a copy of the handler."""
-        return OpenaiRealtimeHandler(self.deps, self.gradio_mode, self.instance_path)
+        return OpenaiRealtimeHandler(
+            self.deps,
+            self.gradio_mode,
+            self.instance_path,
+            audio_input_mode_state=self._audio_input_mode_state,
+        )
+
+    @property
+    def audio_input_mode(self) -> str:
+        """Return the current shared microphone audio mode."""
+        return self._audio_input_mode_state["mode"]
+
+    def set_audio_input_mode(self, audio_input_mode: str) -> None:
+        """Select how microphone audio should be processed."""
+        self._audio_input_mode_state["mode"] = _normalize_audio_input_mode(audio_input_mode)
 
     def _record_startup_error(self, message: str) -> None:
         """Store a startup failure so the UI can show a useful error."""
@@ -947,22 +989,21 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
 
     # Microphone receive
     async def receive(self, frame: Tuple[int, NDArray[np.int16]]) -> None:
-        """Receive audio frame from the microphone and send it to the OpenAI server.
+        """Receive audio frame from the microphone and route it through the selected audio mode."""
+        if self.audio_input_mode == AUDIO_MODE_RIVA_STT:
+            await self._receive_riva_stt(frame)
+            return
 
-        Handles both mono and stereo audio formats, converting to the expected
-        mono format for OpenAI's API. Resamples if the input sample rate differs
-        from the expected rate.
+        await self._receive_openai_realtime_audio(frame)
 
-        Args:
-            frame: A tuple containing (sample_rate, audio_data).
-
-        """
+    async def _receive_openai_realtime_audio(self, frame: Tuple[int, NDArray[np.int16]]) -> None:
+        """Send a microphone frame to the OpenAI Realtime audio session."""
         if not self.connection:
             if not self._text_model_uses_realtime():
                 self._record_startup_error(
-                    "Microphone mode requires an OpenAI-compatible Realtime model. "
+                    "OpenAI Realtime microphone mode requires an OpenAI-compatible Realtime model. "
                     f"Current MODEL_NAME={config.MODEL_NAME!r} uses the text path only; "
-                    "switch Input to Text or configure a Realtime model for microphone input."
+                    "switch Input to Riva STT/Text or configure a Realtime model for OpenAI Realtime mode."
                 )
                 await self._report_microphone_error_once(self._not_connected_message())
                 return
@@ -974,22 +1015,7 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
         self._microphone_error_reported = False
 
         input_sample_rate, audio_frame = frame
-
-        # Reshape if needed
-        if audio_frame.ndim == 2:
-            # Scipy channels last convention
-            if audio_frame.shape[1] > audio_frame.shape[0]:
-                audio_frame = audio_frame.T
-            # Multiple channels -> Mono channel
-            if audio_frame.shape[1] > 1:
-                audio_frame = audio_frame[:, 0]
-
-        # Resample if needed
-        if self.input_sample_rate != input_sample_rate:
-            audio_frame = resample(audio_frame, int(len(audio_frame) * self.input_sample_rate / input_sample_rate))
-
-        # Cast if needed
-        audio_frame = audio_to_int16(audio_frame)
+        audio_frame = self._prepare_audio_frame(input_sample_rate, audio_frame, target_sample_rate=self.input_sample_rate)
 
         # Send to OpenAI (guard against races during reconnect)
         try:
@@ -998,6 +1024,53 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
         except Exception as e:
             logger.debug("Dropping audio frame: connection not ready (%s)", e)
             return
+
+    async def _receive_riva_stt(self, frame: Tuple[int, NDArray[np.int16]]) -> None:
+        """Send a microphone frame to Riva ASR, then route transcripts into the text LLM path."""
+        input_sample_rate, audio_frame = frame
+        audio_frame = self._prepare_audio_frame(input_sample_rate, audio_frame)
+
+        if self._riva_transcriber is None:
+            self._riva_transcriber = RivaStreamingTranscriber(
+                config=RivaAsrConfig.from_env(),
+                on_final_transcript=self._handle_riva_final_transcript,
+                on_partial_transcript=self._handle_riva_partial_transcript,
+            )
+            await self._riva_transcriber.start(input_sample_rate)
+
+        await self._riva_transcriber.send_audio(audio_frame.tobytes())
+
+    def _prepare_audio_frame(
+        self,
+        input_sample_rate: int,
+        audio_frame: NDArray[np.int16],
+        *,
+        target_sample_rate: int | None = None,
+    ) -> NDArray[np.int16]:
+        """Convert incoming audio to mono PCM16, optionally resampling first."""
+        if audio_frame.ndim == 2:
+            # Scipy channels last convention
+            if audio_frame.shape[1] > audio_frame.shape[0]:
+                audio_frame = audio_frame.T
+            # Multiple channels -> Mono channel
+            if audio_frame.shape[1] > 1:
+                audio_frame = audio_frame[:, 0]
+
+        if target_sample_rate is not None and target_sample_rate != input_sample_rate:
+            audio_frame = resample(audio_frame, int(len(audio_frame) * target_sample_rate / input_sample_rate))
+
+        return audio_to_int16(audio_frame)
+
+    async def _handle_riva_partial_transcript(self, transcript: str) -> None:
+        await self.output_queue.put(AdditionalOutputs({"role": "user_partial", "content": transcript}))
+
+    async def _handle_riva_final_transcript(self, transcript: str) -> None:
+        if transcript.startswith("[error]"):
+            await self.output_queue.put(AdditionalOutputs({"role": "assistant", "content": transcript}))
+            return
+
+        for message in await self.send_text_message(transcript):
+            await self.output_queue.put(AdditionalOutputs(message))
 
     async def emit(self) -> Tuple[int, NDArray[np.int16]] | AdditionalOutputs | None:
         """Emit audio frame to be played by the speaker."""
@@ -1026,6 +1099,10 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
 
         # Stop background tool manager tasks (listener + cleanup)
         await self.tool_manager.shutdown()
+
+        if self._riva_transcriber is not None:
+            await self._riva_transcriber.stop()
+            self._riva_transcriber = None
 
         # Cancel any pending debounce task
         if self.partial_transcript_task and not self.partial_transcript_task.done():

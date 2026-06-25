@@ -39,6 +39,7 @@ This project contains:
 
 - a forked Reachy Mini voice conversation app
 - OpenAI Realtime audio conversation support
+- Riva streaming ASR support for microphone-to-text input
 - text conversation support through OpenAI-compatible Chat Completions
 - Reachy Mini movement, dance, emotion, and look-around tools
 - a locked OpenShell profile for instructions and tool selection
@@ -54,9 +55,9 @@ this project. The SDK is pinned to the version compatible with the forked
 conversation-app dependency stack.
 - a running Reachy Mini daemon, either connected to hardware or started in
 simulator mode
-- an API key for conversation. Microphone mode requires an OpenAI-compatible
-Realtime model; text mode can also use OpenAI-compatible Chat Completions
-providers such as NVIDIA NIM.
+- an API key for conversation. OpenAI Realtime microphone mode requires an
+OpenAI-compatible Realtime model; Riva STT and text mode can use
+OpenAI-compatible Chat Completions providers such as NVIDIA NIM.
 
 ## Install
 
@@ -112,9 +113,10 @@ and regenerate `uv.lock` for that platform.
 
 ## Optional Dependencies
 
-The active optional dependency groups are vision-related only:
+The active optional dependency groups cover Riva ASR and vision:
 
 ```bash
+uv sync --extra riva
 uv sync --extra local_vision
 uv sync --extra yolo_vision
 uv sync --extra mediapipe_vision
@@ -124,11 +126,16 @@ uv sync --extra all_vision
 With `pip`, use the equivalent editable installs:
 
 ```bash
+python -m pip install -e '.[riva]'
 python -m pip install -e '.[local_vision]'
 python -m pip install -e '.[yolo_vision]'
 python -m pip install -e '.[mediapipe_vision]'
 python -m pip install -e '.[all_vision]'
 ```
+
+The `riva` extra is intentionally marked incompatible with `mediapipe_vision`
+and `all_vision` because the current Riva and MediaPipe client stacks require
+different protobuf ranges.
 
 There are no project-level `backend` or `sim` extras anymore. The previous
 backend extra belonged to the deleted scaffold. The default dependency set
@@ -149,6 +156,19 @@ reference another exported environment variable, such as
 - `OPENAI_BASE_URL`: OpenAI-compatible API base URL.
 - `MODEL_NAME`: provider model ID. Model names containing `realtime` use the
 Realtime path; other model IDs use Chat Completions for text input.
+- `AUDIO_INPUT_MODE`: microphone routing mode. Use `openai_realtime` for the
+template default, where audio goes to an OpenAI-compatible Realtime endpoint.
+Use `riva_stt` to stream microphone audio to Riva ASR and pass final
+transcripts into the text LLM path.
+- `RIVA_SERVER_URI`: Riva ASR server URI, for example `localhost:50051`.
+- `RIVA_USE_SSL`: set to `true` for TLS-enabled Riva endpoints.
+- `RIVA_LANGUAGE_CODE`: BCP-47 language code for Riva ASR, such as `en-US`.
+- `RIVA_ASR_MODEL`: optional Riva ASR model name. Leave empty to let Riva
+select a model from the language/configuration.
+- `RIVA_AUTHORIZATION`: optional authorization metadata value, such as a bearer
+token, for hosted Riva endpoints.
+- `RIVA_METADATA`: optional comma-separated `key=value` metadata pairs passed
+to the Riva client.
 - `LOCAL_VISION_MODEL`: Hugging Face model used with `--local-vision`.
 - `HF_HOME`: Hugging Face cache directory. Defaults to `./cache`.
 - `HF_TOKEN`: optional Hugging Face token for gated models.
@@ -196,16 +216,19 @@ reachy-mini-daemon --sim --scene minimal --headless --no-media --fastapi-host 12
 python -m reachy_mini_conversation_app --gradio --no-camera
 ```
 
-The Gradio UI includes an `Input` selector. Use `Microphone` for the WebRTC
-audio stream with a Realtime-capable model, or switch to `Text` for typed
-messages. Text mode uses Chat Completions when `MODEL_NAME` is a non-Realtime
-model ID. Tool calls are supported in text mode; the app keeps the tool schema
-attached on the post-tool follow-up request for providers that require it.
+The Gradio UI includes an `Input` selector:
 
-If the microphone appears to connect but no transcript or model response
-arrives, check the visible chat error and your `.env` values. Microphone mode
-requires an OpenAI-compatible Realtime model and endpoint; Chat Completions
-providers are supported through the `Text` input mode only.
+- `OpenAI Realtime`: template-default microphone behavior. Audio streams to an
+OpenAI-compatible Realtime endpoint, which handles transcription and response
+generation in one session.
+- `Riva STT`: microphone audio streams to Riva ASR. Final transcripts are sent
+to the same text LLM path used by typed messages, so OpenAI-compatible Chat
+Completions providers such as NVIDIA NIM can answer.
+- `Text`: typed messages only.
+
+Tool calls are supported in text mode and in the Riva STT path; the app keeps
+the tool schema attached on the post-tool follow-up request for providers that
+require it.
 
 ## Runtime Flags
 

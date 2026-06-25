@@ -338,8 +338,78 @@ async def test_receive_reports_non_realtime_model_without_opening_realtime(monke
 
     output = await asyncio.wait_for(handler.output_queue.get(), timeout=1)
     assert isinstance(output, rt_mod.AdditionalOutputs)
-    assert "Microphone mode requires an OpenAI-compatible Realtime model" in output.args[0]["content"]
+    assert "OpenAI Realtime microphone mode requires an OpenAI-compatible Realtime model" in output.args[0]["content"]
     assert handler.connection is None
+
+
+@pytest.mark.asyncio
+async def test_receive_riva_mode_routes_final_transcript_to_text_llm(monkeypatch: Any) -> None:
+    """Riva STT mode should send final ASR transcripts through the text LLM path."""
+    sent_text_messages: list[str] = []
+
+    class FakeRivaTranscriber:
+        instances: list["FakeRivaTranscriber"] = []
+
+        def __init__(self, **kwargs: Any) -> None:
+            self.on_final_transcript = kwargs["on_final_transcript"]
+            self.on_partial_transcript = kwargs["on_partial_transcript"]
+            self.started_sample_rate: int | None = None
+            self.audio_chunks: list[bytes] = []
+            self.stopped = False
+            self.instances.append(self)
+
+        async def start(self, sample_rate_hertz: int) -> None:
+            self.started_sample_rate = sample_rate_hertz
+
+        async def send_audio(self, audio_bytes: bytes) -> None:
+            self.audio_chunks.append(audio_bytes)
+            await self.on_partial_transcript("hello")
+            await self.on_final_transcript("hello reachy")
+
+        async def stop(self) -> None:
+            self.stopped = True
+
+    monkeypatch.setattr(rt_mod, "RivaStreamingTranscriber", FakeRivaTranscriber)
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = rt_mod.OpenaiRealtimeHandler(deps, audio_input_mode=rt_mod.AUDIO_MODE_RIVA_STT)
+
+    async def fake_send_text_message(message: str) -> list[dict[str, Any]]:
+        sent_text_messages.append(message)
+        return [
+            {"role": "user", "content": message},
+            {"role": "assistant", "content": "Hi from the text model."},
+        ]
+
+    handler.send_text_message = fake_send_text_message  # type: ignore[method-assign]
+    audio_frame = np.array([0, 1000, -1000, 0], dtype=np.int16)
+
+    await handler.receive((16000, audio_frame))
+
+    partial = await asyncio.wait_for(handler.output_queue.get(), timeout=1)
+    user = await asyncio.wait_for(handler.output_queue.get(), timeout=1)
+    assistant = await asyncio.wait_for(handler.output_queue.get(), timeout=1)
+    await handler.shutdown()
+
+    transcriber = FakeRivaTranscriber.instances[0]
+    assert transcriber.started_sample_rate == 16000
+    assert transcriber.audio_chunks == [audio_frame.tobytes()]
+    assert transcriber.stopped
+    assert sent_text_messages == ["hello reachy"]
+    assert partial.args[0] == {"role": "user_partial", "content": "hello"}
+    assert user.args[0] == {"role": "user", "content": "hello reachy"}
+    assert assistant.args[0] == {"role": "assistant", "content": "Hi from the text model."}
+
+
+def test_handler_copies_share_audio_input_mode() -> None:
+    """FastRTC handler copies should see the latest UI-selected audio mode."""
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = rt_mod.OpenaiRealtimeHandler(deps, audio_input_mode=rt_mod.AUDIO_MODE_OPENAI_REALTIME)
+    copied_handler = handler.copy()
+
+    handler.set_audio_input_mode(rt_mod.AUDIO_MODE_RIVA_STT)
+
+    assert copied_handler.audio_input_mode == rt_mod.AUDIO_MODE_RIVA_STT
 
 
 @pytest.mark.asyncio
