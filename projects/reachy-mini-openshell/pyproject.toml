@@ -28,8 +28,19 @@ dev = [
 environments = [
     "sys_platform == 'darwin'",
 ]
+conflicts = [
+    [
+        { extra = "riva" },
+        { extra = "mediapipe_vision" },
+    ],
+    [
+        { extra = "riva" },
+        { extra = "all_vision" },
+    ],
+]
 
 [project.optional-dependencies]
+riva = [ "nvidia-riva-client>=2.19,<3",]
 local_vision = [ "torch>=2.1", "transformers==5.0.0rc2", "num2words",]
 yolo_vision = [ "ultralytics", "supervision",]
 mediapipe_vision = [ "mediapipe==0.10.14",]

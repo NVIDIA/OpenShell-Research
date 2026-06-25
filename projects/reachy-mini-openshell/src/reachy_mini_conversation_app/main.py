@@ -49,8 +49,13 @@ def run(
 
     # Putting these dependencies here makes the dashboard faster to load when the conversation app is installed
     from reachy_mini_conversation_app.moves import MovementManager
+    from reachy_mini_conversation_app.config import config
     from reachy_mini_conversation_app.console import LocalStream
-    from reachy_mini_conversation_app.openai_realtime import OpenaiRealtimeHandler
+    from reachy_mini_conversation_app.openai_realtime import (
+        AUDIO_MODE_RIVA_STT,
+        AUDIO_MODE_OPENAI_REALTIME,
+        OpenaiRealtimeHandler,
+    )
     from reachy_mini_conversation_app.tools.core_tools import ToolDependencies
     from reachy_mini_conversation_app.audio.head_wobbler import HeadWobbler
 
@@ -157,9 +162,16 @@ def run(
         stream_manager = stream.ui
 
         with stream_manager:
+            input_mode_choices = {
+                "OpenAI Realtime": AUDIO_MODE_OPENAI_REALTIME,
+                "Riva STT": AUDIO_MODE_RIVA_STT,
+                "Text": "text",
+            }
+            initial_input_mode = "Riva STT" if handler.audio_input_mode == AUDIO_MODE_RIVA_STT else "OpenAI Realtime"
+
             input_mode = gr.Radio(
-                choices=["Microphone", "Text"],
-                value="Microphone",
+                choices=list(input_mode_choices),
+                value=initial_input_mode,
                 label="Input",
             )
             with gr.Row():
@@ -173,6 +185,8 @@ def run(
 
             def switch_input_mode(mode: str) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
                 text_mode = mode == "Text"
+                if not text_mode:
+                    handler.set_audio_input_mode(input_mode_choices.get(mode, config.AUDIO_INPUT_MODE))
                 return (
                     gr.update(visible=not text_mode),
                     gr.update(visible=text_mode),

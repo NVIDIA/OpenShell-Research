@@ -72,6 +72,7 @@ class Config:
     OPENAI_API_KEY = _dotenv_value("OPENAI_API_KEY")
     OPENAI_BASE_URL = _dotenv_value("OPENAI_BASE_URL", "https://api.openai.com/v1")
     MODEL_NAME = os.getenv("MODEL_NAME", "gpt-realtime")
+    AUDIO_INPUT_MODE = os.getenv("AUDIO_INPUT_MODE", "openai_realtime")
     HF_HOME = os.getenv("HF_HOME", "./cache")
     LOCAL_VISION_MODEL = os.getenv("LOCAL_VISION_MODEL", "HuggingFaceTB/SmolVLM2-2.2B-Instruct")
     HF_TOKEN = os.getenv("HF_TOKEN")
