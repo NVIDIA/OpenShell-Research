@@ -10,7 +10,8 @@ nav = [
   {"Research Engineering" = [
     "research/index.md",
     "research/runtime.md",
-    "research/applications.md"
+    "research/applications.md",
+    "research/reachy-mini-conversation-simulator.md"
   ]},
   {"Dev Notes" = [
     "dev-notes/index.md",
