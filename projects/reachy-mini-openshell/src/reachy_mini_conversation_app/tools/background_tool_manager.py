@@ -205,7 +205,11 @@ class BackgroundToolManager(BaseModel):
         tool_call_routine: ToolCallRoutine,
     ) -> None:
         """Execute the tool and handle completion."""
-        result: dict[str, Any] = await tool_call_routine(self)
+        try:
+            result: dict[str, Any] = await tool_call_routine(self)
+        except asyncio.CancelledError:
+            result = {"error": "Tool cancelled"}
+
         bg_tool.completed_at = time.monotonic()
         error = result.get("error")
 
@@ -333,8 +337,15 @@ class BackgroundToolManager(BaseModel):
                 pass
         self._lifecycle_tasks.clear()
 
+        running_tool_tasks: list[asyncio.Task[None]] = []
         for tool_id in list(self._tools):
+            tool = self._tools.get(tool_id)
+            if tool is not None and tool.status == ToolState.RUNNING and tool._task is not None:
+                running_tool_tasks.append(tool._task)
             await self.cancel_tool(tool_id, log=False)
+
+        if running_tool_tasks:
+            await asyncio.gather(*running_tool_tasks, return_exceptions=True)
 
         logger.info("BackgroundToolManager shut down")
 

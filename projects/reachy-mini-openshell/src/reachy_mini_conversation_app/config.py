@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 from pathlib import Path
+from collections.abc import Mapping
 
 from dotenv import find_dotenv, load_dotenv, dotenv_values
 
@@ -57,13 +58,32 @@ else:
         logger.warning("No .env file found")
 
 
-def _dotenv_value(name: str, default: str | None = None) -> str | None:
+def _dotenv_value(
+    name: str,
+    default: str | None = None,
+    *,
+    values: Mapping[str, str | None] | None = None,
+) -> str | None:
     """Return a value from the loaded .env file only."""
-    value = _dotenv_values.get(name)
+    source = _dotenv_values if values is None else values
+    value = source.get(name)
     if value is None:
         return default
     value = value.strip()
     return value if value else default
+
+
+def _config_value(
+    name: str,
+    default: str | None = None,
+    *,
+    values: Mapping[str, str | None] | None = None,
+) -> str | None:
+    """Return .env value first, then the process environment."""
+    value = _dotenv_value(name, values=values)
+    if value is not None:
+        return value
+    return os.getenv(name, default)
 
 
 class Config:
@@ -90,6 +110,30 @@ class Config:
     def __init__(self) -> None:
         """Initialize the configuration."""
         logger.info("Using locked profile '%s' from %s", LOCKED_PROFILE, DEFAULT_PROFILES_DIRECTORY)
+
+    def apply_dotenv_values(self, values: Mapping[str, str | None]) -> None:
+        """Refresh runtime configuration from an explicit dotenv mapping."""
+        self.OPENAI_API_KEY = _dotenv_value("OPENAI_API_KEY", values=values)
+        self.OPENAI_BASE_URL = _dotenv_value("OPENAI_BASE_URL", "https://api.openai.com/v1", values=values)
+        self.MODEL_NAME = _config_value("MODEL_NAME", "gpt-realtime", values=values) or "gpt-realtime"
+        self.AUDIO_INPUT_MODE = _config_value("AUDIO_INPUT_MODE", "openai_realtime", values=values) or "openai_realtime"
+        self.HF_HOME = _config_value("HF_HOME", "./cache", values=values) or "./cache"
+        self.LOCAL_VISION_MODEL = (
+            _config_value("LOCAL_VISION_MODEL", "HuggingFaceTB/SmolVLM2-2.2B-Instruct", values=values)
+            or "HuggingFaceTB/SmolVLM2-2.2B-Instruct"
+        )
+        self.HF_TOKEN = _config_value("HF_TOKEN", values=values)
+
+    def load_dotenv_file(self, env_path: Path) -> bool:
+        """Load a dotenv file and refresh all runtime config fields."""
+        if not env_path.exists():
+            return False
+
+        values = dict(dotenv_values(env_path))
+        load_dotenv(dotenv_path=env_path, override=True)
+        self.apply_dotenv_values(values)
+        logger.info("Configuration loaded from %s", env_path)
+        return True
 
 
 config = Config()

@@ -55,17 +55,9 @@ class LocalStream:
         # Try to load an existing instance .env first for Reachy Mini app-shell runs.
         if self._instance_path:
             try:
-                from dotenv import load_dotenv, dotenv_values
-
                 env_path = Path(self._instance_path) / ".env"
-                if env_path.exists():
-                    load_dotenv(dotenv_path=str(env_path), override=True)
-                    values = dotenv_values(env_path)
-                    config.OPENAI_API_KEY = (values.get("OPENAI_API_KEY") or "").strip() or None
-                    config.OPENAI_BASE_URL = (
-                        (values.get("OPENAI_BASE_URL") or "").strip()
-                        or "https://api.openai.com/v1"
-                    )
+                if config.load_dotenv_file(env_path):
+                    self.handler.set_audio_input_mode(config.AUDIO_INPUT_MODE)
             except Exception:
                 pass  # Instance .env loading is optional; continue with defaults
 
@@ -117,13 +109,16 @@ class LocalStream:
         except Exception as e:
             logger.debug(f"Error stopping playback (may already be stopped): {e}")
 
-        # Now signal async loops to stop
-        self._stop_event.set()
+        def stop_async_tasks() -> None:
+            self._stop_event.set()
+            for task in self._tasks:
+                if not task.done():
+                    task.cancel()
 
-        # Cancel all running tasks
-        for task in self._tasks:
-            if not task.done():
-                task.cancel()
+        if self._asyncio_loop is not None and self._asyncio_loop.is_running():
+            self._asyncio_loop.call_soon_threadsafe(stop_async_tasks)
+        else:
+            stop_async_tasks()
 
     def clear_audio_queue(self) -> None:
         """Flush the player's appsrc to drop any queued audio immediately."""

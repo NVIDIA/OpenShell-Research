@@ -53,7 +53,7 @@ class MoveHead(Tool):
 
             # Get current state for interpolation
             current_head_pose = deps.reachy_mini.get_current_head_pose()
-            _, current_antennas = deps.reachy_mini.get_current_joint_positions()
+            head_joints, current_antennas = deps.reachy_mini.get_current_joint_positions()
 
             # Create goto move
             goto_move = GotoQueueMove(
@@ -65,7 +65,7 @@ class MoveHead(Tool):
                     current_antennas[1],
                 ),  # Skip body_yaw
                 target_body_yaw=0,  # Reset body yaw
-                start_body_yaw=current_antennas[0],  # body_yaw is first in joint positions
+                start_body_yaw=head_joints[0],
                 duration=deps.motion_duration_s,
             )
 

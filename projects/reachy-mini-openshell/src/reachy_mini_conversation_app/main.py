@@ -7,6 +7,7 @@ import asyncio
 import argparse
 import threading
 from typing import Any, Dict, List, Optional
+from pathlib import Path
 
 from reachy_mini import ReachyMini, ReachyMiniApp
 from reachy_mini_conversation_app.utils import (
@@ -52,6 +53,7 @@ def run(
     from reachy_mini_conversation_app.config import config
     from reachy_mini_conversation_app.console import LocalStream
     from reachy_mini_conversation_app.openai_realtime import (
+        AUDIO_MODE_TEXT,
         AUDIO_MODE_RIVA_STT,
         AUDIO_MODE_OPENAI_REALTIME,
         OpenaiRealtimeHandler,
@@ -61,6 +63,12 @@ def run(
 
     logger = setup_logger(args.debug)
     logger.info("Starting Reachy Mini Conversation App")
+
+    if instance_path:
+        try:
+            config.load_dotenv_file(Path(instance_path) / ".env")
+        except Exception as exc:
+            logger.debug("Instance .env loading skipped: %s", exc)
 
     if args.no_camera and args.head_tracker is not None:
         logger.warning(
@@ -165,9 +173,12 @@ def run(
             input_mode_choices = {
                 "OpenAI Realtime": AUDIO_MODE_OPENAI_REALTIME,
                 "Riva STT": AUDIO_MODE_RIVA_STT,
-                "Text": "text",
+                "Text": AUDIO_MODE_TEXT,
             }
-            initial_input_mode = "Riva STT" if handler.audio_input_mode == AUDIO_MODE_RIVA_STT else "OpenAI Realtime"
+            mode_labels = {value: label for label, value in input_mode_choices.items()}
+            initial_input_mode = mode_labels.get(handler.audio_input_mode, "OpenAI Realtime")
+            initial_text_mode = initial_input_mode == "Text"
+            stream.webrtc_component.visible = not initial_text_mode
 
             input_mode = gr.Radio(
                 choices=list(input_mode_choices),
@@ -179,14 +190,13 @@ def run(
                     label="Message",
                     lines=2,
                     max_lines=5,
-                    visible=False,
+                    visible=initial_text_mode,
                 )
-                send_button = gr.Button("Send", variant="primary", visible=False)
+                send_button = gr.Button("Send", variant="primary", visible=initial_text_mode)
 
             def switch_input_mode(mode: str) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
                 text_mode = mode == "Text"
-                if not text_mode:
-                    handler.set_audio_input_mode(input_mode_choices.get(mode, config.AUDIO_INPUT_MODE))
+                handler.set_audio_input_mode(input_mode_choices.get(mode, config.AUDIO_INPUT_MODE))
                 return (
                     gr.update(visible=not text_mode),
                     gr.update(visible=text_mode),
