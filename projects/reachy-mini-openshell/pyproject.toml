@@ -14,7 +14,15 @@ name = "Pollen Robotics"
 email = "contact@pollen-robotics.com"
 
 [dependency-groups]
-dev = [ "pytest", "pytest-asyncio", "ruff==0.12.0", "mypy==1.18.2", "pre-commit", "types-requests", "python-semantic-release>=10.5.3",]
+dev = [
+ "pytest",
+ "pytest-asyncio",
+ "ruff==0.12.0",
+ "pre-commit",
+ "types-requests",
+ "python-semantic-release>=10.5.3",
+ "ty>=0.0.53",
+]
 
 [tool.uv]
 environments = [
@@ -35,15 +43,7 @@ include-package-data = true
 
 [tool.ruff]
 line-length = 119
-exclude = [ ".venv", "dist", "build", "**/__pycache__", "*.egg-info", ".mypy_cache", ".pytest_cache",]
-
-[tool.mypy]
-python_version = "3.12"
-files = [ "src/",]
-ignore_missing_imports = true
-strict = true
-show_error_codes = true
-warn_unused_ignores = true
+exclude = [ ".venv", "dist", "build", "**/__pycache__", "*.egg-info", ".pytest_cache",]
 
 [project.entry-points.reachy_mini_apps]
 reachy_mini_conversation_app = "reachy_mini_conversation_app.main:ReachyMiniConversationApp"
@@ -52,7 +52,7 @@ reachy_mini_conversation_app = "reachy_mini_conversation_app.main:ReachyMiniConv
 "" = "src"
 
 [tool.setuptools.package-data]
-reachy_mini_conversation_app = [ "images/*", "static/*", "profiles/**/*.py", "profiles/**/*.txt",]
+reachy_mini_conversation_app = [ "images/*", "profiles/**/*.py", "profiles/**/*.txt",]
 
 [tool.ruff.lint]
 select = [ "E", "F", "W", "I", "C4", "D",]
