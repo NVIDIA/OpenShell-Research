@@ -31,7 +31,7 @@ def main() -> None:
 
 def run(
     args: argparse.Namespace,
-    robot: ReachyMini = None,
+    robot: ReachyMini | None = None,
     app_stop_event: Optional[threading.Event] = None,
     settings_app: Optional[Any] = None,
     instance_path: Optional[str] = None,
@@ -41,7 +41,6 @@ def run(
         import gradio as gr
         from fastapi import FastAPI
         from fastrtc import Stream
-        from gradio.utils import get_space
     except ImportError as exc:
         raise RuntimeError(
             "Reachy OpenShell conversation dependencies are not installed. "
@@ -144,25 +143,66 @@ def run(
     stream_manager: gr.Blocks | LocalStream | None = None
 
     if args.gradio:
-        api_key_textbox = gr.Textbox(
-            label="OPENAI API Key",
-            type="password",
-            value=os.getenv("OPENAI_API_KEY") if not get_space() else "",
-        )
-
         stream = Stream(
             handler=handler,
             mode="send-receive",
             modality="audio",
             additional_inputs=[
                 chatbot,
-                api_key_textbox,
             ],
             additional_outputs=[chatbot],
             additional_outputs_handler=update_chatbot,
             ui_args={"title": "Talk with Reachy Mini"},
         )
         stream_manager = stream.ui
+
+        with stream_manager:
+            input_mode = gr.Radio(
+                choices=["Microphone", "Text"],
+                value="Microphone",
+                label="Input",
+            )
+            with gr.Row():
+                text_input = gr.Textbox(
+                    label="Message",
+                    lines=2,
+                    max_lines=5,
+                    visible=False,
+                )
+                send_button = gr.Button("Send", variant="primary", visible=False)
+
+            def switch_input_mode(mode: str) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+                text_mode = mode == "Text"
+                return (
+                    gr.update(visible=not text_mode),
+                    gr.update(visible=text_mode),
+                    gr.update(visible=text_mode),
+                )
+
+            async def send_text_message(
+                message: str,
+                chatbot_messages: List[Dict[str, Any]] | None,
+            ) -> tuple[List[Dict[str, Any]], str]:
+                updated_chatbot = list(chatbot_messages or [])
+                updated_chatbot.extend(await handler.send_text_message(message))
+                return updated_chatbot, ""
+
+            input_mode.change(
+                fn=switch_input_mode,
+                inputs=input_mode,
+                outputs=[stream.webrtc_component, text_input, send_button],
+            )
+            text_input.submit(
+                fn=send_text_message,
+                inputs=[text_input, chatbot],
+                outputs=[chatbot, text_input],
+            )
+            send_button.click(
+                fn=send_text_message,
+                inputs=[text_input, chatbot],
+                outputs=[chatbot, text_input],
+            )
+
         if not settings_app:
             app = FastAPI()
         else:
@@ -243,7 +283,7 @@ class ReachyMiniConversationApp(ReachyMiniApp):  # type: ignore[misc]
             robot=reachy_mini,
             app_stop_event=stop_event,
             settings_app=self.settings_app,
-            instance_path=instance_path,
+            instance_path=str(instance_path),
         )
 
 

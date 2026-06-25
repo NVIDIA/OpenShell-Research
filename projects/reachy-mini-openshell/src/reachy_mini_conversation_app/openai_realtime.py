@@ -4,8 +4,7 @@ import base64
 import random
 import asyncio
 import logging
-from typing import Any, Final, Tuple, Literal, Optional
-from pathlib import Path
+from typing import Any, Final, Tuple, Literal, Optional, cast
 from datetime import datetime
 
 import cv2
@@ -22,6 +21,7 @@ from reachy_mini_conversation_app.prompts import get_session_voice, get_session_
 from reachy_mini_conversation_app.tools.core_tools import (
     ToolDependencies,
     get_tool_specs,
+    dispatch_tool_call_with_manager,
 )
 from reachy_mini_conversation_app.tools.background_tool_manager import (
     ToolCallRoutine,
@@ -89,9 +89,6 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
         self.is_idle_tool_call = False
         self.gradio_mode = gradio_mode
         self.instance_path = instance_path
-        # Track how the API key was provided (env vs textbox) and its value
-        self._key_source: Literal["env", "textbox"] = "env"
-        self._provided_api_key: str | None = None
 
         # Debouncing for partial transcripts
         self.partial_transcript_task: asyncio.Task[None] | None = None
@@ -101,6 +98,8 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
         # Internal lifecycle flags
         self._shutdown_requested: bool = False
         self._connected_event: asyncio.Event = asyncio.Event()
+        self._text_startup_task: asyncio.Task[None] | None = None
+        self._startup_error: str | None = None
 
         # Background tool manager
         self.tool_manager = BackgroundToolManager()
@@ -120,6 +119,314 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
         """Create a copy of the handler."""
         return OpenaiRealtimeHandler(self.deps, self.gradio_mode, self.instance_path)
 
+    def _record_startup_error(self, message: str) -> None:
+        """Store a startup failure so the UI can show a useful error."""
+        self._startup_error = message
+        try:
+            self._connected_event.set()
+        except Exception:
+            pass
+
+    def _realtime_context(self) -> str:
+        """Return non-secret Realtime configuration for diagnostics."""
+        return f"model={config.MODEL_NAME!r}, base_url={config.OPENAI_BASE_URL!r}"
+
+    def _provider_realtime_hint(self) -> str:
+        """Return a provider-specific hint for common compatibility failures."""
+        base_url = str(config.OPENAI_BASE_URL)
+        if "integrate.api.nvidia.com" in base_url or "inference-api.nvidia.com" in base_url:
+            return (
+                " NVIDIA OpenAI-compatible chat endpoints use Chat Completions; "
+                "microphone mode requires an OpenAI-compatible Realtime API endpoint."
+            )
+        return ""
+
+    def _not_connected_message(self) -> str:
+        """Return the user-facing reason the Realtime session is unavailable."""
+        if self._startup_error:
+            return f"[error] {self._startup_error}"
+        return (
+            "[error] Realtime session is not connected. Check OPENAI_API_KEY, "
+            "OPENAI_BASE_URL, and MODEL_NAME in .env."
+        )
+
+    @staticmethod
+    def _text_model_uses_realtime() -> bool:
+        """Return whether typed messages should use the Realtime transport."""
+        return "realtime" in str(config.MODEL_NAME).lower()
+
+    @staticmethod
+    def _chat_completion_tool_specs() -> list[dict[str, Any]]:
+        """Convert Realtime-style tool specs to Chat Completions tool specs."""
+        chat_tools: list[dict[str, Any]] = []
+        for tool in get_tool_specs():
+            if tool.get("type") != "function":
+                continue
+            chat_tools.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool.get("name"),
+                        "description": tool.get("description", ""),
+                        "parameters": tool.get("parameters", {}),
+                    },
+                }
+            )
+        return chat_tools
+
+    @staticmethod
+    def _tool_call_value(tool_call: Any, name: str) -> Any:
+        """Read a value from either an SDK model object or a dict."""
+        if isinstance(tool_call, dict):
+            return tool_call.get(name)
+        return getattr(tool_call, name, None)
+
+    @classmethod
+    def _tool_call_function_value(cls, tool_call: Any, name: str) -> Any:
+        """Read a function value from either an SDK tool-call object or a dict."""
+        function = cls._tool_call_value(tool_call, "function")
+        if isinstance(function, dict):
+            return function.get(name)
+        return getattr(function, name, None)
+
+    @staticmethod
+    def _serialize_tool_call(tool_call: Any) -> dict[str, Any]:
+        """Convert a tool call into the dict shape Chat Completions expects."""
+        if hasattr(tool_call, "model_dump"):
+            return tool_call.model_dump()
+        if isinstance(tool_call, dict):
+            return tool_call
+        return {
+            "id": getattr(tool_call, "id", None),
+            "type": getattr(tool_call, "type", "function"),
+            "function": {
+                "name": getattr(getattr(tool_call, "function", None), "name", None),
+                "arguments": getattr(getattr(tool_call, "function", None), "arguments", "{}"),
+            },
+        }
+
+    def _openai_api_key_or_error(self) -> str | None:
+        """Return the configured API key or record a useful startup error."""
+        openai_api_key = (config.OPENAI_API_KEY or "").strip()
+        if openai_api_key:
+            return openai_api_key
+
+        message = (
+            "OPENAI_API_KEY is missing or empty after reading .env. Add it to .env and restart the "
+            "conversation app. If .env uses OPENAI_API_KEY=${NVIDIA_API_KEY}, make sure "
+            "NVIDIA_API_KEY is exported in the shell that starts the app."
+        )
+        self._record_startup_error(message)
+        logger.error(message)
+        return None
+
+    async def _ensure_text_session(self) -> bool:
+        """Start a Realtime session for text-only Gradio input if needed."""
+        if self.connection is not None:
+            return True
+
+        if self._text_startup_task is None or self._text_startup_task.done():
+            self._startup_error = None
+            try:
+                self._connected_event.clear()
+            except Exception:
+                pass
+            self._text_startup_task = asyncio.create_task(self.start_up(), name="openai-realtime-text")
+
+        try:
+            await asyncio.wait_for(self._connected_event.wait(), timeout=10.0)
+        except asyncio.TimeoutError:
+            logger.warning("Timed out waiting for text Realtime session startup")
+
+        return self.connection is not None
+
+    @staticmethod
+    def _chat_message_from_output(output: AdditionalOutputs) -> dict[str, Any] | None:
+        """Convert a FastRTC AdditionalOutputs payload into a chatbot message."""
+        if not output.args:
+            return None
+        candidate = output.args[0]
+        if not isinstance(candidate, dict):
+            return None
+        role = candidate.get("role")
+        content = candidate.get("content")
+        if role == "user_partial" or not isinstance(role, str) or content is None:
+            return None
+        return candidate
+
+    async def send_text_message(self, message: str, timeout: float = 30.0) -> list[dict[str, Any]]:
+        """Send a typed user message and collect chat updates."""
+        text = message.strip()
+        if not text:
+            return []
+
+        if not self._text_model_uses_realtime():
+            return await self._send_chat_completion_text_message(text)
+
+        if not await self._ensure_text_session():
+            return [
+                {
+                    "role": "assistant",
+                    "content": self._not_connected_message(),
+                },
+            ]
+
+        await self.connection.conversation.item.create(
+            item={
+                "type": "message",
+                "role": "user",
+                "content": [{"type": "input_text", "text": text}],
+            },
+        )
+        await self._safe_response_create()
+
+        messages: list[dict[str, Any]] = [{"role": "user", "content": text}]
+        saw_assistant_message = False
+        deadline = asyncio.get_event_loop().time() + timeout
+
+        while asyncio.get_event_loop().time() < deadline:
+            try:
+                output = await asyncio.wait_for(self.output_queue.get(), timeout=0.5)
+            except asyncio.TimeoutError:
+                if saw_assistant_message and self._response_done_event.is_set():
+                    break
+                continue
+
+            if not isinstance(output, AdditionalOutputs):
+                continue
+
+            chat_message = self._chat_message_from_output(output)
+            if chat_message is None:
+                continue
+
+            messages.append(chat_message)
+            if chat_message.get("role") == "assistant":
+                saw_assistant_message = True
+
+            if saw_assistant_message and self._response_done_event.is_set():
+                break
+
+        if not saw_assistant_message:
+            messages.append({"role": "assistant", "content": "[error] Timed out waiting for a response."})
+
+        return messages
+
+    async def _send_chat_completion_text_message(self, text: str) -> list[dict[str, Any]]:
+        """Send a typed message through Chat Completions for non-Realtime models."""
+        openai_api_key = self._openai_api_key_or_error()
+        if openai_api_key is None:
+            return [{"role": "assistant", "content": self._not_connected_message()}]
+
+        if getattr(self, "client", None) is None:
+            self.client = AsyncOpenAI(
+                api_key=openai_api_key,
+                base_url=config.OPENAI_BASE_URL,
+            )
+
+        chatbot_messages: list[dict[str, Any]] = [{"role": "user", "content": text}]
+        chat_messages: list[dict[str, Any]] = [
+            {"role": "system", "content": get_session_instructions()},
+            {"role": "user", "content": text},
+        ]
+        chat_tools = self._chat_completion_tool_specs()
+
+        try:
+            completion = await self.client.chat.completions.create(
+                model=config.MODEL_NAME,
+                messages=cast(Any, chat_messages),
+                tools=cast(Any, chat_tools),
+                tool_choice="auto",
+            )
+        except Exception as e:
+            logger.exception("Chat Completions request failed")
+            return [
+                *chatbot_messages,
+                {
+                    "role": "assistant",
+                    "content": (
+                        f"[error] Chat Completions request failed "
+                        f"(model={config.MODEL_NAME!r}, base_url={config.OPENAI_BASE_URL!r}): "
+                        f"{type(e).__name__}: {e}"
+                    ),
+                },
+            ]
+
+        choice = completion.choices[0] if completion.choices else None
+        assistant_message = getattr(choice, "message", None) if choice else None
+        assistant_content = getattr(assistant_message, "content", None) or ""
+        tool_calls = getattr(assistant_message, "tool_calls", None) or []
+
+        if not tool_calls:
+            chatbot_messages.append({"role": "assistant", "content": assistant_content or "[no response]"})
+            return chatbot_messages
+
+        chat_messages.append(
+            {
+                "role": "assistant",
+                "content": assistant_content,
+                "tool_calls": [self._serialize_tool_call(tool_call) for tool_call in tool_calls],
+            }
+        )
+
+        for tool_call in tool_calls:
+            tool_call_id = self._tool_call_value(tool_call, "id") or str(uuid.uuid4())
+            tool_name = self._tool_call_function_value(tool_call, "name")
+            args_json = self._tool_call_function_value(tool_call, "arguments") or "{}"
+            if not isinstance(tool_name, str):
+                tool_result = {"error": "tool call did not include a valid function name"}
+            else:
+                tool_result = await dispatch_tool_call_with_manager(
+                    tool_name,
+                    args_json,
+                    self.deps,
+                    self.tool_manager,
+                )
+
+            tool_result_json = json.dumps(tool_result)
+            chat_messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": tool_result_json,
+                }
+            )
+            chatbot_messages.append(
+                {
+                    "role": "assistant",
+                    "content": tool_result_json,
+                    "metadata": {
+                        "title": f"Used tool {tool_name or 'unknown'}",
+                        "status": "done",
+                    },
+                }
+            )
+
+        try:
+            follow_up = await self.client.chat.completions.create(
+                model=config.MODEL_NAME,
+                messages=cast(Any, chat_messages),
+                tools=cast(Any, chat_tools),
+            )
+        except Exception as e:
+            logger.exception("Chat Completions tool follow-up failed")
+            chatbot_messages.append(
+                {
+                    "role": "assistant",
+                    "content": (
+                        f"[error] Chat Completions tool follow-up failed "
+                        f"(model={config.MODEL_NAME!r}, base_url={config.OPENAI_BASE_URL!r}): "
+                        f"{type(e).__name__}: {e}"
+                    ),
+                }
+            )
+            return chatbot_messages
+
+        follow_up_choice = follow_up.choices[0] if follow_up.choices else None
+        follow_up_message = getattr(follow_up_choice, "message", None) if follow_up_choice else None
+        follow_up_content = getattr(follow_up_message, "content", None) or "Done."
+        chatbot_messages.append({"role": "assistant", "content": follow_up_content})
+        return chatbot_messages
+
     async def _emit_debounced_partial(self, transcript: str, sequence: int) -> None:
         """Emit partial transcript after debounce delay."""
         try:
@@ -134,27 +441,14 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
 
     async def start_up(self) -> None:
         """Start the handler with minimal retries on unexpected websocket closure."""
-        openai_api_key = config.OPENAI_API_KEY
-        if self.gradio_mode and not openai_api_key:
-            # api key was not found in .env or in the environment variables
-            await self.wait_for_args()  # type: ignore[no-untyped-call]
-            args = list(self.latest_args)
-            textbox_api_key = args[3] if len(args[3]) > 0 else None
-            if textbox_api_key is not None:
-                openai_api_key = textbox_api_key
-                self._key_source = "textbox"
-                self._provided_api_key = textbox_api_key
-            else:
-                openai_api_key = config.OPENAI_API_KEY
-        else:
-            if not openai_api_key or not openai_api_key.strip():
-                # In headless console mode, LocalStream now blocks startup until the key is provided.
-                # However, unit tests may invoke this handler directly with a stubbed client.
-                # To keep tests hermetic without requiring a real key, fall back to a placeholder.
-                logger.warning("OPENAI_API_KEY missing. Proceeding with a placeholder (tests/offline).")
-                openai_api_key = "DUMMY"
+        openai_api_key = self._openai_api_key_or_error()
+        if openai_api_key is None:
+            return
 
-        self.client = AsyncOpenAI(api_key=openai_api_key)
+        self.client = AsyncOpenAI(
+            api_key=openai_api_key,
+            base_url=config.OPENAI_BASE_URL,
+        )
 
         max_attempts = 3
         for attempt in range(1, max_attempts + 1):
@@ -173,12 +467,29 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
                     logger.info("Retrying in %.1f seconds...", delay)
                     await asyncio.sleep(delay)
                     continue
-                raise
+                message = (
+                    f"Realtime websocket closed before startup completed ({self._realtime_context()}): "
+                    f"{type(e).__name__}: {e}.{self._provider_realtime_hint()}"
+                )
+                self._record_startup_error(message)
+                logger.error(message)
+                return
+            except Exception as e:
+                message = (
+                    f"Realtime startup failed ({self._realtime_context()}): "
+                    f"{type(e).__name__}: {e}.{self._provider_realtime_hint()}"
+                )
+                self._record_startup_error(message)
+                logger.exception(message)
+                return
             finally:
                 # never keep a stale reference
                 self.connection = None
                 try:
-                    self._connected_event.clear()
+                    if self._startup_error is None:
+                        self._connected_event.clear()
+                    else:
+                        self._connected_event.set()
                 except Exception:
                     pass
 
@@ -418,10 +729,12 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
                     LOCKED_PROFILE,
                     get_session_voice(),
                 )
-                # If we reached here, the session update succeeded which implies the API key worked.
-                # Persist the key to a newly created .env (copied from .env.example) if needed.
-                self._persist_api_key_if_needed()
-            except Exception:
+            except Exception as e:
+                message = (
+                    f"Realtime session.update failed ({self._realtime_context()}): "
+                    f"{type(e).__name__}: {e}.{self._provider_realtime_hint()}"
+                )
+                self._record_startup_error(message)
                 logger.exception("Realtime session.update failed; aborting startup")
                 return
 
@@ -742,70 +1055,3 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
                 "tool_choice": "required",
             },
         )
-
-    def _persist_api_key_if_needed(self) -> None:
-        """Persist the API key into `.env` inside `instance_path/` when appropriate.
-
-        - Only runs in Gradio mode when key came from the textbox and is non-empty.
-        - Only saves if `self.instance_path` is not None.
-        - Writes `.env` to `instance_path/.env` (does not overwrite if it already exists).
-        - If `instance_path/.env.example` exists, copies its contents while overriding OPENAI_API_KEY.
-        """
-        try:
-            if not self.gradio_mode:
-                logger.warning("Not in Gradio mode; skipping API key persistence.")
-                return
-
-            if self._key_source != "textbox":
-                logger.info("API key not provided via textbox; skipping persistence.")
-                return
-
-            key = (self._provided_api_key or "").strip()
-            if not key:
-                logger.warning("No API key provided via textbox; skipping persistence.")
-                return
-            if self.instance_path is None:
-                logger.warning("Instance path is None; cannot persist API key.")
-                return
-
-            # Update the current process environment for downstream consumers
-            try:
-                import os
-
-                os.environ["OPENAI_API_KEY"] = key
-            except Exception:  # best-effort
-                pass
-
-            target_dir = Path(self.instance_path)
-            env_path = target_dir / ".env"
-            if env_path.exists():
-                # Respect existing user configuration
-                logger.info(".env already exists at %s; not overwriting.", env_path)
-                return
-
-            example_path = target_dir / ".env.example"
-            content_lines: list[str] = []
-            if example_path.exists():
-                try:
-                    content = example_path.read_text(encoding="utf-8")
-                    content_lines = content.splitlines()
-                except Exception as e:
-                    logger.warning("Failed to read .env.example at %s: %s", example_path, e)
-
-            # Replace or append the OPENAI_API_KEY line
-            replaced = False
-            for i, line in enumerate(content_lines):
-                if line.strip().startswith("OPENAI_API_KEY="):
-                    content_lines[i] = f"OPENAI_API_KEY={key}"
-                    replaced = True
-                    break
-            if not replaced:
-                content_lines.append(f"OPENAI_API_KEY={key}")
-
-            # Ensure file ends with newline
-            final_text = "\n".join(content_lines) + "\n"
-            env_path.write_text(final_text, encoding="utf-8")
-            logger.info("Created %s and stored OPENAI_API_KEY for future runs.", env_path)
-        except Exception as e:
-            # Never crash the app for QoL persistence; just log.
-            logger.warning("Could not persist OPENAI_API_KEY to .env: %s", e)
