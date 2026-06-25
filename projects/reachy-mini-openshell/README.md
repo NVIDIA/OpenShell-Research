@@ -160,8 +160,11 @@ Realtime path; other model IDs use Chat Completions for text input.
 template default, where audio goes to an OpenAI-compatible Realtime endpoint.
 Use `riva_stt` to stream microphone audio to Riva ASR and pass final
 transcripts into the text LLM path.
-- `RIVA_SERVER_URI`: Riva ASR server URI, for example `localhost:50051`.
-- `RIVA_USE_SSL`: set to `true` for TLS-enabled Riva endpoints.
+- `RIVA_SERVER_URI`: Riva ASR server URI, for example `localhost:50051` or
+`http://riva-host:9000`. URL schemes are normalized for the Riva client.
+- `RIVA_USE_SSL`: set to `true` for TLS-enabled Riva endpoints. If
+`RIVA_SERVER_URI` starts with `https://`, TLS is enabled unless this value is
+explicitly set.
 - `RIVA_LANGUAGE_CODE`: BCP-47 language code for Riva ASR, such as `en-US`.
 - `RIVA_ASR_MODEL`: optional Riva ASR model name. Leave empty to let Riva
 select a model from the language/configuration.

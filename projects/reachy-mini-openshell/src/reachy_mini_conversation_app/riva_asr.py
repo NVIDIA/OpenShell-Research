@@ -7,6 +7,7 @@ import asyncio
 import logging
 import threading
 from dataclasses import dataclass
+from urllib.parse import urlparse
 from collections.abc import Callable, Awaitable
 
 
@@ -30,11 +31,12 @@ class RivaAsrConfig:
     @classmethod
     def from_env(cls) -> "RivaAsrConfig":
         """Build Riva ASR configuration from environment variables."""
+        server_uri, inferred_use_ssl = _normalize_server_uri(os.getenv("RIVA_SERVER_URI", "localhost:50051"))
         return cls(
-            server_uri=os.getenv("RIVA_SERVER_URI", "localhost:50051"),
+            server_uri=server_uri,
             language_code=os.getenv("RIVA_LANGUAGE_CODE", "en-US"),
             model=os.getenv("RIVA_ASR_MODEL", ""),
-            use_ssl=_env_flag("RIVA_USE_SSL", default=False),
+            use_ssl=_env_flag("RIVA_USE_SSL", default=inferred_use_ssl),
             ssl_cert=os.getenv("RIVA_SSL_CERT") or None,
             authorization=os.getenv("RIVA_AUTHORIZATION") or None,
             metadata=_parse_metadata(os.getenv("RIVA_METADATA", "")),
@@ -186,6 +188,22 @@ def _env_flag(name: str, default: bool = False) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _normalize_server_uri(raw: str) -> tuple[str, bool]:
+    value = raw.strip()
+    if "://" not in value:
+        return value, False
+
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"}:
+        logger.warning("RIVA_SERVER_URI=%r has an unexpected scheme; passing host/path through", raw)
+
+    server_uri = parsed.netloc or parsed.path
+    if parsed.path not in {"", "/"} and parsed.netloc:
+        logger.warning("Ignoring path in RIVA_SERVER_URI=%r; Riva client expects host:port", raw)
+
+    return server_uri, parsed.scheme == "https"
 
 
 def _parse_metadata(raw: str) -> tuple[tuple[str, str], ...]:
