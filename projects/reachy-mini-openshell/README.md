@@ -196,6 +196,11 @@ messages. Text mode uses Chat Completions when `MODEL_NAME` is a non-Realtime
 model ID. Tool calls are supported in text mode; the app keeps the tool schema
 attached on the post-tool follow-up request for providers that require it.
 
+If the microphone appears to connect but no transcript or model response
+arrives, check the visible chat error and your `.env` values. Microphone mode
+requires an OpenAI-compatible Realtime model and endpoint; Chat Completions
+providers are supported through the `Text` input mode only.
+
 ## Runtime Flags
 
 Useful app flags:
