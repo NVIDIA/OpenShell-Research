@@ -98,8 +98,9 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
         # Internal lifecycle flags
         self._shutdown_requested: bool = False
         self._connected_event: asyncio.Event = asyncio.Event()
-        self._text_startup_task: asyncio.Task[None] | None = None
+        self._realtime_startup_task: asyncio.Task[None] | None = None
         self._startup_error: str | None = None
+        self._microphone_error_reported: bool = False
 
         # Background tool manager
         self.tool_manager = BackgroundToolManager()
@@ -220,25 +221,36 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
         logger.error(message)
         return None
 
-    async def _ensure_text_session(self) -> bool:
-        """Start a Realtime session for text-only Gradio input if needed."""
+    async def _ensure_realtime_session(self, task_name: str) -> bool:
+        """Start a Realtime session for Gradio text or microphone input if needed."""
         if self.connection is not None:
             return True
 
-        if self._text_startup_task is None or self._text_startup_task.done():
+        if self._realtime_startup_task is None or self._realtime_startup_task.done():
             self._startup_error = None
             try:
                 self._connected_event.clear()
             except Exception:
                 pass
-            self._text_startup_task = asyncio.create_task(self.start_up(), name="openai-realtime-text")
+            self._realtime_startup_task = asyncio.create_task(self.start_up(), name=task_name)
 
         try:
             await asyncio.wait_for(self._connected_event.wait(), timeout=10.0)
         except asyncio.TimeoutError:
-            logger.warning("Timed out waiting for text Realtime session startup")
+            logger.warning("Timed out waiting for Realtime session startup")
 
         return self.connection is not None
+
+    async def _ensure_text_session(self) -> bool:
+        """Start a Realtime session for text-only Gradio input if needed."""
+        return await self._ensure_realtime_session("openai-realtime-text")
+
+    async def _report_microphone_error_once(self, message: str) -> None:
+        """Show one visible microphone error instead of silently dropping every frame."""
+        if self._microphone_error_reported:
+            return
+        self._microphone_error_reported = True
+        await self.output_queue.put(AdditionalOutputs({"role": "assistant", "content": message}))
 
     @staticmethod
     def _chat_message_from_output(output: AdditionalOutputs) -> dict[str, Any] | None:
@@ -946,7 +958,20 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
 
         """
         if not self.connection:
-            return
+            if not self._text_model_uses_realtime():
+                self._record_startup_error(
+                    "Microphone mode requires an OpenAI-compatible Realtime model. "
+                    f"Current MODEL_NAME={config.MODEL_NAME!r} uses the text path only; "
+                    "switch Input to Text or configure a Realtime model for microphone input."
+                )
+                await self._report_microphone_error_once(self._not_connected_message())
+                return
+
+            if not await self._ensure_realtime_session("openai-realtime-microphone"):
+                await self._report_microphone_error_once(self._not_connected_message())
+                return
+
+        self._microphone_error_reported = False
 
         input_sample_rate, audio_frame = frame
 

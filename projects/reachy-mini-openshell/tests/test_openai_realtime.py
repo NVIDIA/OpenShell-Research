@@ -1,3 +1,4 @@
+import base64
 import random
 import asyncio
 import logging
@@ -5,6 +6,7 @@ from typing import Any
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 
 import reachy_mini_conversation_app.openai_realtime as rt_mod
@@ -242,8 +244,8 @@ async def test_send_text_message_creates_input_text_and_collects_response(monkey
 
     messages = await handler.send_text_message("Hello typed Reachy")
     await handler.shutdown()
-    if handler._text_startup_task is not None:
-        await asyncio.wait_for(handler._text_startup_task, timeout=1)
+    if handler._realtime_startup_task is not None:
+        await asyncio.wait_for(handler._realtime_startup_task, timeout=1)
 
     assert created_items == [
         {
@@ -256,6 +258,88 @@ async def test_send_text_message_creates_input_text_and_collects_response(monkey
         {"role": "user", "content": "Hello typed Reachy"},
         {"role": "assistant", "content": "Hello from text mode."},
     ]
+
+
+@pytest.mark.asyncio
+async def test_receive_lazily_starts_realtime_and_appends_microphone_audio(monkeypatch: Any) -> None:
+    """Mic frames should start the Realtime session before appending audio."""
+    _set_openai_test_config(monkeypatch)
+    event_queue: asyncio.Queue[Any] = asyncio.Queue()
+    appended_audio: list[str] = []
+
+    class FakeSession:
+        async def update(self, **_kw: Any) -> None:
+            return None
+
+    class FakeInputAudioBuffer:
+        async def append(self, **kwargs: Any) -> None:
+            appended_audio.append(kwargs["audio"])
+
+    class FakeConn:
+        session = FakeSession()
+        input_audio_buffer = FakeInputAudioBuffer()
+
+        async def __aenter__(self) -> "FakeConn":
+            return self
+
+        async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> bool:
+            return False
+
+        def __aiter__(self) -> "FakeConn":
+            return self
+
+        async def __anext__(self) -> Any:
+            event = await event_queue.get()
+            if event is None:
+                raise StopAsyncIteration
+            return event
+
+        async def close(self) -> None:
+            await event_queue.put(None)
+
+    class FakeRealtime:
+        def connect(self, **_kw: Any) -> FakeConn:
+            return FakeConn()
+
+    class FakeClient:
+        def __init__(self, **_kw: Any) -> None:
+            self.realtime = FakeRealtime()
+
+    monkeypatch.setattr(rt_mod, "AsyncOpenAI", FakeClient)
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = rt_mod.OpenaiRealtimeHandler(deps)
+    audio_frame = np.array([0, 1000, -1000, 0], dtype=np.int16)
+
+    await handler.receive((24000, audio_frame))
+    await handler.shutdown()
+    if handler._realtime_startup_task is not None:
+        await asyncio.wait_for(handler._realtime_startup_task, timeout=1)
+
+    assert appended_audio == [base64.b64encode(audio_frame.tobytes()).decode("utf-8")]
+
+
+@pytest.mark.asyncio
+async def test_receive_reports_non_realtime_model_without_opening_realtime(monkeypatch: Any) -> None:
+    """Mic mode should visibly fail when MODEL_NAME can only use text completions."""
+    monkeypatch.setattr(rt_mod.config, "OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(rt_mod.config, "OPENAI_BASE_URL", "https://inference-api.nvidia.com/v1")
+    monkeypatch.setattr(rt_mod.config, "MODEL_NAME", "nvidia/nemotron-3-super-120b-a12b")
+
+    def fail_openai_client(**_kw: Any) -> None:
+        raise AssertionError("microphone mode should not open Realtime for a non-Realtime model")
+
+    monkeypatch.setattr(rt_mod, "AsyncOpenAI", fail_openai_client)
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = rt_mod.OpenaiRealtimeHandler(deps)
+
+    await handler.receive((24000, np.array([0, 0], dtype=np.int16)))
+
+    output = await asyncio.wait_for(handler.output_queue.get(), timeout=1)
+    assert isinstance(output, rt_mod.AdditionalOutputs)
+    assert "Microphone mode requires an OpenAI-compatible Realtime model" in output.args[0]["content"]
+    assert handler.connection is None
 
 
 @pytest.mark.asyncio
