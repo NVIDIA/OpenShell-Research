@@ -13,6 +13,7 @@ Commands:
 ## Quick Start
 
 Recommended first run: OpenAI Realtime + Reachy Mini simulator.
+Recommended local microphone path: Riva ASR NIM + Chat Completions + TTS.
 
 Requirements:
 
@@ -53,7 +54,7 @@ Set exactly one backend in `.env`:
 | --- | --- | --- |
 | `openai_realtime` | You want the fastest full voice demo. | OpenAI Realtime |
 | `hf_realtime` | You want the Pollen/Hugging Face realtime path. | Deployed broker or websocket |
-| `local_stt` | You want custom/local STT before the chat model. | STT, Chat Completions, TTS |
+| `local_stt` | You want Riva ASR NIM or another local STT endpoint before the chat model. | STT, Chat Completions, TTS |
 
 Credentials and model routes come from `.env` or exported variables referenced
 by `.env`. They are not entered in the browser UI.
@@ -76,12 +77,44 @@ OPENAI_REALTIME_VOICE=cedar
 Leave `OPENAI_REALTIME_API_KEY` unset unless this app should use a different
 key from the exported `OPENAI_API_KEY`.
 
-### Local STT + Chat + TTS
+### Riva ASR NIM + Chat + TTS
+
+Use this path when you want microphone input transcribed by Riva before the
+text is sent through Chat Completions and Reachy tools.
+
+Requirement: a deployed Riva ASR NIM endpoint reachable from the app host.
+
+The endpoint must expose:
+
+- `GET /v1/health/ready`
+- `POST /v1/audio/transcriptions`
+
+Readiness check:
+
+```bash
+curl -X GET http://<riva-host>:9000/v1/health/ready
+```
+
+Expected response:
+
+```json
+{"status":"ready"}
+```
+
+The app uses the ASR NIM HTTP transcription route:
+
+```text
+POST http://<riva-host>:9000/v1/audio/transcriptions
+```
+
+This setup uses Riva for ASR. Speech output still uses the configured
+OpenAI-compatible `TTS_*` endpoint. Riva TTS NIM exposes a different HTTP
+route, `/v1/audio/synthesize`, and is not wired into this app yet.
 
 Flow:
 
 ```text
-microphone -> STT -> Chat Completions + Reachy tools -> TTS -> Reachy speaks
+microphone -> Riva ASR NIM -> Chat Completions + Reachy tools -> TTS -> Reachy speaks
 ```
 
 ```bash
@@ -96,8 +129,8 @@ CHAT_BASE_URL=https://inference-api.nvidia.com/v1
 CHAT_MODEL_NAME=azure/anthropic/claude-opus-4-8
 
 STT_API_KEY=not-needed
-STT_BASE_URL=http://127.0.0.1:9000/v1
-STT_MODEL_NAME=whisper-1
+STT_BASE_URL=http://<riva-host>:9000/v1
+STT_MODEL_NAME=parakeet-1-1b-ctc-en-us
 
 TTS_API_KEY=${OPENAI_API_KEY}
 TTS_BASE_URL=https://api.openai.com/v1
@@ -111,6 +144,11 @@ Rules:
 - `*_MODEL_NAME` must match the provider's exact model ID.
 - `${VAR_NAME}` values expand from the shell environment.
 - Use `not-needed` for local no-auth endpoints.
+- `STT_MODEL_NAME` must match an offline model ID served by the Riva ASR
+  endpoint. If `stt-probe` reports `stt_model_listed=no`, use one of the model
+  IDs reported by that endpoint.
+- For a Whisper-compatible endpoint instead of Riva, keep the same backend and
+  set `STT_BASE_URL` plus `STT_MODEL_NAME=whisper-1`.
 
 Stage checks:
 
@@ -125,7 +163,8 @@ uv run reachy-mini-backend-check --live --stage app-flow --require-tool \
   --seed-text "Reachy, use the sweep_look tool, then tell me what you did."
 ```
 
-Use the fake local-STT smoke test when real endpoints are not ready:
+Use the fake local-STT smoke test when Riva or other real endpoints are not
+ready:
 
 ```bash
 scripts/smoke-local-stt.sh
@@ -295,7 +334,8 @@ uv run reachy-mini-app-assistant check .
 | App cannot connect to Reachy | Start the daemon or use `./scripts/start-local.sh`. Match `--robot-name` when using a custom daemon name. |
 | OpenAI Realtime is not connected | Export `OPENAI_API_KEY` in the same shell, then run `uv run reachy-mini-backend-check --live`. |
 | Local-STT text returns `404` | Use a plain `CHAT_BASE_URL` and the exact `CHAT_MODEL_NAME` accepted by the provider. |
-| Local-STT microphone produces no response | Run `uv run reachy-mini-backend-check --live --stage stt-probe`; check `STT_BASE_URL` includes `/v1` and exposes `POST /audio/transcriptions`. |
+| Riva/local microphone produces no response | Run `uv run reachy-mini-backend-check --live --stage stt-probe`; check `STT_BASE_URL` includes `/v1` and exposes `POST /audio/transcriptions`. |
+| Riva ASR readiness fails | Check `http://<riva-host>:9000/v1/health/ready`, GPU/container logs, and that the app can reach the host from macOS. |
 | vLLM STT says audio support is missing | Redeploy the service with vLLM audio support, then rerun `stt-probe`. |
 | `uv sync` builds `pygobject` or `pycairo` on macOS | Run `uv cache clean reachy-mini pygobject pycairo`, then `uv sync`. |
 | Daemon uses `--no-media` | Start the app with `--no-camera`; the launcher already does this. |

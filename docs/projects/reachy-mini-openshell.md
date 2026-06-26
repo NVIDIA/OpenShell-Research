@@ -16,6 +16,7 @@ Requirements:
 - Credentials for the backend selected in `.env`
 
 Recommended first run: OpenAI Realtime with the Reachy Mini simulator.
+Recommended local microphone path: Riva ASR NIM with Chat Completions and TTS.
 
 ```sh
 cd projects/reachy-mini-openshell
@@ -40,7 +41,7 @@ Set one backend in `.env`:
 | --- | --- |
 | `openai_realtime` | You want the fastest full voice demo with OpenAI Realtime. |
 | `hf_realtime` | You want the Pollen/Hugging Face realtime path. |
-| `local_stt` | You want microphone audio transcribed by an OpenAI-compatible STT service before Chat Completions and TTS. |
+| `local_stt` | You want microphone audio transcribed by Riva ASR NIM or another OpenAI-compatible STT service before Chat Completions and TTS. |
 
 Use the single checked-in `.env.example` as the starting point:
 
@@ -62,13 +63,65 @@ OPENAI_REALTIME_MODEL=gpt-realtime
 OPENAI_REALTIME_VOICE=cedar
 ```
 
-For local STT, the microphone path is:
+## Riva ASR Requirement
 
-```text
-microphone -> STT -> Chat Completions + Reachy tools -> TTS -> Reachy speaks
+Use this path when you want microphone input transcribed by Riva before the
+text is sent through Chat Completions and Reachy tools.
+
+Requirement: a deployed Riva ASR NIM endpoint reachable from the app host.
+
+The endpoint must expose:
+
+- `GET /v1/health/ready`
+- `POST /v1/audio/transcriptions`
+
+Readiness check:
+
+```sh
+curl -X GET http://<riva-host>:9000/v1/health/ready
 ```
 
-The STT, chat, and TTS endpoints should each expose OpenAI-compatible APIs.
+Expected response:
+
+```json
+{"status":"ready"}
+```
+
+Then set the app to use the Riva ASR HTTP transcription route:
+
+```dotenv
+BACKEND_PROVIDER=local_stt
+
+CHAT_API_KEY=${NVIDIA_INFERENCE_API_KEY}
+CHAT_BASE_URL=https://inference-api.nvidia.com/v1
+CHAT_MODEL_NAME=azure/anthropic/claude-opus-4-8
+
+STT_API_KEY=not-needed
+STT_BASE_URL=http://<riva-host>:9000/v1
+STT_MODEL_NAME=parakeet-1-1b-ctc-en-us
+
+TTS_API_KEY=${OPENAI_API_KEY}
+TTS_BASE_URL=https://api.openai.com/v1
+TTS_MODEL_NAME=gpt-4o-mini-tts
+TTS_VOICE=cedar
+```
+
+This setup uses Riva for ASR. Speech output still uses the configured
+OpenAI-compatible `TTS_*` endpoint. Riva TTS NIM exposes a different HTTP
+route, `/v1/audio/synthesize`, and is not wired into this app yet.
+
+`STT_MODEL_NAME` must match an offline model ID served by the Riva ASR endpoint.
+If `stt-probe` reports `stt_model_listed=no`, use one of the model IDs reported
+by that endpoint.
+
+The microphone path is:
+
+```text
+microphone -> Riva ASR NIM -> Chat Completions + Reachy tools -> TTS -> Reachy speaks
+```
+
+For non-Riva STT, keep `BACKEND_PROVIDER=local_stt` and set `STT_BASE_URL` plus
+`STT_MODEL_NAME` for that OpenAI-compatible transcription endpoint.
 
 ## What To Expect
 
@@ -124,7 +177,7 @@ Call the configured backend:
 uv run reachy-mini-backend-check --live
 ```
 
-Check local-STT stages independently:
+Check Riva/local-STT stages independently:
 
 ```sh
 uv run reachy-mini-backend-check --live --stage stt-probe
@@ -135,8 +188,8 @@ uv run reachy-mini-backend-check --live --stage tts \
   --seed-text "Hello, I am Reachy."
 ```
 
-Run the fake local-STT smoke workflow when external STT or TTS services are not
-ready:
+Run the fake local-STT smoke workflow when Riva or other external STT/TTS
+services are not ready:
 
 ```sh
 scripts/smoke-local-stt.sh
@@ -169,5 +222,6 @@ uv run python -m reachy_mini_conversation_app --gradio --no-camera
 | App cannot connect to Reachy | Use `./scripts/start-local.sh`, or verify the daemon status endpoint reports `state: "running"`. |
 | OpenAI Realtime is not connected | Export `OPENAI_API_KEY` in the same shell that starts the app, then run `uv run reachy-mini-backend-check --live`. |
 | Local-STT text returns `404` | Use a plain `CHAT_BASE_URL` ending in `/v1` when required, and set `CHAT_MODEL_NAME` to the provider's exact model ID. |
-| Local-STT microphone produces no response | Run the `stt-probe` check and confirm `STT_BASE_URL` exposes `POST /audio/transcriptions`. |
+| Riva/local microphone produces no response | Run the `stt-probe` check and confirm `STT_BASE_URL` exposes `POST /audio/transcriptions`. |
+| Riva ASR readiness fails | Check `http://<riva-host>:9000/v1/health/ready`, GPU/container logs, and that the app can reach the host from macOS. |
 | Daemon reports `MuJoCo is not installed` | Run `uv sync` from `projects/reachy-mini-openshell`, then start the daemon through `uv run` or the launcher. |
