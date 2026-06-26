@@ -12,7 +12,7 @@
       <header class="hero">
         <div class="pill">Reachy Mini App</div>
         <h1>Reachy OpenShell</h1>
-        <p class="subtitle">A conversation app for Reachy Mini robot.</p>
+        <p class="subtitle">A Reachy Mini conversation demo for OpenShell.</p>
       </header>
 
       <div class="panel">
@@ -22,10 +22,10 @@
             <h2>Installation</h2>
           </div>
         </div>
-        <p class="muted">Install this app on your Reachy Mini using the app store, or run it locally:</p>
-        <pre><code>uv sync
-reachy-mini-daemon --sim --scene minimal --headless --no-media
-python -m reachy_mini_conversation_app --gradio --no-camera</code></pre>
+        <p class="muted">Start the Reachy Mini simulator and browser app locally:</p>
+        <pre><code>cp .env.example .env
+export OPENAI_API_KEY=sk-...
+./scripts/start-local.sh</code></pre>
       </div>
 
       <div class="panel">
@@ -35,7 +35,7 @@ python -m reachy_mini_conversation_app --gradio --no-camera</code></pre>
             <h2>Provider Configuration</h2>
           </div>
         </div>
-        <p class="muted">Configure provider credentials, model routing, and input mode in <code>.env</code>, then run <code>./scripts/start-local.sh</code>.</p>
+        <p class="muted">Configure provider credentials and model routing in <code>.env</code>. Choose microphone or text input in the app UI.</p>
       </div>
     </div>
   </body>

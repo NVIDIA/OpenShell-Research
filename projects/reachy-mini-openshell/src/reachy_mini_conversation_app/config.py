@@ -494,11 +494,6 @@ def loaded_dotenv_path() -> str | None:
     return _dotenv_path or None
 
 
-def loaded_dotenv_keys() -> set[str]:
-    """Return the dotenv keys loaded for this process."""
-    return set(_dotenv_values)
-
-
 def openai_realtime_api_key() -> str | None:
     """Return the OpenAI Realtime key, falling back to the standard OpenAI key."""
     return _configured_value(config.OPENAI_REALTIME_API_KEY) or _process_env_value("OPENAI_API_KEY")

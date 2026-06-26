@@ -12,7 +12,6 @@ from numpy.typing import NDArray
 from reachy_mini_conversation_app.config import (
     config,
     load_dotenv_file,
-    loaded_dotenv_keys,
     loaded_dotenv_path,
 )
 from reachy_mini_conversation_app.audio.pcm import (
@@ -45,18 +44,7 @@ def _backend_config_hint(error: str) -> str | None:
     if not error.startswith("BACKEND_PROVIDER is missing"):
         return None
 
-    keys = loaded_dotenv_keys()
-    legacy_keys = {"MODEL_NAME", "OPENAI_BASE_URL"} & keys
     loaded_path = loaded_dotenv_path()
-    if legacy_keys:
-        legacy_list = ", ".join(sorted(legacy_keys))
-        location = f" in {loaded_path}" if loaded_path else ""
-        return (
-            f"Found older config keys{location}: {legacy_list}. They are no longer used. "
-            "Choose one BACKEND_PROVIDER and set the matching new keys: OPENAI_REALTIME_* for "
-            "openai_realtime, HF_REALTIME_* for hf_realtime, or CHAT_*/STT_*/TTS_* for local_stt."
-        )
-
     if loaded_path is None:
         return (
             "No .env file was loaded. Copy .env.example to .env, set BACKEND_PROVIDER to "
