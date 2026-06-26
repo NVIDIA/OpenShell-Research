@@ -56,34 +56,41 @@ def _restore_process_env(snapshot: dict[str, str | None]) -> None:
             os.environ[name] = value
 
 
-def test_documented_env_templates_validate_with_exported_system_keys(monkeypatch: Any) -> None:
-    """Checked-in starter env files should validate without copying global OpenAI secrets."""
+def test_documented_env_template_validates_with_exported_system_keys(monkeypatch: Any) -> None:
+    """The single starter env file should validate without copying global secrets."""
     snapshot = _config_snapshot()
     monkeypatch.setattr(config_mod, "_dotenv_loaded_keys", set())
     monkeypatch.setattr(config_mod, "_dotenv_values", {})
     monkeypatch.setitem(config_mod._ORIGINAL_PROCESS_ENV, "OPENAI_API_KEY", "global-openai-key")
     monkeypatch.setitem(config_mod._ORIGINAL_PROCESS_ENV, "NVIDIA_INFERENCE_API_KEY", "global-nvidia-key")
 
-    expectations = {
-        ".env.example": config_mod.BACKEND_LOCAL_STT,
-        ".env.local-stt.example": config_mod.BACKEND_LOCAL_STT,
-        ".env.hf-realtime.example": config_mod.BACKEND_HF_REALTIME,
-        ".env.openai-realtime.example": config_mod.BACKEND_OPENAI_REALTIME,
-    }
+    raw_values = config_mod.dotenv_values(PROJECT_ROOT / ".env.example", interpolate=False)
+    expanded_values = config_mod._expand_dotenv_values(raw_values)
+    backend_options = (
+        config_mod.BACKEND_OPENAI_REALTIME,
+        config_mod.BACKEND_LOCAL_STT,
+        config_mod.BACKEND_HF_REALTIME,
+    )
 
     try:
-        for filename, expected_backend in expectations.items():
-            raw_values = config_mod.dotenv_values(PROJECT_ROOT / filename, interpolate=False)
-            expanded_values = config_mod._expand_dotenv_values(raw_values)
+        assert not list(PROJECT_ROOT.glob(".env.*.example"))
+        assert raw_values["BACKEND_PROVIDER"] == config_mod.BACKEND_OPENAI_REALTIME
+        assert "OPENAI_REALTIME_API_KEY" not in raw_values
+        assert "OPENAI_API_KEY" not in raw_values
 
-            config_mod.apply_config_values(expanded_values, inherit_current=False)
+        for backend_provider in backend_options:
+            config_mod.apply_config_values(
+                {
+                    **expanded_values,
+                    "BACKEND_PROVIDER": backend_provider,
+                },
+                inherit_current=False,
+            )
 
-            assert config_mod.config.BACKEND_PROVIDER == expected_backend
+            assert config_mod.config.BACKEND_PROVIDER == backend_provider
             assert runtime_mod.backend_config_error() is None
 
-            if filename == ".env.openai-realtime.example":
-                assert "OPENAI_REALTIME_API_KEY" not in raw_values
-                assert "OPENAI_API_KEY" not in raw_values
+            if backend_provider == config_mod.BACKEND_OPENAI_REALTIME:
                 assert config_mod.openai_realtime_api_key() == "global-openai-key"
     finally:
         _restore_config_snapshot(snapshot)
