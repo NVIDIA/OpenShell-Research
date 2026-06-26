@@ -1,18 +1,19 @@
 # OpenShell Runtime Notes
 
-Use this page to document how research applications use OpenShell as their
-runtime.
+Use this page for runtime assumptions that apply across OpenShell research
+applications.
 
-## Topics to fill in
+## Runtime Checklist
 
-- Runtime capabilities and constraints
-- Application lifecycle
-- Data and model access patterns
-- Observability and debugging
-- Packaging and deployment expectations
+- Identify the process that owns the user-facing UI.
+- Identify local services and ports the workflow depends on.
+- Keep model/provider credentials outside the browser UI.
+- Provide a fast local health check before the full app starts.
+- Make logs and status endpoints easy to find.
+- Document shutdown behavior for helper services.
 
-## Open questions
+## Open Questions
 
 - Which runtime APIs should every example application demonstrate?
-- What is the minimum viable application shape for a research prototype?
-- Which runtime assumptions need automated checks in CI?
+- Which checks belong in CI versus local preflight commands?
+- Which deployment assumptions need a shared template?
