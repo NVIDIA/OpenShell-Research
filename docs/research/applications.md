@@ -1,21 +1,18 @@
-# Application Skeletons
+# Application Patterns
 
-This page will track the starter patterns we use to move research ideas into
-OpenShell applications.
+This page captures patterns that are useful across more than one OpenShell
+research project. Keep project-specific setup in [Projects](../projects/index.md).
 
-## Candidate skeletons
+## What To Capture
 
-- [Reachy Mini conversation app simulator tutorial](reachy-mini-conversation-simulator.md)
-- Agent workflow demo
-- Research paper companion
-- Evaluation harness
-- Interactive dataset explorer
-- Model capability probe
+- The user workflow the pattern supports.
+- The minimum runtime integration needed.
+- Required configuration, secrets, or services.
+- How to observe that the app is working.
+- Known limitations and failure modes.
 
-## Skeleton checklist
+## Current Project Example
 
-- Clear user workflow
-- Minimal runtime integration
-- Reproducible setup
-- Observable behavior
-- Documented limitations
+[Reachy Mini conversation demo](../projects/reachy-mini-openshell.md) is the
+current runnable example: a browser UI, simulator daemon, model backend
+selection, microphone/text input, and Reachy movement tools.

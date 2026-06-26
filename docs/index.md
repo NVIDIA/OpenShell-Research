@@ -17,15 +17,17 @@
 ## Starting points
 
 - [Research engineering](research/index.md)
+- [Projects](projects/index.md)
+- [Reachy Mini conversation demo](projects/reachy-mini-openshell.md)
 - [Runtime notes](research/runtime.md)
-- [Application skeletons](research/applications.md)
-- [Reachy Mini simulator tutorial](research/reachy-mini-conversation-simulator.md)
+- [Application patterns](research/applications.md)
 - [Dev Notes](dev-notes/index.md)
 
 ## What belongs here
 
 - OpenShell runtime integration notes
-- Experimental application designs
+- Runnable research projects
+- Experimental application patterns
 - Research-to-product build logs
 - Benchmarks, evaluations, and reproducibility notes
 - Deployment and sharing patterns for research applications

@@ -1,18 +1,22 @@
 # Research Engineering
 
-This section is for durable engineering documentation that should outlive a
-single experiment or Dev Note.
+Durable engineering notes live here: runtime assumptions, application patterns,
+evaluation criteria, and deployment practices that apply across projects.
 
-## Working areas
+Use [Projects](../projects/index.md) for runnable demos and project-specific
+setup guides.
 
-- Runtime integration: how applications bind to OpenShell.
-- Application patterns: reusable structures for research prototypes.
+## Working Areas
+
+- [Runtime integration](runtime.md): how applications bind to OpenShell.
+- [Application patterns](applications.md): reusable structures for prototypes.
 - Evaluation: benchmarks, qualitative checks, and reproducibility criteria.
 - Distribution: packaging and sharing completed research applications.
 
-## Initial standards
+## Standards
 
-- Prefer small, reproducible examples over broad claims.
-- Capture environment assumptions with every experiment.
-- Link Dev Notes updates back to the durable docs page they inform.
-- Promote repeated patterns into templates only after they are used twice.
+- Prefer reproducible commands over broad claims.
+- Capture environment assumptions near the workflow they affect.
+- Link dated [Dev Notes](../dev-notes/index.md) back to durable docs when a
+  lesson should survive the update.
+- Promote project-specific solutions into shared patterns only after they repeat.
