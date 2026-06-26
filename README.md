@@ -13,7 +13,7 @@ OpenShell as the runtime.
   build logs worth sharing.
 - `docs/dev-notes/authors.json` contains reusable Dev Notes author metadata.
 - `projects/` contains self-contained research project folders, including the
-  Reachy OpenShell fork of the Reachy Mini conversation app.
+  Reachy Mini conversation demo for OpenShell.
 - `scripts/render-dev-notes.py` renders Dev Notes cards, post bylines, and
   navigation entries from post front matter.
 - `zensical.toml` configures the documentation site.

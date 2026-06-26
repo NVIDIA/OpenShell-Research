@@ -4,4 +4,4 @@ This directory contains self-contained research projects. Each project should li
 
 Current projects:
 
-- `reachy-mini-openshell`: OpenShell-oriented fork of the Reachy Mini conversation app.
+- `reachy-mini-openshell`: Reachy Mini conversation demo for OpenShell.

@@ -32,10 +32,7 @@ export OPENAI_API_KEY=sk-...
 
 The launcher creates `.venv`, runs `uv sync`, validates `.env`, starts
 `reachy-mini-daemon --sim`, then prints the Gradio URL:
-
-```text
-http://127.0.0.1:7860/
-```
+<http://127.0.0.1:7860/>.
 
 If `7860` is busy, the launcher picks the next free port through `7899`.
 

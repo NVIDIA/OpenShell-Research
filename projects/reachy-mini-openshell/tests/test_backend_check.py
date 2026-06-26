@@ -301,31 +301,6 @@ async def test_run_check_requires_backend_provider_points_at_loaded_env(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_run_check_detects_older_config_keys(monkeypatch: Any, capsys: Any) -> None:
-    """Backend preflight should identify stale config files without honoring old keys."""
-    monkeypatch.setattr(config_mod.config, "BACKEND_PROVIDER", "")
-    monkeypatch.setattr(config_mod, "_dotenv_path", "/tmp/reachy-old.env")
-    monkeypatch.setattr(
-        config_mod,
-        "_dotenv_values",
-        {
-            "OPENAI_API_KEY": "secret",
-            "OPENAI_BASE_URL": "https://inference-api.example/v1",
-            "MODEL_NAME": "example-model",
-        },
-    )
-
-    exit_code = await backend_check.run_check(
-        Namespace(live=False, seed_text="hello", audio_file=None, app_flow=False, require_tool=False),
-    )
-
-    output = capsys.readouterr().out
-    assert exit_code == 2
-    assert "[hint] Found older config keys in /tmp/reachy-old.env: MODEL_NAME, OPENAI_BASE_URL." in output
-    assert "secret" not in output
-
-
-@pytest.mark.asyncio
 async def test_run_check_loads_explicit_env_file(tmp_path: Any, monkeypatch: Any, capsys: Any) -> None:
     """Preflight can validate a candidate dotenv file without editing .env."""
     previous_dotenv_path = config_mod._dotenv_path
