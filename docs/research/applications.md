@@ -14,5 +14,6 @@ research project. Keep project-specific setup in [Projects](../projects/index.md
 ## Current Project Example
 
 [Reachy Mini conversation demo](../projects/reachy-mini-openshell.md) is the
-current runnable example: a browser UI, simulator daemon, model backend
-selection, microphone/text input, and Reachy movement tools.
+current runnable example: OpenAI Realtime quick start, browser UI, simulator
+daemon, optional model backend selection, microphone/text input, and Reachy
+movement tools.
