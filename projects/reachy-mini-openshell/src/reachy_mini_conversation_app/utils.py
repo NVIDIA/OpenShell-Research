@@ -7,7 +7,7 @@ from reachy_mini import ReachyMini
 from reachy_mini_conversation_app.camera_worker import CameraWorker
 
 
-def parse_args() -> Tuple[argparse.Namespace, list]:  # type: ignore
+def parse_args() -> Tuple[argparse.Namespace, list]:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser("Reachy Mini Conversation App")
     parser.add_argument(
@@ -103,20 +103,16 @@ def setup_logger(debug: bool) -> logging.Logger:
         logging.getLogger("aioice").setLevel(logging.WARNING)
     return logger
 
+
 def log_connection_troubleshooting(logger: logging.Logger, robot_name: Optional[str]) -> None:
     """Log troubleshooting steps for connection issues."""
     logger.error("Troubleshooting steps:")
     logger.error("  1. Verify reachy-mini-daemon is running")
 
     if robot_name is not None:
-        logger.error(
-            f"  2. Daemon must be started with: --robot-name '{robot_name}'"
-        )
+        logger.error(f"  2. Daemon must be started with: --robot-name '{robot_name}'")
     else:
-        logger.error(
-            "  2. If daemon uses --robot-name, add the same flag here: "
-            "--robot-name <name>"
-        )
+        logger.error("  2. If daemon uses --robot-name, add the same flag here: --robot-name <name>")
 
     logger.error("  3. For wireless: check network connectivity")
     logger.error("  4. Review daemon logs")

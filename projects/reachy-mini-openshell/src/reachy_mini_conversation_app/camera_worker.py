@@ -51,7 +51,7 @@ class CameraWorker:
         # Face tracking timing variables (same as main_works.py)
         self.last_face_detected_time: float | None = None
         self.interpolation_start_time: float | None = None
-        self.interpolation_start_pose: NDArray[np.float32] | None = None
+        self.interpolation_start_pose: NDArray[np.float64] | None = None
         self.face_lost_delay = 2.0  # seconds to wait before starting interpolation
         self.interpolation_duration = 1.0  # seconds to interpolate back to neutral
 
@@ -102,7 +102,7 @@ class CameraWorker:
         logger.debug("Starting camera working loop")
 
         # Initialize head tracker if available
-        neutral_pose = np.eye(4)  # Neutral pose (identity matrix)
+        neutral_pose = np.eye(4, dtype=np.float64)  # Neutral pose (identity matrix)
         self.previous_head_tracking_state = self.is_head_tracking_enabled
 
         while not self._stop_event.is_set():
@@ -190,7 +190,7 @@ class CameraWorker:
                                     current_translation = self.face_tracking_offsets[:3]
                                     current_rotation_euler = self.face_tracking_offsets[3:]
                                     # Convert to 4x4 pose matrix
-                                    pose_matrix = np.eye(4, dtype=np.float32)
+                                    pose_matrix = np.eye(4, dtype=np.float64)
                                     pose_matrix[:3, 3] = current_translation
                                     pose_matrix[:3, :3] = R.from_euler(
                                         "xyz",
@@ -199,12 +199,17 @@ class CameraWorker:
                                     self.interpolation_start_pose = pose_matrix
 
                             # Calculate interpolation progress (t from 0 to 1)
-                            elapsed_interpolation = current_time - self.interpolation_start_time
+                            interpolation_start_time = self.interpolation_start_time
+                            interpolation_start_pose = self.interpolation_start_pose
+                            if interpolation_start_time is None or interpolation_start_pose is None:
+                                continue
+
+                            elapsed_interpolation = current_time - interpolation_start_time
                             t = min(1.0, elapsed_interpolation / self.interpolation_duration)
 
                             # Interpolate between current pose and neutral pose
                             interpolated_pose = linear_pose_interpolation(
-                                self.interpolation_start_pose,
+                                interpolation_start_pose,
                                 neutral_pose,
                                 t,
                             )

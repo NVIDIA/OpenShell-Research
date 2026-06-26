@@ -11,8 +11,12 @@ from scipy.signal import resample
 
 from reachy_mini import ReachyMini
 from reachy_mini.media.media_manager import MediaBackend
-from reachy_mini_conversation_app.config import config
-from reachy_mini_conversation_app.openai_realtime import OpenaiRealtimeHandler
+from reachy_mini_conversation_app.config import (
+    BACKEND_OPENAI_REALTIME,
+    load_dotenv_file,
+)
+from reachy_mini_conversation_app.backend_runtime import selected_backend, backend_config_error
+from reachy_mini_conversation_app.conversation_stream import ConversationStreamHandler
 
 
 logger = logging.getLogger(__name__)
@@ -23,13 +27,13 @@ class LocalStream:
 
     def __init__(
         self,
-        handler: OpenaiRealtimeHandler,
+        handler: ConversationStreamHandler,
         robot: ReachyMini,
         *,
         settings_app: Optional[Any] = None,
         instance_path: Optional[str] = None,
     ):
-        """Initialize the stream with an OpenAI realtime handler and pipelines.
+        """Initialize the stream with a conversation handler and pipelines.
 
         - ``settings_app``: reserved for the Reachy Mini Apps runtime.
         - ``instance_path``: directory where per-instance ``.env`` should be stored.
@@ -47,22 +51,30 @@ class LocalStream:
     def launch(self) -> None:
         """Start the recorder/player and run the async processing loops.
 
-        Provider credentials are loaded from `.env` only. If `OPENAI_API_KEY` is
-        missing, startup stops before media is opened.
+        Provider credentials are loaded from `.env` or exported process
+        variables. If required backend config is missing, startup stops before
+        media is opened.
         """
         self._stop_event.clear()
 
         # Try to load an existing instance .env first for Reachy Mini app-shell runs.
         if self._instance_path:
             try:
-                env_path = Path(self._instance_path) / ".env"
-                if config.load_dotenv_file(env_path):
-                    self.handler.set_audio_input_mode(config.AUDIO_INPUT_MODE)
-            except Exception:
-                pass  # Instance .env loading is optional; continue with defaults
+                load_dotenv_file(Path(self._instance_path) / ".env")
+            except Exception as exc:
+                logger.debug("Instance .env loading skipped: %s", exc)
 
-        if not (config.OPENAI_API_KEY and str(config.OPENAI_API_KEY).strip()):
-            logger.error("OPENAI_API_KEY is missing. Add it to .env and restart the conversation app.")
+        missing_reason = self._missing_backend_config()
+        if missing_reason:
+            if selected_backend().provider == BACKEND_OPENAI_REALTIME and "OPENAI_API_KEY" in missing_reason:
+                logger.error(
+                    "%s Export OPENAI_API_KEY in the shell that starts the app, or set "
+                    "OPENAI_REALTIME_API_KEY in .env only if this app needs a different OpenAI key. "
+                    "Then restart the conversation app.",
+                    missing_reason,
+                )
+            else:
+                logger.error("%s Add the missing value to .env and restart the conversation app.", missing_reason)
             return
 
         # Start media after key is set/available
@@ -73,7 +85,7 @@ class LocalStream:
         async def runner() -> None:
             self._asyncio_loop = asyncio.get_running_loop()  # type: ignore[assignment]
             self._tasks = [
-                asyncio.create_task(self.handler.start_up(), name="openai-handler"),
+                asyncio.create_task(self.handler.start_up(), name="conversation-handler"),
                 asyncio.create_task(self.record_loop(), name="stream-record-loop"),
                 asyncio.create_task(self.play_loop(), name="stream-play-loop"),
             ]
@@ -87,13 +99,17 @@ class LocalStream:
 
         asyncio.run(runner())
 
+    def _missing_backend_config(self) -> str | None:
+        """Return a startup-blocking config error for the selected backend, if any."""
+        return backend_config_error()
+
     def close(self) -> None:
         """Stop the stream and underlying media pipelines.
 
         This method:
         - Stops audio recording and playback first
         - Sets the stop event to signal async loops to terminate
-        - Cancels all pending async tasks (openai-handler, record-loop, play-loop)
+        - Cancels all pending async tasks (conversation-handler, record-loop, play-loop)
         """
         logger.info("Stopping LocalStream...")
 
@@ -123,11 +139,19 @@ class LocalStream:
     def clear_audio_queue(self) -> None:
         """Flush the player's appsrc to drop any queued audio immediately."""
         logger.info("User intervention: flushing player queue")
+        audio = self._robot.media.audio
         if self._robot.media.backend == MediaBackend.GSTREAMER:
             # Directly flush gstreamer audio pipe
-            self._robot.media.audio.clear_player()
-        elif self._robot.media.backend == MediaBackend.DEFAULT or self._robot.media.backend == MediaBackend.DEFAULT_NO_VIDEO:
-            self._robot.media.audio.clear_output_buffer()
+            clear_player = getattr(audio, "clear_player", None)
+            if callable(clear_player):
+                clear_player()
+        elif (
+            self._robot.media.backend == MediaBackend.DEFAULT
+            or self._robot.media.backend == MediaBackend.DEFAULT_NO_VIDEO
+        ):
+            clear_output_buffer = getattr(audio, "clear_output_buffer", None)
+            if callable(clear_output_buffer):
+                clear_output_buffer()
         self.handler.output_queue = asyncio.Queue()
 
     async def record_loop(self) -> None:

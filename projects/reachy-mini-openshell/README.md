@@ -1,6 +1,5 @@
 ---
-
-## title: Reachy OpenShell
+title: Reachy OpenShell
 emoji: 🤖
 colorFrom: purple
 colorTo: gray
@@ -9,6 +8,7 @@ pinned: false
 tags:
   - reachy_mini
   - reachy_mini_python_app
+---
 
 # 🤖 Reachy OpenShell
 
@@ -27,20 +27,16 @@ The Python package and command names intentionally match that template:
 - console script: `reachy-mini-conversation-app`
 - Reachy Mini Apps entry point: `reachy_mini_conversation_app`
 
-The app is no longer the old `reachy_openshell` smoke/backend scaffold. There is
-no standalone backend server on port `8080`, no `reachy_openshell.backend`, and
-no `reachy_openshell.smoke` module. Runtime communication goes through the
-Reachy Mini SDK and daemon, while the conversation UI is provided by Gradio or
-the Reachy Mini app shell.
+Runtime communication goes through the Reachy Mini SDK and daemon. The
+conversation UI is provided by Gradio or the Reachy Mini app shell.
 
 ## What Is Here
 
 This project contains:
 
 - a forked Reachy Mini voice conversation app
-- OpenAI Realtime audio conversation support
-- Riva streaming ASR support for microphone-to-text input
-- text conversation support through OpenAI-compatible Chat Completions
+- selectable voice backends for OpenAI Realtime, Hugging Face realtime, and
+local STT + Chat Completions + TTS
 - Reachy Mini movement, dance, emotion, and look-around tools
 - a locked OpenShell profile for instructions and tool selection
 - optional camera, local vision, YOLO head-tracking, and MediaPipe head-tracking
@@ -55,9 +51,7 @@ this project. The SDK is pinned to the version compatible with the forked
 conversation-app dependency stack.
 - a running Reachy Mini daemon, either connected to hardware or started in
 simulator mode
-- an API key for conversation. OpenAI Realtime microphone mode requires an
-OpenAI-compatible Realtime model; Riva STT and text mode can use
-OpenAI-compatible Chat Completions providers such as NVIDIA NIM.
+- provider credentials for the backend selected in `.env`
 
 ## Install
 
@@ -68,31 +62,73 @@ cd projects/reachy-mini-openshell
 uv venv --python 3.12
 source .venv/bin/activate
 uv sync
-cp .env.example .env
 ```
 
-Then edit `.env`. For OpenAI Realtime microphone and text input, use:
+Then choose one backend starter and copy it to `.env`:
 
 ```bash
-OPENAI_API_KEY=your_api_key_here
-OPENAI_BASE_URL=https://api.openai.com/v1
-MODEL_NAME=gpt-realtime
-AUDIO_INPUT_MODE=openai_realtime
+cp .env.openai-realtime.example .env
+# or: cp .env.hf-realtime.example .env
+# or: cp .env.local-stt.example .env
 ```
 
-For NVIDIA-hosted text input through an OpenAI-compatible Chat Completions
-endpoint, reference your existing NVIDIA API key environment variable:
+`.env.example` is the combined local-STT starter used by the launcher when no
+`.env` exists.
+
+For the OpenAI Realtime API:
 
 ```bash
-OPENAI_API_KEY=${NVIDIA_API_KEY}
-OPENAI_BASE_URL=https://inference-api.nvidia.com/v1
-MODEL_NAME=azure/anthropic/claude-opus-4-8
-AUDIO_INPUT_MODE=text
+BACKEND_PROVIDER=openai_realtime
+OPENAI_REALTIME_BASE_URL=https://api.openai.com/v1
+OPENAI_REALTIME_MODEL=gpt-realtime
+OPENAI_REALTIME_VOICE=cedar
+```
+
+OpenAI Realtime uses the standard, globally exported `OPENAI_API_KEY` directly.
+Do not copy the global key into `.env` for the normal OpenAI path. Start the app
+from a shell where `OPENAI_API_KEY` is already exported. Set
+`OPENAI_REALTIME_API_KEY` in `.env` only when this app should use a different
+key from the global OpenAI key.
+
+For the default Pollen/Hugging Face realtime path:
+
+```bash
+BACKEND_PROVIDER=hf_realtime
+HF_REALTIME_CONNECTION_MODE=deployed
+HF_REALTIME_MODEL=
+HF_REALTIME_VOICE=Aiden
+```
+
+For a local Hugging Face realtime backend, use a direct websocket endpoint:
+
+```bash
+BACKEND_PROVIDER=hf_realtime
+HF_REALTIME_CONNECTION_MODE=local
+HF_REALTIME_WS_URL=ws://127.0.0.1:8765/v1/realtime
+```
+
+For a local STT cascade, combine an OpenAI-compatible STT endpoint, a Chat
+Completions model, and a TTS endpoint:
+
+```bash
+BACKEND_PROVIDER=local_stt
+CHAT_API_KEY=${NVIDIA_INFERENCE_API_KEY}
+CHAT_BASE_URL=https://inference-api.nvidia.com/v1
+CHAT_MODEL_NAME=azure/anthropic/claude-opus-4-8
+STT_API_KEY=not-needed
+STT_BASE_URL=http://127.0.0.1:9000/v1
+STT_MODEL_NAME=whisper-1
+TTS_API_KEY=${OPENAI_API_KEY}
+TTS_BASE_URL=https://api.openai.com/v1
+TTS_MODEL_NAME=gpt-4o-mini-tts
+TTS_VOICE=cedar
 ```
 
 Use the exact model ID exposed by your provider. For example, NVIDIA model IDs
 can look like `nvidia/nemotron-3-super-120b-a12b` or
 `azure/anthropic/claude-opus-4-8`, depending on the endpoint and account.
+The API key value can reference any exported system environment variable using
+dotenv syntax, for example `${NVIDIA_INFERENCE_API_KEY}`.
 
 If you are not using `uv`, install the app in editable mode from the project
 directory:
@@ -115,10 +151,9 @@ and regenerate `uv.lock` for that platform.
 
 ## Optional Dependencies
 
-The active optional dependency groups cover Riva ASR and vision:
+The active optional dependency groups are vision-related only:
 
 ```bash
-uv sync --extra riva
 uv sync --extra local_vision
 uv sync --extra yolo_vision
 uv sync --extra mediapipe_vision
@@ -128,16 +163,11 @@ uv sync --extra all_vision
 With `pip`, use the equivalent editable installs:
 
 ```bash
-python -m pip install -e '.[riva]'
 python -m pip install -e '.[local_vision]'
 python -m pip install -e '.[yolo_vision]'
 python -m pip install -e '.[mediapipe_vision]'
 python -m pip install -e '.[all_vision]'
 ```
-
-The `riva` extra is intentionally marked incompatible with `mediapipe_vision`
-and `all_vision` because the current Riva and MediaPipe client stacks require
-different protobuf ranges.
 
 There are no project-level `backend` or `sim` extras anymore. The previous
 backend extra belonged to the deleted scaffold. The default dependency set
@@ -146,36 +176,66 @@ workflow starts `reachy-mini-daemon --sim` from this environment.
 
 ## Configuration
 
-The app loads `.env` from the current directory or a parent directory. Provider
-credentials and routing must be configured in `.env`; they are not accepted from
-the browser UI or the Reachy Mini settings UI.
+The app loads `.env` from the current directory or a parent directory. To use a
+candidate file without replacing `.env`, set `REACHY_MINI_DOTENV_PATH` before
+starting the app. Backend routing and model selection are configured in dotenv
+files; credentials are read from dotenv values, dotenv references to exported
+variables, or exported `OPENAI_API_KEY` for OpenAI Realtime. They are not
+accepted from the browser UI or the Reachy Mini settings UI.
 
 Supported `.env` values:
 
-- `OPENAI_API_KEY`: API key used by the configured model provider. This can
-reference another exported environment variable, such as
-`${NVIDIA_API_KEY}`.
-- `OPENAI_BASE_URL`: OpenAI-compatible API base URL.
-- `MODEL_NAME`: provider model ID. Model names containing `realtime` use the
-Realtime path; other model IDs use Chat Completions for text input.
-- `AUDIO_INPUT_MODE`: initial input mode. Use `text` for the default typed
-message path, `openai_realtime` when microphone audio should go to an
-OpenAI-compatible Realtime endpoint, or `riva_stt` to stream microphone audio
-to Riva ASR and pass final transcripts into the text LLM path.
-- `RIVA_SERVER_URI`: Riva ASR server URI, for example `localhost:50051` or
-`http://riva-host:9000`. URL schemes are normalized for the Riva client.
-- `RIVA_USE_SSL`: optional override for TLS-enabled Riva endpoints. If this is
-unset and `RIVA_SERVER_URI` starts with `https://`, TLS is enabled.
-- `RIVA_LANGUAGE_CODE`: BCP-47 language code for Riva ASR, such as `en-US`.
-- `RIVA_ASR_MODEL`: optional Riva ASR model name. Leave empty to let Riva
-select a model from the language/configuration.
-- `RIVA_AUTHORIZATION`: optional authorization metadata value, such as a bearer
-token, for hosted Riva endpoints.
-- `RIVA_METADATA`: optional comma-separated `key=value` metadata pairs passed
-to the Riva client.
+- `BACKEND_PROVIDER`: one of `openai_realtime`, `hf_realtime`, or `local_stt`.
+This is the only switch that selects the voice backend. The app does not choose
+a backend implicitly; missing or unknown values fail preflight and startup.
+- `OPENAI_API_KEY`: standard global OpenAI API key used directly by
+`BACKEND_PROVIDER=openai_realtime` when it is exported in the shell that starts
+the app. This is the normal OpenAI Realtime credential path. It can also be
+referenced from other dotenv values such as `TTS_API_KEY=${OPENAI_API_KEY}`.
+- `OPENAI_REALTIME_API_KEY`: optional override for
+`BACKEND_PROVIDER=openai_realtime`. Leave this unset unless the app should use a
+different OpenAI key from the global `OPENAI_API_KEY`.
+- `OPENAI_REALTIME_BASE_URL`: OpenAI Realtime API base URL. Defaults to
+`https://api.openai.com/v1`.
+- `OPENAI_REALTIME_MODEL`: OpenAI Realtime model ID.
+- `OPENAI_REALTIME_VOICE`: OpenAI Realtime voice name.
+- `HF_REALTIME_CONNECTION_MODE`: `deployed` for the default Pollen/Hugging Face
+session broker, or `local` for a self-hosted Hugging Face realtime backend.
+- `HF_REALTIME_SESSION_URL`: deployed Hugging Face session broker URL. Defaults
+to the Pollen broker and usually does not need to be set.
+- `HF_REALTIME_WS_URL`: local Hugging Face realtime websocket URL, required
+when `HF_REALTIME_CONNECTION_MODE=local`.
+- `HF_REALTIME_MODEL`: optional model ID passed to the Hugging Face realtime
+backend. Leave empty to let the backend choose its default.
+- `HF_REALTIME_VOICE`: voice name passed to the Hugging Face realtime backend.
+- `HF_TOKEN`: optional token used by the deployed Hugging Face session broker
+and gated Hugging Face models.
+- `CHAT_API_KEY`: API key for `BACKEND_PROVIDER=local_stt` Chat Completions.
+This can reference an exported shell variable, such as
+`${NVIDIA_INFERENCE_API_KEY}`.
+- `CHAT_BASE_URL`: OpenAI-compatible Chat Completions base URL.
+- `CHAT_MODEL_NAME`: exact Chat Completions model ID exposed by the provider.
+- `STT_BASE_URL`: OpenAI-compatible speech-to-text base URL. Microphone input
+is buffered into a short WAV phrase, transcribed through this endpoint, then
+passed to Chat Completions.
+- `STT_API_KEY`: API key for `STT_BASE_URL`. For local no-auth STT endpoints,
+use `not-needed`.
+- `STT_MODEL_NAME`: transcription model ID. Defaults to `whisper-1`.
+- `TTS_BASE_URL`: OpenAI-compatible text-to-speech base URL.
+- `TTS_API_KEY`: API key for `TTS_BASE_URL`. For local no-auth TTS endpoints,
+use `not-needed`.
+- `TTS_MODEL_NAME`: speech model ID. Defaults to `gpt-4o-mini-tts`.
+- `TTS_VOICE`: voice name for synthesized Reachy speech.
+- `MIC_TRANSCRIPTION_RMS_THRESHOLD`: voice activity threshold for mic-to-text.
+Defaults to `500`.
+- `MIC_TRANSCRIPTION_MIN_AUDIO_MS`: minimum phrase length before the app can
+submit audio for transcription. Defaults to `250`.
+- `MIC_TRANSCRIPTION_SILENCE_MS`: trailing silence used to end a phrase.
+Defaults to `800`.
+- `MIC_TRANSCRIPTION_MAX_AUDIO_MS`: maximum phrase length before forcing a
+transcription request. Defaults to `12000`.
 - `LOCAL_VISION_MODEL`: Hugging Face model used with `--local-vision`.
 - `HF_HOME`: Hugging Face cache directory. Defaults to `./cache`.
-- `HF_TOKEN`: optional Hugging Face token for gated models.
 
 ## Run Locally
 
@@ -186,19 +246,19 @@ projects/reachy-mini-openshell/scripts/start-local.sh
 ```
 
 The script creates `.venv` when needed, runs `uv sync`, creates `.env` from
-`.env.example` if missing, starts `reachy-mini-daemon --sim`, launches the
-Gradio app, and prints the browser URL:
+`.env.example` if missing, validates the selected backend config, starts
+`reachy-mini-daemon --sim`, launches the Gradio app, and prints the browser URL:
 
 ```text
 http://127.0.0.1:7860/
 ```
 
 If port `7860` is busy, the launcher chooses the next free port through `7899`
-and prints that URL instead. Pass app flags that are compatible with the
-no-camera simulator baseline after the script name:
+and prints that URL instead. Pass app flags after the script name:
 
 ```bash
 projects/reachy-mini-openshell/scripts/start-local.sh --debug
+projects/reachy-mini-openshell/scripts/start-local.sh --head-tracker yolo
 ```
 
 From inside `projects/reachy-mini-openshell`, the shorter form is:
@@ -220,19 +280,164 @@ reachy-mini-daemon --sim --scene minimal --headless --no-media --fastapi-host 12
 python -m reachy_mini_conversation_app --gradio --no-camera
 ```
 
-The Gradio UI includes an `Input` selector:
+Before starting the app, you can validate the selected backend without opening
+the browser or connecting to Reachy:
 
-- `OpenAI Realtime`: Realtime microphone behavior. Audio streams to an
-OpenAI-compatible Realtime endpoint, which handles transcription and response
-generation in one session.
-- `Riva STT`: microphone audio streams to Riva ASR. Final transcripts are sent
-to the same text LLM path used by typed messages, so OpenAI-compatible Chat
-Completions providers such as NVIDIA NIM can answer.
-- `Text`: typed messages only.
+```bash
+reachy-mini-backend-check
+python -m reachy_mini_conversation_app.backend_check
+```
 
-Tool calls are supported in text mode and in the Riva STT path; the app keeps
-the tool schema attached on the post-tool follow-up request for providers that
-require it.
+To validate a candidate dotenv file without replacing `.env`, pass it
+explicitly:
+
+```bash
+reachy-mini-backend-check --env-file .env.local-stt.example
+```
+
+Launch the app with that same candidate file, or with your edited private copy,
+by setting `REACHY_MINI_DOTENV_PATH`:
+
+```bash
+REACHY_MINI_DOTENV_PATH=.env.local-stt.example \
+  python -m reachy_mini_conversation_app --gradio --no-camera
+```
+
+The preflight can also call configured backend endpoints:
+
+```bash
+reachy-mini-backend-check --live
+reachy-mini-backend-check --env-file .env.local-stt.example --live
+```
+
+For `BACKEND_PROVIDER=openai_realtime` and `BACKEND_PROVIDER=hf_realtime`,
+`--live` opens a realtime session, sends the app's session configuration, and
+then shuts the session down. For `BACKEND_PROVIDER=local_stt`, `--live`
+defaults to the app-flow check: it feeds audio through the handler's microphone
+receive path against fake Reachy dependencies, then verifies
+`mic frame handling -> STT -> Chat Completions -> Reachy tools -> TTS`.
+
+Without `--audio-file`, the live check synthesizes a short seed phrase through
+the configured TTS endpoint, sends that audio to STT, sends the transcript to
+Chat Completions, then synthesizes the assistant response. It prints only
+non-secret routing details, the transcript, response text, and audio durations.
+
+When setting up local STT services one at a time, use `--stage` to check only
+the piece you have ready:
+
+```bash
+reachy-mini-backend-check --env-file .env.local-stt.example --live --stage stt-probe
+reachy-mini-backend-check --env-file .env.local-stt.example --live --stage stt \
+  --audio-file ./sample-input.wav
+reachy-mini-backend-check --env-file .env.local-stt.example --live --stage chat \
+  --seed-text "Reachy, use the sweep_look tool, then tell me what you did." \
+  --require-tool
+reachy-mini-backend-check --env-file .env.local-stt.example --live --stage tts \
+  --seed-text "Hello, I am Reachy."
+reachy-mini-backend-check --env-file .env.local-stt.example --live --stage chain \
+  --audio-file ./sample-input.wav
+```
+
+`--stage stt-probe` only needs `STT_*` values. It checks `/models` when that
+endpoint is available, reports whether `STT_MODEL_NAME` is listed, then sends a
+short synthetic WAV to `/audio/transcriptions`. It passes if the endpoint can
+handle an audio request, even if the probe tone transcribes to empty text.
+`--stage stt` checks actual transcription quality and only needs `STT_*`
+values and an audio file unless TTS is already configured to synthesize the
+seed phrase. `--stage chat` only needs `CHAT_*` values and can validate
+model/tool compatibility before STT or TTS are ready. `--stage tts` only needs
+`TTS_*` values. `--stage chain` checks the direct `STT -> Chat Completions ->
+TTS` endpoint chain without the app handler or Reachy tool path.
+
+The app-flow path is the default local-STT live check, but you can name it
+explicitly with `--stage app-flow` or its `--app-flow` shortcut:
+
+```bash
+reachy-mini-backend-check --live --stage app-flow \
+  --seed-text "Reachy, use the sweep_look tool, then tell me what you did."
+reachy-mini-backend-check --live --app-flow --require-tool \
+  --seed-text "Reachy, use the sweep_look tool, then tell me what you did."
+```
+
+When the simulator daemon or a physical Reachy Mini is already running, add
+`--real-reachy` to use the real Reachy SDK client and movement manager instead
+of fake tool dependencies:
+
+```bash
+reachy-mini-backend-check --live --stage app-flow --require-tool --real-reachy \
+  --seed-text "Reachy, use the sweep_look tool, then tell me what you did."
+```
+
+Use `--robot-name <name>` with `--real-reachy` if your daemon is advertised
+under a non-default robot name.
+
+If your real STT endpoint is not online yet, run the local fake
+OpenAI-compatible smoke workflow:
+
+```bash
+scripts/smoke-local-stt.sh
+scripts/smoke-local-stt.sh --real-reachy
+scripts/smoke-local-stt.sh --gradio
+```
+
+The first command starts a fake STT/chat/TTS backend and checks the app handler
+path against fake Reachy dependencies. The second also connects through the
+Reachy SDK and movement manager, so it requires the simulator daemon or a
+physical Reachy Mini to be running. The `--gradio` variant launches the actual
+Gradio app, verifies the `Talk with Reachy Mini` UI, and sends a text tool-call
+prompt through the running app process. It also requires a running daemon or
+simulator.
+
+For manual debugging, you can run the fake backend directly:
+
+```bash
+uv run python scripts/fake_openai_backend.py
+```
+
+Then point a disposable smoke config at it:
+
+```bash
+cat > .env.smoke <<'EOF'
+BACKEND_PROVIDER=local_stt
+CHAT_API_KEY=not-needed
+CHAT_BASE_URL=http://127.0.0.1:8766/v1
+CHAT_MODEL_NAME=fake-chat
+STT_API_KEY=not-needed
+STT_BASE_URL=http://127.0.0.1:8766/v1
+STT_MODEL_NAME=fake-whisper
+TTS_API_KEY=not-needed
+TTS_BASE_URL=http://127.0.0.1:8766/v1
+TTS_MODEL_NAME=fake-tts
+TTS_VOICE=fake-voice
+EOF
+
+reachy-mini-backend-check --env-file .env.smoke --live --stage app-flow --require-tool
+reachy-mini-backend-check --env-file .env.smoke --live --stage app-flow --require-tool --real-reachy
+```
+
+This fake backend validates the app's OpenAI-compatible HTTP plumbing, tool
+loop, and audio handoff. It does not validate STT accuracy, provider auth, or a
+real model's tool-calling behavior.
+
+`--require-tool` applies to `--stage chat` and `--stage app-flow`; it fails if
+the model does not call a Reachy tool. This is useful for checking model/tool
+compatibility, but it still does not replace the final browser microphone and
+simulator validation.
+
+The Gradio UI includes an `Input` selector. With `BACKEND_PROVIDER` set to
+`openai_realtime` or `hf_realtime`, `Microphone` streams audio directly to the
+selected realtime backend. With `BACKEND_PROVIDER=local_stt`, `Microphone`
+sends each spoken phrase to the configured `STT_BASE_URL` transcription
+endpoint, sends the transcript through Chat Completions, then synthesizes
+Reachy's spoken reply through `TTS_BASE_URL`. Tool calls are supported in text
+mode and in microphone-to-text mode; the app keeps the tool schema attached on
+the post-tool follow-up request for providers that require it.
+
+If the microphone appears to connect but no transcript or model response
+arrives, check the visible chat error and your `.env` values. For Chat
+Completions models, verify that `STT_BASE_URL` points at an OpenAI-compatible
+`/audio/transcriptions` service and that `STT_MODEL_NAME` matches the model
+served by that endpoint.
 
 ## Runtime Flags
 
@@ -300,9 +505,8 @@ uv run ty check
 ```
 
 `ty` is the selected Python type checker for this project. The current copied
-conversation-app baseline still reports diagnostics in motion, vision, optional
-dependency, and SDK event typing, so use `uv run ty check` as the active audit
-while that baseline is tightened.
+conversation-app baseline is expected to pass `uv run ty check` before changes
+are merged.
 
 Tests require the development dependency group:
 
@@ -320,14 +524,31 @@ name to the app with `--robot-name`.
 If `--local-vision`, `--head-tracker yolo`, or `--head-tracker mediapipe` fails
 with an import error, install the matching optional dependency group.
 
-If text mode returns `404 page not found`, check that `OPENAI_BASE_URL` matches
-the provider's OpenAI-compatible endpoint and that `MODEL_NAME` is an exact
-model ID from that provider. A catalog name, marketing page slug, or doubled
-namespace may not be accepted by `/chat/completions`.
+If `reachy-mini-backend-check` reports older config keys such as
+`OPENAI_BASE_URL` or `MODEL_NAME`, replace that `.env` shape with one of the
+current `BACKEND_PROVIDER` configurations. Those old keys are intentionally not
+used.
+
+If text mode returns `404 page not found` with `BACKEND_PROVIDER=local_stt`,
+check that `CHAT_BASE_URL` is a plain OpenAI-compatible endpoint string, such
+as `https://inference-api.nvidia.com/v1`, and that `CHAT_MODEL_NAME` is an
+exact model ID from that provider. A catalog name, marketing page slug, or
+doubled namespace may not be accepted by `/chat/completions`.
 
 If text mode returns `401 Unauthorized` with NVIDIA endpoints, make sure
-`OPENAI_API_KEY=${NVIDIA_API_KEY}` resolves to a key that is authorized for
-generation, not only model listing.
+`CHAT_API_KEY=${NVIDIA_INFERENCE_API_KEY}` resolves to a key that is authorized
+for generation, not only model listing.
+
+If microphone-to-text returns a transcription error, make sure `STT_BASE_URL`
+includes the `/v1` base path expected by OpenAI-compatible clients, for example
+`http://<stt-host>:9000/v1`, and that the service exposes
+`POST /audio/transcriptions` for the configured `STT_MODEL_NAME`.
+
+If a vLLM-hosted STT endpoint returns `Please install vllm[audio] for audio
+support`, the service is reachable but was deployed without vLLM's audio
+dependencies. Redeploy the local STT service with the audio extra enabled, then
+rerun `reachy-mini-backend-check --live --stage stt-probe` followed by
+`reachy-mini-backend-check --live --stage stt`.
 
 If `uv sync` tries to build `pygobject` or `pycairo` on macOS, the resolver is
 including a Linux media dependency path. This project scopes uv resolution to

@@ -46,7 +46,6 @@ def test_vision_config_custom_values() -> None:
     assert config.device_preference == "cpu"
 
 
-
 @pytest.fixture
 def mock_torch() -> Any:
     """Mock torch module to avoid loading actual models."""
@@ -61,9 +60,10 @@ def mock_torch() -> Any:
 @pytest.fixture
 def mock_transformers() -> Any:
     """Mock transformers module."""
-    with patch("reachy_mini_conversation_app.vision.processors.AutoProcessor") as proc, \
-         patch("reachy_mini_conversation_app.vision.processors.AutoModelForImageTextToText") as model:
-
+    with (
+        patch("reachy_mini_conversation_app.vision.processors.AutoProcessor") as proc,
+        patch("reachy_mini_conversation_app.vision.processors.AutoModelForImageTextToText") as model,
+    ):
         # Mock processor
         mock_processor = MagicMock()
         mock_processor.apply_chat_template.return_value = {
@@ -381,7 +381,7 @@ def test_vision_manager_skips_invalid_responses(mock_torch: Any, mock_transforme
         manager = VisionManager(mock_camera, config)
 
         # Mock the processor's process_image method to return invalid response
-        with patch.object(manager.processor, 'process_image', return_value="Vision model not initialized"):
+        with patch.object(manager.processor, "process_image", return_value="Vision model not initialized"):
             initial_time = manager._last_processed_time
 
             manager.start()
@@ -394,10 +394,11 @@ def test_vision_manager_skips_invalid_responses(mock_torch: Any, mock_transforme
 
 def test_initialize_vision_manager_success(mock_torch: Any, mock_transformers: Any, mock_camera: Mock) -> None:
     """Test initialize_vision_manager creates VisionManager successfully."""
-    with patch("reachy_mini_conversation_app.vision.processors.snapshot_download") as mock_download, \
-         patch("reachy_mini_conversation_app.vision.processors.os.makedirs"), \
-         patch("reachy_mini_conversation_app.vision.processors.config") as mock_config:
-
+    with (
+        patch("reachy_mini_conversation_app.vision.processors.snapshot_download") as mock_download,
+        patch("reachy_mini_conversation_app.vision.processors.os.makedirs"),
+        patch("reachy_mini_conversation_app.vision.processors.config") as mock_config,
+    ):
         mock_config.LOCAL_VISION_MODEL = "test/model"
         mock_config.HF_HOME = "/tmp/hf_cache"
 
@@ -410,10 +411,11 @@ def test_initialize_vision_manager_success(mock_torch: Any, mock_transformers: A
 
 def test_initialize_vision_manager_download_failure(mock_torch: Any, mock_camera: Mock) -> None:
     """Test initialize_vision_manager handles download failure."""
-    with patch("reachy_mini_conversation_app.vision.processors.snapshot_download") as mock_download, \
-         patch("reachy_mini_conversation_app.vision.processors.os.makedirs"), \
-         patch("reachy_mini_conversation_app.vision.processors.config") as mock_config:
-
+    with (
+        patch("reachy_mini_conversation_app.vision.processors.snapshot_download") as mock_download,
+        patch("reachy_mini_conversation_app.vision.processors.os.makedirs"),
+        patch("reachy_mini_conversation_app.vision.processors.config") as mock_config,
+    ):
         mock_config.LOCAL_VISION_MODEL = "test/model"
         mock_config.HF_HOME = "/tmp/hf_cache"
         mock_download.side_effect = Exception("Network error")
@@ -425,11 +427,12 @@ def test_initialize_vision_manager_download_failure(mock_torch: Any, mock_camera
 
 def test_initialize_vision_manager_processor_failure(mock_torch: Any, mock_camera: Mock) -> None:
     """Test initialize_vision_manager handles processor initialization failure."""
-    with patch("reachy_mini_conversation_app.vision.processors.snapshot_download"), \
-         patch("reachy_mini_conversation_app.vision.processors.os.makedirs"), \
-         patch("reachy_mini_conversation_app.vision.processors.config") as mock_config, \
-         patch("reachy_mini_conversation_app.vision.processors.AutoProcessor") as mock_proc:
-
+    with (
+        patch("reachy_mini_conversation_app.vision.processors.snapshot_download"),
+        patch("reachy_mini_conversation_app.vision.processors.os.makedirs"),
+        patch("reachy_mini_conversation_app.vision.processors.config") as mock_config,
+        patch("reachy_mini_conversation_app.vision.processors.AutoProcessor") as mock_proc,
+    ):
         mock_config.LOCAL_VISION_MODEL = "test/model"
         mock_config.HF_HOME = "/tmp/hf_cache"
         mock_proc.from_pretrained.side_effect = Exception("Model load error")

@@ -18,8 +18,8 @@ class GotoQueueMove(Move):  # type: ignore[misc]
 
     def __init__(
         self,
-        target_head_pose: NDArray[np.float32],
-        start_head_pose: NDArray[np.float32] | None = None,
+        target_head_pose: NDArray[np.float64],
+        start_head_pose: NDArray[np.float64] | None = None,
         target_antennas: Tuple[float, float] = (0, 0),
         start_antennas: Tuple[float, float] | None = None,
         target_body_yaw: float = 0,

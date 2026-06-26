@@ -8,22 +8,41 @@ from dataclasses import dataclass
 
 import cv2
 import numpy as np
-import torch
 from numpy.typing import NDArray
-from transformers import AutoProcessor, AutoModelForImageTextToText
 from huggingface_hub import snapshot_download
 
 from reachy_mini_conversation_app.config import config
 
 
 logger = logging.getLogger(__name__)
+DEFAULT_LOCAL_VISION_MODEL = "HuggingFaceTB/SmolVLM2-2.2B-Instruct"
+
+try:
+    import torch as _torch  # ty: ignore[unresolved-import]
+except ImportError:
+    _torch = None
+
+try:
+    from transformers import (  # ty: ignore[unresolved-import]
+        AutoProcessor as _AutoProcessor,
+    )
+    from transformers import (  # ty: ignore[unresolved-import]
+        AutoModelForImageTextToText as _AutoModelForImageTextToText,
+    )
+except ImportError:
+    _AutoProcessor = None
+    _AutoModelForImageTextToText = None
+
+torch: Any = _torch
+AutoProcessor: Any = _AutoProcessor
+AutoModelForImageTextToText: Any = _AutoModelForImageTextToText
 
 
 @dataclass
 class VisionConfig:
     """Configuration for vision processing."""
 
-    model_path: str = config.LOCAL_VISION_MODEL
+    model_path: str = config.LOCAL_VISION_MODEL or DEFAULT_LOCAL_VISION_MODEL
     vision_interval: float = 5.0
     max_new_tokens: int = 64
     jpeg_quality: int = 85
@@ -45,6 +64,9 @@ class VisionProcessor:
         self._initialized = False
 
     def _determine_device(self) -> str:
+        if torch is None:
+            return "cpu"
+
         pref = self.vision_config.device_preference
         if pref == "cpu":
             return "cpu"
@@ -60,8 +82,14 @@ class VisionProcessor:
     def initialize(self) -> bool:
         """Load model and processor onto the selected device."""
         try:
+            if torch is None or AutoProcessor is None or AutoModelForImageTextToText is None:
+                raise ImportError(
+                    "Local vision requires the optional local_vision dependencies. "
+                    "Install them with: uv sync --extra local_vision",
+                )
+
             logger.info(f"Loading SmolVLM2 model on {self.device} (HF_HOME={config.HF_HOME})")
-            self.processor = AutoProcessor.from_pretrained(self.model_path)  # type: ignore
+            self.processor = AutoProcessor.from_pretrained(self.model_path)
 
             # Select dtype depending on device
             if self.device == "cuda":
@@ -78,7 +106,7 @@ class VisionProcessor:
                 model_kwargs["_attn_implementation"] = "flash_attention_2"
 
             # Load model weights
-            self.model = AutoModelForImageTextToText.from_pretrained(self.model_path, **model_kwargs).to(self.device)  # type: ignore
+            self.model = AutoModelForImageTextToText.from_pretrained(self.model_path, **model_kwargs).to(self.device)
 
             if self.model is not None:
                 self.model.eval()
@@ -161,21 +189,26 @@ class VisionProcessor:
 
                 return response.replace(chr(10), " ").strip()
 
-            except torch.cuda.OutOfMemoryError as e:
-                logger.error(f"CUDA OOM on attempt {attempt + 1}: {e}")
-                if self.device == "cuda":
-                    torch.cuda.empty_cache()
-                if attempt < self.vision_config.max_retries - 1:
-                    time.sleep(self.vision_config.retry_delay * (attempt + 1))
-                else:
-                    return "GPU out of memory - vision processing failed"
-
             except Exception as e:
+                cuda = getattr(torch, "cuda", None)
+                oom_error = getattr(cuda, "OutOfMemoryError", None)
+                if isinstance(oom_error, type) and isinstance(e, oom_error):
+                    logger.error(f"CUDA OOM on attempt {attempt + 1}: {e}")
+                    if self.device == "cuda":
+                        torch.cuda.empty_cache()
+                    if attempt < self.vision_config.max_retries - 1:
+                        time.sleep(self.vision_config.retry_delay * (attempt + 1))
+                    else:
+                        return "GPU out of memory - vision processing failed"
+                    continue
+
                 logger.error(f"Vision processing failed (attempt {attempt + 1}): {e}")
                 if attempt < self.vision_config.max_retries - 1:
                     time.sleep(self.vision_config.retry_delay)
                 else:
                     return f"Vision processing error after {self.vision_config.max_retries} attempts"
+
+        return "Vision processing failed"
 
     def _extract_response(self, full_text: str) -> str:
         """Extract the assistant's response from the full generated text."""
@@ -287,8 +320,8 @@ def initialize_vision_manager(camera_worker: Any) -> VisionManager | None:
 
     """
     try:
-        model_id = config.LOCAL_VISION_MODEL
-        cache_dir = os.path.expanduser(config.HF_HOME)
+        model_id = config.LOCAL_VISION_MODEL or DEFAULT_LOCAL_VISION_MODEL
+        cache_dir = os.path.expanduser(config.HF_HOME or "./cache")
 
         # Prepare cache directory
         os.makedirs(cache_dir, exist_ok=True)
