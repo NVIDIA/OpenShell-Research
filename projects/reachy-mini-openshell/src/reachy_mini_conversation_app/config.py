@@ -303,7 +303,7 @@ class Config:
         or _process_env_value("OPENAI_API_KEY")
     )
     OPENAI_REALTIME_BASE_URL = _dotenv_url("OPENAI_REALTIME_BASE_URL", "https://api.openai.com/v1")
-    OPENAI_REALTIME_MODEL = _dotenv_value("OPENAI_REALTIME_MODEL", "gpt-realtime")
+    OPENAI_REALTIME_MODEL = _dotenv_value("OPENAI_REALTIME_MODEL", "gpt-realtime-2")
     OPENAI_REALTIME_VOICE = _dotenv_value("OPENAI_REALTIME_VOICE", "cedar")
 
     HF_REALTIME_CONNECTION_MODE = _normalize_hf_connection_mode(_dotenv_value("HF_REALTIME_CONNECTION_MODE"))
@@ -360,7 +360,7 @@ def apply_config_values(values: Mapping[str, str | None], *, inherit_current: bo
     openai_realtime_base_url_default = (
         config.OPENAI_REALTIME_BASE_URL if inherit_current else "https://api.openai.com/v1"
     )
-    openai_realtime_model_default = config.OPENAI_REALTIME_MODEL if inherit_current else "gpt-realtime"
+    openai_realtime_model_default = config.OPENAI_REALTIME_MODEL if inherit_current else "gpt-realtime-2"
     openai_realtime_voice_default = config.OPENAI_REALTIME_VOICE if inherit_current else "cedar"
     hf_realtime_connection_mode_default = (
         config.HF_REALTIME_CONNECTION_MODE if inherit_current else HF_REALTIME_CONNECTION_DEPLOYED

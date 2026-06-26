@@ -6,8 +6,9 @@ setup guide, validation commands, and troubleshooting notes.
 ## Current Projects
 
 - [Reachy Mini conversation demo](reachy-mini-openshell.md): a simulator-first
-  Reachy Mini + OpenShell demo with a Gradio UI, microphone or text input,
-  selectable model backends, and Reachy movement tools.
+  Reachy Mini + OpenShell demo with an OpenAI Realtime quick start, Gradio UI,
+  microphone or text input, optional local speech backends, and Reachy movement
+  tools.
 
 ## Project Page Standard
 

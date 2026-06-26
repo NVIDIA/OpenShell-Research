@@ -2,6 +2,7 @@
 
 Reachy Mini conversation demo for OpenShell: Gradio UI, simulator support,
 microphone or text input, Reachy movement tools, and selectable model backends.
+The default and preferred starting point is OpenAI Realtime.
 
 Commands:
 
@@ -12,15 +13,15 @@ Commands:
 
 ## Quick Start
 
-Recommended first run: OpenAI Realtime + Reachy Mini simulator.
-Recommended local microphone path: Riva ASR NIM + Chat Completions + TTS.
+Start here: OpenAI Realtime + the Reachy Mini simulator.
 
 Requirements:
 
 - macOS
 - Python 3.10, 3.11, or 3.12. Python 3.12 is recommended.
 - `uv`
-- `OPENAI_API_KEY` exported in the shell that starts the app
+- `OPENAI_API_KEY` exported in the shell that starts the app, with access to
+  the OpenAI Realtime API
 
 From the repository root:
 
@@ -46,20 +47,28 @@ In the UI:
 Keep the launcher terminal open. `Ctrl+C` stops the app and the simulator it
 started.
 
+The checked-in `.env.example` already selects `BACKEND_PROVIDER=openai_realtime`.
+Provider keys, base URLs, and model IDs are configured in `.env`, not in the
+browser UI.
+
 ## Backend Selection
 
 Set exactly one backend in `.env`:
 
 | `BACKEND_PROVIDER` | Use when | Requires |
 | --- | --- | --- |
-| `openai_realtime` | You want the fastest full voice demo. | OpenAI Realtime |
-| `hf_realtime` | You want the Pollen/Hugging Face realtime path. | Deployed broker or websocket |
-| `local_stt` | You want Riva ASR NIM or another local STT endpoint before the chat model. | STT, Chat Completions, TTS |
+| `openai_realtime` | First-time setup and the fastest full voice demo. | OpenAI Realtime |
+| `local_stt` | Optional local ASR before Chat Completions and TTS. | Riva ASR NIM or compatible STT, Chat Completions, TTS |
+| `hf_realtime` | Optional Pollen/Hugging Face realtime path. | Deployed broker or websocket |
 
 Credentials and model routes come from `.env` or exported variables referenced
 by `.env`. They are not entered in the browser UI.
 
 ### OpenAI Realtime
+
+This is the recommended path for a first run. It handles microphone input,
+assistant reasoning, Reachy tool calls, and speech output through one Realtime
+session.
 
 ```bash
 cp .env.example .env
@@ -70,17 +79,18 @@ export OPENAI_API_KEY=sk-...
 ```dotenv
 BACKEND_PROVIDER=openai_realtime
 OPENAI_REALTIME_BASE_URL=https://api.openai.com/v1
-OPENAI_REALTIME_MODEL=gpt-realtime
+OPENAI_REALTIME_MODEL=gpt-realtime-2
 OPENAI_REALTIME_VOICE=cedar
 ```
 
 Leave `OPENAI_REALTIME_API_KEY` unset unless this app should use a different
 key from the exported `OPENAI_API_KEY`.
 
-### Riva ASR NIM + Chat + TTS
+### Optional: Riva ASR NIM + Chat + TTS
 
-Use this path when you want microphone input transcribed by Riva before the
-text is sent through Chat Completions and Reachy tools.
+Use this path after the OpenAI Realtime path is working, or when you explicitly
+want microphone input transcribed by a local ASR service before text is sent
+through Chat Completions and Reachy tools.
 
 Requirement: a deployed Riva ASR NIM endpoint reachable from the app host.
 
@@ -170,7 +180,7 @@ ready:
 scripts/smoke-local-stt.sh
 ```
 
-### Hugging Face Realtime
+### Optional: Hugging Face Realtime
 
 ```bash
 cp .env.example .env
