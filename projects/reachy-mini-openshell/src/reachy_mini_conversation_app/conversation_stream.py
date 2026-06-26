@@ -4,25 +4,46 @@ import base64
 import random
 import asyncio
 import logging
-from typing import Any, Final, Tuple, Literal, Optional, cast
+from typing import Any, Final, Tuple, Optional, cast
 from datetime import datetime
 
-import cv2
 import numpy as np
 import gradio as gr
 from openai import AsyncOpenAI
-from fastrtc import AdditionalOutputs, AsyncStreamHandler, wait_for_item, audio_to_int16
+from fastrtc import AdditionalOutputs, AsyncStreamHandler, wait_for_item
 from numpy.typing import NDArray
-from scipy.signal import resample
 from websockets.exceptions import ConnectionClosedError
 
-from reachy_mini_conversation_app.config import LOCKED_PROFILE, config
+from reachy_mini_conversation_app.config import (
+    LOCKED_PROFILE,
+    BACKEND_HF_REALTIME,
+    BACKEND_OPENAI_REALTIME,
+    config,
+    openai_realtime_api_key,
+)
 from reachy_mini_conversation_app.prompts import get_session_voice, get_session_instructions
-from reachy_mini_conversation_app.riva_asr import RivaAsrConfig, RivaStreamingTranscriber
+from reachy_mini_conversation_app.audio.pcm import prepare_mono_int16_audio
+from reachy_mini_conversation_app.backend_runtime import (
+    selected_backend,
+    backend_config_error,
+    local_stt_chat_config_error,
+)
+from reachy_mini_conversation_app.audio.mic_phrase import (
+    MIC_TRANSCRIPTION_SAMPLE_RATE,
+    MicPhraseBuffer,
+    MicPhraseConfig,
+)
 from reachy_mini_conversation_app.tools.core_tools import (
     ToolDependencies,
     get_tool_specs,
-    dispatch_tool_call_with_manager,
+)
+from reachy_mini_conversation_app.local_stt_backend import LocalSTTBackend
+from reachy_mini_conversation_app.realtime_backends import (
+    realtime_context,
+    build_realtime_client,
+    provider_realtime_hint,
+    build_realtime_connect_kwargs,
+    build_realtime_session_config,
 )
 from reachy_mini_conversation_app.tools.background_tool_manager import (
     ToolCallRoutine,
@@ -33,13 +54,6 @@ from reachy_mini_conversation_app.tools.background_tool_manager import (
 
 logger = logging.getLogger(__name__)
 
-OPEN_AI_INPUT_SAMPLE_RATE: Final[Literal[24000]] = 24000
-OPEN_AI_OUTPUT_SAMPLE_RATE: Final[Literal[24000]] = 24000
-AUDIO_MODE_OPENAI_REALTIME: Final = "openai_realtime"
-AUDIO_MODE_RIVA_STT: Final = "riva_stt"
-AUDIO_MODE_TEXT: Final = "text"
-AUDIO_INPUT_MODES: Final = {AUDIO_MODE_OPENAI_REALTIME, AUDIO_MODE_RIVA_STT, AUDIO_MODE_TEXT}
-
 # Cost tracking from usage data (pricing as of Feb 2026 https://openai.com/api/pricing/)
 AUDIO_INPUT_COST_PER_1M = 32.0
 AUDIO_OUTPUT_COST_PER_1M = 64.0
@@ -48,21 +62,6 @@ TEXT_OUTPUT_COST_PER_1M = 16.0
 IMAGE_INPUT_COST_PER_1M = 5.0
 
 _RESPONSE_DONE_TIMEOUT: Final[float] = 30.0
-
-
-def _normalize_audio_input_mode(audio_input_mode: str) -> str:
-    """Normalize configured audio input mode."""
-    normalized = audio_input_mode.strip().lower().replace("-", "_")
-    if normalized in {"openai", "realtime", "microphone"}:
-        return AUDIO_MODE_OPENAI_REALTIME
-    if normalized in {"riva", "riva_asr", "riva_stt"}:
-        return AUDIO_MODE_RIVA_STT
-    if normalized in {"chat", "chat_completions", "text"}:
-        return AUDIO_MODE_TEXT
-    if normalized not in AUDIO_INPUT_MODES:
-        logger.warning("Unknown AUDIO_INPUT_MODE=%r; using %s", audio_input_mode, AUDIO_MODE_OPENAI_REALTIME)
-        return AUDIO_MODE_OPENAI_REALTIME
-    return normalized
 
 
 def _compute_response_cost(usage: Any) -> float:
@@ -80,38 +79,27 @@ def _compute_response_cost(usage: Any) -> float:
     return cost
 
 
-class OpenaiRealtimeHandler(AsyncStreamHandler):
-    """An OpenAI realtime handler for fastrtc Stream."""
+class ConversationStreamHandler(AsyncStreamHandler):
+    """Conversation audio/text stream handler for the selected backend."""
 
-    def __init__(
-        self,
-        deps: ToolDependencies,
-        gradio_mode: bool = False,
-        instance_path: Optional[str] = None,
-        audio_input_mode: str | None = None,
-        audio_input_mode_state: dict[str, str] | None = None,
-    ):
+    def __init__(self, deps: ToolDependencies, gradio_mode: bool = False, instance_path: Optional[str] = None):
         """Initialize the handler."""
+        backend = selected_backend()
+        stream_sample_rate = backend.stream_sample_rate
         super().__init__(
             expected_layout="mono",
-            output_sample_rate=OPEN_AI_OUTPUT_SAMPLE_RATE,
-            input_sample_rate=OPEN_AI_INPUT_SAMPLE_RATE,
+            output_sample_rate=stream_sample_rate,
+            input_sample_rate=stream_sample_rate,
         )
 
-        # Override typing of the sample rates to match OpenAI's requirements
-        self.output_sample_rate: Literal[24000] = self.output_sample_rate
-        self.input_sample_rate: Literal[24000] = self.input_sample_rate
-
         self.deps = deps
-        self._audio_input_mode_state = audio_input_mode_state or {
-            "mode": _normalize_audio_input_mode(audio_input_mode or config.AUDIO_INPUT_MODE)
-        }
 
-        # Override type annotations for OpenAI strict typing (only for values used in API)
-        self.output_sample_rate = OPEN_AI_OUTPUT_SAMPLE_RATE
-        self.input_sample_rate = OPEN_AI_INPUT_SAMPLE_RATE
+        self.output_sample_rate = stream_sample_rate
+        self.input_sample_rate = stream_sample_rate
 
         self.connection: Any = None
+        self.local_stt_backend: LocalSTTBackend | None = None
+        self._realtime_connect_query: dict[str, str] = {}
         self.output_queue: "asyncio.Queue[Tuple[int, NDArray[np.int16]] | AdditionalOutputs]" = asyncio.Queue()
 
         self.last_activity_time = asyncio.get_event_loop().time()
@@ -119,7 +107,6 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
         self.is_idle_tool_call = False
         self.gradio_mode = gradio_mode
         self.instance_path = instance_path
-        self._riva_transcriber: RivaStreamingTranscriber | None = None
 
         # Debouncing for partial transcripts
         self.partial_transcript_task: asyncio.Task[None] | None = None
@@ -147,23 +134,21 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
         self._response_done_event.set()
         self._last_response_rejected: bool = False
 
-    def copy(self) -> "OpenaiRealtimeHandler":
-        """Create a copy of the handler."""
-        return OpenaiRealtimeHandler(
-            self.deps,
-            self.gradio_mode,
-            self.instance_path,
-            audio_input_mode_state=self._audio_input_mode_state,
+        self.mic_phrase_buffer = MicPhraseBuffer(
+            MicPhraseConfig(
+                sample_rate=MIC_TRANSCRIPTION_SAMPLE_RATE,
+                rms_threshold=config.MIC_TRANSCRIPTION_RMS_THRESHOLD,
+                min_audio_ms=config.MIC_TRANSCRIPTION_MIN_AUDIO_MS,
+                silence_ms=config.MIC_TRANSCRIPTION_SILENCE_MS,
+                max_audio_ms=config.MIC_TRANSCRIPTION_MAX_AUDIO_MS,
+            )
         )
+        self._mic_transcription_lock: asyncio.Lock = asyncio.Lock()
+        self._mic_transcription_tasks: set[asyncio.Task[None]] = set()
 
-    @property
-    def audio_input_mode(self) -> str:
-        """Return the current shared microphone audio mode."""
-        return self._audio_input_mode_state["mode"]
-
-    def set_audio_input_mode(self, audio_input_mode: str) -> None:
-        """Select how microphone audio should be processed."""
-        self._audio_input_mode_state["mode"] = _normalize_audio_input_mode(audio_input_mode)
+    def copy(self) -> "ConversationStreamHandler":
+        """Create a copy of the handler."""
+        return ConversationStreamHandler(self.deps, self.gradio_mode, self.instance_path)
 
     def _record_startup_error(self, message: str) -> None:
         """Store a startup failure so the UI can show a useful error."""
@@ -173,94 +158,172 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
         except Exception:
             pass
 
-    def _realtime_context(self) -> str:
-        """Return non-secret Realtime configuration for diagnostics."""
-        return f"model={config.MODEL_NAME!r}, base_url={config.OPENAI_BASE_URL!r}"
-
-    def _provider_realtime_hint(self) -> str:
-        """Return a provider-specific hint for common compatibility failures."""
-        base_url = str(config.OPENAI_BASE_URL)
-        if "integrate.api.nvidia.com" in base_url or "inference-api.nvidia.com" in base_url:
-            return (
-                " NVIDIA OpenAI-compatible chat endpoints use Chat Completions; "
-                "microphone mode requires an OpenAI-compatible Realtime API endpoint."
-            )
-        return ""
-
     def _not_connected_message(self) -> str:
         """Return the user-facing reason the Realtime session is unavailable."""
         if self._startup_error:
             return f"[error] {self._startup_error}"
         return (
-            "[error] Realtime session is not connected. Check OPENAI_API_KEY, "
-            "OPENAI_BASE_URL, and MODEL_NAME in .env."
+            "[error] Realtime session is not connected. Check BACKEND_PROVIDER and the matching API key, "
+            "OPENAI_REALTIME_* values, or HF_REALTIME_* values."
         )
+
+    def _record_backend_config_error(self, error: str) -> None:
+        """Store a selected-backend config error for user-facing output."""
+        if selected_backend().provider == BACKEND_OPENAI_REALTIME and "OPENAI_API_KEY" in error:
+            message = (
+                f"{error} Export OPENAI_API_KEY in the shell that starts the app, or set "
+                "OPENAI_REALTIME_API_KEY in .env only if this app needs a different OpenAI key. "
+                "Then restart the conversation app."
+            )
+        else:
+            message = f"{error} Add the missing value to .env and restart the conversation app."
+        self._record_startup_error(message)
+        logger.error(message)
 
     @staticmethod
     def _text_model_uses_realtime() -> bool:
         """Return whether typed messages should use the Realtime transport."""
-        return "realtime" in str(config.MODEL_NAME).lower()
+        return selected_backend().uses_realtime
 
-    @staticmethod
-    def _chat_completion_tool_specs() -> list[dict[str, Any]]:
-        """Convert Realtime-style tool specs to Chat Completions tool specs."""
-        chat_tools: list[dict[str, Any]] = []
-        for tool in get_tool_specs():
-            if tool.get("type") != "function":
-                continue
-            chat_tools.append(
-                {
-                    "type": "function",
-                    "function": {
-                        "name": tool.get("name"),
-                        "description": tool.get("description", ""),
-                        "parameters": tool.get("parameters", {}),
-                    },
-                }
+    def _get_local_stt_backend(self) -> LocalSTTBackend:
+        """Return the local-STT backend adapter."""
+        if self.local_stt_backend is None:
+            self.local_stt_backend = LocalSTTBackend(
+                deps=self.deps,
+                tool_manager=self.tool_manager,
+                client_factory=AsyncOpenAI,
             )
-        return chat_tools
+        return self.local_stt_backend
 
-    @staticmethod
-    def _tool_call_value(tool_call: Any, name: str) -> Any:
-        """Read a value from either an SDK model object or a dict."""
-        if isinstance(tool_call, dict):
-            return tool_call.get(name)
-        return getattr(tool_call, name, None)
+    def _schedule_mic_transcription(self, audio_frame: NDArray[np.int16]) -> None:
+        """Start a background transcription task for a captured mic phrase."""
+        if audio_frame.size == 0:
+            return
 
-    @classmethod
-    def _tool_call_function_value(cls, tool_call: Any, name: str) -> Any:
-        """Read a function value from either an SDK tool-call object or a dict."""
-        function = cls._tool_call_value(tool_call, "function")
-        if isinstance(function, dict):
-            return function.get(name)
-        return getattr(function, name, None)
+        task = asyncio.create_task(
+            self._transcribe_and_send_mic_audio(audio_frame),
+            name="mic-transcribe-and-send",
+        )
+        self._mic_transcription_tasks.add(task)
 
-    @staticmethod
-    def _serialize_tool_call(tool_call: Any) -> dict[str, Any]:
-        """Convert a tool call into the dict shape Chat Completions expects."""
-        if hasattr(tool_call, "model_dump"):
-            return tool_call.model_dump()
-        if isinstance(tool_call, dict):
-            return tool_call
-        return {
-            "id": getattr(tool_call, "id", None),
-            "type": getattr(tool_call, "type", "function"),
-            "function": {
-                "name": getattr(getattr(tool_call, "function", None), "name", None),
-                "arguments": getattr(getattr(tool_call, "function", None), "arguments", "{}"),
-            },
-        }
+        def discard_task(done_task: asyncio.Task[None]) -> None:
+            self._mic_transcription_tasks.discard(done_task)
+            try:
+                done_task.result()
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                logger.exception("Mic transcription task failed")
 
-    def _openai_api_key_or_error(self) -> str | None:
-        """Return the configured API key or record a useful startup error."""
-        openai_api_key = (config.OPENAI_API_KEY or "").strip()
-        if openai_api_key:
-            return openai_api_key
+        task.add_done_callback(discard_task)
+
+    async def _receive_transcribed_text_frame(self, frame: Tuple[int, NDArray[Any]]) -> None:
+        """Buffer microphone audio and transcribe completed phrases for chat models."""
+        self._microphone_error_reported = False
+        phrase_result = self.mic_phrase_buffer.push_frame(frame)
+        if phrase_result.saw_speech:
+            self.last_activity_time = asyncio.get_event_loop().time()
+
+        if phrase_result.phrase_audio is None:
+            return
+
+        self._schedule_mic_transcription(phrase_result.phrase_audio)
+
+    async def _transcribe_and_send_mic_audio(self, audio_frame: NDArray[np.int16]) -> None:
+        """Transcribe microphone audio and send the transcript through text chat."""
+        async with self._mic_transcription_lock:
+            local_backend = self._get_local_stt_backend()
+            try:
+                transcript = await local_backend.transcribe_audio(
+                    audio_frame,
+                    MIC_TRANSCRIPTION_SAMPLE_RATE,
+                    filename="microphone.wav",
+                )
+            except Exception as e:
+                logger.exception("Speech transcription failed")
+                await self.output_queue.put(
+                    AdditionalOutputs(
+                        {
+                            "role": "assistant",
+                            "content": (
+                                f"[error] Speech transcription failed "
+                                f"({local_backend.stt_context}): "
+                                f"{type(e).__name__}: {e}"
+                            ),
+                        },
+                    ),
+                )
+                return
+
+            if not transcript:
+                logger.debug("Speech transcription returned no text")
+                return
+
+            for message in await self.send_text_message(transcript):
+                await self.output_queue.put(AdditionalOutputs(message))
+                if message.get("role") == "assistant" and isinstance(message.get("content"), str):
+                    if message.get("metadata"):
+                        continue
+                    await self._synthesize_assistant_speech(message["content"])
+
+    async def _synthesize_assistant_speech(self, text: str) -> None:
+        """Synthesize assistant text and enqueue audio for playback."""
+        spoken_text = text.strip()
+        if not spoken_text or spoken_text.startswith("[error]"):
+            return
+
+        local_backend = self._get_local_stt_backend()
+        try:
+            sample_rate, audio_frame = await local_backend.synthesize_speech(spoken_text)
+        except Exception as e:
+            logger.exception("Text-to-speech synthesis failed")
+            await self.output_queue.put(
+                AdditionalOutputs(
+                    {
+                        "role": "assistant",
+                        "content": (
+                            f"[error] Text-to-speech synthesis failed "
+                            f"({local_backend.tts_context}): "
+                            f"{type(e).__name__}: {e}"
+                        ),
+                    },
+                )
+            )
+            return
+
+        if self.deps.head_wobbler is not None:
+            self.deps.head_wobbler.feed(base64.b64encode(audio_frame.tobytes()).decode("utf-8"))
+        await self.output_queue.put((sample_rate, audio_frame.reshape(1, -1)))
+
+    def _chat_api_key_or_error(self) -> str | None:
+        """Return the configured chat API key or record a useful startup error."""
+        chat_api_key = (config.CHAT_API_KEY or "").strip()
+        if chat_api_key:
+            return chat_api_key
 
         message = (
-            "OPENAI_API_KEY is missing or empty after reading .env. Add it to .env and restart the "
-            "conversation app. If .env uses OPENAI_API_KEY=${NVIDIA_API_KEY}, make sure "
-            "NVIDIA_API_KEY is exported in the shell that starts the app."
+            "CHAT_API_KEY is missing or empty after reading .env. Add it to .env and restart the "
+            "conversation app. If .env uses CHAT_API_KEY=${NVIDIA_INFERENCE_API_KEY}, make sure "
+            "NVIDIA_INFERENCE_API_KEY is exported in the shell that starts the app."
+        )
+        self._record_startup_error(message)
+        logger.error(message)
+        return None
+
+    def _realtime_api_key_or_error(self) -> str | None:
+        """Return the configured realtime API key or record a useful startup error."""
+        if selected_backend().provider == BACKEND_HF_REALTIME:
+            return (config.HF_TOKEN or "").strip() or "DUMMY"
+
+        realtime_api_key = openai_realtime_api_key()
+        if realtime_api_key:
+            return realtime_api_key
+
+        message = (
+            "OPENAI_API_KEY is not exported in the shell that starts the conversation app, and no "
+            "OPENAI_REALTIME_API_KEY override was found in .env. Export OPENAI_API_KEY, then restart "
+            "the app. Set OPENAI_REALTIME_API_KEY in .env only if this app should use a different "
+            "OpenAI key from the global one."
         )
         self._record_startup_error(message)
         logger.error(message)
@@ -288,7 +351,7 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
 
     async def _ensure_text_session(self) -> bool:
         """Start a Realtime session for text-only Gradio input if needed."""
-        return await self._ensure_realtime_session("openai-realtime-text")
+        return await self._ensure_realtime_session("conversation-realtime-text")
 
     async def _report_microphone_error_once(self, message: str) -> None:
         """Show one visible microphone error instead of silently dropping every frame."""
@@ -316,6 +379,16 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
         text = message.strip()
         if not text:
             return []
+
+        config_error = backend_config_error()
+        if config_error:
+            self._record_backend_config_error(config_error)
+            return [
+                {
+                    "role": "assistant",
+                    "content": self._not_connected_message(),
+                },
+            ]
 
         if not self._text_model_uses_realtime():
             return await self._send_chat_completion_text_message(text)
@@ -370,119 +443,16 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
 
     async def _send_chat_completion_text_message(self, text: str) -> list[dict[str, Any]]:
         """Send a typed message through Chat Completions for non-Realtime models."""
-        openai_api_key = self._openai_api_key_or_error()
-        if openai_api_key is None:
+        chat_api_key = self._chat_api_key_or_error()
+        if chat_api_key is None:
             return [{"role": "assistant", "content": self._not_connected_message()}]
 
-        if getattr(self, "client", None) is None:
-            self.client = AsyncOpenAI(
-                api_key=openai_api_key,
-                base_url=config.OPENAI_BASE_URL,
-            )
+        config_error = local_stt_chat_config_error()
+        if config_error:
+            self._record_backend_config_error(config_error)
+            return [{"role": "assistant", "content": self._not_connected_message()}]
 
-        chatbot_messages: list[dict[str, Any]] = [{"role": "user", "content": text}]
-        chat_messages: list[dict[str, Any]] = [
-            {"role": "system", "content": get_session_instructions()},
-            {"role": "user", "content": text},
-        ]
-        chat_tools = self._chat_completion_tool_specs()
-
-        try:
-            completion = await self.client.chat.completions.create(
-                model=config.MODEL_NAME,
-                messages=cast(Any, chat_messages),
-                tools=cast(Any, chat_tools),
-                tool_choice="auto",
-            )
-        except Exception as e:
-            logger.exception("Chat Completions request failed")
-            return [
-                *chatbot_messages,
-                {
-                    "role": "assistant",
-                    "content": (
-                        f"[error] Chat Completions request failed "
-                        f"(model={config.MODEL_NAME!r}, base_url={config.OPENAI_BASE_URL!r}): "
-                        f"{type(e).__name__}: {e}"
-                    ),
-                },
-            ]
-
-        choice = completion.choices[0] if completion.choices else None
-        assistant_message = getattr(choice, "message", None) if choice else None
-        assistant_content = getattr(assistant_message, "content", None) or ""
-        tool_calls = getattr(assistant_message, "tool_calls", None) or []
-
-        if not tool_calls:
-            chatbot_messages.append({"role": "assistant", "content": assistant_content or "[no response]"})
-            return chatbot_messages
-
-        chat_messages.append(
-            {
-                "role": "assistant",
-                "content": assistant_content,
-                "tool_calls": [self._serialize_tool_call(tool_call) for tool_call in tool_calls],
-            }
-        )
-
-        for tool_call in tool_calls:
-            tool_call_id = self._tool_call_value(tool_call, "id") or str(uuid.uuid4())
-            tool_name = self._tool_call_function_value(tool_call, "name")
-            args_json = self._tool_call_function_value(tool_call, "arguments") or "{}"
-            if not isinstance(tool_name, str):
-                tool_result = {"error": "tool call did not include a valid function name"}
-            else:
-                tool_result = await dispatch_tool_call_with_manager(
-                    tool_name,
-                    args_json,
-                    self.deps,
-                    self.tool_manager,
-                )
-
-            tool_result_json = json.dumps(tool_result)
-            chat_messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tool_call_id,
-                    "content": tool_result_json,
-                }
-            )
-            chatbot_messages.append(
-                {
-                    "role": "assistant",
-                    "content": tool_result_json,
-                    "metadata": {
-                        "title": f"Used tool {tool_name or 'unknown'}",
-                        "status": "done",
-                    },
-                }
-            )
-
-        try:
-            follow_up = await self.client.chat.completions.create(
-                model=config.MODEL_NAME,
-                messages=cast(Any, chat_messages),
-                tools=cast(Any, chat_tools),
-            )
-        except Exception as e:
-            logger.exception("Chat Completions tool follow-up failed")
-            chatbot_messages.append(
-                {
-                    "role": "assistant",
-                    "content": (
-                        f"[error] Chat Completions tool follow-up failed "
-                        f"(model={config.MODEL_NAME!r}, base_url={config.OPENAI_BASE_URL!r}): "
-                        f"{type(e).__name__}: {e}"
-                    ),
-                }
-            )
-            return chatbot_messages
-
-        follow_up_choice = follow_up.choices[0] if follow_up.choices else None
-        follow_up_message = getattr(follow_up_choice, "message", None) if follow_up_choice else None
-        follow_up_content = getattr(follow_up_message, "content", None) or "Done."
-        chatbot_messages.append({"role": "assistant", "content": follow_up_content})
-        return chatbot_messages
+        return await self._get_local_stt_backend().send_text_message(text)
 
     async def _emit_debounced_partial(self, transcript: str, sequence: int) -> None:
         """Emit partial transcript after debounce delay."""
@@ -498,23 +468,34 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
 
     async def start_up(self) -> None:
         """Start the handler with minimal retries on unexpected websocket closure."""
-        openai_api_key = self._openai_api_key_or_error()
-        if openai_api_key is None:
+        if not self._text_model_uses_realtime():
+            logger.info(
+                "Skipping Realtime startup because BACKEND_PROVIDER=%r uses local STT/chat", config.BACKEND_PROVIDER
+            )
+            self._connected_event.set()
             return
 
-        self.client = AsyncOpenAI(
-            api_key=openai_api_key,
-            base_url=config.OPENAI_BASE_URL,
-        )
+        realtime_api_key = self._realtime_api_key_or_error()
+        if realtime_api_key is None:
+            return
+
+        config_error = backend_config_error()
+        if config_error:
+            self._record_backend_config_error(config_error)
+            return
 
         max_attempts = 3
         for attempt in range(1, max_attempts + 1):
             try:
+                if getattr(self, "client", None) is None or (
+                    attempt > 1 and selected_backend().refresh_realtime_client_on_retry
+                ):
+                    self.client = await self._build_realtime_client(realtime_api_key)
                 await self._run_realtime_session()
                 # Normal exit from the session, stop retrying
                 return
             except ConnectionClosedError as e:
-                # Abrupt close (e.g., "no close frame received or sent") → retry
+                # Abrupt close (e.g., "no close frame received or sent") triggers a retry.
                 logger.warning("Realtime websocket closed unexpectedly (attempt %d/%d): %s", attempt, max_attempts, e)
                 if attempt < max_attempts:
                     # exponential backoff with jitter
@@ -525,30 +506,29 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
                     await asyncio.sleep(delay)
                     continue
                 message = (
-                    f"Realtime websocket closed before startup completed ({self._realtime_context()}): "
-                    f"{type(e).__name__}: {e}.{self._provider_realtime_hint()}"
+                    f"Realtime websocket closed before startup completed ({realtime_context()}): "
+                    f"{type(e).__name__}: {e}.{provider_realtime_hint()}"
                 )
                 self._record_startup_error(message)
                 logger.error(message)
                 return
             except Exception as e:
                 message = (
-                    f"Realtime startup failed ({self._realtime_context()}): "
-                    f"{type(e).__name__}: {e}.{self._provider_realtime_hint()}"
+                    f"Realtime startup failed ({realtime_context()}): "
+                    f"{type(e).__name__}: {e}.{provider_realtime_hint()}"
                 )
                 self._record_startup_error(message)
                 logger.exception(message)
                 return
-            finally:
-                # never keep a stale reference
-                self.connection = None
-                try:
-                    if self._startup_error is None:
-                        self._connected_event.clear()
-                    else:
-                        self._connected_event.set()
-                except Exception:
-                    pass
+
+    async def _build_realtime_client(self, realtime_api_key: str) -> Any:
+        """Build the selected OpenAI-compatible realtime client."""
+        bundle = await build_realtime_client(
+            realtime_api_key,
+            client_factory=AsyncOpenAI,
+        )
+        self._realtime_connect_query = bundle.connect_query
+        return bundle.client
 
     async def _restart_session(self) -> None:
         """Force-close the current session and start a fresh one in background.
@@ -564,17 +544,24 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
                 finally:
                     self.connection = None
 
-            # Ensure we have a client (start_up must have run once)
-            if getattr(self, "client", None) is None:
-                logger.warning("Cannot restart: OpenAI client not initialized yet.")
+            realtime_api_key = self._realtime_api_key_or_error()
+            if realtime_api_key is None:
                 return
+
+            config_error = backend_config_error()
+            if config_error:
+                self._record_backend_config_error(config_error)
+                return
+
+            if getattr(self, "client", None) is None or selected_backend().refresh_realtime_client_on_retry:
+                self.client = await self._build_realtime_client(realtime_api_key)
 
             # Fire-and-forget new session and wait briefly for connection
             try:
                 self._connected_event.clear()
             except Exception:
                 pass
-            asyncio.create_task(self._run_realtime_session(), name="openai-realtime-restart")
+            asyncio.create_task(self._run_realtime_session(), name="conversation-realtime-restart")
             try:
                 await asyncio.wait_for(self._connected_event.wait(), timeout=5.0)
                 logger.info("Realtime session restarted and connected.")
@@ -623,10 +610,6 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
 
                 self._last_response_rejected = False
                 try:
-                    # Mark the just-requested response as active immediately.
-                    # The server's response.created event can arrive after
-                    # response.create() returns, so waiting on the old set
-                    # event here would let the next queued response race ahead.
                     self._response_done_event.clear()
                     await self.connection.response.create(**kwargs)
                 except Exception as e:
@@ -661,7 +644,8 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
             tool_result = bg_tool.result
             logger.info(
                 "Tool '%s' (id=%s) executed successfully.",
-                bg_tool.tool_name, bg_tool.id,
+                bg_tool.tool_name,
+                bg_tool.id,
             )
             logger.debug("Tool '%s' full result: %s", bg_tool.tool_name, tool_result)
         else:
@@ -670,7 +654,11 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
 
         # Connection may have closed while tool was running
         if not self.connection:
-            logger.warning("Connection closed during tool '%s' (id=%s) execution; cannot send result back", bg_tool.tool_name, bg_tool.id)
+            logger.warning(
+                "Connection closed during tool '%s' (id=%s) execution; cannot send result back",
+                bg_tool.tool_name,
+                bg_tool.id,
+            )
             return
 
         try:
@@ -721,6 +709,8 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
                 if self.deps.camera_worker is not None:
                     np_img = self.deps.camera_worker.get_latest_frame()
                     if np_img is not None:
+                        import cv2
+
                         # Camera frames are BGR from OpenCV; convert so Gradio displays correct colors.
                         rgb_frame = cv2.cvtColor(np_img, cv2.COLOR_BGR2RGB)
                     else:
@@ -756,45 +746,32 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
 
     async def _run_realtime_session(self) -> None:
         """Establish and manage a single realtime session."""
-        async with self.client.realtime.connect(model=config.MODEL_NAME) as conn:
+        connect_kwargs = build_realtime_connect_kwargs(self._realtime_connect_query)
+
+        async with self.client.realtime.connect(**connect_kwargs) as conn:
             try:
-                await conn.session.update(
-                    session={
-                        "type": "realtime",
-                        "instructions": get_session_instructions(),
-                        "audio": {
-                            "input": {
-                                "format": {
-                                    "type": "audio/pcm",
-                                    "rate": self.input_sample_rate,
-                                },
-                                "transcription": {"model": "gpt-4o-transcribe", "language": "en"},
-                                "turn_detection": {
-                                    "type": "server_vad",
-                                    "interrupt_response": True,
-                                },
-                            },
-                            "output": {
-                                "format": {
-                                    "type": "audio/pcm",
-                                    "rate": self.output_sample_rate,
-                                },
-                                "voice": get_session_voice(),
-                            },
-                        },
-                        "tools": get_tool_specs(),  # type: ignore[typeddict-item]
-                        "tool_choice": "auto",
-                    },
+                backend = selected_backend()
+                session_voice = get_session_voice(backend.realtime_voice)
+                session_config = build_realtime_session_config(
+                    backend_provider=backend.provider,
+                    input_sample_rate=self.input_sample_rate,
+                    output_sample_rate=self.output_sample_rate,
+                    instructions=get_session_instructions(),
+                    voice=session_voice,
+                    tools=get_tool_specs(),
+                    transcription_language=config.REALTIME_TRANSCRIPTION_LANGUAGE,
                 )
+                await conn.session.update(session=cast(Any, session_config))
                 logger.info(
-                    "Realtime session initialized with locked_profile=%r voice=%r",
+                    "Realtime session initialized with backend=%r locked_profile=%r voice=%r",
+                    backend.provider,
                     LOCKED_PROFILE,
-                    get_session_voice(),
+                    session_voice,
                 )
             except Exception as e:
                 message = (
-                    f"Realtime session.update failed ({self._realtime_context()}): "
-                    f"{type(e).__name__}: {e}.{self._provider_realtime_hint()}"
+                    f"Realtime session.update failed ({realtime_context()}): "
+                    f"{type(e).__name__}: {e}.{provider_realtime_hint()}"
                 )
                 self._record_startup_error(message)
                 logger.exception("Realtime session.update failed; aborting startup")
@@ -802,13 +779,12 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
 
             logger.info("Realtime session updated successfully")
 
-            # Manage event received from the openai server
+            # Manage events received from the selected Realtime backend.
             self.connection = conn
             try:
                 self._connected_event.set()
             except Exception:
                 pass
-
 
             response_sender_task: asyncio.Task[None] | None = None
             try:
@@ -816,9 +792,7 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
                 self.tool_manager.start_up(tool_callbacks=[self._handle_tool_result])
 
                 # Start the response sender worker
-                response_sender_task = asyncio.create_task(
-                    self._response_sender_loop(), name="response-sender"
-                )
+                response_sender_task = asyncio.create_task(self._response_sender_loop(), name="response-sender")
 
                 async for event in self.connection:
                     logger.debug(f"OpenAI event: {event.type}")
@@ -862,7 +836,10 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
 
                     # Handle partial transcription (user speaking in real-time)
                     if event.type == "conversation.item.input_audio_transcription.partial":
-                        logger.debug(f"User partial transcript: {event.transcript}")
+                        transcript = getattr(event, "transcript", "")
+                        if not isinstance(transcript, str):
+                            transcript = ""
+                        logger.debug(f"User partial transcript: {transcript}")
 
                         # Increment sequence
                         self.partial_transcript_sequence += 1
@@ -878,12 +855,15 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
 
                         # Start new debounce timer with sequence number
                         self.partial_transcript_task = asyncio.create_task(
-                            self._emit_debounced_partial(event.transcript, current_sequence)
+                            self._emit_debounced_partial(transcript, current_sequence)
                         )
 
                     # Handle completed transcription (user finished speaking)
                     if event.type == "conversation.item.input_audio_transcription.completed":
-                        logger.debug(f"User transcript: {event.transcript}")
+                        transcript = getattr(event, "transcript", "")
+                        if not isinstance(transcript, str):
+                            transcript = ""
+                        logger.debug(f"User transcript: {transcript}")
 
                         # Cancel any pending partial emission
                         if self.partial_transcript_task and not self.partial_transcript_task.done():
@@ -893,23 +873,30 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
                             except asyncio.CancelledError:
                                 pass
 
-                        await self.output_queue.put(AdditionalOutputs({"role": "user", "content": event.transcript}))
+                        await self.output_queue.put(AdditionalOutputs({"role": "user", "content": transcript}))
 
                     # Handle assistant transcription
                     if event.type in ("response.audio_transcript.done", "response.output_audio_transcript.done"):
-                        logger.debug(f"Assistant transcript: {event.transcript}")
-                        await self.output_queue.put(AdditionalOutputs({"role": "assistant", "content": event.transcript}))
+                        transcript = getattr(event, "transcript", "")
+                        if not isinstance(transcript, str):
+                            transcript = ""
+                        logger.debug(f"Assistant transcript: {transcript}")
+                        await self.output_queue.put(AdditionalOutputs({"role": "assistant", "content": transcript}))
 
                     # Handle audio delta
                     if event.type in ("response.audio.delta", "response.output_audio.delta"):
+                        delta = getattr(event, "delta", None)
+                        if not isinstance(delta, str):
+                            logger.warning("Skipping audio delta event without string delta")
+                            continue
                         if self.deps.head_wobbler is not None:
-                            self.deps.head_wobbler.feed(event.delta)
+                            self.deps.head_wobbler.feed(delta)
                         self.last_activity_time = asyncio.get_event_loop().time()
                         logger.debug("last activity time updated to %s", self.last_activity_time)
                         await self.output_queue.put(
                             (
                                 self.output_sample_rate,
-                                np.frombuffer(base64.b64decode(event.delta), dtype=np.int16).reshape(1, -1),
+                                np.frombuffer(base64.b64decode(delta), dtype=np.int16).reshape(1, -1),
                             ),
                         )
 
@@ -921,14 +908,19 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
 
                         logger.info(
                             "Tool call received — tool_name=%r, call_id=%s, is_idle=%s, args=%s",
-                            tool_name, call_id, self.is_idle_tool_call, args_json_str,
+                            tool_name,
+                            call_id,
+                            self.is_idle_tool_call,
+                            args_json_str,
                         )
 
                         if not isinstance(tool_name, str) or not isinstance(args_json_str, str):
                             logger.error(
                                 "Invalid tool call: tool_name=%s (type=%s), args=%s (type=%s), call_id=%s",
-                                tool_name, type(tool_name).__name__,
-                                args_json_str, type(args_json_str).__name__,
+                                tool_name,
+                                type(tool_name).__name__,
+                                args_json_str,
+                                type(args_json_str).__name__,
                                 call_id,
                             )
                             continue
@@ -961,7 +953,9 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
                                 },
                             )
 
-                        logger.info("Started background tool: %s (id=%s, call_id=%s)", tool_name, bg_tool.tool_id, call_id)
+                        logger.info(
+                            "Started background tool: %s (id=%s, call_id=%s)", tool_name, bg_tool.tool_id, call_id
+                        )
 
                     # server error
                     if event.type == "error":
@@ -994,38 +988,45 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
 
                 # Stop background tool manager tasks (listener + cleanup) in all paths.
                 await self.tool_manager.shutdown()
+                self.connection = None
+                try:
+                    if self._startup_error is None:
+                        self._connected_event.clear()
+                    else:
+                        self._connected_event.set()
+                except Exception:
+                    pass
 
     # Microphone receive
-    async def receive(self, frame: Tuple[int, NDArray[np.int16]]) -> None:
-        """Receive audio frame from the microphone and route it through the selected audio mode."""
-        if self.audio_input_mode == AUDIO_MODE_RIVA_STT:
-            await self._receive_riva_stt(frame)
-            return
-        if self.audio_input_mode == AUDIO_MODE_TEXT:
-            return
+    async def receive(self, frame: Tuple[int, NDArray[Any]]) -> None:
+        """Receive an audio frame from the microphone and send it through the selected backend.
 
-        await self._receive_openai_realtime_audio(frame)
+        Handles both mono and stereo audio formats, converting to the expected
+        mono format. Realtime models stream audio to the Realtime API; chat models
+        transcribe completed phrases and pass the transcript through text chat.
 
-    async def _receive_openai_realtime_audio(self, frame: Tuple[int, NDArray[np.int16]]) -> None:
-        """Send a microphone frame to the OpenAI Realtime audio session."""
-        if not self.connection:
-            if not self._text_model_uses_realtime():
-                self._record_startup_error(
-                    "OpenAI Realtime microphone mode requires an OpenAI-compatible Realtime model. "
-                    f"Current MODEL_NAME={config.MODEL_NAME!r} uses the text path only; "
-                    "switch Input to Riva STT/Text or configure a Realtime model for OpenAI Realtime mode."
+        Args:
+            frame: A tuple containing (sample_rate, audio_data).
+
+        """
+        if not self._text_model_uses_realtime():
+            config_error = backend_config_error()
+            if config_error:
+                await self._report_microphone_error_once(
+                    f"[error] {config_error} Add the missing value to .env and restart the conversation app."
                 )
-                await self._report_microphone_error_once(self._not_connected_message())
                 return
+            await self._receive_transcribed_text_frame(frame)
+            return
 
-            if not await self._ensure_realtime_session("openai-realtime-microphone"):
+        if not self.connection:
+            if not await self._ensure_realtime_session("conversation-realtime-microphone"):
                 await self._report_microphone_error_once(self._not_connected_message())
                 return
 
         self._microphone_error_reported = False
 
-        input_sample_rate, audio_frame = frame
-        audio_frame = self._prepare_audio_frame(input_sample_rate, audio_frame, target_sample_rate=self.input_sample_rate)
+        audio_frame = prepare_mono_int16_audio(frame, self.input_sample_rate)
 
         # Send to OpenAI (guard against races during reconnect)
         try:
@@ -1035,73 +1036,13 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
             logger.debug("Dropping audio frame: connection not ready (%s)", e)
             return
 
-    async def _receive_riva_stt(self, frame: Tuple[int, NDArray[np.int16]]) -> None:
-        """Send a microphone frame to Riva ASR, then route transcripts into the text LLM path."""
-        input_sample_rate, audio_frame = frame
-        audio_frame = self._prepare_audio_frame(input_sample_rate, audio_frame)
-
-        if self._riva_transcriber is None:
-            self._riva_transcriber = RivaStreamingTranscriber(
-                config=RivaAsrConfig.from_env(),
-                on_final_transcript=self._handle_riva_final_transcript,
-                on_partial_transcript=self._handle_riva_partial_transcript,
-            )
-            try:
-                await self._riva_transcriber.start(input_sample_rate)
-            except RuntimeError as exc:
-                self._riva_transcriber = None
-                await self._report_microphone_error_once(f"[error] Riva STT stream is not available: {exc}")
-                return
-
-        try:
-            if await self._riva_transcriber.send_audio(audio_frame.tobytes()) is False:
-                self._riva_transcriber = None
-                await self._report_microphone_error_once("[error] Riva STT stream is not running.")
-        except RuntimeError as exc:
-            logger.warning("Riva STT stream stopped: %s", exc)
-            self._riva_transcriber = None
-            await self._report_microphone_error_once(f"[error] Riva STT stream is not available: {exc}")
-
-    def _prepare_audio_frame(
-        self,
-        input_sample_rate: int,
-        audio_frame: NDArray[np.int16],
-        *,
-        target_sample_rate: int | None = None,
-    ) -> NDArray[np.int16]:
-        """Convert incoming audio to mono PCM16, optionally resampling first."""
-        if audio_frame.ndim == 2:
-            # Scipy channels last convention
-            if audio_frame.shape[1] > audio_frame.shape[0]:
-                audio_frame = audio_frame.T
-            # Multiple channels -> Mono channel
-            if audio_frame.shape[1] > 1:
-                audio_frame = audio_frame[:, 0]
-
-        if target_sample_rate is not None and target_sample_rate != input_sample_rate:
-            audio_frame = resample(audio_frame, int(len(audio_frame) * target_sample_rate / input_sample_rate))
-
-        return audio_to_int16(audio_frame)
-
-    async def _handle_riva_partial_transcript(self, transcript: str) -> None:
-        await self.output_queue.put(AdditionalOutputs({"role": "user_partial", "content": transcript}))
-
-    async def _handle_riva_final_transcript(self, transcript: str) -> None:
-        if transcript.startswith("[error]"):
-            await self.output_queue.put(AdditionalOutputs({"role": "assistant", "content": transcript}))
-            return
-
-        for message in await self.send_text_message(transcript):
-            await self.output_queue.put(AdditionalOutputs(message))
-
     async def emit(self) -> Tuple[int, NDArray[np.int16]] | AdditionalOutputs | None:
         """Emit audio frame to be played by the speaker."""
-        # sends to the stream the stuff put in the output queue by the openai event handler
-        # This is called periodically by the fastrtc Stream
+        # This is called periodically by the FastRTC stream to drain handler outputs.
 
         # Handle idle
         idle_duration = asyncio.get_event_loop().time() - self.last_activity_time
-        if idle_duration > 15.0 and self.deps.movement_manager.is_idle():
+        if self._text_model_uses_realtime() and idle_duration > 15.0 and self.deps.movement_manager.is_idle():
             try:
                 await self.send_idle_signal(idle_duration)
             except Exception as e:
@@ -1122,10 +1063,6 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
         # Stop background tool manager tasks (listener + cleanup)
         await self.tool_manager.shutdown()
 
-        if self._riva_transcriber is not None:
-            await self._riva_transcriber.stop()
-            self._riva_transcriber = None
-
         # Cancel any pending debounce task
         if self.partial_transcript_task and not self.partial_transcript_task.done():
             self.partial_transcript_task.cancel()
@@ -1133,6 +1070,16 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
                 await self.partial_transcript_task
             except asyncio.CancelledError:
                 pass
+
+        for task in list(self._mic_transcription_tasks):
+            if not task.done():
+                task.cancel()
+        for task in list(self._mic_transcription_tasks):
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+        self._mic_transcription_tasks.clear()
 
         if self.connection:
             try:
@@ -1159,7 +1106,7 @@ class OpenaiRealtimeHandler(AsyncStreamHandler):
         return f"[{dt.strftime('%Y-%m-%d %H:%M:%S')} | +{elapsed_seconds:.1f}s]"
 
     async def send_idle_signal(self, idle_duration: float) -> None:
-        """Send an idle signal to the openai server."""
+        """Send an idle signal to the selected Realtime backend."""
         logger.debug("Sending idle signal")
         self.is_idle_tool_call = True
         timestamp_msg = f"[Idle time update: {self.format_timestamp()} - No activity for {idle_duration:.1f}s] You've been idle for a while. Feel free to get creative - dance, show an emotion, look around, do nothing, or just be yourself!"

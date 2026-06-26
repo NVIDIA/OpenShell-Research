@@ -58,15 +58,15 @@ logger = logging.getLogger(__name__)
 CONTROL_LOOP_FREQUENCY_HZ = 100.0  # Hz - Target frequency for the movement control loop
 
 # Type definitions
-FullBodyPose = Tuple[NDArray[np.float32], Tuple[float, float], float]  # (head_pose_4x4, antennas, body_yaw)
+FullBodyPose = Tuple[NDArray[np.float64], Tuple[float, float], float]  # (head_pose_4x4, antennas, body_yaw)
 
 
-class BreathingMove(Move):  # type: ignore
+class BreathingMove(Move):
     """Breathing move with interpolation to neutral and then continuous breathing patterns."""
 
     def __init__(
         self,
-        interpolation_start_pose: NDArray[np.float32],
+        interpolation_start_pose: NDArray[np.float64],
         interpolation_start_antennas: Tuple[float, float],
         interpolation_duration: float = 1.0,
     ):
@@ -79,7 +79,7 @@ class BreathingMove(Move):  # type: ignore
 
         """
         self.interpolation_start_pose = interpolation_start_pose
-        self.interpolation_start_antennas = np.array(interpolation_start_antennas)
+        self.interpolation_start_antennas = np.array(interpolation_start_antennas, dtype=np.float64)
         self.interpolation_duration = interpolation_duration
 
         # Neutral positions for breathing base
@@ -105,7 +105,9 @@ class BreathingMove(Move):  # type: ignore
 
             # Interpolate head pose
             head_pose = linear_pose_interpolation(
-                self.interpolation_start_pose, self.neutral_head_pose, interpolation_t,
+                self.interpolation_start_pose,
+                self.neutral_head_pose,
+                interpolation_t,
             )
 
             # Interpolate antennas
@@ -257,7 +259,8 @@ class MovementManager:
         self.state = MovementState()
         self.state.last_activity_time = self._now()
         neutral_pose = create_head_pose(0, 0, 0, 0, 0, 0, degrees=True)
-        self.state.last_primary_pose = (neutral_pose, (0.0, 0.0), 0.0)
+        initial_pose: FullBodyPose = (neutral_pose, (0.0, 0.0), 0.0)
+        self.state.last_primary_pose = initial_pose
 
         # Move queue (primary moves)
         self.move_queue: deque[Move] = deque()
@@ -270,7 +273,7 @@ class MovementManager:
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._is_listening = False
-        self._last_commanded_pose: FullBodyPose = clone_full_body_pose(self.state.last_primary_pose)
+        self._last_commanded_pose: FullBodyPose = clone_full_body_pose(initial_pose)
         self._listening_antennas: Tuple[float, float] = self._last_commanded_pose[1]
         self._antenna_unfreeze_blend = 1.0
         self._antenna_blend_duration = 0.4  # seconds to blend back after listening
@@ -510,7 +513,7 @@ class MovementManager:
 
                     breathing_move = BreathingMove(
                         interpolation_start_pose=current_head_pose,
-                        interpolation_start_antennas=current_antennas,
+                        interpolation_start_antennas=(float(current_antennas[0]), float(current_antennas[1])),
                         interpolation_duration=1.0,
                     )
                     self.move_queue.append(breathing_move)
@@ -632,10 +635,16 @@ class MovementManager:
 
         return antennas_cmd
 
-    def _issue_control_command(self, head: NDArray[np.float32], antennas: Tuple[float, float], body_yaw: float) -> None:
+    def _issue_control_command(
+        self, head: NDArray[np.float64], antennas: Tuple[float, float], body_yaw: float
+    ) -> None:
         """Send the fused pose to the robot with throttled error logging."""
         try:
-            self.current_robot.set_target(head=head, antennas=antennas, body_yaw=body_yaw)
+            self.current_robot.set_target(
+                head=head,
+                antennas=[float(antennas[0]), float(antennas[1])],
+                body_yaw=body_yaw,
+            )
         except Exception as e:
             now = self._now()
             if now - self._last_set_target_err >= self._set_target_err_interval:
@@ -652,7 +661,10 @@ class MovementManager:
                 self._last_commanded_pose = clone_full_body_pose((head, antennas, body_yaw))
 
     def _update_frequency_stats(
-        self, loop_start: float, prev_loop_start: float, stats: LoopFrequencyStats,
+        self,
+        loop_start: float,
+        prev_loop_start: float,
+        stats: LoopFrequencyStats,
     ) -> LoopFrequencyStats:
         """Update frequency statistics based on the current loop start time."""
         period = loop_start - prev_loop_start

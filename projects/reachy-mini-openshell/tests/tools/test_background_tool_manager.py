@@ -53,7 +53,6 @@ def _make_routine(
         except Exception as e:
             return {"error": f"{type(e).__name__}: {e}"}
 
-    routine.__call__ = _call  # type: ignore[method-assign]
     routine.side_effect = _call
     return routine
 
@@ -535,7 +534,6 @@ class TestStartUp:
                 raise
             return {"ok": True}
 
-        routine.__call__ = _call  # type: ignore[method-assign]
         routine.side_effect = _call
 
         bg = await manager.start_tool("c1", routine, is_idle_tool_call=False)

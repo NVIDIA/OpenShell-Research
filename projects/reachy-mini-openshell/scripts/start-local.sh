@@ -119,6 +119,9 @@ fi
 
 export PATH="${PROJECT_DIR}/.venv/bin:${PATH}"
 
+log "Validating conversation backend configuration"
+reachy-mini-backend-check
+
 if daemon_status_ok; then
   log "Using existing Reachy daemon at http://${DAEMON_HOST}:${DAEMON_PORT}"
 else

@@ -7,7 +7,7 @@ from numpy.typing import NDArray
 
 
 try:
-    from supervision import Detections
+    from supervision import Detections  # ty: ignore[unresolved-import]
     from ultralytics import YOLO  # type: ignore
 except ImportError as e:
     raise ImportError(
@@ -29,8 +29,8 @@ class HeadTracker:
     def __init__(
         self,
         model_repo: str = DEFAULT_YOLO_FACE_MODEL_REPO,
-        model_filename: str = DEFAULT_YOLO_FACE_MODEL_FILENAME,
         model_revision: str = DEFAULT_YOLO_FACE_MODEL_REVISION,
+        model_filename: str = DEFAULT_YOLO_FACE_MODEL_FILENAME,
         confidence_threshold: float = 0.3,
         device: str = "cpu",
     ) -> None:
@@ -38,8 +38,8 @@ class HeadTracker:
 
         Args:
             model_repo: HuggingFace model repository
+            model_revision: Model repository revision
             model_filename: Model file name
-            model_revision: Pinned Hugging Face commit SHA for the model repository
             confidence_threshold: Minimum confidence for face detection
             device: Device to run inference on ('cpu' or 'cuda')
 

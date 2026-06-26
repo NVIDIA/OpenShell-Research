@@ -24,6 +24,16 @@ def update_chatbot(chatbot: List[Dict[str, Any]], response: Dict[str, Any]) -> L
     return chatbot
 
 
+def _shutdown_step(logger: Any, name: str, callback: Any) -> None:
+    """Run one shutdown callback without turning cleanup interrupts into tracebacks."""
+    try:
+        callback()
+    except KeyboardInterrupt:
+        logger.warning("Shutdown interrupted while stopping %s; continuing cleanup.", name)
+    except Exception as exc:
+        logger.debug("Error while stopping %s: %s", name, exc)
+
+
 def main() -> None:
     """Entrypoint for the Reachy Mini conversation app."""
     args, _ = parse_args()
@@ -50,31 +60,23 @@ def run(
 
     # Putting these dependencies here makes the dashboard faster to load when the conversation app is installed
     from reachy_mini_conversation_app.moves import MovementManager
-    from reachy_mini_conversation_app.config import config
+    from reachy_mini_conversation_app.config import load_dotenv_file
     from reachy_mini_conversation_app.console import LocalStream
-    from reachy_mini_conversation_app.openai_realtime import (
-        AUDIO_MODE_TEXT,
-        AUDIO_MODE_RIVA_STT,
-        AUDIO_MODE_OPENAI_REALTIME,
-        OpenaiRealtimeHandler,
-    )
     from reachy_mini_conversation_app.tools.core_tools import ToolDependencies
     from reachy_mini_conversation_app.audio.head_wobbler import HeadWobbler
+    from reachy_mini_conversation_app.conversation_stream import ConversationStreamHandler
 
     logger = setup_logger(args.debug)
     logger.info("Starting Reachy Mini Conversation App")
 
+    if args.no_camera and args.head_tracker is not None:
+        logger.warning("Head tracking disabled: --no-camera flag is set. Remove --no-camera to enable head tracking.")
+
     if instance_path:
         try:
-            config.load_dotenv_file(Path(instance_path) / ".env")
+            load_dotenv_file(Path(instance_path) / ".env")
         except Exception as exc:
             logger.debug("Instance .env loading skipped: %s", exc)
-
-    if args.no_camera and args.head_tracker is not None:
-        logger.warning(
-            "Head tracking disabled: --no-camera flag is set. "
-            "Remove --no-camera to enable head tracking."
-        )
 
     if robot is None:
         try:
@@ -86,25 +88,17 @@ def run(
             robot = ReachyMini(**robot_kwargs)
 
         except TimeoutError as e:
-            logger.error(
-                "Connection timeout: Failed to connect to Reachy Mini daemon. "
-                f"Details: {e}"
-            )
+            logger.error(f"Connection timeout: Failed to connect to Reachy Mini daemon. Details: {e}")
             log_connection_troubleshooting(logger, args.robot_name)
             sys.exit(1)
 
         except ConnectionError as e:
-            logger.error(
-                "Connection failed: Unable to establish connection to Reachy Mini. "
-                f"Details: {e}"
-            )
+            logger.error(f"Connection failed: Unable to establish connection to Reachy Mini. Details: {e}")
             log_connection_troubleshooting(logger, args.robot_name)
             sys.exit(1)
 
         except Exception as e:
-            logger.error(
-                f"Unexpected error during robot initialization: {type(e).__name__}: {e}"
-            )
+            logger.error(f"Unexpected error during robot initialization: {type(e).__name__}: {e}")
             logger.error("Please check your configuration and try again.")
             sys.exit(1)
 
@@ -151,7 +145,7 @@ def run(
     )
     logger.debug(f"Chatbot avatar images: {chatbot.avatar_images}")
 
-    handler = OpenaiRealtimeHandler(deps, gradio_mode=args.gradio, instance_path=instance_path)
+    handler = ConversationStreamHandler(deps, gradio_mode=args.gradio, instance_path=instance_path)
 
     stream_manager: gr.Blocks | LocalStream | None = None
 
@@ -170,19 +164,9 @@ def run(
         stream_manager = stream.ui
 
         with stream_manager:
-            input_mode_choices = {
-                "OpenAI Realtime": AUDIO_MODE_OPENAI_REALTIME,
-                "Riva STT": AUDIO_MODE_RIVA_STT,
-                "Text": AUDIO_MODE_TEXT,
-            }
-            mode_labels = {value: label for label, value in input_mode_choices.items()}
-            initial_input_mode = mode_labels.get(handler.audio_input_mode, "OpenAI Realtime")
-            initial_text_mode = initial_input_mode == "Text"
-            stream.webrtc_component.visible = not initial_text_mode
-
             input_mode = gr.Radio(
-                choices=list(input_mode_choices),
-                value=initial_input_mode,
+                choices=["Microphone", "Text"],
+                value="Microphone",
                 label="Input",
             )
             with gr.Row():
@@ -190,13 +174,12 @@ def run(
                     label="Message",
                     lines=2,
                     max_lines=5,
-                    visible=initial_text_mode,
+                    visible=False,
                 )
-                send_button = gr.Button("Send", variant="primary", visible=initial_text_mode)
+                send_button = gr.Button("Send", variant="primary", visible=False)
 
             def switch_input_mode(mode: str) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
                 text_mode = mode == "Text"
-                handler.set_audio_input_mode(input_mode_choices.get(mode, config.AUDIO_INPUT_MODE))
                 return (
                     gr.update(visible=not text_mode),
                     gr.update(visible=text_mode),
@@ -269,21 +252,15 @@ def run(
     except KeyboardInterrupt:
         logger.info("Keyboard interruption in main thread... closing server.")
     finally:
-        movement_manager.stop()
-        head_wobbler.stop()
+        _shutdown_step(logger, "movement manager", movement_manager.stop)
+        _shutdown_step(logger, "head wobbler", head_wobbler.stop)
         if camera_worker:
-            camera_worker.stop()
+            _shutdown_step(logger, "camera worker", camera_worker.stop)
         if vision_manager:
-            vision_manager.stop()
+            _shutdown_step(logger, "vision manager", vision_manager.stop)
 
-        # Ensure media is explicitly closed before disconnecting
-        try:
-            robot.media.close()
-        except Exception as e:
-            logger.debug(f"Error closing media during shutdown: {e}")
-
-        # prevent connection to keep alive some threads
-        robot.client.disconnect()
+        _shutdown_step(logger, "media", robot.media.close)
+        _shutdown_step(logger, "robot client", robot.client.disconnect)
         time.sleep(1)
         logger.info("Shutdown complete.")
 
