@@ -41,13 +41,19 @@ require_command() {
 
 daemon_status_ok() {
   "${PROJECT_DIR}/.venv/bin/python" - "$DAEMON_HOST" "$DAEMON_PORT" <<'PY' >/dev/null 2>&1
+import json
 import sys
 import urllib.request
 
 host, port = sys.argv[1], sys.argv[2]
 try:
     with urllib.request.urlopen(f"http://{host}:{port}/api/daemon/status", timeout=1.5) as response:
-        raise SystemExit(0 if 200 <= response.status < 500 else 1)
+        if response.status != 200:
+            raise SystemExit(1)
+        payload = json.loads(response.read().decode("utf-8"))
+        if payload.get("type") == "daemon_status" and payload.get("state") == "running":
+            raise SystemExit(0)
+        raise SystemExit(1)
 except Exception:
     raise SystemExit(1)
 PY
