@@ -946,12 +946,6 @@ class ConversationStreamHandler(AsyncStreamHandler):
 
                         if self.is_idle_tool_call:
                             self.is_idle_tool_call = False
-                        else:
-                            await self._safe_response_create(
-                                response={
-                                    "instructions": "Notify what the tool has been running giving meaningful information about the task",
-                                },
-                            )
 
                         logger.info(
                             "Started background tool: %s (id=%s, call_id=%s)", tool_name, bg_tool.tool_id, call_id

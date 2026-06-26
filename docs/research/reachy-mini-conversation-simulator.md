@@ -129,16 +129,17 @@ app-flow check: it feeds audio through the handler's microphone receive path
 against fake Reachy dependencies, then verifies
 `mic frame handling -> STT -> Chat Completions -> Reachy tools -> TTS`.
 
-You can also name the app-flow stage explicitly:
+For `BACKEND_PROVIDER=local_stt`, you can also name the app-flow stage
+explicitly:
 
 ```sh
 reachy-mini-backend-check --live --stage app-flow \
   --seed-text "Reachy, use the sweep_look tool, then tell me what you did."
 ```
 
-The app-flow check uses fake Reachy tool dependencies by default. After the
-simulator daemon is running, add `--real-reachy` to connect through the Reachy
-SDK and queue movements through the real movement manager:
+The local-STT app-flow check uses fake Reachy tool dependencies by default.
+After the simulator daemon is running, add `--real-reachy` to connect through
+the Reachy SDK and queue movements through the real movement manager:
 
 ```sh
 reachy-mini-backend-check --live --stage app-flow --require-tool --real-reachy \

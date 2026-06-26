@@ -646,6 +646,109 @@ async def test_receive_lazily_starts_realtime_and_appends_microphone_audio(monke
 
 
 @pytest.mark.asyncio
+async def test_realtime_tool_call_waits_for_tool_result_before_response_create(monkeypatch: Any) -> None:
+    """Realtime tool calls should not request a follow-up before function_call_output is available."""
+    _set_openai_test_config(monkeypatch)
+    monkeypatch.setattr(stream_mod, "get_session_instructions", lambda: "test instructions")
+    monkeypatch.setattr(stream_mod, "get_tool_specs", lambda: [])
+    event_queue: asyncio.Queue[Any] = asyncio.Queue()
+    response_create_calls: list[dict[str, Any]] = []
+
+    class FakeEvent:
+        def __init__(self, etype: str, **kwargs: Any) -> None:
+            self.type = etype
+            for key, value in kwargs.items():
+                setattr(self, key, value)
+
+    class FakeSession:
+        async def update(self, **_kw: Any) -> None:
+            return None
+
+    class FakeConversationItem:
+        async def create(self, **_kwargs: Any) -> None:
+            return None
+
+    class FakeConversation:
+        item = FakeConversationItem()
+
+    class FakeResponse:
+        async def create(self, **kwargs: Any) -> None:
+            response_create_calls.append(kwargs)
+
+        async def cancel(self, **_kw: Any) -> None:
+            return None
+
+    class FakeInputAudioBuffer:
+        async def append(self, **_kw: Any) -> None:
+            return None
+
+    class FakeConn:
+        session = FakeSession()
+        conversation = FakeConversation()
+        response = FakeResponse()
+        input_audio_buffer = FakeInputAudioBuffer()
+
+        async def __aenter__(self) -> "FakeConn":
+            return self
+
+        async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> bool:
+            return False
+
+        def __aiter__(self) -> "FakeConn":
+            return self
+
+        async def __anext__(self) -> Any:
+            event = await event_queue.get()
+            if event is None:
+                raise StopAsyncIteration
+            return event
+
+        async def close(self) -> None:
+            await event_queue.put(None)
+
+    class FakeRealtime:
+        def connect(self, **_kw: Any) -> FakeConn:
+            return FakeConn()
+
+    class FakeClient:
+        def __init__(self, **_kw: Any) -> None:
+            self.realtime = FakeRealtime()
+
+    async def fake_start_tool(*_args: Any, **_kwargs: Any) -> Any:
+        class FakeBackgroundTool:
+            tool_id = "sweep_look-call_1"
+
+        return FakeBackgroundTool()
+
+    monkeypatch.setattr(stream_mod, "AsyncOpenAI", FakeClient)
+    monkeypatch.setattr(stream_mod.BackgroundToolManager, "start_tool", fake_start_tool)
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = stream_mod.ConversationStreamHandler(deps)
+
+    startup_task = asyncio.create_task(handler.start_up())
+    assert await handler._ensure_realtime_session("test-realtime-tool-call") is True
+
+    await event_queue.put(
+        FakeEvent(
+            "response.function_call_arguments.done",
+            name="sweep_look",
+            arguments="{}",
+            call_id="call_1",
+        )
+    )
+    output = await asyncio.wait_for(handler.output_queue.get(), timeout=1)
+
+    await handler.shutdown()
+    await event_queue.put(None)
+    await asyncio.wait_for(startup_task, timeout=1)
+
+    assert isinstance(output, stream_mod.AdditionalOutputs)
+    assert output.args[0]["content"].startswith("🛠️ Used tool sweep_look")
+    assert response_create_calls == []
+
+
+@pytest.mark.asyncio
 async def test_receive_transcribes_microphone_audio_for_non_realtime_model(monkeypatch: Any) -> None:
     """Local-STT mic mode transcribes speech and sends the transcript through Chat Completions."""
     _set_local_stt_test_config(monkeypatch)
