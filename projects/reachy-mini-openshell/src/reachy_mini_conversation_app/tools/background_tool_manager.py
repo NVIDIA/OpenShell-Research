@@ -6,6 +6,7 @@ completion is announced vocally via a silent notification queue.
 """
 
 from __future__ import annotations
+import json
 import time
 import asyncio
 import logging
@@ -13,6 +14,7 @@ from typing import Any, Dict, Callable, Optional, Coroutine
 
 from pydantic import Field, BaseModel, PrivateAttr
 
+from reachy_mini_conversation_app.tool_transport import ToolTransport
 from reachy_mini_conversation_app.tools.core_tools import (
     ToolDependencies,
     dispatch_tool_call,
@@ -50,6 +52,9 @@ class ToolCallRoutine(BaseModel):
     """the dependencies for the tool call"""
     deps: "ToolDependencies"
 
+    """the selected local or MCP transport"""
+    transport: ToolTransport | None = None
+
     async def __call__(self, tool_manager: BackgroundToolManager) -> Any:
         """Execute the stored callable with its arguments."""
         if self.tool_name in _SYSTEM_TOOL_NAMES:
@@ -57,6 +62,14 @@ class ToolCallRoutine(BaseModel):
             return await dispatch_tool_call_with_manager(
                 tool_name=self.tool_name, args_json=self.args_json_str, deps=self.deps, tool_manager=tool_manager
             )
+        if self.transport is not None:
+            try:
+                arguments = json.loads(self.args_json_str or "{}")
+            except (TypeError, ValueError):
+                arguments = {}
+            if not isinstance(arguments, dict):
+                arguments = {}
+            return await self.transport.call_tool(self.tool_name, arguments)
         return await dispatch_tool_call(tool_name=self.tool_name, args_json=self.args_json_str, deps=self.deps)
 
 
@@ -213,6 +226,7 @@ class BackgroundToolManager(BaseModel):
             result = {"error": "Tool cancelled"}
 
         bg_tool.completed_at = time.monotonic()
+        bg_tool.result = result
         error = result.get("error")
 
         if error is not None:
@@ -225,7 +239,6 @@ class BackgroundToolManager(BaseModel):
             bg_tool.error = result["error"]
 
         else:
-            bg_tool.result = result
             bg_tool.status = ToolState.COMPLETED
             logger.debug(f"Background tool completed: {bg_tool.tool_name} (id={bg_tool.id})")
 

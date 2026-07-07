@@ -7,6 +7,9 @@ OpenAI Realtime with the simulator.
 
 Source: `projects/reachy-mini-openshell`
 
+To build the policy-enforced physical-robot architecture, follow the
+[Reachy Mini OpenShell sandbox tutorial](reachy-mini-openshell-sandbox.md).
+
 ## Quick Start
 
 Requirements:
@@ -165,9 +168,36 @@ Use `Microphone` for voice or `Text` for typed prompts. A good first prompt is:
 Hi Reachy, introduce yourself and look around.
 ```
 
-Because the local simulator runs with `--no-media` and the app starts with
-`--no-camera`, camera and head-tracking features are disabled. Conversation and
-motion tools still work through the simulated daemon.
+Because the local simulator runs with `--no-media`, the launcher detects that
+media is unavailable and starts the app with `--no-camera`. The `camera` and
+`scan_scene` tools are then omitted from the model session. Conversation and
+motion tools still work through the simulated daemon. When an existing real
+Reachy daemon reports media available, the launcher starts the camera worker and
+exposes both camera tools.
+
+The locked profile exposes these tools when their runtime dependencies are
+available:
+
+```text
+dance
+stop_dance
+play_emotion
+stop_emotion
+sweep_look
+camera
+scan_scene
+move_head
+do_nothing
+```
+
+`scan_scene` records the full sweep to `REACHY_CAPTURE_DIR` (`./captures` by
+default), selects nine chronological frames, and sends those frames to the
+active multimodal conversation model for a combined description. A matching
+voice or text request is:
+
+```text
+Scan the room, save a video, and tell me everything you saw.
+```
 
 ## Useful Checks
 

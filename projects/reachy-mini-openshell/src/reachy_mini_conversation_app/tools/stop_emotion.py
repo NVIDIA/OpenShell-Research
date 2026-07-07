@@ -26,6 +26,6 @@ class StopEmotion(Tool):
     async def __call__(self, deps: ToolDependencies, **kwargs: Any) -> Dict[str, Any]:
         """Stop the current emotion."""
         logger.info("Tool call: stop_emotion")
-        movement_manager = deps.movement_manager
+        movement_manager = deps.require_movement_manager()
         movement_manager.clear_move_queue()
         return {"status": "stopped emotion and cleared queue"}

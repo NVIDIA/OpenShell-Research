@@ -26,6 +26,18 @@ def parse_args() -> Tuple[argparse.Namespace, list]:
     parser.add_argument("--gradio", default=False, action="store_true", help="Open gradio interface")
     parser.add_argument("--debug", default=False, action="store_true", help="Enable debug logging")
     parser.add_argument(
+        "--model-logs",
+        default=False,
+        action="store_true",
+        help="Log only focused model selection, sanitized requests, and token usage at INFO level",
+    )
+    parser.add_argument(
+        "--tool-transport",
+        choices=["local", "mcp"],
+        default=None,
+        help="Execute Reachy tools locally or through the configured MCP server (default: REACHY_TOOL_TRANSPORT)",
+    )
+    parser.add_argument(
         "--robot-name",
         type=str,
         default=None,

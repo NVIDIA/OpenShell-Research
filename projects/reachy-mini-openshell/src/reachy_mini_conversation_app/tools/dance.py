@@ -78,7 +78,7 @@ class Dance(Tool):
             return {"error": f"Unknown dance move '{move_name}'. Available: {list(AVAILABLE_MOVES.keys())}"}
 
         # Add dance moves to queue
-        movement_manager = deps.movement_manager
+        movement_manager = deps.require_movement_manager()
         for _ in range(repeat):
             dance_move = DanceQueueMove(move_name)
             movement_manager.queue_move(dance_move)

@@ -99,7 +99,7 @@ class PlayEmotion(Tool):
                 return {"error": f"Unknown emotion '{emotion_name}'. Available: {emotion_names}"}
 
             # Add emotion to queue
-            movement_manager = deps.movement_manager
+            movement_manager = deps.require_movement_manager()
             emotion_move = EmotionQueueMove(emotion_name, recorded_moves)
             movement_manager.queue_move(emotion_move)
 

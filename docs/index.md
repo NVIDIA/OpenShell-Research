@@ -19,6 +19,7 @@
 - [Research engineering](research/index.md)
 - [Projects](projects/index.md)
 - [Reachy Mini conversation demo](projects/reachy-mini-openshell.md)
+- [Reachy Mini OpenShell sandbox tutorial](projects/reachy-mini-openshell-sandbox.md)
 - [Runtime notes](research/runtime.md)
 - [Application patterns](research/applications.md)
 - [Dev Notes](dev-notes/index.md)

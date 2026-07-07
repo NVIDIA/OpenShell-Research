@@ -7,6 +7,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from reachy_mini_conversation_app.config import config
+from reachy_mini_conversation_app.tool_transport import ToolTransport
 from reachy_mini_conversation_app.chat_completions import ChatCompletionRunner
 from reachy_mini_conversation_app.speech_endpoints import SpeechEndpointClient
 from reachy_mini_conversation_app.tools.core_tools import ToolDependencies
@@ -22,10 +23,12 @@ class LocalSTTBackend:
         deps: ToolDependencies,
         tool_manager: BackgroundToolManager,
         client_factory: Callable[..., Any],
+        tool_transport: ToolTransport | None = None,
     ) -> None:
         """Initialize the local-STT backend adapter."""
         self.deps = deps
         self.tool_manager = tool_manager
+        self.tool_transport = tool_transport
         self.client_factory = client_factory
         self._speech_endpoint_client: SpeechEndpointClient | None = None
         self._chat_client: Any = None
@@ -96,6 +99,7 @@ class LocalSTTBackend:
             client=self._get_chat_client(),
             deps=self.deps,
             tool_manager=self.tool_manager,
+            tool_transport=self.tool_transport,
             model_name=config.CHAT_MODEL_NAME or "",
             base_url=config.CHAT_BASE_URL,
         ).send_text_message(text)

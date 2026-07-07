@@ -36,6 +36,10 @@ The launcher creates `.venv`, runs `uv sync`, validates `.env`, starts
 `reachy-mini-daemon --sim`, then prints the Gradio URL:
 <http://127.0.0.1:7860/>.
 
+Camera support follows the connected daemon. The no-media simulator starts with
+camera support disabled. A real Reachy daemon that reports media available
+starts the camera worker and exposes the `camera` tool to the model.
+
 If `7860` is busy, the launcher picks the next free port through `7899`.
 
 In the UI:
@@ -50,6 +54,41 @@ started.
 The checked-in `.env.example` already selects `BACKEND_PROVIDER=openai_realtime`.
 Provider keys, base URLs, and model IDs are configured in `.env`, not in the
 browser UI.
+
+## MCP Tool Mode
+
+MCP mode keeps the robot SDK, camera worker, and movement manager in the
+separate host MCP server. The conversation process discovers hardware tools
+from that server and retains only `do_nothing`, `task_status`, and
+`task_cancel` locally.
+
+Start the MCP server first:
+
+```bash
+export REACHY_MCP_TOKEN="$(cat .reachy-mcp-token)"
+
+REACHY_MINI_SKIP_DOTENV=1 \
+DAEMON_HOST=reachy-mini.local \
+uv run reachy-mini-mcp-server
+```
+
+Then start the conversation app in another terminal:
+
+```bash
+export OPENAI_API_KEY=sk-...
+export REACHY_MCP_TOKEN="$(cat .reachy-mcp-token)"
+
+REACHY_TOOL_TRANSPORT=mcp \
+REACHY_MCP_URL=http://127.0.0.1:8766/mcp \
+uv run python -m reachy_mini_conversation_app \
+  --gradio \
+  --model-logs \
+  --tool-transport mcp
+```
+
+This is the intermediate host test before adding the OpenShell sandbox. Raw
+camera results are still handled by the existing conversation flow until the
+routed-vision step is implemented.
 
 ## Backend Selection
 
@@ -85,6 +124,32 @@ OPENAI_REALTIME_VOICE=cedar
 
 Leave `OPENAI_REALTIME_API_KEY` unset unless this app should use a different
 key from the exported `OPENAI_API_KEY`.
+
+### Camera model routing
+
+Camera images can use a model selected independently from the Realtime voice
+session. The selected model is validated against a server-side allowlist before
+the image is uploaded:
+
+```dotenv
+VISION_BASE_URL=https://api.openai.com/v1
+VISION_DEFAULT_MODEL=gpt-5.4-mini
+VISION_ALLOWED_MODELS=gpt-5.4-mini,gpt-5.5
+```
+
+`VISION_API_KEY` is optional and falls back to `OPENAI_API_KEY`. If the user
+does not name a model, the camera uses `VISION_DEFAULT_MODEL`. If the user asks
+for a model outside `VISION_ALLOWED_MODELS`, the tool rejects the request before
+sending the image. For example:
+
+```text
+Use gpt-5.5 to take a picture of me and tell me what I am doing.
+```
+
+The Realtime model turns that request into a camera tool call containing the
+exact `requested_model`. The camera router sends the image to the approved
+vision model through the Responses API, then returns only the text description
+to the Realtime conversation.
 
 ### Optional: Riva ASR NIM + Chat + TTS
 
@@ -247,9 +312,15 @@ Launcher:
 ```bash
 ./scripts/start-local.sh
 ./scripts/start-local.sh --debug
+./scripts/start-local.sh --model-logs
 APP_PORT=7861 ./scripts/start-local.sh
 REACHY_SKIP_SYNC=1 ./scripts/start-local.sh
 ```
+
+Use `--model-logs` for focused INFO records containing the selected model, sanitized
+requests, and response token usage/cost. Use `--debug` only when you also need the full
+Realtime event stream and movement diagnostics. API keys and raw Base64 image/audio data
+are redacted; media payloads are logged only by type and size.
 
 Manual simulator, in one terminal:
 
@@ -303,6 +374,24 @@ stop_dance
 play_emotion
 stop_emotion
 sweep_look
+camera
+scan_scene
+move_head
+do_nothing
+```
+
+The app filters tools against runtime dependencies. In particular, `camera` and
+`scan_scene` are omitted from the model session when the camera worker is
+unavailable. The standalone launcher enables the camera automatically only when
+the daemon reports media available.
+
+`scan_scene` records the complete left-to-right sweep as an MP4, selects nine
+chronological frames, and asks the active multimodal conversation model for one
+combined account. Recordings are written to `REACHY_CAPTURE_DIR` (`./captures`
+by default). For example:
+
+```text
+Scan the room, save a video, and tell me everything you saw.
 ```
 
 ## Optional Vision Extras
@@ -348,7 +437,7 @@ uv run reachy-mini-app-assistant check .
 | Riva ASR readiness fails | Check `http://<riva-host>:9000/v1/health/ready`, GPU/container logs, and that the app can reach the host from macOS. |
 | vLLM STT says audio support is missing | Redeploy the service with vLLM audio support, then rerun `stt-probe`. |
 | `uv sync` builds `pygobject` or `pycairo` on macOS | Run `uv cache clean reachy-mini pygobject pycairo`, then `uv sync`. |
-| Daemon uses `--no-media` | Start the app with `--no-camera`; the launcher already does this. |
+| Daemon uses `--no-media` | Start the app with `--no-camera`; the launcher detects this and does so automatically. |
 
 The checked-in uv resolution targets macOS/Darwin. For Linux deployment,
 update `[tool.uv].environments` and regenerate `uv.lock`.

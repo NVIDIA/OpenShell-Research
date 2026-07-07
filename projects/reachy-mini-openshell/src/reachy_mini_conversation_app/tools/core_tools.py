@@ -6,6 +6,7 @@ import inspect
 import logging
 import importlib
 from typing import TYPE_CHECKING, Any, Dict, List
+from pathlib import Path
 from dataclasses import dataclass
 
 from reachy_mini import ReachyMini
@@ -50,12 +51,26 @@ def get_concrete_subclasses(base: type[Tool]) -> List[type[Tool]]:
 class ToolDependencies:
     """External dependencies injected into tools."""
 
-    reachy_mini: ReachyMini
-    movement_manager: Any
+    reachy_mini: ReachyMini | None = None
+    movement_manager: Any | None = None
     camera_worker: Any | None = None
     vision_manager: Any | None = None
+    vision_router: Any | None = None
     head_wobbler: Any | None = None
     motion_duration_s: float = 1.0
+    capture_directory: Path | None = None
+
+    def require_reachy_mini(self) -> ReachyMini:
+        """Return the local robot or fail clearly in a hardware-free process."""
+        if self.reachy_mini is None:
+            raise RuntimeError("This tool requires a local ReachyMini connection")
+        return self.reachy_mini
+
+    def require_movement_manager(self) -> Any:
+        """Return the local movement manager or fail clearly in MCP mode."""
+        if self.movement_manager is None:
+            raise RuntimeError("This tool requires a local movement manager")
+        return self.movement_manager
 
 
 class Tool(abc.ABC):
@@ -174,6 +189,14 @@ def get_tool_specs(exclusion_list: list[str] | None = None) -> list[Dict[str, An
     """Get tool specs, optionally excluding some tools."""
     exclusion_list = exclusion_list or []
     return [spec for spec in ALL_TOOL_SPECS if spec.get("name") not in exclusion_list]
+
+
+def get_tool_specs_for_dependencies(deps: ToolDependencies) -> list[Dict[str, Any]]:
+    """Return only tools whose runtime dependencies are available."""
+    exclusions: list[str] = []
+    if deps.camera_worker is None:
+        exclusions.extend(("camera", "head_tracking", "scan_scene"))
+    return get_tool_specs(exclusions)
 
 
 # Dispatcher

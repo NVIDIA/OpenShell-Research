@@ -9,6 +9,10 @@ setup guide, validation commands, and troubleshooting notes.
   Reachy Mini + OpenShell demo with an OpenAI Realtime quick start, Gradio UI,
   microphone or text input, optional local speech backends, and Reachy movement
   tools.
+- [Reachy Mini OpenShell sandbox tutorial](reachy-mini-openshell-sandbox.md):
+  build a host-side MCP robot service, run the conversation application in an
+  OpenShell sandbox, route images to an approved model, and iteratively enable
+  a denied physical tool.
 
 ## Project Page Standard
 

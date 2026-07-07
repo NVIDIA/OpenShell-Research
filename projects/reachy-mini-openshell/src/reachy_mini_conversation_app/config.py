@@ -22,6 +22,10 @@ BACKEND_PROVIDERS = {
     BACKEND_LOCAL_STT,
 }
 
+TOOL_TRANSPORT_LOCAL = "local"
+TOOL_TRANSPORT_MCP = "mcp"
+TOOL_TRANSPORTS = {TOOL_TRANSPORT_LOCAL, TOOL_TRANSPORT_MCP}
+
 HF_REALTIME_CONNECTION_DEPLOYED = "deployed"
 HF_REALTIME_CONNECTION_LOCAL = "local"
 HF_REALTIME_SESSION_PROXY_URL = "https://pollen-robotics-reachy-mini-realtime-url.hf.space/session"
@@ -31,11 +35,11 @@ _MARKDOWN_URL_RE = re.compile(r"^\[(?P<label>(?:https?|wss?)://[^\]]+)\]\((?P<ur
 _ENV_REF_RE = re.compile(r"\$\{(?P<name>[A-Za-z_][A-Za-z0-9_]*)\}")
 _PLACEHOLDER_VALUES = {"<set-me>", "set-me"}
 _ORIGINAL_PROCESS_ENV = dict(os.environ)
+_DEFAULT_VISION_ALLOWED_MODELS = ("gpt-5.4-mini", "gpt-5.5")
 
 
-def _env_flag(name: str, default: bool = False) -> bool:
-    """Parse a boolean environment flag."""
-    raw = os.getenv(name)
+def _parse_bool_value(name: str, raw: str | None, default: bool = False) -> bool:
+    """Parse a boolean configuration value."""
     if raw is None:
         return default
 
@@ -47,6 +51,11 @@ def _env_flag(name: str, default: bool = False) -> bool:
 
     logger.warning("Invalid boolean value for %s=%r, using default=%s", name, raw, default)
     return default
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    """Parse a boolean environment flag."""
+    return _parse_bool_value(name, os.getenv(name), default)
 
 
 _profile_path = DEFAULT_PROFILES_DIRECTORY / LOCKED_PROFILE
@@ -243,9 +252,46 @@ def _mapping_float(values: Mapping[str, str | None], name: str, default: float) 
         return default
 
 
+def _mapping_bool(values: Mapping[str, str | None], name: str, default: bool) -> bool:
+    """Return a boolean from an arbitrary dotenv mapping."""
+    return _parse_bool_value(name, _mapping_value(values, name), default)
+
+
+def _csv_values(value: str | None, default: tuple[str, ...]) -> tuple[str, ...]:
+    """Parse a comma-separated list while preserving order and removing duplicates."""
+    if value is None:
+        return default
+
+    parsed = tuple(dict.fromkeys(item.strip() for item in value.split(",") if item.strip()))
+    return parsed or default
+
+
+def _dotenv_csv(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    """Return a comma-separated tuple from the loaded dotenv file."""
+    return _csv_values(_dotenv_value(name), default)
+
+
+def _mapping_csv(
+    values: Mapping[str, str | None],
+    name: str,
+    default: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Return a comma-separated tuple from an arbitrary dotenv mapping."""
+    return _csv_values(values.get(name), default)
+
+
 def _normalize_backend_provider(value: str | None) -> str:
     """Normalize the configured conversation backend provider."""
     return (value or "").strip().lower()
+
+
+def _normalize_tool_transport(value: str | None) -> str:
+    """Normalize the selected conversation tool transport."""
+    candidate = (value or TOOL_TRANSPORT_LOCAL).strip().lower()
+    if candidate in TOOL_TRANSPORTS:
+        return candidate
+    logger.warning("Invalid REACHY_TOOL_TRANSPORT=%r; using local.", value)
+    return TOOL_TRANSPORT_LOCAL
 
 
 def _normalize_hf_connection_mode(value: str | None) -> str:
@@ -306,6 +352,25 @@ class Config:
     OPENAI_REALTIME_MODEL = _dotenv_value("OPENAI_REALTIME_MODEL", "gpt-realtime-2")
     OPENAI_REALTIME_VOICE = _dotenv_value("OPENAI_REALTIME_VOICE", "cedar")
 
+    VISION_API_KEY = _configured_value(_dotenv_value("VISION_API_KEY"))
+    VISION_BASE_URL = _dotenv_url("VISION_BASE_URL", "https://api.openai.com/v1")
+    VISION_DEFAULT_MODEL = _dotenv_value("VISION_DEFAULT_MODEL", "gpt-5.4-mini")
+    VISION_ALLOWED_MODELS = _dotenv_csv("VISION_ALLOWED_MODELS", _DEFAULT_VISION_ALLOWED_MODELS)
+
+    REACHY_TOOL_TRANSPORT = _normalize_tool_transport(
+        _process_env_value("REACHY_TOOL_TRANSPORT") or _dotenv_value("REACHY_TOOL_TRANSPORT", TOOL_TRANSPORT_LOCAL)
+    )
+    REACHY_MCP_URL = _clean_url_value(
+        "REACHY_MCP_URL",
+        _process_env_value("REACHY_MCP_URL") or _dotenv_value("REACHY_MCP_URL"),
+    )
+    REACHY_MCP_TOKEN = _configured_value(_process_env_value("REACHY_MCP_TOKEN") or _dotenv_value("REACHY_MCP_TOKEN"))
+    REQUIRE_ROUTED_VISION = _parse_bool_value(
+        "REQUIRE_ROUTED_VISION",
+        _process_env_value("REQUIRE_ROUTED_VISION") or _dotenv_value("REQUIRE_ROUTED_VISION"),
+        False,
+    )
+
     HF_REALTIME_CONNECTION_MODE = _normalize_hf_connection_mode(_dotenv_value("HF_REALTIME_CONNECTION_MODE"))
     HF_REALTIME_SESSION_URL = _dotenv_url("HF_REALTIME_SESSION_URL", HF_REALTIME_SESSION_PROXY_URL)
     HF_REALTIME_WS_URL = _dotenv_url("HF_REALTIME_WS_URL")
@@ -332,7 +397,8 @@ class Config:
     HF_TOKEN = _dotenv_value("HF_TOKEN")
 
     logger.debug(
-        "Backend: %s, realtime_model=%s, chat_model=%s, STT=%s, TTS=%s, HF mode=%s, HF_HOME=%s, Vision Model=%s",
+        "Backend: %s, realtime_model=%s, chat_model=%s, STT=%s, TTS=%s, HF mode=%s, "
+        "HF_HOME=%s, local_vision_model=%s, routed_vision_default=%s, routed_vision_allowed=%s",
         BACKEND_PROVIDER,
         OPENAI_REALTIME_MODEL,
         CHAT_MODEL_NAME,
@@ -341,6 +407,8 @@ class Config:
         HF_REALTIME_CONNECTION_MODE,
         HF_HOME,
         LOCAL_VISION_MODEL,
+        VISION_DEFAULT_MODEL,
+        VISION_ALLOWED_MODELS,
     )
     logger.debug(f"Locked profile: {LOCKED_PROFILE}")
     logger.debug("Dotenv path: %s", _dotenv_path or "<none>")
@@ -362,6 +430,14 @@ def apply_config_values(values: Mapping[str, str | None], *, inherit_current: bo
     )
     openai_realtime_model_default = config.OPENAI_REALTIME_MODEL if inherit_current else "gpt-realtime-2"
     openai_realtime_voice_default = config.OPENAI_REALTIME_VOICE if inherit_current else "cedar"
+    vision_api_key_default = config.VISION_API_KEY if inherit_current else None
+    vision_base_url_default = config.VISION_BASE_URL if inherit_current else "https://api.openai.com/v1"
+    vision_default_model_default = config.VISION_DEFAULT_MODEL if inherit_current else "gpt-5.4-mini"
+    vision_allowed_models_default = config.VISION_ALLOWED_MODELS if inherit_current else _DEFAULT_VISION_ALLOWED_MODELS
+    tool_transport_default = config.REACHY_TOOL_TRANSPORT if inherit_current else TOOL_TRANSPORT_LOCAL
+    mcp_url_default = config.REACHY_MCP_URL if inherit_current else None
+    mcp_token_default = config.REACHY_MCP_TOKEN if inherit_current else None
+    require_routed_vision_default = config.REQUIRE_ROUTED_VISION if inherit_current else False
     hf_realtime_connection_mode_default = (
         config.HF_REALTIME_CONNECTION_MODE if inherit_current else HF_REALTIME_CONNECTION_DEPLOYED
     )
@@ -421,6 +497,34 @@ def apply_config_values(values: Mapping[str, str | None], *, inherit_current: bo
         values,
         "OPENAI_REALTIME_VOICE",
         openai_realtime_voice_default,
+    )
+
+    config.VISION_API_KEY = _configured_value(_mapping_value(values, "VISION_API_KEY", vision_api_key_default))
+    config.VISION_BASE_URL = _mapping_url(values, "VISION_BASE_URL", vision_base_url_default)
+    config.VISION_DEFAULT_MODEL = (
+        _mapping_value(values, "VISION_DEFAULT_MODEL", vision_default_model_default) or vision_default_model_default
+    )
+    config.VISION_ALLOWED_MODELS = _mapping_csv(
+        values,
+        "VISION_ALLOWED_MODELS",
+        vision_allowed_models_default,
+    )
+
+    config.REACHY_TOOL_TRANSPORT = _normalize_tool_transport(
+        _process_env_value("REACHY_TOOL_TRANSPORT")
+        or _mapping_value(values, "REACHY_TOOL_TRANSPORT", tool_transport_default)
+    )
+    config.REACHY_MCP_URL = _clean_url_value(
+        "REACHY_MCP_URL",
+        _process_env_value("REACHY_MCP_URL") or _mapping_value(values, "REACHY_MCP_URL", mcp_url_default),
+    )
+    config.REACHY_MCP_TOKEN = _configured_value(
+        _process_env_value("REACHY_MCP_TOKEN") or _mapping_value(values, "REACHY_MCP_TOKEN", mcp_token_default)
+    )
+    config.REQUIRE_ROUTED_VISION = _parse_bool_value(
+        "REQUIRE_ROUTED_VISION",
+        _process_env_value("REQUIRE_ROUTED_VISION") or _mapping_value(values, "REQUIRE_ROUTED_VISION"),
+        require_routed_vision_default,
     )
 
     config.HF_REALTIME_CONNECTION_MODE = _normalize_hf_connection_mode(
@@ -497,3 +601,10 @@ def loaded_dotenv_path() -> str | None:
 def openai_realtime_api_key() -> str | None:
     """Return the OpenAI Realtime key, falling back to the standard OpenAI key."""
     return _configured_value(config.OPENAI_REALTIME_API_KEY) or _process_env_value("OPENAI_API_KEY")
+
+
+def vision_api_key() -> str | None:
+    """Return the routed-vision key, falling back to the app's standard OpenAI key."""
+    return (
+        _configured_value(config.VISION_API_KEY) or _process_env_value("OPENAI_API_KEY") or openai_realtime_api_key()
+    )

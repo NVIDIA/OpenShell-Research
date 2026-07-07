@@ -14,6 +14,14 @@ CONFIG_ATTRS = (
     "OPENAI_REALTIME_BASE_URL",
     "OPENAI_REALTIME_MODEL",
     "OPENAI_REALTIME_VOICE",
+    "VISION_API_KEY",
+    "VISION_BASE_URL",
+    "VISION_DEFAULT_MODEL",
+    "VISION_ALLOWED_MODELS",
+    "REACHY_TOOL_TRANSPORT",
+    "REACHY_MCP_URL",
+    "REACHY_MCP_TOKEN",
+    "REQUIRE_ROUTED_VISION",
     "HF_REALTIME_CONNECTION_MODE",
     "HF_REALTIME_SESSION_URL",
     "HF_REALTIME_WS_URL",
@@ -75,6 +83,11 @@ def test_documented_env_template_validates_with_exported_system_keys(monkeypatch
     try:
         assert not list(PROJECT_ROOT.glob(".env.*.example"))
         assert raw_values["BACKEND_PROVIDER"] == config_mod.BACKEND_OPENAI_REALTIME
+        assert raw_values["VISION_DEFAULT_MODEL"] == "gpt-5.4-mini"
+        assert raw_values["VISION_ALLOWED_MODELS"] == "gpt-5.4-mini,gpt-5.5"
+        assert raw_values["REACHY_TOOL_TRANSPORT"] == "local"
+        assert raw_values["REACHY_MCP_URL"] == ""
+        assert raw_values["REQUIRE_ROUTED_VISION"] == "0"
         assert "OPENAI_REALTIME_API_KEY" not in raw_values
         assert "OPENAI_API_KEY" not in raw_values
 
@@ -92,6 +105,54 @@ def test_documented_env_template_validates_with_exported_system_keys(monkeypatch
 
             if backend_provider == config_mod.BACKEND_OPENAI_REALTIME:
                 assert config_mod.openai_realtime_api_key() == "global-openai-key"
+    finally:
+        _restore_config_snapshot(snapshot)
+
+
+def test_apply_config_values_parses_vision_route_and_key_fallback(monkeypatch: Any) -> None:
+    """Vision configuration should parse its allowlist and reuse the standard OpenAI key."""
+    snapshot = _config_snapshot()
+    monkeypatch.setitem(config_mod._ORIGINAL_PROCESS_ENV, "OPENAI_API_KEY", "global-openai-key")
+
+    try:
+        config_mod.apply_config_values(
+            {
+                "VISION_BASE_URL": "https://vision.example.test/v1",
+                "VISION_DEFAULT_MODEL": "gpt-5.5",
+                "VISION_ALLOWED_MODELS": "gpt-5.4-mini, gpt-5.5, gpt-5.5",
+            },
+            inherit_current=False,
+        )
+
+        assert config_mod.config.VISION_BASE_URL == "https://vision.example.test/v1"
+        assert config_mod.config.VISION_DEFAULT_MODEL == "gpt-5.5"
+        assert config_mod.config.VISION_ALLOWED_MODELS == ("gpt-5.4-mini", "gpt-5.5")
+        assert config_mod.vision_api_key() == "global-openai-key"
+    finally:
+        _restore_config_snapshot(snapshot)
+
+
+def test_apply_config_values_parses_mcp_conversation_transport(monkeypatch: Any) -> None:
+    """MCP mode should load its endpoint, token, and routed-vision requirement."""
+    snapshot = _config_snapshot()
+    monkeypatch.setattr(config_mod, "_dotenv_loaded_keys", set())
+    monkeypatch.setattr(config_mod, "_dotenv_values", {})
+
+    try:
+        config_mod.apply_config_values(
+            {
+                "REACHY_TOOL_TRANSPORT": "mcp",
+                "REACHY_MCP_URL": "http://127.0.0.1:8766/mcp",
+                "REACHY_MCP_TOKEN": "test-token",
+                "REQUIRE_ROUTED_VISION": "1",
+            },
+            inherit_current=False,
+        )
+
+        assert config_mod.config.REACHY_TOOL_TRANSPORT == "mcp"
+        assert config_mod.config.REACHY_MCP_URL == "http://127.0.0.1:8766/mcp"
+        assert config_mod.config.REACHY_MCP_TOKEN == "test-token"
+        assert config_mod.config.REQUIRE_ROUTED_VISION is True
     finally:
         _restore_config_snapshot(snapshot)
 

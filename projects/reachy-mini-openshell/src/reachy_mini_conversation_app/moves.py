@@ -247,10 +247,16 @@ class MovementManager:
         self,
         current_robot: ReachyMini,
         camera_worker: "Any" = None,
+        target_frequency_hz: float = CONTROL_LOOP_FREQUENCY_HZ,
+        enable_idle_breathing: bool = True,
     ):
         """Initialize movement manager."""
+        if target_frequency_hz <= 0:
+            raise ValueError("target_frequency_hz must be positive")
+
         self.current_robot = current_robot
         self.camera_worker = camera_worker
+        self.enable_idle_breathing = enable_idle_breathing
 
         # Single timing source for durations
         self._now = time.monotonic
@@ -260,6 +266,18 @@ class MovementManager:
         self.state.last_activity_time = self._now()
         neutral_pose = create_head_pose(0, 0, 0, 0, 0, 0, degrees=True)
         initial_pose: FullBodyPose = (neutral_pose, (0.0, 0.0), 0.0)
+        initial_pose_is_observed = False
+        try:
+            current_head_pose = current_robot.get_current_head_pose()
+            current_head_joints, current_antennas = current_robot.get_current_joint_positions()
+            initial_pose = (
+                current_head_pose.copy(),
+                (float(current_antennas[0]), float(current_antennas[1])),
+                float(current_head_joints[0]),
+            )
+            initial_pose_is_observed = True
+        except (AttributeError, AssertionError, IndexError, TypeError, ValueError):
+            logger.debug("Could not seed movement output from current robot state; using neutral state")
         self.state.last_primary_pose = initial_pose
 
         # Move queue (primary moves)
@@ -267,13 +285,14 @@ class MovementManager:
 
         # Configuration
         self.idle_inactivity_delay = 0.3  # seconds
-        self.target_frequency = CONTROL_LOOP_FREQUENCY_HZ
+        self.target_frequency = target_frequency_hz
         self.target_period = 1.0 / self.target_frequency
 
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._is_listening = False
         self._last_commanded_pose: FullBodyPose = clone_full_body_pose(initial_pose)
+        self._has_sent_target = initial_pose_is_observed
         self._listening_antennas: Tuple[float, float] = self._last_commanded_pose[1]
         self._antenna_unfreeze_blend = 1.0
         self._antenna_blend_duration = 0.4  # seconds to blend back after listening
@@ -281,9 +300,10 @@ class MovementManager:
         self._breathing_active = False  # true when breathing move is running or queued
         self._listening_debounce_s = 0.15
         self._last_listening_toggle_time = self._now()
-        self._last_set_target_err = 0.0
-        self._set_target_err_interval = 1.0  # seconds between error logs
-        self._set_target_err_suppressed = 0
+        self._delivery_condition = threading.Condition()
+        self._delivery_sequence = 0
+        self._delivery_error: str | None = None
+        self._delivery_failed = False
 
         # Cross-thread signalling
         self._command_queue: "Queue[Tuple[str, Any]]" = Queue()
@@ -330,6 +350,38 @@ class MovementManager:
         Thread-safe: executed by the worker thread via the command queue.
         """
         self._command_queue.put(("clear_queue", None))
+
+    def delivery_checkpoint(self) -> int:
+        """Return a sequence number callers can use to await a later send."""
+        with self._delivery_condition:
+            return self._delivery_sequence
+
+    def wait_for_delivery(self, checkpoint: int, timeout: float = 1.0) -> tuple[bool, str | None]:
+        """Wait for a target send after ``checkpoint`` or a terminal send error."""
+        with self._delivery_condition:
+            self._delivery_condition.wait_for(
+                lambda: self._delivery_sequence > checkpoint or self._delivery_failed,
+                timeout=max(0.0, timeout),
+            )
+            if self._delivery_sequence > checkpoint:
+                return True, None
+            return False, self._delivery_error or "Timed out waiting to send a target to Reachy"
+
+    def connection_healthy(self) -> bool:
+        """Return whether the SDK and this movement loop can still send commands."""
+        with self._delivery_condition:
+            if self._delivery_failed:
+                return False
+
+        client = getattr(self.current_robot, "client", None)
+        sdk_alive = getattr(client, "_is_alive", None)
+        return True if sdk_alive is None else bool(sdk_alive)
+
+    @property
+    def delivery_error(self) -> str | None:
+        """Return the terminal target-delivery error, if one occurred."""
+        with self._delivery_condition:
+            return self._delivery_error
 
     def set_speech_offsets(self, offsets: Tuple[float, float, float, float, float, float]) -> None:
         """Update speech-induced secondary offsets (x, y, z, roll, pitch, yaw).
@@ -411,6 +463,9 @@ class MovementManager:
     def _handle_command(self, command: str, payload: Any, current_time: float) -> None:
         """Handle a single cross-thread command."""
         if command == "queue_move":
+            if not self.connection_healthy():
+                logger.warning("Ignored queued move because the Reachy control connection is unavailable")
+                return
             if isinstance(payload, Move):
                 self.move_queue.append(payload)
                 self.state.update_activity()
@@ -494,6 +549,10 @@ class MovementManager:
 
     def _manage_breathing(self, current_time: float) -> None:
         """Manage automatic breathing when idle."""
+        if not self.enable_idle_breathing:
+            self._breathing_active = False
+            return
+
         if (
             self.state.current_move is None
             and not self.move_queue
@@ -638,7 +697,11 @@ class MovementManager:
     def _issue_control_command(
         self, head: NDArray[np.float64], antennas: Tuple[float, float], body_yaw: float
     ) -> None:
-        """Send the fused pose to the robot with throttled error logging."""
+        """Send one fused pose, stopping permanently after uncertain delivery."""
+        with self._delivery_condition:
+            if self._delivery_failed:
+                return
+
         try:
             self.current_robot.set_target(
                 head=head,
@@ -646,19 +709,41 @@ class MovementManager:
                 body_yaw=body_yaw,
             )
         except Exception as e:
-            now = self._now()
-            if now - self._last_set_target_err >= self._set_target_err_interval:
-                msg = f"Failed to set robot target: {e}"
-                if self._set_target_err_suppressed:
-                    msg += f" (suppressed {self._set_target_err_suppressed} repeats)"
-                    self._set_target_err_suppressed = 0
-                logger.error(msg)
-                self._last_set_target_err = now
-            else:
-                self._set_target_err_suppressed += 1
+            error = f"Failed to set robot target: {type(e).__name__}: {e}"
+            with self._delivery_condition:
+                self._delivery_failed = True
+                self._delivery_error = error
+                self._delivery_condition.notify_all()
+
+            self.move_queue.clear()
+            self.state.current_move = None
+            self.state.move_start_time = None
+            self._breathing_active = False
+            logger.error("%s; motion output paused until the runtime reconnects", error)
         else:
             with self._status_lock:
                 self._last_commanded_pose = clone_full_body_pose((head, antennas, body_yaw))
+                self._has_sent_target = True
+            with self._delivery_condition:
+                self._delivery_sequence += 1
+                self._delivery_condition.notify_all()
+
+    def _target_changed(
+        self,
+        head: NDArray[np.float64],
+        antennas: Tuple[float, float],
+        body_yaw: float,
+    ) -> bool:
+        """Return whether a target differs enough to justify a network send."""
+        with self._status_lock:
+            if not self._has_sent_target:
+                return True
+            previous = clone_full_body_pose(self._last_commanded_pose)
+        return not (
+            np.allclose(head, previous[0], rtol=0.0, atol=1e-7)
+            and np.allclose(antennas, previous[1], rtol=0.0, atol=1e-7)
+            and abs(body_yaw - previous[2]) <= 1e-7
+        )
 
     def _update_frequency_stats(
         self,
@@ -725,7 +810,7 @@ class MovementManager:
             self.state.face_tracking_offsets = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
     def start(self) -> None:
-        """Start the worker thread that drives the 100 Hz control loop."""
+        """Start the worker thread that drives the configured control loop."""
         if self._thread is not None and self._thread.is_alive():
             logger.warning("Move worker already running; start() ignored")
             return
@@ -754,6 +839,10 @@ class MovementManager:
             self._thread.join()
             self._thread = None
         logger.debug("Move worker stopped")
+
+        if not self.connection_healthy():
+            logger.info("Skipping neutral reset because the Reachy control connection is unavailable")
+            return
 
         # Reset to neutral position using goto_target (same approach as wake_up)
         try:
@@ -795,6 +884,8 @@ class MovementManager:
             "queue_size": len(self.move_queue),
             "is_listening": self._is_listening,
             "breathing_active": self._breathing_active,
+            "connection_healthy": self.connection_healthy(),
+            "delivery_error": self.delivery_error,
             "last_commanded_pose": {
                 "head": head_matrix,
                 "antennas": antennas,
@@ -814,7 +905,7 @@ class MovementManager:
 
         Single set_target() call with pose fusion.
         """
-        logger.debug("Starting enhanced movement control loop (100Hz)")
+        logger.debug("Starting enhanced movement control loop (%.1fHz)", self.target_frequency)
 
         loop_count = 0
         prev_loop_start = self._now()
@@ -844,8 +935,11 @@ class MovementManager:
             # 5) Apply listening antenna freeze or blend-back
             antennas_cmd = self._calculate_blended_antennas(antennas)
 
-            # 6) Single set_target call - the only control point
-            self._issue_control_command(head, antennas_cmd, body_yaw)
+            # 6) Send only changed targets. Avoiding idle writes is especially
+            # important over Wi-Fi, where a 100 Hz no-op stream can starve the
+            # daemon's WebSocket and eventually trigger a keepalive timeout.
+            if self._target_changed(head, antennas_cmd, body_yaw):
+                self._issue_control_command(head, antennas_cmd, body_yaw)
 
             # 7) Adaptive sleep to align to next tick, then publish shared state
             sleep_time, freq_stats = self._schedule_next_tick(loop_start, freq_stats)

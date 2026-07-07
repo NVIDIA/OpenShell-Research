@@ -1,8 +1,10 @@
+import json
 import base64
 import random
 import asyncio
 import logging
 from typing import Any, cast
+from pathlib import Path
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
@@ -20,8 +22,13 @@ from reachy_mini_conversation_app.config import (
 )
 from reachy_mini_conversation_app.audio.pcm import wav_bytes, prepare_mono_int16_audio
 from reachy_mini_conversation_app.tools.core_tools import ToolDependencies
-from reachy_mini_conversation_app.conversation_stream import ConversationStreamHandler, _compute_response_cost
-from reachy_mini_conversation_app.tools.background_tool_manager import ToolCallRoutine
+from reachy_mini_conversation_app.conversation_stream import (
+    ConversationStreamHandler,
+    _model_io_json,
+    _compute_response_cost,
+)
+from reachy_mini_conversation_app.tools.tool_constants import ToolState
+from reachy_mini_conversation_app.tools.background_tool_manager import ToolCallRoutine, ToolNotification
 
 
 def _build_handler(loop: asyncio.AbstractEventLoop) -> ConversationStreamHandler:
@@ -80,6 +87,44 @@ def test_format_timestamp_uses_wall_clock() -> None:
     # Extract year from "[YYYY-MM-DD ...]"
     year = int(formatted[1:5])
     assert year == datetime.now(timezone.utc).year
+
+
+def test_model_io_logging_redacts_secrets_and_binary_payloads() -> None:
+    """Detailed model logs keep useful text while omitting credentials and media bytes."""
+    raw_base64 = "A" * 1_000
+
+    logged = _model_io_json(
+        {
+            "api_key": "sk-secret-value",
+            "text": "Describe this image in detail.",
+            "image_url": f"data:image/jpeg;base64,{raw_base64}",
+            "audio": raw_base64,
+            "b64_images": [raw_base64, raw_base64],
+        }
+    )
+
+    assert "sk-secret-value" not in logged
+    assert raw_base64 not in logged
+    assert "<redacted>" in logged
+    assert "image/jpeg" in logged
+    assert "estimated_bytes" in logged
+    assert "Describe this image in detail." in logged
+
+
+@pytest.mark.asyncio
+async def test_focused_model_request_logging_uses_info(caplog: Any) -> None:
+    """Focused model logs should work without enabling global DEBUG output."""
+    caplog.set_level(logging.INFO)
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = ConversationStreamHandler(deps, model_logs=True)
+
+    handler._log_model_request(
+        "response.create",
+        {"response": {"instructions": "Describe the image.", "tool_choice": "none"}},
+    )
+
+    assert "MODEL request type=response.create" in caplog.text
+    assert "Describe the image." in caplog.text
 
 
 def test_parse_hf_realtime_url_removes_realtime_path_and_preserves_query() -> None:
@@ -169,7 +214,7 @@ async def test_hf_realtime_session_uses_configured_model_and_connect_query(monke
     """HF realtime sessions pass the selected model separately from session query params."""
     _set_hf_realtime_test_config(monkeypatch)
     monkeypatch.setattr(stream_mod, "get_session_instructions", lambda: "test instructions")
-    monkeypatch.setattr(stream_mod, "get_tool_specs", lambda: [])
+    monkeypatch.setattr(stream_mod, "get_tool_specs_for_dependencies", lambda _deps: [])
 
     connect_calls: list[dict[str, Any]] = []
     session_updates: list[dict[str, Any]] = []
@@ -222,11 +267,73 @@ async def test_hf_realtime_session_uses_configured_model_and_connect_query(monke
 
 
 @pytest.mark.asyncio
+async def test_transport_discovery_precedes_realtime_configuration(monkeypatch: Any) -> None:
+    """MCP schemas must be discovered before the model session is configured."""
+    _set_openai_test_config(monkeypatch)
+    events: list[str] = []
+    session_updates: list[dict[str, Any]] = []
+
+    class FakeTransport:
+        async def list_tools(self) -> list[dict[str, Any]]:
+            events.append("tools/list")
+            return [
+                {
+                    "type": "function",
+                    "name": "move_head",
+                    "description": "Move Reachy's head",
+                    "parameters": {"type": "object"},
+                }
+            ]
+
+        async def call_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+            return {"name": name, "arguments": arguments}
+
+        async def close(self) -> None:
+            events.append("transport.close")
+
+    class FakeSession:
+        async def update(self, **kwargs: Any) -> None:
+            events.append("session.update")
+            session_updates.append(kwargs)
+
+    class FakeConn:
+        session = FakeSession()
+
+        async def __aenter__(self) -> "FakeConn":
+            return self
+
+        async def __aexit__(self, exc_type: Any, exc: Any, tb: Any) -> bool:
+            return False
+
+        def __aiter__(self) -> "FakeConn":
+            return self
+
+        async def __anext__(self) -> None:
+            raise StopAsyncIteration
+
+    class FakeRealtime:
+        def connect(self, **_kwargs: Any) -> FakeConn:
+            return FakeConn()
+
+    class FakeClient:
+        realtime = FakeRealtime()
+
+    handler = ConversationStreamHandler(ToolDependencies(), tool_transport=FakeTransport())
+    handler.client = cast(Any, FakeClient())
+
+    await handler._run_realtime_session()
+    await handler.shutdown()
+
+    assert events == ["tools/list", "session.update", "transport.close"]
+    assert session_updates[0]["session"]["tools"][0]["name"] == "move_head"
+
+
+@pytest.mark.asyncio
 async def test_hf_start_up_refreshes_client_between_realtime_retries(monkeypatch: Any) -> None:
     """HF session retries should allocate a fresh client/connect URL after abrupt closes."""
     _set_hf_realtime_test_config(monkeypatch)
     monkeypatch.setattr(stream_mod, "get_session_instructions", lambda: "test instructions")
-    monkeypatch.setattr(stream_mod, "get_tool_specs", lambda: [])
+    monkeypatch.setattr(stream_mod, "get_tool_specs_for_dependencies", lambda _deps: [])
 
     fake_closed_error = type("FakeConnectionClosedError", (Exception,), {})
     monkeypatch.setattr(stream_mod, "ConnectionClosedError", fake_closed_error)
@@ -650,7 +757,7 @@ async def test_realtime_tool_call_waits_for_tool_result_before_response_create(m
     """Realtime tool calls should not request a follow-up before function_call_output is available."""
     _set_openai_test_config(monkeypatch)
     monkeypatch.setattr(stream_mod, "get_session_instructions", lambda: "test instructions")
-    monkeypatch.setattr(stream_mod, "get_tool_specs", lambda: [])
+    monkeypatch.setattr(stream_mod, "get_tool_specs_for_dependencies", lambda _deps: [])
     event_queue: asyncio.Queue[Any] = asyncio.Queue()
     response_create_calls: list[dict[str, Any]] = []
 
@@ -746,6 +853,394 @@ async def test_realtime_tool_call_waits_for_tool_result_before_response_create(m
     assert isinstance(output, stream_mod.AdditionalOutputs)
     assert output.args[0]["content"].startswith("🛠️ Used tool sweep_look")
     assert response_create_calls == []
+
+
+@pytest.mark.asyncio
+async def test_camera_result_sends_image_separately_from_function_output() -> None:
+    """Camera bytes belong in input_image, not the text function result."""
+    item_create_calls: list[dict[str, Any]] = []
+
+    class FakeConversationItem:
+        async def create(self, **kwargs: Any) -> None:
+            item_create_calls.append(kwargs)
+
+    class FakeConversation:
+        item = FakeConversationItem()
+
+    class FakeConnection:
+        conversation = FakeConversation()
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = stream_mod.ConversationStreamHandler(deps)
+    handler.connection = FakeConnection()
+
+    await handler._handle_tool_result(
+        ToolNotification(
+            id="call_camera",
+            tool_name="camera",
+            is_idle_tool_call=False,
+            status=ToolState.COMPLETED,
+            result={
+                "b64_im": "jpeg-base64-data",
+                "question": "What is the person doing?",
+            },
+        )
+    )
+
+    function_output = item_create_calls[0]["item"]
+    image_message = item_create_calls[1]["item"]
+    parsed_output = json.loads(function_output["output"])
+    queued_response = handler._pending_responses.get_nowait()
+
+    assert function_output["type"] == "function_call_output"
+    assert parsed_output == {
+        "question": "What is the person doing?",
+        "status": "image_captured",
+    }
+    assert "jpeg-base64-data" not in function_output["output"]
+    assert image_message["content"] == [
+        {
+            "type": "input_image",
+            "image_url": "data:image/jpeg;base64,jpeg-base64-data",
+        }
+    ]
+    assert queued_response["response"]["tool_choice"] == "none"
+    assert "input image" in queued_response["response"]["instructions"]
+
+
+@pytest.mark.asyncio
+async def test_policy_denial_preserves_structured_transport_result() -> None:
+    """Realtime should receive the policy status as well as its human-readable error."""
+    item_create_calls: list[dict[str, Any]] = []
+
+    class FakeConversationItem:
+        async def create(self, **kwargs: Any) -> None:
+            item_create_calls.append(kwargs)
+
+    class FakeConversation:
+        item = FakeConversationItem()
+
+    class FakeConnection:
+        conversation = FakeConversation()
+
+    handler = stream_mod.ConversationStreamHandler(ToolDependencies())
+    handler.connection = FakeConnection()
+
+    await handler._handle_tool_result(
+        ToolNotification(
+            id="call_dance",
+            tool_name="dance",
+            is_idle_tool_call=False,
+            status=ToolState.FAILED,
+            result={
+                "status": "policy_denied",
+                "tool": "dance",
+                "error": "Blocked by OpenShell policy",
+            },
+            error="Blocked by OpenShell policy",
+        )
+    )
+
+    function_output = item_create_calls[0]["item"]
+    assert json.loads(function_output["output"]) == {
+        "status": "policy_denied",
+        "tool": "dance",
+        "error": "Blocked by OpenShell policy",
+    }
+
+
+@pytest.mark.asyncio
+async def test_routed_camera_result_returns_description_without_realtime_image() -> None:
+    """A dedicated vision route should keep raw image bytes out of the Realtime session."""
+    item_create_calls: list[dict[str, Any]] = []
+
+    class FakeConversationItem:
+        async def create(self, **kwargs: Any) -> None:
+            item_create_calls.append(kwargs)
+
+    class FakeConversation:
+        item = FakeConversationItem()
+
+    class FakeConnection:
+        conversation = FakeConversation()
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = stream_mod.ConversationStreamHandler(deps)
+    handler.connection = FakeConnection()
+
+    await handler._handle_tool_result(
+        ToolNotification(
+            id="call_camera_routed",
+            tool_name="camera",
+            is_idle_tool_call=False,
+            status=ToolState.COMPLETED,
+            result={
+                "status": "image_analyzed",
+                "image_description": "The person is waving.",
+                "requested_model": "gpt-5.5",
+                "selected_model": "gpt-5.5",
+                "response_id": "resp_vision",
+            },
+        )
+    )
+
+    assert len(item_create_calls) == 1
+    function_output = item_create_calls[0]["item"]
+    parsed_output = json.loads(function_output["output"])
+    queued_response = handler._pending_responses.get_nowait()
+
+    assert function_output["type"] == "function_call_output"
+    assert parsed_output["image_description"] == "The person is waving."
+    assert parsed_output["selected_model"] == "gpt-5.5"
+    assert queued_response["response"]["tool_choice"] == "none"
+    assert "approved vision model" in queued_response["response"]["instructions"]
+
+
+@pytest.mark.asyncio
+async def test_scene_scan_result_sends_chronological_images_and_video_preview(
+    monkeypatch: Any,
+    tmp_path: Path,
+) -> None:
+    """Scene-scan media stays out of tool JSON and reaches the vision model as images."""
+    item_create_calls: list[dict[str, Any]] = []
+
+    class FakeConversationItem:
+        async def create(self, **kwargs: Any) -> None:
+            item_create_calls.append(kwargs)
+
+    class FakeConversation:
+        item = FakeConversationItem()
+
+    class FakeConnection:
+        conversation = FakeConversation()
+
+    video_path = tmp_path / "scene-scan.mp4"
+    video_path.write_bytes(b"fake-mp4")
+    monkeypatch.setattr(stream_mod.gr, "Video", lambda **kwargs: {"video": kwargs["value"]})
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = stream_mod.ConversationStreamHandler(deps)
+    handler.connection = FakeConnection()
+
+    await handler._handle_tool_result(
+        ToolNotification(
+            id="call_scan",
+            tool_name="scan_scene",
+            is_idle_tool_call=False,
+            status=ToolState.COMPLETED,
+            result={
+                "status": "scene_scan_complete",
+                "question": "What did you see?",
+                "video_path": str(video_path),
+                "frame_timestamps_seconds": [0.5, 7.0],
+                "b64_images": ["first-jpeg", "second-jpeg"],
+            },
+        )
+    )
+
+    function_output = item_create_calls[0]["item"]
+    image_message = item_create_calls[1]["item"]
+    parsed_output = json.loads(function_output["output"])
+    queued_response = handler._pending_responses.get_nowait()
+
+    assert "b64_images" not in parsed_output
+    assert parsed_output["video_path"] == str(video_path)
+    assert image_message["content"][0]["type"] == "input_text"
+    assert "chronological" in image_message["content"][0]["text"]
+    assert image_message["content"][1:] == [
+        {
+            "type": "input_image",
+            "image_url": "data:image/jpeg;base64,first-jpeg",
+        },
+        {
+            "type": "input_image",
+            "image_url": "data:image/jpeg;base64,second-jpeg",
+        },
+    ]
+    assert queued_response["response"]["tool_choice"] == "none"
+    assert "every chronological image" in queued_response["response"]["instructions"]
+
+    tool_card = await handler.output_queue.get()
+    video_preview = await handler.output_queue.get()
+    assert isinstance(tool_card, stream_mod.AdditionalOutputs)
+    assert isinstance(video_preview, stream_mod.AdditionalOutputs)
+    assert tool_card.args[0]["metadata"]["title"] == "🛠️ Used tool scan_scene"
+    assert video_preview.args[0]["content"] == {"video": str(video_path)}
+
+
+@pytest.mark.asyncio
+async def test_typed_realtime_message_waits_for_answer_after_tool_updates(monkeypatch: Any) -> None:
+    """A tool card is an intermediate update, not the final typed-chat answer."""
+    monkeypatch.setattr(stream_mod, "backend_config_error", lambda: None)
+
+    class FakeConversationItem:
+        async def create(self, **_kwargs: Any) -> None:
+            return None
+
+    class FakeConversation:
+        item = FakeConversationItem()
+
+    class FakeConnection:
+        conversation = FakeConversation()
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = stream_mod.ConversationStreamHandler(deps)
+    handler.connection = FakeConnection()
+    monkeypatch.setattr(handler, "_text_model_uses_realtime", lambda: True)
+
+    async def ensure_text_session() -> bool:
+        return True
+
+    monkeypatch.setattr(handler, "_ensure_text_session", ensure_text_session)
+    handler._response_done_event.clear()
+
+    send_task = asyncio.create_task(handler.send_text_message("Take a picture", timeout=2.0))
+    await asyncio.sleep(0)
+    await handler._publish_chat_output(
+        {
+            "role": "assistant",
+            "content": "🛠️ Used tool camera with args {}. The tool is now running.",
+        }
+    )
+    handler._response_done_event.set()
+
+    await asyncio.sleep(0.05)
+    assert not send_task.done()
+
+    handler._response_done_event.clear()
+    await handler._publish_chat_output(
+        {
+            "role": "assistant",
+            "content": "You are sitting in front of the camera.",
+        }
+    )
+    handler._response_done_event.set()
+
+    messages = await asyncio.wait_for(send_task, timeout=1.0)
+
+    assert messages[-1] == {
+        "role": "assistant",
+        "content": "You are sitting in front of the camera.",
+    }
+
+
+@pytest.mark.asyncio
+async def test_typed_realtime_output_is_not_stolen_by_stream_consumer(monkeypatch: Any) -> None:
+    """FastRTC and typed chat should each receive a copy of assistant text."""
+    monkeypatch.setattr(stream_mod, "backend_config_error", lambda: None)
+
+    class FakeConversationItem:
+        async def create(self, **_kwargs: Any) -> None:
+            return None
+
+    class FakeConversation:
+        item = FakeConversationItem()
+
+    class FakeConnection:
+        conversation = FakeConversation()
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = stream_mod.ConversationStreamHandler(deps)
+    handler.connection = FakeConnection()
+    monkeypatch.setattr(handler, "_text_model_uses_realtime", lambda: True)
+
+    async def ensure_text_session() -> bool:
+        return True
+
+    monkeypatch.setattr(handler, "_ensure_text_session", ensure_text_session)
+    handler._response_done_event.clear()
+
+    send_task = asyncio.create_task(handler.send_text_message("Describe the picture", timeout=2.0))
+    await asyncio.sleep(0)
+    await handler._publish_chat_output(
+        {
+            "role": "assistant",
+            "content": "I can see a person standing by a desk.",
+        }
+    )
+
+    stream_output = await asyncio.wait_for(handler.output_queue.get(), timeout=1.0)
+    handler._response_done_event.set()
+    messages = await asyncio.wait_for(send_task, timeout=1.0)
+
+    assert isinstance(stream_output, stream_mod.AdditionalOutputs)
+    assert stream_output.args[0]["content"] == "I can see a person standing by a desk."
+    assert messages[-1]["content"] == "I can see a person standing by a desk."
+
+
+@pytest.mark.asyncio
+async def test_typed_realtime_waits_past_tool_commentary_for_followup(monkeypatch: Any) -> None:
+    """Pre-tool commentary must not finish a typed turn before the tool's final answer."""
+    monkeypatch.setattr(stream_mod, "backend_config_error", lambda: None)
+
+    class FakeConversationItem:
+        async def create(self, **_kwargs: Any) -> None:
+            return None
+
+    class FakeConversation:
+        item = FakeConversationItem()
+
+    class FakeConnection:
+        conversation = FakeConversation()
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = stream_mod.ConversationStreamHandler(deps)
+    handler.connection = FakeConnection()
+    monkeypatch.setattr(handler, "_text_model_uses_realtime", lambda: True)
+
+    async def ensure_text_session() -> bool:
+        return True
+
+    monkeypatch.setattr(handler, "_ensure_text_session", ensure_text_session)
+    handler._response_done_event.clear()
+
+    send_task = asyncio.create_task(handler.send_text_message("What am I doing?", timeout=2.0))
+    await asyncio.sleep(0)
+    await handler._publish_chat_output(
+        {
+            "role": "assistant",
+            "content": "Let me check the camera.",
+        }
+    )
+    handler._typed_tool_calls_awaiting_followup.add("call_camera")
+    handler._typed_followup_call_order.append("call_camera")
+    handler._tool_call_response_ids.add("resp_tool_call")
+    handler._response_done_event.set()
+
+    await asyncio.sleep(0.05)
+    assert not send_task.done()
+
+    handler._response_done_event.clear()
+    handler._mark_typed_followup_response("resp_camera_answer")
+    await handler._publish_chat_output(
+        {
+            "role": "assistant",
+            "content": "You are sitting at a desk with one hand near your mouth.",
+        }
+    )
+    handler._response_done_event.set()
+
+    messages = await asyncio.wait_for(send_task, timeout=1.0)
+
+    assert messages[-1]["content"] == "You are sitting at a desk with one hand near your mouth."
+
+
+def test_response_message_text_extracts_audio_transcript_fallback() -> None:
+    """response.done can recover text when a backend omits transcript.done."""
+
+    class Content:
+        transcript = "I can see someone wearing a blue shirt."
+        text = None
+
+    class Message:
+        type = "message"
+        role = "assistant"
+        content = [Content()]
+
+    class Response:
+        output = [Message()]
+
+    assert ConversationStreamHandler._response_message_text(Response()) == "I can see someone wearing a blue shirt."
 
 
 @pytest.mark.asyncio
@@ -1108,8 +1603,8 @@ async def test_chat_completion_tool_follow_up_keeps_tools_param(monkeypatch: Any
     monkeypatch.setattr(stream_mod.config, "CHAT_MODEL_NAME", "azure/anthropic/claude-opus-4-8")
     monkeypatch.setattr(
         chat_mod,
-        "get_tool_specs",
-        lambda: [
+        "get_tool_specs_for_dependencies",
+        lambda _deps: [
             {
                 "type": "function",
                 "name": "dance",
@@ -1194,8 +1689,8 @@ async def test_chat_completion_supports_multiple_tool_rounds(monkeypatch: Any) -
     _set_local_stt_test_config(monkeypatch)
     monkeypatch.setattr(
         chat_mod,
-        "get_tool_specs",
-        lambda: [
+        "get_tool_specs_for_dependencies",
+        lambda _deps: [
             {
                 "type": "function",
                 "name": "play_emotion",
@@ -1302,8 +1797,8 @@ async def test_chat_completion_accepts_dict_shaped_messages_and_tool_calls(monke
     _set_local_stt_test_config(monkeypatch)
     monkeypatch.setattr(
         chat_mod,
-        "get_tool_specs",
-        lambda: [
+        "get_tool_specs_for_dependencies",
+        lambda _deps: [
             {
                 "type": "function",
                 "name": "play_emotion",
@@ -1379,8 +1874,8 @@ async def test_chat_completion_tool_follow_up_retries_rate_limit(monkeypatch: An
     monkeypatch.setattr(stream_mod.config, "CHAT_MODEL_NAME", "azure/anthropic/claude-opus-4-8")
     monkeypatch.setattr(
         chat_mod,
-        "get_tool_specs",
-        lambda: [
+        "get_tool_specs_for_dependencies",
+        lambda _deps: [
             {
                 "type": "function",
                 "name": "sweep_look",
@@ -1550,7 +2045,7 @@ async def test_response_sender_retries_on_active_response_rejection(monkeypatch:
     monkeypatch.setattr(stream_mod, "ConnectionClosedError", FakeCCE)
     monkeypatch.setattr(stream_mod, "get_session_instructions", lambda: "test")
     monkeypatch.setattr(stream_mod, "get_session_voice", lambda *_args: "alloy")
-    monkeypatch.setattr(stream_mod, "get_tool_specs", lambda: [])
+    monkeypatch.setattr(stream_mod, "get_tool_specs_for_dependencies", lambda _deps: [])
 
     N_TOOL_RESULTS = 400
     REJECT_CALL_NUMBERS = {1, 3, 5, 10, 25, 50, 75, 100, 150, 200, 300, 399}
