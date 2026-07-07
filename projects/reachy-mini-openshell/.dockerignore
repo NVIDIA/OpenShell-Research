@@ -1,0 +1,12 @@
+.env
+.venv
+.git
+.pytest_cache
+.ruff_cache
+cache
+captures
+captures-sandbox
+__pycache__
+*.pyc
+.reachy-mcp-token
+.run

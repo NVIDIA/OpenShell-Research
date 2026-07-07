@@ -11,6 +11,7 @@ from reachy_mini_conversation_app.tool_transport import ToolTransport
 from reachy_mini_conversation_app.chat_completions import ChatCompletionRunner
 from reachy_mini_conversation_app.speech_endpoints import SpeechEndpointClient
 from reachy_mini_conversation_app.tools.core_tools import ToolDependencies
+from reachy_mini_conversation_app.media_result_processor import MediaResultProcessor
 from reachy_mini_conversation_app.tools.background_tool_manager import BackgroundToolManager
 
 
@@ -24,11 +25,13 @@ class LocalSTTBackend:
         tool_manager: BackgroundToolManager,
         client_factory: Callable[..., Any],
         tool_transport: ToolTransport | None = None,
+        media_result_processor: MediaResultProcessor | None = None,
     ) -> None:
         """Initialize the local-STT backend adapter."""
         self.deps = deps
         self.tool_manager = tool_manager
         self.tool_transport = tool_transport
+        self.media_result_processor = media_result_processor
         self.client_factory = client_factory
         self._speech_endpoint_client: SpeechEndpointClient | None = None
         self._chat_client: Any = None
@@ -99,6 +102,7 @@ class LocalSTTBackend:
             client=self._get_chat_client(),
             deps=self.deps,
             tool_manager=self.tool_manager,
+            media_result_processor=self.media_result_processor,
             tool_transport=self.tool_transport,
             model_name=config.CHAT_MODEL_NAME or "",
             base_url=config.CHAT_BASE_URL,

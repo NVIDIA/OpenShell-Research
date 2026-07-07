@@ -28,6 +28,7 @@ from reachy_mini_conversation_app.conversation_stream import (
     _compute_response_cost,
 )
 from reachy_mini_conversation_app.tools.tool_constants import ToolState
+from reachy_mini_conversation_app.media_result_processor import ProcessedToolResult
 from reachy_mini_conversation_app.tools.background_tool_manager import ToolCallRoutine, ToolNotification
 
 
@@ -909,6 +910,72 @@ async def test_camera_result_sends_image_separately_from_function_output() -> No
 
 
 @pytest.mark.asyncio
+async def test_camera_processor_routes_raw_image_before_realtime() -> None:
+    """Configured routing should send Realtime only the approved text result."""
+    item_create_calls: list[dict[str, Any]] = []
+    processor_calls: list[tuple[str, dict[str, Any]]] = []
+
+    class FakeConversationItem:
+        async def create(self, **kwargs: Any) -> None:
+            item_create_calls.append(kwargs)
+
+    class FakeConversation:
+        item = FakeConversationItem()
+
+    class FakeConnection:
+        conversation = FakeConversation()
+
+    class FakeProcessor:
+        async def process(self, tool_name: str, result: dict[str, Any]) -> ProcessedToolResult:
+            processor_calls.append((tool_name, result))
+            return ProcessedToolResult(
+                model_payload={
+                    "status": "image_analyzed",
+                    "question": result["question"],
+                    "image_description": "The person is waving.",
+                    "selected_model": "approved-vision-model",
+                }
+            )
+
+    deps = ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock())
+    handler = stream_mod.ConversationStreamHandler(
+        deps,
+        media_result_processor=cast(Any, FakeProcessor()),
+    )
+    handler.connection = FakeConnection()
+
+    await handler._handle_tool_result(
+        ToolNotification(
+            id="call_camera_routed_before_realtime",
+            tool_name="camera",
+            is_idle_tool_call=False,
+            status=ToolState.COMPLETED,
+            result={
+                "b64_im": "raw-camera-bytes",
+                "question": "What am I doing?",
+            },
+        )
+    )
+
+    assert processor_calls == [
+        (
+            "camera",
+            {
+                "b64_im": "raw-camera-bytes",
+                "question": "What am I doing?",
+            },
+        )
+    ]
+    assert len(item_create_calls) == 1
+    function_output = item_create_calls[0]["item"]
+    assert function_output["type"] == "function_call_output"
+    assert "raw-camera-bytes" not in function_output["output"]
+    assert json.loads(function_output["output"])["image_description"] == "The person is waving."
+    queued_response = handler._pending_responses.get_nowait()
+    assert "approved vision model" in queued_response["response"]["instructions"]
+
+
+@pytest.mark.asyncio
 async def test_policy_denial_preserves_structured_transport_result() -> None:
     """Realtime should receive the policy status as well as its human-readable error."""
     item_create_calls: list[dict[str, Any]] = []
@@ -977,8 +1044,7 @@ async def test_routed_camera_result_returns_description_without_realtime_image()
             result={
                 "status": "image_analyzed",
                 "image_description": "The person is waving.",
-                "requested_model": "gpt-5.5",
-                "selected_model": "gpt-5.5",
+                "selected_model": "gpt-5.4-mini",
                 "response_id": "resp_vision",
             },
         )
@@ -991,7 +1057,7 @@ async def test_routed_camera_result_returns_description_without_realtime_image()
 
     assert function_output["type"] == "function_call_output"
     assert parsed_output["image_description"] == "The person is waving."
-    assert parsed_output["selected_model"] == "gpt-5.5"
+    assert parsed_output["selected_model"] == "gpt-5.4-mini"
     assert queued_response["response"]["tool_choice"] == "none"
     assert "approved vision model" in queued_response["response"]["instructions"]
 
@@ -1223,6 +1289,57 @@ async def test_typed_realtime_waits_past_tool_commentary_for_followup(monkeypatc
     messages = await asyncio.wait_for(send_task, timeout=1.0)
 
     assert messages[-1]["content"] == "You are sitting at a desk with one hand near your mouth."
+
+
+@pytest.mark.asyncio
+async def test_typed_realtime_uses_longer_timeout_while_tool_is_pending(monkeypatch: Any) -> None:
+    """A long scan should stay attached after the normal response timeout expires."""
+    monkeypatch.setattr(stream_mod, "backend_config_error", lambda: None)
+
+    class FakeConversationItem:
+        async def create(self, **_kwargs: Any) -> None:
+            return None
+
+    class FakeConversation:
+        item = FakeConversationItem()
+
+    class FakeConnection:
+        conversation = FakeConversation()
+
+    handler = stream_mod.ConversationStreamHandler(ToolDependencies())
+    handler.connection = FakeConnection()
+    monkeypatch.setattr(handler, "_text_model_uses_realtime", lambda: True)
+
+    async def ensure_text_session() -> bool:
+        return True
+
+    monkeypatch.setattr(handler, "_ensure_text_session", ensure_text_session)
+    handler._response_done_event.clear()
+
+    send_task = asyncio.create_task(handler.send_text_message("Scan the room", timeout=0.05, tool_timeout=0.5))
+    await asyncio.sleep(0)
+    await handler._publish_chat_output({"role": "assistant", "content": "Okay, I’ll scan the room."})
+    handler._typed_tool_calls_awaiting_followup.add("call_scan")
+    handler._typed_followup_call_order.append("call_scan")
+    handler._response_done_event.set()
+
+    await asyncio.sleep(0.1)
+    assert not send_task.done()
+
+    handler._response_done_event.clear()
+    handler._mark_typed_followup_response("resp_scan_answer")
+    await handler._publish_chat_output(
+        {
+            "role": "assistant",
+            "content": "I saw a desk, a chair, and a clear walking path.",
+        }
+    )
+    handler._response_done_event.set()
+
+    messages = await asyncio.wait_for(send_task, timeout=1.0)
+
+    assert messages[-1]["content"] == "I saw a desk, a chair, and a clear walking path."
+    assert not any(message.get("content", "").startswith("[error] Timed out") for message in messages)
 
 
 def test_response_message_text_extracts_audio_transcript_fallback() -> None:

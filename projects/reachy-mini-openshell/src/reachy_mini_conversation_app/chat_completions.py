@@ -15,6 +15,7 @@ from reachy_mini_conversation_app.tools.core_tools import (
     dispatch_tool_call_with_manager,
     get_tool_specs_for_dependencies,
 )
+from reachy_mini_conversation_app.media_result_processor import MediaResultProcessor
 from reachy_mini_conversation_app.tools.background_tool_manager import ToolCallRoutine, BackgroundToolManager
 
 
@@ -208,12 +209,14 @@ class ChatCompletionRunner:
         model_name: str,
         base_url: str | None,
         tool_transport: ToolTransport | None = None,
+        media_result_processor: MediaResultProcessor | None = None,
     ) -> None:
         """Initialize the runner."""
         self.client = client
         self.deps = deps
         self.tool_manager = tool_manager
         self.tool_transport = tool_transport
+        self.media_result_processor = media_result_processor
         self.model_name = model_name
         self.base_url = base_url
 
@@ -334,7 +337,12 @@ class ChatCompletionRunner:
                         self.tool_manager,
                     )
 
-                model_tool_result, vision_images = _separate_tool_images(tool_name or "", tool_result)
+                if self.media_result_processor is not None:
+                    processed_media = await self.media_result_processor.process(tool_name or "", tool_result)
+                    model_tool_result = processed_media.model_payload
+                    vision_images: list[str] = []
+                else:
+                    model_tool_result, vision_images = _separate_tool_images(tool_name or "", tool_result)
                 tool_result_json = json.dumps(model_tool_result)
                 chat_messages.append(
                     {

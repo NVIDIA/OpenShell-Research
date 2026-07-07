@@ -84,7 +84,7 @@ def test_documented_env_template_validates_with_exported_system_keys(monkeypatch
         assert not list(PROJECT_ROOT.glob(".env.*.example"))
         assert raw_values["BACKEND_PROVIDER"] == config_mod.BACKEND_OPENAI_REALTIME
         assert raw_values["VISION_DEFAULT_MODEL"] == "gpt-5.4-mini"
-        assert raw_values["VISION_ALLOWED_MODELS"] == "gpt-5.4-mini,gpt-5.5"
+        assert raw_values["VISION_ALLOWED_MODELS"] == "gpt-5.4-mini"
         assert raw_values["REACHY_TOOL_TRANSPORT"] == "local"
         assert raw_values["REACHY_MCP_URL"] == ""
         assert raw_values["REQUIRE_ROUTED_VISION"] == "0"
@@ -110,7 +110,7 @@ def test_documented_env_template_validates_with_exported_system_keys(monkeypatch
 
 
 def test_apply_config_values_parses_vision_route_and_key_fallback(monkeypatch: Any) -> None:
-    """Vision configuration should parse its allowlist and reuse the standard OpenAI key."""
+    """Vision configuration should parse its single model and reuse the standard OpenAI key."""
     snapshot = _config_snapshot()
     monkeypatch.setitem(config_mod._ORIGINAL_PROCESS_ENV, "OPENAI_API_KEY", "global-openai-key")
 
@@ -118,15 +118,15 @@ def test_apply_config_values_parses_vision_route_and_key_fallback(monkeypatch: A
         config_mod.apply_config_values(
             {
                 "VISION_BASE_URL": "https://vision.example.test/v1",
-                "VISION_DEFAULT_MODEL": "gpt-5.5",
-                "VISION_ALLOWED_MODELS": "gpt-5.4-mini, gpt-5.5, gpt-5.5",
+                "VISION_DEFAULT_MODEL": "gpt-5.4-mini",
+                "VISION_ALLOWED_MODELS": "gpt-5.4-mini, gpt-5.4-mini",
             },
             inherit_current=False,
         )
 
         assert config_mod.config.VISION_BASE_URL == "https://vision.example.test/v1"
-        assert config_mod.config.VISION_DEFAULT_MODEL == "gpt-5.5"
-        assert config_mod.config.VISION_ALLOWED_MODELS == ("gpt-5.4-mini", "gpt-5.5")
+        assert config_mod.config.VISION_DEFAULT_MODEL == "gpt-5.4-mini"
+        assert config_mod.config.VISION_ALLOWED_MODELS == ("gpt-5.4-mini",)
         assert config_mod.vision_api_key() == "global-openai-key"
     finally:
         _restore_config_snapshot(snapshot)

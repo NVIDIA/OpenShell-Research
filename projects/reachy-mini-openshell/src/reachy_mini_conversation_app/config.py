@@ -35,7 +35,7 @@ _MARKDOWN_URL_RE = re.compile(r"^\[(?P<label>(?:https?|wss?)://[^\]]+)\]\((?P<ur
 _ENV_REF_RE = re.compile(r"\$\{(?P<name>[A-Za-z_][A-Za-z0-9_]*)\}")
 _PLACEHOLDER_VALUES = {"<set-me>", "set-me"}
 _ORIGINAL_PROCESS_ENV = dict(os.environ)
-_DEFAULT_VISION_ALLOWED_MODELS = ("gpt-5.4-mini", "gpt-5.5")
+_DEFAULT_VISION_ALLOWED_MODELS = ("gpt-5.4-mini",)
 
 
 def _parse_bool_value(name: str, raw: str | None, default: bool = False) -> bool:

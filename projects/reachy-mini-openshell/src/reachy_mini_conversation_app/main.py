@@ -96,8 +96,10 @@ def run(
     )
     from reachy_mini_conversation_app.console import LocalStream
     from reachy_mini_conversation_app.robot_runtime import ReachyRuntime
+    from reachy_mini_conversation_app.vision_router import build_vision_router
     from reachy_mini_conversation_app.tools.core_tools import ToolDependencies
     from reachy_mini_conversation_app.conversation_stream import ConversationStreamHandler
+    from reachy_mini_conversation_app.media_result_processor import MediaResultProcessor
 
     logger = setup_logger(args.debug)
     logger.info("Starting Reachy Mini Conversation App")
@@ -118,7 +120,18 @@ def run(
         if not args.gradio:
             logger.info("MCP mode has no in-process robot audio device; automatically enabling Gradio")
             args.gradio = True
-        dependencies = ToolDependencies()
+        try:
+            vision_router = build_vision_router()
+        except Exception as e:
+            if config.REQUIRE_ROUTED_VISION:
+                logger.error("Routed vision initialization failed: %s: %s", type(e).__name__, e)
+                sys.exit(1)
+            logger.warning("Routed vision initialization failed; media tools will fail closed: %s", type(e).__name__)
+            vision_router = None
+        dependencies = ToolDependencies(
+            vision_router=vision_router,
+            capture_directory=Path(os.getenv("REACHY_CAPTURE_DIR", "captures")).expanduser(),
+        )
         robot = None
     else:
         if args.no_camera and args.head_tracker is not None:
@@ -167,6 +180,18 @@ def run(
         logger.error("Invalid tool transport configuration: %s", e)
         sys.exit(1)
 
+    try:
+        media_result_processor = MediaResultProcessor(
+            vision_router=dependencies.vision_router,
+            mcp_token=config.REACHY_MCP_TOKEN,
+            capture_directory=dependencies.capture_directory or Path("captures"),
+            require_routed_vision=config.REQUIRE_ROUTED_VISION,
+            mcp_url=config.REACHY_MCP_URL if tool_transport_mode == TOOL_TRANSPORT_MCP else None,
+        )
+    except ValueError as e:
+        logger.error("Invalid routed vision configuration: %s", e)
+        sys.exit(1)
+
     current_file_path = os.path.dirname(os.path.abspath(__file__))
     logger.debug(f"Current file absolute path: {current_file_path}")
     chatbot = gr.Chatbot(
@@ -185,6 +210,7 @@ def run(
         instance_path=instance_path,
         model_logs=args.model_logs,
         tool_transport_factory=tool_transport_factory,
+        media_result_processor=media_result_processor,
     )
 
     stream_manager: gr.Blocks | LocalStream | None = None

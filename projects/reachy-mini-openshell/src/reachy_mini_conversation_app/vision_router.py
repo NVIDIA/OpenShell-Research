@@ -1,4 +1,4 @@
-"""Allowlist-enforced routing for camera image analysis."""
+"""Single-model routing for camera and scene-scan image analysis."""
 
 from __future__ import annotations
 import logging
@@ -12,9 +12,7 @@ from reachy_mini_conversation_app.config import config, vision_api_key
 
 logger = logging.getLogger(__name__)
 
-
-class VisionModelNotAllowed(ValueError):
-    """Raised before upload when a requested vision model is not approved."""
+MAX_VISION_IMAGES = 9
 
 
 @dataclass(frozen=True)
@@ -22,7 +20,6 @@ class VisionAnalysis:
     """Text and routing metadata returned by an approved vision request."""
 
     description: str
-    requested_model: str | None
     selected_model: str
     response_id: str | None
     usage: Any | None
@@ -32,7 +29,6 @@ class VisionAnalysis:
         result: dict[str, Any] = {
             "status": "image_analyzed",
             "image_description": self.description,
-            "requested_model": self.requested_model,
             "selected_model": self.selected_model,
         }
         if self.response_id:
@@ -54,7 +50,7 @@ def _jsonable(value: Any) -> Any:
 
 
 class VisionRouter:
-    """Route one camera image to a server-approved model through Responses."""
+    """Route one or more images to the single approved Responses model."""
 
     def __init__(
         self,
@@ -68,50 +64,74 @@ class VisionRouter:
         self.default_model = default_model.strip()
         self.allowed_models = tuple(dict.fromkeys(model.strip() for model in allowed_models if model.strip()))
 
-        if not self.allowed_models:
-            raise ValueError("VISION_ALLOWED_MODELS must contain at least one model")
+        if len(self.allowed_models) != 1:
+            raise ValueError("VISION_ALLOWED_MODELS must contain exactly one model")
         if not self.default_model:
             raise ValueError("VISION_DEFAULT_MODEL must be configured")
-        if self.default_model not in self.allowed_models:
-            raise ValueError(f"VISION_DEFAULT_MODEL={self.default_model!r} must also appear in VISION_ALLOWED_MODELS")
+        if self.default_model != self.allowed_models[0]:
+            raise ValueError(
+                f"VISION_DEFAULT_MODEL={self.default_model!r} must equal the only VISION_ALLOWED_MODELS entry"
+            )
 
-    def select_model(self, requested_model: str | None) -> str:
-        """Resolve a request to an approved model or fail before image upload."""
-        requested = requested_model.strip() if isinstance(requested_model, str) else ""
-        selected = requested or self.default_model
-        if selected not in self.allowed_models:
-            allowed = ", ".join(self.allowed_models)
-            raise VisionModelNotAllowed(f"Vision model {selected!r} is not approved. Allowed models: {allowed}.")
-        return selected
-
-    async def analyze_jpeg(
+    async def analyze_images(
         self,
         *,
-        image_base64: str,
+        images_base64: list[str],
         question: str,
-        requested_model: str | None,
+        frame_timestamps: list[float] | None = None,
     ) -> VisionAnalysis:
-        """Analyze a Base64 JPEG with the selected model and return text only."""
-        selected_model = self.select_model(requested_model)
-        normalized_requested = requested_model.strip() if isinstance(requested_model, str) else ""
+        """Analyze one or more chronological images with the configured default model."""
+        if not 1 <= len(images_base64) <= MAX_VISION_IMAGES:
+            raise ValueError(f"Vision analysis requires between 1 and {MAX_VISION_IMAGES} images")
+        if not all(isinstance(image, str) and image for image in images_base64):
+            raise ValueError("Vision images must be non-empty Base64 strings")
+        if frame_timestamps is not None and len(frame_timestamps) != len(images_base64):
+            raise ValueError("Frame timestamp count must match image count")
+
+        return await self._analyze(
+            images_base64=images_base64,
+            question=question,
+            frame_timestamps=frame_timestamps,
+        )
+
+    async def _analyze(
+        self,
+        *,
+        images_base64: list[str],
+        question: str,
+        frame_timestamps: list[float] | None,
+    ) -> VisionAnalysis:
+        """Send one Responses request containing text followed by ordered images."""
+        prompt = question
+        if len(images_base64) > 1:
+            prompt = (
+                "These are chronological frames sampled across one Reachy scene sweep. "
+                f"Frame timestamps in seconds: {frame_timestamps or []}. "
+                "Combine evidence across every frame, deduplicate people and objects visible more than once, "
+                "and describe only details supported by the images. "
+                f"User question: {question}"
+            )
         logger.info(
-            "VISION request requested_model=%s selected_model=%s question=%s",
-            normalized_requested or "<default>",
-            selected_model,
+            "VISION request selected_model=%s image_count=%d question=%s",
+            self.default_model,
+            len(images_base64),
             question[:160],
         )
 
         response = await self.client.responses.create(
-            model=selected_model,
+            model=self.default_model,
             input=[
                 {
                     "role": "user",
                     "content": [
-                        {"type": "input_text", "text": question},
-                        {
-                            "type": "input_image",
-                            "image_url": f"data:image/jpeg;base64,{image_base64}",
-                        },
+                        {"type": "input_text", "text": prompt},
+                        *[
+                            {
+                                "type": "input_image",
+                                "image_url": f"data:image/jpeg;base64,{image_base64}",
+                            }
+                            for image_base64 in images_base64
+                        ],
                     ],
                 }
             ],
@@ -119,20 +139,19 @@ class VisionRouter:
 
         description = (getattr(response, "output_text", None) or "").strip()
         if not description:
-            raise RuntimeError(f"Vision model {selected_model!r} returned no text")
+            raise RuntimeError(f"Vision model {self.default_model!r} returned no text")
 
         response_id = getattr(response, "id", None)
         usage = getattr(response, "usage", None)
         logger.info(
             "VISION response selected_model=%s response_id=%s usage=%s",
-            selected_model,
+            self.default_model,
             response_id,
             _jsonable(usage),
         )
         return VisionAnalysis(
             description=description,
-            requested_model=normalized_requested or None,
-            selected_model=selected_model,
+            selected_model=self.default_model,
             response_id=response_id if isinstance(response_id, str) else None,
             usage=usage,
         )

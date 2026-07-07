@@ -1,0 +1,33 @@
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    ffmpeg \
+    iproute2 \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --gid 1000660000 sandbox \
+    && useradd \
+       --no-log-init \
+       --uid 1000660000 \
+       --gid 1000660000 \
+       --create-home \
+       sandbox
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
+
+WORKDIR /opt/reachy-app
+COPY . /opt/reachy-app
+
+RUN /opt/venv/bin/pip install --no-cache-dir --upgrade pip \
+    && /opt/venv/bin/pip install --no-cache-dir /opt/reachy-app
+
+RUN mkdir -p /sandbox/captures /home/sandbox \
+    && chown -R sandbox:sandbox /sandbox /home/sandbox
+
+WORKDIR /sandbox
+USER sandbox

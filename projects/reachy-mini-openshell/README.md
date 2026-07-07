@@ -86,9 +86,12 @@ uv run python -m reachy_mini_conversation_app \
   --tool-transport mcp
 ```
 
-This is the intermediate host test before adding the OpenShell sandbox. Raw
-camera results are still handled by the existing conversation flow until the
-routed-vision step is implemented.
+This is the intermediate host test before adding the OpenShell sandbox. Camera
+and scene-scan bytes are intercepted by the media processor and sent only to
+the configured `VISION_*` route. Set `REQUIRE_ROUTED_VISION=1` to make missing
+vision routing a startup error. If strict mode is off and vision is unavailable,
+camera tools return a sanitized error and still discard the raw media rather
+than falling back to the conversation model.
 
 ## Backend Selection
 
@@ -127,29 +130,21 @@ key from the exported `OPENAI_API_KEY`.
 
 ### Camera model routing
 
-Camera images can use a model selected independently from the Realtime voice
-session. The selected model is validated against a server-side allowlist before
-the image is uploaded:
+Camera and scene-scan images use one model selected independently from the
+Realtime voice session. The router requires the default model to be the only
+entry in its server-side allowlist before any image can be uploaded:
 
 ```dotenv
 VISION_BASE_URL=https://api.openai.com/v1
 VISION_DEFAULT_MODEL=gpt-5.4-mini
-VISION_ALLOWED_MODELS=gpt-5.4-mini,gpt-5.5
+VISION_ALLOWED_MODELS=gpt-5.4-mini
 ```
 
-`VISION_API_KEY` is optional and falls back to `OPENAI_API_KEY`. If the user
-does not name a model, the camera uses `VISION_DEFAULT_MODEL`. If the user asks
-for a model outside `VISION_ALLOWED_MODELS`, the tool rejects the request before
-sending the image. For example:
-
-```text
-Use gpt-5.5 to take a picture of me and tell me what I am doing.
-```
-
-The Realtime model turns that request into a camera tool call containing the
-exact `requested_model`. The camera router sends the image to the approved
-vision model through the Responses API, then returns only the text description
-to the Realtime conversation.
+`VISION_API_KEY` is optional and falls back to `OPENAI_API_KEY`. The public
+camera tool has no model-selection argument, so a model name in the user's
+prompt cannot override `VISION_DEFAULT_MODEL`. The router sends one camera
+image or up to nine ordered scene-scan frames through one Responses API request,
+then returns only the text description to the Realtime conversation.
 
 ### Optional: Riva ASR NIM + Chat + TTS
 

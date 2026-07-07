@@ -1,13 +1,14 @@
 """Tests for camera media passed through the Chat Completions tool loop."""
 
 import json
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
 
 import reachy_mini_conversation_app.chat_completions as chat_mod
 from reachy_mini_conversation_app.tools.core_tools import ToolDependencies
+from reachy_mini_conversation_app.media_result_processor import ProcessedToolResult
 
 
 @pytest.mark.asyncio
@@ -103,3 +104,91 @@ async def test_scene_scan_images_are_sent_as_vision_content(monkeypatch: Any) ->
     ]
     assert "first-jpeg" not in chatbot_messages[1]["content"]
     assert chatbot_messages[-1]["content"] == "I saw a desk and a person."
+
+
+@pytest.mark.asyncio
+async def test_media_processor_keeps_raw_camera_image_out_of_chat_completions(monkeypatch: Any) -> None:
+    """Local STT should use routed vision text instead of sending the image to chat."""
+    create_calls: list[dict[str, Any]] = []
+
+    class FakeFunction:
+        name = "camera"
+        arguments = '{"question":"What am I doing?"}'
+
+    class FakeToolCall:
+        id = "call_camera"
+        type = "function"
+        function = FakeFunction()
+
+        def model_dump(self) -> dict[str, Any]:
+            return {
+                "id": self.id,
+                "type": self.type,
+                "function": {
+                    "name": self.function.name,
+                    "arguments": self.function.arguments,
+                },
+            }
+
+    class FakeMessage:
+        def __init__(self, content: str, tool_calls: list[Any]) -> None:
+            self.content = content
+            self.tool_calls = tool_calls
+
+    class FakeChoice:
+        def __init__(self, message: FakeMessage) -> None:
+            self.message = message
+
+    class FakeCompletion:
+        def __init__(self, message: FakeMessage) -> None:
+            self.choices = [FakeChoice(message)]
+
+    class FakeCompletions:
+        async def create(self, **kwargs: Any) -> FakeCompletion:
+            create_calls.append(kwargs)
+            if len(create_calls) == 1:
+                return FakeCompletion(FakeMessage("", [FakeToolCall()]))
+            return FakeCompletion(FakeMessage("You are waving.", []))
+
+    class FakeChat:
+        completions = FakeCompletions()
+
+    class FakeClient:
+        chat = FakeChat()
+
+    class FakeProcessor:
+        async def process(self, _tool_name: str, result: dict[str, Any]) -> ProcessedToolResult:
+            assert result["b64_im"] == "private-image"
+            return ProcessedToolResult(
+                model_payload={
+                    "status": "image_analyzed",
+                    "question": result["question"],
+                    "image_description": "The person is waving.",
+                    "selected_model": "approved-vision-model",
+                }
+            )
+
+    async def fake_dispatch(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        return {
+            "question": "What am I doing?",
+            "b64_im": "private-image",
+        }
+
+    monkeypatch.setattr(chat_mod, "dispatch_tool_call_with_manager", fake_dispatch)
+    runner = chat_mod.ChatCompletionRunner(
+        client=FakeClient(),
+        deps=ToolDependencies(reachy_mini=MagicMock(), movement_manager=MagicMock()),
+        tool_manager=MagicMock(),
+        model_name="chat-model",
+        base_url="https://example.test/v1",
+        media_result_processor=cast(Any, FakeProcessor()),
+    )
+
+    chatbot_messages = await runner.send_text_message("Use the camera.")
+
+    followup_messages = create_calls[1]["messages"]
+    serialized_messages = json.dumps(followup_messages)
+    assert "private-image" not in serialized_messages
+    assert "data:image" not in serialized_messages
+    assert "The person is waving." in serialized_messages
+    assert chatbot_messages[-1]["content"] == "You are waving."

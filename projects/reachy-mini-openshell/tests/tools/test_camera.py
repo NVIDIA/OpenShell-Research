@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from reachy_mini_conversation_app.tools.camera import Camera
-from reachy_mini_conversation_app.vision_router import VisionAnalysis, VisionModelNotAllowed
+from reachy_mini_conversation_app.vision_router import VisionAnalysis
 from reachy_mini_conversation_app.tools.core_tools import ToolDependencies
 
 
@@ -17,26 +17,22 @@ class _FakeCameraWorker:
 
 
 class _FakeVisionRouter:
-    def __init__(self, *, reject: bool = False) -> None:
-        self.reject = reject
+    def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
 
-    async def analyze_jpeg(self, **kwargs: Any) -> VisionAnalysis:
+    async def analyze_images(self, **kwargs: Any) -> VisionAnalysis:
         self.calls.append(kwargs)
-        if self.reject:
-            raise VisionModelNotAllowed("Vision model 'blocked' is not approved. Allowed models: approved.")
         return VisionAnalysis(
             description="The person is waving.",
-            requested_model=kwargs["requested_model"],
-            selected_model=kwargs["requested_model"] or "approved",
+            selected_model="gpt-5.4-mini",
             response_id="resp_camera",
             usage={"total_tokens": 20},
         )
 
 
 @pytest.mark.asyncio
-async def test_camera_passes_exact_requested_model_to_router() -> None:
-    """The tool should preserve the model name supplied by the Realtime tool call."""
+async def test_camera_sends_one_image_without_a_model_selection() -> None:
+    """The tool should send one frame while leaving model selection to the router."""
     router = _FakeVisionRouter()
     deps = ToolDependencies(
         reachy_mini=MagicMock(),
@@ -45,19 +41,20 @@ async def test_camera_passes_exact_requested_model_to_router() -> None:
         vision_router=router,
     )
 
-    result = await Camera()(deps, question="What am I doing?", requested_model="gpt-5.5")
+    result = await Camera()(deps, question="What am I doing?")
 
-    assert router.calls[0]["requested_model"] == "gpt-5.5"
+    assert len(router.calls[0]["images_base64"]) == 1
     assert router.calls[0]["question"] == "What am I doing?"
+    assert "requested_model" not in router.calls[0]
     assert result["status"] == "image_analyzed"
-    assert result["selected_model"] == "gpt-5.5"
+    assert result["selected_model"] == "gpt-5.4-mini"
     assert "b64_im" not in result
 
 
 @pytest.mark.asyncio
-async def test_camera_surfaces_router_rejection_without_fallback_image() -> None:
-    """A rejected route must not fall back to sending the image to the Realtime model."""
-    router = _FakeVisionRouter(reject=True)
+async def test_camera_schema_and_runtime_ignore_user_model_selection() -> None:
+    """Neither the public schema nor direct kwargs should provide a model override."""
+    router = _FakeVisionRouter()
     deps = ToolDependencies(
         reachy_mini=MagicMock(),
         movement_manager=MagicMock(),
@@ -65,23 +62,28 @@ async def test_camera_surfaces_router_rejection_without_fallback_image() -> None
         vision_router=router,
     )
 
-    result = await Camera()(deps, question="What am I doing?", requested_model="blocked")
+    result = await Camera()(deps, question="Use gpt-5.5.", requested_model="gpt-5.5")
 
-    assert result["status"] == "model_not_allowed"
-    assert "not approved" in result["error"]
+    properties = Camera.parameters_schema["properties"]
+    assert isinstance(properties, dict)
+    assert "requested_model" not in properties
+    assert Camera.parameters_schema["additionalProperties"] is False
+    assert "requested_model" not in router.calls[0]
+    assert result["selected_model"] == "gpt-5.4-mini"
     assert "b64_im" not in result
 
 
 @pytest.mark.asyncio
-async def test_camera_fails_closed_when_model_requested_without_router() -> None:
-    """A named model must not silently fall back to the active conversation model."""
+async def test_camera_without_a_router_returns_raw_media_for_the_internal_processor() -> None:
+    """The unprocessed path should return an internal image for MediaResultProcessor."""
     deps = ToolDependencies(
         reachy_mini=MagicMock(),
         movement_manager=MagicMock(),
         camera_worker=_FakeCameraWorker(),
     )
 
-    result = await Camera()(deps, question="What am I doing?", requested_model="gpt-5.5")
+    result = await Camera()(deps, question="What am I doing?")
 
-    assert "routed camera vision is not configured" in result["error"]
-    assert "b64_im" not in result
+    assert result["question"] == "What am I doing?"
+    assert isinstance(result["b64_im"], str)
+    assert result["b64_im"]

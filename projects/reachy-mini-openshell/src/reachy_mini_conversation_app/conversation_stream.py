@@ -48,6 +48,13 @@ from reachy_mini_conversation_app.realtime_backends import (
     build_realtime_connect_kwargs,
     build_realtime_session_config,
 )
+from reachy_mini_conversation_app.media_result_processor import (
+    MediaSecurityError,
+    ProcessedToolResult,
+    MediaResultProcessor,
+    contains_raw_media,
+    assert_no_raw_media,
+)
 from reachy_mini_conversation_app.tools.background_tool_manager import (
     ToolCallRoutine,
     ToolNotification,
@@ -65,6 +72,7 @@ TEXT_OUTPUT_COST_PER_1M = 16.0
 IMAGE_INPUT_COST_PER_1M = 5.0
 
 _RESPONSE_DONE_TIMEOUT: Final[float] = 30.0
+_TYPED_TOOL_TIMEOUT: Final[float] = 180.0
 _MODEL_IO_MAX_STRING: Final[int] = 8_000
 _MAX_TOOL_IMAGES: Final[int] = 12
 _MODEL_IO_SECRET_FIELDS: Final[frozenset[str]] = frozenset(
@@ -151,6 +159,7 @@ class ConversationStreamHandler(AsyncStreamHandler):
         model_logs: bool = False,
         tool_transport: ToolTransport | None = None,
         tool_transport_factory: Callable[[], ToolTransport] | None = None,
+        media_result_processor: MediaResultProcessor | None = None,
     ):
         """Initialize the handler."""
         backend = selected_backend()
@@ -168,6 +177,7 @@ class ConversationStreamHandler(AsyncStreamHandler):
         self.tool_transport = tool_transport or (tool_transport_factory() if tool_transport_factory else None)
         self._tool_specs_cache: list[dict[str, Any]] | None = None
         self._tool_transport_closed = False
+        self.media_result_processor = media_result_processor
 
         self.output_sample_rate = stream_sample_rate
         self.input_sample_rate = stream_sample_rate
@@ -237,6 +247,7 @@ class ConversationStreamHandler(AsyncStreamHandler):
             self.model_logs,
             tool_transport=self.tool_transport if self._tool_transport_factory is None else None,
             tool_transport_factory=self._tool_transport_factory,
+            media_result_processor=self.media_result_processor,
         )
 
     async def _available_tool_specs(self) -> list[dict[str, Any]]:
@@ -291,6 +302,7 @@ class ConversationStreamHandler(AsyncStreamHandler):
                 tool_manager=self.tool_manager,
                 client_factory=AsyncOpenAI,
                 tool_transport=self.tool_transport,
+                media_result_processor=self.media_result_processor,
             )
         return self.local_stt_backend
 
@@ -555,7 +567,12 @@ class ConversationStreamHandler(AsyncStreamHandler):
         self._typed_tool_calls_awaiting_followup.discard(call_id)
         logger.debug("Typed tool follow-up completed for call_id=%s response_id=%s", call_id, response_id)
 
-    async def send_text_message(self, message: str, timeout: float = 30.0) -> list[dict[str, Any]]:
+    async def send_text_message(
+        self,
+        message: str,
+        timeout: float = 30.0,
+        tool_timeout: float = _TYPED_TOOL_TIMEOUT,
+    ) -> list[dict[str, Any]]:
         """Send a typed user message and collect chat updates."""
         text = message.strip()
         if not text:
@@ -589,7 +606,7 @@ class ConversationStreamHandler(AsyncStreamHandler):
             self._typed_followup_call_order.clear()
             self._tool_call_response_ids.clear()
             try:
-                return await self._send_realtime_text_message(text, timeout, typed_output_queue)
+                return await self._send_realtime_text_message(text, timeout, tool_timeout, typed_output_queue)
             finally:
                 self._typed_output_queue = None
                 self._typed_tool_calls_awaiting_followup.clear()
@@ -600,6 +617,7 @@ class ConversationStreamHandler(AsyncStreamHandler):
         self,
         text: str,
         timeout: float,
+        tool_timeout: float,
         typed_output_queue: asyncio.Queue[AdditionalOutputs],
     ) -> list[dict[str, Any]]:
         """Send one typed Realtime turn and collect its dedicated chat updates."""
@@ -614,16 +632,38 @@ class ConversationStreamHandler(AsyncStreamHandler):
 
         messages: list[dict[str, Any]] = [{"role": "user", "content": text}]
         saw_assistant_message = False
-        deadline = asyncio.get_event_loop().time() + timeout
+        turn_completed = False
+        loop = asyncio.get_event_loop()
+        response_deadline = loop.time() + timeout
+        active_tool_deadline: float | None = None
 
-        while asyncio.get_event_loop().time() < deadline:
+        while True:
+            now = loop.time()
+            has_pending_tool = bool(self._typed_tool_calls_awaiting_followup)
+            if has_pending_tool and active_tool_deadline is None:
+                active_tool_deadline = now + tool_timeout
+                logger.debug("Extended typed request timeout for active tool by %.1f seconds", tool_timeout)
+            elif not has_pending_tool and active_tool_deadline is not None:
+                active_tool_deadline = None
+                response_deadline = now + timeout
+
+            if has_pending_tool:
+                assert active_tool_deadline is not None
+                deadline = active_tool_deadline
+            else:
+                deadline = response_deadline
+            if now >= deadline:
+                break
+
             try:
-                output = await asyncio.wait_for(typed_output_queue.get(), timeout=0.5)
+                output = await asyncio.wait_for(typed_output_queue.get(), timeout=min(0.5, deadline - now))
             except asyncio.TimeoutError:
                 if self._typed_turn_is_complete(saw_assistant_message):
+                    turn_completed = True
                     break
                 continue
 
+            response_deadline = loop.time() + timeout
             chat_message = self._chat_message_from_output(output)
             if chat_message is None:
                 continue
@@ -633,9 +673,15 @@ class ConversationStreamHandler(AsyncStreamHandler):
                 saw_assistant_message = True
 
             if self._typed_turn_is_complete(saw_assistant_message):
+                turn_completed = True
                 break
 
-        if not saw_assistant_message:
+        if not turn_completed:
+            logger.warning(
+                "Typed Realtime request timed out (pending_tools=%s, saw_assistant=%s)",
+                sorted(self._typed_tool_calls_awaiting_followup),
+                saw_assistant_message,
+            )
             messages.append({"role": "assistant", "content": "[error] Timed out waiting for a response."})
 
         return messages
@@ -876,27 +922,48 @@ class ConversationStreamHandler(AsyncStreamHandler):
 
         try:
             vision_images: list[str] = []
-            model_tool_result = dict(tool_result)
-            if bg_tool.tool_name == "camera" and "b64_im" in model_tool_result:
-                raw_camera_image = model_tool_result.pop("b64_im")
-                if isinstance(raw_camera_image, str) and raw_camera_image:
-                    vision_images = [raw_camera_image]
-                    model_tool_result["status"] = "image_captured"
-                else:
-                    logger.warning("Unexpected camera image type: %s", type(raw_camera_image))
-                    model_tool_result = {"error": "Camera returned an invalid image"}
-            elif bg_tool.tool_name == "scan_scene" and "b64_images" in model_tool_result:
-                raw_scan_images = model_tool_result.pop("b64_images")
-                if (
-                    isinstance(raw_scan_images, list)
-                    and 0 < len(raw_scan_images) <= _MAX_TOOL_IMAGES
-                    and all(isinstance(image, str) and image for image in raw_scan_images)
-                ):
-                    vision_images = raw_scan_images
-                else:
-                    logger.warning("Unexpected scene-scan image payload")
-                    model_tool_result = {"error": "Scene scan returned invalid analysis images"}
+            processed_media: ProcessedToolResult | None = None
+            if self.media_result_processor is not None:
+                try:
+                    processed_media = await self.media_result_processor.process(bg_tool.tool_name, tool_result)
+                    model_tool_result = processed_media.model_payload
+                except MediaSecurityError:
+                    logger.error("Raw media was rejected before Realtime serialization")
+                    model_tool_result = {
+                        "status": "media_security_error",
+                        "tool": bg_tool.tool_name,
+                        "error": "Raw media was rejected before reaching the conversation model",
+                    }
+            elif config.REQUIRE_ROUTED_VISION and contains_raw_media(tool_result):
+                logger.error("Raw media reached a strict Realtime handler without a media processor")
+                model_tool_result = {
+                    "status": "media_security_error",
+                    "tool": bg_tool.tool_name,
+                    "error": "Routed vision is required; raw media was discarded",
+                }
+            else:
+                model_tool_result = dict(tool_result)
+                if bg_tool.tool_name == "camera" and "b64_im" in model_tool_result:
+                    raw_camera_image = model_tool_result.pop("b64_im")
+                    if isinstance(raw_camera_image, str) and raw_camera_image:
+                        vision_images = [raw_camera_image]
+                        model_tool_result["status"] = "image_captured"
+                    else:
+                        logger.warning("Unexpected camera image type: %s", type(raw_camera_image))
+                        model_tool_result = {"error": "Camera returned an invalid image"}
+                elif bg_tool.tool_name == "scan_scene" and "b64_images" in model_tool_result:
+                    raw_scan_images = model_tool_result.pop("b64_images")
+                    if (
+                        isinstance(raw_scan_images, list)
+                        and 0 < len(raw_scan_images) <= _MAX_TOOL_IMAGES
+                        and all(isinstance(image, str) and image for image in raw_scan_images)
+                    ):
+                        vision_images = raw_scan_images
+                    else:
+                        logger.warning("Unexpected scene-scan image payload")
+                        model_tool_result = {"error": "Scene scan returned invalid analysis images"}
 
+            assert_no_raw_media(model_tool_result)
             serialized_tool_result = json.dumps(model_tool_result)
 
             # Send the tool result back
@@ -956,7 +1023,8 @@ class ConversationStreamHandler(AsyncStreamHandler):
 
             # Show the local camera preview even when a dedicated vision model
             # consumed the raw image and only returned a text description.
-            if (
+            preview_image = processed_media.preview_image if processed_media is not None else None
+            if preview_image is None and (
                 bg_tool.tool_name == "camera"
                 and self.deps.camera_worker is not None
                 and (vision_images or model_tool_result.get("status") == "image_analyzed")
@@ -966,10 +1034,10 @@ class ConversationStreamHandler(AsyncStreamHandler):
                     import cv2
 
                     # Camera frames are BGR from OpenCV; convert so Gradio displays correct colors.
-                    rgb_frame = cv2.cvtColor(np_img, cv2.COLOR_BGR2RGB)
-                else:
-                    rgb_frame = None
-                img = gr.Image(value=rgb_frame)
+                    preview_image = cv2.cvtColor(np_img, cv2.COLOR_BGR2RGB)
+
+            if preview_image is not None:
+                img = gr.Image(value=preview_image)
 
                 await self._publish_chat_output(
                     {
@@ -979,12 +1047,14 @@ class ConversationStreamHandler(AsyncStreamHandler):
                 )
 
             if bg_tool.tool_name == "scan_scene":
-                video_path = model_tool_result.get("video_path")
-                if isinstance(video_path, str) and Path(video_path).is_file():
+                video_path: str | Path | None = (
+                    processed_media.video_path if processed_media is not None else model_tool_result.get("video_path")
+                )
+                if isinstance(video_path, (str, Path)) and Path(video_path).is_file():
                     await self._publish_chat_output(
                         {
                             "role": "assistant",
-                            "content": gr.Video(value=video_path),
+                            "content": gr.Video(value=str(video_path)),
                         },
                     )
 
@@ -1010,6 +1080,18 @@ class ConversationStreamHandler(AsyncStreamHandler):
                         "describe only visibly supported details. Mention that the recording was saved, but do "
                         "not read the full local filesystem path aloud."
                     )
+                elif bg_tool.tool_name == "scan_scene" and model_tool_result.get("status") == "scene_analyzed":
+                    if model_tool_result.get("recording_status") == "preview_unavailable":
+                        follow_up_instructions = (
+                            "Relay the image_description returned by the approved vision model as one concise "
+                            "combined account. Briefly mention that the recording preview is unavailable, without "
+                            "exposing internal paths."
+                        )
+                    else:
+                        follow_up_instructions = (
+                            "Relay the image_description returned by the approved vision model as one concise "
+                            "combined account. Mention that the recording was saved, but do not expose internal paths."
+                        )
                 await self._safe_response_create(
                     response={
                         "instructions": follow_up_instructions,
