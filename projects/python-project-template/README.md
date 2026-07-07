@@ -40,10 +40,10 @@ uv build
 Use `uv add <package>` for runtime dependencies and `uv add --dev <package>` for
 development tools. uv updates `pyproject.toml` and `uv.lock` together.
 
-nSpect needs a resolved dependency manifest it can inspect. `uv.lock` remains
-the source of truth for installs, while `requirements.txt` is a generated,
-hash-pinned export of runtime dependencies for the scanner. Do not edit the
-export by hand. Regenerate it after every runtime dependency update:
+`uv.lock` remains the source of truth for installs. Keep `requirements.txt` as
+a generated, hash-pinned export of runtime dependencies for compatibility with
+workflows that consume requirements files. Do not edit the export by hand.
+Regenerate it after every runtime dependency update:
 
 ```sh
 uv export \
