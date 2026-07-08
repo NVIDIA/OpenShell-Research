@@ -4,6 +4,9 @@ Reachy Mini conversation demo for OpenShell: Gradio UI, simulator support,
 microphone or text input, Reachy movement tools, and selectable model backends.
 The default and preferred starting point is OpenAI Realtime.
 
+> **Building the OpenShell policy demo with a physical Reachy?** Follow the
+> [full step-by-step Reachy Mini OpenShell sandbox tutorial](../../docs/projects/reachy-mini-openshell-sandbox.md).
+
 Commands:
 
 - package: `reachy_mini_conversation_app`

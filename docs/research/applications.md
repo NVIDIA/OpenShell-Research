@@ -13,7 +13,9 @@ research project. Keep project-specific setup in [Projects](../projects/index.md
 
 ## Current Project Example
 
-[Reachy Mini conversation demo](../projects/reachy-mini-openshell.md) is the
-current runnable example: OpenAI Realtime quick start, browser UI, simulator
-daemon, optional model backend selection, microphone/text input, and Reachy
-movement tools.
+[Reachy Mini + OpenShell](../projects/reachy-mini-openshell/index.md) is the
+current runnable example: OpenAI Realtime conversation, a browser UI, simulator
+or physical robot operation, an authenticated MCP tool boundary, approved
+vision routing, and OpenShell policy enforcement for Reachy tools. Follow the
+[step-by-step sandbox tutorial](../projects/reachy-mini-openshell-sandbox.md)
+to build the complete POC.

@@ -976,6 +976,68 @@ async def test_camera_processor_routes_raw_image_before_realtime() -> None:
 
 
 @pytest.mark.asyncio
+async def test_interrupted_routed_scan_is_explained_as_partial() -> None:
+    """The follow-up must not describe interrupted scan frames as a complete room scan."""
+    item_create_calls: list[dict[str, Any]] = []
+
+    class FakeConversationItem:
+        async def create(self, **kwargs: Any) -> None:
+            item_create_calls.append(kwargs)
+
+    class FakeConversation:
+        item = FakeConversationItem()
+
+    class FakeConnection:
+        conversation = FakeConversation()
+
+    class FakeProcessor:
+        async def process(self, tool_name: str, result: dict[str, Any]) -> ProcessedToolResult:
+            assert tool_name == "scan_scene"
+            assert result["scan_status"] == "scene_scan_incomplete"
+            return ProcessedToolResult(
+                model_payload={
+                    "status": "scene_analyzed",
+                    "scan_status": "scene_scan_incomplete",
+                    "scan_warning": "Reachy lost its control connection during the sweep",
+                    "returned_to_front": True,
+                    "image_description": "The recorded frames show a desk and one chair.",
+                    "selected_model": "approved-vision-model",
+                }
+            )
+
+    handler = stream_mod.ConversationStreamHandler(
+        ToolDependencies(),
+        media_result_processor=cast(Any, FakeProcessor()),
+    )
+    handler.connection = FakeConnection()
+
+    await handler._handle_tool_result(
+        ToolNotification(
+            id="call_interrupted_scan",
+            tool_name="scan_scene",
+            is_idle_tool_call=False,
+            status=ToolState.COMPLETED,
+            result={
+                "status": "scene_scan_incomplete",
+                "scan_status": "scene_scan_incomplete",
+                "scan_warning": "Reachy lost its control connection during the sweep",
+                "returned_to_front": True,
+                "question": "What did you see?",
+                "frame_timestamps_seconds": [0.5],
+                "b64_images": ["raw-frame"],
+            },
+        )
+    )
+
+    function_output = json.loads(item_create_calls[0]["item"]["output"])
+    queued_response = handler._pending_responses.get_nowait()
+    assert function_output["scan_status"] == "scene_scan_incomplete"
+    assert function_output["returned_to_front"] is True
+    assert "physical scene sweep was interrupted" in queued_response["response"]["instructions"]
+    assert "Do not claim a complete room scan" in queued_response["response"]["instructions"]
+
+
+@pytest.mark.asyncio
 async def test_policy_denial_preserves_structured_transport_result() -> None:
     """Realtime should receive the policy status as well as its human-readable error."""
     item_create_calls: list[dict[str, Any]] = []

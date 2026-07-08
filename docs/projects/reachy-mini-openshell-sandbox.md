@@ -1021,11 +1021,19 @@ Sweep the room, record what you see, and list the people and objects.
 
 Expected behavior:
 
-- Reachy performs one sweep.
+- Reachy performs one sweep using absolute left and right targets, then returns
+  to absolute front before the tool reports completion.
 - The MCP server saves the MP4 on the laptop.
 - Up to nine frames go through `inference.local` to `gpt-5.4-mini`.
 - The model produces one deduplicated description.
 - Gradio displays the downloaded recording.
+
+The final front movement is an internal completion step of the already allowed
+`scan_scene` call; it is not a separate `move_head` MCP request. If the control
+connection drops, the host MCP server preserves the recording, reconnects, and
+attempts the bounded front recovery before returning. An interrupted recording
+returns `scan_status: scene_scan_incomplete` even when that recovery succeeds,
+so the model must describe only the frames that were actually captured.
 
 ## 16. Trigger a Tool Denial
 

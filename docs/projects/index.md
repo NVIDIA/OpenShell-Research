@@ -5,14 +5,14 @@ setup guide, validation commands, and troubleshooting notes.
 
 ## Current Projects
 
-- [Reachy Mini conversation demo](reachy-mini-openshell.md): a simulator-first
-  Reachy Mini + OpenShell demo with an OpenAI Realtime quick start, Gradio UI,
-  microphone or text input, optional local speech backends, and Reachy movement
-  tools.
-- [Reachy Mini OpenShell sandbox tutorial](reachy-mini-openshell-sandbox.md):
-  build a host-side MCP robot service, run the conversation application in an
-  OpenShell sandbox, route images to an approved model, and iteratively enable
-  a denied physical tool.
+### [Reachy Mini + OpenShell](reachy-mini-openshell/index.md)
+
+A physical-robot and simulator conversation demo with OpenAI Realtime, a
+Gradio UI, an authenticated host-side MCP service, approved vision routing,
+and OpenShell policy enforcement for robot tools.
+
+**Following the POC build?** Start with the
+[full step-by-step sandbox tutorial](reachy-mini-openshell-sandbox.md).
 
 ## Project Page Standard
 

@@ -4,6 +4,25 @@ This repository is the home for OpenShell research engineering work. It is for
 building, documenting, and sharing applications of cutting-edge research that use
 OpenShell as the runtime.
 
+## Start here: Reachy Mini + OpenShell
+
+Follow the **[Reachy Mini OpenShell sandbox tutorial](docs/projects/reachy-mini-openshell-sandbox.md)**
+to build the policy-controlled physical-robot demo from start to finish.
+
+The tutorial walks through:
+
+1. Running the Reachy robot runtime and authenticated MCP server on the host.
+2. Running the conversation application inside an OpenShell sandbox.
+3. Routing camera images through an approved vision model.
+4. Allowing or denying individual Reachy MCP tools with OpenShell policy.
+5. Testing movement, camera capture, scene scans, model routing, and policy denials.
+
+Related links:
+
+- [Reachy Mini project overview](docs/projects/reachy-mini-openshell/index.md)
+- [Reachy Mini application source](projects/reachy-mini-openshell/)
+- [Safe OpenShell policy](projects/reachy-mini-openshell/openshell/policy-safe.yaml)
+
 ## Repository layout
 
 - `docs/` contains the Zensical documentation source.

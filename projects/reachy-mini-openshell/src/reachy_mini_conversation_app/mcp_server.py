@@ -17,13 +17,13 @@ import numpy as np
 import uvicorn
 from pydantic import Field
 from mcp.server.fastmcp import FastMCP
-from reachy_mini.utils import create_head_pose
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse
 from starlette.applications import Starlette
 from starlette.datastructures import Headers
 from mcp.server.fastmcp.exceptions import ToolError
 
+from reachy_mini.utils import create_head_pose
 from reachy_mini_conversation_app.tools.dance import Dance
 from reachy_mini_conversation_app.tools.camera import Camera
 from reachy_mini_conversation_app.robot_runtime import ReachyRuntime

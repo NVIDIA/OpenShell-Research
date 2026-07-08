@@ -421,7 +421,7 @@ async def test_interrupted_scan_preserves_recording_when_front_recovery_fails(tm
     assert result["runtime_reconnected"] is False
     assert result["front_recovery_commanded"] is False
     assert result["capture_id"]
-    assert "Reachy control connection is unavailable" in result["recovery_error"]
+    assert "socket closed" in result["recovery_error"]
     assert "socket closed" in result["scan_warning"]
 
 

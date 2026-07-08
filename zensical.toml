@@ -14,7 +14,10 @@ nav = [
   ]},
   {"Projects" = [
     "projects/index.md",
-    "projects/reachy-mini-openshell.md"
+    {"Reachy Mini + OpenShell" = [
+      "projects/reachy-mini-openshell/index.md",
+      {"Step-by-step sandbox tutorial" = "projects/reachy-mini-openshell-sandbox.md"}
+    ]}
   ]},
   {"Dev Notes" = [
     "dev-notes/index.md",

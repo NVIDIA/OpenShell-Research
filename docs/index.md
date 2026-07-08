@@ -14,11 +14,22 @@
   </p>
 </section>
 
+## Featured tutorial
+
+### Reachy Mini + OpenShell
+
+Build a physical Reachy Mini application with an authenticated MCP robot
+service, an OpenShell-sandboxed conversation agent, separate Realtime and
+vision model routes, and policy-controlled robot tools.
+
+[Start the step-by-step tutorial](projects/reachy-mini-openshell-sandbox.md){ .md-button .md-button--primary }
+[View the project overview](projects/reachy-mini-openshell/index.md){ .md-button }
+
 ## Starting points
 
 - [Research engineering](research/index.md)
 - [Projects](projects/index.md)
-- [Reachy Mini conversation demo](projects/reachy-mini-openshell.md)
+- [Reachy Mini + OpenShell project](projects/reachy-mini-openshell/index.md)
 - [Reachy Mini OpenShell sandbox tutorial](projects/reachy-mini-openshell-sandbox.md)
 - [Runtime notes](research/runtime.md)
 - [Application patterns](research/applications.md)

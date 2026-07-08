@@ -186,6 +186,37 @@ async def test_scene_scan_routes_nine_ordered_frames_once_and_downloads_video(tm
 
 
 @pytest.mark.asyncio
+async def test_scene_scan_preserves_interruption_and_front_recovery_metadata(tmp_path: Path) -> None:
+    """Vision analysis must not erase the physical scan's incomplete status."""
+    router = _FakeVisionRouter()
+    processor, _ = _processor(tmp_path, router)
+    image = _jpeg_base64()
+
+    processed = await processor.process(
+        "scan_scene",
+        {
+            "status": "scene_scan_incomplete",
+            "scan_status": "scene_scan_incomplete",
+            "scan_warning": "Reachy lost its control connection during the sweep",
+            "returned_to_front": True,
+            "front_verified": True,
+            "question": "What did you see?",
+            "capture_id": "capture_partial",
+            "video_url": "http://host.openshell.internal:8766/captures/capture_partial.mp4",
+            "frame_timestamps_seconds": [0.0],
+            "b64_images": [image],
+        },
+    )
+
+    assert processed.model_payload["status"] == "scene_analyzed"
+    assert processed.model_payload["scan_status"] == "scene_scan_incomplete"
+    assert processed.model_payload["returned_to_front"] is True
+    assert processed.model_payload["front_verified"] is True
+    assert "lost its control connection" in processed.model_payload["scan_warning"]
+    assert processed.model_payload["image_description"] == "A person is sitting at a desk."
+
+
+@pytest.mark.asyncio
 async def test_scene_scan_preserves_analysis_when_video_preview_fails(tmp_path: Path) -> None:
     """A capture-download failure should not discard successful vision output."""
     router = _FakeVisionRouter()
