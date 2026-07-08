@@ -226,6 +226,28 @@ def _dotenv_float(name: str, default: float) -> float:
         return default
 
 
+def _runtime_value(name: str, default: str | None = None) -> str | None:
+    """Return a process-injected value first, then dotenv, then the default."""
+    return _process_env_value(name) or _dotenv_value(name, default)
+
+
+def _runtime_url(name: str, default: str | None = None) -> str | None:
+    """Return a normalized URL using process environment precedence."""
+    return _clean_url_value(name, _runtime_value(name, default))
+
+
+def _runtime_float(name: str, default: float) -> float:
+    """Return a float using process environment precedence."""
+    value = _runtime_value(name)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except ValueError:
+        logger.warning("Invalid float value for %s=%r, using default=%s", name, value, default)
+        return default
+
+
 def _mapping_value(values: Mapping[str, str | None], name: str, default: str | None = None) -> str | None:
     """Return a stripped value from a dotenv mapping."""
     value = values.get(name)
@@ -269,6 +291,11 @@ def _csv_values(value: str | None, default: tuple[str, ...]) -> tuple[str, ...]:
 def _dotenv_csv(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
     """Return a comma-separated tuple from the loaded dotenv file."""
     return _csv_values(_dotenv_value(name), default)
+
+
+def _runtime_csv(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    """Return a comma-separated tuple using process environment precedence."""
+    return _csv_values(_runtime_value(name), default)
 
 
 def _mapping_csv(
@@ -339,62 +366,55 @@ def parse_hf_realtime_url(realtime_url: str) -> HFRealtimeURLParts:
 class Config:
     """Configuration class for the conversation app."""
 
-    BACKEND_PROVIDER = _normalize_backend_provider(_dotenv_value("BACKEND_PROVIDER"))
+    BACKEND_PROVIDER = _normalize_backend_provider(_runtime_value("BACKEND_PROVIDER"))
 
-    REALTIME_TRANSCRIPTION_LANGUAGE = _dotenv_value("REALTIME_TRANSCRIPTION_LANGUAGE", "en")
+    REALTIME_TRANSCRIPTION_LANGUAGE = _runtime_value("REALTIME_TRANSCRIPTION_LANGUAGE", "en")
 
-    OPENAI_REALTIME_API_KEY = (
-        _configured_value(_dotenv_value("OPENAI_REALTIME_API_KEY"))
-        or _configured_value(_dotenv_value("OPENAI_API_KEY"))
-        or _process_env_value("OPENAI_API_KEY")
+    OPENAI_REALTIME_API_KEY = _configured_value(_runtime_value("OPENAI_REALTIME_API_KEY")) or _configured_value(
+        _runtime_value("OPENAI_API_KEY")
     )
-    OPENAI_REALTIME_BASE_URL = _dotenv_url("OPENAI_REALTIME_BASE_URL", "https://api.openai.com/v1")
-    OPENAI_REALTIME_MODEL = _dotenv_value("OPENAI_REALTIME_MODEL", "gpt-realtime-2")
-    OPENAI_REALTIME_VOICE = _dotenv_value("OPENAI_REALTIME_VOICE", "cedar")
+    OPENAI_REALTIME_BASE_URL = _runtime_url("OPENAI_REALTIME_BASE_URL", "https://api.openai.com/v1")
+    OPENAI_REALTIME_MODEL = _runtime_value("OPENAI_REALTIME_MODEL", "gpt-realtime-2")
+    OPENAI_REALTIME_VOICE = _runtime_value("OPENAI_REALTIME_VOICE", "cedar")
 
-    VISION_API_KEY = _configured_value(_dotenv_value("VISION_API_KEY"))
-    VISION_BASE_URL = _dotenv_url("VISION_BASE_URL", "https://api.openai.com/v1")
-    VISION_DEFAULT_MODEL = _dotenv_value("VISION_DEFAULT_MODEL", "gpt-5.4-mini")
-    VISION_ALLOWED_MODELS = _dotenv_csv("VISION_ALLOWED_MODELS", _DEFAULT_VISION_ALLOWED_MODELS)
+    VISION_API_KEY = _configured_value(_runtime_value("VISION_API_KEY"))
+    VISION_BASE_URL = _runtime_url("VISION_BASE_URL", "https://api.openai.com/v1")
+    VISION_DEFAULT_MODEL = _runtime_value("VISION_DEFAULT_MODEL", "gpt-5.4-mini")
+    VISION_ALLOWED_MODELS = _runtime_csv("VISION_ALLOWED_MODELS", _DEFAULT_VISION_ALLOWED_MODELS)
 
-    REACHY_TOOL_TRANSPORT = _normalize_tool_transport(
-        _process_env_value("REACHY_TOOL_TRANSPORT") or _dotenv_value("REACHY_TOOL_TRANSPORT", TOOL_TRANSPORT_LOCAL)
-    )
-    REACHY_MCP_URL = _clean_url_value(
-        "REACHY_MCP_URL",
-        _process_env_value("REACHY_MCP_URL") or _dotenv_value("REACHY_MCP_URL"),
-    )
-    REACHY_MCP_TOKEN = _configured_value(_process_env_value("REACHY_MCP_TOKEN") or _dotenv_value("REACHY_MCP_TOKEN"))
+    REACHY_TOOL_TRANSPORT = _normalize_tool_transport(_runtime_value("REACHY_TOOL_TRANSPORT", TOOL_TRANSPORT_LOCAL))
+    REACHY_MCP_URL = _runtime_url("REACHY_MCP_URL")
+    REACHY_MCP_TOKEN = _configured_value(_runtime_value("REACHY_MCP_TOKEN"))
     REQUIRE_ROUTED_VISION = _parse_bool_value(
         "REQUIRE_ROUTED_VISION",
-        _process_env_value("REQUIRE_ROUTED_VISION") or _dotenv_value("REQUIRE_ROUTED_VISION"),
+        _runtime_value("REQUIRE_ROUTED_VISION"),
         False,
     )
 
-    HF_REALTIME_CONNECTION_MODE = _normalize_hf_connection_mode(_dotenv_value("HF_REALTIME_CONNECTION_MODE"))
-    HF_REALTIME_SESSION_URL = _dotenv_url("HF_REALTIME_SESSION_URL", HF_REALTIME_SESSION_PROXY_URL)
-    HF_REALTIME_WS_URL = _dotenv_url("HF_REALTIME_WS_URL")
-    HF_REALTIME_MODEL = _dotenv_value("HF_REALTIME_MODEL", "")
-    HF_REALTIME_VOICE = _dotenv_value("HF_REALTIME_VOICE", "Aiden")
+    HF_REALTIME_CONNECTION_MODE = _normalize_hf_connection_mode(_runtime_value("HF_REALTIME_CONNECTION_MODE"))
+    HF_REALTIME_SESSION_URL = _runtime_url("HF_REALTIME_SESSION_URL", HF_REALTIME_SESSION_PROXY_URL)
+    HF_REALTIME_WS_URL = _runtime_url("HF_REALTIME_WS_URL")
+    HF_REALTIME_MODEL = _runtime_value("HF_REALTIME_MODEL", "")
+    HF_REALTIME_VOICE = _runtime_value("HF_REALTIME_VOICE", "Aiden")
 
-    CHAT_API_KEY = _dotenv_value("CHAT_API_KEY")
-    CHAT_BASE_URL = _dotenv_url("CHAT_BASE_URL")
-    CHAT_MODEL_NAME = _dotenv_value("CHAT_MODEL_NAME")
+    CHAT_API_KEY = _runtime_value("CHAT_API_KEY")
+    CHAT_BASE_URL = _runtime_url("CHAT_BASE_URL")
+    CHAT_MODEL_NAME = _runtime_value("CHAT_MODEL_NAME")
 
-    STT_API_KEY = _dotenv_value("STT_API_KEY", "not-needed")
-    STT_BASE_URL = _dotenv_url("STT_BASE_URL")
-    STT_MODEL_NAME = _dotenv_value("STT_MODEL_NAME", "whisper-1")
-    TTS_API_KEY = _dotenv_value("TTS_API_KEY", "not-needed")
-    TTS_BASE_URL = _dotenv_url("TTS_BASE_URL")
-    TTS_MODEL_NAME = _dotenv_value("TTS_MODEL_NAME", "gpt-4o-mini-tts")
-    TTS_VOICE = _dotenv_value("TTS_VOICE", OPENAI_REALTIME_VOICE)
-    MIC_TRANSCRIPTION_RMS_THRESHOLD = _dotenv_float("MIC_TRANSCRIPTION_RMS_THRESHOLD", 500.0)
-    MIC_TRANSCRIPTION_MIN_AUDIO_MS = _dotenv_float("MIC_TRANSCRIPTION_MIN_AUDIO_MS", 250.0)
-    MIC_TRANSCRIPTION_SILENCE_MS = _dotenv_float("MIC_TRANSCRIPTION_SILENCE_MS", 800.0)
-    MIC_TRANSCRIPTION_MAX_AUDIO_MS = _dotenv_float("MIC_TRANSCRIPTION_MAX_AUDIO_MS", 12_000.0)
-    HF_HOME = _dotenv_value("HF_HOME", "./cache")
-    LOCAL_VISION_MODEL = _dotenv_value("LOCAL_VISION_MODEL", "HuggingFaceTB/SmolVLM2-2.2B-Instruct")
-    HF_TOKEN = _dotenv_value("HF_TOKEN")
+    STT_API_KEY = _runtime_value("STT_API_KEY", "not-needed")
+    STT_BASE_URL = _runtime_url("STT_BASE_URL")
+    STT_MODEL_NAME = _runtime_value("STT_MODEL_NAME", "whisper-1")
+    TTS_API_KEY = _runtime_value("TTS_API_KEY", "not-needed")
+    TTS_BASE_URL = _runtime_url("TTS_BASE_URL")
+    TTS_MODEL_NAME = _runtime_value("TTS_MODEL_NAME", "gpt-4o-mini-tts")
+    TTS_VOICE = _runtime_value("TTS_VOICE", OPENAI_REALTIME_VOICE)
+    MIC_TRANSCRIPTION_RMS_THRESHOLD = _runtime_float("MIC_TRANSCRIPTION_RMS_THRESHOLD", 500.0)
+    MIC_TRANSCRIPTION_MIN_AUDIO_MS = _runtime_float("MIC_TRANSCRIPTION_MIN_AUDIO_MS", 250.0)
+    MIC_TRANSCRIPTION_SILENCE_MS = _runtime_float("MIC_TRANSCRIPTION_SILENCE_MS", 800.0)
+    MIC_TRANSCRIPTION_MAX_AUDIO_MS = _runtime_float("MIC_TRANSCRIPTION_MAX_AUDIO_MS", 12_000.0)
+    HF_HOME = _runtime_value("HF_HOME", "./cache")
+    LOCAL_VISION_MODEL = _runtime_value("LOCAL_VISION_MODEL", "HuggingFaceTB/SmolVLM2-2.2B-Instruct")
+    HF_TOKEN = _runtime_value("HF_TOKEN")
 
     logger.debug(
         "Backend: %s, realtime_model=%s, chat_model=%s, STT=%s, TTS=%s, HF mode=%s, "

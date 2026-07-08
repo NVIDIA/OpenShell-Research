@@ -6,6 +6,7 @@ from typing import Any, cast
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 
+import httpx
 import pytest
 from mcp import types
 from mcp.shared.exceptions import McpError
@@ -13,6 +14,8 @@ from mcp.shared.exceptions import McpError
 from reachy_mini_conversation_app.mcp_client import (
     McpToolTransport,
     McpTransportUnavailable,
+    _PolicyDenialTracker,
+    _PolicyAwareMcpSession,
 )
 from reachy_mini_conversation_app.tool_transport import (
     ToolTransport,
@@ -267,6 +270,59 @@ async def test_mcp_transport_maps_proxy_denials() -> None:
         "tool": "dance",
         "error": "Blocked by OpenShell policy",
     }
+
+
+@pytest.mark.asyncio
+async def test_mcp_transport_recovers_proxy_denial_hidden_as_sdk_cancellation() -> None:
+    """A Streamable HTTP 403 cancellation should retain the policy decision."""
+    tracker = _PolicyDenialTracker()
+
+    class CancelledByProxySession(_FakeSession):
+        async def call_tool(
+            self,
+            name: str,
+            arguments: dict[str, Any] | None = None,
+        ) -> types.CallToolResult:
+            self.tool_calls.append((name, arguments))
+            await tracker.observe_response(httpx.Response(403))
+            raise asyncio.CancelledError("cancelled by MCP Streamable HTTP task group")
+
+    session = CancelledByProxySession()
+    policy_aware_session = _PolicyAwareMcpSession(cast(Any, session), tracker)
+    connector = _FakeConnector([cast(Any, policy_aware_session)])
+    transport = McpToolTransport(
+        "http://127.0.0.1:8766/mcp",
+        "secret",
+        session_connector=connector,
+    )
+
+    result = await transport.call_tool("move_head", {"directions": ["up"]})
+
+    assert result == {
+        "status": "policy_denied",
+        "tool": "move_head",
+        "error": "Blocked by OpenShell policy",
+    }
+    assert session.tool_calls == [("move_head", {"directions": ["up"]})]
+
+
+@pytest.mark.asyncio
+async def test_policy_aware_mcp_session_preserves_real_task_cancellation() -> None:
+    """Application shutdown and explicit cancellation must not be called policy denial."""
+    tracker = _PolicyDenialTracker()
+
+    class CancelledSession(_FakeSession):
+        async def call_tool(
+            self,
+            name: str,
+            arguments: dict[str, Any] | None = None,
+        ) -> types.CallToolResult:
+            raise asyncio.CancelledError("application cancelled the tool")
+
+    session = _PolicyAwareMcpSession(cast(Any, CancelledSession()), tracker)
+
+    with pytest.raises(asyncio.CancelledError, match="application cancelled the tool"):
+        await session.call_tool("move_head", {"directions": ["up"]})
 
 
 @pytest.mark.asyncio

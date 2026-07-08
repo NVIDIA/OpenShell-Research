@@ -686,15 +686,19 @@ Add tests that confirm:
 Create `Dockerfile.openshell` in the project root:
 
 ```dockerfile
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     ca-certificates \
     curl \
     ffmpeg \
     iproute2 \
+    libcairo2-dev \
+    libgirepository1.0-dev \
     libgl1 \
     libglib2.0-0 \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid 1000660000 sandbox \
@@ -934,6 +938,7 @@ openshell sandbox create \
   --policy ./openshell/policy-safe.yaml \
   --provider reachy-openai \
   --env REACHY_MINI_SKIP_DOTENV=1 \
+  --env BACKEND_PROVIDER=openai_realtime \
   --env REACHY_TOOL_TRANSPORT=mcp \
   --env REACHY_MCP_URL=http://host.openshell.internal:8766/mcp \
   --env REACHY_MCP_TOKEN="${REACHY_MCP_TOKEN}" \
@@ -1065,6 +1070,22 @@ openshell logs reachy-agent --since 5m
 
 This establishes that the failure occurred at the sandbox policy boundary, not
 inside the Reachy dance implementation.
+
+The browser should display a tool card titled `OpenShell blocked tool dance`
+with this structured result:
+
+```json
+{
+  "status": "policy_denied",
+  "tool": "dance",
+  "error": "Blocked by OpenShell policy"
+}
+```
+
+If the card instead reports `{"error":"Tool cancelled"}`, the sandbox image
+contains an older MCP transport that loses an HTTP 403 when the MCP SDK cancels
+its Streamable HTTP task group. Rebuild `Dockerfile.openshell`, recreate the
+sandbox, and repeat the denial test.
 
 ## 18. Create and Apply the Updated Policy
 

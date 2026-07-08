@@ -285,7 +285,7 @@ class ConversationStreamHandler(AsyncStreamHandler):
                 "Then restart the conversation app."
             )
         else:
-            message = f"{error} Add the missing value to .env and restart the conversation app."
+            message = f"{error} Add it to .env or the process environment, then restart the conversation app."
         self._record_startup_error(message)
         logger.error(message)
 
@@ -976,13 +976,18 @@ class ConversationStreamHandler(AsyncStreamHandler):
                     }
                 )
 
+            policy_denied = model_tool_result.get("status") == "policy_denied"
             await self._publish_chat_output(
                 {
                     "role": "assistant",
                     "content": serialized_tool_result,
                     # Gradio UI metadata.status accept only "pending" and "done". Do not accept bg.tool.status values.
                     "metadata": {
-                        "title": f"🛠️ Used tool {bg_tool.tool_name}",
+                        "title": (
+                            f"🚫 OpenShell blocked tool {bg_tool.tool_name}"
+                            if policy_denied
+                            else f"🛠️ Used tool {bg_tool.tool_name}"
+                        ),
                         "status": "done",
                     },
                 },
@@ -1062,7 +1067,13 @@ class ConversationStreamHandler(AsyncStreamHandler):
             # For other tool calls, let the robot reply out loud.
             if not bg_tool.is_idle_tool_call:
                 follow_up_instructions = "Use the tool result just returned and answer concisely in speech."
-                if bg_tool.tool_name == "camera" and vision_images:
+                if policy_denied:
+                    follow_up_instructions = (
+                        f"Tell the user that the requested {bg_tool.tool_name} action was blocked by the "
+                        "OpenShell policy. Do not claim the robot lacks the physical capability, do not imply "
+                        "that the action succeeded, and do not retry the tool."
+                    )
+                elif bg_tool.tool_name == "camera" and vision_images:
                     follow_up_instructions = (
                         "Answer the user's camera question using the input image just added. "
                         "Describe only what is visibly supported by the image, and answer concisely in speech."
@@ -1081,7 +1092,14 @@ class ConversationStreamHandler(AsyncStreamHandler):
                         "not read the full local filesystem path aloud."
                     )
                 elif bg_tool.tool_name == "scan_scene" and model_tool_result.get("status") == "scene_analyzed":
-                    if model_tool_result.get("recording_status") == "preview_unavailable":
+                    if model_tool_result.get("scan_status") == "scene_scan_incomplete":
+                        follow_up_instructions = (
+                            "Explain that Reachy's physical scene sweep was interrupted and may be incomplete. "
+                            "Use scan_warning and returned_to_front from the tool result to say whether Reachy "
+                            "recovered to its front pose. Then relay the approved vision model's description of "
+                            "the frames that were successfully recorded. Do not claim a complete room scan."
+                        )
+                    elif model_tool_result.get("recording_status") == "preview_unavailable":
                         follow_up_instructions = (
                             "Relay the image_description returned by the approved vision model as one concise "
                             "combined account. Briefly mention that the recording preview is unavailable, without "
@@ -1448,7 +1466,7 @@ class ConversationStreamHandler(AsyncStreamHandler):
             config_error = backend_config_error()
             if config_error:
                 await self._report_microphone_error_once(
-                    f"[error] {config_error} Add the missing value to .env and restart the conversation app."
+                    f"[error] {config_error} Add it to .env or the process environment, then restart the conversation app."
                 )
                 return
             await self._receive_transcribed_text_frame(frame)

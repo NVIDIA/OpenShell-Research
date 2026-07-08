@@ -1014,6 +1014,11 @@ async def test_policy_denial_preserves_structured_transport_result() -> None:
         "tool": "dance",
         "error": "Blocked by OpenShell policy",
     }
+    tool_card = handler.output_queue.get_nowait().args[0]
+    assert tool_card["metadata"]["title"] == "🚫 OpenShell blocked tool dance"
+    queued_response = handler._pending_responses.get_nowait()
+    assert "blocked by the OpenShell policy" in queued_response["response"]["instructions"]
+    assert "Do not claim the robot lacks the physical capability" in queued_response["response"]["instructions"]
 
 
 @pytest.mark.asyncio

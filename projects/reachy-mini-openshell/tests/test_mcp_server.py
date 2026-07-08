@@ -83,12 +83,27 @@ class _ResultTool:
 class _SensorRobot:
     def __init__(self) -> None:
         self.head_pose = np.eye(4)
+        self.body_yaw = 0.0
 
     def get_current_head_pose(self) -> np.ndarray[Any, Any]:
         return self.head_pose.copy()
 
     def get_current_joint_positions(self) -> tuple[list[float], list[float]]:
-        return [0.0] * 7, [0.0, 0.0]
+        return [self.body_yaw, *([0.0] * 6)], [0.0, 0.0]
+
+
+def _scan_result(video: Path) -> dict[str, Any]:
+    video.write_bytes(b"fake-mp4")
+    return {
+        "status": "scene_scan_complete",
+        "scan_status": "scene_scan_complete",
+        "video_path": str(video),
+        "duration_seconds": 8.5,
+        "frames_recorded": 120,
+        "frames_selected": 2,
+        "frame_timestamps_seconds": [0.4, 1.3],
+        "b64_images": ["image-one", "image-two"],
+    }
 
 
 def _settings(tmp_path: Path, **overrides: Any) -> McpServerSettings:
@@ -292,6 +307,122 @@ def test_scan_registers_and_serves_only_known_capture_ids(tmp_path: Path) -> Non
     assert missing.status_code == 404
     assert traversal.status_code == 404
     assert unauthenticated.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_scan_reports_complete_only_after_front_pose_is_verified(tmp_path: Path) -> None:
+    """A successful sweep must finish at absolute front before reporting completion."""
+    runtime = _Runtime()
+    sensor_robot = _SensorRobot()
+    runtime.robot = sensor_robot
+    service = ReachyMcpService(runtime, _settings(tmp_path))  # type: ignore[arg-type]
+
+    class SuccessfulScan(_ResultTool):
+        async def __call__(self, dependencies: Any, **kwargs: Any) -> dict[str, Any]:
+            sensor_robot.body_yaw = 0.4
+            await asyncio.sleep(0.01)
+            sensor_robot.body_yaw = 0.0
+            return await super().__call__(dependencies, **kwargs)
+
+    service._scan_scene = SuccessfulScan(_scan_result(tmp_path / "successful-scan.mp4"))
+
+    result = await service.scan_scene("What did you see?")
+
+    assert result["status"] == "scene_scan_complete"
+    assert result["scan_status"] == "scene_scan_complete"
+    assert result["returned_to_front"] is True
+    assert result["front_verified"] is True
+    assert result["front_recovery_commanded"] is False
+    assert result["runtime_reconnected"] is False
+    assert result["motion_observed"] is True
+    assert "scan_warning" not in result
+
+
+@pytest.mark.asyncio
+async def test_interrupted_scan_reconnects_and_returns_front_inside_same_tool_call(tmp_path: Path) -> None:
+    """A dropped sweep should preserve media and perform a bounded internal front recovery."""
+    disconnected = _Runtime()
+    disconnected_sensor = _SensorRobot()
+    disconnected.robot = disconnected_sensor
+    replacement = _Runtime()
+    replacement_sensor = _SensorRobot()
+    replacement_sensor.body_yaw = -0.7
+    replacement.robot = replacement_sensor
+
+    builds = 0
+
+    def build_runtime() -> _Runtime:
+        nonlocal builds
+        builds += 1
+        return replacement
+
+    service = ReachyMcpService(
+        disconnected,  # type: ignore[arg-type]
+        _settings(tmp_path),
+        build_runtime,  # type: ignore[arg-type]
+    )
+
+    class InterruptedScan(_ResultTool):
+        async def __call__(self, dependencies: Any, **kwargs: Any) -> dict[str, Any]:
+            disconnected_sensor.body_yaw = -0.7
+            disconnected.movement_manager.delivery_error = "Lost connection with the server"
+            result = await super().__call__(dependencies, **kwargs)
+            result["status"] = "scene_scan_incomplete"
+            result["scan_status"] = "scene_scan_incomplete"
+            result["scan_warning"] = "Reachy lost its control connection before returning to front"
+            return result
+
+    class FrontRecovery(_ResultTool):
+        async def __call__(self, dependencies: Any, **kwargs: Any) -> dict[str, Any]:
+            replacement_sensor.body_yaw = 0.0
+            replacement_sensor.head_pose = np.eye(4)
+            return await super().__call__(dependencies, **kwargs)
+
+    service._scan_scene = InterruptedScan(_scan_result(tmp_path / "interrupted-scan.mp4"))
+    front_recovery = FrontRecovery({"status": "queued"})
+    service._move_head = front_recovery
+
+    result = await service.scan_scene("What did you see?")
+
+    assert result["status"] == "scene_scan_incomplete"
+    assert result["scan_status"] == "scene_scan_incomplete"
+    assert result["returned_to_front"] is True
+    assert result["front_verified"] is True
+    assert result["front_recovery_commanded"] is True
+    assert result["runtime_reconnected"] is True
+    assert result["capture_id"]
+    assert "video_path" not in result
+    assert "Lost connection" in result["scan_warning"]
+    assert front_recovery.calls == [{"directions": ["front"]}]
+    assert builds == 1
+    assert disconnected.stop_calls == 1
+    assert replacement.start_calls == 1
+
+
+@pytest.mark.asyncio
+async def test_interrupted_scan_preserves_recording_when_front_recovery_fails(tmp_path: Path) -> None:
+    """A failed reconnect should return partial media with an explicit unsafe final-pose state."""
+    disconnected = _Runtime()
+    disconnected.robot = _SensorRobot()
+    service = ReachyMcpService(disconnected, _settings(tmp_path))  # type: ignore[arg-type]
+
+    class InterruptedScan(_ResultTool):
+        async def __call__(self, dependencies: Any, **kwargs: Any) -> dict[str, Any]:
+            disconnected.movement_manager.delivery_error = "socket closed"
+            return await super().__call__(dependencies, **kwargs)
+
+    service._scan_scene = InterruptedScan(_scan_result(tmp_path / "unrecovered-scan.mp4"))
+
+    result = await service.scan_scene("What did you see?")
+
+    assert result["status"] == "scene_scan_incomplete"
+    assert result["returned_to_front"] is False
+    assert result["front_verified"] is False
+    assert result["runtime_reconnected"] is False
+    assert result["front_recovery_commanded"] is False
+    assert result["capture_id"]
+    assert "Reachy control connection is unavailable" in result["recovery_error"]
+    assert "socket closed" in result["scan_warning"]
 
 
 def test_capture_store_rejects_paths_outside_capture_directory(tmp_path: Path) -> None:

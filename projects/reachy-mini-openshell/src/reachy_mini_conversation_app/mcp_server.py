@@ -17,6 +17,7 @@ import numpy as np
 import uvicorn
 from pydantic import Field
 from mcp.server.fastmcp import FastMCP
+from reachy_mini.utils import create_head_pose
 from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse
 from starlette.applications import Starlette
@@ -42,6 +43,9 @@ Question = Annotated[str, Field(min_length=1, max_length=1000)]
 RepeatCount = Annotated[int, Field(ge=1, le=2)]
 
 _CAPTURE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
+_FRONT_HEAD_POSE_TOLERANCE = 0.08
+_FRONT_BODY_YAW_TOLERANCE_RADIANS = math.radians(5.0)
+_FRONT_POSE_POLL_INTERVAL_SECONDS = 0.05
 
 
 def _parse_allowlist(raw_value: str) -> frozenset[str]:
@@ -311,6 +315,98 @@ class ReachyMcpService:
             await asyncio.sleep(0.05)
         return False
 
+    def _front_pose_state(self) -> bool | None:
+        """Return whether sensor state is at absolute front, or None when unavailable."""
+        try:
+            current_head_pose = np.asarray(self.runtime.robot.get_current_head_pose(), dtype=np.float64)
+            head_joints, _ = self.runtime.robot.get_current_joint_positions()
+            body_yaw = float(head_joints[0])
+            front_head_pose = np.asarray(create_head_pose(0, 0, 0, 0, 0, 0, degrees=True), dtype=np.float64)
+        except (AttributeError, AssertionError, IndexError, TypeError, ValueError):
+            return None
+
+        if current_head_pose.shape != front_head_pose.shape:
+            return None
+        return bool(
+            np.allclose(
+                current_head_pose,
+                front_head_pose,
+                rtol=0.0,
+                atol=_FRONT_HEAD_POSE_TOLERANCE,
+            )
+            and abs(body_yaw) <= _FRONT_BODY_YAW_TOLERANCE_RADIANS
+        )
+
+    async def _wait_for_front_pose(self, timeout: float) -> bool | None:
+        """Wait for Reachy sensors to confirm absolute front without hiding disconnects."""
+        deadline = asyncio.get_running_loop().time() + max(0.0, timeout)
+        while True:
+            if not self.runtime.is_connected:
+                return False
+            state = self._front_pose_state()
+            if state is None or state:
+                return state
+            if asyncio.get_running_loop().time() >= deadline:
+                return False
+            await asyncio.sleep(_FRONT_POSE_POLL_INTERVAL_SECONDS)
+
+    async def _recover_scan_front(self) -> dict[str, Any]:
+        """Reconnect if necessary and perform the bounded final front step for scan_scene."""
+        reconnected = False
+        recovery_commanded = False
+        try:
+            if not self.runtime.is_connected:
+                await self._ensure_connected()
+                reconnected = True
+
+            current_state = await self._wait_for_front_pose(0.0)
+            if current_state is True:
+                return {
+                    "returned_to_front": True,
+                    "front_verified": True,
+                    "runtime_reconnected": reconnected,
+                    "front_recovery_commanded": False,
+                }
+
+            checkpoint = self._delivery_checkpoint()
+            recovery_result = await self._move_head(self.runtime.dependencies, directions=["front"])
+            self._raise_for_tool_error(recovery_result)
+            recovery_commanded = True
+            await self._confirm_motion_delivery(checkpoint)
+
+            motion_duration = float(getattr(self.runtime.dependencies, "motion_duration_s", 1.0))
+            verified = await self._wait_for_front_pose(motion_duration + self.settings.delivery_timeout_seconds)
+            if verified is not True:
+                self.runtime.movement_manager.clear_move_queue()
+                detail = (
+                    "Reachy sensors could not verify the front pose"
+                    if verified is None
+                    else "Reachy did not reach the front pose before the recovery timeout"
+                )
+                return {
+                    "returned_to_front": False,
+                    "front_verified": verified,
+                    "runtime_reconnected": reconnected,
+                    "front_recovery_commanded": recovery_commanded,
+                    "recovery_error": detail,
+                }
+
+            return {
+                "returned_to_front": True,
+                "front_verified": True,
+                "runtime_reconnected": reconnected,
+                "front_recovery_commanded": recovery_commanded,
+            }
+        except Exception as exc:
+            self.runtime.movement_manager.clear_move_queue()
+            return {
+                "returned_to_front": False,
+                "front_verified": False,
+                "runtime_reconnected": reconnected,
+                "front_recovery_commanded": recovery_commanded,
+                "recovery_error": f"{type(exc).__name__}: {exc}",
+            }
+
     async def _finish_motion(
         self,
         checkpoint: int | None,
@@ -391,14 +487,72 @@ class ReachyMcpService:
             checkpoint = self._delivery_checkpoint()
             baseline = self._motion_snapshot()
             observer = asyncio.create_task(self._observe_motion(baseline)) if baseline is not None else None
-            result = await self._scan_scene(self.runtime.dependencies, question=question)
             try:
+                result = await self._scan_scene(self.runtime.dependencies, question=question)
                 result = self._raise_for_tool_error(result)
-                observed = await self._finish_motion(checkpoint, observer, require_observed_motion=True)
             except BaseException:
                 if observer is not None and not observer.done():
                     observer.cancel()
+                    try:
+                        await observer
+                    except asyncio.CancelledError:
+                        pass
                 raise
+
+            delivery_error: str | None = None
+            try:
+                await self._confirm_motion_delivery(checkpoint)
+            except ToolError as exc:
+                delivery_error = str(exc)
+
+            observed: bool | None = None
+            observation_error: str | None = None
+            if observer is not None:
+                try:
+                    observed = await observer
+                except ToolError as exc:
+                    observation_error = str(exc)
+                except asyncio.CancelledError:
+                    raise
+
+            connection_lost = not self.runtime.is_connected
+            front_before_recovery = (
+                await self._wait_for_front_pose(self.settings.delivery_timeout_seconds)
+                if not connection_lost
+                else False
+            )
+            recovery = (
+                await self._recover_scan_front()
+                if front_before_recovery is not True
+                else {
+                    "returned_to_front": True,
+                    "front_verified": True,
+                    "runtime_reconnected": False,
+                    "front_recovery_commanded": False,
+                }
+            )
+
+            scan_interrupted = bool(
+                connection_lost
+                or delivery_error
+                or observation_error
+                or observed is False
+                or result.get("scan_status") == "scene_scan_incomplete"
+            )
+            scan_complete = not scan_interrupted and recovery["returned_to_front"] is True
+
+            interruption_reasons = [
+                reason
+                for reason in (
+                    delivery_error,
+                    observation_error,
+                    "Reachy control connection was lost during the sweep" if connection_lost else None,
+                    "No physical sweep motion was observed" if observed is False else None,
+                    result.get("scan_warning"),
+                    recovery.get("recovery_error"),
+                )
+                if reason
+            ]
 
         images = result.get("b64_images")
         if not isinstance(images, list) or not 1 <= len(images) <= MAX_ANALYSIS_FRAMES:
@@ -416,14 +570,18 @@ class ReachyMcpService:
 
         result.update(
             {
-                "status": "scene_scan_complete",
+                "status": "scene_scan_complete" if scan_complete else "scene_scan_incomplete",
+                "scan_status": "scene_scan_complete" if scan_complete else "scene_scan_incomplete",
                 "question": question,
                 "capture_id": capture_id,
                 "video_url": f"{self.settings.public_base_url}/captures/{capture_id}.mp4",
-                "delivery_confirmed": True,
+                "delivery_confirmed": delivery_error is None,
                 "motion_observed": observed,
+                **recovery,
             }
         )
+        if interruption_reasons:
+            result["scan_warning"] = "; ".join(dict.fromkeys(interruption_reasons))
         return result
 
     async def stop_motion(self) -> dict[str, Any]:

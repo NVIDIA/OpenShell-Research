@@ -1,4 +1,7 @@
 import os
+import sys
+import json
+import subprocess
 from typing import Any
 from pathlib import Path
 
@@ -107,6 +110,66 @@ def test_documented_env_template_validates_with_exported_system_keys(monkeypatch
                 assert config_mod.openai_realtime_api_key() == "global-openai-key"
     finally:
         _restore_config_snapshot(snapshot)
+
+
+def test_sandbox_process_environment_loads_when_dotenv_is_disabled() -> None:
+    """OpenShell --env values should configure the app without a bundled dotenv file."""
+    env: dict[str, str] = dict(os.environ)
+    env.update(
+        {
+            "REACHY_MINI_SKIP_DOTENV": "1",
+            "BACKEND_PROVIDER": "openai_realtime",
+            "OPENAI_API_KEY": "sandbox-provider-key",
+            "OPENAI_REALTIME_BASE_URL": "https://api.openai.com/v1",
+            "OPENAI_REALTIME_MODEL": "gpt-realtime-2",
+            "OPENAI_REALTIME_VOICE": "cedar",
+            "VISION_BASE_URL": "https://inference.local/v1",
+            "VISION_DEFAULT_MODEL": "gpt-5.4-mini",
+            "VISION_ALLOWED_MODELS": "gpt-5.4-mini",
+            "REACHY_TOOL_TRANSPORT": "mcp",
+            "REACHY_MCP_URL": "http://host.openshell.internal:8766/mcp",
+            "REACHY_MCP_TOKEN": "sandbox-mcp-token",
+            "REQUIRE_ROUTED_VISION": "1",
+        }
+    )
+    env.pop("REACHY_MINI_DOTENV_PATH", None)
+    code = """
+import json
+from reachy_mini_conversation_app.config import config
+print(json.dumps({
+    "backend": config.BACKEND_PROVIDER,
+    "realtime_base_url": config.OPENAI_REALTIME_BASE_URL,
+    "realtime_model": config.OPENAI_REALTIME_MODEL,
+    "vision_base_url": config.VISION_BASE_URL,
+    "vision_model": config.VISION_DEFAULT_MODEL,
+    "vision_allowed": config.VISION_ALLOWED_MODELS,
+    "tool_transport": config.REACHY_TOOL_TRANSPORT,
+    "mcp_url": config.REACHY_MCP_URL,
+    "require_routed_vision": config.REQUIRE_ROUTED_VISION,
+}))
+"""
+
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=PROJECT_ROOT,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    loaded = json.loads(completed.stdout)
+
+    assert loaded == {
+        "backend": "openai_realtime",
+        "realtime_base_url": "https://api.openai.com/v1",
+        "realtime_model": "gpt-realtime-2",
+        "vision_base_url": "https://inference.local/v1",
+        "vision_model": "gpt-5.4-mini",
+        "vision_allowed": ["gpt-5.4-mini"],
+        "tool_transport": "mcp",
+        "mcp_url": "http://host.openshell.internal:8766/mcp",
+        "require_routed_vision": True,
+    }
 
 
 def test_apply_config_values_parses_vision_route_and_key_fallback(monkeypatch: Any) -> None:

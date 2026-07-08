@@ -32,6 +32,65 @@ class McpTransportUnavailable(McpTransportError):
     """Raised when MCP discovery cannot reach or initialize the server."""
 
 
+class McpPolicyDenied(McpTransportError):
+    """Raised when OpenShell rejects an MCP request at the policy boundary."""
+
+
+class _PolicyDenialTracker:
+    """Remember a proxy 403 that the MCP SDK otherwise surfaces as cancellation.
+
+    The Streamable HTTP client executes each POST in an AnyIO task group.  When
+    ``response.raise_for_status()`` sees a 403, that task group cancels the
+    waiting ``ClientSession.call_tool`` coroutine.  Without this side channel,
+    callers see only ``CancelledError`` and lose OpenShell's policy decision.
+    """
+
+    def __init__(self) -> None:
+        self._denied = False
+
+    async def observe_response(self, response: httpx.Response) -> None:
+        """Record policy-shaped HTTP denials before the SDK raises for status."""
+        if response.status_code == httpx.codes.FORBIDDEN:
+            self._denied = True
+
+    def clear(self) -> None:
+        """Start tracking a new serialized MCP operation."""
+        self._denied = False
+
+    def consume(self) -> bool:
+        """Return and clear the most recent denial marker."""
+        denied = self._denied
+        self._denied = False
+        return denied
+
+
+class _PolicyAwareMcpSession:
+    """Translate the MCP SDK's proxy-denial cancellation back into an error."""
+
+    def __init__(self, session: ClientSession, tracker: _PolicyDenialTracker) -> None:
+        self._session = session
+        self._tracker = tracker
+
+    async def initialize(self) -> types.InitializeResult:
+        return await self._session.initialize()
+
+    async def list_tools(self, *, cursor: str | None = None) -> types.ListToolsResult:
+        return await self._session.list_tools(cursor=cursor)
+
+    async def call_tool(
+        self,
+        name: str,
+        arguments: dict[str, Any] | None = None,
+    ) -> types.CallToolResult:
+        self._tracker.clear()
+        try:
+            return await self._session.call_tool(name, arguments)
+        except asyncio.CancelledError:
+            if self._tracker.consume():
+                raise McpPolicyDenied(POLICY_DENIED_ERROR) from None
+            raise
+
+
 class _McpSession(Protocol):
     """Subset of ClientSession used by the transport and its tests."""
 
@@ -70,18 +129,24 @@ async def _streamable_http_session(
     url: str,
     token: str,
     request_timeout_seconds: float,
-) -> AsyncIterator[ClientSession]:
+) -> AsyncIterator[_McpSession]:
     """Open one initialized-capable MCP session with bearer authentication."""
     timeout = httpx.Timeout(request_timeout_seconds, read=max(300.0, request_timeout_seconds))
     headers = {"Authorization": f"Bearer {token}"}
-    async with httpx.AsyncClient(headers=headers, timeout=timeout, follow_redirects=True) as http_client:
+    denial_tracker = _PolicyDenialTracker()
+    async with httpx.AsyncClient(
+        headers=headers,
+        timeout=timeout,
+        follow_redirects=True,
+        event_hooks={"response": [denial_tracker.observe_response]},
+    ) as http_client:
         async with streamable_http_client(url, http_client=http_client) as (read_stream, write_stream, _):
             async with ClientSession(
                 read_stream,
                 write_stream,
                 read_timeout_seconds=timedelta(seconds=request_timeout_seconds),
             ) as session:
-                yield session
+                yield _PolicyAwareMcpSession(session, denial_tracker)
 
 
 class McpToolTransport:
@@ -138,6 +203,7 @@ class McpToolTransport:
                 result = await self._request("call_tool", name=name, arguments=arguments)
             except Exception as exc:
                 if _is_policy_denial(exc):
+                    logger.warning("Reachy MCP tool denied by OpenShell policy: %s", name)
                     return _policy_denied_result(name)
                 logger.warning("Reachy MCP call failed for %s: %s", name, type(exc).__name__)
                 return {"status": "mcp_unavailable", "error": MCP_UNAVAILABLE_ERROR}

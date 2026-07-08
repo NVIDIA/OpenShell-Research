@@ -74,7 +74,9 @@ class LocalStream:
                     missing_reason,
                 )
             else:
-                logger.error("%s Add the missing value to .env and restart the conversation app.", missing_reason)
+                logger.error(
+                    "%s Add it to .env or the process environment, then restart the conversation app.", missing_reason
+                )
             return
 
         # Start media after key is set/available

@@ -54,7 +54,7 @@ class SweepLook(Tool):
             start_head_pose=current_head_pose,
             target_antennas=(current_antenna1, current_antenna2),
             start_antennas=(current_antenna1, current_antenna2),
-            target_body_yaw=current_body_yaw + max_angle,
+            target_body_yaw=max_angle,
             start_body_yaw=current_body_yaw,
             duration=transition_duration,
         )
@@ -64,8 +64,8 @@ class SweepLook(Tool):
             start_head_pose=left_head_pose,
             target_antennas=(current_antenna1, current_antenna2),
             start_antennas=(current_antenna1, current_antenna2),
-            target_body_yaw=current_body_yaw + max_angle,
-            start_body_yaw=current_body_yaw + max_angle,
+            target_body_yaw=max_angle,
+            start_body_yaw=max_angle,
             duration=hold_duration,
         )
 
@@ -75,8 +75,8 @@ class SweepLook(Tool):
             start_head_pose=left_head_pose,
             target_antennas=(current_antenna1, current_antenna2),
             start_antennas=(current_antenna1, current_antenna2),
-            target_body_yaw=current_body_yaw,
-            start_body_yaw=current_body_yaw + max_angle,
+            target_body_yaw=0,
+            start_body_yaw=max_angle,
             duration=transition_duration,
         )
 
@@ -86,8 +86,8 @@ class SweepLook(Tool):
             start_head_pose=center_head_pose,
             target_antennas=(current_antenna1, current_antenna2),
             start_antennas=(current_antenna1, current_antenna2),
-            target_body_yaw=current_body_yaw - max_angle,
-            start_body_yaw=current_body_yaw,
+            target_body_yaw=-max_angle,
+            start_body_yaw=0,
             duration=transition_duration,
         )
 
@@ -96,8 +96,8 @@ class SweepLook(Tool):
             start_head_pose=right_head_pose,
             target_antennas=(current_antenna1, current_antenna2),
             start_antennas=(current_antenna1, current_antenna2),
-            target_body_yaw=current_body_yaw - max_angle,
-            start_body_yaw=current_body_yaw - max_angle,
+            target_body_yaw=-max_angle,
+            start_body_yaw=-max_angle,
             duration=hold_duration,
         )
 
@@ -106,8 +106,8 @@ class SweepLook(Tool):
             start_head_pose=right_head_pose,
             target_antennas=(current_antenna1, current_antenna2),
             start_antennas=(current_antenna1, current_antenna2),
-            target_body_yaw=current_body_yaw,
-            start_body_yaw=current_body_yaw - max_angle,
+            target_body_yaw=0,
+            start_body_yaw=-max_angle,
             duration=transition_duration,
         )
 

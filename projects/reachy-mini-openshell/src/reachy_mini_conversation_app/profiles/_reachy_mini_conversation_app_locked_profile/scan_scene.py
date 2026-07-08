@@ -190,15 +190,21 @@ class ScanScene(Tool):
             return {"error": "The sweep recorded no usable analysis frames"}
 
         elapsed_total = round(time.monotonic() - started_at, 2)
+        movement_manager = deps.require_movement_manager()
+        connection_checker = getattr(movement_manager, "connection_healthy", None)
+        connection_healthy = True if not callable(connection_checker) else bool(connection_checker())
+        scan_status = "scene_scan_complete" if connection_healthy else "scene_scan_incomplete"
         logger.info(
-            "Scene scan captured video=%s frames_recorded=%d analysis_frames=%d elapsed=%.2fs",
+            "Scene scan captured video=%s frames_recorded=%d analysis_frames=%d elapsed=%.2fs status=%s",
             video_path,
             frames_recorded,
             len(b64_images),
             elapsed_total,
+            scan_status,
         )
-        return {
-            "status": "scene_scan_complete",
+        result = {
+            "status": scan_status,
+            "scan_status": scan_status,
             "question": question,
             "video_path": str(video_path),
             "duration_seconds": elapsed_total,
@@ -207,3 +213,6 @@ class ScanScene(Tool):
             "frame_timestamps_seconds": frame_timestamps,
             "b64_images": b64_images,
         }
+        if not connection_healthy:
+            result["scan_warning"] = "Reachy lost its control connection before the sweep returned to front"
+        return result

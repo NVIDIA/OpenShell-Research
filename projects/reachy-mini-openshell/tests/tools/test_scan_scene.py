@@ -11,6 +11,7 @@ from numpy.typing import NDArray
 
 import reachy_mini_conversation_app.tools.core_tools as core_tools
 import reachy_mini_conversation_app.profiles._reachy_mini_conversation_app_locked_profile.scan_scene as scan_mod
+import reachy_mini_conversation_app.profiles._reachy_mini_conversation_app_locked_profile.sweep_look as sweep_mod
 
 
 ToolDependencies = core_tools.ToolDependencies
@@ -57,6 +58,31 @@ def test_scan_scene_schema_requires_an_analysis_question() -> None:
 
     assert schema["required"] == ["question"]
     assert schema["properties"]["question"]["type"] == "string"
+
+
+@pytest.mark.asyncio
+async def test_sweep_look_uses_absolute_left_right_and_front_body_targets() -> None:
+    """A scan that begins off-center must still end at absolute front."""
+    movement_manager = MagicMock()
+    robot = MagicMock()
+    robot.get_current_head_pose.return_value = np.eye(4)
+    robot.get_current_joint_positions.return_value = ([0.6, *([0.0] * 6)], [0.1, -0.1])
+    deps = ToolDependencies(reachy_mini=robot, movement_manager=movement_manager)
+
+    await sweep_mod.SweepLook()(deps)
+
+    queued_moves = [call.args[0] for call in movement_manager.queue_move.call_args_list]
+    max_angle = sweep_mod.SWEEP_MAX_ANGLE_RADIANS
+    assert [move.target_body_yaw for move in queued_moves] == [
+        max_angle,
+        max_angle,
+        0,
+        -max_angle,
+        -max_angle,
+        0,
+    ]
+    assert queued_moves[0].start_body_yaw == 0.6
+    assert queued_moves[-1].target_body_yaw == 0
 
 
 @pytest.mark.asyncio
