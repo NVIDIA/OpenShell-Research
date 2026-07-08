@@ -30,7 +30,7 @@ Everything except the existing Reachy daemon runs on your laptop.
 
 ```mermaid
 flowchart LR
-    U["Browser"] --> A["Conversation app<br/>OpenShell sandbox"]
+    U["Browser"] -->|"gateway-managed<br/>service URL"| A["Conversation app<br/>OpenShell sandbox"]
 
     subgraph L["Laptop"]
         G["OpenShell gateway"]
@@ -159,6 +159,7 @@ Verify the gateway and Docker driver:
 openshell --version
 openshell status
 openshell gateway info
+openshell service --help
 docker version
 ```
 
@@ -950,7 +951,6 @@ openshell sandbox create \
   --env VISION_ALLOWED_MODELS=gpt-5.4-mini \
   --env REQUIRE_ROUTED_VISION=1 \
   --env REACHY_CAPTURE_DIR=/sandbox/captures \
-  --forward 7860 \
   -- /opt/venv/bin/python \
        -m reachy_mini_conversation_app \
        --gradio \
@@ -958,11 +958,28 @@ openshell sandbox create \
        --tool-transport mcp
 ```
 
-Open:
+The Gradio process is a long-running HTTP service listening on loopback inside
+the sandbox. Expose it through a named, gateway-managed OpenShell service:
 
-```text
-http://127.0.0.1:7860/
+```sh
+openshell service expose reachy-agent 7860 gradio
 ```
+
+Open the URL printed by the command. A local gateway returns an
+`openshell.localhost` URL; a remote gateway returns an authenticated HTTPS URL.
+Do not assume the URL is `127.0.0.1:7860`.
+
+You can list or inspect the endpoint later:
+
+```sh
+openshell service list reachy-agent
+openshell service get reachy-agent gradio
+```
+
+This tutorial uses `openshell service expose` instead of `openshell forward`
+because Gradio is part of the sandbox's long-running application lifecycle,
+not a temporary debugging tunnel. See
+[Expose Long Running Services](https://docs.nvidia.com/openshell/latest/sandboxes/manage-sandboxes#expose-long-running-services).
 
 In another host terminal, follow the sandbox logs:
 
@@ -1224,6 +1241,12 @@ Reachy connected.
 
 ## 22. Clean Up
 
+Delete the named Gradio service endpoint:
+
+```sh
+openshell service delete reachy-agent gradio
+```
+
 Delete the sandbox:
 
 ```sh
@@ -1247,6 +1270,7 @@ DAEMON_HOST=reachy-mini.local \
 
 | Symptom | Likely cause | Check |
 | --- | --- | --- |
+| Gradio service URL is missing or unreachable | The app is not listening on sandbox loopback, or the service endpoint was not created. | Check `openshell logs reachy-agent --tail`, then run `openshell service list reachy-agent` and `openshell service get reachy-agent gradio`. |
 | Sandbox cannot connect to MCP | Host server is bound only to loopback, token is wrong, or private routing is not allowed. | Bind `0.0.0.0:8766`, check `/healthz`, and inspect `reachy_mcp` policy logs. |
 | MCP works on the host but not in the sandbox | `host.openshell.internal` or `allowed_ips` does not match the Docker host route. | Run a connection probe from `openshell sandbox exec` and inspect the denial. |
 | Realtime session cannot connect | Provider is not attached or the WebSocket path/query does not match. | Check `openshell provider get reachy-openai` and Realtime policy logs. |
@@ -1273,6 +1297,20 @@ application code could never embed image bytes inside an otherwise permitted
 Realtime message. A stronger design would put vision processing in a separate
 sandbox or trusted service that returns text only.
 
+When adding that vision-only sandbox, run its HTTP broker on loopback and expose
+it with the service API rather than a local port-forwarding process:
+
+```sh
+openshell service expose reachy-vision 8787 vision
+```
+
+Use the gateway-managed URL returned by OpenShell as the trusted host robot
+service's vision endpoint. Do not grant the conversation sandbox access to that
+endpoint. The vision sandbox should have `inference.local` access but no
+Realtime route, while the conversation sandbox should receive text descriptions
+only. See
+[Expose Long Running Services](https://docs.nvidia.com/openshell/latest/sandboxes/manage-sandboxes#expose-long-running-services).
+
 ## Next Steps
 
 - Add a second policy that restricts emotions as separate MCP tool names rather
@@ -1280,7 +1318,8 @@ sandbox or trusted service that returns text only.
 - Add rate limits and an emergency-stop endpoint to the MCP server.
 - Export OpenShell allow and deny events to a dashboard for the live demo.
 - Move vision into a separate isolation boundary if you need protection from a
-  compromised conversation application.
+  compromised conversation application, and expose its loopback HTTP broker
+  with `openshell service expose`.
 - Compare the active policy with the
   [OpenShell policy schema](https://docs.nvidia.com/openshell/reference/policy-schema).
 - Review
