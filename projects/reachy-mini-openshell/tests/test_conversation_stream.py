@@ -269,7 +269,7 @@ async def test_hf_realtime_session_uses_configured_model_and_connect_query(monke
 
 @pytest.mark.asyncio
 async def test_transport_discovery_precedes_realtime_configuration(monkeypatch: Any) -> None:
-    """MCP schemas must be discovered before the model session is configured."""
+    """Remote schemas must be discovered before the model session is configured."""
     _set_openai_test_config(monkeypatch)
     events: list[str] = []
     session_updates: list[dict[str, Any]] = []

@@ -1,14 +1,13 @@
 """Entrypoint for the Reachy Mini conversation app."""
 
+from __future__ import annotations
 import os
 import sys
-import asyncio
 import argparse
 import threading
 from typing import Any, Dict, List, Callable, Optional
 from pathlib import Path
 
-from reachy_mini import ReachyMini, ReachyMiniApp
 from reachy_mini_conversation_app.utils import (
     parse_args,
     setup_logger,
@@ -36,32 +35,44 @@ def _build_tool_transport_factory(
     mode: str,
     dependencies: Any,
     *,
-    mcp_url: str | None = None,
-    mcp_token: str | None = None,
+    rest_base_url: str | None = None,
+    camera_base_url: str | None = None,
+    rest_timeout_seconds: float = 5.0,
+    motion_duration_seconds: float = 1.0,
+    motion_poll_interval_seconds: float = 0.1,
+    motion_completion_timeout_seconds: float = 10.0,
 ) -> Callable[[], Any]:
     """Build per-conversation transports without opening a network connection yet."""
-    from reachy_mini_conversation_app.mcp_client import McpToolTransport
     from reachy_mini_conversation_app.tool_transport import (
         LocalToolTransport,
         RoutedToolTransport,
+        ConversationUtilityTransport,
     )
+    from reachy_mini_conversation_app.rest_tool_transport import RestToolTransport, RestTransportSettings
 
     if mode == "local":
         return lambda: LocalToolTransport(dependencies)
-    if mode != "mcp":
+    if mode != "rest":
         raise ValueError(f"Unsupported tool transport: {mode!r}")
-    if not mcp_url or mcp_url.strip().lower() in {"", "<set-me>", "set-me"}:
-        raise ValueError("REACHY_MCP_URL must be set when REACHY_TOOL_TRANSPORT=mcp")
-    if not mcp_token or mcp_token.strip().lower() in {"", "<set-me>", "set-me"}:
-        raise ValueError("REACHY_MCP_TOKEN must be set when REACHY_TOOL_TRANSPORT=mcp")
+    if not rest_base_url or rest_base_url.strip().lower() in {"", "<set-me>", "set-me"}:
+        raise ValueError("REACHY_REST_BASE_URL must be set when REACHY_TOOL_TRANSPORT=rest")
 
-    def create_mcp_transport() -> Any:
+    settings = RestTransportSettings(
+        base_url=rest_base_url,
+        camera_base_url=camera_base_url,
+        request_timeout_seconds=rest_timeout_seconds,
+        motion_duration_seconds=motion_duration_seconds,
+        poll_interval_seconds=motion_poll_interval_seconds,
+        completion_timeout_seconds=motion_completion_timeout_seconds,
+    )
+
+    def create_rest_transport() -> Any:
         return RoutedToolTransport(
-            remote=McpToolTransport(mcp_url, mcp_token),
-            local=LocalToolTransport(dependencies),
+            remote=RestToolTransport(settings),
+            local=ConversationUtilityTransport(),
         )
 
-    return create_mcp_transport
+    return create_rest_transport
 
 
 def main() -> None:
@@ -72,7 +83,7 @@ def main() -> None:
 
 def run(
     args: argparse.Namespace,
-    robot: ReachyMini | None = None,
+    robot: Any | None = None,
     app_stop_event: Optional[threading.Event] = None,
     settings_app: Optional[Any] = None,
     instance_path: Optional[str] = None,
@@ -90,16 +101,12 @@ def run(
 
     # Putting these dependencies here makes the dashboard faster to load when the conversation app is installed
     from reachy_mini_conversation_app.config import (
-        TOOL_TRANSPORT_MCP,
+        TOOL_TRANSPORT_REST,
         config,
         load_dotenv_file,
     )
-    from reachy_mini_conversation_app.console import LocalStream
-    from reachy_mini_conversation_app.robot_runtime import ReachyRuntime
-    from reachy_mini_conversation_app.vision_router import build_vision_router
     from reachy_mini_conversation_app.tools.core_tools import ToolDependencies
     from reachy_mini_conversation_app.conversation_stream import ConversationStreamHandler
-    from reachy_mini_conversation_app.media_result_processor import MediaResultProcessor
 
     logger = setup_logger(args.debug)
     logger.info("Starting Reachy Mini Conversation App")
@@ -111,29 +118,22 @@ def run(
             logger.debug("Instance .env loading skipped: %s", exc)
 
     tool_transport_mode = getattr(args, "tool_transport", None) or config.REACHY_TOOL_TRANSPORT
-    runtime: ReachyRuntime | None = None
+    runtime: Any | None = None
 
-    if tool_transport_mode == TOOL_TRANSPORT_MCP:
-        logger.info("Using MCP tool transport; robot SDK workers stay in the host MCP server")
-        if args.head_tracker is not None or args.local_vision or args.no_camera:
-            logger.warning("--head-tracker, --local-vision, and --no-camera are ignored in MCP mode")
+    if tool_transport_mode == TOOL_TRANSPORT_REST:
+        logger.info("Using direct Reachy REST tool transport; local robot SDK workers are disabled")
+        if args.head_tracker is not None or args.local_vision:
+            logger.warning("--head-tracker and --local-vision are ignored in REST mode")
         if not args.gradio:
-            logger.info("MCP mode has no in-process robot audio device; automatically enabling Gradio")
+            logger.info("REST mode has no in-process robot audio device; automatically enabling Gradio")
             args.gradio = True
-        try:
-            vision_router = build_vision_router()
-        except Exception as e:
-            if config.REQUIRE_ROUTED_VISION:
-                logger.error("Routed vision initialization failed: %s: %s", type(e).__name__, e)
-                sys.exit(1)
-            logger.warning("Routed vision initialization failed; media tools will fail closed: %s", type(e).__name__)
-            vision_router = None
         dependencies = ToolDependencies(
-            vision_router=vision_router,
             capture_directory=Path(os.getenv("REACHY_CAPTURE_DIR", "captures")).expanduser(),
         )
         robot = None
     else:
+        from reachy_mini_conversation_app.robot_runtime import ReachyRuntime
+
         if args.no_camera and args.head_tracker is not None:
             logger.warning(
                 "Head tracking disabled: --no-camera flag is set. Remove --no-camera to enable head tracking."
@@ -173,24 +173,30 @@ def run(
         tool_transport_factory = _build_tool_transport_factory(
             tool_transport_mode,
             dependencies,
-            mcp_url=config.REACHY_MCP_URL,
-            mcp_token=config.REACHY_MCP_TOKEN,
+            rest_base_url=config.REACHY_REST_BASE_URL,
+            camera_base_url=config.REACHY_CAMERA_BASE_URL,
+            rest_timeout_seconds=config.REACHY_REST_TIMEOUT_SECONDS,
+            motion_duration_seconds=config.REACHY_MOTION_DURATION_SECONDS,
+            motion_poll_interval_seconds=config.REACHY_MOTION_POLL_INTERVAL_SECONDS,
+            motion_completion_timeout_seconds=config.REACHY_MOTION_COMPLETION_TIMEOUT_SECONDS,
         )
     except ValueError as e:
         logger.error("Invalid tool transport configuration: %s", e)
         sys.exit(1)
 
-    try:
-        media_result_processor = MediaResultProcessor(
-            vision_router=dependencies.vision_router,
-            mcp_token=config.REACHY_MCP_TOKEN,
-            capture_directory=dependencies.capture_directory or Path("captures"),
-            require_routed_vision=config.REQUIRE_ROUTED_VISION,
-            mcp_url=config.REACHY_MCP_URL if tool_transport_mode == TOOL_TRANSPORT_MCP else None,
-        )
-    except ValueError as e:
-        logger.error("Invalid routed vision configuration: %s", e)
-        sys.exit(1)
+    media_result_processor = None
+    if tool_transport_mode != TOOL_TRANSPORT_REST:
+        from reachy_mini_conversation_app.media_result_processor import MediaResultProcessor
+
+        try:
+            media_result_processor = MediaResultProcessor(
+                vision_router=dependencies.vision_router,
+                capture_directory=dependencies.capture_directory or Path("captures"),
+                require_routed_vision=config.REQUIRE_ROUTED_VISION,
+            )
+        except ValueError as e:
+            logger.error("Invalid routed vision configuration: %s", e)
+            sys.exit(1)
 
     current_file_path = os.path.dirname(os.path.abspath(__file__))
     logger.debug(f"Current file absolute path: {current_file_path}")
@@ -213,7 +219,7 @@ def run(
         media_result_processor=media_result_processor,
     )
 
-    stream_manager: gr.Blocks | LocalStream | None = None
+    stream_manager: Any | None = None
 
     if args.gradio:
         stream = Stream(
@@ -283,6 +289,8 @@ def run(
 
         app = gr.mount_gradio_app(app, stream.ui, path="/")
     else:
+        from reachy_mini_conversation_app.console import LocalStream
+
         # In headless mode, wire settings_app + instance_path to console LocalStream
         if robot is None:
             raise RuntimeError("Headless mode requires the local Reachy tool transport")
@@ -319,32 +327,5 @@ def run(
             runtime.stop()
 
 
-class ReachyMiniConversationApp(ReachyMiniApp):  # type: ignore[misc]
-    """Reachy Mini Apps entry point for the conversation app."""
-
-    custom_app_url = "http://0.0.0.0:7860/"
-    dont_start_webserver = False
-
-    def run(self, reachy_mini: ReachyMini, stop_event: threading.Event) -> None:
-        """Run the Reachy Mini conversation app."""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-        args, _ = parse_args()
-
-        instance_path = self._get_instance_path().parent
-        run(
-            args,
-            robot=reachy_mini,
-            app_stop_event=stop_event,
-            settings_app=self.settings_app,
-            instance_path=str(instance_path),
-        )
-
-
 if __name__ == "__main__":
-    app = ReachyMiniConversationApp()
-    try:
-        app.wrapped_run()
-    except KeyboardInterrupt:
-        app.stop()
+    main()

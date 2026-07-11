@@ -1,0 +1,11 @@
+FROM reachy-mini-openshell:rest-arm64
+
+USER root
+COPY reachy_mini_conversation_app-0.3.0-py3-none-any.whl /tmp/reachy-app.whl
+RUN /usr/local/bin/python -c \
+    'import zipfile; zipfile.ZipFile("/tmp/reachy-app.whl").extractall("/opt/venv/lib/python3.12/site-packages")' \
+    && rm /tmp/reachy-app.whl
+
+USER sandbox
+WORKDIR /sandbox
+CMD ["/bin/sleep", "infinity"]

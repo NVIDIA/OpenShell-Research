@@ -27,50 +27,14 @@ process:
   run_as_user: sandbox
   run_as_group: sandbox
 
-# Network policy is hot-reloadable.
+# This policy permits the whole /api/move/goto endpoint. OpenShell does not
+# currently verify that its JSON body contains only a fixed head direction.
 network_policies:
-  reachy_mcp:
-    name: reachy-mcp
+  reachy_rest:
+    name: reachy-rest-head-motion-enabled
     endpoints:
       - host: host.openshell.internal
-        port: 8766
-        path: /mcp
-        protocol: mcp
-        enforcement: enforce
-        allowed_ips:
-          - 10.0.0.0/8
-          - 172.16.0.0/12
-          - 192.168.0.0/16
-        mcp:
-          max_body_bytes: 131072
-        rules:
-          - allow:
-              method: initialize
-          - allow:
-              method: notifications/initialized
-          - allow:
-              method: tools/list
-          - allow:
-              method: tools/call
-              tool:
-                any:
-                  - play_emotion
-                  - camera
-                  - scan_scene
-                  - stop_motion
-        deny_rules:
-          - method: tools/call
-            tool: move_head
-          - method: tools/call
-            tool: dance
-    binaries:
-      - path: /opt/venv/bin/python
-
-  reachy_captures:
-    name: reachy-captures
-    endpoints:
-      - host: host.openshell.internal
-        port: 8766
+        port: 8000
         protocol: rest
         enforcement: enforce
         allowed_ips:
@@ -80,7 +44,16 @@ network_policies:
         rules:
           - allow:
               method: GET
-              path: /captures/*.mp4
+              path: /api/daemon/status
+          - allow:
+              method: GET
+              path: /api/move/running
+          - allow:
+              method: POST
+              path: /api/move/goto
+          - allow:
+              method: POST
+              path: /api/move/stop
     binaries:
       - path: /opt/venv/bin/python
 

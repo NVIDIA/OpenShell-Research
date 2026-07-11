@@ -83,8 +83,8 @@ class ReachyRuntime:
         """Connect to Reachy and construct every worker that depends on it.
 
         Passing an existing ``robot`` preserves the Reachy Mini Apps integration,
-        while callers such as a standalone MCP server can let the runtime create
-        its own SDK connection.
+        while standalone local-mode callers can let the runtime create its own
+        SDK connection.
         """
         current_robot = robot
         if current_robot is None:

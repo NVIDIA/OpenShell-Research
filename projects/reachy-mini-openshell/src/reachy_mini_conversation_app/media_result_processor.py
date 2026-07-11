@@ -1,27 +1,20 @@
-"""Process raw MCP media before any result reaches a conversation model."""
+"""Process raw local-tool media before any result reaches a conversation model."""
 
 from __future__ import annotations
-import re
 import base64
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from pathlib import Path
 from dataclasses import dataclass
-from urllib.parse import unquote, urlsplit, urlunsplit
-from collections.abc import Callable
 
-import cv2
-import httpx
-import numpy as np
 
-from reachy_mini_conversation_app.vision_router import VisionRouter, VisionAnalysis
+if TYPE_CHECKING:
+    from reachy_mini_conversation_app.vision_router import VisionRouter, VisionAnalysis
 
 
 logger = logging.getLogger(__name__)
 
 MAX_SCENE_IMAGES = 9
-MAX_VIDEO_BYTES = 100 * 1024 * 1024
-_CAPTURE_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$")
 _RAW_MEDIA_KEYS = frozenset({"b64_im", "b64_images"})
 
 
@@ -45,22 +38,16 @@ class MediaResultProcessor:
         self,
         *,
         vision_router: VisionRouter | None,
-        mcp_token: str | None,
         capture_directory: Path,
         require_routed_vision: bool,
-        mcp_url: str | None = None,
-        http_client_factory: Callable[..., Any] = httpx.AsyncClient,
     ) -> None:
         """Configure media routing and fail startup when strict routing is unavailable."""
         if require_routed_vision and vision_router is None:
             raise ValueError("REQUIRE_ROUTED_VISION=1 requires a configured VisionRouter")
 
         self.vision_router = vision_router
-        self.mcp_token = (mcp_token or "").strip()
-        self.mcp_origin = _mcp_origin(mcp_url)
         self.capture_directory = capture_directory.expanduser().resolve()
         self.require_routed_vision = require_routed_vision
-        self.http_client_factory = http_client_factory
 
     async def process(self, tool_name: str, tool_result: dict[str, Any]) -> ProcessedToolResult:
         """Process supported media results and verify that model output has no raw bytes."""
@@ -87,7 +74,7 @@ class MediaResultProcessor:
 
         try:
             preview_image = _decode_preview(raw_image)
-        except (ValueError, cv2.error):
+        except ValueError:
             return self._security_failure("camera", "Camera returned an invalid JPEG")
 
         analysis = await self._analyze_images(
@@ -189,52 +176,7 @@ class MediaResultProcessor:
         local_path = result.get("video_path")
         if isinstance(local_path, str):
             return self._validated_local_video(local_path)
-
-        capture_id = result.get("capture_id")
-        video_url = result.get("video_url")
-        if not isinstance(capture_id, str) or not _CAPTURE_ID_PATTERN.fullmatch(capture_id):
-            raise MediaSecurityError("Invalid scene capture identifier")
-        if not isinstance(video_url, str):
-            raise MediaSecurityError("Missing scene video URL")
-        _validate_video_url(video_url, capture_id)
-        if self.mcp_origin is not None:
-            video_url = f"{self.mcp_origin}/captures/{capture_id}.mp4"
-        if not self.mcp_token:
-            raise MediaSecurityError("MCP token is required to download scene video")
-
-        self.capture_directory.mkdir(parents=True, exist_ok=True)
-        destination = self.capture_directory / f"{capture_id}.mp4"
-        temporary = destination.with_suffix(".mp4.part")
-        temporary.unlink(missing_ok=True)
-        try:
-            timeout = httpx.Timeout(30.0, read=120.0)
-            headers = {"Authorization": f"Bearer {self.mcp_token}"}
-            async with self.http_client_factory(
-                headers=headers,
-                timeout=timeout,
-                follow_redirects=False,
-            ) as client:
-                async with client.stream("GET", video_url) as response:
-                    response.raise_for_status()
-                    content_type = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
-                    if content_type != "video/mp4":
-                        raise MediaSecurityError("Scene capture response was not video/mp4")
-                    content_length = response.headers.get("content-length")
-                    if content_length is not None and int(content_length) > MAX_VIDEO_BYTES:
-                        raise MediaSecurityError("Scene capture exceeded the 100 MB limit")
-
-                    bytes_written = 0
-                    with temporary.open("wb") as output:
-                        async for chunk in response.aiter_bytes():
-                            bytes_written += len(chunk)
-                            if bytes_written > MAX_VIDEO_BYTES:
-                                raise MediaSecurityError("Scene capture exceeded the 100 MB limit")
-                            output.write(chunk)
-            temporary.replace(destination)
-            return destination
-        except BaseException:
-            temporary.unlink(missing_ok=True)
-            raise
+        raise MediaSecurityError("Missing local scene recording path")
 
     def _validated_local_video(self, raw_path: str) -> Path:
         path = Path(raw_path).expanduser().resolve(strict=True)
@@ -311,12 +253,18 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
-def _decode_preview(image_base64: str) -> np.ndarray[Any, Any]:
+def _decode_preview(image_base64: str) -> Any:
+    import cv2
+    import numpy as np
+
     try:
         encoded = base64.b64decode(image_base64, validate=True)
     except (ValueError, TypeError) as exc:
         raise ValueError("Invalid Base64 image") from exc
-    frame = cv2.imdecode(np.frombuffer(encoded, dtype=np.uint8), cv2.IMREAD_COLOR)
+    try:
+        frame = cv2.imdecode(np.frombuffer(encoded, dtype=np.uint8), cv2.IMREAD_COLOR)
+    except cv2.error as exc:
+        raise ValueError("Invalid JPEG image") from exc
     if frame is None:
         raise ValueError("Invalid JPEG image")
     return cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -328,22 +276,3 @@ def _valid_timestamps(value: Any, image_count: int) -> bool:
         and len(value) == image_count
         and all(isinstance(timestamp, (int, float)) and not isinstance(timestamp, bool) for timestamp in value)
     )
-
-
-def _validate_video_url(video_url: str, capture_id: str) -> None:
-    parsed = urlsplit(video_url)
-    expected_path = f"/captures/{capture_id}.mp4"
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        raise MediaSecurityError("Invalid scene video URL")
-    if unquote(parsed.path) != expected_path or parsed.query or parsed.fragment:
-        raise MediaSecurityError("Scene video URL did not match its capture identifier")
-
-
-def _mcp_origin(mcp_url: str | None) -> str | None:
-    """Return the trusted origin used for MCP capture downloads."""
-    if not isinstance(mcp_url, str) or not mcp_url.strip():
-        return None
-    parsed = urlsplit(mcp_url.strip())
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        raise ValueError("REACHY_MCP_URL must be an absolute HTTP(S) URL")
-    return urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))

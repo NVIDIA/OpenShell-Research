@@ -23,8 +23,8 @@ BACKEND_PROVIDERS = {
 }
 
 TOOL_TRANSPORT_LOCAL = "local"
-TOOL_TRANSPORT_MCP = "mcp"
-TOOL_TRANSPORTS = {TOOL_TRANSPORT_LOCAL, TOOL_TRANSPORT_MCP}
+TOOL_TRANSPORT_REST = "rest"
+TOOL_TRANSPORTS = {TOOL_TRANSPORT_LOCAL, TOOL_TRANSPORT_REST}
 
 HF_REALTIME_CONNECTION_DEPLOYED = "deployed"
 HF_REALTIME_CONNECTION_LOCAL = "local"
@@ -314,11 +314,11 @@ def _normalize_backend_provider(value: str | None) -> str:
 
 def _normalize_tool_transport(value: str | None) -> str:
     """Normalize the selected conversation tool transport."""
-    candidate = (value or TOOL_TRANSPORT_LOCAL).strip().lower()
+    candidate = (value or TOOL_TRANSPORT_REST).strip().lower()
     if candidate in TOOL_TRANSPORTS:
         return candidate
-    logger.warning("Invalid REACHY_TOOL_TRANSPORT=%r; using local.", value)
-    return TOOL_TRANSPORT_LOCAL
+    logger.warning("Invalid REACHY_TOOL_TRANSPORT=%r; using rest.", value)
+    return TOOL_TRANSPORT_REST
 
 
 def _normalize_hf_connection_mode(value: str | None) -> str:
@@ -382,9 +382,16 @@ class Config:
     VISION_DEFAULT_MODEL = _runtime_value("VISION_DEFAULT_MODEL", "gpt-5.4-mini")
     VISION_ALLOWED_MODELS = _runtime_csv("VISION_ALLOWED_MODELS", _DEFAULT_VISION_ALLOWED_MODELS)
 
-    REACHY_TOOL_TRANSPORT = _normalize_tool_transport(_runtime_value("REACHY_TOOL_TRANSPORT", TOOL_TRANSPORT_LOCAL))
-    REACHY_MCP_URL = _runtime_url("REACHY_MCP_URL")
-    REACHY_MCP_TOKEN = _configured_value(_runtime_value("REACHY_MCP_TOKEN"))
+    REACHY_TOOL_TRANSPORT = _normalize_tool_transport(_runtime_value("REACHY_TOOL_TRANSPORT", TOOL_TRANSPORT_REST))
+    REACHY_REST_BASE_URL = _runtime_url("REACHY_REST_BASE_URL", "http://127.0.0.1:8000")
+    REACHY_CAMERA_BASE_URL = _runtime_url("REACHY_CAMERA_BASE_URL")
+    REACHY_REST_TIMEOUT_SECONDS = _runtime_float("REACHY_REST_TIMEOUT_SECONDS", 5.0)
+    REACHY_MOTION_DURATION_SECONDS = _runtime_float("REACHY_MOTION_DURATION_SECONDS", 1.0)
+    REACHY_MOTION_POLL_INTERVAL_SECONDS = _runtime_float("REACHY_MOTION_POLL_INTERVAL_SECONDS", 0.1)
+    REACHY_MOTION_COMPLETION_TIMEOUT_SECONDS = _runtime_float(
+        "REACHY_MOTION_COMPLETION_TIMEOUT_SECONDS",
+        10.0,
+    )
     REQUIRE_ROUTED_VISION = _parse_bool_value(
         "REQUIRE_ROUTED_VISION",
         _runtime_value("REQUIRE_ROUTED_VISION"),
@@ -454,9 +461,15 @@ def apply_config_values(values: Mapping[str, str | None], *, inherit_current: bo
     vision_base_url_default = config.VISION_BASE_URL if inherit_current else "https://api.openai.com/v1"
     vision_default_model_default = config.VISION_DEFAULT_MODEL if inherit_current else "gpt-5.4-mini"
     vision_allowed_models_default = config.VISION_ALLOWED_MODELS if inherit_current else _DEFAULT_VISION_ALLOWED_MODELS
-    tool_transport_default = config.REACHY_TOOL_TRANSPORT if inherit_current else TOOL_TRANSPORT_LOCAL
-    mcp_url_default = config.REACHY_MCP_URL if inherit_current else None
-    mcp_token_default = config.REACHY_MCP_TOKEN if inherit_current else None
+    tool_transport_default = config.REACHY_TOOL_TRANSPORT if inherit_current else TOOL_TRANSPORT_REST
+    rest_base_url_default = config.REACHY_REST_BASE_URL if inherit_current else "http://127.0.0.1:8000"
+    camera_base_url_default = config.REACHY_CAMERA_BASE_URL if inherit_current else None
+    rest_timeout_default = config.REACHY_REST_TIMEOUT_SECONDS if inherit_current else 5.0
+    motion_duration_default = config.REACHY_MOTION_DURATION_SECONDS if inherit_current else 1.0
+    motion_poll_interval_default = config.REACHY_MOTION_POLL_INTERVAL_SECONDS if inherit_current else 0.1
+    motion_completion_timeout_default = (
+        config.REACHY_MOTION_COMPLETION_TIMEOUT_SECONDS if inherit_current else 10.0
+    )
     require_routed_vision_default = config.REQUIRE_ROUTED_VISION if inherit_current else False
     hf_realtime_connection_mode_default = (
         config.HF_REALTIME_CONNECTION_MODE if inherit_current else HF_REALTIME_CONNECTION_DEPLOYED
@@ -534,12 +547,35 @@ def apply_config_values(values: Mapping[str, str | None], *, inherit_current: bo
         _process_env_value("REACHY_TOOL_TRANSPORT")
         or _mapping_value(values, "REACHY_TOOL_TRANSPORT", tool_transport_default)
     )
-    config.REACHY_MCP_URL = _clean_url_value(
-        "REACHY_MCP_URL",
-        _process_env_value("REACHY_MCP_URL") or _mapping_value(values, "REACHY_MCP_URL", mcp_url_default),
+    config.REACHY_REST_BASE_URL = _clean_url_value(
+        "REACHY_REST_BASE_URL",
+        _process_env_value("REACHY_REST_BASE_URL")
+        or _mapping_value(values, "REACHY_REST_BASE_URL", rest_base_url_default),
     )
-    config.REACHY_MCP_TOKEN = _configured_value(
-        _process_env_value("REACHY_MCP_TOKEN") or _mapping_value(values, "REACHY_MCP_TOKEN", mcp_token_default)
+    config.REACHY_CAMERA_BASE_URL = _clean_url_value(
+        "REACHY_CAMERA_BASE_URL",
+        _process_env_value("REACHY_CAMERA_BASE_URL")
+        or _mapping_value(values, "REACHY_CAMERA_BASE_URL", camera_base_url_default),
+    )
+    config.REACHY_REST_TIMEOUT_SECONDS = _mapping_float(
+        values,
+        "REACHY_REST_TIMEOUT_SECONDS",
+        rest_timeout_default,
+    )
+    config.REACHY_MOTION_DURATION_SECONDS = _mapping_float(
+        values,
+        "REACHY_MOTION_DURATION_SECONDS",
+        motion_duration_default,
+    )
+    config.REACHY_MOTION_POLL_INTERVAL_SECONDS = _mapping_float(
+        values,
+        "REACHY_MOTION_POLL_INTERVAL_SECONDS",
+        motion_poll_interval_default,
+    )
+    config.REACHY_MOTION_COMPLETION_TIMEOUT_SECONDS = _mapping_float(
+        values,
+        "REACHY_MOTION_COMPLETION_TIMEOUT_SECONDS",
+        motion_completion_timeout_default,
     )
     config.REQUIRE_ROUTED_VISION = _parse_bool_value(
         "REQUIRE_ROUTED_VISION",

@@ -146,7 +146,7 @@ def test_connect_constructs_robot_with_name(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_connect_passes_explicit_network_and_movement_settings(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The MCP runtime should honor the configured robot address and lower send rate."""
+    """A standalone runtime should honor the configured robot address and lower send rate."""
     events: list[str] = []
     robot = _Robot(events, {})
     received_robot_kwargs: dict[str, Any] = {}
@@ -218,7 +218,7 @@ def test_connect_skips_cloud_router_for_local_vision(monkeypatch: pytest.MonkeyP
 
 
 def test_connect_can_disable_cloud_router_for_camera_only_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The trusted MCP runtime should capture images without constructing an OpenAI client."""
+    """The local robot runtime should capture images without constructing an OpenAI client."""
     events: list[str] = []
     camera_worker = _Component("camera", events)
     router_builds = 0

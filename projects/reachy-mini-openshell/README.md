@@ -1,8 +1,8 @@
 # Reachy OpenShell
 
-Reachy Mini conversation demo for OpenShell: Gradio UI, simulator support,
-microphone or text input, Reachy movement tools, and selectable model backends.
-The default and preferred starting point is OpenAI Realtime.
+Reachy Mini conversation demo for OpenShell: native robot microphone, speaker,
+and single-frame camera capture; optional Gradio input; OpenAI Realtime; and a
+deliberately small REST-controlled action surface.
 
 > **Building the OpenShell policy demo with a physical Reachy?** Follow the
 > [full step-by-step Reachy Mini OpenShell sandbox tutorial](../../docs/projects/reachy-mini-openshell-sandbox.md).
@@ -13,6 +13,9 @@ Commands:
 - app: `reachy-mini-conversation-app`
 - module: `python -m reachy_mini_conversation_app`
 - check: `reachy-mini-backend-check`
+- sandbox audio: `reachy-mini-sandbox-audio`
+- sandbox lifecycle: `reachy-agent-control start|stop|status`
+- native Reachy App: `native-controller/`
 
 ## Quick Start
 
@@ -39,9 +42,10 @@ The launcher creates `.venv`, runs `uv sync`, validates `.env`, starts
 `reachy-mini-daemon --sim`, then prints the Gradio URL:
 <http://127.0.0.1:7860/>.
 
-Camera support follows the connected daemon. The no-media simulator starts with
-camera support disabled. A real Reachy daemon that reports media available
-starts the camera worker and exposes the `camera` tool to the model.
+The default local REST mode exposes only fixed head directions and
+`stop_motion`. Onboard deployments may separately enable the trusted `camera`
+tool. Dance, emotion, tracking, raw targets, and motor-management operations are
+not advertised to the model.
 
 If `7860` is busy, the launcher picks the next free port through `7899`.
 
@@ -49,7 +53,7 @@ In the UI:
 
 1. Use `Microphone` for voice.
 2. Use `Text` for typed prompts.
-3. Try: `Hi Reachy, introduce yourself and look around.`
+3. Try: `Reachy, look up and then right.`
 
 Keep the launcher terminal open. `Ctrl+C` stops the app and the simulator it
 started.
@@ -58,43 +62,62 @@ The checked-in `.env.example` already selects `BACKEND_PROVIDER=openai_realtime`
 Provider keys, base URLs, and model IDs are configured in `.env`, not in the
 browser UI.
 
-## MCP Tool Mode
+## REST Tool Mode
 
-MCP mode keeps the robot SDK, camera worker, and movement manager in the
-separate host MCP server. The conversation process discovers hardware tools
-from that server and retains only `do_nothing`, `task_status`, and
-`task_cancel` locally.
-
-Start the MCP server first:
-
-```bash
-export REACHY_MCP_TOKEN="$(cat .reachy-mcp-token)"
-
-REACHY_MINI_SKIP_DOTENV=1 \
-DAEMON_HOST=reachy-mini.local \
-uv run reachy-mini-mcp-server
-```
-
-Then start the conversation app in another terminal:
+REST mode calls fixed robot endpoints. It publishes model-facing schemas for
+`move_head` and `stop_motion`; when `REACHY_CAMERA_BASE_URL` is configured, it
+also publishes `camera(question)`. It never discovers or exposes the complete
+Reachy API.
 
 ```bash
 export OPENAI_API_KEY=sk-...
-export REACHY_MCP_TOKEN="$(cat .reachy-mcp-token)"
 
-REACHY_TOOL_TRANSPORT=mcp \
-REACHY_MCP_URL=http://127.0.0.1:8766/mcp \
+REACHY_TOOL_TRANSPORT=rest \
+REACHY_REST_BASE_URL=http://127.0.0.1:8000 \
 uv run python -m reachy_mini_conversation_app \
   --gradio \
   --model-logs \
-  --tool-transport mcp
+  --tool-transport rest
 ```
 
-This is the intermediate host test before adding the OpenShell sandbox. Camera
-and scene-scan bytes are intercepted by the media processor and sent only to
-the configured `VISION_*` route. Set `REQUIRE_ROUTED_VISION=1` to make missing
-vision routing a startup error. If strict mode is off and vision is unavailable,
-camera tools return a sanitized error and still discard the raw media rather
-than falling back to the conversation model.
+Inside an OpenShell sandbox, set the base URL to
+`http://host.openshell.internal:8000`. OpenShell can allow or deny
+`POST /api/move/goto`, but REST policy does not inspect the JSON pose values.
+The app therefore fixes the direction, pose, duration, and interpolation before
+sending the request. See the sandbox tutorial for the exact security boundary.
+
+For onboard snapshots, also set
+`REACHY_CAMERA_BASE_URL=http://host.openshell.internal:8042`. The trusted native
+Reachy App exposes only `POST /camera/capture`; OpenShell can allow or deny that
+capture independently from head motion.
+
+## Native Reachy Media
+
+The robot-native deployment keeps all application processes on Reachy while
+preserving the OpenShell boundary:
+
+```text
+Reachy microphone/speaker/camera
+  <-> native-controller (trusted Reachy App)
+       audio: ws://reachy-agent--audio.openshell.localhost:17670/audio
+       image: http://host.openshell.internal:8042/camera/capture
+  <-> conversation agent inside the reachy-agent sandbox
+  <-> OpenShell-controlled robot action calls
+```
+
+The native controller contains no model client or motion call. Its narrow camera
+adapter accepts no filename, device, resolution, or storage path and returns at
+most one bounded JPEG per request. Starting it from the Reachy Apps UI verifies
+that the pre-created sandbox is `Ready`, invokes the fixed
+`/opt/venv/bin/reachy-agent-control start` command through `openshell sandbox
+exec`, then ensures the `audio` service exists. Stopping the Reachy App closes
+media and invokes `reachy-agent-control stop`; it does not delete or recreate
+the sandbox.
+
+The initial audio bridge is deliberately half-duplex. Microphone frames are
+suppressed while response audio is being played to prevent the robot from
+hearing and interrupting itself. Browser Gradio remains available as an
+optional diagnostic path.
 
 ## Backend Selection
 
@@ -130,24 +153,6 @@ OPENAI_REALTIME_VOICE=cedar
 
 Leave `OPENAI_REALTIME_API_KEY` unset unless this app should use a different
 key from the exported `OPENAI_API_KEY`.
-
-### Camera model routing
-
-Camera and scene-scan images use one model selected independently from the
-Realtime voice session. The router requires the default model to be the only
-entry in its server-side allowlist before any image can be uploaded:
-
-```dotenv
-VISION_BASE_URL=https://api.openai.com/v1
-VISION_DEFAULT_MODEL=gpt-5.4-mini
-VISION_ALLOWED_MODELS=gpt-5.4-mini
-```
-
-`VISION_API_KEY` is optional and falls back to `OPENAI_API_KEY`. The public
-camera tool has no model-selection argument, so a model name in the user's
-prompt cannot override `VISION_DEFAULT_MODEL`. The router sends one camera
-image or up to nine ordered scene-scan frames through one Responses API request,
-then returns only the text description to the Realtime conversation.
 
 ### Optional: Riva ASR NIM + Chat + TTS
 
@@ -331,26 +336,53 @@ uv run reachy-mini-daemon --sim --scene minimal --headless --no-media \
 Manual app, in another terminal:
 
 ```bash
-uv run python -m reachy_mini_conversation_app --gradio --no-camera
+uv run python -m reachy_mini_conversation_app --gradio --tool-transport rest
 ```
+
+### Build the ARM64 OpenShell image
+
+Build and load the REST-only image into the local Docker engine:
+
+```bash
+docker buildx build \
+  --platform linux/arm64 \
+  --load \
+  --tag reachy-mini-openshell:rest-arm64 \
+  --file Dockerfile.openshell \
+  .
+```
+
+Verify the architecture and standalone CLI:
+
+```bash
+docker image inspect reachy-mini-openshell:rest-arm64 \
+  --format 'architecture={{.Architecture}} os={{.Os}} size_bytes={{.Size}}'
+docker run --rm --platform linux/arm64 \
+  reachy-mini-openshell:rest-arm64 \
+  reachy-mini-conversation-app --help
+```
+
+The image contains the browser/headless audio paths, model client, and direct
+REST transport, including the small client for the native snapshot adapter. It
+intentionally excludes the native Reachy SDK, OpenCV, MuJoCo, dances, Zenoh,
+MCP, camera workers, and local vision packages.
 
 Use a config file without replacing `.env`:
 
 ```bash
 REACHY_MINI_DOTENV_PATH=path/to/alternate.env \
-  uv run python -m reachy_mini_conversation_app --gradio --no-camera
+  uv run python -m reachy_mini_conversation_app --gradio --tool-transport rest
 ```
 
 Common app flags:
 
 - `--gradio`: browser UI
-- `--no-camera`: simulator baseline
-- `--robot-name <name>`: connect to a matching daemon robot name
+- `--tool-transport rest`: fixed direct REST action tools; this is the default
 - `--debug`: debug logging
-- `--local-vision`: local vision model; requires `local_vision`
-- `--head-tracker yolo`: YOLO head tracking; requires `yolo_vision`
-- `--head-tracker mediapipe`: MediaPipe head tracking; requires
-  `mediapipe_vision`
+- `--tool-transport local`: legacy in-process SDK development mode
+- `--no-camera`, `--robot-name`, `--local-vision`, and `--head-tracker`: legacy
+  local-mode options; the REST snapshot tool is controlled only by
+  `REACHY_CAMERA_BASE_URL`
 
 ## Customize Reachy
 
@@ -364,35 +396,22 @@ src/reachy_mini_conversation_app/profiles/_reachy_mini_conversation_app_locked_p
 - `tools.txt`: allowed profile tools
 - `*.py`: profile-local tool implementations
 
-Current profile tools:
+REST-mode model tools:
 
 ```text
-dance
-stop_dance
-play_emotion
-stop_emotion
-sweep_look
-camera
-scan_scene
 move_head
+stop_motion
 do_nothing
+task_status
+task_cancel
 ```
 
-The app filters tools against runtime dependencies. In particular, `camera` and
-`scan_scene` are omitted from the model session when the camera worker is
-unavailable. The standalone launcher enables the camera automatically only when
-the daemon reports media available.
+The REST transport supplies the two physical tools. Only `do_nothing` and the
+task-management helpers remain local. The files in the locked profile still
+support explicit legacy local-mode development, but those extra physical tools
+are not merged into a REST-mode model session.
 
-`scan_scene` records the complete left-to-right sweep as an MP4, selects nine
-chronological frames, and asks the active multimodal conversation model for one
-combined account. Recordings are written to `REACHY_CAPTURE_DIR` (`./captures`
-by default). For example:
-
-```text
-Scan the room, save a video, and tell me everything you saw.
-```
-
-## Optional Vision Extras
+## Legacy Local-Mode Vision Extras
 
 The default install includes the MuJoCo simulator backend. There are no
 project-level `backend` or `sim` extras.
@@ -435,7 +454,7 @@ uv run reachy-mini-app-assistant check .
 | Riva ASR readiness fails | Check `http://<riva-host>:9000/v1/health/ready`, GPU/container logs, and that the app can reach the host from macOS. |
 | vLLM STT says audio support is missing | Redeploy the service with vLLM audio support, then rerun `stt-probe`. |
 | `uv sync` builds `pygobject` or `pycairo` on macOS | Run `uv cache clean reachy-mini pygobject pycairo`, then `uv sync`. |
-| Daemon uses `--no-media` | Start the app with `--no-camera`; the launcher detects this and does so automatically. |
+| REST motion returns `policy_denied` | Inspect the active OpenShell policy and allow `POST /api/move/goto` only when motion should be enabled. |
 
 The checked-in uv resolution targets macOS/Darwin. For Linux deployment,
 update `[tool.uv].environments` and regenerate `uv.lock`.

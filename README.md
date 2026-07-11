@@ -11,17 +11,18 @@ to build the policy-controlled physical-robot demo from start to finish.
 
 The tutorial walks through:
 
-1. Running the Reachy robot runtime and authenticated MCP server on the host.
-2. Running the conversation application inside an OpenShell sandbox.
-3. Routing camera images through an approved vision model.
-4. Allowing or denying individual Reachy MCP tools with OpenShell policy.
-5. Testing movement, camera capture, scene scans, model routing, and policy denials.
+1. Running the conversation application inside an OpenShell sandbox.
+2. Calling the Reachy daemon's existing REST API directly.
+3. Restricting exact HTTP methods and paths with OpenShell policy.
+4. Enabling or disabling head motion without recreating the sandbox.
+5. Testing fixed head directions, emergency stop, and visible policy denials.
 
 Related links:
 
 - [Reachy Mini project overview](docs/projects/reachy-mini-openshell/index.md)
 - [Reachy Mini application source](projects/reachy-mini-openshell/)
-- [Safe OpenShell policy](projects/reachy-mini-openshell/openshell/policy-safe.yaml)
+- [Motion-disabled policy](projects/reachy-mini-openshell/openshell/policy-motion-disabled.yaml)
+- [Head-motion-enabled policy](projects/reachy-mini-openshell/openshell/policy-head-motion-enabled.yaml)
 
 ## Repository layout
 

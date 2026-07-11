@@ -85,7 +85,7 @@ def test_unchanged_target_is_not_sent_continuously() -> None:
 
 
 def test_observed_starting_pose_does_not_command_neutral_on_startup() -> None:
-    """Starting the MCP runtime should preserve the robot's current physical pose."""
+    """Starting the standalone runtime should preserve the robot's current physical pose."""
     robot = _ObservedRobot()
     manager = MovementManager(robot, enable_idle_breathing=False)  # type: ignore[arg-type]
     observed = (robot.head_pose, (0.2, -0.2), 0.1)

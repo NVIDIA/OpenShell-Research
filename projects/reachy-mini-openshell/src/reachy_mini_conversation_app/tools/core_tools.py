@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, Dict, List
 from pathlib import Path
 from dataclasses import dataclass
 
-from reachy_mini import ReachyMini
 from reachy_mini_conversation_app.config import LOCKED_PROFILE, DEFAULT_PROFILES_DIRECTORY
 from reachy_mini_conversation_app.tools.tool_constants import SystemTool
 
@@ -51,7 +50,7 @@ def get_concrete_subclasses(base: type[Tool]) -> List[type[Tool]]:
 class ToolDependencies:
     """External dependencies injected into tools."""
 
-    reachy_mini: ReachyMini | None = None
+    reachy_mini: Any | None = None
     movement_manager: Any | None = None
     camera_worker: Any | None = None
     vision_manager: Any | None = None
@@ -60,14 +59,14 @@ class ToolDependencies:
     motion_duration_s: float = 1.0
     capture_directory: Path | None = None
 
-    def require_reachy_mini(self) -> ReachyMini:
+    def require_reachy_mini(self) -> Any:
         """Return the local robot or fail clearly in a hardware-free process."""
         if self.reachy_mini is None:
             raise RuntimeError("This tool requires a local ReachyMini connection")
         return self.reachy_mini
 
     def require_movement_manager(self) -> Any:
-        """Return the local movement manager or fail clearly in MCP mode."""
+        """Return the local movement manager or fail clearly in remote mode."""
         if self.movement_manager is None:
             raise RuntimeError("This tool requires a local movement manager")
         return self.movement_manager
@@ -182,11 +181,9 @@ def _initialize_tools() -> None:
     _TOOLS_INITIALIZED = True
 
 
-_initialize_tools()
-
-
 def get_tool_specs(exclusion_list: list[str] | None = None) -> list[Dict[str, Any]]:
     """Get tool specs, optionally excluding some tools."""
+    _initialize_tools()
     exclusion_list = exclusion_list or []
     return [spec for spec in ALL_TOOL_SPECS if spec.get("name") not in exclusion_list]
 
@@ -226,6 +223,7 @@ async def _dispatch_tool_call(tool_name: str, args: Dict[str, Any], deps: ToolDe
 
 async def dispatch_tool_call(tool_name: str, args_json: str, deps: ToolDependencies) -> Dict[str, Any]:
     """Dispatch a tool call by name with JSON args and dependencies."""
+    _initialize_tools()
     return await _dispatch_tool_call(tool_name, _safe_load_obj(args_json), deps)
 
 
@@ -233,6 +231,7 @@ async def dispatch_tool_call_with_manager(
     tool_name: str, args_json: str, deps: ToolDependencies, tool_manager: "BackgroundToolManager"
 ) -> Dict[str, Any]:
     """Dispatch a tool call, injecting a BackgroundToolManager into the args."""
+    _initialize_tools()
     args = _safe_load_obj(args_json)
     args["tool_manager"] = tool_manager
     return await _dispatch_tool_call(tool_name, args, deps)

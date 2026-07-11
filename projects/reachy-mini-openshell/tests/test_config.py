@@ -22,8 +22,12 @@ CONFIG_ATTRS = (
     "VISION_DEFAULT_MODEL",
     "VISION_ALLOWED_MODELS",
     "REACHY_TOOL_TRANSPORT",
-    "REACHY_MCP_URL",
-    "REACHY_MCP_TOKEN",
+    "REACHY_REST_BASE_URL",
+    "REACHY_CAMERA_BASE_URL",
+    "REACHY_REST_TIMEOUT_SECONDS",
+    "REACHY_MOTION_DURATION_SECONDS",
+    "REACHY_MOTION_POLL_INTERVAL_SECONDS",
+    "REACHY_MOTION_COMPLETION_TIMEOUT_SECONDS",
     "REQUIRE_ROUTED_VISION",
     "HF_REALTIME_CONNECTION_MODE",
     "HF_REALTIME_SESSION_URL",
@@ -88,8 +92,10 @@ def test_documented_env_template_validates_with_exported_system_keys(monkeypatch
         assert raw_values["BACKEND_PROVIDER"] == config_mod.BACKEND_OPENAI_REALTIME
         assert raw_values["VISION_DEFAULT_MODEL"] == "gpt-5.4-mini"
         assert raw_values["VISION_ALLOWED_MODELS"] == "gpt-5.4-mini"
-        assert raw_values["REACHY_TOOL_TRANSPORT"] == "local"
-        assert raw_values["REACHY_MCP_URL"] == ""
+        assert raw_values["REACHY_TOOL_TRANSPORT"] == "rest"
+        assert raw_values["REACHY_REST_BASE_URL"] == "http://127.0.0.1:8000"
+        assert "REACHY_CAMERA_BASE_URL" not in raw_values
+        assert raw_values["REACHY_MOTION_DURATION_SECONDS"] == "1"
         assert raw_values["REQUIRE_ROUTED_VISION"] == "0"
         assert "OPENAI_REALTIME_API_KEY" not in raw_values
         assert "OPENAI_API_KEY" not in raw_values
@@ -123,13 +129,13 @@ def test_sandbox_process_environment_loads_when_dotenv_is_disabled() -> None:
             "OPENAI_REALTIME_BASE_URL": "https://api.openai.com/v1",
             "OPENAI_REALTIME_MODEL": "gpt-realtime-2",
             "OPENAI_REALTIME_VOICE": "cedar",
-            "VISION_BASE_URL": "https://inference.local/v1",
-            "VISION_DEFAULT_MODEL": "gpt-5.4-mini",
-            "VISION_ALLOWED_MODELS": "gpt-5.4-mini",
-            "REACHY_TOOL_TRANSPORT": "mcp",
-            "REACHY_MCP_URL": "http://host.openshell.internal:8766/mcp",
-            "REACHY_MCP_TOKEN": "sandbox-mcp-token",
-            "REQUIRE_ROUTED_VISION": "1",
+            "REACHY_TOOL_TRANSPORT": "rest",
+            "REACHY_REST_BASE_URL": "http://host.openshell.internal:8000",
+            "REACHY_CAMERA_BASE_URL": "http://host.openshell.internal:8042",
+            "REACHY_REST_TIMEOUT_SECONDS": "4",
+            "REACHY_MOTION_DURATION_SECONDS": "0.75",
+            "REACHY_MOTION_POLL_INTERVAL_SECONDS": "0.2",
+            "REACHY_MOTION_COMPLETION_TIMEOUT_SECONDS": "8",
         }
     )
     env.pop("REACHY_MINI_DOTENV_PATH", None)
@@ -140,12 +146,13 @@ print(json.dumps({
     "backend": config.BACKEND_PROVIDER,
     "realtime_base_url": config.OPENAI_REALTIME_BASE_URL,
     "realtime_model": config.OPENAI_REALTIME_MODEL,
-    "vision_base_url": config.VISION_BASE_URL,
-    "vision_model": config.VISION_DEFAULT_MODEL,
-    "vision_allowed": config.VISION_ALLOWED_MODELS,
     "tool_transport": config.REACHY_TOOL_TRANSPORT,
-    "mcp_url": config.REACHY_MCP_URL,
-    "require_routed_vision": config.REQUIRE_ROUTED_VISION,
+    "rest_base_url": config.REACHY_REST_BASE_URL,
+    "camera_base_url": config.REACHY_CAMERA_BASE_URL,
+    "rest_timeout": config.REACHY_REST_TIMEOUT_SECONDS,
+    "motion_duration": config.REACHY_MOTION_DURATION_SECONDS,
+    "motion_poll": config.REACHY_MOTION_POLL_INTERVAL_SECONDS,
+    "motion_completion_timeout": config.REACHY_MOTION_COMPLETION_TIMEOUT_SECONDS,
 }))
 """
 
@@ -163,12 +170,13 @@ print(json.dumps({
         "backend": "openai_realtime",
         "realtime_base_url": "https://api.openai.com/v1",
         "realtime_model": "gpt-realtime-2",
-        "vision_base_url": "https://inference.local/v1",
-        "vision_model": "gpt-5.4-mini",
-        "vision_allowed": ["gpt-5.4-mini"],
-        "tool_transport": "mcp",
-        "mcp_url": "http://host.openshell.internal:8766/mcp",
-        "require_routed_vision": True,
+        "tool_transport": "rest",
+        "rest_base_url": "http://host.openshell.internal:8000",
+        "camera_base_url": "http://host.openshell.internal:8042",
+        "rest_timeout": 4.0,
+        "motion_duration": 0.75,
+        "motion_poll": 0.2,
+        "motion_completion_timeout": 8.0,
     }
 
 
@@ -195,8 +203,8 @@ def test_apply_config_values_parses_vision_route_and_key_fallback(monkeypatch: A
         _restore_config_snapshot(snapshot)
 
 
-def test_apply_config_values_parses_mcp_conversation_transport(monkeypatch: Any) -> None:
-    """MCP mode should load its endpoint, token, and routed-vision requirement."""
+def test_apply_config_values_parses_rest_conversation_transport(monkeypatch: Any) -> None:
+    """REST mode should load its endpoint and bounded motion timing settings."""
     snapshot = _config_snapshot()
     monkeypatch.setattr(config_mod, "_dotenv_loaded_keys", set())
     monkeypatch.setattr(config_mod, "_dotenv_values", {})
@@ -204,18 +212,24 @@ def test_apply_config_values_parses_mcp_conversation_transport(monkeypatch: Any)
     try:
         config_mod.apply_config_values(
             {
-                "REACHY_TOOL_TRANSPORT": "mcp",
-                "REACHY_MCP_URL": "http://127.0.0.1:8766/mcp",
-                "REACHY_MCP_TOKEN": "test-token",
-                "REQUIRE_ROUTED_VISION": "1",
+                "REACHY_TOOL_TRANSPORT": "rest",
+                "REACHY_REST_BASE_URL": "http://127.0.0.1:8000",
+                "REACHY_CAMERA_BASE_URL": "http://127.0.0.1:8042",
+                "REACHY_REST_TIMEOUT_SECONDS": "3",
+                "REACHY_MOTION_DURATION_SECONDS": "0.5",
+                "REACHY_MOTION_POLL_INTERVAL_SECONDS": "0.05",
+                "REACHY_MOTION_COMPLETION_TIMEOUT_SECONDS": "6",
             },
             inherit_current=False,
         )
 
-        assert config_mod.config.REACHY_TOOL_TRANSPORT == "mcp"
-        assert config_mod.config.REACHY_MCP_URL == "http://127.0.0.1:8766/mcp"
-        assert config_mod.config.REACHY_MCP_TOKEN == "test-token"
-        assert config_mod.config.REQUIRE_ROUTED_VISION is True
+        assert config_mod.config.REACHY_TOOL_TRANSPORT == "rest"
+        assert config_mod.config.REACHY_REST_BASE_URL == "http://127.0.0.1:8000"
+        assert config_mod.config.REACHY_CAMERA_BASE_URL == "http://127.0.0.1:8042"
+        assert config_mod.config.REACHY_REST_TIMEOUT_SECONDS == 3.0
+        assert config_mod.config.REACHY_MOTION_DURATION_SECONDS == 0.5
+        assert config_mod.config.REACHY_MOTION_POLL_INTERVAL_SECONDS == 0.05
+        assert config_mod.config.REACHY_MOTION_COMPLETION_TIMEOUT_SECONDS == 6.0
     finally:
         _restore_config_snapshot(snapshot)
 

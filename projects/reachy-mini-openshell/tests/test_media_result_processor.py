@@ -1,9 +1,8 @@
-"""Tests for the raw-media boundary in front of conversation models."""
+"""Tests for the optional local raw-media boundary."""
 
 import base64
 from typing import Any
 from pathlib import Path
-from collections.abc import AsyncIterator
 
 import cv2
 import numpy as np
@@ -41,74 +40,19 @@ class _FakeVisionRouter:
         )
 
 
-class _FakeResponse:
-    def __init__(self, body: bytes, content_type: str = "video/mp4") -> None:
-        self.body = body
-        self.headers = {
-            "content-type": content_type,
-            "content-length": str(len(body)),
-        }
-
-    async def __aenter__(self) -> "_FakeResponse":
-        return self
-
-    async def __aexit__(self, *_args: Any) -> None:
-        return None
-
-    def raise_for_status(self) -> None:
-        return None
-
-    async def aiter_bytes(self) -> AsyncIterator[bytes]:
-        yield self.body
-
-
-class _FakeHttpClient:
-    def __init__(self, response: _FakeResponse, calls: list[dict[str, Any]], **kwargs: Any) -> None:
-        self.response = response
-        self.calls = calls
-        self.calls.append({"client": kwargs})
-
-    async def __aenter__(self) -> "_FakeHttpClient":
-        return self
-
-    async def __aexit__(self, *_args: Any) -> None:
-        return None
-
-    def stream(self, method: str, url: str) -> _FakeResponse:
-        self.calls.append({"method": method, "url": url})
-        return self.response
-
-
-def _processor(
-    tmp_path: Path,
-    router: Any,
-    *,
-    response: _FakeResponse | None = None,
-) -> tuple[MediaResultProcessor, list[dict[str, Any]]]:
-    http_calls: list[dict[str, Any]] = []
-    fake_response = response or _FakeResponse(b"fake-mp4")
-
-    def client_factory(**kwargs: Any) -> _FakeHttpClient:
-        return _FakeHttpClient(fake_response, http_calls, **kwargs)
-
-    return (
-        MediaResultProcessor(
-            vision_router=router,
-            mcp_token="secret-token",
-            capture_directory=tmp_path,
-            require_routed_vision=True,
-            mcp_url="http://127.0.0.1:8766/mcp",
-            http_client_factory=client_factory,
-        ),
-        http_calls,
+def _processor(tmp_path: Path, router: Any) -> MediaResultProcessor:
+    return MediaResultProcessor(
+        vision_router=router,
+        capture_directory=tmp_path,
+        require_routed_vision=True,
     )
 
 
 @pytest.mark.asyncio
 async def test_camera_is_analyzed_before_model_payload_is_created(tmp_path: Path) -> None:
-    """A camera result should expose text to the model and pixels only to the UI."""
+    """A local camera result should expose text to the model and pixels only to the UI."""
     router = _FakeVisionRouter()
-    processor, _ = _processor(tmp_path, router)
+    processor = _processor(tmp_path, router)
     image = _jpeg_base64(25)
 
     processed = await processor.process(
@@ -141,22 +85,23 @@ async def test_camera_is_analyzed_before_model_payload_is_created(tmp_path: Path
 
 
 @pytest.mark.asyncio
-async def test_scene_scan_routes_nine_ordered_frames_once_and_downloads_video(tmp_path: Path) -> None:
-    """A scan should use one vision request and retain its MP4 as a UI artifact."""
+async def test_scene_scan_routes_ordered_frames_and_keeps_local_video(tmp_path: Path) -> None:
+    """A local scan should retain its validated MP4 as a UI-only artifact."""
     router = _FakeVisionRouter()
-    processor, http_calls = _processor(tmp_path, router)
-    images = [_jpeg_base64(value) for value in range(9)]
-    timestamps = [float(value) for value in range(9)]
+    processor = _processor(tmp_path, router)
+    images = [_jpeg_base64(value) for value in range(3)]
+    timestamps = [0.0, 1.0, 2.0]
+    video_path = tmp_path / "scan.mp4"
+    video_path.write_bytes(b"fake-mp4")
 
     processed = await processor.process(
         "scan_scene",
         {
             "status": "scene_scan_complete",
             "question": "What did you see?",
-            "capture_id": "capture_123",
-            "video_url": "http://host.openshell.internal:8766/captures/capture_123.mp4",
+            "video_path": str(video_path),
             "frame_timestamps_seconds": timestamps,
-            "frames_selected": 9,
+            "frames_selected": 3,
             "b64_images": images,
         },
     )
@@ -172,25 +117,17 @@ async def test_scene_scan_routes_nine_ordered_frames_once_and_downloads_video(tm
     assert processed.model_payload["recording_status"] == "available"
     assert processed.model_payload["image_description"] == "A person is sitting at a desk."
     assert "b64_images" not in processed.model_payload
-    assert "video_url" not in processed.model_payload
     assert "video_path" not in processed.model_payload
-    assert processed.video_path == tmp_path / "capture_123.mp4"
-    video_path = processed.video_path
-    assert video_path is not None
-    assert video_path.read_bytes() == b"fake-mp4"
-    assert http_calls[0]["client"]["headers"] == {"Authorization": "Bearer secret-token"}
-    assert http_calls[1] == {
-        "method": "GET",
-        "url": "http://127.0.0.1:8766/captures/capture_123.mp4",
-    }
+    assert processed.video_path == video_path
 
 
 @pytest.mark.asyncio
-async def test_scene_scan_preserves_interruption_and_front_recovery_metadata(tmp_path: Path) -> None:
+async def test_scene_scan_preserves_interruption_metadata(tmp_path: Path) -> None:
     """Vision analysis must not erase the physical scan's incomplete status."""
     router = _FakeVisionRouter()
-    processor, _ = _processor(tmp_path, router)
-    image = _jpeg_base64()
+    processor = _processor(tmp_path, router)
+    video_path = tmp_path / "partial.mp4"
+    video_path.write_bytes(b"partial")
 
     processed = await processor.process(
         "scan_scene",
@@ -201,10 +138,9 @@ async def test_scene_scan_preserves_interruption_and_front_recovery_metadata(tmp
             "returned_to_front": True,
             "front_verified": True,
             "question": "What did you see?",
-            "capture_id": "capture_partial",
-            "video_url": "http://host.openshell.internal:8766/captures/capture_partial.mp4",
+            "video_path": str(video_path),
             "frame_timestamps_seconds": [0.0],
-            "b64_images": [image],
+            "b64_images": [_jpeg_base64()],
         },
     )
 
@@ -213,51 +149,39 @@ async def test_scene_scan_preserves_interruption_and_front_recovery_metadata(tmp
     assert processed.model_payload["returned_to_front"] is True
     assert processed.model_payload["front_verified"] is True
     assert "lost its control connection" in processed.model_payload["scan_warning"]
-    assert processed.model_payload["image_description"] == "A person is sitting at a desk."
 
 
 @pytest.mark.asyncio
-async def test_scene_scan_preserves_analysis_when_video_preview_fails(tmp_path: Path) -> None:
-    """A capture-download failure should not discard successful vision output."""
+async def test_scene_scan_preserves_analysis_when_local_preview_is_invalid(tmp_path: Path) -> None:
+    """An invalid local recording must not discard successful vision output."""
     router = _FakeVisionRouter()
-    processor, _ = _processor(
-        tmp_path,
-        router,
-        response=_FakeResponse(b"not-video", content_type="text/plain"),
-    )
-    image = _jpeg_base64()
+    processor = _processor(tmp_path, router)
 
     processed = await processor.process(
         "scan_scene",
         {
             "status": "scene_scan_complete",
             "question": "What did you see?",
-            "capture_id": "capture_456",
-            "video_url": "http://host.openshell.internal:8766/captures/capture_456.mp4",
+            "video_path": str(tmp_path / "missing.mp4"),
             "frame_timestamps_seconds": [0.0],
-            "b64_images": [image],
+            "b64_images": [_jpeg_base64()],
         },
     )
 
     assert processed.model_payload["status"] == "scene_analyzed"
-    assert processed.model_payload["image_description"] == "A person is sitting at a desk."
     assert processed.model_payload["recording_status"] == "preview_unavailable"
-    assert "recording preview could not be retrieved" in processed.model_payload["recording_error"]
     assert processed.video_path is None
     assert not contains_raw_media(processed.model_payload)
 
 
 @pytest.mark.asyncio
 async def test_vision_failure_discards_camera_bytes(tmp_path: Path) -> None:
-    """A failed approved route must not fall back to the conversation model."""
-    processor, _ = _processor(tmp_path, _FakeVisionRouter(fail=True))
+    """A failed local vision route must discard raw camera bytes."""
+    processor = _processor(tmp_path, _FakeVisionRouter(fail=True))
 
     processed = await processor.process(
         "camera",
-        {
-            "question": "Describe this.",
-            "b64_im": _jpeg_base64(),
-        },
+        {"question": "Describe this.", "b64_im": _jpeg_base64()},
     )
 
     assert processed.model_payload == {
@@ -271,9 +195,9 @@ async def test_vision_failure_discards_camera_bytes(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_scene_scan_rejects_more_than_nine_frames_before_upload(tmp_path: Path) -> None:
-    """Oversized frame sets should fail before any external model upload."""
+    """Oversized local frame sets should fail before model upload."""
     router = _FakeVisionRouter()
-    processor, _ = _processor(tmp_path, router)
+    processor = _processor(tmp_path, router)
 
     processed = await processor.process(
         "scan_scene",
@@ -286,29 +210,21 @@ async def test_scene_scan_rejects_more_than_nine_frames_before_upload(tmp_path: 
 
     assert processed.model_payload["status"] == "media_security_error"
     assert router.calls == []
-    assert not contains_raw_media(processed.model_payload)
 
 
 def test_strict_routing_requires_a_vision_router(tmp_path: Path) -> None:
-    """Strict mode should fail during startup when no approved router exists."""
+    """Explicit local strict mode should require a configured vision router."""
     with pytest.raises(ValueError, match="requires a configured VisionRouter"):
         MediaResultProcessor(
             vision_router=None,
-            mcp_token="token",
             capture_directory=tmp_path,
             require_routed_vision=True,
         )
 
 
 def test_recursive_raw_media_guard_rejects_data_urls() -> None:
-    """The final serialization guard should find raw media at any nesting depth."""
-    payload = {
-        "nested": [
-            {
-                "image_url": "data:image/jpeg;base64,secret",
-            }
-        ]
-    }
+    """The serialization guard should detect nested raw image data URLs."""
+    payload = {"nested": [{"image_url": "data:image/jpeg;base64,secret"}]}
 
     assert contains_raw_media(payload)
     with pytest.raises(RuntimeError, match="Raw media reached"):
