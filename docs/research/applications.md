@@ -15,7 +15,9 @@ research project. Keep project-specific setup in [Projects](../projects/index.md
 
 [Reachy Mini + OpenShell](../projects/reachy-mini-openshell/index.md) is the
 current runnable example: OpenAI Realtime conversation, a browser UI, simulator
-or physical robot operation, an authenticated MCP tool boundary, approved
-vision routing, and OpenShell policy enforcement for Reachy tools. Follow the
-[step-by-step sandbox tutorial](../projects/reachy-mini-openshell-sandbox.md)
-to build the complete POC.
+or physical robot operation, a robot-native media bridge, fixed REST actions,
+and OpenShell policy enforcement for Reachy tools. Read the
+[implementation Dev Note](../dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md),
+then follow the
+[project-local setup tutorial](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/ONBOARD_SETUP.md)
+to reproduce the complete onboard demo.

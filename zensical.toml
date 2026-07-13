@@ -15,14 +15,14 @@ nav = [
   {"Projects" = [
     "projects/index.md",
     {"Reachy Mini + OpenShell" = [
-      "projects/reachy-mini-openshell/index.md",
-      {"Step-by-step sandbox tutorial" = "projects/reachy-mini-openshell-sandbox.md"}
+      "projects/reachy-mini-openshell/index.md"
     ]}
   ]},
   {"Dev Notes" = [
     "dev-notes/index.md",
     {"Posts" = [
       # dev-notes:nav:start
+      {"Designing OpenShell for the Edge: Why Policy Has to Live Next to the Action" = "dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md"},
       {"Making Dev Notes Repeatable" = "dev-notes/posts/2026-06-05-making-dev-notes-repeatable.md"},
       {"Bootstrapping OpenShell Research" = "dev-notes/posts/2026-06-04-bootstrapping-openshell-research.md"}
       # dev-notes:nav:end

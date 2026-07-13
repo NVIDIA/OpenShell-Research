@@ -8,11 +8,14 @@ setup guide, validation commands, and troubleshooting notes.
 ### [Reachy Mini + OpenShell](reachy-mini-openshell/index.md)
 
 A physical-robot and simulator conversation demo with OpenAI Realtime, a
-Gradio UI, an authenticated host-side MCP service, approved vision routing,
-and OpenShell policy enforcement for robot tools.
+robot-native audio and camera bridge, fixed REST actions, an optional Gradio
+diagnostic UI, and OpenShell policy enforcement for physical robot tools.
 
-**Following the POC build?** Start with the
-[full step-by-step sandbox tutorial](reachy-mini-openshell-sandbox.md).
+**Want the edge architecture and engineering story?** Read
+[Designing OpenShell for the Edge](../dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md).
+
+**Building it on a robot?** Follow the
+[project-local onboard setup tutorial](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/ONBOARD_SETUP.md).
 
 ## Project Page Standard
 

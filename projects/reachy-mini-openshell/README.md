@@ -5,7 +5,9 @@ and single-frame camera capture; optional Gradio input; OpenAI Realtime; and a
 deliberately small REST-controlled action surface.
 
 > **Building the OpenShell policy demo with a physical Reachy?** Follow the
-> [full step-by-step Reachy Mini OpenShell sandbox tutorial](../../docs/projects/reachy-mini-openshell-sandbox.md).
+> [onboard setup tutorial](ONBOARD_SETUP.md). For the architecture, implementation
+> decisions, and lessons learned, read the
+> [Dev Note](../../docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md).
 
 Commands:
 
@@ -84,7 +86,8 @@ Inside an OpenShell sandbox, set the base URL to
 `http://host.openshell.internal:8000`. OpenShell can allow or deny
 `POST /api/move/goto`, but REST policy does not inspect the JSON pose values.
 The app therefore fixes the direction, pose, duration, and interpolation before
-sending the request. See the sandbox tutorial for the exact security boundary.
+sending the request. See the [onboard setup guide](ONBOARD_SETUP.md#security-boundary)
+for the exact security boundary.
 
 For onboard snapshots, also set
 `REACHY_CAMERA_BASE_URL=http://host.openshell.internal:8042`. The trusted native

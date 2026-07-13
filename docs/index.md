@@ -14,15 +14,16 @@
   </p>
 </section>
 
-## Featured tutorial
+## Featured project
 
 ### Reachy Mini + OpenShell
 
-Build a physical Reachy Mini application with an authenticated MCP robot
-service, an OpenShell-sandboxed conversation agent, separate Realtime and
-vision model routes, and policy-controlled robot tools.
+Run a voice agent onboard a physical Reachy Mini while OpenShell independently
+allows camera capture and denies head motion. The robot-native controller owns
+media; the conversation and model-selected REST tools stay inside the sandbox.
 
-[Start the step-by-step tutorial](projects/reachy-mini-openshell-sandbox.md){ .md-button .md-button--primary }
+[Read the Dev Note](dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md){ .md-button .md-button--primary }
+[Open the setup tutorial](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/ONBOARD_SETUP.md){ .md-button }
 [View the project overview](projects/reachy-mini-openshell/index.md){ .md-button }
 
 ## Starting points
@@ -30,7 +31,7 @@ vision model routes, and policy-controlled robot tools.
 - [Research engineering](research/index.md)
 - [Projects](projects/index.md)
 - [Reachy Mini + OpenShell project](projects/reachy-mini-openshell/index.md)
-- [Reachy Mini OpenShell sandbox tutorial](projects/reachy-mini-openshell-sandbox.md)
+- [Designing OpenShell for the Edge](dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md)
 - [Runtime notes](research/runtime.md)
 - [Application patterns](research/applications.md)
 - [Dev Notes](dev-notes/index.md)

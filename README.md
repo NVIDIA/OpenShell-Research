@@ -6,16 +6,19 @@ OpenShell as the runtime.
 
 ## Start here: Reachy Mini + OpenShell
 
-Follow the **[Reachy Mini OpenShell sandbox tutorial](docs/projects/reachy-mini-openshell-sandbox.md)**
-to build the policy-controlled physical-robot demo from start to finish.
+Use these two documents:
 
-The tutorial walks through:
+- **[Dev Note: Designing OpenShell for the Edge](docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md)** explains the reusable edge architecture, design principles, and lessons from Reachy Mini.
+- **[Onboard setup tutorial](projects/reachy-mini-openshell/ONBOARD_SETUP.md)** contains the copy-and-run build, installation, validation, and troubleshooting procedure.
+
+The project demonstrates:
 
 1. Running the conversation application inside an OpenShell sandbox.
 2. Calling the Reachy daemon's existing REST API directly.
 3. Restricting exact HTTP methods and paths with OpenShell policy.
-4. Enabling or disabling head motion without recreating the sandbox.
-5. Testing fixed head directions, emergency stop, and visible policy denials.
+4. Bridging Reachy's native microphone, speaker, and one-frame camera into the
+   sandboxed conversation.
+5. Permitting camera capture while visibly denying head motion.
 
 Related links:
 
