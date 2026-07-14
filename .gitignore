@@ -55,6 +55,7 @@ __pycache__/
 .mypy_cache/
 .pyright/
 .ruff_cache/
+.ty/
 .hypothesis/
 .tox/
 .nox/
