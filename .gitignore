@@ -1,7 +1,101 @@
+# Operating system files
 .DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors and IDEs
+.idea/
+.vscode/
+*.code-workspace
+*.suo
+*.user
+*.swp
+*.swo
+*~
+
+# Local scratch work
+.scratch/
+
+# Environment files and private configuration
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+credentials*.json
+secrets*.json
+
+# Logs, temporary files, and local caches
+*.log
+*.pid
+*.seed
+*.tmp
+*.temp
+*.bak
 .cache/
-.venv/
-.venv-docs/
+.tmp/
+tmp/
+
+# Rust
+target/
+**/*.rs.bk
+*.profraw
+*.profdata
+
+# Python bytecode and caches
 __pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.pyright/
+.ruff_cache/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Python environments and packaging output
+.venv/
+.venv-*/
+venv/
+env/
+ENV/
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# TypeScript and Node.js dependencies
+node_modules/
+.pnpm-store/
+.yarn/cache/
+.yarn/install-state.gz
+.npm/
+.eslintcache
+*.tsbuildinfo
+
+# TypeScript and frontend build output
+lib/
+out/
+.next/
+.nuxt/
+.svelte-kit/
+.astro/
+.parcel-cache/
+.turbo/
+.vite/
+coverage/
+
+# Generated documentation sites
 public/
 site/
