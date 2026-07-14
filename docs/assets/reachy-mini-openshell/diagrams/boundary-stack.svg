@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 664" role="img"
+     aria-label="On-device boundary stack: model, sandboxed agent, OpenShell policy decision, trusted adapter, and physical device as five separate boundaries.">
+  <defs>
+    <style>
+      .panel   { fill:#ffffff; stroke:#e6ebde; stroke-width:1.5; }
+      .node    { fill:#ffffff; stroke:#d8ded0; stroke-width:1.5; }
+      .policy  { fill:#f2f8e8; stroke:#76b900; stroke-width:2.25; }
+      .title   { font:600 18px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; fill:#1b1c1e; }
+      .sub     { font:400 12.5px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; fill:#6a7160; }
+      .eyebrow { font:600 12px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; fill:#4f7d00; letter-spacing:.16em; }
+      .num     { font:600 13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; fill:#ffffff; }
+      .flowlbl { font:500 11.5px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; fill:#6a7160; }
+      .badge   { font:600 10px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; fill:#4f7d00; letter-spacing:.08em; }
+    </style>
+    <filter id="soft" x="-8%" y="-14%" width="116%" height="128%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3.5" flood-color="#1b2a08" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arw" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+      <path d="M0 0.5 L9 5 L0 9.5 Z" fill="#9aa290"/>
+    </marker>
+  </defs>
+
+  <rect class="panel" x="8" y="8" width="704" height="648" rx="20"/>
+  <text class="eyebrow" x="360" y="46" text-anchor="middle">ON-DEVICE BOUNDARY STACK</text>
+
+  <!-- connectors -->
+  <line x1="360" y1="140" x2="360" y2="188" stroke="#9aa290" stroke-width="2" marker-start="url(#arw)" marker-end="url(#arw)"/>
+  <line x1="360" y1="252" x2="360" y2="300" stroke="#9aa290" stroke-width="2" marker-end="url(#arw)"/>
+  <line x1="360" y1="364" x2="360" y2="412" stroke="#9aa290" stroke-width="2" marker-end="url(#arw)"/>
+  <line x1="360" y1="476" x2="360" y2="524" stroke="#9aa290" stroke-width="2" marker-end="url(#arw)"/>
+  <text class="flowlbl" x="374" y="169" text-anchor="start">model I/O</text>
+  <text class="flowlbl" x="374" y="281" text-anchor="start">request</text>
+  <text class="flowlbl" x="374" y="393" text-anchor="start">if allowed</text>
+  <text class="flowlbl" x="374" y="505" text-anchor="start">bounded action</text>
+
+  <!-- node 1 -->
+  <g filter="url(#soft)"><rect class="node" x="150" y="76" width="420" height="64" rx="13"/></g>
+  <circle cx="132" cy="108" r="15" fill="#2b2c31"/><text class="num" x="132" y="112.5" text-anchor="middle">1</text>
+  <text class="title" x="360" y="104" text-anchor="middle">Cloud or local model</text>
+  <text class="sub" x="360" y="124" text-anchor="middle">interprets the conversation, selects a tool</text>
+
+  <!-- node 2 -->
+  <g filter="url(#soft)"><rect class="node" x="150" y="188" width="420" height="64" rx="13"/></g>
+  <circle cx="132" cy="220" r="15" fill="#2b2c31"/><text class="num" x="132" y="224.5" text-anchor="middle">2</text>
+  <text class="title" x="360" y="216" text-anchor="middle">Agent in an on-device OpenShell sandbox</text>
+  <text class="sub" x="360" y="236" text-anchor="middle">turns intent into one concrete request</text>
+
+  <!-- node 3 (policy control point) -->
+  <g filter="url(#soft)"><rect class="policy" x="150" y="300" width="420" height="64" rx="13"/></g>
+  <circle cx="132" cy="332" r="15" fill="#76b900"/><text class="num" x="132" y="336.5" text-anchor="middle">3</text>
+  <text class="title" x="360" y="328" text-anchor="middle">Local OpenShell policy decision</text>
+  <text class="sub" x="360" y="348" text-anchor="middle">allow or deny before it leaves the sandbox</text>
+  <text class="badge" x="552" y="292" text-anchor="end">CONTROL POINT</text>
+
+  <!-- node 4 -->
+  <g filter="url(#soft)"><rect class="node" x="150" y="412" width="420" height="64" rx="13"/></g>
+  <circle cx="132" cy="444" r="15" fill="#2b2c31"/><text class="num" x="132" y="448.5" text-anchor="middle">4</text>
+  <text class="title" x="360" y="440" text-anchor="middle">Narrow trusted capability adapter</text>
+  <text class="sub" x="360" y="460" text-anchor="middle">one bounded operation per capability</text>
+
+  <!-- node 5 -->
+  <g filter="url(#soft)"><rect class="node" x="150" y="524" width="420" height="64" rx="13"/></g>
+  <circle cx="132" cy="556" r="15" fill="#2b2c31"/><text class="num" x="132" y="560.5" text-anchor="middle">5</text>
+  <text class="title" x="360" y="552" text-anchor="middle">Physical device, sensor, or local data</text>
+  <text class="sub" x="360" y="572" text-anchor="middle">motors, camera, microphone, files</text>
+
+  <text class="flowlbl" x="360" y="624" text-anchor="middle">Each boundary enforces one thing — and can be tested on its own.</text>
+</svg>

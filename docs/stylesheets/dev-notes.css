@@ -377,3 +377,31 @@ body[data-md-color-scheme="slate"][data-md-color-primary="black"] {
     font-size: clamp(1.2rem, 8vw, 1.55rem);
   }
 }
+
+/* Dev note diagrams (SVG figures) */
+.dev-note-figure {
+  margin: 1.9rem auto;
+  text-align: center;
+}
+
+.dev-note-figure img {
+  width: 100%;
+  max-width: 620px;
+  height: auto;
+  border-radius: 14px;
+  border: 1px solid var(--openshell-home-hero-border, rgba(0, 0, 0, 0.08));
+  box-shadow: var(--openshell-card-shadow, 0 0.55rem 1.6rem rgba(15, 23, 42, 0.11));
+  background: #ffffff;
+}
+
+.dev-note-figure--wide img {
+  max-width: 820px;
+}
+
+.dev-note-figure figcaption {
+  margin: 0.7rem auto 0;
+  max-width: 42rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--md-default-fg-color--light);
+}

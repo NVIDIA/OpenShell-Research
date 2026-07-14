@@ -200,17 +200,10 @@ device execution into components with focused responsibilities.
    other local systems are reached only after the preceding boundaries allow
    it.
 
-```text
-cloud or local model
-        ↕
-agent in an on-device OpenShell sandbox
-        ↓
-local OpenShell policy decision
-        ↓
-narrow trusted capability adapter
-        ↓
-physical device, sensor, or local data
-```
+<figure class="dev-note-figure">
+  <img src="../../assets/reachy-mini-openshell/diagrams/boundary-stack.svg" alt="On-device boundary stack. Five boundaries connected top to bottom: a cloud or local model, the agent in an on-device OpenShell sandbox, the local OpenShell policy decision as the control point, a narrow trusted capability adapter, and the physical device, sensor, or local data.">
+  <figcaption>Reasoning, policy enforcement, hardware ownership, and device execution are separated into distinct boundaries. The local OpenShell policy decision is the control point, evaluated on the device before a request can leave the sandbox.</figcaption>
+</figure>
 
 This decomposition gives each boundary something specific to enforce and
 something specific to test. We can change the model without changing the robot
@@ -337,40 +330,10 @@ model endpoint.
 
 ## What This Looks Like on Reachy
 
-```mermaid
-flowchart TB
-    Human["Person near Reachy"]
-
-    subgraph Robot["Reachy Mini onboard computer"]
-        Native["Trusted native Reachy App\nmicrophone, speaker, camera"]
-        Gateway["OpenShell gateway\nand policy engine"]
-
-        subgraph Sandbox["OpenShell sandbox"]
-            Agent["Conversation agent\nRealtime client and fixed tools"]
-            Audio["Loopback audio service\n127.0.0.1:8765"]
-        end
-
-        Daemon["Reachy daemon REST API\n127.0.0.1:8000"]
-        Camera["One-frame adapter\n127.0.0.1:8042"]
-        Hardware["Mic, speaker, camera, motors"]
-    end
-
-    Model["OpenAI Realtime API"]
-
-    Human <-->|"voice"| Hardware
-    Native <-->|"Reachy media API"| Hardware
-    Native <-->|"PCM through exposed service"| Gateway
-    Gateway <--> Audio
-    Audio <--> Agent
-    Agent <-->|"policy-checked Realtime WebSocket"| Gateway
-    Gateway <--> Model
-    Agent -->|"robot REST action"| Gateway
-    Gateway -->|"permitted request"| Daemon
-    Daemon --> Hardware
-    Agent -->|"POST /camera/capture"| Gateway
-    Gateway --> Camera
-    Camera --> Native
-```
+<figure class="dev-note-figure dev-note-figure--wide">
+  <img src="../../assets/reachy-mini-openshell/diagrams/request-flow.svg" alt="Request flow on Reachy. The person speaks to the trusted native Reachy App, which streams PCM audio into the OpenShell sandbox, where the conversation agent exchanges policy-checked audio with the OpenAI Realtime API. Robot requests from the agent pass through the OpenShell gateway and policy engine, which allows the POST /camera/capture path to the one-frame camera adapter and denies the POST /api/move/goto path to the Reachy daemon and motors.">
+  <figcaption>The same policy engine sits in front of both physical capabilities. It allows the camera capture path (green) and denies the movement path (red), so the camera works and the head does not move — enforced by policy rather than by the application choosing to refuse.</figcaption>
+</figure>
 
 There is no laptop, browser, or Gradio page in the runtime path. The complete
 request flow is:
