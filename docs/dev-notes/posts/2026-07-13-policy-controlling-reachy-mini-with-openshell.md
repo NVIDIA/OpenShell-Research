@@ -44,9 +44,9 @@ working while the operator is out of the loop. That growing autonomy is the
 motivation behind OpenShell: the more an agent can change and act on its own,
 the less we can rely on guardrails implemented inside the same process.
 
-OpenShell moves the control point outside the agent. The agent can remain
-capable and autonomous inside a sandbox, while separately configured policy
-governs its filesystem, process, network, and inference access. If the model is
+OpenShell is a runtime that moves the control point outside the agent: it runs
+the agent in a sandbox while a separately configured policy layer governs the
+agent's filesystem, process, network, and inference access. If the model is
 prompt-injected, a tool is compromised, or the agent rewrites part of its own
 workflow, it still cannot grant itself permissions that the runtime has not
 allowed.
@@ -58,15 +58,12 @@ longer limited to a bad shell command or leaked cloud credential. It can expose
 data that was supposed to remain on-site or cause an action with material
 real-world consequences.
 
-That creates two immediate requirements. Some data should never leave the
-device or the site where it was produced. Some actions should never be possible
-in a particular deployment, even if a model, prompt, tool, skill, or application
-update tries to request them.
-
-Trust at the edge therefore requires the OpenShell control plane to move with
-the agent. The boundary must be deterministic, provisioned independently, and
-enforced locally before data leaves the device or an action reaches the
-hardware.
+That creates two requirements. Some data should never leave the device or the
+site where it was produced, and some actions should never be possible in a given
+deployment, even if a model, prompt, tool, skill, or application update tries to
+request them. Meeting both means the control plane has to move with the agent: a
+boundary that is deterministic, provisioned independently, and enforced locally
+before data leaves the device or an action reaches the hardware.
 
 We used Reachy Mini to explore what that deployment looks like. The resulting
 pattern keeps the agent in an on-device OpenShell sandbox, keeps hardware
@@ -103,11 +100,10 @@ policy runtime such as OpenShell fits: it enforces those boundaries at the edge,
 independently of the agent's instructions or behavior.
 
 **Safety has to be enforced before action.** An inspection robot may use its
-camera everywhere but move only inside a controlled workcell. A building agent
-may read temperature data but not change a setpoint in a public deployment. A
-field device may expose an emergency stop while route changes remain disabled.
-The same software image can be paired with different policies for different
-operating environments.
+camera everywhere but move only inside a controlled workcell. The same software
+image can be paired with different policies for different operating environments,
+so what an agent is allowed to physically do becomes a deployment decision rather
+than a property baked into the build.
 
 **Controls have to survive agent evolution.** Models change. Prompts are tuned.
 Tools are added. Application code is upgraded. A safety or privacy guarantee
@@ -238,9 +234,8 @@ and paths permitted by its policy. A deployment can allow an approved remote
 model, route through a local privacy service, or deny remote model access and
 use an on-device endpoint instead.
 
-This is the central edge property. The model may remain a cloud service, but
-the authority to move local data and use local capabilities remains local.
-Model placement and policy placement are independent choices.
+This is the central edge property: the model may remain a cloud service, but the
+authority to move local data and use local capabilities stays on the device.
 
 ### Expose capabilities, not complete APIs
 
@@ -437,6 +432,12 @@ installation, and Reachy Apps Python environment can coexist temporarily. The
 robot needs several gigabytes free even though the final sandbox image is only
 about 339 MB.
 
+**The policy hop is cheap next to the model round-trip.** Each robot request adds
+one local policy evaluation on the same host as the agent and daemon — a match on
+binary, destination, port, method, and path — which is small beside the network
+round-trip to the Realtime model. The latency that mattered in practice was cold
+start, not steady-state enforcement.
+
 These details are easy to dismiss as deployment issues. On an edge product,
 they are part of the architecture because they determine whether the security
 boundary survives normal starts, updates, failures, and operator workflows.
@@ -474,21 +475,25 @@ adapters. What generalizes is the placement of the boundary: the less-trusted
 agent runs inside the sandbox, and policy-approved requests cross into narrowly
 defined device capabilities.
 
+This does not remove trust so much as concentrate it. The policy engine, the
+trusted adapter, and the device controller are all still trusted code. The point
+is where that trust sits: instead of a large, long-running, self-modifying agent
+policing itself, the parts you have to trust are small, fixed, and auditable, and
+they sit outside the component most likely to change. The goal is a minimal
+trusted surface, not the absence of one.
+
 ---
 
 ## Summary
 
 Running autonomous, evolving agents at the edge is a systems problem, not just
-a container-build problem. The Reachy implementation reflects seven principles:
-
-1. Keep the final control point outside the agent process.
-2. Put policy on the device, next to the data and actions it controls.
-3. Give the agent narrow capabilities rather than a complete hardware API.
-4. Keep hardware handles and native SDK objects in a small trusted process.
-5. Separate operator provisioning from the product's Start/Stop lifecycle.
-6. Treat CPU, memory, disk, networking, and cold-start time as architecture
-   inputs.
-7. Keep model placement independent from the local action boundary.
+a container-build problem. The Reachy implementation comes down to a few choices:
+keep the final control point outside the agent and on the device, next to the
+data and actions it governs; give the agent narrow capabilities instead of a
+complete hardware API, with hardware handles kept in a small trusted process;
+separate operator provisioning from the product's start/stop lifecycle; and treat
+CPU, memory, disk, networking, cold-start time, and where the model runs as
+architecture inputs rather than afterthoughts.
 
 The result is more than a policy-controlled robot demo. It is a deployment
 pattern in which OpenShell becomes the on-device isolation and policy layer for
