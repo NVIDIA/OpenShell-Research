@@ -64,5 +64,5 @@
   <text class="title" x="360" y="552" text-anchor="middle">Physical device, sensor, or local data</text>
   <text class="sub" x="360" y="572" text-anchor="middle">motors, camera, microphone, files</text>
 
-  <text class="flowlbl" x="360" y="624" text-anchor="middle">Each boundary enforces one thing — and can be tested on its own.</text>
+  <text class="flowlbl" x="360" y="624" text-anchor="middle">Each boundary enforces one thing and can be tested on its own.</text>
 </svg>

@@ -86,14 +86,14 @@
   <text class="badgeA" x="130" y="518" text-anchor="middle">ALLOWED</text>
   <text class="title" x="270" y="556" text-anchor="middle">One-frame camera adapter</text>
   <text class="mono" x="270" y="577" text-anchor="middle">127.0.0.1:8042 · POST /camera/capture</text>
-  <text class="sub" x="270" y="597" text-anchor="middle">returns one bounded JPEG — Reachy describes it aloud</text>
+  <text class="sub" x="270" y="597" text-anchor="middle">returns one bounded JPEG, Reachy describes it aloud</text>
 
   <g filter="url(#soft)"><rect class="deny" x="510" y="524" width="360" height="94" rx="14"/></g>
   <rect x="790" y="505" width="80" height="18" rx="9" fill="#d1495b"/>
   <text class="badgeD" x="830" y="518" text-anchor="middle">DENIED</text>
   <text class="title" x="690" y="556" text-anchor="middle">Reachy daemon → motors</text>
   <text class="mono" x="690" y="577" text-anchor="middle">127.0.0.1:8000 · POST /api/move/goto</text>
-  <text class="sub" x="690" y="597" text-anchor="middle">stopped at the boundary — the robot stays still</text>
+  <text class="sub" x="690" y="597" text-anchor="middle">stopped at the boundary, the robot stays still</text>
 
   <!-- gateway -> allowed (green) -->
   <path d="M420 442 C380 480, 320 494, 285 522" fill="none" stroke="#76b900" stroke-width="2.25" marker-end="url(#ag)"/>
@@ -106,5 +106,5 @@
     <path d="M-4 -4 L4 4 M4 -4 L-4 4" stroke="#d1495b" stroke-width="2" stroke-linecap="round"/>
   </g>
 
-  <text class="flowlbl" x="480" y="642" text-anchor="middle">The camera works and the head does not move — enforced by policy, not by the app choosing to refuse.</text>
+  <text class="flowlbl" x="480" y="642" text-anchor="middle">The camera works and the head does not move, enforced by policy, not by the app choosing to refuse.</text>
 </svg>
