@@ -370,47 +370,22 @@ effect.
 
 ---
 
-## What We Learned Bringing It Onto the Robot
-
-Moving from a dev machine to a small onboard computer forced several assumptions
-into the open.
-
-**A persistent product needs a persistent sandbox.** Starting the sandbox with a
-one-shot command made the container exit and restart. The final image stays
-alive with `sleep infinity`, and the Reachy lifecycle starts and stops only the
-agent process inside it.
-
-**A defined service is not a healthy service.** The audio route could exist
-before the sandbox listener was ready. The native app now starts the listener,
-checks that it is healthy, and only then brings up the OpenShell service route.
-
-**Cold starts on edge hardware need real timeouts.** Loading and starting the
-audio stack took about 41 seconds on the robot we tested. A 120-second health
-window covers the first start without masking a process that never comes up.
-
-**Storage needs room to install, not just room to run.** The compressed archive,
-the expanded image, the Docker layers, the OpenShell install, and the Reachy
-Apps Python environment can all sit on disk at once for a while. The robot needs
-several gigabytes free even though the final image is only about 339 MB.
-
-**The policy check is cheap next to the model round-trip.** Each robot request
-adds one local policy check on the same host as the agent and daemon (a match on
-binary, destination, port, method, and path), which is tiny next to the network
-round-trip to the Realtime model. The latency that mattered in practice was cold
-start, not the check itself.
-
-It is easy to write these off as deployment details. On an edge product they are
-part of the architecture, because they decide whether the security boundary
-survives normal starts, updates, failures, and operator workflows.
-
----
-
 ## Conclusion
 
 None of this is specific to Reachy. The same approach fits inspection robots,
-smart cameras, lab instruments, field vehicles, building gateways, and kiosks. In each one, the agent can read sensors and describe what it sees, while
-anything with a real consequence has to be approved by a policy first: moving an actuator,
-changing a setpoint, or sending raw data off the device. We see this as a pattern for using OpenShell to bring security and trust to
+smart cameras, lab instruments, field vehicles, building gateways, and kiosks. In
+each one, the agent can read sensors and describe what it sees, while anything
+with a real consequence has to be approved by policy first: moving an actuator,
+changing a setpoint, or sending raw data off the device.
+
+The main result from putting this on Reachy is that the whole OpenShell stack,
+the gateway and the sandbox, runs on the device's own computer. The isolation and
+the policy do not depend on the network or a cloud service, so the device keeps
+enforcing its boundary even if the network drops or the model is unreachable.
+Running the full stack on device is what gives complete isolation and control at
+the edge.
+
+We see this as a pattern for using OpenShell to bring security and trust to
 autonomous edge systems.
 
 Key resources:
