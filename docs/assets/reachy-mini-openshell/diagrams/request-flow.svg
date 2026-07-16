@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 664" role="img"
-     aria-label="Reachy request flow: audio moves from the person through the trusted native app into the sandboxed agent and the OpenAI Realtime model; robot requests pass through the OpenShell policy engine, which allows the camera capture path and denies the movement path.">
+     aria-label="Reachy request flow: audio moves from the person through the trusted native app into the sandboxed agent and the OpenAI Realtime model; robot requests pass through the OpenShell gateway, which allows the camera capture path and denies the movement path.">
   <defs>
     <style>
       .panel   { fill:#ffffff; stroke:#e6ebde; stroke-width:1.5; }
@@ -73,7 +73,7 @@
   <g filter="url(#soft)"><rect class="policy" x="330" y="360" width="300" height="82" rx="14"/></g>
   <rect x="330" y="341" width="118" height="18" rx="9" fill="#76b900"/>
   <text class="badgeA" x="389" y="354" text-anchor="middle">POLICY DECISION</text>
-  <text class="title" x="480" y="392" text-anchor="middle">OpenShell gateway + policy engine</text>
+  <text class="title" x="480" y="392" text-anchor="middle">OpenShell gateway</text>
   <text class="sub" x="480" y="413" text-anchor="middle">evaluates binary · destination · port · method · path</text>
 
   <!-- agent -> gateway -->
