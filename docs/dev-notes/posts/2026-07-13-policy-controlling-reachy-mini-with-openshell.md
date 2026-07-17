@@ -53,7 +53,7 @@ your isolation backend, add enterprise specific checks for policy updates, and d
 the sandbox. With this, there's more you can do than just allow or deny requests. For privacy, you
 can run outbound requests through a filter that redacts or drops sensitive data,
 such as faces in a camera frame, before it leaves the device. For routing, you
-can point a model call at an on-device endpoint, a cloud provider, or a
+can point an agent call at an on-device endpoint, a cloud provider, or a
 middleware service in between, and change that choice per deployment without
 touching the agent. For authorization, you can require an extra check before a
 sensitive request goes through, so an action waits for an operator's approval or
@@ -68,19 +68,11 @@ read microphones, cameras, and sensors, and take actions that move machines or
 change local systems. A corrupted agent can leak data that was supposed to stay on-site, or move
 something in the real world.
 
-Two requirements come out of this - some data should never leave the device or the site
-where it was produced. Some actions should never be possible in a given
-deployment, even if a model, prompt, tool, skill, or update asks for them. We run the entire OpenShell stack on the edge
-to bring deterministic policy enforcement and security to edge devices. 
+Two core problems that stand out to us with edge deployments are - privacy of data captured at the edge, and restricting physical actions a robot or
+similar device can take depending on it's deployment scenario. We used Reachy Mini to see what that looks like in practice. We run a small chat application connected to an Open AI endpoint within the OpenShell Runtime, all on the Reachy Mini's onboard Raspberry Pi. We use OpenShell to restrict what actions the model can take. Our next step is to 
+route sensitive data to approved models but more on that in a follow on post!
 
-We used Reachy Mini to see what that looks like in practice. We run a small chat application connected to an Open AI endpoint within the OpenShell
-Runtime, all on the Reachy Mini's onboard Raspberry Pi. 
-
-
-<!-- more -->
-
-This post talks about how we approached this and what it means for agent security at the edge. If 
-you just want to try this for yourself, check out our tutorial [here](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/ONBOARD_SETUP.md).
+If  you just want to try this for yourself, check out our tutorial [here](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/ONBOARD_SETUP.md).
 
 ---
 
@@ -103,7 +95,7 @@ approved service may process, and what may leave. That rule is what OpenShell
 enforces, and it holds no matter what the agent is told to do.
 
 **Enforce safety before the action, not after.** An inspection robot may use its
-camera everywhere but move only inside a controlled workcell. That workcell
+camera everywhere but move only inside a controlled environment. That environment
 limit lives in the policy an operator applies at deployment, not in the image or
 the agent's code, so the same build can ship to a test bench where movement is
 open and to a production line where it is denied.
