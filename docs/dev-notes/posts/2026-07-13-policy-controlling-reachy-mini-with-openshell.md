@@ -38,87 +38,31 @@ card_tags:
 </div>
 <!-- dev-note:byline:end -->
 
-AI agents can now run for a long time, pursue
-goals, call tools, learn new skills, write code, and keep working while no one is
-watching. This creates a problem. When an agent can change itself and act on its
-own, a guardrail that lives inside the same process is easy for it to bypass.
+AI agents can now run for a long time, pursue goals, call tools, learn new skills, write code, and keep working while no one is watching. How do you give autonomy to such a highly capable agent?
 
-OpenShell is the agent runtime for autonomous fleets of agents, and it solves
-this problem by moving the point of control outside the agent. It runs the agent in
-a sandbox and sits in the path of everything the agent does. A policy layer, configured separately from the agent, governs each
-interaction: which processes it can start, which hosts and ports it can reach, which models it can call, other services it needs to invoke along its network path.
+OpenShell is the secure agent runtime for autonomous agents. It solves this problem by moving the security layer outside the agent. OpenShell runs your agent in a sandbox and sits in the path of everything the agent does. A policy layer, configured separately from the agent, governs what processes the agent can start, which hosts and ports it can reach, which models it can call, and which other services it needs to invoke along its network path.
 
-We recognize that everyone has different criteria and needs for an agent runtime, that's why we made OpenShell extensible. You can pick 
-your isolation backend, add enterprise specific checks for policy updates, and deploy middleware services that are invoked when any traffic egresses 
-the sandbox. With this, there's more you can do than just allow or deny requests. For privacy, you
-can run outbound requests through a filter that redacts or drops sensitive data,
-such as faces in a camera frame, before it leaves the device. For routing, you
-can point an agent call at an on-device endpoint, a cloud provider, or a
-middleware service in between, and change that choice per deployment without
-touching the agent. For authorization, you can require an extra check before a
-sensitive request goes through, so an action waits for an operator's approval or
-a stronger credential instead of passing on the model's say-so. For enterprise
-control, you can sign a policy and have the device verify that signature before
-it loads, so it only enforces rules an operator actually approved, and push those
-signed policies across a fleet. So OpenShell is more than a sandbox around the
-agent, it's a complete runtime.
+Every OpenShell deployment has different needs, so we made OpenShell extensible. You are not locked into a fixed set of behaviors. You can swap the isolation backend, add your own checks on policy updates, and plug in middleware services that run on traffic as it leaves the sandbox.
 
-At the edge, this problem gets physical. An agent can watch people and places,
-read microphones, cameras, and sensors, and take actions that move machines or
-change local systems. A corrupted agent can leak data that was supposed to stay on-site, or move
-something in the real world.
+The combination of autonomous agents and edge devices like robots brings the digital concerns of traditional software deployments into the physical world. Imagine a home assistant robot that is only supposed to clean. It suffers a prompt injection and starts unlocking the doors instead. At the edge, a compromised agent does not just leak data or crash a process. It can let a stranger into your home, or send what it sees and hears somewhere it should never go.
 
-Two core problems that stand out to us with edge deployments are - privacy of data captured at the edge, and restricting physical actions a robot or
-similar device can take depending on it's deployment scenario. We used Reachy Mini to see what that looks like in practice. We run a small chat application connected to an Open AI endpoint within the OpenShell Runtime, all on the Reachy Mini's onboard Raspberry Pi. We use OpenShell to restrict what actions the model can take. Our next step is to 
-route sensitive data to approved models but more on that in a follow on post!
+OpenShell makes an autonomous agent safe to run at the edge by solving two problems:
 
-If  you just want to try this for yourself, check out our tutorial [here](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/ONBOARD_SETUP.md).
+- **Restrict what the device can do.** Deterministic policy decides what the agent can actually make the device do, and it is enforced on the device.
+- **Keep the data private.** Sensitive data stays local, and only approved services ever see it.
 
----
+We used the HuggingFace Reachy Mini to see what that looks like in practice. We run a small chat application connected to an OpenAI endpoint within the OpenShell runtime, all on the Reachy Mini's onboard Raspberry Pi. We use OpenShell to restrict what actions the model can take. Our next step is to route sensitive data to approved models, but more on that in a follow-up post.
 
-## Bring Privacy and Trust to the Edge
-
-The way we approach privacy for edge devices and traditional software applications changes. At the edge, you can have
-devices that can see you, hear you, and talk to you. These devices can be in your home, your office, even your schools and
-you need to make sure these devices see and hear only things they really need to, and keep that data private. You also need to make sure
-these devices can only do the things you really want them to. For a home assistant robot, that could be only allowing a robot to clean but never allowing 
-it to open a door. 
-
-Let's think about how OpenShell's core principles can apply here: 
-
-**Stop private data before it leaves.** A camera can analyze a scene on the
-device but be blocked from sending raw video off-site. A microphone can drive a
-local interaction while the recording stays put. A lab instrument can hand back
-a result while its raw measurements never leave the building. Each case needs a
-hard rule about where sensitive data can go: what stays on the device, what an
-approved service may process, and what may leave. That rule is what OpenShell
-enforces, and it holds no matter what the agent is told to do.
-
-**Enforce safety before the action, not after.** An inspection robot may use its
-camera everywhere but move only inside a controlled environment. That environment
-limit lives in the policy an operator applies at deployment, not in the image or
-the agent's code, so the same build can ship to a test bench where movement is
-open and to a production line where it is denied.
-
-**Controls have to outlast changes to the agent.** Models get swapped, prompts
-get tuned, tools get added, code gets upgraded. A guarantee that lives in the
-prompt or the tool code breaks the moment any of those change, so you have to
-re-check it after every update. A guarantee that lives in policy outside the
-agent does not. You can change the agent without touching it.
-
-The Reachy demo talks to the OpenAI Realtime API over one allowed WebSocket
-endpoint, so the conversation audio and the requested camera frame go to that
-approved service. A deployment with strict data-residency rules could allow a
-local model instead, or an approved on-device preprocessing service, or only
-derived data. Local policy decides what leaves, no matter where the model runs.
+If you just want to try this for yourself, check out our tutorial [here](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/ONBOARD_SETUP.md).
 
 ---
 
 ## Give Each Job Its Own Boundary
 
-The simplest way to build this is to run the agent on the device and give it the
-robot's SDK. That works for a quick demo, but it puts two things that should be
-separate into a single process.
+Start with the first problem: restricting what the device can do. The simplest
+way to build this is to run the agent on the device and give it the robot's SDK.
+That works for a quick demo, but it puts two things that should be separate into
+a single process.
 
 **The agent gets more than it needs.** A robot SDK exposes motors, raw targets,
 camera settings, recorded motions, app management, and system state. An agent
@@ -130,16 +74,14 @@ actually moves. That call belongs on the device, right before the request reache
 the controller.
 
 Both come from the same place: one process holds all the access and makes all the
-decisions. So we split the work into separate parts, each with one job. Reasoning,
-policy, hardware ownership, and device execution each become their own boundary.
+decisions. So we split the work into separate parts, each with one job.
 
-1. **The model reasons.** It reads the conversation and picks from the tools the
-   app offers. It can be remote or local.
+1. **The model reasons.** It listens to what the user says and picks from the
+   tools the app offers. The model can be remote or local.
 2. **The sandboxed agent turns that choice into a concrete request.** It owns the
    conversation state and the tool logic, but it does not own the hardware.
 3. **OpenShell decides whether the request may leave the sandbox.** It checks the
-   request on the device against the calling binary, destination, port, HTTP
-   method, path, and query.
+   tool call request against the OpenShell policy.
 4. **A trusted adapter exposes one narrow capability.** It owns the native device
    objects and turns an approved request into a single bounded operation.
 5. **The device controller does the work.** Motors, sensors, and cameras are
@@ -149,12 +91,6 @@ policy, hardware ownership, and device execution each become their own boundary.
   <img src="../../assets/reachy-mini-openshell/diagrams/boundary-stack.svg" alt="On-device boundary stack. Five boundaries connected top to bottom: a cloud or local model, the agent in an on-device OpenShell sandbox, the local OpenShell policy decision as the control point, a narrow trusted capability adapter, and the physical device, sensor, or local data.">
   <figcaption>Reasoning, policy enforcement, hardware ownership, and device execution are separated into distinct boundaries. The local OpenShell policy decision is the control point, evaluated on the device before a request can leave the sandbox.</figcaption>
 </figure>
-
-Each boundary now has one thing to enforce and one thing to test. You can change
-the model without touching the robot adapter. You can change the policy without
-rebuilding the image. You can restart the app without recreating credentials or
-resource limits. And you can test the allowed camera path on its own, separate
-from the denied movement path.
 
 The sandbox starts with deny-by-default policy instead of inheriting everything
 the host can do. When Reachy hits a denied action, the agent gets a clear error
@@ -174,11 +110,8 @@ We run all of OpenShell on Reachy's onboard computer. The gateway is the control
 plane: it creates the sandbox, holds the policy, and manages the sandbox
 lifecycle. The agent runs inside the sandbox. When the agent tries to move the
 robot, OpenShell checks the request on the device and decides whether it reaches
-the daemon. A denial stops right there. It does not wait for the remote model to
-withdraw the call. The same check controls what leaves the sandbox: every
-outbound connection can be allowed, routed somewhere else, or denied. The model
-can sit in the cloud, but the gateway and the sandbox both run on the device, so
-the power to move local data and use local hardware stays local.
+the daemon. The same check controls what leaves the sandbox: every outbound
+connection can be allowed, routed somewhere else, or denied.
 
 ### Expose capabilities, not complete APIs
 
@@ -233,7 +166,7 @@ changes. The sandbox, the adapter, and the boundary stay the same.
 
 <figure class="dev-note-figure dev-note-figure--wide">
   <img src="../../assets/reachy-mini-openshell/diagrams/request-flow.svg" alt="Request flow on Reachy. The person speaks to the trusted native Reachy App, which streams PCM audio into the OpenShell sandbox, where the conversation agent exchanges policy-checked audio with the OpenAI Realtime API. Robot requests from the agent pass through the OpenShell gateway, which allows the POST /camera/capture path to the one-frame camera adapter and denies the POST /api/move/goto path to the Reachy daemon and motors.">
-  <figcaption>The same OpenShell gateway sits in front of both physical capabilities. It allows the camera capture path (green) and denies the movement path (red), so the camera works and the head does not move, enforced by policy rather than by the application choosing to refuse.</figcaption>
+  <figcaption>Every request to the hardware passes through OpenShell first. The OpenShell policy allows the camera capture path (green) and denies the movement path (red), so the camera works and the head does not move, enforced by policy rather than by the application choosing to refuse.</figcaption>
 </figure>
 
 There is no laptop, browser, or Gradio page in the runtime path. The full
@@ -270,6 +203,32 @@ The robot stays still, and it says so out loud.
 The key point is that the app is not just choosing not to move. The agent makes
 a real attempt to move, and a separate policy boundary stops the physical
 effect.
+
+---
+
+## Keeping Data Private
+
+The demo above covers action restriction, the first of the two problems. The
+second is privacy, and at the edge it matters more than usual, because these
+devices can see and hear the room they are in. A camera should be able to
+describe a scene without sending raw video off the device, and a microphone
+should be able to drive a conversation while the recording stays local. The
+device should capture only what it needs, and anything sensitive should leave
+only when it has to.
+
+The next piece for Reachy is to add privacy routing. We use OpenShell's
+middleware service, which hooks into OpenShell's sandbox proxy. The middleware service is built to detect
+what type of data is leaving the sandbox. We keep things simple here: if it's image data, we route it to a model approved to
+handle image data, which may be sensitive. If it's not image data, it goes to a frontier model in the cloud. This is just an
+example, but the benefit of middleware is its flexibility. You can build in whatever routing logic you want, and use any tool you
+want for PII redaction or replacement.
+
+<figure class="dev-note-figure dev-note-figure--wide">
+  <img src="../../assets/reachy-mini-openshell/diagrams/privacy-routing.svg" alt="Privacy routing with middleware. OpenShell's policy forces the sandboxed agent's outbound traffic through an OpenShell middleware service. A router in the middleware detects the data type: image data goes to a model approved to handle sensitive images, and everything else goes to a frontier model in the cloud.">
+  <figcaption>Privacy routing.</figcaption>
+</figure>
+
+We will publish more on this as a follow-up.
 
 ---
 
