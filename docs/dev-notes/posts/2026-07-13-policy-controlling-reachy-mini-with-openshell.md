@@ -223,12 +223,12 @@ handle image data, which may be sensitive. If it's not image data, it goes to a 
 example, but the benefit of middleware is its flexibility. You can build in whatever routing logic you want, and use any tool you
 want for PII redaction or replacement.
 
+Keep an eye on this repo for more details on privacy routing!
+
 <figure class="dev-note-figure dev-note-figure--wide">
   <img src="../../assets/reachy-mini-openshell/diagrams/privacy-routing.svg" alt="Privacy routing with middleware. OpenShell's policy forces the sandboxed agent's outbound traffic through an OpenShell middleware service. A router in the middleware detects the data type: image data goes to a model approved to handle sensitive images, and everything else goes to a frontier model in the cloud.">
-  <figcaption>Privacy routing.</figcaption>
 </figure>
 
-We will publish more on this as a follow-up.
 
 ---
 
