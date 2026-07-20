@@ -27,6 +27,7 @@ BYLINE_START = "<!-- dev-note:byline:start -->"
 BYLINE_END = "<!-- dev-note:byline:end -->"
 NAV_START = "      # dev-notes:nav:start"
 NAV_END = "      # dev-notes:nav:end"
+CANONICAL_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 
 def parse_scalar(value: str) -> str:
@@ -149,16 +150,21 @@ def author_label(authors: list[dict[str, str]]) -> str:
     return f"{prefix}: {natural_join(names)}"
 
 
-def format_date(value: str, path: Path) -> str:
+def parse_date(value: str, path: Path) -> dt.date:
+    if not CANONICAL_DATE.fullmatch(value):
+        raise ValueError(f"{path} date {value!r} must use YYYY-MM-DD")
     try:
-        parsed = dt.date.fromisoformat(value)
+        return dt.date.fromisoformat(value)
     except ValueError as exc:
         raise ValueError(f"{path} has invalid ISO date {value!r}") from exc
-    return f"{parsed.strftime('%B')} {parsed.day}, {parsed.year}"
 
 
-def post_sort_key(post: dict[str, Any]) -> tuple[str, str]:
-    return (str(post["metadata"].get("date", "")), str(post["metadata"].get("title", "")))
+def format_date(value: dt.date) -> str:
+    return f"{value.strftime('%B')} {value.day}, {value.year}"
+
+
+def post_sort_key(post: dict[str, Any]) -> tuple[dt.date, str]:
+    return (post["published"], str(post["metadata"].get("title", "")))
 
 
 def discover_posts(authors: dict[str, dict[str, str]]) -> list[dict[str, Any]]:
@@ -167,6 +173,7 @@ def discover_posts(authors: dict[str, dict[str, str]]) -> list[dict[str, Any]]:
         markdown = path.read_text(encoding="utf-8")
         metadata, raw_frontmatter, body = parse_frontmatter(markdown, path)
         post_authors = require_authors(require_list(metadata, "authors", path), authors, path)
+        published = parse_date(require_string(metadata, "date", path), path)
         posts.append(
             {
                 "path": path,
@@ -174,60 +181,131 @@ def discover_posts(authors: dict[str, dict[str, str]]) -> list[dict[str, Any]]:
                 "frontmatter": raw_frontmatter,
                 "body": body,
                 "authors": post_authors,
+                "published": published,
             }
         )
     return sorted(posts, key=post_sort_key, reverse=True)
 
 
-def render_card(post: dict[str, Any]) -> str:
+def card_visual_class(post: dict[str, Any]) -> str:
+    """Choose a stable visual treatment from authored metadata."""
+    metadata = post["metadata"]
+    variant = str(metadata.get("card_variant", "")).strip()
+    if variant and not re.fullmatch(r"[a-z0-9_-]+", variant):
+        raise ValueError(f"{post['path']} has invalid card_variant {variant!r}")
+    categories = require_list(metadata, "categories", post["path"])
+    source = variant or (categories[0] if categories else "research")
+    slug = re.sub(r"[^a-z0-9_-]+", "-", source.lower()).strip("-")
+    return slug or "research"
+
+
+def render_card_visual(post: dict[str, Any]) -> str:
+    metadata = post["metadata"]
+    categories = require_list(metadata, "categories", post["path"])
+    label = categories[0] if categories else "Research"
+    date_stamp = post["published"].strftime("%Y.%m.%d")
+    return f"""      <div class="dev-note-card__visual dev-note-card__visual--{html.escape(card_visual_class(post), quote=True)}" aria-hidden="true">
+        <span class="dev-note-card__visual-label">Field note / {html.escape(label)}</span>
+        <span class="dev-note-card__visual-index">{date_stamp}</span>
+        <span class="dev-note-card__visual-mark">&gt;_</span>
+      </div>"""
+
+
+def render_card_authors(authors: list[dict[str, str]]) -> str:
+    author_images = "\n".join(
+        f'          <img src="{html.escape(avatar_url(author, 64), quote=True)}" alt="" loading="lazy">'
+        for author in authors
+    )
+    names = natural_join([author["name"] for author in authors])
+    return f"""        <span class="dev-note-card__authors" aria-label="{html.escape(author_label(authors), quote=True)}">
+{author_images}
+          <span class="dev-note-card__author-names">{html.escape(names)}</span>
+        </span>"""
+
+
+def render_card_copy(post: dict[str, Any]) -> str:
     path = post["path"]
     metadata = post["metadata"]
     title = require_string(metadata, "title", path)
-    date = require_string(metadata, "date", path)
+    published = post["published"]
     description = require_string(metadata, "description", path)
     categories = require_list(metadata, "categories", path)
     tags = require_list(metadata, "card_tags", path) or require_list(metadata, "tags", path)
     authors = post["authors"]
+    category = categories[0] if categories else "Research"
+    tags_html = ""
+    if tags:
+        tag_items = "\n".join(f"          <span>{html.escape(tag)}</span>" for tag in tags)
+        tags_html = f"""
+        <div class="dev-note-card__tags" aria-label="Tags">
+{tag_items}
+        </div>"""
+    return f"""      <div class="dev-note-card__copy">
+        <div class="dev-note-card__meta">
+          <time datetime="{published.isoformat()}">{html.escape(format_date(published))}</time>
+          <span>{html.escape(category)}</span>
+        </div>
+        <h3>{html.escape(title)}</h3>
+        <p class="dev-note-card__summary">{html.escape(description)}</p>{tags_html}
+        <div class="dev-note-card__footer">
+{render_card_authors(authors)}
+          <span class="dev-note-card__read">Read note</span>
+        </div>
+      </div>"""
 
-    classes = ["dev-note-card"]
-    variant = str(metadata.get("card_variant", "")).strip()
-    if variant:
-        if not re.fullmatch(r"[a-z0-9_-]+", variant):
-            raise ValueError(f"{path} has invalid card_variant {variant!r}")
-        classes.append(f"dev-note-card--{variant}")
 
-    relative_url = path.relative_to(DEV_NOTES_DIR).with_suffix("").as_posix() + "/"
-    meta_parts = [format_date(date, path), "Dev Note"]
-    if categories:
-        meta_parts.append(categories[0])
+def render_featured_card(post: dict[str, Any]) -> str:
+    relative_url = post["path"].relative_to(DEV_NOTES_DIR).with_suffix("").as_posix() + "/"
+    variant = card_visual_class(post)
+    return f"""    <article class="dev-note-card dev-note-card--featured dev-note-card--{html.escape(variant, quote=True)}">
+      <a class="dev-note-card__link" href="{html.escape(relative_url, quote=True)}">
+{render_card_visual(post)}
+{render_card_copy(post)}
+      </a>
+    </article>"""
 
-    author_images = "\n".join(
-        f'        <img src="{html.escape(avatar_url(author, 64), quote=True)}" alt="" loading="lazy">'
-        for author in authors
-    )
 
-    return f"""  <article class="{html.escape(' '.join(classes), quote=True)}">
-    <a class="dev-note-card__link" href="{html.escape(relative_url, quote=True)}">
-      <span class="dev-note-card__meta">{html.escape(' / '.join(meta_parts))}</span>
-      <h2>{html.escape(title)}</h2>
-      <p>{html.escape(description)}</p>
-      <span class="dev-note-card__authors" aria-label="{html.escape(author_label(authors), quote=True)}">
-{author_images}
-      </span>
-      <span class="dev-note-card__tags">{html.escape(' / '.join(tags))}</span>
-    </a>
-  </article>"""
+def render_recent_card(post: dict[str, Any]) -> str:
+    relative_url = post["path"].relative_to(DEV_NOTES_DIR).with_suffix("").as_posix() + "/"
+    variant = card_visual_class(post)
+    return f"""    <article class="dev-note-card dev-note-card--recent dev-note-card--{html.escape(variant, quote=True)}">
+      <a class="dev-note-card__link" href="{html.escape(relative_url, quote=True)}">
+{render_card_visual(post)}
+{render_card_copy(post)}
+      </a>
+    </article>"""
 
 
 def render_index_cards(posts: list[dict[str, Any]]) -> str:
     if not posts:
-        body = '  <p class="dev-notes-empty">No Dev Notes yet.</p>'
+        body = '  <p class="dev-notes-empty">The first field note is being prepared.</p>'
     else:
-        body = "\n".join(render_card(post) for post in posts)
+        featured = render_featured_card(posts[0])
+        recent_posts = posts[1:]
+        recent = "\n".join(render_recent_card(post) for post in recent_posts)
+        recent_section = ""
+        if recent:
+            recent_section = f"""
+  <section class="journal-section dev-notes-recent" aria-labelledby="recent-notes-title">
+    <div class="journal-section__head">
+      <h2 id="recent-notes-title">Recent notes</h2>
+      <span>The working archive</span>
+    </div>
+    <div class="dev-notes-recent-list">
+{recent}
+    </div>
+  </section>"""
+        body = f"""  <section class="journal-section dev-notes-featured" aria-labelledby="featured-note-title">
+    <div class="journal-section__head">
+      <h2 id="featured-note-title">Featured note</h2>
+      <span>Latest from the lab</span>
+    </div>
+{featured}
+  </section>{recent_section}"""
     return (
         f"{POSTS_START}\n"
         "<!-- Generated by scripts/render-dev-notes.py; edit posts and authors.json. -->\n"
-        f'<section class="dev-notes-grid" aria-label="Dev Notes posts">\n{body}\n</section>\n'
+        f"{body}\n"
         f"{POSTS_END}"
     )
 
@@ -236,7 +314,7 @@ def replace_between_markers(content: str, start: str, end: str, replacement: str
     pattern = re.compile(re.escape(start) + r".*?" + re.escape(end), re.DOTALL)
     if not pattern.search(content):
         raise ValueError(f"{path} is missing generated section markers {start!r} and {end!r}")
-    return pattern.sub(replacement, content, count=1)
+    return pattern.sub(lambda _: replacement, content, count=1)
 
 
 def update_index(posts: list[dict[str, Any]]) -> None:
@@ -279,7 +357,10 @@ def update_nav(posts: list[dict[str, Any]]) -> None:
 
 def render_byline(post: dict[str, Any]) -> str:
     authors = post["authors"]
-    label = "Author" if len(authors) == 1 else "Authors"
+    metadata = post["metadata"]
+    published = post["published"]
+    categories = require_list(metadata, "categories", post["path"])
+    category = categories[0] if categories else "Research"
     blocks = []
     for author in authors:
         description = author.get("description", "")
@@ -295,9 +376,13 @@ def render_byline(post: dict[str, Any]) -> str:
 
     return f"""{BYLINE_START}
 <!-- Generated by scripts/render-dev-notes.py; edit front matter and authors.json. -->
-<div class="dev-note-byline" aria-labelledby="dev-note-authors">
-  <p class="dev-note-byline__label" id="dev-note-authors">{label}</p>
-  <div class="dev-note-byline__authors">
+<div class="dev-note-byline">
+  <p class="dev-note-byline__label">
+    <span>Field note</span>
+    <time datetime="{published.isoformat()}">{html.escape(format_date(published))}</time>
+    <span>{html.escape(category)}</span>
+  </p>
+  <div class="dev-note-byline__authors" aria-label="{html.escape(author_label(authors), quote=True)}">
 {chr(10).join(blocks)}
   </div>
 </div>
@@ -311,7 +396,7 @@ def update_post_byline(post: dict[str, Any]) -> None:
 
     marker_pattern = re.compile(re.escape(BYLINE_START) + r".*?" + re.escape(BYLINE_END), re.DOTALL)
     if marker_pattern.search(body):
-        updated_body = marker_pattern.sub(byline, body, count=1)
+        updated_body = marker_pattern.sub(lambda _: byline, body, count=1)
     else:
         heading = re.search(r"(?m)^# .+\n", body)
         if not heading:

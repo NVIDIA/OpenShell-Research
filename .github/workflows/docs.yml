@@ -11,8 +11,27 @@ permissions:
   contents: read
 
 jobs:
+  renderer-tests:
+    name: Test Dev Notes renderer (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run renderer tests
+        run: python -m unittest discover -s tests
+
   validate:
     name: Validate documentation
+    needs: renderer-tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,6 +49,9 @@ jobs:
 
       - name: Build documentation
         run: scripts/build-docs.sh
+
+      - name: Verify generated documentation is committed
+        run: git diff --exit-code -- docs/dev-notes zensical.toml
 
   deploy:
     name: Deploy documentation

@@ -1,17 +1,11 @@
 [project]
 site_name = "OpenShell Research"
-site_description = "Research engineering notes and applications built on the OpenShell runtime."
+site_description = "Research engineering Dev Notes and software documentation from the OpenShell team."
 site_author = "OpenShell Research Engineering"
 docs_dir = "docs"
 site_dir = "site"
 extra_css = ["stylesheets/dev-notes.css"]
 nav = [
-  {"Home" = "index.md"},
-  {"Research Engineering" = [
-    "research/index.md",
-    "research/runtime.md",
-    "research/applications.md"
-  ]},
   {"Dev Notes" = [
     "dev-notes/index.md",
     {"Posts" = [
@@ -20,8 +14,12 @@ nav = [
       {"Bootstrapping OpenShell Research" = "dev-notes/posts/2026-06-04-bootstrapping-openshell-research.md"}
       # dev-notes:nav:end
     ]}
-  ]}
+  ]},
+  {"Documentation" = "documentation/index.md"}
 ]
+
+[project.extra]
+homepage = "."
 
 [project.theme]
 favicon = "assets/brand/favicon.svg"

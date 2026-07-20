@@ -46,8 +46,10 @@ explicit `url` or `avatar` fields when needed.
 Each Dev Note post needs `title`, `date`, `description`, and at least one
 author. The landing card uses `description` as its summary, `categories[0]` as
 the topic after `Dev Note`, and `card_tags` when present; otherwise it falls
-back to `tags`. `card_variant` is optional and maps to a CSS modifier such as
-`.dev-note-card--launch`.
+back to `tags`. Dates must use the exact `YYYY-MM-DD` form. `card_variant` is
+optional and maps to both the card and artwork CSS modifiers, such as
+`.dev-note-card--launch` and `.dev-note-card__visual--launch`; add the
+corresponding styles when introducing a new visual variant.
 
 Posts are sorted newest first by ISO `date`, then title. Use dated filenames
 such as `YYYY-MM-DD-short-title.md` so file paths stay stable and readable, but
