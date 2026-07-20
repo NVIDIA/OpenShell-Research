@@ -32,3 +32,4 @@ python -m pip install -r requirements-docs.txt
 
 python scripts/render-dev-notes.py
 zensical build --clean --strict
+REQUIRE_RENDERED_404=1 python tests/test_docs_404.py

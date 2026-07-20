@@ -58,7 +58,9 @@ Verify branded surfaces in both the `default` and `slate` palette schemes. Prefe
 CSS variables in `docs/stylesheets/dev-notes.css` over one-off hard-coded colors.
 Keep asset paths relative to `docs_dir`. Theme templates live in `overrides/`;
 keep the custom `404.html` useful for ordinary missing pages as well as expired
-pull request previews.
+pull request previews. Keep that fallback self-contained: GitHub Pages serves it
+for arbitrary paths where root-relative theme assets do not resolve beneath the
+project site prefix.
 
 ## Validate and preview
 

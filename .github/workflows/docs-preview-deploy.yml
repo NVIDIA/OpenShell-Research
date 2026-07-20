@@ -98,6 +98,7 @@ jobs:
                 'requirements-docs.txt',
                 'scripts/build-docs.sh',
                 'scripts/render-dev-notes.py',
+                'tests/test_docs_404.py',
                 'tests/test_render_dev_notes.py',
                 'zensical.toml',
               ]);
