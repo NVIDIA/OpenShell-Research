@@ -1,20 +1,12 @@
-# Application Skeletons
+---
+title: Application documentation has moved
+hide:
+  - toc
+---
 
-This page will track the starter patterns we use to move research ideas into
-OpenShell applications.
+<meta http-equiv="refresh" content="0; url=../../documentation/">
 
-## Candidate skeletons
+# Application documentation has moved
 
-- Agent workflow demo
-- Research paper companion
-- Evaluation harness
-- Interactive dataset explorer
-- Model capability probe
-
-## Skeleton checklist
-
-- Clear user workflow
-- Minimal runtime integration
-- Reproducible setup
-- Observable behavior
-- Documented limitations
+Application guides and examples now live in
+[Documentation](../documentation/).
