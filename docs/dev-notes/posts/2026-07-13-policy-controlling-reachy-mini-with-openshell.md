@@ -38,11 +38,11 @@ card_tags:
 </div>
 <!-- dev-note:byline:end -->
 
-AI agents can now run for a long time, pursue goals, call tools, learn new skills, write code, and keep working while no one is watching. How do you give autonomy to such a highly capable agent?
+Useful AI agents now run for long periods of time, taking on critical tasks to accomplish goals. They call tools, learn new skills, write code, and keep working while no one is watching. How do you give autonomy to such a highly capable agent?
 
-OpenShell is the secure agent runtime for autonomous agents. It solves this problem by moving the security layer outside the agent. OpenShell runs your agent in a sandbox and sits in the path of everything the agent does. A policy layer, configured separately from the agent, governs what processes the agent can start, which hosts and ports it can reach, which models it can call, and which other services it needs to invoke along its network path.
+OpenShell is the secure runtime for autonomous agents. It solves this problem by moving the security layer outside the agent. OpenShell runs your agent in a sandbox and sits in the path of everything the agent does. A policy layer, configured separately from the agent, governs what processes the agent can start, which hosts and ports it can reach, which models it can call, and which other services it needs to invoke along its network path.
 
-Every OpenShell deployment has different needs, so we made OpenShell extensible. You are not locked into a fixed set of behaviors. You can swap the isolation backend, add your own checks on policy updates, and plug in middleware services that run on traffic as it leaves the sandbox.
+Every OpenShell deployment has different needs, and different agents want different things, so we made OpenShell extensible. You are not locked into a fixed set of behaviors. You can swap the isolation backend, add your own checks on policy updates, and plug in middleware services that run on traffic as it leaves the sandbox.
 
 The combination of autonomous agents and edge devices like robots brings the digital concerns of traditional software deployments into the physical world. Imagine a home assistant robot that is only supposed to clean. It suffers a prompt injection and starts unlocking the doors instead. At the edge, a compromised agent does not just leak data or crash a process. It can let a stranger into your home, or send what it sees and hears somewhere it should never go.
 
@@ -51,7 +51,7 @@ OpenShell makes an autonomous agent safe to run at the edge by solving two probl
 - **Restrict what the device can do.** Deterministic policy decides what the agent can actually make the device do, and it is enforced on the device.
 - **Keep the data private.** Sensitive data stays local, and only approved services ever see it.
 
-We used the HuggingFace Reachy Mini to see what that looks like in practice. We run a small chat application connected to an OpenAI endpoint within the OpenShell runtime, all on the Reachy Mini's onboard Raspberry Pi. We use OpenShell to restrict what actions the model can take. Our next step is to route sensitive data to approved models, but more on that in a follow-up post.
+We used the HuggingFace Reachy Mini to see what that looks like in practice. We run a small chat application connected to an OpenAI endpoint within the OpenShell runtime, all on the Reachy Mini's onboard Raspberry Pi. Running the whole stack on a Raspberry Pi is part of the point: OpenShell holds up on the small, resource-constrained hardware that real edge devices ship with, not just a workstation. We use OpenShell to restrict what actions the model can take. Our next step is to route sensitive data to approved models, but more on that in a follow-up post.
 
 If you just want to try this for yourself, check out our tutorial [here](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/ONBOARD_SETUP.md).
 
@@ -93,10 +93,12 @@ decisions. So we split the work into separate parts, each with one job.
 </figure>
 
 The sandbox starts with deny-by-default policy instead of inheriting everything
-the host can do. When Reachy hits a denied action, the agent gets a clear error
-it can explain out loud, rather than quietly working around it. An operator can
-change the policy without rebuilding the app, and the power to grant new
-authority stays outside the agent.
+the host can do. When OpenShell blocks an action, it returns a natural-language
+message explaining why, along with examples of what is allowed. The agent can
+tell the person what happened and look for a safe way to do the same task,
+instead of quietly working around the limit. An operator can change the policy
+without rebuilding the app, and the power to grant new authority stays outside
+the agent.
 
 ---
 
@@ -247,8 +249,12 @@ enforcing its boundary even if the network drops or the model is unreachable.
 Running the full stack on device is what gives complete isolation and control at
 the edge.
 
-We see this as a pattern for using OpenShell to bring security and trust to
-autonomous edge systems.
+This is a repeatable pattern for edge and robotics. Agents are going to run
+everywhere: in homes, factories, vehicles, and hospitals, with more and more of
+them running side by side and working together. You cannot govern that many
+agents, in that many places, by writing a guardrail into each app. It takes one
+deterministic boundary you can put on any device and trust the same way every
+time. That is the pattern we are building with OpenShell.
 
 Key resources:
 

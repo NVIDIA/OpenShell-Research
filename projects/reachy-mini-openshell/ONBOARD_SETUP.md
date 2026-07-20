@@ -250,7 +250,7 @@ openshell/policy-camera-enabled-motion-disabled.yaml
 openshell/policy-head-motion-enabled.yaml
 ```
 
-Both allow:
+All three allow:
 
 ```text
 GET  /api/daemon/status
@@ -273,7 +273,7 @@ POST /camera/capture
 That camera policy still blocks `POST /api/move/goto`. The base
 `policy-motion-disabled.yaml` blocks both camera capture and motion start.
 
-Neither policy allows `/api/move/set_target`, `/api/motors/**`,
+None of the three policies allow `/api/move/set_target`, `/api/motors/**`,
 `/api/apps/**`, raw movement WebSockets, wake/sleep, or recorded motions.
 
 The permitted binary is `/opt/venv/bin/python`. A denial seen with `curl` could
@@ -728,14 +728,14 @@ definition.
 
 | Symptom | First checks |
 | --- | --- |
-| `docker load` is silent | In another SSH session run `ps -eo pid,etime,stat,%cpu,%mem,cmd | grep '[d]ocker load'`, `df -h /`, and `sudo journalctl -u docker -n 30 --no-pager`. Slow microSD extraction is normal. |
+| `docker load` is silent | In another SSH session run `ps -eo pid,etime,stat,%cpu,%mem,cmd \| grep '[d]ocker load'`, `df -h /`, and `sudo journalctl -u docker -n 30 --no-pager`. Slow microSD extraction is normal. |
 | Sandbox enters `ContainerRestarting` | Inspect the image command. It must be `sleep infinity`; do not append `/bin/true` to `sandbox create`. |
 | `reachy-agent failed to become healthy` | Retry with the 120-second timeout and inspect `/sandbox/logs/reachy-agent.log`. A cold start took about 41 seconds. |
 | Audio URL says `Service endpoint is not available` | Confirm the inner agent is `running`, then recreate or expose `audio` and check `/health`. The target listener must exist before the route is usable. |
 | Audio bridge reports `Name or service not known` | Verify controller version `0.2.0`. It preserves the virtual routing hostname while connecting the socket to `127.0.0.1:17670`. |
 | Reachy says it cannot take a picture | Test `POST http://127.0.0.1:8042/camera/capture`, then test the same path from the sandbox with `/opt/venv/bin/python`. If both work, inspect the model/tool logs and session instructions. |
 | Local wheel install is rejected by `/api/apps/install` | This endpoint does not accept `source_kind: local`; install the wheel into `/venvs/apps_venv` with `/opt/uv/uv pip install`. |
-| Root filesystem is almost full | Run `docker system df` and `sudo du -sh /var/lib/docker /venvs/apps_venv`. Remove transferred archives, obsolete images, failed layers, and old wheel versions—but not the active image or `/venvs/mini_daemon`. |
+| Root filesystem is almost full | Run `docker system df` and `sudo du -sh /var/lib/docker /venvs/apps_venv`. Remove transferred archives, obsolete images, failed layers, and old wheel versions, but not the active image or `/venvs/mini_daemon`. |
 
 ## Development checks
 
