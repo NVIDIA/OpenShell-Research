@@ -6,4 +6,4 @@ The canonical tutorial now lives beside the runnable project:
 
 For the engineering story and reusable edge architecture, read
 [Designing OpenShell for the Edge: Why Policy Has to Live Next to the
-Action](../dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md).
+Action](../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell.md).

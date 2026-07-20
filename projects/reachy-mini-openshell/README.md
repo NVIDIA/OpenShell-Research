@@ -7,7 +7,7 @@ deliberately small REST-controlled action surface.
 > **Building the OpenShell policy demo with a physical Reachy?** Follow the
 > [onboard setup tutorial](ONBOARD_SETUP.md). For the architecture, implementation
 > decisions, and lessons learned, read the
-> [Dev Note](../../docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md).
+> [Dev Note](../../docs/dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell.md).
 
 Commands:
 

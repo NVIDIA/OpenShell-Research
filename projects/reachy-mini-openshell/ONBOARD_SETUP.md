@@ -7,7 +7,7 @@ access; and OpenShell independently allows or denies the REST requests that can
 cause physical actions.
 
 For the implementation story, architecture decisions, and lessons from building
-the demo, read the [Dev Note](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md).
+the demo, read the [Dev Note](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/docs/dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell.md).
 
 The commands alternate between a **development machine** and **Reachy**. Build
 the wheel and ARM64 image on the development machine; install and run the final

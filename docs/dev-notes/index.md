@@ -32,10 +32,10 @@ hide:
       <span>Latest from the team</span>
     </div>
     <article class="dev-note-card dev-note-card--featured dev-note-card--edge-ai">
-      <a class="dev-note-card__link" href="posts/2026-07-13-policy-controlling-reachy-mini-with-openshell/">
+      <a class="dev-note-card__link" href="posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/">
       <div class="dev-note-card__visual dev-note-card__visual--edge-ai" aria-hidden="true">
         <span class="dev-note-card__visual-label">Field note / Edge AI</span>
-        <span class="dev-note-card__visual-index">2026.07.13</span>
+        <span class="dev-note-card__visual-index">2026.07.20</span>
         <span class="dev-note-card__visual-mark">&gt;_</span>
       </div>
       <div class="dev-note-card__copy">

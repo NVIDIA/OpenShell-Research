@@ -8,7 +8,7 @@ physical effects on Reachy Mini.
 ## Start here
 
 Read **[Designing OpenShell for the Edge: Why Policy Has to Live Next to the
-Action](../../dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md)**
+Action](../../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell.md)**
 for the reusable edge architecture, implementation decisions, challenges, and
 demo result.
 
@@ -36,7 +36,7 @@ The tutorial progressively adds:
 
 ## Project resources
 
-- [Implementation Dev Note](../../dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md)
+- [Implementation Dev Note](../../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell.md)
 - [Onboard setup and troubleshooting tutorial](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/ONBOARD_SETUP.md)
 - [Application source and README](https://github.com/NVIDIA/OpenShell-Research/tree/kirit93/reachy-implementation/projects/reachy-mini-openshell)
 - [Motion-disabled policy](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/openshell/policy-motion-disabled.yaml)

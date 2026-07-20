@@ -42,6 +42,8 @@ card_tags:
 </div>
 <!-- dev-note:byline:end -->
 
+![Bringing Privacy and Security to the Edge with OpenShell: a stylized Reachy Mini robot with two green camera eyes inside an OpenShell boundary ring.](../../assets/reachy-mini-openshell/hero.svg)
+
 Useful AI agents now run for long periods of time, taking on critical tasks to accomplish goals. They call tools, learn new skills, write code, and keep working while no one is watching. How do you give autonomy to such a highly capable agent?
 
 OpenShell is the secure runtime for autonomous agents. It solves this problem by moving the security layer outside the agent. OpenShell runs your agent in a sandbox and sits in the path of everything the agent does. A policy layer, configured separately from the agent, governs what processes the agent can start, which hosts and ports it can reach, which models it can call, and which other services it needs to invoke along its network path.
