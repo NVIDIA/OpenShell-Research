@@ -1,0 +1,101 @@
+name: Docs preview build
+
+"on":
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - closed
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: docs-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect documentation changes
+    runs-on: ubuntu-latest
+    outputs:
+      operation: ${{ steps.operation.outputs.operation }}
+    steps:
+      - name: Choose preview operation
+        id: operation
+        uses: actions/github-script@v8
+        with:
+          script: |
+            if (context.payload.action === 'closed') {
+              core.setOutput('operation', 'remove');
+              return;
+            }
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const exactInputs = new Set([
+              '.github/workflows/docs.yml',
+              '.github/workflows/docs-preview.yml',
+              '.github/workflows/docs-preview-deploy.yml',
+              'requirements-docs.txt',
+              'scripts/build-docs.sh',
+              'scripts/render-dev-notes.py',
+              'tests/test_render_dev_notes.py',
+              'zensical.toml',
+            ]);
+            const docsChanged = files.some(
+              ({ filename }) => filename.startsWith('docs/') || exactInputs.has(filename),
+            );
+            core.setOutput('operation', docsChanged ? 'deploy' : 'remove');
+
+  build:
+    name: Build documentation preview
+    needs: changes
+    if: needs.changes.outputs.operation == 'deploy'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
+      - name: Build documentation
+        run: scripts/build-docs.sh
+
+      - name: Upload preview request
+        uses: actions/upload-artifact@v7
+        with:
+          name: docs-preview-${{ github.event.pull_request.number }}-deploy
+          path: site
+          if-no-files-found: error
+          retention-days: 1
+
+  remove:
+    name: Request preview removal
+    needs: changes
+    if: needs.changes.outputs.operation == 'remove'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create removal request
+        run: mkdir preview-removal && touch preview-removal/remove
+
+      - name: Upload removal request
+        uses: actions/upload-artifact@v7
+        with:
+          name: docs-preview-${{ github.event.pull_request.number }}-remove
+          path: preview-removal
+          if-no-files-found: error
+          retention-days: 1
