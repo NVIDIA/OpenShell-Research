@@ -1,68 +1,39 @@
-# Repository Instructions
+# OpenShell Research
 
-## Brand Assets
+## Purpose
 
-OpenShell documentation brand assets live in `docs/assets/brand/`. Use the SVG
-assets for site UI and authored docs because they stay crisp in the header,
-high-density displays, and generated static pages. The header uses the compact
-mark through `project.theme.logo`, the browser tab uses `favicon.svg`, the
-regular horizontal lockup is best on light page surfaces, and the reversed
-horizontal lockup is best on dark hero or announcement surfaces.
+This repository contains research engineering projects, Dev Notes, and durable
+documentation for work that uses OpenShell as its runtime.
 
-The docs theme supports system-aware light and dark modes through
-`project.theme.palette` entries in `zensical.toml`. When adding branded page
-surfaces, verify both `default` and `slate` schemes and prefer CSS variables in
-`docs/stylesheets/dev-notes.css` over one-off hard-coded colors.
+## Work routing
 
-Do not reference local files from `~/Downloads` in documentation content or
-theme config. Copy intentionally selected assets into `docs/assets/brand/` and
-keep paths relative to `docs_dir` so Zensical can copy them into the generated
-site.
+- Put self-contained implementations and experiments in `projects/<name>/`.
+- Put durable user-facing guides and references in `docs/documentation/`.
+- Put Dev Notes (human-written technical notes) `docs/dev-notes/`.
+- Put agent-facing repository maintenance workflows in `docs/development/`.
 
-## Static Site Development
+Before changing a project, read that project's `README.md` and `pyproject.toml`;
+projects are self-contained and may have different platforms, dependencies, and
+validation commands. Before changing anything under `docs/` or `zensical.toml`,
+read `docs/development/index.md`.
 
-When developing the static documentation site associated with this repository,
-serve the generated site locally so the user can view it. Print the URL and the
-directory or command being served before finishing.
+## Repository rules
 
-## Dev Notes
+- Make the smallest change that satisfies the task and preserve unrelated work.
+- Use `uv` and the committed `uv.lock` within Python projects. Do not hand-edit
+  generated dependency exports such as `requirements.txt`.
+- Never commit credentials or populated `.env` files. Document configuration in
+  `.env.example`.
+- Do not hand-edit generated Dev Notes cards, bylines, or navigation; use
+  `python3 scripts/render-dev-notes.py`.
+- When adding a project or workflow with distinct conventions, add a nested
+  `AGENTS.md` in that directory instead of expanding this root file.
 
-Dev Notes are implemented as plain Markdown posts under
-`docs/dev-notes/posts/`, but the listing cards, visible author bylines, and
-`zensical.toml` navigation entries are generated. Do not hand-edit content
-inside these marker pairs:
+## Validation
 
-- `<!-- dev-notes:posts:start -->` / `<!-- dev-notes:posts:end -->` in
-  `docs/dev-notes/index.md`
-- `<!-- dev-note:byline:start -->` / `<!-- dev-note:byline:end -->` in each
-  Dev Note post
-- `# dev-notes:nav:start` / `# dev-notes:nav:end` in `zensical.toml`
-
-Author records live in `docs/dev-notes/authors.json`. A post's `authors` front
-matter must reference IDs from that file. The renderer derives GitHub profile
-links and avatar URLs from the `github` field, but an author can also provide
-explicit `url` or `avatar` fields when needed.
-
-Each Dev Note post needs `title`, `date`, `description`, and at least one
-author. The landing card uses `description` as its summary, `categories[0]` as
-the topic after `Dev Note`, and `card_tags` when present; otherwise it falls
-back to `tags`. Dates must use the exact `YYYY-MM-DD` form. `card_variant` is
-optional and maps to both the card and artwork CSS modifiers, such as
-`.dev-note-card--launch` and `.dev-note-card__visual--launch`; add the
-corresponding styles when introducing a new visual variant.
-
-Posts are sorted newest first by ISO `date`, then title. Use dated filenames
-such as `YYYY-MM-DD-short-title.md` so file paths stay stable and readable, but
-the generated ordering comes from front matter rather than filenames.
-
-After editing Dev Note posts, author metadata, or the Dev Notes nav markers,
-run:
-
-```sh
-python scripts/render-dev-notes.py
-zensical build --clean --strict
-```
-
-The repository build script already runs `scripts/render-dev-notes.py` before
-the Zensical build, so CI should catch unknown author IDs, missing required post
-metadata, invalid dates, or invalid `card_variant` values.
+- For project changes, run the checks documented by that project's README from
+  the project directory.
+- For documentation changes, run `python3 tests/test_render_dev_notes.py` and
+  `scripts/build-docs.sh`, then serve the generated site as described in
+  `docs/development/index.md`.
+- Report the checks run and any checks that could not be completed.

@@ -1,79 +1,21 @@
-# OpenShell Research
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/openshell-lockup-horizontal-reversed.svg">
+    <img src="docs/assets/brand/openshell-lockup-horizontal.svg" alt="OpenShell Research" width="520">
+  </picture>
+</p>
 
-This repository is the home for OpenShell research engineering work. It is for
-building, documenting, and sharing applications of cutting-edge research that use
-OpenShell as the runtime.
+OpenShell Research is where we build, document, and share research engineering
+work that uses [OpenShell](https://github.com/NVIDIA/OpenShell) as its runtime.
 
-## Repository layout
+## Start with an agent
 
-- `docs/` contains the Zensical documentation source.
-- `docs/assets/brand/` contains the OpenShell logo and favicon assets used by
-  the documentation theme and authored pages.
-- `docs/dev-notes/` contains research engineering updates, release notes, and
-  build logs worth sharing.
-- `docs/dev-notes/authors.json` contains reusable Dev Notes author metadata.
-- `docs/documentation/` contains durable guides and references for packages,
-  libraries, benchmarks, and examples introduced in Dev Notes.
-- `projects/` contains self-contained research projects, including the reusable
-  Python project template and the Reachy Mini conversation demo for OpenShell.
-- `scripts/render-dev-notes.py` renders Dev Notes cards, post bylines, and
-  navigation entries from post front matter.
-- `zensical.toml` configures the documentation site.
-- `requirements-docs.txt` pins the documentation build toolchain.
-- `.github/workflows/docs.yml` validates documentation builds in GitHub Actions
-  and deploys the generated site to GitHub Pages.
+This repository is designed to be explored and developed with a coding agent.
+Open the repository in your agent from the repository root and describe what you
+want to accomplish.
 
-## Documentation workflow
+Try this prompt:
 
-Use Python 3.10 or newer.
-
-To preview the documentation locally:
-
-```sh
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements-docs.txt
-python scripts/render-dev-notes.py
-zensical serve
-```
-
-The local preview runs at <http://localhost:8000>. To run the same clean build
-used by CI:
-
-```sh
-scripts/build-docs.sh
-```
-
-The build script recreates `.venv-docs`, installs `requirements-docs.txt`,
-renders Dev Notes metadata, and runs `zensical build --clean --strict`. The
-generated site is written to `site/`.
-
-GitHub Actions runs the docs workflow for every pull request and `main` push.
-Pull requests validate the generated site without deploying. Pushes to `main`
-and manual workflow dispatches from `main` publish `site/` to GitHub Pages
-after validation passes.
-
-### Dev Notes
-
-Add new posts under `docs/dev-notes/posts/` with a dated filename such as
-`YYYY-MM-DD-short-title.md`. Set `authors` to IDs from
-`docs/dev-notes/authors.json`; add new authors there once, including their
-GitHub handle and description. Dates must use the exact `YYYY-MM-DD` form.
-`card_tags` controls the landing-page taxonomy (falling back to `tags`), and an
-optional `card_variant` selects a matching visual modifier such as `launch`.
-Run `python scripts/render-dev-notes.py` after editing posts or authors so the
-landing-page cards, visible post bylines, and Dev Notes navigation stay in
-sync; CI verifies that generated changes are committed.
-
-### Documentation
-
-Add durable software documentation under `docs/documentation/` when a Dev Note
-introduces a package, library, benchmark, or reusable example. Link the
-documentation back to its originating Dev Note and cover installation, usage,
-reproducibility requirements, and known limitations. Add the new page beneath
-the `Documentation` entry in `zensical.toml`.
-
-## Content model
-
-Use Documentation for durable software knowledge. Use Dev Notes for dated
-experiments, benchmarks, releases, use case examples, and engineering updates.
+> Help me work on `<your goal>`. Orient me to the relevant parts of the
+> repository, explain the smallest useful next step, and verify any changes you
+> make.
