@@ -78,5 +78,17 @@ For documentation-site changes, serve the site before handing the task back:
 ```
 
 Confirm <http://localhost:8000> is reachable and report the URL and command being
-served. Pull requests validate without deploying; pushes and manual workflow runs
-from `main` publish the validated `site/` directory to GitHub Pages.
+served. Pull requests from branches in this repository that change documentation
+inputs publish the built site under `/pr-preview/pr-<number>/` and receive a
+comment linking to that browser-accessible preview. The preview is updated when
+the PR changes and removed when the PR closes or no longer changes documentation.
+Fork and Dependabot pull requests validate with read-only credentials but do not
+publish previews on the production documentation origin.
+
+The `gh-pages` branch stores the composite production site and active previews;
+GitHub Pages remains configured with **GitHub Actions** as its publishing source.
+Pushes and manual workflow runs from `main` update the production site while
+preserving active previews, then deploy the complete branch through the official
+Pages artifact workflow. The first production deployment creates `gh-pages`
+automatically. To roll back to a revision before preview support, leave the Pages
+source set to **GitHub Actions** and rerun the restored documentation workflow.
