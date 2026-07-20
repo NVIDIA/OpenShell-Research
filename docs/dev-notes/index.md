@@ -29,7 +29,7 @@ hide:
   <section class="journal-section dev-notes-featured" aria-labelledby="featured-note-title">
     <div class="journal-section__head">
       <h2 id="featured-note-title">Featured note</h2>
-      <span>Latest from the lab</span>
+      <span>Latest from the team</span>
     </div>
     <article class="dev-note-card dev-note-card--featured dev-note-card--process">
       <a class="dev-note-card__link" href="posts/2026-06-05-making-dev-notes-repeatable/">

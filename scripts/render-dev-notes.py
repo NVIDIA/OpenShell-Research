@@ -298,7 +298,7 @@ def render_index_cards(posts: list[dict[str, Any]]) -> str:
         body = f"""  <section class="journal-section dev-notes-featured" aria-labelledby="featured-note-title">
     <div class="journal-section__head">
       <h2 id="featured-note-title">Featured note</h2>
-      <span>Latest from the lab</span>
+      <span>Latest from the team</span>
     </div>
 {featured}
   </section>{recent_section}"""
