@@ -28,5 +28,11 @@ hide:
         <span>Guides and reference material for packages, libraries, benchmarks, and examples introduced in Dev Notes.</span>
       </span>
     </a>
+    <a class="openshell-home-link" href="projects/">
+      <span class="openshell-home-link__copy">
+        <strong>Projects</strong>
+        <span>Runnable research demos with setup guides, validation commands, and troubleshooting notes, including the Reachy Mini conversation demo.</span>
+      </span>
+    </a>
   </nav>
 </div>

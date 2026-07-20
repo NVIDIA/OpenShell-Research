@@ -1,45 +1,87 @@
-# Operating system files
+# OS and editor noise
 .DS_Store
 Thumbs.db
 Desktop.ini
-
-# Editors and IDEs
-.idea/
-.vscode/
-*.code-workspace
-*.suo
-*.user
 *.swp
 *.swo
 *~
+.idea/
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+*.code-workspace
+*.suo
+*.user
 
-# Local scratch work
-.scratch/
-
-# Environment files and private configuration
+# Secrets and local environment
 .env
 .env.*
 !.env.example
 !.env.sample
 !.env.template
-*.pem
+*.local
 *.key
+*.pem
+*.crt
+*.csr
 *.p12
 *.pfx
 *.jks
 credentials*.json
 secrets*.json
 
-# Logs, temporary files, and local caches
+# Logs
 *.log
-*.pid
-*.seed
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Temporary and cache directories
+.cache/
+.uv-cache/
+.tmp/
+tmp/
+temp/
 *.tmp
 *.temp
 *.bak
-.cache/
-.tmp/
-tmp/
+.scratch/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+.venv-*/
+venv/
+ENV/
+env/
+pip-wheel-metadata/
+*.egg-info/
+.eggs/
+build/
+dist/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ty/
+.pyright/
+.pyre/
+.pytype/
+.hypothesis/
+.tox/
+.nox/
+.dmypy.json
+dmypy.json
+.ipynb_checkpoints/
 
 # Rust
 target/
@@ -47,56 +89,48 @@ target/
 *.profraw
 *.profdata
 
-# Python bytecode and caches
-__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
-.mypy_cache/
-.pyright/
-.ruff_cache/
-.ty/
-.hypothesis/
-.tox/
-.nox/
-.coverage
-.coverage.*
-coverage.xml
-htmlcov/
-
-# Python environments and packaging output
-.venv/
-.venv-*/
-venv/
-env/
-ENV/
-build/
-dist/
-*.egg-info/
-.eggs/
-pip-wheel-metadata/
-
-# TypeScript and Node.js dependencies
+# JavaScript and TypeScript
 node_modules/
+.npm/
 .pnpm-store/
 .yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
 .yarn/install-state.gz
-.npm/
-.eslintcache
+dist/
+build/
+coverage/
+.nyc_output/
 *.tsbuildinfo
-
-# TypeScript and frontend build output
-lib/
-out/
+*.eslintcache
+.vite/
+.turbo/
+.parcel-cache/
+.angular/cache/
 .next/
 .nuxt/
 .svelte-kit/
+.output/
+.vercel/
+.netlify/
+.serverless/
+out/
+lib/
 .astro/
-.parcel-cache/
-.turbo/
-.vite/
-coverage/
 
-# Generated documentation sites
+# Static site and docs output
 public/
 site/
+.docusaurus/
+.vitepress/cache/
+.vitepress/dist/
+
+# Runtime artifacts
+*.pid
+*.seed
+*.pid.lock
+
+# Package artifacts
+*.tgz
+*.tar.gz
+*.zip

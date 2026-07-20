@@ -8,3 +8,4 @@ Current projects:
 
 - `python-project-template`: Minimal, production-ready Python project scaffold
   managed with uv.
+- `reachy-mini-openshell`: Reachy Mini conversation demo for OpenShell.

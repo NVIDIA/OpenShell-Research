@@ -7,6 +7,10 @@ site_dir = "site"
 extra_css = ["stylesheets/dev-notes.css"]
 extra_javascript = ["javascripts/navigation-drawer.js"]
 nav = [
+  {"Projects" = [
+    "projects/index.md",
+    "projects/reachy-mini-openshell.md"
+  ]},
   {"Dev Notes" = [
     "dev-notes/index.md",
     {"Posts" = [

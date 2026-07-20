@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reachy OpenShell</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="ambient"></div>
+    <div class="container">
+      <header class="hero">
+        <div class="pill">Reachy Mini App</div>
+        <h1>Reachy OpenShell</h1>
+        <p class="subtitle">A Reachy Mini conversation demo for OpenShell, starting with OpenAI Realtime.</p>
+      </header>
+
+      <div class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Getting Started</p>
+            <h2>Installation</h2>
+          </div>
+        </div>
+        <p class="muted">Start the Reachy Mini simulator and browser app locally:</p>
+        <pre><code>cp .env.example .env
+export OPENAI_API_KEY=sk-...
+./scripts/start-local.sh</code></pre>
+      </div>
+
+      <div class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Configuration</p>
+            <h2>Provider Configuration</h2>
+          </div>
+        </div>
+        <p class="muted">The default <code>.env.example</code> uses OpenAI Realtime. Configure provider credentials and model routing in <code>.env</code>, then choose microphone or text input in the app UI.</p>
+      </div>
+    </div>
+  </body>
+</html>
