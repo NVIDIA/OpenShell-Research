@@ -43,7 +43,9 @@ card_tags:
 </div>
 <!-- dev-note:byline:end -->
 
-![Bringing Privacy and Security to the Edge with OpenShell: a stylized Reachy Mini robot with two green camera eyes inside an OpenShell boundary ring.](../../assets/reachy-mini-openshell/hero.svg)
+<figure class="dev-note-figure dev-note-figure--hero">
+  <img src="../../assets/reachy-mini-openshell/hero.svg" alt="Bringing Privacy and Security to the Edge with OpenShell: a stylized Reachy Mini robot with two green camera eyes inside an OpenShell boundary ring.">
+</figure>
 
 Useful AI agents now run for long periods of time, taking on critical tasks to accomplish goals. They call tools, learn new skills, write code, and keep working while no one is watching. How do you give autonomy to such a highly capable agent?
 

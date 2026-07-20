@@ -1128,26 +1128,35 @@ body[data-md-color-scheme="slate"] .openshell-home-brand__dark {
 }
 
 /* Dev note diagrams (SVG figures) */
-.dev-note-figure {
+.md-typeset .dev-note-figure {
+  width: 100%;
+  max-width: 100%;
   margin: 1.9rem auto;
   text-align: center;
 }
 
-.dev-note-figure img {
+.md-typeset .dev-note-figure img {
+  display: block;
   width: 100%;
   max-width: 620px;
   height: auto;
+  margin-inline: auto;
   border-radius: 14px;
   border: 1px solid var(--openshell-home-hero-border, rgba(0, 0, 0, 0.08));
   box-shadow: var(--openshell-card-shadow, 0 0.55rem 1.6rem rgba(15, 23, 42, 0.11));
   background: #ffffff;
 }
 
-.dev-note-figure--wide img {
-  max-width: 820px;
+.md-typeset .dev-note-figure--wide img {
+  max-width: 960px;
 }
 
-.dev-note-figure figcaption {
+.md-typeset .dev-note-figure--hero img {
+  max-width: 100%;
+  aspect-ratio: 1200 / 630;
+}
+
+.md-typeset .dev-note-figure figcaption {
   margin: 0.7rem auto 0;
   max-width: 42rem;
   font-size: 0.8rem;
