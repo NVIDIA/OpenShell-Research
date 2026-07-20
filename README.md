@@ -1,9 +1,4 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/brand/openshell-lockup-horizontal-reversed.svg">
-    <img src="docs/assets/brand/openshell-lockup-horizontal.svg" alt="OpenShell Research" width="520">
-  </picture>
-</p>
+# <img src="docs/assets/brand/openshell-mark.svg" alt="" width="42"> OpenShell Research
 
 OpenShell Research is where we build, document, and share research engineering
 work that uses [OpenShell](https://github.com/NVIDIA/OpenShell) as its runtime.
