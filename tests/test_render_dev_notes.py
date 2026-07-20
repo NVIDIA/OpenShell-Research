@@ -23,7 +23,7 @@ def make_post(
     filename: str,
     *,
     date: str = "2026-06-05",
-    title: str = "A field note",
+    title: str = "A Dev Note",
     description: str = "What the experiment taught us.",
     categories: list[str] | None = None,
     tags: list[str] | None = None,
@@ -102,7 +102,7 @@ class CardRenderingTests(unittest.TestCase):
         second = make_post("2026-06-04-second.md", date="2026-06-04", title="Second")
         third = make_post("2026-06-03-third.md", date="2026-06-03", title="Third")
 
-        self.assertIn("first field note", renderer.render_index_cards([]))
+        self.assertIn("first Dev Note", renderer.render_index_cards([]))
         one = renderer.render_index_cards([first])
         self.assertIn("Featured note", one)
         self.assertNotIn("Recent notes", one)
@@ -192,9 +192,9 @@ class MarkerReplacementTests(unittest.TestCase):
             path = Path(directory) / "post.md"
             post = make_post("post.md")
             post["path"] = path
-            post["frontmatter"] = "title: A field note\ndate: 2026-06-05"
+            post["frontmatter"] = "title: A Dev Note\ndate: 2026-06-05"
             post["body"] = (
-                "# A field note\n\n"
+                "# A Dev Note\n\n"
                 f"{renderer.BYLINE_START}\nstale\n{renderer.BYLINE_END}\n\n"
                 "Body.\n"
             )
