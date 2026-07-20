@@ -95,11 +95,18 @@ body {
   height: 3.7rem;
 }
 
-.md-header__inner > [for="__drawer"] {
+.md-header__inner > [for="__drawer"],
+.md-header__inner > .openshell-drawer-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   order: -2;
+}
+
+.openshell-drawer-button:focus-visible {
+  border-radius: 0.2rem;
+  outline: 2px solid var(--openshell-accent);
+  outline-offset: 0.15rem;
 }
 
 .md-header__inner > .md-logo {
@@ -162,11 +169,14 @@ body {
   background: var(--openshell-paper-raised);
   box-shadow: 0 1.2rem 3rem rgba(0, 0, 0, 0.2);
   transform: translateX(calc(-100% - 0.5rem)) !important;
-  transition: transform 200ms ease !important;
+  visibility: hidden;
+  transition: transform 200ms ease, visibility 0s linear 200ms !important;
 }
 
 #__drawer:checked ~ .md-container .md-sidebar--primary {
   transform: translateX(0) !important;
+  visibility: visible;
+  transition-delay: 0s !important;
 }
 
 .md-sidebar--primary .md-sidebar__scrollwrap {
@@ -552,7 +562,7 @@ body:has(.openshell-home-page) .md-footer {
   text-transform: uppercase;
 }
 
-.dev-note-card__meta span + span::before {
+.dev-note-card__meta > * + *::before {
   margin-right: 0.85rem;
   color: var(--openshell-accent-soft);
   content: "/";

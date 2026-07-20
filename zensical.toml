@@ -5,6 +5,7 @@ site_author = "OpenShell Research Engineering"
 docs_dir = "docs"
 site_dir = "site"
 extra_css = ["stylesheets/dev-notes.css"]
+extra_javascript = ["javascripts/navigation-drawer.js"]
 nav = [
   {"Dev Notes" = [
     "dev-notes/index.md",
