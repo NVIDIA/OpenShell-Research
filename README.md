@@ -12,8 +12,10 @@ OpenShell as the runtime.
 - `docs/dev-notes/` contains research engineering updates, release notes, and
   build logs worth sharing.
 - `docs/dev-notes/authors.json` contains reusable Dev Notes author metadata.
+- `docs/documentation/` contains durable guides and references for packages,
+  libraries, benchmarks, and examples introduced in Dev Notes.
 - `projects/` contains self-contained research projects, including the reusable
-  Python template and Reachy Mini conversation demo for OpenShell.
+  Python project template and the Reachy Mini conversation demo for OpenShell.
 - `scripts/render-dev-notes.py` renders Dev Notes cards, post bylines, and
   navigation entries from post front matter.
 - `zensical.toml` configures the documentation site.
@@ -31,6 +33,7 @@ To preview the documentation locally:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements-docs.txt
+python scripts/render-dev-notes.py
 zensical serve
 ```
 
@@ -55,14 +58,22 @@ after validation passes.
 Add new posts under `docs/dev-notes/posts/` with a dated filename such as
 `YYYY-MM-DD-short-title.md`. Set `authors` to IDs from
 `docs/dev-notes/authors.json`; add new authors there once, including their
-GitHub handle and description. Run `python scripts/render-dev-notes.py` after
-editing posts or authors so the landing-page cards, visible post bylines, and
-Dev Notes navigation stay in sync.
+GitHub handle and description. Dates must use the exact `YYYY-MM-DD` form.
+`card_tags` controls the landing-page taxonomy (falling back to `tags`), and an
+optional `card_variant` selects a matching visual modifier such as `launch`.
+Run `python scripts/render-dev-notes.py` after editing posts or authors so the
+landing-page cards, visible post bylines, and Dev Notes navigation stay in
+sync; CI verifies that generated changes are committed.
+
+### Documentation
+
+Add durable software documentation under `docs/documentation/` when a Dev Note
+introduces a package, library, benchmark, or reusable example. Link the
+documentation back to its originating Dev Note and cover installation, usage,
+reproducibility requirements, and known limitations. Add the new page beneath
+the `Documentation` entry in `zensical.toml`.
 
 ## Content model
 
-Use the documentation for durable project knowledge: architecture notes,
-application guides, runtime integration details, and reproducible research
-engineering workflows. Use Dev Notes for dated updates: experiments, milestones,
-benchmarks, release notes, and lessons learned while turning research into OpenShell
-applications.
+Use Documentation for durable software knowledge. Use Dev Notes for dated
+experiments, benchmarks, releases, use case examples, and engineering updates.
