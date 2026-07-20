@@ -1,0 +1,28 @@
+{% extends "main.html" %}
+
+{% block htmltitle %}
+  <title>Page not found - {{ config.site_name }}</title>
+{% endblock %}
+
+{% block content %}
+  <h1>Page not found</h1>
+  <p id="not-found-message">The requested documentation page does not exist.</p>
+  <p>
+    <a id="not-found-home" href="{{ config.extra.homepage | d(nav.homepage.url, true) | url }}">
+      Return to OpenShell Research
+    </a>
+  </p>
+  <script>
+    (() => {
+      const previewPath = window.location.pathname.match(
+        /^(.*\/)pr-preview\/pr-[1-9][0-9]*(?:\/|$)/,
+      );
+      if (previewPath) {
+        document.title = `Preview unavailable - {{ config.site_name }}`;
+        document.getElementById("not-found-message").textContent =
+          "This pull request preview has expired or was removed.";
+        document.getElementById("not-found-home").href = previewPath[1];
+      }
+    })();
+  </script>
+{% endblock %}

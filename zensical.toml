@@ -30,6 +30,7 @@ homepage = "."
 generator = false
 
 [project.theme]
+custom_dir = "overrides"
 favicon = "assets/brand/favicon.svg"
 logo = "assets/brand/openshell-mark.svg"
 features = [

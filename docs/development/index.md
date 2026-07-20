@@ -56,7 +56,9 @@ local Downloads directory.
 
 Verify branded surfaces in both the `default` and `slate` palette schemes. Prefer
 CSS variables in `docs/stylesheets/dev-notes.css` over one-off hard-coded colors.
-Keep asset paths relative to `docs_dir`.
+Keep asset paths relative to `docs_dir`. Theme templates live in `overrides/`;
+keep the custom `404.html` useful for ordinary missing pages as well as expired
+pull request previews.
 
 ## Validate and preview
 
