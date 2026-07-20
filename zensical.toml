@@ -2,6 +2,10 @@
 site_name = "OpenShell Research"
 site_description = "Research engineering Dev Notes and software documentation from the OpenShell team."
 site_author = "OpenShell Research Engineering"
+copyright = """
+<span><span class="openshell-footer-prompt" aria-hidden="true">&gt;_</span> OpenShell Research</span>
+<a href="https://github.com/NVIDIA/OpenShell">OpenShell on GitHub <span aria-hidden="true">↗</span></a>
+"""
 docs_dir = "docs"
 site_dir = "site"
 extra_css = ["stylesheets/dev-notes.css"]
@@ -24,6 +28,7 @@ nav = [
 
 [project.extra]
 homepage = "."
+generator = false
 
 [project.theme]
 favicon = "assets/brand/favicon.svg"

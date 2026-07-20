@@ -100,9 +100,4 @@ hide:
     </div>
   </section>
 <!-- dev-notes:posts:end -->
-
-  <footer class="journal-colophon">
-    <p><span>&gt;_</span> OpenShell Research Engineering Journal</p>
-    <p>2026</p>
-  </footer>
 </div>
