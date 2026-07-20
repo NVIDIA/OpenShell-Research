@@ -47,10 +47,10 @@ Commit any generated changes with the source change.
 
 ## Theme and brand assets
 
-Use SVG assets from `docs/assets/brand/`. Use the compact mark for
-`project.theme.logo`, `favicon.svg` for the browser icon, the regular horizontal
-lockup on light surfaces, and the reversed lockup on dark surfaces. Never
-reference files from a local Downloads directory.
+Keep shared brand assets in `docs/assets/brand/`. Use the compact SVG mark for
+`project.theme.logo`, `favicon.svg` for the browser icon, and the light and dark
+PNG banners for full OpenShell Research lockups. Never reference files from a
+local Downloads directory.
 
 Verify branded surfaces in both the `default` and `slate` palette schemes. Prefer
 CSS variables in `docs/stylesheets/dev-notes.css` over one-off hard-coded colors.

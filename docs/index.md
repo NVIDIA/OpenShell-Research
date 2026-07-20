@@ -8,9 +8,9 @@ hide:
 <div class="openshell-home-page">
   <section class="openshell-home-hero" aria-labelledby="openshell-home-title">
     <div>
-      <h1 id="openshell-home-title">
-        <img src="assets/brand/openshell-mark.svg" alt="" aria-hidden="true">
-        <span>OpenShell Research</span>
+      <h1 id="openshell-home-title" class="openshell-home-brand">
+        <img class="openshell-home-brand__light" src="assets/brand/openshell-research-light.png" alt="OpenShell Research">
+        <img class="openshell-home-brand__dark" src="assets/brand/openshell-research-dark.png" alt="" aria-hidden="true">
       </h1>
     </div>
   </section>

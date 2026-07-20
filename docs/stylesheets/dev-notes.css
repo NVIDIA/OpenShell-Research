@@ -794,22 +794,26 @@ body:has(.openshell-home-page) .md-footer {
 }
 
 .openshell-home-hero h1 {
-  display: flex;
-  align-items: center;
-  gap: clamp(1rem, 2vw, 1.75rem);
-  max-width: none;
+  max-width: 50rem;
   margin: 0;
-  font-family: var(--openshell-serif);
-  font-size: clamp(3.2rem, 7vw, 5.8rem);
-  font-weight: 500;
-  letter-spacing: -0.06em;
-  line-height: 0.92;
 }
 
 .openshell-home-hero h1 img {
-  width: 0.88em;
-  height: 0.88em;
-  flex: 0 0 auto;
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.openshell-home-brand__dark {
+  display: none !important;
+}
+
+body[data-md-color-scheme="slate"] .openshell-home-brand__light {
+  display: none;
+}
+
+body[data-md-color-scheme="slate"] .openshell-home-brand__dark {
+  display: block !important;
 }
 
 .openshell-home-links {
@@ -988,12 +992,6 @@ body:has(.openshell-home-page) .md-footer {
 
   .research-masthead__copy h1 {
     font-size: clamp(3rem, 16vw, 4.25rem);
-  }
-
-  .openshell-home-hero h1 {
-    gap: 0.75rem;
-    font-size: clamp(1.6rem, 7.3vw, 3.25rem);
-    white-space: nowrap;
   }
 
   .journal-section__head {
