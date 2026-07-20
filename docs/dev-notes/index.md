@@ -1,6 +1,6 @@
 ---
 title: Dev Notes
-description: Research field notes, experiments, milestones, and lessons from building OpenShell research applications.
+description: Dev Notes, experiments, milestones, and lessons from building OpenShell research applications.
 hide:
   - toc
 ---
