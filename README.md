@@ -1,4 +1,4 @@
-# <img src="docs/assets/brand/openshell-mark.svg" alt="" width="42"> OpenShell Research
+# <img src="docs/assets/brand/openshell-mark.svg" alt="" width="42" align="middle"> OpenShell Research
 
 OpenShell Research is where we build, document, and share research engineering
 work that uses [OpenShell](https://github.com/NVIDIA/OpenShell) as its runtime.
