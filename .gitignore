@@ -1,6 +1,7 @@
 # OS and editor noise
 .DS_Store
 Thumbs.db
+Desktop.ini
 *.swp
 *.swo
 *~
@@ -8,16 +9,26 @@ Thumbs.db
 .vscode/
 !.vscode/extensions.json
 !.vscode/settings.json
+*.code-workspace
+*.suo
+*.user
 
 # Secrets and local environment
 .env
 .env.*
 !.env.example
+!.env.sample
+!.env.template
 *.local
 *.key
 *.pem
 *.crt
 *.csr
+*.p12
+*.pfx
+*.jks
+credentials*.json
+secrets*.json
 
 # Logs
 *.log
@@ -33,6 +44,10 @@ pnpm-debug.log*
 .tmp/
 tmp/
 temp/
+*.tmp
+*.temp
+*.bak
+.scratch/
 
 # Python
 __pycache__/
@@ -57,6 +72,8 @@ coverage.xml
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.ty/
+.pyright/
 .pyre/
 .pytype/
 .hypothesis/
@@ -69,6 +86,8 @@ dmypy.json
 # Rust
 target/
 **/*.rs.bk
+*.profraw
+*.profdata
 
 # JavaScript and TypeScript
 node_modules/
@@ -96,6 +115,8 @@ coverage/
 .netlify/
 .serverless/
 out/
+lib/
+.astro/
 
 # Static site and docs output
 public/

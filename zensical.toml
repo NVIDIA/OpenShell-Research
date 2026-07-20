@@ -1,34 +1,35 @@
 [project]
 site_name = "OpenShell Research"
-site_description = "Research engineering notes and applications built on the OpenShell runtime."
+site_description = "Research engineering Dev Notes and software documentation from the OpenShell team."
 site_author = "OpenShell Research Engineering"
+copyright = """
+<span><span class="openshell-footer-prompt" aria-hidden="true">&gt;_</span> OpenShell Research</span>
+<a href="https://github.com/NVIDIA/OpenShell">OpenShell on GitHub <span aria-hidden="true">↗</span></a>
+"""
 docs_dir = "docs"
 site_dir = "site"
 extra_css = ["stylesheets/dev-notes.css"]
+extra_javascript = ["javascripts/navigation-drawer.js"]
 nav = [
-  {"Home" = "index.md"},
-  {"Research Engineering" = [
-    "research/index.md",
-    "research/runtime.md",
-    "research/applications.md"
-  ]},
-  {"Projects" = [
-    "projects/index.md",
-    {"Reachy Mini + OpenShell" = [
-      "projects/reachy-mini-openshell/index.md"
-    ]}
-  ]},
   {"Dev Notes" = [
     "dev-notes/index.md",
     {"Posts" = [
       # dev-notes:nav:start
-      {"Designing OpenShell for the Edge: Why Policy Has to Live Next to the Action" = "dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md"},
+      {"Bringing Privacy and Security to the Edge with OpenShell" = "dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md"},
       {"Making Dev Notes Repeatable" = "dev-notes/posts/2026-06-05-making-dev-notes-repeatable.md"},
       {"Bootstrapping OpenShell Research" = "dev-notes/posts/2026-06-04-bootstrapping-openshell-research.md"}
       # dev-notes:nav:end
     ]}
+  ]},
+  {"Documentation" = [
+    "documentation/index.md",
+    {"Reachy Mini Conversation Demo" = "documentation/reachy-mini-openshell.md"}
   ]}
 ]
+
+[project.extra]
+homepage = "."
+generator = false
 
 [project.theme]
 favicon = "assets/brand/favicon.svg"
