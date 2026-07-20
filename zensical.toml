@@ -15,9 +15,7 @@ nav = [
     "dev-notes/index.md",
     {"Posts" = [
       # dev-notes:nav:start
-      {"Bringing Privacy and Security to the Edge with OpenShell" = "dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell.md"},
-      {"Making Dev Notes Repeatable" = "dev-notes/posts/2026-06-05-making-dev-notes-repeatable.md"},
-      {"Bootstrapping OpenShell Research" = "dev-notes/posts/2026-06-04-bootstrapping-openshell-research.md"}
+      {"Bringing Privacy and Security to the Edge with OpenShell" = "dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell.md"}
       # dev-notes:nav:end
     ]}
   ]},

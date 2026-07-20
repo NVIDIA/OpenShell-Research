@@ -31,16 +31,14 @@ hide:
       <h2 id="featured-note-title">Featured note</h2>
       <span>Latest from the team</span>
     </div>
-    <article class="dev-note-card dev-note-card--featured dev-note-card--edge-ai">
+    <article class="dev-note-card dev-note-card--featured dev-note-card--edge-ai dev-note-card--has-image">
       <a class="dev-note-card__link" href="posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/">
-      <div class="dev-note-card__visual dev-note-card__visual--edge-ai" aria-hidden="true">
-        <span class="dev-note-card__visual-label">Field note / Edge AI</span>
-        <span class="dev-note-card__visual-index">2026.07.20</span>
-        <span class="dev-note-card__visual-mark">&gt;_</span>
+      <div class="dev-note-card__visual dev-note-card__visual--edge-ai dev-note-card__visual--image" aria-hidden="true">
+        <img class="dev-note-card__visual-image" src="../assets/reachy-mini-openshell/hero.svg" alt="" loading="eager" fetchpriority="high">
       </div>
       <div class="dev-note-card__copy">
         <div class="dev-note-card__meta">
-          <time datetime="2026-07-13">July 13, 2026</time>
+          <time datetime="2026-07-20">July 20, 2026</time>
           <span>Edge AI</span>
         </div>
         <h3>Bringing Privacy and Security to the Edge with OpenShell</h3>
@@ -60,73 +58,6 @@ hide:
       </div>
       </a>
     </article>
-  </section>
-  <section class="journal-section dev-notes-recent" aria-labelledby="recent-notes-title">
-    <div class="journal-section__head">
-      <h2 id="recent-notes-title">Recent notes</h2>
-      <span>The working archive</span>
-    </div>
-    <div class="dev-notes-recent-list">
-    <article class="dev-note-card dev-note-card--recent dev-note-card--process">
-      <a class="dev-note-card__link" href="posts/2026-06-05-making-dev-notes-repeatable/">
-      <div class="dev-note-card__visual dev-note-card__visual--process" aria-hidden="true">
-        <span class="dev-note-card__visual-label">Field note / Process</span>
-        <span class="dev-note-card__visual-index">2026.06.05</span>
-        <span class="dev-note-card__visual-mark">&gt;_</span>
-      </div>
-      <div class="dev-note-card__copy">
-        <div class="dev-note-card__meta">
-          <time datetime="2026-06-05">June 5, 2026</time>
-          <span>Process</span>
-        </div>
-        <h3>Making Dev Notes Repeatable</h3>
-        <p class="dev-note-card__summary">A repeatable author and post workflow keeps Dev Notes easy to extend as the research log grows.</p>
-        <div class="dev-note-card__tags" aria-label="Tags">
-          <span>dev-notes</span>
-          <span>authors</span>
-          <span>workflow</span>
-        </div>
-        <div class="dev-note-card__footer">
-        <span class="dev-note-card__authors" aria-label="Author: Kirit Thadaka">
-          <img src="https://github.com/kirit93.png?size=64" alt="" loading="lazy">
-          <span class="dev-note-card__author-names">Kirit Thadaka</span>
-        </span>
-          <span class="dev-note-card__read">Read note</span>
-        </div>
-      </div>
-      </a>
-    </article>
-    <article class="dev-note-card dev-note-card--recent dev-note-card--launch">
-      <a class="dev-note-card__link" href="posts/2026-06-04-bootstrapping-openshell-research/">
-      <div class="dev-note-card__visual dev-note-card__visual--launch" aria-hidden="true">
-        <span class="dev-note-card__visual-label">Field note / Runtime</span>
-        <span class="dev-note-card__visual-index">2026.06.04</span>
-        <span class="dev-note-card__visual-mark">&gt;_</span>
-      </div>
-      <div class="dev-note-card__copy">
-        <div class="dev-note-card__meta">
-          <time datetime="2026-06-04">June 4, 2026</time>
-          <span>Runtime</span>
-        </div>
-        <h3>Bootstrapping OpenShell Research</h3>
-        <p class="dev-note-card__summary">Initial setup for OpenShell Research documentation and Dev Notes.</p>
-        <div class="dev-note-card__tags" aria-label="Tags">
-          <span>openshell</span>
-          <span>docs</span>
-          <span>ci</span>
-        </div>
-        <div class="dev-note-card__footer">
-        <span class="dev-note-card__authors" aria-label="Authors: Johnny Greco and Alex Watson">
-          <img src="https://github.com/johnnygreco.png?size=64" alt="" loading="lazy">
-          <img src="https://github.com/zredlined.png?size=64" alt="" loading="lazy">
-          <span class="dev-note-card__author-names">Johnny Greco and Alex Watson</span>
-        </span>
-          <span class="dev-note-card__read">Read note</span>
-        </div>
-      </div>
-      </a>
-    </article>
-    </div>
   </section>
 <!-- dev-notes:posts:end -->
 </div>

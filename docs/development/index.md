@@ -28,7 +28,9 @@ defined in `docs/dev-notes/authors.json`. Use a dated filename such as
 
 The renderer uses `categories[0]` as the card topic and `card_tags` as its tags,
 falling back to `tags`. An optional `card_variant` must have matching card and
-artwork CSS modifiers in `docs/stylesheets/dev-notes.css`.
+artwork CSS modifiers in `docs/stylesheets/dev-notes.css`. Set `hero_image` to
+an image path relative to the post when its card should use the post's hero
+instead of generated artwork. Hero images must live under `docs/`.
 
 Do not edit content inside these generated marker pairs:
 

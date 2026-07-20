@@ -29,6 +29,7 @@ def make_post(
     tags: list[str] | None = None,
     card_tags: list[str] | None = None,
     variant: str = "",
+    hero_image: str = "",
 ) -> dict[str, object]:
     path = renderer.POSTS_DIR / filename
     metadata: dict[str, object] = {
@@ -42,6 +43,8 @@ def make_post(
         metadata["card_tags"] = card_tags
     if variant:
         metadata["card_variant"] = variant
+    if hero_image:
+        metadata["hero_image"] = hero_image
     return {
         "path": path,
         "metadata": metadata,
@@ -124,6 +127,32 @@ class CardRenderingTests(unittest.TestCase):
         self.assertIn(">preferred<", card)
         self.assertIn(">evaluation<", card)
         self.assertNotIn(">fallback<", card)
+
+    def test_hero_image_replaces_generated_visual(self) -> None:
+        post = make_post(
+            "2026-06-05-note.md",
+            hero_image="../../assets/reachy-mini-openshell/hero.svg",
+        )
+
+        featured = renderer.render_featured_card(post)
+        self.assertIn("dev-note-card--has-image", featured)
+        self.assertIn("dev-note-card__visual--image", featured)
+        self.assertIn('src="../assets/reachy-mini-openshell/hero.svg"', featured)
+        self.assertIn('loading="eager" fetchpriority="high"', featured)
+        self.assertNotIn("dev-note-card__visual-label", featured)
+
+        recent = renderer.render_recent_card(post)
+        self.assertIn('loading="lazy"', recent)
+        self.assertNotIn("fetchpriority", recent)
+
+    def test_hero_image_must_exist_inside_docs(self) -> None:
+        outside = make_post("2026-06-05-note.md", hero_image="../../../../outside.svg")
+        with self.assertRaisesRegex(ValueError, "must stay inside"):
+            renderer.render_featured_card(outside)
+
+        missing = make_post("2026-06-05-note.md", hero_image="../../assets/missing.svg")
+        with self.assertRaisesRegex(ValueError, "does not exist"):
+            renderer.render_featured_card(missing)
 
     def test_metadata_is_html_escaped(self) -> None:
         post = make_post(
