@@ -615,7 +615,9 @@ PNG banners for full OpenShell Research lockups. Never reference files from a
 local Downloads directory.</p>
 <p>Verify branded surfaces in both the <code>default</code> and <code>slate</code> palette schemes. Prefer
 CSS variables in <code>docs/stylesheets/dev-notes.css</code> over one-off hard-coded colors.
-Keep asset paths relative to <code>docs_dir</code>.</p>
+Keep asset paths relative to <code>docs_dir</code>. Theme templates live in <code>overrides/</code>;
+keep the custom <code>404.html</code> useful for ordinary missing pages as well as expired
+pull request previews.</p>
 <h2 id="validate-and-preview">Validate and preview<a class="headerlink" href="#validate-and-preview" title="Permanent link">&para;</a></h2>
 <p>Run the renderer tests and the same clean build used by CI:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python3<span class="w"> </span>tests/test_render_dev_notes.py

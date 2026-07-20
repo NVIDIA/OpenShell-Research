@@ -22,10 +22,8 @@
       <meta name="generator" content="zensical-0.0.44">
     
     
-      
-        <title>OpenShell Research</title>
-      
-    
+  <title>Page not found - OpenShell Research</title>
+
     
       
         
@@ -509,7 +507,26 @@
               
               <article class="md-content__inner md-typeset">
                 
-  <h1>404 - Not found</h1>
+  <h1>Page not found</h1>
+  <p id="not-found-message">The requested documentation page does not exist.</p>
+  <p>
+    <a id="not-found-home" href="/">
+      Return to OpenShell Research
+    </a>
+  </p>
+  <script>
+    (() => {
+      const previewPath = window.location.pathname.match(
+        /^(.*\/)pr-preview\/pr-[1-9][0-9]*(?:\/|$)/,
+      );
+      if (previewPath) {
+        document.title = `Preview unavailable - OpenShell Research`;
+        document.getElementById("not-found-message").textContent =
+          "This pull request preview has expired or was removed.";
+        document.getElementById("not-found-home").href = previewPath[1];
+      }
+    })();
+  </script>
 
               </article>
             </div>
