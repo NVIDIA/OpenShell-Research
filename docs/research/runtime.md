@@ -9,4 +9,4 @@ hide:
 # Runtime documentation has moved
 
 Runtime guides and reference material now live in
-[Documentation](../../documentation/).
+[Documentation](../documentation/).

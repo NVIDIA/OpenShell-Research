@@ -47,6 +47,9 @@ jobs:
       - name: Check Dev Notes renderer syntax
         run: python -m py_compile scripts/render-dev-notes.py
 
+      - name: Check navigation JavaScript syntax
+        run: node --check docs/javascripts/navigation-drawer.js
+
       - name: Build documentation
         run: scripts/build-docs.sh
 

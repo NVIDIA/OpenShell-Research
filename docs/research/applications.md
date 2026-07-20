@@ -9,4 +9,4 @@ hide:
 # Application documentation has moved
 
 Application guides and examples now live in
-[Documentation](../../documentation/).
+[Documentation](../documentation/).

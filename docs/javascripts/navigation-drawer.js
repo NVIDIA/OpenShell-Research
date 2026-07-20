@@ -32,9 +32,31 @@
     }
 
     sidebar.id = "primary-navigation";
+    sidebar.setAttribute("role", "dialog");
+    sidebar.setAttribute("aria-label", "Primary navigation");
     button.setAttribute("aria-controls", sidebar.id);
 
     let returnFocus = button;
+    const backgroundElements = new Map();
+
+    const rememberBackgroundElement = (element) => {
+      if (element instanceof HTMLElement && element !== button && element !== sidebar) {
+        backgroundElements.set(element, element.inert);
+      }
+    };
+
+    Array.from(button.parentElement?.children ?? []).forEach(rememberBackgroundElement);
+    Array.from(sidebar.parentElement?.children ?? []).forEach(rememberBackgroundElement);
+    document
+      .querySelectorAll('[data-md-component="skip"], [data-md-component="announce"]')
+      .forEach(rememberBackgroundElement);
+
+    const container = document.querySelector(".md-container");
+    if (container instanceof HTMLElement) {
+      Array.from(container.children)
+        .filter((element) => !element.contains(sidebar))
+        .forEach(rememberBackgroundElement);
+    }
 
     const focusableElements = () =>
       Array.from(
@@ -48,7 +70,15 @@
       button.setAttribute("aria-expanded", String(isOpen));
       button.setAttribute("aria-label", isOpen ? "Close navigation" : "Open navigation");
       sidebar.setAttribute("aria-hidden", String(!isOpen));
+      if (isOpen) {
+        sidebar.setAttribute("aria-modal", "true");
+      } else {
+        sidebar.removeAttribute("aria-modal");
+      }
       sidebar.inert = !isOpen;
+      backgroundElements.forEach((wasInert, element) => {
+        element.inert = isOpen || wasInert;
+      });
 
       if (isOpen && moveFocus) {
         focusableElements()[0]?.focus();
@@ -123,6 +153,9 @@
       overlay?.removeEventListener("click", onOverlayClick);
       sidebar.removeEventListener("click", onSidebarClick);
       document.removeEventListener("keydown", onKeyDown);
+      backgroundElements.forEach((wasInert, element) => {
+        element.inert = wasInert;
+      });
     };
   }
 
