@@ -50,7 +50,8 @@ jobs:
               'zensical.toml',
             ]);
             const docsChanged = files.some(
-              ({ filename }) => filename.startsWith('docs/') || exactInputs.has(filename),
+              ({ filename }) => filename.startsWith('docs/') ||
+                filename.startsWith('overrides/') || exactInputs.has(filename),
             );
             core.setOutput('operation', docsChanged ? 'deploy' : 'remove');
 
