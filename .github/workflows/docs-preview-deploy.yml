@@ -152,6 +152,12 @@ jobs:
             core.setOutput('number', String(request.number));
             core.setOutput('operation', operation);
 
+      - name: Checkout deployment tooling context
+        if: steps.request.outputs.operation != 'none'
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
       - name: Download preview site
         if: steps.request.outputs.operation == 'deploy'
         uses: actions/download-artifact@v8
@@ -165,12 +171,6 @@ jobs:
       - name: Create empty removal directory
         if: steps.request.outputs.operation == 'remove'
         run: mkdir preview-site
-
-      - name: Checkout deployment tooling context
-        if: steps.request.outputs.operation != 'none'
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
 
       - name: Update composite Pages branch
         if: steps.request.outputs.operation != 'none'
