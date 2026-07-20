@@ -479,6 +479,19 @@ body:has(.openshell-home-page) .md-path {
   border-bottom: 1px solid var(--openshell-rule);
 }
 
+.dev-note-card--featured.dev-note-card--has-image .dev-note-card__link {
+  grid-template-columns: 1fr;
+}
+
+.dev-note-card--featured.dev-note-card--has-image .dev-note-card__visual {
+  min-height: 0;
+  aspect-ratio: 1200 / 630;
+}
+
+.dev-note-card--featured.dev-note-card--has-image .dev-note-card__copy {
+  border-left: 1px solid var(--openshell-rule);
+}
+
 .dev-note-card__visual {
   position: relative;
   display: block;
@@ -523,6 +536,26 @@ body:has(.openshell-home-page) .md-path {
   transform: translate(-50%, -50%) rotate(-31deg);
   transform-origin: center;
   transition: transform 400ms ease;
+}
+
+.dev-note-card__visual--image {
+  background: var(--openshell-paper-deep);
+}
+
+.dev-note-card__visual--image::before,
+.dev-note-card__visual--image::after {
+  display: none;
+}
+
+.dev-note-card__visual-image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transition: transform 300ms ease;
 }
 
 .dev-note-card__visual--runtime,
@@ -701,6 +734,10 @@ body:has(.openshell-home-page) .md-path {
 
 .dev-note-card__link:hover .dev-note-card__visual::after {
   transform: translate(-50%, -50%) rotate(-27deg);
+}
+
+.dev-note-card__link:hover .dev-note-card__visual-image {
+  transform: scale(1.015);
 }
 
 .dev-note-card__link:hover .dev-note-card__read::after {
@@ -1088,4 +1125,41 @@ body[data-md-color-scheme="slate"] .openshell-home-brand__dark {
   html {
     scroll-behavior: auto;
   }
+}
+
+/* Dev note diagrams (SVG figures) */
+.md-typeset .dev-note-figure {
+  width: 100%;
+  max-width: 100%;
+  margin: 1.9rem auto;
+  text-align: center;
+}
+
+.md-typeset .dev-note-figure img {
+  display: block;
+  width: 100%;
+  max-width: 620px;
+  height: auto;
+  margin-inline: auto;
+  border-radius: 14px;
+  border: 1px solid var(--openshell-home-hero-border, rgba(0, 0, 0, 0.08));
+  box-shadow: var(--openshell-card-shadow, 0 0.55rem 1.6rem rgba(15, 23, 42, 0.11));
+  background: #ffffff;
+}
+
+.md-typeset .dev-note-figure--wide img {
+  max-width: 960px;
+}
+
+.md-typeset .dev-note-figure--hero img {
+  max-width: 100%;
+  aspect-ratio: 1200 / 630;
+}
+
+.md-typeset .dev-note-figure figcaption {
+  margin: 0.7rem auto 0;
+  max-width: 42rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--md-default-fg-color--light);
 }

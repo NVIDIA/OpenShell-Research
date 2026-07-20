@@ -572,3 +572,4 @@ class TestNotificationQueue:
         n = manager._notification_queue.get_nowait()
         assert n.status == ToolState.FAILED
         assert "RuntimeError: oops" in (n.error or "")
+        assert n.result == {"error": "RuntimeError: oops"}

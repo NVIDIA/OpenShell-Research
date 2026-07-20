@@ -59,6 +59,28 @@ except Exception:
 PY
 }
 
+daemon_camera_available() {
+  "${PROJECT_DIR}/.venv/bin/python" - "$DAEMON_HOST" "$DAEMON_PORT" <<'PY' >/dev/null 2>&1
+import json
+import sys
+import urllib.request
+
+host, port = sys.argv[1], sys.argv[2]
+try:
+    with urllib.request.urlopen(f"http://{host}:{port}/api/daemon/status", timeout=1.5) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    available = (
+        response.status == 200
+        and payload.get("state") == "running"
+        and not payload.get("no_media", False)
+        and not payload.get("media_released", False)
+    )
+    raise SystemExit(0 if available else 1)
+except Exception:
+    raise SystemExit(1)
+PY
+}
+
 pick_app_port() {
   if [[ -n "${APP_PORT}" ]]; then
     "${PROJECT_DIR}/.venv/bin/python" - "$APP_HOST" "$APP_PORT" <<'PY'
@@ -159,4 +181,11 @@ export GRADIO_SERVER_PORT="${SELECTED_APP_PORT}"
 
 log "Starting Reachy conversation app"
 log "Open: http://${APP_HOST}:${SELECTED_APP_PORT}/"
-"${PROJECT_DIR}/.venv/bin/python" -m reachy_mini_conversation_app --gradio --no-camera "$@"
+APP_ARGS=(--gradio)
+if daemon_camera_available; then
+  log "Reachy media is available; enabling the camera tool"
+else
+  log "Reachy media is unavailable; disabling camera support"
+  APP_ARGS+=(--no-camera)
+fi
+"${PROJECT_DIR}/.venv/bin/python" -m reachy_mini_conversation_app "${APP_ARGS[@]}" "$@"

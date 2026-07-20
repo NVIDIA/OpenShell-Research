@@ -1,10 +1,13 @@
+from __future__ import annotations
 import logging
 import argparse
 import warnings
-from typing import Any, Tuple, Optional
+from typing import TYPE_CHECKING, Any, Tuple, Optional
 
-from reachy_mini import ReachyMini
-from reachy_mini_conversation_app.camera_worker import CameraWorker
+
+if TYPE_CHECKING:
+    from reachy_mini import ReachyMini
+    from reachy_mini_conversation_app.camera_worker import CameraWorker
 
 
 def parse_args() -> Tuple[argparse.Namespace, list]:
@@ -26,6 +29,18 @@ def parse_args() -> Tuple[argparse.Namespace, list]:
     parser.add_argument("--gradio", default=False, action="store_true", help="Open gradio interface")
     parser.add_argument("--debug", default=False, action="store_true", help="Enable debug logging")
     parser.add_argument(
+        "--model-logs",
+        default=False,
+        action="store_true",
+        help="Log only focused model selection, sanitized requests, and token usage at INFO level",
+    )
+    parser.add_argument(
+        "--tool-transport",
+        choices=["local", "rest"],
+        default=None,
+        help="Execute Reachy tools locally or through the daemon REST API (default: REACHY_TOOL_TRANSPORT)",
+    )
+    parser.add_argument(
         "--robot-name",
         type=str,
         default=None,
@@ -45,6 +60,8 @@ def handle_vision_stuff(args: argparse.Namespace, current_robot: ReachyMini) -> 
     vision_manager = None
 
     if not args.no_camera:
+        from reachy_mini_conversation_app.camera_worker import CameraWorker
+
         # Initialize head tracker if specified
         if args.head_tracker is not None:
             if args.head_tracker == "yolo":

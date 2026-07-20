@@ -4,8 +4,10 @@ import base64
 import random
 import asyncio
 import logging
-from typing import Any, Final, Tuple, Optional, cast
+from typing import Any, Final, Tuple, Callable, Optional, cast
+from pathlib import Path
 from datetime import datetime
+from collections import deque
 
 import numpy as np
 import gradio as gr
@@ -23,6 +25,7 @@ from reachy_mini_conversation_app.config import (
 )
 from reachy_mini_conversation_app.prompts import get_session_voice, get_session_instructions
 from reachy_mini_conversation_app.audio.pcm import prepare_mono_int16_audio
+from reachy_mini_conversation_app.tool_transport import ToolTransport
 from reachy_mini_conversation_app.backend_runtime import (
     selected_backend,
     backend_config_error,
@@ -35,7 +38,7 @@ from reachy_mini_conversation_app.audio.mic_phrase import (
 )
 from reachy_mini_conversation_app.tools.core_tools import (
     ToolDependencies,
-    get_tool_specs,
+    get_tool_specs_for_dependencies,
 )
 from reachy_mini_conversation_app.local_stt_backend import LocalSTTBackend
 from reachy_mini_conversation_app.realtime_backends import (
@@ -44,6 +47,13 @@ from reachy_mini_conversation_app.realtime_backends import (
     provider_realtime_hint,
     build_realtime_connect_kwargs,
     build_realtime_session_config,
+)
+from reachy_mini_conversation_app.media_result_processor import (
+    MediaSecurityError,
+    ProcessedToolResult,
+    MediaResultProcessor,
+    contains_raw_media,
+    assert_no_raw_media,
 )
 from reachy_mini_conversation_app.tools.background_tool_manager import (
     ToolCallRoutine,
@@ -62,6 +72,65 @@ TEXT_OUTPUT_COST_PER_1M = 16.0
 IMAGE_INPUT_COST_PER_1M = 5.0
 
 _RESPONSE_DONE_TIMEOUT: Final[float] = 30.0
+_TYPED_TOOL_TIMEOUT: Final[float] = 180.0
+_MODEL_IO_MAX_STRING: Final[int] = 8_000
+_MAX_TOOL_IMAGES: Final[int] = 12
+_MODEL_IO_SECRET_FIELDS: Final[frozenset[str]] = frozenset(
+    {
+        "api_key",
+        "authorization",
+        "hf_token",
+        "openai_api_key",
+        "openai_realtime_api_key",
+        "token",
+    }
+)
+
+
+def _encoded_payload_summary(value: str, media_type: str) -> str:
+    """Describe a Base64 payload without writing the payload to logs."""
+    encoded = value.split(",", 1)[1] if "," in value else value
+    padding = len(encoded) - len(encoded.rstrip("="))
+    estimated_bytes = max(0, (len(encoded) * 3 // 4) - padding)
+    return f"<{media_type}: base64_chars={len(encoded)}, estimated_bytes={estimated_bytes}>"
+
+
+def _sanitize_model_io(value: Any, field_name: str = "") -> Any:
+    """Convert model I/O to JSON-safe values while removing secrets and binary blobs."""
+    normalized_field = field_name.lower()
+    if normalized_field in _MODEL_IO_SECRET_FIELDS:
+        return "<redacted>"
+
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        try:
+            value = model_dump(mode="json")
+        except TypeError:
+            value = model_dump()
+
+    if isinstance(value, dict):
+        return {str(key): _sanitize_model_io(item, str(key)) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_model_io(item, field_name) for item in value]
+    if isinstance(value, str):
+        if normalized_field == "image_url" and value.startswith("data:image/"):
+            media_type = value.split(";", 1)[0].removeprefix("data:")
+            return _encoded_payload_summary(value, media_type)
+        if normalized_field in {"audio", "b64_im", "b64_images", "delta"} and len(value) > 128:
+            return _encoded_payload_summary(value, normalized_field)
+        if len(value) > _MODEL_IO_MAX_STRING:
+            omitted = len(value) - _MODEL_IO_MAX_STRING
+            return f"{value[:_MODEL_IO_MAX_STRING]}... <{omitted} characters omitted>"
+        return value
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+
+    return repr(value)
+
+
+def _model_io_json(value: Any) -> str:
+    """Return a compact, redacted JSON representation for debug logs."""
+    return json.dumps(_sanitize_model_io(value), ensure_ascii=False, separators=(",", ":"), default=repr)
 
 
 def _compute_response_cost(usage: Any) -> float:
@@ -82,7 +151,16 @@ def _compute_response_cost(usage: Any) -> float:
 class ConversationStreamHandler(AsyncStreamHandler):
     """Conversation audio/text stream handler for the selected backend."""
 
-    def __init__(self, deps: ToolDependencies, gradio_mode: bool = False, instance_path: Optional[str] = None):
+    def __init__(
+        self,
+        deps: ToolDependencies,
+        gradio_mode: bool = False,
+        instance_path: Optional[str] = None,
+        model_logs: bool = False,
+        tool_transport: ToolTransport | None = None,
+        tool_transport_factory: Callable[[], ToolTransport] | None = None,
+        media_result_processor: MediaResultProcessor | None = None,
+    ):
         """Initialize the handler."""
         backend = selected_backend()
         stream_sample_rate = backend.stream_sample_rate
@@ -93,6 +171,13 @@ class ConversationStreamHandler(AsyncStreamHandler):
         )
 
         self.deps = deps
+        if tool_transport is not None and tool_transport_factory is not None:
+            raise ValueError("Provide tool_transport or tool_transport_factory, not both")
+        self._tool_transport_factory = tool_transport_factory
+        self.tool_transport = tool_transport or (tool_transport_factory() if tool_transport_factory else None)
+        self._tool_specs_cache: list[dict[str, Any]] | None = None
+        self._tool_transport_closed = False
+        self.media_result_processor = media_result_processor
 
         self.output_sample_rate = stream_sample_rate
         self.input_sample_rate = stream_sample_rate
@@ -101,12 +186,19 @@ class ConversationStreamHandler(AsyncStreamHandler):
         self.local_stt_backend: LocalSTTBackend | None = None
         self._realtime_connect_query: dict[str, str] = {}
         self.output_queue: "asyncio.Queue[Tuple[int, NDArray[np.int16]] | AdditionalOutputs]" = asyncio.Queue()
+        self._typed_output_queue: asyncio.Queue[AdditionalOutputs] | None = None
+        self._typed_request_lock: asyncio.Lock = asyncio.Lock()
+        self._typed_tool_calls_awaiting_followup: set[str] = set()
+        self._typed_followup_call_order: deque[str] = deque()
+        self._tool_call_response_ids: set[str] = set()
+        self._chat_response_ids: set[str] = set()
 
         self.last_activity_time = asyncio.get_event_loop().time()
         self.start_time = asyncio.get_event_loop().time()
         self.is_idle_tool_call = False
         self.gradio_mode = gradio_mode
         self.instance_path = instance_path
+        self.model_logs = model_logs
 
         # Debouncing for partial transcripts
         self.partial_transcript_task: asyncio.Task[None] | None = None
@@ -148,7 +240,24 @@ class ConversationStreamHandler(AsyncStreamHandler):
 
     def copy(self) -> "ConversationStreamHandler":
         """Create a copy of the handler."""
-        return ConversationStreamHandler(self.deps, self.gradio_mode, self.instance_path)
+        return ConversationStreamHandler(
+            self.deps,
+            self.gradio_mode,
+            self.instance_path,
+            self.model_logs,
+            tool_transport=self.tool_transport if self._tool_transport_factory is None else None,
+            tool_transport_factory=self._tool_transport_factory,
+            media_result_processor=self.media_result_processor,
+        )
+
+    async def _available_tool_specs(self) -> list[dict[str, Any]]:
+        """Return and cache the schemas advertised by the selected transport."""
+        if self._tool_specs_cache is None:
+            if self.tool_transport is None:
+                self._tool_specs_cache = get_tool_specs_for_dependencies(self.deps)
+            else:
+                self._tool_specs_cache = await self.tool_transport.list_tools()
+        return self._tool_specs_cache
 
     def _record_startup_error(self, message: str) -> None:
         """Store a startup failure so the UI can show a useful error."""
@@ -176,7 +285,7 @@ class ConversationStreamHandler(AsyncStreamHandler):
                 "Then restart the conversation app."
             )
         else:
-            message = f"{error} Add the missing value to .env and restart the conversation app."
+            message = f"{error} Add it to .env or the process environment, then restart the conversation app."
         self._record_startup_error(message)
         logger.error(message)
 
@@ -192,6 +301,8 @@ class ConversationStreamHandler(AsyncStreamHandler):
                 deps=self.deps,
                 tool_manager=self.tool_manager,
                 client_factory=AsyncOpenAI,
+                tool_transport=self.tool_transport,
+                media_result_processor=self.media_result_processor,
             )
         return self.local_stt_backend
 
@@ -358,7 +469,51 @@ class ConversationStreamHandler(AsyncStreamHandler):
         if self._microphone_error_reported:
             return
         self._microphone_error_reported = True
-        await self.output_queue.put(AdditionalOutputs({"role": "assistant", "content": message}))
+        await self._publish_chat_output({"role": "assistant", "content": message})
+
+    async def _publish_chat_output(self, message: dict[str, Any]) -> None:
+        """Publish a chat update to the live stream and any active typed request.
+
+        FastRTC continuously drains ``output_queue``. Typed Gradio callbacks
+        therefore need their own copy so the stream cannot consume the model's
+        final transcript before ``send_text_message`` sees it.
+        """
+        output = AdditionalOutputs(message)
+        await self.output_queue.put(output)
+        typed_output_queue = self._typed_output_queue
+        if typed_output_queue is not None:
+            await typed_output_queue.put(output)
+
+    async def _create_conversation_item(self, item: dict[str, Any]) -> None:
+        """Log and send a Realtime conversation.item.create request."""
+        self._log_model_request("conversation.item.create", item)
+        await self.connection.conversation.item.create(item=item)
+
+    def _log_model_request(self, request_type: str, payload: Any) -> None:
+        """Log a sanitized model request at the selected detail level."""
+        log = logger.info if self.model_logs else logger.debug
+        log("MODEL request type=%s payload=%s", request_type, _model_io_json(payload))
+
+    @staticmethod
+    def _response_message_text(response: Any) -> str:
+        """Extract final assistant text or audio transcript from response.done."""
+        output_items = getattr(response, "output", None)
+        if not isinstance(output_items, list):
+            return ""
+
+        text_parts: list[str] = []
+        for item in output_items:
+            if getattr(item, "type", None) != "message" or getattr(item, "role", None) != "assistant":
+                continue
+            content_parts = getattr(item, "content", None)
+            if not isinstance(content_parts, list):
+                continue
+            for content_part in content_parts:
+                text = getattr(content_part, "transcript", None) or getattr(content_part, "text", None)
+                if isinstance(text, str) and text.strip():
+                    text_parts.append(text.strip())
+
+        return "\n".join(text_parts)
 
     @staticmethod
     def _chat_message_from_output(output: AdditionalOutputs) -> dict[str, Any] | None:
@@ -374,7 +529,50 @@ class ConversationStreamHandler(AsyncStreamHandler):
             return None
         return candidate
 
-    async def send_text_message(self, message: str, timeout: float = 30.0) -> list[dict[str, Any]]:
+    @staticmethod
+    def _is_final_assistant_message(message: dict[str, Any]) -> bool:
+        """Return whether a chat update is a user-facing assistant answer.
+
+        Tool lifecycle cards and camera previews also use the assistant role in
+        Gradio, but they are intermediate updates. Treating either as the final
+        answer makes typed requests return before the post-tool model response.
+        """
+        if message.get("role") != "assistant" or message.get("metadata"):
+            return False
+
+        content = message.get("content")
+        if not isinstance(content, str):
+            return False
+
+        return not content.startswith("🛠️ Used tool")
+
+    def _typed_turn_is_complete(self, saw_assistant_message: bool) -> bool:
+        """Return whether typed chat has a final answer and no pending tool follow-up."""
+        return (
+            saw_assistant_message
+            and self._response_done_event.is_set()
+            and not self._typed_tool_calls_awaiting_followup
+        )
+
+    def _mark_typed_followup_response(self, response_id: Any) -> None:
+        """Match a non-tool response to the next tool awaiting a spoken follow-up."""
+        if not self._typed_tool_calls_awaiting_followup:
+            return
+        if isinstance(response_id, str) and response_id in self._tool_call_response_ids:
+            return
+        if not self._typed_followup_call_order:
+            return
+
+        call_id = self._typed_followup_call_order.popleft()
+        self._typed_tool_calls_awaiting_followup.discard(call_id)
+        logger.debug("Typed tool follow-up completed for call_id=%s response_id=%s", call_id, response_id)
+
+    async def send_text_message(
+        self,
+        message: str,
+        timeout: float = 30.0,
+        tool_timeout: float = _TYPED_TOOL_TIMEOUT,
+    ) -> list[dict[str, Any]]:
         """Send a typed user message and collect chat updates."""
         text = message.strip()
         if not text:
@@ -401,42 +599,89 @@ class ConversationStreamHandler(AsyncStreamHandler):
                 },
             ]
 
-        await self.connection.conversation.item.create(
-            item={
+        async with self._typed_request_lock:
+            typed_output_queue: asyncio.Queue[AdditionalOutputs] = asyncio.Queue()
+            self._typed_output_queue = typed_output_queue
+            self._typed_tool_calls_awaiting_followup.clear()
+            self._typed_followup_call_order.clear()
+            self._tool_call_response_ids.clear()
+            try:
+                return await self._send_realtime_text_message(text, timeout, tool_timeout, typed_output_queue)
+            finally:
+                self._typed_output_queue = None
+                self._typed_tool_calls_awaiting_followup.clear()
+                self._typed_followup_call_order.clear()
+                self._tool_call_response_ids.clear()
+
+    async def _send_realtime_text_message(
+        self,
+        text: str,
+        timeout: float,
+        tool_timeout: float,
+        typed_output_queue: asyncio.Queue[AdditionalOutputs],
+    ) -> list[dict[str, Any]]:
+        """Send one typed Realtime turn and collect its dedicated chat updates."""
+        await self._create_conversation_item(
+            {
                 "type": "message",
                 "role": "user",
                 "content": [{"type": "input_text", "text": text}],
-            },
+            }
         )
         await self._safe_response_create()
 
         messages: list[dict[str, Any]] = [{"role": "user", "content": text}]
         saw_assistant_message = False
-        deadline = asyncio.get_event_loop().time() + timeout
+        turn_completed = False
+        loop = asyncio.get_event_loop()
+        response_deadline = loop.time() + timeout
+        active_tool_deadline: float | None = None
 
-        while asyncio.get_event_loop().time() < deadline:
+        while True:
+            now = loop.time()
+            has_pending_tool = bool(self._typed_tool_calls_awaiting_followup)
+            if has_pending_tool and active_tool_deadline is None:
+                active_tool_deadline = now + tool_timeout
+                logger.debug("Extended typed request timeout for active tool by %.1f seconds", tool_timeout)
+            elif not has_pending_tool and active_tool_deadline is not None:
+                active_tool_deadline = None
+                response_deadline = now + timeout
+
+            if has_pending_tool:
+                assert active_tool_deadline is not None
+                deadline = active_tool_deadline
+            else:
+                deadline = response_deadline
+            if now >= deadline:
+                break
+
             try:
-                output = await asyncio.wait_for(self.output_queue.get(), timeout=0.5)
+                output = await asyncio.wait_for(typed_output_queue.get(), timeout=min(0.5, deadline - now))
             except asyncio.TimeoutError:
-                if saw_assistant_message and self._response_done_event.is_set():
+                if self._typed_turn_is_complete(saw_assistant_message):
+                    turn_completed = True
                     break
                 continue
 
-            if not isinstance(output, AdditionalOutputs):
-                continue
-
+            response_deadline = loop.time() + timeout
             chat_message = self._chat_message_from_output(output)
             if chat_message is None:
                 continue
 
             messages.append(chat_message)
-            if chat_message.get("role") == "assistant":
+            if self._is_final_assistant_message(chat_message):
                 saw_assistant_message = True
 
-            if saw_assistant_message and self._response_done_event.is_set():
+            if self._typed_turn_is_complete(saw_assistant_message):
+                turn_completed = True
                 break
 
-        if not saw_assistant_message:
+        if not turn_completed:
+            logger.warning(
+                "Typed Realtime request timed out (pending_tools=%s, saw_assistant=%s)",
+                sorted(self._typed_tool_calls_awaiting_followup),
+                saw_assistant_message,
+            )
             messages.append({"role": "assistant", "content": "[error] Timed out waiting for a response."})
 
         return messages
@@ -468,6 +713,14 @@ class ConversationStreamHandler(AsyncStreamHandler):
 
     async def start_up(self) -> None:
         """Start the handler with minimal retries on unexpected websocket closure."""
+        try:
+            await self._available_tool_specs()
+        except Exception as e:
+            message = f"Tool discovery failed: {type(e).__name__}: {e}"
+            self._record_startup_error(message)
+            logger.exception(message)
+            return
+
         if not self._text_model_uses_realtime():
             logger.info(
                 "Skipping Realtime startup because BACKEND_PROVIDER=%r uses local STT/chat", config.BACKEND_PROVIDER
@@ -602,7 +855,7 @@ class ConversationStreamHandler(AsyncStreamHandler):
                 try:
                     await asyncio.wait_for(self._response_done_event.wait(), timeout=_RESPONSE_DONE_TIMEOUT)
                 except asyncio.TimeoutError:
-                    logger.debug("Timed out waiting for previous response to finish; forcing ahead")
+                    logger.warning("Timed out waiting for previous response to finish; forcing ahead")
                     self._response_done_event.set()
 
                 if not self.connection:
@@ -611,16 +864,19 @@ class ConversationStreamHandler(AsyncStreamHandler):
                 self._last_response_rejected = False
                 try:
                     self._response_done_event.clear()
+                    logger.info("Sending queued Realtime response")
+                    self._log_model_request("response.create", kwargs)
                     await self.connection.response.create(**kwargs)
+                    logger.info("Realtime response request sent; waiting for model output")
                 except Exception as e:
-                    logger.debug("_response_sender_loop: send failed: %s", e)
+                    logger.exception("Failed to send queued Realtime response: %s", e)
                     self._response_done_event.set()
                     break
 
                 try:
                     await asyncio.wait_for(self._response_done_event.wait(), timeout=_RESPONSE_DONE_TIMEOUT)
                 except asyncio.TimeoutError:
-                    logger.debug("Timed out waiting for response.done; assuming response completed")
+                    logger.warning("Timed out waiting for response.done; assuming response completed")
                     self._response_done_event.set()
                     break
 
@@ -628,7 +884,7 @@ class ConversationStreamHandler(AsyncStreamHandler):
                 if self._last_response_rejected:
                     attempts += 1
                     if attempts >= max_retries:
-                        logger.debug("response.create rejected %d times; giving up", attempts)
+                        logger.warning("response.create rejected %d times; giving up", attempts)
                         break
                     logger.debug("response.create was rejected; retrying (%d/%d)", attempts, max_retries)
                     continue
@@ -637,17 +893,20 @@ class ConversationStreamHandler(AsyncStreamHandler):
 
     async def _handle_tool_result(self, bg_tool: ToolNotification) -> None:
         """Process the result of a tool call."""
-        if bg_tool.error is not None:
+        if bg_tool.result is not None:
+            tool_result = bg_tool.result
+            if bg_tool.error is not None:
+                logger.error("Tool '%s' (id=%s) failed with error: %s", bg_tool.tool_name, bg_tool.id, bg_tool.error)
+            else:
+                logger.info(
+                    "Tool '%s' (id=%s) executed successfully.",
+                    bg_tool.tool_name,
+                    bg_tool.id,
+                )
+            logger.debug("TOOL response name=%s result=%s", bg_tool.tool_name, _model_io_json(tool_result))
+        elif bg_tool.error is not None:
             logger.error("Tool '%s' (id=%s) failed with error: %s", bg_tool.tool_name, bg_tool.id, bg_tool.error)
             tool_result = {"error": bg_tool.error}
-        elif bg_tool.result is not None:
-            tool_result = bg_tool.result
-            logger.info(
-                "Tool '%s' (id=%s) executed successfully.",
-                bg_tool.tool_name,
-                bg_tool.id,
-            )
-            logger.debug("Tool '%s' full result: %s", bg_tool.tool_name, tool_result)
         else:
             logger.warning("Tool '%s' (id=%s) returned no result and no error", bg_tool.tool_name, bg_tool.id)
             tool_result = {"error": "No result returned from tool execution"}
@@ -662,78 +921,204 @@ class ConversationStreamHandler(AsyncStreamHandler):
             return
 
         try:
+            vision_images: list[str] = []
+            processed_media: ProcessedToolResult | None = None
+            if self.media_result_processor is not None:
+                try:
+                    processed_media = await self.media_result_processor.process(bg_tool.tool_name, tool_result)
+                    model_tool_result = processed_media.model_payload
+                except MediaSecurityError:
+                    logger.error("Raw media was rejected before Realtime serialization")
+                    model_tool_result = {
+                        "status": "media_security_error",
+                        "tool": bg_tool.tool_name,
+                        "error": "Raw media was rejected before reaching the conversation model",
+                    }
+            elif config.REQUIRE_ROUTED_VISION and contains_raw_media(tool_result):
+                logger.error("Raw media reached a strict Realtime handler without a media processor")
+                model_tool_result = {
+                    "status": "media_security_error",
+                    "tool": bg_tool.tool_name,
+                    "error": "Routed vision is required; raw media was discarded",
+                }
+            else:
+                model_tool_result = dict(tool_result)
+                if bg_tool.tool_name == "camera" and "b64_im" in model_tool_result:
+                    raw_camera_image = model_tool_result.pop("b64_im")
+                    if isinstance(raw_camera_image, str) and raw_camera_image:
+                        vision_images = [raw_camera_image]
+                        model_tool_result["status"] = "image_captured"
+                    else:
+                        logger.warning("Unexpected camera image type: %s", type(raw_camera_image))
+                        model_tool_result = {"error": "Camera returned an invalid image"}
+                elif bg_tool.tool_name == "scan_scene" and "b64_images" in model_tool_result:
+                    raw_scan_images = model_tool_result.pop("b64_images")
+                    if (
+                        isinstance(raw_scan_images, list)
+                        and 0 < len(raw_scan_images) <= _MAX_TOOL_IMAGES
+                        and all(isinstance(image, str) and image for image in raw_scan_images)
+                    ):
+                        vision_images = raw_scan_images
+                    else:
+                        logger.warning("Unexpected scene-scan image payload")
+                        model_tool_result = {"error": "Scene scan returned invalid analysis images"}
+
+            assert_no_raw_media(model_tool_result)
+            serialized_tool_result = json.dumps(model_tool_result)
+
             # Send the tool result back
             if isinstance(bg_tool.id, str):
-                await self.connection.conversation.item.create(
-                    item={
+                await self._create_conversation_item(
+                    {
                         "type": "function_call_output",
                         "call_id": bg_tool.id,
-                        "output": json.dumps(tool_result),
-                    },
+                        "output": serialized_tool_result,
+                    }
                 )
 
-            await self.output_queue.put(
-                AdditionalOutputs(
-                    {
-                        "role": "assistant",
-                        "content": json.dumps(tool_result),
-                        # Gradio UI metadata.status accept only "pending" and "done". Do not accept bg.tool.status values.
-                        "metadata": {
-                            "title": f"🛠️ Used tool {bg_tool.tool_name}",
-                            "status": "done",
-                        },
+            policy_denied = model_tool_result.get("status") == "policy_denied"
+            await self._publish_chat_output(
+                {
+                    "role": "assistant",
+                    "content": serialized_tool_result,
+                    # Gradio UI metadata.status accept only "pending" and "done". Do not accept bg.tool.status values.
+                    "metadata": {
+                        "title": (
+                            f"🚫 OpenShell blocked tool {bg_tool.tool_name}"
+                            if policy_denied
+                            else f"🛠️ Used tool {bg_tool.tool_name}"
+                        ),
+                        "status": "done",
                     },
-                ),
+                },
             )
 
-            if bg_tool.tool_name == "camera" and "b64_im" in tool_result:
-                # use raw base64, don't json.dumps (which adds quotes)
-                b64_im = tool_result["b64_im"]
-                if not isinstance(b64_im, str):
-                    logger.warning("Unexpected type for b64_im: %s", type(b64_im))
-                    b64_im = str(b64_im)
-                await self.connection.conversation.item.create(
-                    item={
+            if vision_images:
+                image_content: list[dict[str, Any]] = []
+                if bg_tool.tool_name == "scan_scene":
+                    question = model_tool_result.get("question", "Describe everything visible during the scan.")
+                    timestamps = model_tool_result.get("frame_timestamps_seconds", [])
+                    image_content.append(
+                        {
+                            "type": "input_text",
+                            "text": (
+                                "These are chronological frames sampled across one Reachy scene sweep. "
+                                f"Frame timestamps in seconds: {timestamps}. "
+                                "Combine evidence across all frames, deduplicate repeated people and objects, "
+                                "and do not claim details that are not visibly supported. "
+                                f"User question: {question}"
+                            ),
+                        }
+                    )
+                image_content.extend(
+                    {
+                        "type": "input_image",
+                        "image_url": f"data:image/jpeg;base64,{image}",
+                    }
+                    for image in vision_images
+                )
+                await self._create_conversation_item(
+                    {
                         "type": "message",
                         "role": "user",
-                        "content": [
-                            {
-                                "type": "input_image",
-                                "image_url": f"data:image/jpeg;base64,{b64_im}",
-                            },
-                        ],
+                        "content": image_content,
+                    }
+                )
+                logger.info("Added %d image(s) from tool '%s' to conversation", len(vision_images), bg_tool.tool_name)
+
+            # Show the local camera preview even when a dedicated vision model
+            # consumed the raw image and only returned a text description.
+            preview_image = processed_media.preview_image if processed_media is not None else None
+            if preview_image is None and (
+                bg_tool.tool_name == "camera"
+                and self.deps.camera_worker is not None
+                and (vision_images or model_tool_result.get("status") == "image_analyzed")
+            ):
+                np_img = self.deps.camera_worker.get_latest_frame()
+                if np_img is not None:
+                    import cv2
+
+                    # Camera frames are BGR from OpenCV; convert so Gradio displays correct colors.
+                    preview_image = cv2.cvtColor(np_img, cv2.COLOR_BGR2RGB)
+
+            if preview_image is not None:
+                img = gr.Image(value=preview_image)
+
+                await self._publish_chat_output(
+                    {
+                        "role": "assistant",
+                        "content": img,
                     },
                 )
-                logger.info("Added camera image to conversation")
 
-                if self.deps.camera_worker is not None:
-                    np_img = self.deps.camera_worker.get_latest_frame()
-                    if np_img is not None:
-                        import cv2
-
-                        # Camera frames are BGR from OpenCV; convert so Gradio displays correct colors.
-                        rgb_frame = cv2.cvtColor(np_img, cv2.COLOR_BGR2RGB)
-                    else:
-                        rgb_frame = None
-                    img = gr.Image(value=rgb_frame)
-
-                    await self.output_queue.put(
-                        AdditionalOutputs(
-                            {
-                                "role": "assistant",
-                                "content": img,
-                            },
-                        ),
+            if bg_tool.tool_name == "scan_scene":
+                video_path: str | Path | None = (
+                    processed_media.video_path if processed_media is not None else model_tool_result.get("video_path")
+                )
+                if isinstance(video_path, (str, Path)) and Path(video_path).is_file():
+                    await self._publish_chat_output(
+                        {
+                            "role": "assistant",
+                            "content": gr.Video(value=str(video_path)),
+                        },
                     )
 
             # If this tool call was triggered by an idle signal, don't make the robot speak.
             # For other tool calls, let the robot reply out loud.
             if not bg_tool.is_idle_tool_call:
+                follow_up_instructions = "Use the tool result just returned and answer concisely in speech."
+                if policy_denied:
+                    follow_up_instructions = (
+                        f"Tell the user that the requested {bg_tool.tool_name} action was blocked by the "
+                        "OpenShell policy. Do not claim the robot lacks the physical capability, do not imply "
+                        "that the action succeeded, and do not retry the tool."
+                    )
+                elif bg_tool.tool_name == "camera" and vision_images:
+                    follow_up_instructions = (
+                        "Answer the user's camera question using the input image just added. "
+                        "Describe only what is visibly supported by the image, and answer concisely in speech."
+                    )
+                elif bg_tool.tool_name == "camera" and model_tool_result.get("status") == "image_analyzed":
+                    follow_up_instructions = (
+                        "Relay the image_description returned by the approved vision model. "
+                        "Answer the user's camera question concisely in speech and do not claim that you "
+                        "personally received the raw image."
+                    )
+                elif bg_tool.tool_name == "scan_scene" and vision_images:
+                    follow_up_instructions = (
+                        "Answer the user's scene-scan question using every chronological image just added. "
+                        "Give one concise combined account, deduplicate things visible in multiple frames, and "
+                        "describe only visibly supported details. Mention that the recording was saved, but do "
+                        "not read the full local filesystem path aloud."
+                    )
+                elif bg_tool.tool_name == "scan_scene" and model_tool_result.get("status") == "scene_analyzed":
+                    if model_tool_result.get("scan_status") == "scene_scan_incomplete":
+                        follow_up_instructions = (
+                            "Explain that Reachy's physical scene sweep was interrupted and may be incomplete. "
+                            "Use scan_warning and returned_to_front from the tool result to say whether Reachy "
+                            "recovered to its front pose. Then relay the approved vision model's description of "
+                            "the frames that were successfully recorded. Do not claim a complete room scan."
+                        )
+                    elif model_tool_result.get("recording_status") == "preview_unavailable":
+                        follow_up_instructions = (
+                            "Relay the image_description returned by the approved vision model as one concise "
+                            "combined account. Briefly mention that the recording preview is unavailable, without "
+                            "exposing internal paths."
+                        )
+                    else:
+                        follow_up_instructions = (
+                            "Relay the image_description returned by the approved vision model as one concise "
+                            "combined account. Mention that the recording was saved, but do not expose internal paths."
+                        )
                 await self._safe_response_create(
                     response={
-                        "instructions": "Use the tool result just returned and answer concisely in speech.",
+                        "instructions": follow_up_instructions,
+                        "tool_choice": "none",
                     },
                 )
+                if isinstance(bg_tool.id, str) and bg_tool.id in self._typed_tool_calls_awaiting_followup:
+                    self._typed_followup_call_order.append(bg_tool.id)
+                logger.info("Queued spoken follow-up for tool '%s'", bg_tool.tool_name)
 
             # Re-synchronize the head wobble after a tool call that may have taken some time
             if self.deps.head_wobbler is not None:
@@ -758,16 +1143,27 @@ class ConversationStreamHandler(AsyncStreamHandler):
                     output_sample_rate=self.output_sample_rate,
                     instructions=get_session_instructions(),
                     voice=session_voice,
-                    tools=get_tool_specs(),
+                    tools=await self._available_tool_specs(),
                     transcription_language=config.REALTIME_TRANSCRIPTION_LANGUAGE,
                 )
+                logger.info("Realtime model connection: %s", realtime_context())
+                logger.debug("MODEL request session.update=%s", _model_io_json({"session": session_config}))
                 await conn.session.update(session=cast(Any, session_config))
                 logger.info(
-                    "Realtime session initialized with backend=%r locked_profile=%r voice=%r",
+                    "Realtime session initialized with backend=%r model=%r locked_profile=%r voice=%r tools=%s",
                     backend.provider,
+                    backend.realtime_model,
                     LOCKED_PROFILE,
                     session_voice,
+                    [tool.get("name", "<unnamed>") for tool in session_config["tools"]],
                 )
+                if self.model_logs:
+                    logger.info(
+                        "MODEL selected provider=%s model=%s voice=%s",
+                        backend.provider,
+                        backend.realtime_model,
+                        session_voice,
+                    )
             except Exception as e:
                 message = (
                     f"Realtime session.update failed ({realtime_context()}): "
@@ -801,11 +1197,13 @@ class ConversationStreamHandler(AsyncStreamHandler):
                             self._clear_queue()
                         if self.deps.head_wobbler is not None:
                             self.deps.head_wobbler.reset()
-                        self.deps.movement_manager.set_listening(True)
+                        if self.deps.movement_manager is not None:
+                            self.deps.movement_manager.set_listening(True)
                         logger.debug("User speech started")
 
                     if event.type == "input_audio_buffer.speech_stopped":
-                        self.deps.movement_manager.set_listening(False)
+                        if self.deps.movement_manager is not None:
+                            self.deps.movement_manager.set_listening(False)
                         logger.debug("User speech stopped - server will auto-commit with VAD")
 
                     if event.type in (
@@ -823,14 +1221,41 @@ class ConversationStreamHandler(AsyncStreamHandler):
                     if event.type == "response.done":
                         # Doesn't mean the audio is done playing
                         self._response_done_event.set()
-                        logger.debug("Response done")
-
                         response = getattr(event, "response", None)
+                        response_status = getattr(response, "status", "unknown") if response else "unknown"
+                        logger.info("Realtime response completed (status=%s)", response_status)
+                        logger.debug("MODEL response response.done=%s", _model_io_json(response))
+
+                        # The normal transcript/text events are preferred, but
+                        # response.done also contains the complete assistant
+                        # message. Use it as a fallback for compatible backends
+                        # that omit the dedicated done event.
+                        response_id = getattr(response, "id", None) if response else None
+                        if isinstance(response_id, str) and response_id not in self._chat_response_ids:
+                            response_text = self._response_message_text(response)
+                            if response_text:
+                                self._mark_typed_followup_response(response_id)
+                                logger.info(
+                                    "Recovered assistant text from response.done (%d characters)", len(response_text)
+                                )
+                                await self._publish_chat_output({"role": "assistant", "content": response_text})
+                                self._chat_response_ids.add(response_id)
+
                         usage = getattr(response, "usage", None) if response else None
                         if usage:
                             cost = _compute_response_cost(usage)
                             self.cumulative_cost += cost
-                            logger.debug("Cost: $%.4f | Cumulative: $%.4f", cost, self.cumulative_cost)
+                            if self.model_logs:
+                                logger.info(
+                                    "MODEL usage model=%s response_id=%s tokens=%s cost_usd=%.6f cumulative_cost_usd=%.6f",
+                                    selected_backend().realtime_model,
+                                    response_id,
+                                    _model_io_json(usage),
+                                    cost,
+                                    self.cumulative_cost,
+                                )
+                            else:
+                                logger.debug("Cost: $%.4f | Cumulative: $%.4f", cost, self.cumulative_cost)
                         else:
                             logger.warning("No usage data available for cost tracking")
 
@@ -881,7 +1306,27 @@ class ConversationStreamHandler(AsyncStreamHandler):
                         if not isinstance(transcript, str):
                             transcript = ""
                         logger.debug(f"Assistant transcript: {transcript}")
-                        await self.output_queue.put(AdditionalOutputs({"role": "assistant", "content": transcript}))
+                        logger.info("Received assistant transcript (%d characters)", len(transcript))
+                        logger.debug("MODEL response assistant.transcript=%s", _model_io_json(transcript))
+                        await self._publish_chat_output({"role": "assistant", "content": transcript})
+                        response_id = getattr(event, "response_id", None)
+                        self._mark_typed_followup_response(response_id)
+                        if isinstance(response_id, str):
+                            self._chat_response_ids.add(response_id)
+
+                    # Some Realtime responses use text content instead of an
+                    # audio transcript. Surface those in the same chat path.
+                    if event.type in ("response.text.done", "response.output_text.done"):
+                        text = getattr(event, "text", "")
+                        if not isinstance(text, str):
+                            text = ""
+                        logger.info("Received assistant text (%d characters)", len(text))
+                        logger.debug("MODEL response assistant.text=%s", _model_io_json(text))
+                        await self._publish_chat_output({"role": "assistant", "content": text})
+                        response_id = getattr(event, "response_id", None)
+                        self._mark_typed_followup_response(response_id)
+                        if isinstance(response_id, str):
+                            self._chat_response_ids.add(response_id)
 
                     # Handle audio delta
                     if event.type in ("response.audio.delta", "response.output_audio.delta"):
@@ -913,6 +1358,17 @@ class ConversationStreamHandler(AsyncStreamHandler):
                             self.is_idle_tool_call,
                             args_json_str,
                         )
+                        logger.debug(
+                            "MODEL response function_call=%s",
+                            _model_io_json(
+                                {
+                                    "name": tool_name,
+                                    "call_id": call_id,
+                                    "arguments": args_json_str,
+                                    "is_idle": self.is_idle_tool_call,
+                                }
+                            ),
+                        )
 
                         if not isinstance(tool_name, str) or not isinstance(args_json_str, str):
                             logger.error(
@@ -925,23 +1381,28 @@ class ConversationStreamHandler(AsyncStreamHandler):
                             )
                             continue
 
+                        response_id = getattr(event, "response_id", None)
+                        if self._typed_output_queue is not None and not self.is_idle_tool_call:
+                            self._typed_tool_calls_awaiting_followup.add(call_id)
+                            if isinstance(response_id, str):
+                                self._tool_call_response_ids.add(response_id)
+
                         bg_tool = await self.tool_manager.start_tool(
                             call_id=call_id,
                             tool_call_routine=ToolCallRoutine(
                                 tool_name=tool_name,
                                 args_json_str=args_json_str,
                                 deps=self.deps,
+                                transport=self.tool_transport,
                             ),
                             is_idle_tool_call=self.is_idle_tool_call,
                         )
 
-                        await self.output_queue.put(
-                            AdditionalOutputs(
-                                {
-                                    "role": "assistant",
-                                    "content": f"🛠️ Used tool {tool_name} with args {args_json_str}. The tool is now running. Tool ID: {bg_tool.tool_id}",
-                                },
-                            ),
+                        await self._publish_chat_output(
+                            {
+                                "role": "assistant",
+                                "content": f"🛠️ Used tool {tool_name} with args {args_json_str}. The tool is now running. Tool ID: {bg_tool.tool_id}",
+                            },
                         )
 
                         if self.is_idle_tool_call:
@@ -968,9 +1429,7 @@ class ConversationStreamHandler(AsyncStreamHandler):
 
                         # Only show user-facing errors, not internal state errors
                         if code not in ("input_audio_buffer_commit_empty",):
-                            await self.output_queue.put(
-                                AdditionalOutputs({"role": "assistant", "content": f"[error] {msg}"})
-                            )
+                            await self._publish_chat_output({"role": "assistant", "content": f"[error] {msg}"})
             finally:
                 # Stop the response sender worker.
                 if response_sender_task is not None:
@@ -1007,7 +1466,7 @@ class ConversationStreamHandler(AsyncStreamHandler):
             config_error = backend_config_error()
             if config_error:
                 await self._report_microphone_error_once(
-                    f"[error] {config_error} Add the missing value to .env and restart the conversation app."
+                    f"[error] {config_error} Add it to .env or the process environment, then restart the conversation app."
                 )
                 return
             await self._receive_transcribed_text_frame(frame)
@@ -1036,7 +1495,12 @@ class ConversationStreamHandler(AsyncStreamHandler):
 
         # Handle idle
         idle_duration = asyncio.get_event_loop().time() - self.last_activity_time
-        if self._text_model_uses_realtime() and idle_duration > 15.0 and self.deps.movement_manager.is_idle():
+        if (
+            self._text_model_uses_realtime()
+            and idle_duration > 15.0
+            and self.deps.movement_manager is not None
+            and self.deps.movement_manager.is_idle()
+        ):
             try:
                 await self.send_idle_signal(idle_duration)
             except Exception as e:
@@ -1085,6 +1549,10 @@ class ConversationStreamHandler(AsyncStreamHandler):
             finally:
                 self.connection = None
 
+        if self.tool_transport is not None and not self._tool_transport_closed:
+            self._tool_transport_closed = True
+            await self.tool_transport.close()
+
         # Clear any remaining items in the output queue
         while not self.output_queue.empty():
             try:
@@ -1107,12 +1575,12 @@ class ConversationStreamHandler(AsyncStreamHandler):
         if not self.connection:
             logger.debug("No connection, cannot send idle signal")
             return
-        await self.connection.conversation.item.create(
-            item={
+        await self._create_conversation_item(
+            {
                 "type": "message",
                 "role": "user",
                 "content": [{"type": "input_text", "text": timestamp_msg}],
-            },
+            }
         )
         await self._safe_response_create(
             response={

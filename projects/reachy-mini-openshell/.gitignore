@@ -42,11 +42,13 @@ coverage.xml
 *.pem
 *.crt
 *.csr
+.reachy-mcp-token
 
 # Temporary files
 tmp/
 *.log
 cache/
+captures/
 
 # macOS
 .DS_Store

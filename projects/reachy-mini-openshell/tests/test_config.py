@@ -1,4 +1,7 @@
 import os
+import sys
+import json
+import subprocess
 from typing import Any
 from pathlib import Path
 
@@ -14,6 +17,18 @@ CONFIG_ATTRS = (
     "OPENAI_REALTIME_BASE_URL",
     "OPENAI_REALTIME_MODEL",
     "OPENAI_REALTIME_VOICE",
+    "VISION_API_KEY",
+    "VISION_BASE_URL",
+    "VISION_DEFAULT_MODEL",
+    "VISION_ALLOWED_MODELS",
+    "REACHY_TOOL_TRANSPORT",
+    "REACHY_REST_BASE_URL",
+    "REACHY_CAMERA_BASE_URL",
+    "REACHY_REST_TIMEOUT_SECONDS",
+    "REACHY_MOTION_DURATION_SECONDS",
+    "REACHY_MOTION_POLL_INTERVAL_SECONDS",
+    "REACHY_MOTION_COMPLETION_TIMEOUT_SECONDS",
+    "REQUIRE_ROUTED_VISION",
     "HF_REALTIME_CONNECTION_MODE",
     "HF_REALTIME_SESSION_URL",
     "HF_REALTIME_WS_URL",
@@ -75,6 +90,13 @@ def test_documented_env_template_validates_with_exported_system_keys(monkeypatch
     try:
         assert not list(PROJECT_ROOT.glob(".env.*.example"))
         assert raw_values["BACKEND_PROVIDER"] == config_mod.BACKEND_OPENAI_REALTIME
+        assert raw_values["VISION_DEFAULT_MODEL"] == "gpt-5.4-mini"
+        assert raw_values["VISION_ALLOWED_MODELS"] == "gpt-5.4-mini"
+        assert raw_values["REACHY_TOOL_TRANSPORT"] == "rest"
+        assert raw_values["REACHY_REST_BASE_URL"] == "http://127.0.0.1:8000"
+        assert "REACHY_CAMERA_BASE_URL" not in raw_values
+        assert raw_values["REACHY_MOTION_DURATION_SECONDS"] == "1"
+        assert raw_values["REQUIRE_ROUTED_VISION"] == "0"
         assert "OPENAI_REALTIME_API_KEY" not in raw_values
         assert "OPENAI_API_KEY" not in raw_values
 
@@ -92,6 +114,122 @@ def test_documented_env_template_validates_with_exported_system_keys(monkeypatch
 
             if backend_provider == config_mod.BACKEND_OPENAI_REALTIME:
                 assert config_mod.openai_realtime_api_key() == "global-openai-key"
+    finally:
+        _restore_config_snapshot(snapshot)
+
+
+def test_sandbox_process_environment_loads_when_dotenv_is_disabled() -> None:
+    """OpenShell --env values should configure the app without a bundled dotenv file."""
+    env: dict[str, str] = dict(os.environ)
+    env.update(
+        {
+            "REACHY_MINI_SKIP_DOTENV": "1",
+            "BACKEND_PROVIDER": "openai_realtime",
+            "OPENAI_API_KEY": "sandbox-provider-key",
+            "OPENAI_REALTIME_BASE_URL": "https://api.openai.com/v1",
+            "OPENAI_REALTIME_MODEL": "gpt-realtime-2",
+            "OPENAI_REALTIME_VOICE": "cedar",
+            "REACHY_TOOL_TRANSPORT": "rest",
+            "REACHY_REST_BASE_URL": "http://host.openshell.internal:8000",
+            "REACHY_CAMERA_BASE_URL": "http://host.openshell.internal:8042",
+            "REACHY_REST_TIMEOUT_SECONDS": "4",
+            "REACHY_MOTION_DURATION_SECONDS": "0.75",
+            "REACHY_MOTION_POLL_INTERVAL_SECONDS": "0.2",
+            "REACHY_MOTION_COMPLETION_TIMEOUT_SECONDS": "8",
+        }
+    )
+    env.pop("REACHY_MINI_DOTENV_PATH", None)
+    code = """
+import json
+from reachy_mini_conversation_app.config import config
+print(json.dumps({
+    "backend": config.BACKEND_PROVIDER,
+    "realtime_base_url": config.OPENAI_REALTIME_BASE_URL,
+    "realtime_model": config.OPENAI_REALTIME_MODEL,
+    "tool_transport": config.REACHY_TOOL_TRANSPORT,
+    "rest_base_url": config.REACHY_REST_BASE_URL,
+    "camera_base_url": config.REACHY_CAMERA_BASE_URL,
+    "rest_timeout": config.REACHY_REST_TIMEOUT_SECONDS,
+    "motion_duration": config.REACHY_MOTION_DURATION_SECONDS,
+    "motion_poll": config.REACHY_MOTION_POLL_INTERVAL_SECONDS,
+    "motion_completion_timeout": config.REACHY_MOTION_COMPLETION_TIMEOUT_SECONDS,
+}))
+"""
+
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=PROJECT_ROOT,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    loaded = json.loads(completed.stdout)
+
+    assert loaded == {
+        "backend": "openai_realtime",
+        "realtime_base_url": "https://api.openai.com/v1",
+        "realtime_model": "gpt-realtime-2",
+        "tool_transport": "rest",
+        "rest_base_url": "http://host.openshell.internal:8000",
+        "camera_base_url": "http://host.openshell.internal:8042",
+        "rest_timeout": 4.0,
+        "motion_duration": 0.75,
+        "motion_poll": 0.2,
+        "motion_completion_timeout": 8.0,
+    }
+
+
+def test_apply_config_values_parses_vision_route_and_key_fallback(monkeypatch: Any) -> None:
+    """Vision configuration should parse its single model and reuse the standard OpenAI key."""
+    snapshot = _config_snapshot()
+    monkeypatch.setitem(config_mod._ORIGINAL_PROCESS_ENV, "OPENAI_API_KEY", "global-openai-key")
+
+    try:
+        config_mod.apply_config_values(
+            {
+                "VISION_BASE_URL": "https://vision.example.test/v1",
+                "VISION_DEFAULT_MODEL": "gpt-5.4-mini",
+                "VISION_ALLOWED_MODELS": "gpt-5.4-mini, gpt-5.4-mini",
+            },
+            inherit_current=False,
+        )
+
+        assert config_mod.config.VISION_BASE_URL == "https://vision.example.test/v1"
+        assert config_mod.config.VISION_DEFAULT_MODEL == "gpt-5.4-mini"
+        assert config_mod.config.VISION_ALLOWED_MODELS == ("gpt-5.4-mini",)
+        assert config_mod.vision_api_key() == "global-openai-key"
+    finally:
+        _restore_config_snapshot(snapshot)
+
+
+def test_apply_config_values_parses_rest_conversation_transport(monkeypatch: Any) -> None:
+    """REST mode should load its endpoint and bounded motion timing settings."""
+    snapshot = _config_snapshot()
+    monkeypatch.setattr(config_mod, "_dotenv_loaded_keys", set())
+    monkeypatch.setattr(config_mod, "_dotenv_values", {})
+
+    try:
+        config_mod.apply_config_values(
+            {
+                "REACHY_TOOL_TRANSPORT": "rest",
+                "REACHY_REST_BASE_URL": "http://127.0.0.1:8000",
+                "REACHY_CAMERA_BASE_URL": "http://127.0.0.1:8042",
+                "REACHY_REST_TIMEOUT_SECONDS": "3",
+                "REACHY_MOTION_DURATION_SECONDS": "0.5",
+                "REACHY_MOTION_POLL_INTERVAL_SECONDS": "0.05",
+                "REACHY_MOTION_COMPLETION_TIMEOUT_SECONDS": "6",
+            },
+            inherit_current=False,
+        )
+
+        assert config_mod.config.REACHY_TOOL_TRANSPORT == "rest"
+        assert config_mod.config.REACHY_REST_BASE_URL == "http://127.0.0.1:8000"
+        assert config_mod.config.REACHY_CAMERA_BASE_URL == "http://127.0.0.1:8042"
+        assert config_mod.config.REACHY_REST_TIMEOUT_SECONDS == 3.0
+        assert config_mod.config.REACHY_MOTION_DURATION_SECONDS == 0.5
+        assert config_mod.config.REACHY_MOTION_POLL_INTERVAL_SECONDS == 0.05
+        assert config_mod.config.REACHY_MOTION_COMPLETION_TIMEOUT_SECONDS == 6.0
     finally:
         _restore_config_snapshot(snapshot)
 

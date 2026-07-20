@@ -6,6 +6,7 @@ completion is announced vocally via a silent notification queue.
 """
 
 from __future__ import annotations
+import json
 import time
 import asyncio
 import logging
@@ -13,17 +14,107 @@ from typing import Any, Dict, Callable, Optional, Coroutine
 
 from pydantic import Field, BaseModel, PrivateAttr
 
-from reachy_mini_conversation_app.tools.core_tools import (
-    ToolDependencies,
-    dispatch_tool_call,
-    dispatch_tool_call_with_manager,
-)
+from reachy_mini_conversation_app.tool_transport import ToolTransport
+from reachy_mini_conversation_app.tools.core_tools import ToolDependencies
 from reachy_mini_conversation_app.tools.tool_constants import ToolState, SystemTool
 
 
 logger = logging.getLogger(__name__)
 
 _SYSTEM_TOOL_NAMES: set[str] = {t.value for t in SystemTool}
+
+
+async def dispatch_tool_call(tool_name: str, args_json: str, deps: ToolDependencies) -> dict[str, Any]:
+    """Load the native registry only when a local tool actually executes."""
+    from reachy_mini_conversation_app.tools.core_tools import dispatch_tool_call as dispatch_local_tool
+
+    return await dispatch_local_tool(tool_name=tool_name, args_json=args_json, deps=deps)
+
+
+def _tool_arguments(args_json_str: str) -> dict[str, Any]:
+    """Parse model tool arguments into a safe object."""
+    try:
+        arguments = json.loads(args_json_str or "{}")
+    except (TypeError, ValueError):
+        return {}
+    return arguments if isinstance(arguments, dict) else {}
+
+
+async def _call_system_tool(
+    tool_name: str,
+    arguments: dict[str, Any],
+    tool_manager: "BackgroundToolManager",
+) -> dict[str, Any]:
+    """Handle manager tools without loading the local robot tool registry."""
+    tool_id = arguments.get("tool_id")
+    if tool_name == SystemTool.TASK_STATUS.value:
+        if isinstance(tool_id, str) and tool_id:
+            tool = tool_manager.get_tool(tool_id)
+            if tool is None:
+                return {"error": f"Tool {tool_id} not found."}
+            result: dict[str, Any] = {
+                "tool_id": tool.tool_id,
+                "name": tool.tool_name,
+                "status": tool.status.value,
+                "started_at": tool.started_at,
+            }
+            if tool.completed_at is not None:
+                result["completed_at"] = tool.completed_at
+            if tool.progress is not None:
+                result["progress_percent"] = f"{tool.progress.progress:.0%}"
+                if tool.progress.message:
+                    result["progress_message"] = tool.progress.message
+            if tool.result:
+                result["result"] = tool.result
+            if tool.error:
+                result["error"] = tool.error
+            return result
+
+        running = [tool for tool in tool_manager.get_running_tools() if tool.tool_name not in _SYSTEM_TOOL_NAMES]
+        if not running:
+            return {"status": "idle", "message": "No tools running in the background."}
+        tools_info = []
+        for tool in running:
+            tool_info: dict[str, Any] = {
+                "tool_id": tool.tool_id,
+                "name": tool.tool_name,
+                "status": tool.status.value,
+                "elapsed_seconds": round(time.monotonic() - tool.started_at, 1),
+            }
+            if tool.progress is not None:
+                tool_info["progress_percent"] = f"{tool.progress.progress:.0%}"
+                if tool.progress.message:
+                    tool_info["progress_message"] = tool.progress.message
+            tools_info.append(tool_info)
+        return {
+            "status": "running",
+            "count": len(tools_info),
+            "message": f"{len(tools_info)} tool(s) running in the background.",
+            "tools": tools_info,
+        }
+
+    if tool_name == SystemTool.TASK_CANCEL.value:
+        if not isinstance(tool_id, str) or not tool_id:
+            return {"error": "Tool ID is required."}
+        tool = tool_manager.get_tool(tool_id)
+        if tool is None:
+            return {"error": f"Tool {tool_id} not found."}
+        if tool.status != ToolState.RUNNING:
+            return {
+                "status": tool.status.value,
+                "message": f"Tool '{tool.tool_name}' is not running (status: {tool.status.value}).",
+                "tool_id": tool_id,
+            }
+        if await tool_manager.cancel_tool(tool_id):
+            return {
+                "status": "cancelled",
+                "message": f"Tool '{tool.tool_name}' has been cancelled.",
+                "tool_id": tool_id,
+                "tool_name": tool.tool_name,
+            }
+        return {"error": f"Could not cancel tool {tool_id}. It may have already completed."}
+
+    return {"error": f"unknown system tool: {tool_name}"}
 
 
 class ToolProgress(BaseModel):
@@ -50,13 +141,16 @@ class ToolCallRoutine(BaseModel):
     """the dependencies for the tool call"""
     deps: "ToolDependencies"
 
+    """the selected local or remote tool transport"""
+    transport: ToolTransport | None = None
+
     async def __call__(self, tool_manager: BackgroundToolManager) -> Any:
         """Execute the stored callable with its arguments."""
+        arguments = _tool_arguments(self.args_json_str)
         if self.tool_name in _SYSTEM_TOOL_NAMES:
-            # For safety purposes, we only allow system tools to be called with the tool manager
-            return await dispatch_tool_call_with_manager(
-                tool_name=self.tool_name, args_json=self.args_json_str, deps=self.deps, tool_manager=tool_manager
-            )
+            return await _call_system_tool(self.tool_name, arguments, tool_manager)
+        if self.transport is not None:
+            return await self.transport.call_tool(self.tool_name, arguments)
         return await dispatch_tool_call(tool_name=self.tool_name, args_json=self.args_json_str, deps=self.deps)
 
 
@@ -213,6 +307,7 @@ class BackgroundToolManager(BaseModel):
             result = {"error": "Tool cancelled"}
 
         bg_tool.completed_at = time.monotonic()
+        bg_tool.result = result
         error = result.get("error")
 
         if error is not None:
@@ -225,7 +320,6 @@ class BackgroundToolManager(BaseModel):
             bg_tool.error = result["error"]
 
         else:
-            bg_tool.result = result
             bg_tool.status = ToolState.COMPLETED
             logger.debug(f"Background tool completed: {bg_tool.tool_name} (id={bg_tool.id})")
 

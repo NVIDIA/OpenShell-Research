@@ -1,0 +1,13 @@
+# Runtime dependencies for the ARM64 OpenShell REST container.
+# Native Reachy SDK, camera, vision, dance, simulator, and Zenoh packages are
+# intentionally omitted because robot actions go through the daemon REST API.
+fastrtc>=0.0.34
+fastapi>=0.115,<1
+gradio==5.50.1.dev1
+huggingface-hub==1.3.0
+httpx>=0.27
+numpy<3
+openai[realtime]>=2.1
+python-dotenv
+uvicorn>=0.34
+websockets>=15,<16

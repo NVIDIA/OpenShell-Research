@@ -79,6 +79,15 @@ class CameraWorker:
         self.is_head_tracking_enabled = enabled
         logger.info(f"Head tracking {'enabled' if enabled else 'disabled'}")
 
+    def clear_face_tracking_offsets(self) -> None:
+        """Immediately clear the additive face-tracking pose.
+
+        Scene scans use this after temporarily disabling tracking so the sweep
+        follows its deterministic primary motion without a stale face offset.
+        """
+        with self.face_tracking_lock:
+            self.face_tracking_offsets = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
     def start(self) -> None:
         """Start the camera worker loop in a thread."""
         self._stop_event.clear()

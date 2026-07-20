@@ -1,0 +1,53 @@
+FROM python:3.12-slim-bookworm AS wheel-builder
+
+WORKDIR /build
+COPY requirements-rest.txt pyproject.toml README.md ./
+COPY src ./src
+
+RUN python -m pip install --no-cache-dir --upgrade pip \
+    && python -m pip wheel --no-cache-dir --wheel-dir /wheels -r requirements-rest.txt \
+    && python -m pip wheel --no-cache-dir --no-deps --wheel-dir /wheels .
+
+
+FROM python:3.12-slim-bookworm AS runtime
+
+ENV PATH="/opt/venv/bin:${PATH}" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends iproute2 nftables \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --gid 1000660000 sandbox \
+    && useradd \
+       --no-log-init \
+       --uid 1000660000 \
+       --gid 1000660000 \
+       --create-home \
+       sandbox
+
+RUN python -m venv /opt/venv
+COPY requirements-rest.txt /tmp/requirements-rest.txt
+RUN --mount=type=bind,from=wheel-builder,source=/wheels,target=/wheels,ro \
+    /opt/venv/bin/pip install --no-cache-dir --no-compile --no-index --find-links=/wheels \
+       -r /tmp/requirements-rest.txt \
+    && /opt/venv/bin/pip check \
+    && /opt/venv/bin/pip install --no-cache-dir --no-compile --no-index --find-links=/wheels \
+       --no-deps reachy_mini_conversation_app \
+    && /opt/venv/bin/python -c \
+       "import reachy_mini_conversation_app.main; import reachy_mini_conversation_app.conversation_stream; import reachy_mini_conversation_app.rest_tool_transport; import reachy_mini_conversation_app.sandbox_audio; import reachy_mini_conversation_app.sandbox_control" \
+    && test -x /opt/venv/bin/reachy-agent-control \
+    && test -x /opt/venv/bin/reachy-mini-sandbox-audio \
+    && rm -rf /opt/venv/lib/python3.12/site-packages/pip /opt/venv/lib/python3.12/site-packages/pip-*.dist-info \
+    && rm -f /tmp/requirements-rest.txt
+
+RUN mkdir -p /sandbox/captures /sandbox/run /sandbox/logs /home/sandbox \
+    && chown -R sandbox:sandbox /sandbox /home/sandbox
+
+WORKDIR /sandbox
+USER sandbox
+
+# Keep the pre-created sandbox alive. The trusted native Reachy App starts and
+# stops the detached conversation process with reachy-agent-control.
+CMD ["/bin/sleep", "infinity"]

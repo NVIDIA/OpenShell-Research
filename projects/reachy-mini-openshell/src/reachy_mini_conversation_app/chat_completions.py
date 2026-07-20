@@ -8,12 +8,15 @@ import logging
 from typing import Any, Final, cast
 
 from reachy_mini_conversation_app.prompts import get_session_instructions
+from reachy_mini_conversation_app.tool_transport import ToolTransport
 from reachy_mini_conversation_app.tools.core_tools import (
     ToolDependencies,
     get_tool_specs,
     dispatch_tool_call_with_manager,
+    get_tool_specs_for_dependencies,
 )
-from reachy_mini_conversation_app.tools.background_tool_manager import BackgroundToolManager
+from reachy_mini_conversation_app.media_result_processor import MediaResultProcessor
+from reachy_mini_conversation_app.tools.background_tool_manager import ToolCallRoutine, BackgroundToolManager
 
 
 logger = logging.getLogger(__name__)
@@ -22,16 +25,25 @@ _RATE_LIMIT_ATTEMPTS: Final[int] = 3
 _RATE_LIMIT_DEFAULT_DELAY: Final[float] = 5.0
 _RATE_LIMIT_MAX_DELAY: Final[float] = 30.0
 _TOOL_ROUND_LIMIT: Final[int] = 5
+_MAX_TOOL_IMAGES: Final[int] = 12
 _WAIT_RE: Final[re.Pattern[str]] = re.compile(
     r"(?:please\s+)?wait\s+(\d+(?:\.\d+)?)\s+seconds?",
     re.IGNORECASE,
 )
 
 
-def chat_completion_tool_specs() -> list[dict[str, Any]]:
+def chat_completion_tool_specs(
+    deps: ToolDependencies | None = None,
+    tool_specs: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     """Convert Realtime-style tool specs to Chat Completions tool specs."""
     chat_tools: list[dict[str, Any]] = []
-    for tool in get_tool_specs():
+    realtime_tools = (
+        tool_specs
+        if tool_specs is not None
+        else (get_tool_specs_for_dependencies(deps) if deps is not None else get_tool_specs())
+    )
+    for tool in realtime_tools:
         if tool.get("type") != "function":
             continue
         chat_tools.append(
@@ -92,6 +104,66 @@ def _serialize_tool_call(tool_call: Any) -> dict[str, Any]:
     }
 
 
+def _separate_tool_images(tool_name: str, tool_result: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Remove raw image bytes from tool JSON and return validated vision inputs."""
+    model_tool_result = dict(tool_result)
+    images: list[str] = []
+
+    if tool_name == "camera" and "b64_im" in model_tool_result:
+        raw_image = model_tool_result.pop("b64_im")
+        if isinstance(raw_image, str) and raw_image:
+            images = [raw_image]
+            model_tool_result["status"] = "image_captured"
+        else:
+            return {"error": "Camera returned an invalid image"}, []
+    elif tool_name == "scan_scene" and "b64_images" in model_tool_result:
+        raw_images = model_tool_result.pop("b64_images")
+        if (
+            isinstance(raw_images, list)
+            and 0 < len(raw_images) <= _MAX_TOOL_IMAGES
+            and all(isinstance(image, str) and image for image in raw_images)
+        ):
+            images = raw_images
+        else:
+            return {"error": "Scene scan returned invalid analysis images"}, []
+
+    return model_tool_result, images
+
+
+def _vision_followup_message(
+    tool_name: str,
+    tool_result: dict[str, Any],
+    images: list[str],
+) -> dict[str, Any]:
+    """Build a Chat Completions user message containing tool-captured images."""
+    if tool_name == "scan_scene":
+        question = tool_result.get("question", "Describe everything visible during the scan.")
+        timestamps = tool_result.get("frame_timestamps_seconds", [])
+        prompt = (
+            "These are chronological frames sampled across one Reachy scene sweep. "
+            f"Frame timestamps in seconds: {timestamps}. Combine evidence across all frames, "
+            "deduplicate repeated people and objects, and describe only visibly supported details. "
+            f"User question: {question}"
+        )
+    else:
+        question = tool_result.get("question", "Describe this image.")
+        prompt = f"Answer the camera question using this image: {question}"
+
+    return {
+        "role": "user",
+        "content": [
+            {"type": "text", "text": prompt},
+            *[
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{image}"},
+                }
+                for image in images
+            ],
+        ],
+    }
+
+
 def _rate_limit_delay(exc: Exception) -> float | None:
     """Return a retry delay when a Chat Completions error is a provider rate limit."""
     status_code = getattr(exc, "status_code", None)
@@ -136,11 +208,15 @@ class ChatCompletionRunner:
         tool_manager: BackgroundToolManager,
         model_name: str,
         base_url: str | None,
+        tool_transport: ToolTransport | None = None,
+        media_result_processor: MediaResultProcessor | None = None,
     ) -> None:
         """Initialize the runner."""
         self.client = client
         self.deps = deps
         self.tool_manager = tool_manager
+        self.tool_transport = tool_transport
+        self.media_result_processor = media_result_processor
         self.model_name = model_name
         self.base_url = base_url
 
@@ -172,7 +248,19 @@ class ChatCompletionRunner:
             {"role": "system", "content": get_session_instructions()},
             {"role": "user", "content": text},
         ]
-        chat_tools = chat_completion_tool_specs()
+        try:
+            transport_specs = await self.tool_transport.list_tools() if self.tool_transport is not None else None
+        except Exception as e:
+            logger.exception("Tool discovery failed")
+            chatbot_messages.append(
+                {
+                    "role": "assistant",
+                    "content": f"[error] Tool discovery failed: {type(e).__name__}: {e}",
+                }
+            )
+            return chatbot_messages
+
+        chat_tools = chat_completion_tool_specs(self.deps, transport_specs)
 
         operation = "Chat Completions request"
         request_kwargs: dict[str, Any] = {
@@ -227,12 +315,20 @@ class ChatCompletionRunner:
                 }
             )
 
+            vision_followups: list[dict[str, Any]] = []
             for tool_call in tool_calls:
                 tool_call_id = _tool_call_value(tool_call, "id") or str(uuid.uuid4())
                 tool_name = _tool_call_function_value(tool_call, "name")
                 args_json = _tool_call_function_value(tool_call, "arguments") or "{}"
                 if not isinstance(tool_name, str):
                     tool_result = {"error": "tool call did not include a valid function name"}
+                elif self.tool_transport is not None:
+                    tool_result = await ToolCallRoutine(
+                        tool_name=tool_name,
+                        args_json_str=args_json,
+                        deps=self.deps,
+                        transport=self.tool_transport,
+                    )(self.tool_manager)
                 else:
                     tool_result = await dispatch_tool_call_with_manager(
                         tool_name,
@@ -241,7 +337,13 @@ class ChatCompletionRunner:
                         self.tool_manager,
                     )
 
-                tool_result_json = json.dumps(tool_result)
+                if self.media_result_processor is not None:
+                    processed_media = await self.media_result_processor.process(tool_name or "", tool_result)
+                    model_tool_result = processed_media.model_payload
+                    vision_images: list[str] = []
+                else:
+                    model_tool_result, vision_images = _separate_tool_images(tool_name or "", tool_result)
+                tool_result_json = json.dumps(model_tool_result)
                 chat_messages.append(
                     {
                         "role": "tool",
@@ -259,6 +361,12 @@ class ChatCompletionRunner:
                         },
                     }
                 )
+                if vision_images:
+                    vision_followups.append(
+                        _vision_followup_message(tool_name or "", model_tool_result, vision_images)
+                    )
+
+            chat_messages.extend(vision_followups)
 
             operation = "Chat Completions tool follow-up"
             request_kwargs = {

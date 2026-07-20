@@ -199,12 +199,39 @@ def card_visual_class(post: dict[str, Any]) -> str:
     return slug or "research"
 
 
-def render_card_visual(post: dict[str, Any]) -> str:
+def card_hero_image_url(post: dict[str, Any]) -> str | None:
+    """Resolve an optional post-relative hero image for the Dev Notes index."""
+    raw_path = str(post["metadata"].get("hero_image", "")).strip()
+    if not raw_path:
+        return None
+
+    docs_root = (ROOT / "docs").resolve()
+    hero_path = (post["path"].parent / raw_path).resolve()
+    try:
+        docs_relative = hero_path.relative_to(docs_root)
+    except ValueError as exc:
+        raise ValueError(f"{post['path']} hero_image must stay inside {docs_root}") from exc
+    if not hero_path.is_file():
+        raise ValueError(f"{post['path']} hero_image does not exist: {hero_path}")
+
+    return (Path("..") / docs_relative).as_posix()
+
+
+def render_card_visual(post: dict[str, Any], *, eager: bool = False) -> str:
     metadata = post["metadata"]
+    variant = html.escape(card_visual_class(post), quote=True)
+    hero_image = card_hero_image_url(post)
+    if hero_image:
+        loading = "eager" if eager else "lazy"
+        priority = ' fetchpriority="high"' if eager else ""
+        return f"""      <div class="dev-note-card__visual dev-note-card__visual--{variant} dev-note-card__visual--image" aria-hidden="true">
+        <img class="dev-note-card__visual-image" src="{html.escape(hero_image, quote=True)}" alt="" loading="{loading}"{priority}>
+      </div>"""
+
     categories = require_list(metadata, "categories", post["path"])
     label = categories[0] if categories else "Research"
     date_stamp = post["published"].strftime("%Y.%m.%d")
-    return f"""      <div class="dev-note-card__visual dev-note-card__visual--{html.escape(card_visual_class(post), quote=True)}" aria-hidden="true">
+    return f"""      <div class="dev-note-card__visual dev-note-card__visual--{variant}" aria-hidden="true">
         <span class="dev-note-card__visual-label">Field note / {html.escape(label)}</span>
         <span class="dev-note-card__visual-index">{date_stamp}</span>
         <span class="dev-note-card__visual-mark">&gt;_</span>
@@ -257,9 +284,10 @@ def render_card_copy(post: dict[str, Any]) -> str:
 def render_featured_card(post: dict[str, Any]) -> str:
     relative_url = post["path"].relative_to(DEV_NOTES_DIR).with_suffix("").as_posix() + "/"
     variant = card_visual_class(post)
-    return f"""    <article class="dev-note-card dev-note-card--featured dev-note-card--{html.escape(variant, quote=True)}">
+    image_class = " dev-note-card--has-image" if card_hero_image_url(post) else ""
+    return f"""    <article class="dev-note-card dev-note-card--featured dev-note-card--{html.escape(variant, quote=True)}{image_class}">
       <a class="dev-note-card__link" href="{html.escape(relative_url, quote=True)}">
-{render_card_visual(post)}
+{render_card_visual(post, eager=True)}
 {render_card_copy(post)}
       </a>
     </article>"""
@@ -268,7 +296,8 @@ def render_featured_card(post: dict[str, Any]) -> str:
 def render_recent_card(post: dict[str, Any]) -> str:
     relative_url = post["path"].relative_to(DEV_NOTES_DIR).with_suffix("").as_posix() + "/"
     variant = card_visual_class(post)
-    return f"""    <article class="dev-note-card dev-note-card--recent dev-note-card--{html.escape(variant, quote=True)}">
+    image_class = " dev-note-card--has-image" if card_hero_image_url(post) else ""
+    return f"""    <article class="dev-note-card dev-note-card--recent dev-note-card--{html.escape(variant, quote=True)}{image_class}">
       <a class="dev-note-card__link" href="{html.escape(relative_url, quote=True)}">
 {render_card_visual(post)}
 {render_card_copy(post)}

@@ -3,3 +3,7 @@ stop_dance
 play_emotion
 stop_emotion
 sweep_look
+camera
+scan_scene
+move_head
+do_nothing

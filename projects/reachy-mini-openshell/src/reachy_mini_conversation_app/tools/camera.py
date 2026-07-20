@@ -25,6 +25,7 @@ class Camera(Tool):
             },
         },
         "required": ["question"],
+        "additionalProperties": False,
     }
 
     async def __call__(self, deps: ToolDependencies, **kwargs: Any) -> Dict[str, Any]:
@@ -46,7 +47,9 @@ class Camera(Tool):
             logger.error("Camera worker not available")
             return {"error": "Camera worker not available"}
 
-        # Use vision manager for processing if available
+        # Use the explicitly enabled local vision manager before the legacy
+        # active-conversation path. Main does not install both local vision and
+        # routed cloud vision at the same time.
         if deps.vision_manager is not None:
             vision_result = await asyncio.to_thread(
                 deps.vision_manager.processor.process_image,
@@ -67,4 +70,12 @@ class Camera(Tool):
             raise RuntimeError("Failed to encode frame as JPEG")
 
         b64_encoded = base64.b64encode(buffer.tobytes()).decode("utf-8")
-        return {"b64_im": b64_encoded}
+
+        if deps.vision_router is not None:
+            analysis = await deps.vision_router.analyze_images(
+                images_base64=[b64_encoded],
+                question=image_query,
+            )
+            return analysis.as_tool_result()
+
+        return {"b64_im": b64_encoded, "question": image_query}
