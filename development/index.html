@@ -62,6 +62,9 @@
 
     
     
+  
+  
+
   </head>
   
   
@@ -506,6 +509,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#agent-readable-markdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Agent-readable Markdown
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#dev-notes" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -560,8 +574,10 @@
               <article class="md-content__inner md-typeset">
                 
                   
+
   
   
+
 
 
 <h1 id="documentation-site-development">Documentation site development<a class="headerlink" href="#documentation-site-development" title="Permanent link">&para;</a></h1>
@@ -578,6 +594,19 @@ root. Use Python 3.10 or newer.</p>
   <code>docs/documentation/</code>, link it to the originating Dev Note, and add it to
   <code>zensical.toml</code>.</li>
 </ul>
+<h2 id="agent-readable-markdown">Agent-readable Markdown<a class="headerlink" href="#agent-readable-markdown" title="Permanent link">&para;</a></h2>
+<p>Every canonical content page under <code>docs/dev-notes/posts/</code> and
+<code>docs/documentation/</code> must declare <code>agent_markdown: true</code> in its front matter.
+The clean site build copies those sources byte-for-byte into <code>site/</code> at the same
+path relative to <code>docs/</code>, and each rendered page links to its same-origin
+Markdown source for people and agents. The generated copies under <code>site/</code> must
+not be edited.</p>
+<p>Every page in the two canonical content directories is published, including
+the Documentation index. Keep presentation-only landing pages such as the
+homepage and Dev Notes card index, redirect-only pages, obsolete or orphan
+project pages, internal development documentation, and the 404 page outside
+those directories and do not add the marker to them. Those pages are not
+canonical content for agent consumption.</p>
 <h2 id="dev-notes">Dev Notes<a class="headerlink" href="#dev-notes" title="Permanent link">&para;</a></h2>
 <p>Dev Notes are Markdown posts under <code>docs/dev-notes/posts/</code>. Each post requires
 <code>title</code>, an exact <code>YYYY-MM-DD</code> date, <code>description</code>, and at least one <code>authors</code> ID
@@ -619,16 +648,19 @@ project site prefix.</p>
 <p><code>scripts/build-docs.sh</code> recreates <code>.venv-docs</code>, installs the pinned toolchain,
 renders Dev Notes metadata, and runs <code>zensical build --clean --strict</code>. Do not
 report success unless it completes without issues.</p>
-<p>For documentation-site changes, serve the site before handing the task back:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>.venv-docs/bin/zensical<span class="w"> </span>serve
+<p>For documentation-site changes, serve the complete built artifact before
+handing the task back:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>http.server<span class="w"> </span><span class="m">8000</span><span class="w"> </span>--directory<span class="w"> </span>site
 </span></code></pre></div>
 <p>Confirm <a href="http://localhost:8000">http://localhost:8000</a> is reachable and report the URL and command being
-served. Pull requests from branches in this repository that change documentation
-inputs publish the built site under <code>/pr-preview/pr-&lt;number&gt;/</code> and receive a
-comment linking to that browser-accessible preview. The preview is updated when
-the PR changes and removed when the PR closes or no longer changes documentation.
-Fork and Dependabot pull requests validate with read-only credentials but do not
-publish previews on the production documentation origin.</p>
+served. Plain <code>zensical serve</code> does not run the post-build Markdown publisher,
+so it is not an artifact-faithful preview. Pull requests from branches in this
+repository that change documentation inputs publish the built site under
+<code>/pr-preview/pr-&lt;number&gt;/</code> and receive a comment linking to that
+browser-accessible preview. The preview is updated when the PR changes and
+removed when the PR closes or no longer changes documentation. Fork and
+Dependabot pull requests validate with read-only credentials but do not publish
+previews on the production documentation origin.</p>
 <p>The <code>gh-pages</code> branch stores the composite production site and active previews;
 GitHub Pages remains configured with <strong>GitHub Actions</strong> as its publishing source.
 Pushes and manual workflow runs from <code>main</code> update the production site while
