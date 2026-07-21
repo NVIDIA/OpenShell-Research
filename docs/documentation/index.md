@@ -1,6 +1,7 @@
 ---
 title: Documentation
 description: Technical guides for projects featured in OpenShell Dev Notes.
+agent_markdown: true
 ---
 
 # Documentation

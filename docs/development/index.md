@@ -19,6 +19,22 @@ root. Use Python 3.10 or newer.
   `docs/documentation/`, link it to the originating Dev Note, and add it to
   `zensical.toml`.
 
+## Agent-readable Markdown
+
+Every canonical content page under `docs/dev-notes/posts/` and
+`docs/documentation/` must declare `agent_markdown: true` in its front matter.
+The clean site build copies those sources byte-for-byte into `site/` at the same
+path relative to `docs/`, and each rendered page links to its same-origin
+Markdown source for people and agents. The generated copies under `site/` must
+not be edited.
+
+Every page in the two canonical content directories is published, including
+the Documentation index. Keep presentation-only landing pages such as the
+homepage and Dev Notes card index, redirect-only pages, obsolete or orphan
+project pages, internal development documentation, and the 404 page outside
+those directories and do not add the marker to them. Those pages are not
+canonical content for agent consumption.
+
 ## Dev Notes
 
 Dev Notes are Markdown posts under `docs/dev-notes/posts/`. Each post requires
@@ -75,19 +91,22 @@ scripts/build-docs.sh
 renders Dev Notes metadata, and runs `zensical build --clean --strict`. Do not
 report success unless it completes without issues.
 
-For documentation-site changes, serve the site before handing the task back:
+For documentation-site changes, serve the complete built artifact before
+handing the task back:
 
 ```sh
-.venv-docs/bin/zensical serve
+python3 -m http.server 8000 --directory site
 ```
 
 Confirm <http://localhost:8000> is reachable and report the URL and command being
-served. Pull requests from branches in this repository that change documentation
-inputs publish the built site under `/pr-preview/pr-<number>/` and receive a
-comment linking to that browser-accessible preview. The preview is updated when
-the PR changes and removed when the PR closes or no longer changes documentation.
-Fork and Dependabot pull requests validate with read-only credentials but do not
-publish previews on the production documentation origin.
+served. Plain `zensical serve` does not run the post-build Markdown publisher,
+so it is not an artifact-faithful preview. Pull requests from branches in this
+repository that change documentation inputs publish the built site under
+`/pr-preview/pr-<number>/` and receive a comment linking to that
+browser-accessible preview. The preview is updated when the PR changes and
+removed when the PR closes or no longer changes documentation. Fork and
+Dependabot pull requests validate with read-only credentials but do not publish
+previews on the production documentation origin.
 
 The `gh-pages` branch stores the composite production site and active previews;
 GitHub Pages remains configured with **GitHub Actions** as its publishing source.
