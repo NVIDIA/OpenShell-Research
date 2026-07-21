@@ -32,4 +32,6 @@ python -m pip install -r requirements-docs.txt
 
 python scripts/render-dev-notes.py
 zensical build --clean --strict
+python scripts/publish-agent-markdown.py
+REQUIRE_RENDERED_AGENT_MARKDOWN=1 python tests/test_agent_markdown.py
 REQUIRE_RENDERED_404=1 python tests/test_docs_404.py

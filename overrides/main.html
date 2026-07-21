@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% import "partials/agent-markdown.html" as agent_markdown with context %}
+
+{% block extrahead %}
+  {{ super() }}
+  {% if page.meta and page.meta.agent_markdown %}
+    <link rel="alternate" type="text/markdown" href="{{ agent_markdown.href(page) }}" title="Markdown source">
+  {% endif %}
+{% endblock %}

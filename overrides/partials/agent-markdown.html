@@ -1,0 +1,13 @@
+{% macro href(page) -%}
+  {%- if page.edit_url.split is defined -%}
+    {%- set parts = page.edit_url.split("/") -%}
+  {%- else -%}
+    {%- set parts = page.edit_url | split("/") -%}
+  {%- endif -%}
+  {%- set filename = parts | last -%}
+  {%- if filename == "index.md" -%}
+    index.md
+  {%- else -%}
+    ../{{ filename }}
+  {%- endif -%}
+{%- endmacro %}
