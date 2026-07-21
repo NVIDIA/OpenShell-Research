@@ -2,8 +2,9 @@
 site_name = "OpenShell Research"
 site_description = "Research engineering Dev Notes and software documentation from the OpenShell team."
 site_author = "OpenShell Research Engineering"
+repo_url = "https://github.com/NVIDIA/OpenShell-Research"
+repo_name = "OpenShell Research on GitHub"
 copyright = """
-<span><span class="openshell-footer-prompt" aria-hidden="true">&gt;_</span> OpenShell Research</span>
 <a href="https://github.com/NVIDIA/OpenShell">OpenShell on GitHub <span aria-hidden="true">↗</span></a>
 """
 docs_dir = "docs"
@@ -32,6 +33,7 @@ generator = false
 custom_dir = "overrides"
 favicon = "assets/brand/favicon.svg"
 logo = "assets/brand/openshell-mark.svg"
+icon.repo = "fontawesome/brands/github"
 features = [
   "navigation.sections",
   "navigation.indexes",
