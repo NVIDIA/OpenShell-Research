@@ -28,10 +28,12 @@ path relative to `docs/`, and each rendered page links to its same-origin
 Markdown source for people and agents. The generated copies under `site/` must
 not be edited.
 
-Do not add the marker to the homepage, section landing pages, redirects,
-obsolete or orphan project pages, internal development documentation, or the
-404 page. Those pages are not canonical long-form content for agent
-consumption.
+Every page in the two canonical content directories is published, including
+the Documentation index. Keep presentation-only landing pages such as the
+homepage and Dev Notes card index, redirect-only pages, obsolete or orphan
+project pages, internal development documentation, and the 404 page outside
+those directories and do not add the marker to them. Those pages are not
+canonical content for agent consumption.
 
 ## Dev Notes
 
