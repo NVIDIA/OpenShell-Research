@@ -1,0 +1,21 @@
+[package]
+name = "__RUST_CRATE_NAME__"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+publish = false
+
+[lib]
+name = "__RUST_LIB_NAME__"
+
+[dependencies]
+prost = "0.14"
+prost-types = "0.14"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
+tokio-stream = { version = "0.1", features = ["net"] }
+tonic = "0.14"
+tonic-prost = "0.14"
+
+[build-dependencies]
+protobuf-src = "1.1.0"
+tonic-prost-build = "0.14"
