@@ -91,6 +91,17 @@ _RUST_KEYWORDS = {
     "while",
     "yield",
 }
+_RUST_RESERVED_IDENTIFIERS = _RUST_KEYWORDS | {
+    "alloc",
+    "build",
+    "core",
+    "deps",
+    "examples",
+    "incremental",
+    "proc_macro",
+    "std",
+    "test",
+}
 
 
 class InitializationError(RuntimeError):
@@ -256,7 +267,7 @@ def _template_context(name: str, language: str, package_name: str | None) -> Tem
     service_name = normalized_name.replace("_", "-").replace(".", "-")
     rust_lib_name = identifier
     rust_crate_name = distribution_name
-    if not rust_lib_name[0].isalpha() or rust_lib_name in _RUST_KEYWORDS:
+    if not rust_lib_name[0].isalpha() or rust_lib_name in _RUST_RESERVED_IDENTIFIERS:
         rust_lib_name = f"middleware_{rust_lib_name}"
         rust_crate_name = f"middleware-{distribution_name}"
     return TemplateContext(

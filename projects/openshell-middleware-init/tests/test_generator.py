@@ -125,6 +125,8 @@ def test_numeric_project_name_gets_importable_python_package(tmp_path: Path) -> 
     [
         ("123", "middleware-123", "middleware_123"),
         ("type", "middleware-type", "middleware_type"),
+        ("std", "middleware-std", "middleware_std"),
+        ("build", "middleware-build", "middleware_build"),
     ],
 )
 def test_rust_project_names_get_valid_explicit_library_names(
