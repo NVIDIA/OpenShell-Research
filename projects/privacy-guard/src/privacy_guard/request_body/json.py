@@ -12,13 +12,13 @@ from typing import TYPE_CHECKING
 from pydantic import ConfigDict, TypeAdapter, ValidationError
 from typing_extensions import TypeAliasType, override
 
-from privacy_guard.body.base import FormatHandler, RequestBody, TextBlock
 from privacy_guard.constants import (
     MAX_JSON_NESTING,
     MAX_SCANNED_CHARACTERS,
     MAX_TEXT_BLOCKS,
 )
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
+from privacy_guard.request_body.base import FormatHandler, RequestBody, TextBlock
 from privacy_guard.validation import ScalarString, parse_scalar_string
 
 if TYPE_CHECKING:

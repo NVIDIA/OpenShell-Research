@@ -5,14 +5,14 @@ import pytest
 from pydantic import ValidationError
 from typing_extensions import override
 
-from privacy_guard.body import (
+from privacy_guard.config import PolicyConfig
+from privacy_guard.request_body import (
     FormatHandler,
     FormatHandlerContractError,
     RequestBody,
     TextBlock,
     parse_normalized_body,
 )
-from privacy_guard.config import PolicyConfig
 
 
 class OpaqueHandler(FormatHandler):

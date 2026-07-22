@@ -1,11 +1,16 @@
-# Manually try Privacy Guard with Claude Code
+# Email scanner example
 
-This example temporarily runs the installed OpenShell gateway with a config from
-this directory. It does not create or modify `~/.config/openshell/gateway.toml`,
-and it does not create a project-local state directory.
+This self-contained example supplies a deterministic email scanner, its Privacy
+Guard server entry point, and the OpenShell gateway and sandbox policy needed to
+try redaction with Claude Code. It temporarily runs the installed OpenShell
+gateway with the config from this directory. It does not create or modify
+`~/.config/openshell/gateway.toml`, and it does not create a project-local state
+directory.
 
-The example scanner detects email addresses in Claude Code request bodies and
-replaces them with `[email]` before Anthropic receives the request.
+The illustrative regex scanner in `middleware_server.py` detects email-shaped
+text in Claude Code request bodies. The policy replaces matches with `[email]`
+before Anthropic receives the request. The scanner is intentionally small and
+deterministic; it is not intended for production PII detection.
 
 ## Prerequisites
 
@@ -20,7 +25,7 @@ replaces them with `[email]` before Anthropic receives the request.
 Run the example commands from this directory:
 
 ```bash
-cd projects/privacy-guard/examples/openshell-manual
+cd projects/privacy-guard/examples/email-scanner
 ```
 
 ## 1. Edit the example config
@@ -46,7 +51,7 @@ Only the checked-out `gateway.toml` is edited. Do not copy it into
 In terminal 1:
 
 ```bash
-uv run --project ../.. python ../openshell-e2e/middleware_server.py \
+uv run --project ../.. python middleware_server.py \
   --listen 0.0.0.0:50051
 ```
 
@@ -144,6 +149,6 @@ brew services start openshell
 Stop Privacy Guard with `Ctrl-C` in terminal 1. No default OpenShell config was
 changed.
 
-This test uses Claude Code because subscription prompts are sent in inspectable
+This example uses Claude Code because subscription prompts are sent in inspectable
 HTTP request bodies. ChatGPT-subscription Codex currently sends prompts in
 WebSocket frames, which this HTTP middleware cannot inspect.

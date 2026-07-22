@@ -6,10 +6,15 @@ from dataclasses import FrozenInstanceError
 import pytest
 from pydantic import ValidationError
 
-import privacy_guard.body.json as json_module
-from privacy_guard.body import JsonHandler, RequestBody, TextBlock, select_handler
+import privacy_guard.request_body.json as json_module
 from privacy_guard.config import PolicyConfig
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
+from privacy_guard.request_body import (
+    JsonHandler,
+    RequestBody,
+    TextBlock,
+    select_format_handler,
+)
 
 
 def _assert_safe_error(
@@ -244,7 +249,7 @@ def test_normalize_rejects_invalid_json() -> None:
 def test_normalize_shape_failure_drops_sensitive_exception_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import privacy_guard.body.json as json_module
+    import privacy_guard.request_body.json as json_module
 
     sensitive_text = "distinctive-sensitive-shape-8472"
     monkeypatch.setattr(json_module, "MAX_SCANNED_CHARACTERS", len(sensitive_text) - 1)
@@ -557,18 +562,18 @@ def test_reconstruct_does_not_mutate_original_parsed_value() -> None:
     assert _json_state_value(request_body) == original_value
 
 
-def test_select_handler_returns_registered_json_singleton() -> None:
-    json_handler = select_handler("json")
+def test_select_format_handler_returns_registered_json_singleton() -> None:
+    json_handler = select_format_handler("json")
 
     assert isinstance(json_handler, JsonHandler)
-    assert select_handler("json") is json_handler
+    assert select_format_handler("json") is json_handler
 
 
-def test_select_handler_rejects_unknown_kind_without_fallback() -> None:
+def test_select_format_handler_rejects_unknown_kind_without_fallback() -> None:
     sentinel = "unknown-sensitive-format-8472"
 
     with pytest.raises(PrivacyGuardError) as exception_info:
-        select_handler(sentinel)
+        select_format_handler(sentinel)
 
     assert exception_info.value.code is ErrorCode.BODY_FORMAT_UNSUPPORTED
     assert sentinel not in str(exception_info.value)

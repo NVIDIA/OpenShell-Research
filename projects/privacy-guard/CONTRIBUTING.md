@@ -39,7 +39,8 @@ suppressions narrow and rule-specific. Production and test overrides are
 explicit; example scripts omit `@override` to keep their public API surface
 minimal and copyable.
 
-Run the committed full-path performance evidence with:
+When changing performance-sensitive processing code, run the optional
+diagnostic benchmark with:
 
 ```bash
 uv run --frozen python scripts/benchmark_privacy_guard.py --suite full
@@ -47,4 +48,8 @@ uv run --frozen python scripts/benchmark_privacy_guard.py --suite full
 
 Use the default quick suite during iteration. Both suites verify findings and
 reconstruction outcomes before reporting median wall time and peak traced
-allocation.
+allocation. The benchmark is not part of the contributor gate and has no
+pass/fail thresholds; compare results only on a controlled environment. It uses
+a synthetic scanner and the synchronous processor path, so it does not measure
+real scanner cost, service concurrency, queuing, gRPC adaptation, or process
+RSS.

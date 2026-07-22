@@ -1,4 +1,9 @@
-# Full-path benchmark evidence
+# Diagnostic benchmark
+
+This is a manual development tool, not a contributor or release gate. It has no
+pass/fail thresholds, and results should be compared only across equivalent,
+controlled environments. The recorded table below is a one-time snapshot, not
+an evergreen performance baseline.
 
 The benchmark invokes `RequestProcessor.process` and therefore covers JSON
 normalization, scanner calls, scanner-output validation, contextual finding
@@ -63,3 +68,11 @@ domain. The maximum-width peak includes the unavoidable overlap while the
 cached Pydantic adapter constructs its validated output from the stdlib parse
 tree; the raw parse tree becomes unreachable when the parse helper returns,
 before text-block materialization begins.
+
+The harness deliberately isolates processor overhead with a synthetic scanner.
+It does not represent the latency of a future production PII scanner and does
+not include protobuf conversion, gRPC transport, executor or semaphore queuing,
+concurrent throughput, or whole-process memory. Add realistic request
+distributions and service-level concurrency measurements when a production
+scanner is introduced; establish regression thresholds only on pinned
+infrastructure.

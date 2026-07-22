@@ -4,7 +4,6 @@ import pytest
 from pydantic import ValidationError
 from typing_extensions import override
 
-from privacy_guard.body import FormatHandler, RequestBody, TextBlock
 from privacy_guard.config import PolicyAction, PolicyConfig
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
 from privacy_guard.payloads import (
@@ -13,6 +12,7 @@ from privacy_guard.payloads import (
     ProcessingResult,
 )
 from privacy_guard.processor import RequestProcessor
+from privacy_guard.request_body import FormatHandler, RequestBody, TextBlock
 from privacy_guard.scanners import (
     Finding,
     PassthroughScanner,

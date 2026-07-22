@@ -1,7 +1,6 @@
 import pytest
 from pydantic import ValidationError
 
-from privacy_guard.body import select_handler
 from privacy_guard.config import (
     ActionConfig,
     BlockActionConfig,
@@ -13,6 +12,7 @@ from privacy_guard.config import (
 )
 from privacy_guard.constants import MAX_SCANNER_METADATA_BYTES
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
+from privacy_guard.request_body import select_format_handler
 from privacy_guard.scanners import Confidence
 from privacy_guard.validation import (
     BoundedMetadataString,
@@ -358,11 +358,11 @@ def test_validation_failure_does_not_leak_input_or_pydantic_error() -> None:
     assert error.__cause__ is None
 
 
-def test_select_handler_error_does_not_leak_unknown_format() -> None:
+def test_select_format_handler_error_does_not_leak_unknown_format() -> None:
     sentinel = "sensitive-unknown-format-8472"
 
     with pytest.raises(PrivacyGuardError) as exception_info:
-        select_handler(sentinel)
+        select_format_handler(sentinel)
 
     assert exception_info.value.code is ErrorCode.BODY_FORMAT_UNSUPPORTED
     assert sentinel not in str(exception_info.value)

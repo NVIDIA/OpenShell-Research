@@ -12,9 +12,9 @@ original.
 > a loopback server are implemented. The production scanner is still the
 > passthrough scanner; no real PII scanner exists yet.
 
-The [OpenShell E2E example](examples/openshell-e2e/README.md) launches the
-middleware, attaches it to a disposable sandbox, and verifies that OpenShell
-forwards a reconstructed provider-shaped request to a local capture endpoint.
+The self-contained [email scanner example](examples/email-scanner/README.md)
+provides a deterministic scanner, middleware entry point, gateway registration,
+sandbox policy, and manual Claude Code workflow.
 
 ## Request flow
 
@@ -23,10 +23,12 @@ forwards a reconstructed provider-shaped request to a local capture endpoint.
 ```
 proto HttpRequestEvaluation
   -> payloads.InterceptedRequest         proto-free capture of the request
-  -> body.FormatHandler.normalize()      -> body.RequestBody (TextBlocks)
+  -> request_body.FormatHandler.normalize()
+                                       -> request_body.RequestBody (TextBlocks)
   -> scanners.Scanner.scan(text_block)   -> scanners.Finding[]
   -> policy via config.PolicyConfig      -> per-block replacements
-  -> body.FormatHandler.reconstruct()    -> rewritten body (bytes)
+  -> request_body.FormatHandler.reconstruct()
+                                       -> rewritten body (bytes)
   -> payloads.ProcessingResult           decision + replacement + findings
   -> proto HttpRequestResult
 ```
@@ -86,7 +88,7 @@ and entity. A scanner sequence is passed to `RequestProcessor`; scanner names
 must be unique and remain visible in aggregated findings.
 
 The default service uses `PassthroughScanner`. The deterministic email regex and
-its server entry point live entirely under `examples/openshell-e2e`; production
+its server entry point live entirely under `examples/email-scanner`; production
 package modules neither export nor select it.
 
 A scanner is a nominal extension: declare its strict configuration type and
@@ -152,7 +154,7 @@ release its scanner slot until its synchronous worker really exits.
 | `constants` | Package-wide limits, service metadata, and stable protocol values |
 | `errors` | Closed, content-safe error catalog shared by all components |
 | `payloads` | Frozen `InterceptedRequest` and `ProcessingResult` domain records |
-| `body` | Nominal `FormatHandler` ABC + `JsonHandler`; strict `RequestBody`, `TextBlock` models |
+| `request_body` | Nominal `FormatHandler` ABC + `JsonHandler`; strict `RequestBody`, `TextBlock` models |
 | `scanners` | `Scanner` ABC + strict `ScannerConfig`, `Finding`, and `RequestBodyFinding` models |
 | `processor` | Proto-free request orchestration and policy application |
 | `service` | High-level `MiddlewareServer`, gRPC lifecycle, and servicer adapter |
@@ -184,7 +186,7 @@ release its scanner slot until its synchronous worker really exits.
 
   from typing_extensions import override
 
-  from privacy_guard.body import FormatHandler, RequestBody
+  from privacy_guard.request_body import FormatHandler, RequestBody
   from privacy_guard.config import PolicyConfig
 
 
@@ -227,16 +229,20 @@ The AST policy test rejects cast operations and explicit dynamic typing in
 handwritten `src`, `tests`, and `examples`; only generated protobuf/gRPC bindings
 are excluded.
 
-The deterministic benchmark gate uses three samples per median and covers every
-required size, finding load, scanner shape, and reconstruction mode:
+The optional diagnostic benchmark uses three samples per median and covers a
+focused set of body sizes, finding loads, scanner shapes, and reconstruction
+modes:
 
 ```bash
 uv run --frozen python scripts/benchmark_privacy_guard.py
 ```
 
-For the broader scenario set and seven samples per median, pass `--suite full`.
+Use it manually when changing performance-sensitive processing code; it is not
+part of `scripts/validate.sh` and does not enforce regression thresholds. For
+the broader scenario set and seven samples per median, pass `--suite full`.
 Pass `--profile profile.out` to either suite to record a `cProfile` artifact.
 The harness reports median wall time and median peak traced allocation for the
-complete normalize, scan, output validation, policy, and reconstruction path.
-Committed reference measurements and methodology are in
-[BENCHMARKS.md](BENCHMARKS.md).
+synchronous normalize, synthetic scan, output validation, policy, and
+reconstruction path. It does not measure a real PII scanner, gRPC adaptation,
+executor queuing, concurrent throughput, or process RSS. Methodology and one
+platform-specific development snapshot are in [BENCHMARKS.md](BENCHMARKS.md).

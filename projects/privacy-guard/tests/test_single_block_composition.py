@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from privacy_guard.body import JsonHandler
 from privacy_guard.config import PolicyConfig
+from privacy_guard.request_body import JsonHandler
 from privacy_guard.scanners import PassthroughScanner
 
 

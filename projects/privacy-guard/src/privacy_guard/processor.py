@@ -6,13 +6,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from string import Formatter
 
-from privacy_guard.body import (
-    DEFAULT_FORMAT_HANDLERS,
-    FormatHandler,
-    FormatHandlerContractError,
-    RequestBody,
-    TextBlock,
-)
 from privacy_guard.config import (
     ActionConfig,
     BlockActionConfig,
@@ -34,6 +27,13 @@ from privacy_guard.payloads import (
     InterceptedRequest,
     ProcessingDecision,
     ProcessingResult,
+)
+from privacy_guard.request_body import (
+    DEFAULT_FORMAT_HANDLERS,
+    FormatHandler,
+    FormatHandlerContractError,
+    RequestBody,
+    TextBlock,
 )
 from privacy_guard.scanners import (
     Finding,

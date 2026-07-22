@@ -5,15 +5,15 @@ from __future__ import annotations
 from collections.abc import Mapping
 from types import MappingProxyType
 
-from privacy_guard.body.base import (
+from privacy_guard.errors import ErrorCode, PrivacyGuardError
+from privacy_guard.request_body.base import (
     FormatHandler,
     FormatHandlerContractError,
     RequestBody,
     TextBlock,
     parse_normalized_body,
 )
-from privacy_guard.body.json import JsonHandler
-from privacy_guard.errors import ErrorCode, PrivacyGuardError
+from privacy_guard.request_body.json import JsonHandler
 
 DEFAULT_FORMAT_HANDLERS: Mapping[str, FormatHandler] = MappingProxyType(
     {handler.format_name: handler for handler in (JsonHandler(),)}
@@ -21,7 +21,7 @@ DEFAULT_FORMAT_HANDLERS: Mapping[str, FormatHandler] = MappingProxyType(
 """Built-in handlers keyed by name; processors may receive a custom mapping."""
 
 
-def select_handler(body_format: str) -> FormatHandler:
+def select_format_handler(body_format: str) -> FormatHandler:
     """Return the registered FormatHandler for ``body_format`` (e.g. "json").
 
     ``body_format`` comes from ``PolicyConfig.body_format``. Raise for an
@@ -41,5 +41,5 @@ __all__ = [
     "RequestBody",
     "TextBlock",
     "parse_normalized_body",
-    "select_handler",
+    "select_format_handler",
 ]

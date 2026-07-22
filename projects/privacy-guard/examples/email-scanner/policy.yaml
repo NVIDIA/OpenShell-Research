@@ -11,21 +11,29 @@ process:
   run_as_group: sandbox
 
 network_policies:
-  privacy_guard_capture:
-    name: Privacy Guard E2E capture endpoint
+  claude_code:
+    name: Claude Code subscription access
     endpoints:
-      - host: host.openshell.internal
-        port: 18080
+      - host: api.anthropic.com
+        port: 443
         protocol: rest
         enforcement: enforce
         access: full
+      - host: platform.claude.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - { host: statsig.anthropic.com, port: 443 }
+      - { host: sentry.io, port: 443 }
     binaries:
-      - { path: /usr/bin/curl }
+      - { path: /usr/local/bin/claude }
+      - { path: /usr/bin/node }
 
 network_middlewares:
   privacy_guard_redaction:
-    name: Redact deterministic example email
-    middleware: privacy-guard-e2e
+    name: Redact deterministic example emails
+    middleware: privacy-guard-email-scanner
     order: 0
     config:
       body_format: json
@@ -35,4 +43,5 @@ network_middlewares:
         minimum_confidence: high
     on_error: fail_closed
     endpoints:
-      include: [host.openshell.internal]
+      include:
+        - api.anthropic.com

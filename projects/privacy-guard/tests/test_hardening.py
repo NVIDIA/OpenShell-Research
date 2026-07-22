@@ -13,7 +13,6 @@ from typing_extensions import override
 
 import privacy_guard.service.servicer as servicer_module
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
-from privacy_guard.body import JsonHandler
 from privacy_guard.config import PolicyConfig
 from privacy_guard.constants import MAX_BODY_BYTES
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
@@ -23,6 +22,7 @@ from privacy_guard.payloads import (
     ProcessingResult,
 )
 from privacy_guard.processor import RequestProcessor
+from privacy_guard.request_body import JsonHandler
 from privacy_guard.scanners import (
     Confidence,
     Finding,
@@ -92,7 +92,7 @@ def test_json_nesting_beyond_adapter_recursion_limit_is_shape_error(depth: int) 
 def test_json_walker_bounds_allocation_at_exact_aggregate_boundaries(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import privacy_guard.body.json as json_module
+    import privacy_guard.request_body.json as json_module
 
     monkeypatch.setattr(json_module, "MAX_TEXT_BLOCKS", 2)
     monkeypatch.setattr(json_module, "MAX_SCANNED_CHARACTERS", 2)
@@ -111,7 +111,7 @@ def test_json_walker_bounds_allocation_at_exact_aggregate_boundaries(
 
 
 def test_json_walker_keeps_wide_container_traversal_allocation_bounded() -> None:
-    import privacy_guard.body.json as json_module
+    import privacy_guard.request_body.json as json_module
 
     raw_body = b"[" + (b"0," * 99_999) + b"0]"
     handler = JsonHandler()
