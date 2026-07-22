@@ -78,7 +78,7 @@ def main() -> None:
 
 @app.command("regex")
 def run_regex(
-    scanner_config: Annotated[
+    config: Annotated[
         Path,
         typer.Option(help="Path to the RegexScanner configuration."),
     ],
@@ -98,7 +98,7 @@ def run_regex(
     """Run Privacy Guard with the built-in RegexScanner."""
     try:
         scanner = RegexScanner.from_yaml(
-            scanner_config,
+            config,
             profile,
             scanner_name=scanner_name,
         )

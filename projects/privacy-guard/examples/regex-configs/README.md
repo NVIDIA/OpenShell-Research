@@ -6,8 +6,8 @@ profile is a RegexScanner option, so select the `regex` built-in and pass one of
 its profiles, for example:
 
 ```bash
-privacy-guard regex --scanner-config profiles.yaml --profile customer-support
-privacy-guard regex --scanner-config profiles.yaml --profile hipaa
+privacy-guard regex --config profiles.yaml --profile customer-support
+privacy-guard regex --config profiles.yaml --profile hipaa
 ```
 
 The HIPAA catalog is only a starting rule set. It is not a claim of compliance.

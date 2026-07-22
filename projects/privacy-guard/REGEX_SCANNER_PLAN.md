@@ -214,7 +214,7 @@ they are not blamed on the request that happened to expose the pattern defect.
    the scanner implementation must not emit a response its consumer rejects.
 7. Add a loader such as `RegexScanner.from_yaml(path, profile=None)`. Update the
    packaged command to expose RegexScanner as the `regex` built-in command with
-   one required `--scanner-config PATH`, the conditionally required
+   one required `--config PATH`, the conditionally required
    `--profile NAME`, and optional `--scanner-name`. Load and compile the
    configuration before binding a listening socket. Restore the `privacy-guard`
    script only in the same change, so the command cannot run with an implicit
