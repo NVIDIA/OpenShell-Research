@@ -102,6 +102,35 @@ def test_cli_reports_expected_configuration_failure_without_traceback(
     assert "8472" not in stderr
 
 
+@pytest.mark.parametrize("profile", [None, "customer-support"])
+def test_cli_profile_is_optional_and_forwarded_only_when_supplied(
+    monkeypatch: pytest.MonkeyPatch,
+    profile: str | None,
+) -> None:
+    calls: list[tuple[str, str | None, str]] = []
+    scanner = DeterministicEmailScanner(
+        ScannerConfig(name="regex", entity_types=frozenset({"email"}))
+    )
+
+    def load_scanner(
+        path: str,
+        selected_profile: str | None,
+        *,
+        scanner_name: str,
+    ) -> DeterministicEmailScanner:
+        calls.append((path, selected_profile, scanner_name))
+        return scanner
+
+    monkeypatch.setattr(server_module.RegexScanner, "from_yaml", load_scanner)
+    monkeypatch.setattr(MiddlewareServer, "serve", lambda self, listen: None)
+    arguments = ["--scanner-config", "entities.yaml"]
+    if profile is not None:
+        arguments.extend(("--profile", profile))
+
+    assert main(arguments) == 0
+    assert calls == [("entities.yaml", profile, "regex")]
+
+
 @pytest.mark.asyncio
 async def test_create_server_accepts_injected_servicer_and_serves_loopback_rpcs() -> (
     None

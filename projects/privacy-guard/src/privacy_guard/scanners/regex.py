@@ -244,6 +244,7 @@ def _validate_name(value: str) -> str:
 
 
 def _read_bounded_file(path: str | Path) -> bytes:
+    """Bound allocation before handing configuration bytes to PyYAML."""
     with Path(path).open("rb") as stream:
         return stream.read(MAX_SCANNER_CONFIG_BYTES + 1)
 

@@ -67,7 +67,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Load the required regex catalog, then run the middleware server."""
     parser = argparse.ArgumentParser(description="Run the Privacy Guard middleware")
     parser.add_argument("--scanner-config", required=True)
-    parser.add_argument("--profile")
+    parser.add_argument(
+        "--profile",
+        help=(
+            "Regex catalog profile; required only when --scanner-config contains "
+            "profiles"
+        ),
+    )
     parser.add_argument("--scanner-name", default="regex")
     parser.add_argument("--listen", default="127.0.0.1:50051")
     arguments = parser.parse_args(argv)
