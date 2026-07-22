@@ -135,9 +135,9 @@ they are not blamed on the request that happened to expose the pattern defect.
    structural, and model failures into one content-safe scanner-configuration
    error that never includes paths, patterns, or matched text. Add a dedicated
    `SCANNER_CONFIG_INVALID` catalog code rather than reusing policy
-   `CONFIG_INVALID`. Add the selected safe-YAML parser and timeout-capable regex
-   engine as bounded project dependencies in `pyproject.toml` and `uv.lock`;
-   do not build either boundary on undocumented engine behavior.
+   `CONFIG_INVALID`. Add the selected safe-YAML parser as a bounded project
+   dependency in `pyproject.toml` and `uv.lock`; use the standard-library regex
+   engine and documented behavior.
 2. Add `RegexScannerConfig`, derived from `ScannerConfig`, and `RegexScanner`.
    Compile each configured expression as
    `(?:expression)(?P<normalized_group_name>)`. The trailing empty named marker
@@ -163,13 +163,11 @@ they are not blamed on the request that happened to expose the pattern defect.
    default budget for standalone calls when none is supplied. The protected
    scanner hook receives the effective non-optional budget; simple scanners may
    ignore it, while scanners performing potentially unbounded work must
-   cooperate with it. The budget is therefore an automatic hard bound for
-   `RegexScanner`, but only a cooperative contract for custom scanners. Before
-   each pattern evaluation,
-   `RegexScanner` will pass the smaller of the remaining request budget and the
-   per-pattern ceiling to a timeout-capable regex engine. Check the budget while
-   consuming the engine's iterator, not only when constructing it. Budget
-   exhaustion or an engine timeout will raise one exported, content-safe
+   cooperate with it. The budget is a cooperative contract for `RegexScanner`
+   and custom scanners because the standard-library regex engine cannot
+   interrupt an active evaluation. `RegexScanner` checks the budget before and
+   after each evaluation and while consuming matches. Budget exhaustion raises
+   one exported, content-safe
    `ScanBudgetExceeded` exception from `Scanner.scan`, with no partial findings.
    `RequestProcessor` will catch only that typed condition, discard findings
    accumulated from earlier scanners or blocks, and produce the existing stable
@@ -185,11 +183,11 @@ they are not blamed on the request that happened to expose the pattern defect.
    benchmarks. The scalability gate is 1,000 active entities and 10,000 active
    patterns on documented representative inputs and reference hardware. Record
    input size and match density with each result so the claim is reproducible.
-   The request-scoped budget remains the runtime CPU bound regardless of
-   catalog size. If separately evaluating 10,000 compiled patterns cannot meet
-   the default budget, introduce bounded batching, indexing, or a multi-pattern
-   engine before claiming that scale; preserve overlapping results and original
-   pattern identity in any optimization. If batching combines patterns, assign
+   The request-scoped budget bounds work between regex evaluations regardless
+   of catalog size. If separately evaluating 10,000 compiled patterns cannot
+   meet the default budget, introduce bounded batching, indexing, or a
+   multi-pattern engine before claiming that scale; preserve overlapping
+   results and original pattern identity in any optimization. If batching combines patterns, assign
    collision-free internal group identifiers even when configured names
    normalize to the same value. Implement conservative provisional file and
    count ceilings first, then finalize and document them only after this gate
@@ -241,10 +239,11 @@ they are not blamed on the request that happened to expose the pattern defect.
   trailing named markers, numeric backreferences, reserved named-group and
   inline-flag rejection, load-time and contextual zero-width rejection,
   deterministic ordering, and finding limits.
-- Test per-pattern and request-wide timeout behavior with adversarial
-  expressions, many patterns, many text blocks, and long inputs. Verify timeout
-  paths raise `ScanBudgetExceeded` for standalone calls and return a stable deny
-  through `RequestProcessor`, with no partial findings in either case.
+- Test per-pattern and request-wide budget behavior with many patterns, many
+  text blocks, and long inputs. Verify exhaustion paths raise
+  `ScanBudgetExceeded` for standalone calls and return a stable deny through
+  `RequestProcessor`, with no partial findings in either case. Document that an
+  active standard-library regex evaluation cannot be interrupted.
 - Test that `RequestProcessor` and standalone `Scanner.scan` calls use safe
   default budgets when callers provide no timeout or budget, and that an
   explicit processor timeout applies one shared deadline across the request.

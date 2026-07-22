@@ -146,7 +146,7 @@ class RegexScanner(Scanner[RegexScannerConfig]):
                 for entity in self.config.entities
                 for pattern in entity.patterns
             )
-        except (ValueError, re.error):
+        except (RecursionError, ValueError, re.error):
             raise PrivacyGuardError(ErrorCode.SCANNER_CONFIG_INVALID) from None
 
     @classmethod
@@ -159,7 +159,7 @@ class RegexScanner(Scanner[RegexScannerConfig]):
     ) -> Self:
         """Load, validate, select, and compile a complete YAML catalog."""
         try:
-            raw = Path(path).read_bytes()
+            raw = _read_bounded_file(path)
             value = _load_yaml(raw)
             catalogs = _parse_catalogs(value)
             for entities in catalogs.values():
@@ -177,6 +177,7 @@ class RegexScanner(Scanner[RegexScannerConfig]):
             raise
         except (
             OSError,
+            RecursionError,
             UnicodeError,
             ValueError,
             TypeError,
@@ -240,6 +241,11 @@ def _validate_name(value: str) -> str:
     if len(value.encode("ascii")) > MAX_REGEX_NAME_BYTES:
         raise ValueError("name is too long")
     return value
+
+
+def _read_bounded_file(path: str | Path) -> bytes:
+    with Path(path).open("rb") as stream:
+        return stream.read(MAX_SCANNER_CONFIG_BYTES + 1)
 
 
 def _compile_rule(entity_name: str, pattern: RegexPattern) -> _CompiledRule:

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from io import BytesIO
 from pathlib import Path
 from time import monotonic
 
 import pytest
+from typing_extensions import override
 
+import privacy_guard.scanners.regex as regex_module
 from privacy_guard.errors import ErrorCode, ErrorKind, PrivacyGuardError
 from privacy_guard.scanners import RegexScanner, ScanBudget, ScanBudgetExceeded
 
@@ -156,6 +159,30 @@ def test_invalid_yaml_and_patterns_use_one_content_safe_error(
     assert "8472" not in str(exception_info.value)
 
 
+def test_configuration_read_is_bounded_before_parsing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class RecordingBytesIO(BytesIO):
+        def __init__(self) -> None:
+            super().__init__(b"x" * 100)
+            self.read_sizes: list[int | None] = []
+
+        @override
+        def read(self, size: int | None = -1, /) -> bytes:
+            self.read_sizes.append(size)
+            return super().read(size)
+
+    stream = RecordingBytesIO()
+    monkeypatch.setattr(regex_module, "MAX_SCANNER_CONFIG_BYTES", 64)
+    monkeypatch.setattr(Path, "open", lambda path, mode: stream)
+
+    with pytest.raises(PrivacyGuardError) as exception_info:
+        RegexScanner.from_yaml("ignored.yaml")
+
+    assert exception_info.value.code is ErrorCode.SCANNER_CONFIG_INVALID
+    assert stream.read_sizes == [65]
+
+
 def test_inactive_profiles_are_fully_validated(tmp_path: Path) -> None:
     path = _write(
         tmp_path / "profiles.yaml",
@@ -182,6 +209,26 @@ def test_excessive_yaml_nesting_is_rejected_safely(tmp_path: Path) -> None:
     for _ in range(20):
         document = f"[{document}]"
     path = _write(tmp_path / "nested.yaml", document)
+
+    with pytest.raises(PrivacyGuardError) as exception_info:
+        RegexScanner.from_yaml(path)
+
+    assert exception_info.value.code is ErrorCode.SCANNER_CONFIG_INVALID
+    assert exception_info.value.kind is ErrorKind.INVALID_INPUT
+
+
+def test_deeply_nested_regex_is_a_content_safe_configuration_error(
+    tmp_path: Path,
+) -> None:
+    nested_expression = "(" * 1_000 + "x" + ")" * 1_000
+    path = _write(
+        tmp_path / "deep-regex.yaml",
+        _single(
+            "    - name: nested\n"
+            f"      regex: '{nested_expression}'\n"
+            "      confidence: high\n"
+        ),
+    )
 
     with pytest.raises(PrivacyGuardError) as exception_info:
         RegexScanner.from_yaml(path)
