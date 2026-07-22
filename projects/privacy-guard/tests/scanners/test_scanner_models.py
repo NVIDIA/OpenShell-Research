@@ -1,10 +1,15 @@
+import math
+from types import MappingProxyType
+
 import pytest
 from pydantic import ValidationError
+from typing_extensions import override
 
 from privacy_guard.scanners import (
     Finding,
-    PassthroughScanner,
     RequestBodyFinding,
+    ScanBudget,
+    Scanner,
     ScannerConfig,
 )
 
@@ -20,11 +25,21 @@ def test_finding_names_the_scanner_that_produced_it() -> None:
     assert finding.scanner_name == "example-scanner"
 
 
-def test_passthrough_scanner_has_stable_name() -> None:
-    scanner = PassthroughScanner()
+def test_finding_accepts_general_immutable_string_metadata() -> None:
+    finding = Finding(
+        entity="email",
+        scanner_name="scanner",
+        start_offset=0,
+        end_offset=1,
+        metadata={"rule": "common-email", "source": "customer-catalog"},
+    )
 
-    assert scanner.scanner_name == "passthrough"
-    assert scanner.supported_entity_types == frozenset()
+    assert finding.metadata == {
+        "rule": "common-email",
+        "source": "customer-catalog",
+    }
+    assert isinstance(finding.metadata, MappingProxyType)
+    assert "customer-catalog" not in repr(finding)
 
 
 def test_scanner_config_owns_identity_and_entity_types() -> None:
@@ -34,13 +49,6 @@ def test_scanner_config_owns_identity_and_entity_types() -> None:
     assert config.entity_types == frozenset({"email", "phone"})
     with pytest.raises(ValidationError):
         setattr(config, "name", "changed")
-
-
-def test_passthrough_uses_minimal_config_with_fixed_empty_catalog() -> None:
-    scanner = PassthroughScanner()
-
-    assert type(scanner.config) is ScannerConfig
-    assert scanner.supported_entity_types == frozenset()
 
 
 @pytest.mark.parametrize(
@@ -105,6 +113,13 @@ def test_scanner_config_rejects_invalid_metadata(values: dict[str, object]) -> N
             "scanner_name": "scanner",
             "start_offset": 0,
             "end_offset": 1,
+            "metadata": {"key": 3},
+        },
+        {
+            "entity": "email",
+            "scanner_name": "scanner",
+            "start_offset": 0,
+            "end_offset": 1,
             "text_block_path": "path",
         },
     ],
@@ -135,21 +150,26 @@ def test_request_body_finding_requires_hidden_path_and_models_are_frozen() -> No
         )
 
 
-@pytest.mark.parametrize(
-    "text_block",
-    [
-        "",
-        "ordinary ASCII text",
-        "Unicode: café 🐍",
-        "first line\nsecond line",
-        '{"looks": "like JSON"}',
-        "Contact alice@example.com or call 555-0100",
-    ],
-)
-def test_passthrough_scanner_always_returns_immutable_empty_tuple(
-    text_block: str,
-) -> None:
-    findings = PassthroughScanner().scan(text_block)
+def test_scanner_initialize_runs_after_validated_config_is_available() -> None:
+    class InitializingScanner(Scanner[ScannerConfig]):
+        initialized_name: str | None = None
 
-    assert findings == ()
-    assert type(findings) is tuple
+        @override
+        def _initialize(self) -> None:
+            self.initialized_name = self.scanner_name
+
+        @override
+        def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
+            return ()
+
+    scanner = InitializingScanner(
+        ScannerConfig(name="initialized", entity_types=frozenset())
+    )
+
+    assert scanner.initialized_name == "initialized"
+
+
+@pytest.mark.parametrize("deadline", [True, math.inf, math.nan, "soon"])
+def test_scan_budget_uses_strict_pydantic_validation(deadline: object) -> None:
+    with pytest.raises(ValidationError):
+        ScanBudget.model_validate({"deadline": deadline})

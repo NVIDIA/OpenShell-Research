@@ -70,9 +70,20 @@ tree; the raw parse tree becomes unreachable when the parse helper returns,
 before text-block materialization begins.
 
 The harness deliberately isolates processor overhead with a synthetic scanner.
-It does not represent the latency of a future production PII scanner and does
-not include protobuf conversion, gRPC transport, executor or semaphore queuing,
-concurrent throughput, or whole-process memory. Add realistic request
-distributions and service-level concurrency measurements when a production
-scanner is introduced; establish regression thresholds only on pinned
-infrastructure.
+It does not include protobuf conversion, gRPC transport, executor or semaphore
+queuing, concurrent throughput, or whole-process memory.
+
+## Regex catalog scalability gate
+
+A separate one-shot gate measured the required 1,000 active entities and 10,000
+active patterns. The generated 749,790-byte single-profile YAML gave every
+entity ten unique literal patterns. The representative sparse input was 46
+characters and produced zero matches. This deliberately measures catalog
+evaluation rather than dense-result aggregation, which has independent limits.
+
+Reference environment: CPython 3.14.4 on Linux x86_64 in the Codex workspace.
+Recorded 2026-07-22 using the stdlib `re` engine. Parsing, strict validation,
+and compiling took 14.399 seconds with 132.1 MiB peak traced allocation.
+Scanning took 9 ms, within the one-second default request budget. These are
+reproducibility snapshots, not release thresholds; the shared deadline remains
+the cooperative runtime CPU budget.

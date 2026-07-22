@@ -28,7 +28,7 @@ from privacy_guard.constants import (
 )
 from privacy_guard.payloads import InterceptedRequest, ProcessingDecision
 from privacy_guard.processor import RequestProcessor
-from privacy_guard.scanners import Finding, Scanner, ScannerConfig
+from privacy_guard.scanners import Finding, ScanBudget, Scanner, ScannerConfig
 
 _KIB = 1024
 _MIB = 1024 * 1024
@@ -44,7 +44,7 @@ class _BenchmarkScannerConfig(ScannerConfig):
 
 class _BenchmarkScanner(Scanner[_BenchmarkScannerConfig]):
     @override
-    def _scan(self, text_block: str) -> tuple[Finding, ...]:
+    def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
         if not text_block.startswith(
             _MARKER_CHARACTER * self.config.findings_per_block
         ):

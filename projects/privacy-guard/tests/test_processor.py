@@ -1,3 +1,4 @@
+import math
 from collections.abc import Mapping
 
 import pytest
@@ -15,8 +16,9 @@ from privacy_guard.processor import RequestProcessor
 from privacy_guard.request_body import FormatHandler, RequestBody, TextBlock
 from privacy_guard.scanners import (
     Finding,
-    PassthroughScanner,
     RequestBodyFinding,
+    ScanBudget,
+    ScanBudgetExceeded,
     Scanner,
     ScannerConfig,
     ScannerContractError,
@@ -39,7 +41,7 @@ class RecordingScanner(Scanner[ScannerConfig]):
         self.calls: list[str] = []
 
     @override
-    def _scan(self, text_block: str) -> tuple[Finding, ...]:
+    def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
         self.calls.append(text_block)
         return self.findings_by_text.get(text_block, ())
 
@@ -146,7 +148,7 @@ def _request_body_finding(
     )
 
 
-def test_passthrough_scans_each_text_block_and_reconstructs_once() -> None:
+def test_scanner_visits_each_text_block_and_reconstructs_once() -> None:
     scanner = RecordingScanner()
     handler = RecordingHandler(
         (
@@ -171,6 +173,58 @@ def test_empty_scanner_sequence_is_rejected_at_construction() -> None:
     assert exception_info.value.code is ErrorCode.SCANNER_OUTPUT_INVALID
 
 
+@pytest.mark.parametrize(
+    "timeout",
+    [True, False, 0, -1, math.inf, math.nan, 31],
+)
+def test_processor_rejects_invalid_scan_timeout(timeout: float) -> None:
+    with pytest.raises(ValueError):
+        RequestProcessor([RecordingScanner()], scan_timeout_seconds=timeout)
+
+
+def test_one_scan_budget_is_shared_across_blocks_and_exhaustion_discards_findings() -> (
+    None
+):
+    class BudgetScanner(Scanner[ScannerConfig]):
+        def __init__(self) -> None:
+            super().__init__(
+                ScannerConfig(name="budget", entity_types=frozenset({"secret"}))
+            )
+            self.budgets: list[ScanBudget] = []
+
+        @override
+        def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
+            self.budgets.append(budget)
+            if text_block == "second":
+                raise ScanBudgetExceeded
+            return (
+                Finding(
+                    entity="secret",
+                    scanner_name=self.scanner_name,
+                    start_offset=0,
+                    end_offset=1,
+                ),
+            )
+
+    scanner = BudgetScanner()
+    handler = RecordingHandler(
+        (
+            TextBlock(path="first", text="first"),
+            TextBlock(path="second", text="second"),
+        )
+    )
+
+    result = _processor(scanner, handler).process(
+        _request(policy_config=_config(action_kind=PolicyAction.OBSERVE.value))
+    )
+
+    assert result.decision is ProcessingDecision.DENY
+    assert result.reason_code == "privacy_guard_limit_exceeded"
+    assert result.findings == ()
+    assert len(scanner.budgets) == 2
+    assert scanner.budgets[0] is scanner.budgets[1]
+
+
 def test_duplicate_scanner_names_are_rejected_at_construction() -> None:
     with pytest.raises(PrivacyGuardError) as exception_info:
         RequestProcessor([RecordingScanner(), RecordingScanner()])
@@ -184,7 +238,7 @@ def test_scanner_infers_validates_and_uses_concrete_config_type() -> None:
 
     class PrefixScanner(Scanner[PrefixScannerConfig]):
         @override
-        def _scan(self, text_block: str) -> tuple[Finding, ...]:
+        def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
             return (
                 Finding(
                     entity=self.config.finding_entity,
@@ -214,11 +268,8 @@ def test_scanner_infers_validates_and_uses_concrete_config_type() -> None:
     )
 
 
-@pytest.mark.parametrize("scanner", [RecordingScanner(), PassthroughScanner()])
-def test_empty_supported_entity_catalog_rejects_enabled_filter(
-    scanner: Scanner[ScannerConfig],
-) -> None:
-    processor = RequestProcessor([scanner])
+def test_empty_supported_entity_catalog_rejects_enabled_filter() -> None:
+    processor = RequestProcessor([RecordingScanner()])
 
     with pytest.raises(PrivacyGuardError) as exception_info:
         processor.validate_policy_config(
@@ -232,7 +283,7 @@ def test_empty_supported_entity_catalog_rejects_enabled_filter(
 
 def test_handler_registry_key_must_match_immutable_identity() -> None:
     with pytest.raises(PrivacyGuardError) as exception_info:
-        RequestProcessor([PassthroughScanner()], {"wrong": RecordingHandler()})
+        RequestProcessor([RecordingScanner()], {"wrong": RecordingHandler()})
 
     assert exception_info.value.code is ErrorCode.FORMAT_HANDLER_OUTPUT_INVALID
 
@@ -244,7 +295,7 @@ def test_malformed_normalize_output_maps_to_handler_contract_error(
     monkeypatch.setattr(handler, "_normalize", lambda raw_body, policy: object())
 
     with pytest.raises(PrivacyGuardError) as exception_info:
-        _processor(PassthroughScanner(), handler).process(_request())
+        _processor(RecordingScanner(), handler).process(_request())
 
     assert exception_info.value.code is ErrorCode.FORMAT_HANDLER_OUTPUT_INVALID
 
@@ -260,14 +311,14 @@ def test_non_bytes_reconstruct_output_maps_to_handler_contract_error(
     )
 
     with pytest.raises(PrivacyGuardError) as exception_info:
-        _processor(PassthroughScanner(), handler).process(_request())
+        _processor(RecordingScanner(), handler).process(_request())
 
     assert exception_info.value.code is ErrorCode.FORMAT_HANDLER_OUTPUT_INVALID
 
 
 def test_validate_policy_config_selects_and_validates_without_processing() -> None:
     handler = RecordingHandler()
-    processor = _processor(PassthroughScanner(), handler)
+    processor = _processor(RecordingScanner(), handler)
 
     processor.validate_policy_config(_config())
 
@@ -421,7 +472,7 @@ def test_block_denies_with_findings_and_suppresses_reconstruction() -> None:
 def test_block_allows_and_reconstructs_when_no_findings_exist() -> None:
     handler = RecordingHandler((TextBlock(path="text_block::alpha", text="safe"),))
 
-    result = _processor(PassthroughScanner(), handler).process(
+    result = _processor(RecordingScanner(), handler).process(
         _request(policy_config=_config(action_kind=PolicyAction.BLOCK.value))
     )
 
@@ -579,7 +630,7 @@ def test_contextually_invalid_finding_is_rejected(finding: Finding) -> None:
 def test_finding_entity_must_be_declared_by_scanner_config() -> None:
     class UndeclaredEntityScanner(Scanner[ScannerConfig]):
         @override
-        def _scan(self, text_block: str) -> tuple[Finding, ...]:
+        def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
             return (
                 _finding(0, 1, entity="undeclared", scanner_name=self.scanner_name),
             )
@@ -621,7 +672,7 @@ def test_collaborator_exceptions_are_replaced_without_partial_result_or_content(
 
     class RaisingScanner(Scanner[ScannerConfig]):
         @override
-        def _scan(self, text_block: str) -> tuple[Finding, ...]:
+        def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
             raise RuntimeError(sentinel)
 
     class RaisingHandler(RecordingHandler):
@@ -634,7 +685,7 @@ def test_collaborator_exceptions_are_replaced_without_partial_result_or_content(
     scanner: Scanner[ScannerConfig] = (
         RaisingScanner(ScannerConfig(name="raising", entity_types=frozenset()))
         if collaborator == "scanner"
-        else PassthroughScanner()
+        else RecordingScanner()
     )
     handler: FormatHandler = (
         RaisingHandler()
@@ -662,7 +713,7 @@ def test_cataloged_handler_error_propagates_unchanged() -> None:
             raise expected
 
     with pytest.raises(PrivacyGuardError) as exception_info:
-        _processor(PassthroughScanner(), CatalogRaisingHandler()).process(_request())
+        _processor(RecordingScanner(), CatalogRaisingHandler()).process(_request())
 
     assert exception_info.value is expected
 
@@ -672,7 +723,7 @@ def test_reconstruction_equal_to_original_returns_no_replacement() -> None:
         (TextBlock(path="text_block::alpha", text="text"),), reconstructed=b"body"
     )
 
-    result = _processor(PassthroughScanner(), handler).process(_request(b"body"))
+    result = _processor(RecordingScanner(), handler).process(_request(b"body"))
 
     assert result.replacement_body is None
 

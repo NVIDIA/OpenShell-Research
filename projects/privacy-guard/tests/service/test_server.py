@@ -13,7 +13,7 @@ from privacy_guard.errors import ErrorCode, PrivacyGuardError
 from privacy_guard.processor import RequestProcessor
 from privacy_guard.scanners import ScannerConfig
 from privacy_guard.service import server as server_module
-from privacy_guard.service.server import MiddlewareServer, create_server, main, serve
+from privacy_guard.service.server import MiddlewareServer, create_server, serve
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
 
 from ..scanner_helpers import DeterministicEmailScanner
@@ -54,15 +54,19 @@ class LifecycleServerFake(grpc.aio.Server):
         raise NotImplementedError
 
 
+def _middleware() -> PrivacyGuardMiddleware:
+    scanner = DeterministicEmailScanner(
+        ScannerConfig(name="test_email", entity_types=frozenset({"email"}))
+    )
+    return PrivacyGuardMiddleware(RequestProcessor([scanner]))
+
+
 def test_middleware_server_wires_scanner_and_has_a_default_listen_address(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     served: list[tuple[str, PrivacyGuardMiddleware]] = []
 
-    async def record_serve(
-        listen: str, servicer: PrivacyGuardMiddleware | None = None
-    ) -> None:
-        assert servicer is not None
+    async def record_serve(servicer: PrivacyGuardMiddleware, listen: str) -> None:
         served.append((listen, servicer))
 
     monkeypatch.setattr(server_module, "serve", record_serve)
@@ -141,7 +145,7 @@ async def test_create_server_accepts_injected_servicer_and_serves_loopback_rpcs(
 async def test_loopback_accepts_body_at_advertised_limit_and_rejects_larger_body() -> (
     None
 ):
-    middleware = PrivacyGuardMiddleware()
+    middleware = _middleware()
     server = create_server(middleware)
     port = server.add_insecure_port("127.0.0.1:0")
     assert port != 0
@@ -255,7 +259,7 @@ async def test_serve_rejects_bind_failure_and_stops_server(
     )
 
     with pytest.raises(PrivacyGuardError) as exception_info:
-        await serve("invalid-sensitive-listen-8472")
+        await serve(_middleware(), "invalid-sensitive-listen-8472")
 
     assert exception_info.value.code is ErrorCode.SERVER_BIND_FAILED
     assert "Hint:" in str(exception_info.value)
@@ -288,36 +292,6 @@ async def test_startup_failure_stops_server_and_propagates(
     )
 
     with pytest.raises(RuntimeError, match="startup failed"):
-        await serve("127.0.0.1:12345")
+        await serve(_middleware(), "127.0.0.1:12345")
 
     assert fake_server.stopped is True
-
-
-def test_main_parses_custom_and_default_listen_without_permanent_server(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    listens: list[str] = []
-
-    def recording_serve(server: MiddlewareServer, listen: str) -> None:
-        listens.append(listen)
-
-    monkeypatch.setattr(MiddlewareServer, "serve", recording_serve)
-
-    assert main(["--listen", "127.0.0.1:54321"]) == 0
-    assert main([]) == 0
-    assert listens == ["127.0.0.1:54321", "127.0.0.1:50051"]
-
-
-def test_main_accepts_a_general_sequence(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    received: list[str] = []
-
-    def recording_serve(server: MiddlewareServer, listen: str) -> None:
-        received.append(listen)
-
-    monkeypatch.setattr(MiddlewareServer, "serve", recording_serve)
-    argv: Sequence[str] = ("--listen", "127.0.0.1:50052")
-
-    assert main(argv) == 0
-    assert received == ["127.0.0.1:50052"]

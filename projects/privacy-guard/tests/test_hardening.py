@@ -26,8 +26,8 @@ from privacy_guard.request_body import JsonHandler
 from privacy_guard.scanners import (
     Confidence,
     Finding,
-    PassthroughScanner,
     RequestBodyFinding,
+    ScanBudget,
     Scanner,
     ScannerConfig,
 )
@@ -145,7 +145,13 @@ def test_processor_checks_handler_aggregate_boundaries_contextually(
 ) -> None:
     import privacy_guard.processor as processor_module
 
-    processor = RequestProcessor([PassthroughScanner()])
+    processor = RequestProcessor(
+        [
+            DeterministicEmailScanner(
+                ScannerConfig(name="test_email", entity_types=frozenset({"email"}))
+            )
+        ]
+    )
     monkeypatch.setattr(processor_module, "MAX_TEXT_BLOCKS", 2)
     monkeypatch.setattr(processor_module, "MAX_SCANNED_CHARACTERS", 2)
     assert (
@@ -192,7 +198,7 @@ def test_json_key_findings_are_observed_blocked_and_never_rewritten(
 def test_finding_criteria_are_owned_by_every_action(action_kind: str) -> None:
     class MixedScanner(Scanner[ScannerConfig]):
         @override
-        def _scan(self, text_block: str) -> tuple[Finding, ...]:
+        def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
             return (
                 Finding(
                     entity="email",
@@ -235,12 +241,12 @@ def test_unknown_entity_filter_is_content_safe_and_multi_scanner_union_is_valid(
 ):
     class EmailScanner(Scanner[ScannerConfig]):
         @override
-        def _scan(self, text_block: str) -> tuple[Finding, ...]:
+        def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
             return ()
 
     class TokenScanner(Scanner[ScannerConfig]):
         @override
-        def _scan(self, text_block: str) -> tuple[Finding, ...]:
+        def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
             return ()
 
     processor = RequestProcessor(
@@ -288,7 +294,7 @@ def test_multi_scanner_overlap_is_retained_for_observe_and_resolved_for_redact()
 ):
     class FirstScanner(Scanner[ScannerConfig]):
         @override
-        def _scan(self, text_block: str) -> tuple[Finding, ...]:
+        def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
             return (
                 Finding(
                     entity="short",
@@ -300,7 +306,7 @@ def test_multi_scanner_overlap_is_retained_for_observe_and_resolved_for_redact()
 
     class SecondScanner(Scanner[ScannerConfig]):
         @override
-        def _scan(self, text_block: str) -> tuple[Finding, ...]:
+        def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
             return (
                 Finding(
                     entity="long",
@@ -344,7 +350,7 @@ def test_finding_excess_stably_denies_without_returning_partial_findings(
 
     class NoisyScanner(Scanner[ScannerConfig]):
         @override
-        def _scan(self, text_block: str) -> tuple[Finding, ...]:
+        def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
             return (
                 Finding(
                     entity="a",
@@ -388,7 +394,7 @@ def test_scanner_identity_is_non_empty_and_finding_entities_are_bounded() -> Non
 def test_request_finding_limit_exact_boundary(block_count: int, allowed: bool) -> None:
     class DenseScanner(Scanner[ScannerConfig]):
         @override
-        def _scan(self, text_block: str) -> tuple[Finding, ...]:
+        def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
             return tuple(
                 Finding(
                     entity="unit",
@@ -419,7 +425,7 @@ async def test_slow_scan_does_not_stall_unrelated_rpc() -> None:
 
     class SlowScanner(Scanner[ScannerConfig]):
         @override
-        def _scan(self, text_block: str) -> tuple[Finding, ...]:
+        def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
             started.set()
             release.wait(timeout=2)
             return ()
@@ -454,7 +460,7 @@ async def test_cancelled_rpc_holds_scan_slot_until_worker_really_finishes() -> N
 
     class BlockingScanner(Scanner[ScannerConfig]):
         @override
-        def _scan(self, text_block: str) -> tuple[Finding, ...]:
+        def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
             nonlocal entered
             entered += 1
             first_started.set()

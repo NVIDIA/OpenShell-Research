@@ -17,7 +17,7 @@ from privacy_guard.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
 from privacy_guard.constants import MAX_CONCURRENT_RPCS, MAX_RECEIVE_MESSAGE_BYTES
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
 from privacy_guard.processor import RequestProcessor
-from privacy_guard.scanners import PassthroughScanner, Scanner, ScannerConfig
+from privacy_guard.scanners import RegexScanner, Scanner, ScannerConfig
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
 
 
@@ -29,13 +29,12 @@ class MiddlewareServer:
 
     def serve(self, listen: str = "127.0.0.1:50051") -> None:
         """Serve until termination using a managed synchronous entry point."""
-        asyncio.run(serve(listen, self._servicer))
+        asyncio.run(serve(self._servicer, listen))
 
 
-def create_server(servicer: PrivacyGuardMiddleware | None = None) -> grpc.aio.Server:
+def create_server(servicer: PrivacyGuardMiddleware) -> grpc.aio.Server:
     """Build an unstarted gRPC server with the servicer mounted (no port bound).
 
-    Accepts a servicer for tests; defaults to a fresh ``PrivacyGuardMiddleware``.
     The receive limit reserves bounded space around the advertised body maximum
     for the protobuf envelope; the servicer enforces the body limit itself.
     """
@@ -43,19 +42,16 @@ def create_server(servicer: PrivacyGuardMiddleware | None = None) -> grpc.aio.Se
         maximum_concurrent_rpcs=MAX_CONCURRENT_RPCS,
         options=(("grpc.max_receive_message_length", MAX_RECEIVE_MESSAGE_BYTES),),
     )
-    pb2_grpc.add_SupervisorMiddlewareServicer_to_server(
-        servicer if servicer is not None else PrivacyGuardMiddleware(), server
-    )
+    pb2_grpc.add_SupervisorMiddlewareServicer_to_server(servicer, server)
     return server
 
 
 async def serve(
+    servicer: PrivacyGuardMiddleware,
     listen: str = "127.0.0.1:50051",
-    servicer: PrivacyGuardMiddleware | None = None,
 ) -> None:
     """Bind ``listen``, start the server, and serve until terminated."""
-    effective_servicer = servicer if servicer is not None else PrivacyGuardMiddleware()
-    server = create_server(effective_servicer)
+    server = create_server(servicer)
     try:
         bound_port = server.add_insecure_port(listen)
         if bound_port == 0:
@@ -64,15 +60,23 @@ async def serve(
         await server.wait_for_termination()
     finally:
         await server.stop(grace=0)
-        await effective_servicer.close()
+        await servicer.close()
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """CLI entry point: parse args and run the high-level middleware server."""
+    """Load the required regex catalog, then run the middleware server."""
     parser = argparse.ArgumentParser(description="Run the Privacy Guard middleware")
+    parser.add_argument("--scanner-config", required=True)
+    parser.add_argument("--profile")
+    parser.add_argument("--scanner-name", default="regex")
     parser.add_argument("--listen", default="127.0.0.1:50051")
     arguments = parser.parse_args(argv)
-    MiddlewareServer(scanner=PassthroughScanner()).serve(arguments.listen)
+    scanner = RegexScanner.from_yaml(
+        arguments.scanner_config,
+        arguments.profile,
+        scanner_name=arguments.scanner_name,
+    )
+    MiddlewareServer(scanner=scanner).serve(arguments.listen)
     return 0
 
 

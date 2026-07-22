@@ -7,10 +7,10 @@ body, scans its text for sensitive values, and returns an allow/deny decision
 plus an optionally rewritten body that the supervisor forwards instead of the
 original.
 
-> Status: **hardened research project with a passthrough production default.** Strict policy parsing,
-> request-level processing, the generic JSON handler, safe gRPC adaptation, and
-> a loopback server are implemented. The production scanner is still the
-> passthrough scanner; no real PII scanner exists yet.
+> Status: **hardened research project with a configurable regex scanner.** Strict
+> policy and scanner configuration, request-level processing, bounded scanning,
+> the generic JSON handler, safe gRPC adaptation, and a loopback server are
+> implemented.
 
 The self-contained [email scanner example](examples/email-scanner/README.md)
 provides a deterministic scanner, middleware entry point, gateway registration,
@@ -87,20 +87,36 @@ winners deterministically by confidence, span length, offsets, scanner identity,
 and entity. A scanner sequence is passed to `RequestProcessor`; scanner names
 must be unique and remain visible in aggregated findings.
 
-The default service uses `PassthroughScanner`. The deterministic email regex and
-its server entry point live entirely under `examples/email-scanner`; production
-package modules neither export nor select it.
+`RegexScanner` is the packaged command's default implementation. Its entity
+catalog remains explicit: the command refuses to start without
+`--scanner-config`. Single-profile files contain a non-empty entity list;
+multi-profile files contain only a non-empty `profiles` mapping and require
+`--profile`. See [examples/regex-configs](examples/regex-configs) for both forms.
+
+```bash
+uv run privacy-guard \
+  --scanner-config examples/regex-configs/customer.yaml \
+  --listen 127.0.0.1:50051
+```
+
+Each entity has a unique name and a non-empty `patterns` list. Patterns declare
+`name`, `regex`, `confidence`, and optional `ignore_case`, `multiline`,
+`dot_all`, and `ascii` booleans. Every match carries its configured pattern name
+in general finding metadata and is reported as `entity/pattern-name` by the
+service. Policy filtering remains at entity level.
 
 A scanner is a nominal extension: declare its strict configuration type and
-implement only `_scan`. The base constructor validates and retains the config,
-and the public `scan` wrapper validates the returned tuple and each `Finding`.
+implement `_scan`. Scanners that need derived, reusable state may also override
+`_initialize`; the base constructor calls it after validating and retaining the
+configuration. The public `scan` wrapper validates the returned tuple and each
+`Finding`.
 
 ```python
-from privacy_guard.scanners import Finding, Scanner, ScannerConfig
+from privacy_guard.scanners import Finding, ScanBudget, Scanner, ScannerConfig
 
 
 class ExampleScanner(Scanner[ScannerConfig]):
-    def _scan(self, text_block: str) -> tuple[Finding, ...]:
+    def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
         return ()
 ```
 
@@ -134,6 +150,9 @@ manifest or add the lower limit to service configuration.
 JSON parsing is additionally bounded to 64 nesting levels, 4,096 text blocks,
 and 4 MiB of scanned characters. Scanning is capped at 256 findings per block,
 4,096 per request, four active scanner workers, and 16 concurrent gRPC calls.
+One default one-second monotonic scan budget is shared across every block and
+scanner in a request. `RegexScanner` checks it before and after each expression
+evaluation and while consuming overlapping matches.
 Shape excess is invalid input. Finding or outbound representation excess returns
 a stable `privacy_guard_limit_exceeded` deny with no body or partial findings,
 avoiding a failure-mode-dependent fail open.
@@ -169,6 +188,14 @@ release its scanner slot until its synchronous worker really exits.
 - **Finding types.** A scanner returns strict block-relative `scanners.Finding`
   values. The processor creates `RequestBodyFinding` values with the owning text-block
   path, and the servicer aggregates those into the protocol's count-based `Finding`.
+  A finding may include an immutable, bounded string metadata mapping for
+  scanner-specific attribution. Regex findings use its `pattern_name` key.
+- **Scanner initialization.** Override `_initialize` only when validated config
+  must be compiled or transformed into reusable immutable scanner state. The
+  default hook does nothing.
+- **Scan budgets.** The protected scanner hook receives a request-scoped
+  `ScanBudget`. Standalone `scan` calls create a safe default when no budget is
+  supplied. Potentially unbounded scanners must cooperate with the deadline.
 - **Text-block paths.** `Finding` has no path state. A `Scanner` sees only one text
   block; the processor attaches `TextBlock.path` by creating `RequestBodyFinding`.
 - **Format selection.** `PolicyConfig.body_format` (default `json`) picks a handler

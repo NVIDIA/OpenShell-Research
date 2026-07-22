@@ -6,18 +6,24 @@ from __future__ import annotations
 import argparse
 import re
 
-from privacy_guard.scanners import Confidence, Finding, Scanner, ScannerConfig
+from privacy_guard.scanners import (
+    Confidence,
+    Finding,
+    ScanBudget,
+    Scanner,
+    ScannerConfig,
+)
 from privacy_guard.service import MiddlewareServer
 
 
 class EmailScanner(Scanner[ScannerConfig]):
-    """Detect common email-shaped text for this example, not for production."""
+    """Detect common email-shaped text as a minimal custom scanner example."""
 
     _EMAIL = re.compile(
         r"(?<![\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])"
     )
 
-    def _scan(self, text_block: str) -> tuple[Finding, ...]:
+    def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
         return tuple(
             Finding(
                 entity="email",

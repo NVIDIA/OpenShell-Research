@@ -25,7 +25,13 @@ from privacy_guard.payloads import (
     ProcessingResult,
 )
 from privacy_guard.processor import RequestProcessor
-from privacy_guard.scanners import Finding, RequestBodyFinding, Scanner, ScannerConfig
+from privacy_guard.scanners import (
+    Finding,
+    RequestBodyFinding,
+    ScanBudget,
+    Scanner,
+    ScannerConfig,
+)
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
 
 from ..scanner_helpers import DeterministicEmailScanner
@@ -88,8 +94,15 @@ def _evaluation(
     )
 
 
+def _middleware() -> PrivacyGuardMiddleware:
+    scanner = DeterministicEmailScanner(
+        ScannerConfig(name="test_email", entity_types=frozenset({"email"}))
+    )
+    return PrivacyGuardMiddleware(RequestProcessor([scanner]))
+
+
 def test_describe_advertises_one_pre_credentials_http_binding() -> None:
-    manifest = PrivacyGuardMiddleware()._describe()
+    manifest = _middleware()._describe()
 
     assert manifest.name == SERVICE_NAME == "privacy-guard"
     assert manifest.service_version == SERVICE_VERSION == "0.1.0"
@@ -109,9 +122,7 @@ def test_validate_config_accepts_defaults_and_actions(
     if action is not None:
         values["on_finding"] = {"action": action.value}
 
-    response = PrivacyGuardMiddleware()._validate_config(
-        pb2.ValidateConfigRequest(config=values)
-    )
+    response = _middleware()._validate_config(pb2.ValidateConfigRequest(config=values))
 
     assert response.valid is True
     assert response.reason == ""
@@ -135,9 +146,7 @@ def test_validate_config_accepts_defaults_and_actions(
 def test_validate_config_rejects_malformed_values_without_echoing_them(
     config: Mapping[str, object],
 ) -> None:
-    response = PrivacyGuardMiddleware()._validate_config(
-        pb2.ValidateConfigRequest(config=config)
-    )
+    response = _middleware()._validate_config(pb2.ValidateConfigRequest(config=config))
 
     assert response.valid is False
     assert "Hint:" in response.reason
@@ -202,8 +211,8 @@ def test_validate_config_uses_domain_parser_and_processor_validation() -> None:
 
 
 @pytest.mark.asyncio
-async def test_passthrough_and_bodyless_requests_allow_without_replacement() -> None:
-    servicer = PrivacyGuardMiddleware()
+async def test_requests_without_findings_and_bodyless_requests_are_unchanged() -> None:
+    servicer = _middleware()
 
     ordinary = await servicer._evaluate_http_request(_evaluation())
     bodyless = await servicer._evaluate_http_request(_evaluation(body=b""))
@@ -374,6 +383,31 @@ async def test_findings_aggregate_in_first_observed_group_order() -> None:
 
 
 @pytest.mark.asyncio
+async def test_pattern_metadata_is_included_in_aggregate_label() -> None:
+    finding = RequestBodyFinding(
+        finding=Finding(
+            entity="email",
+            metadata={"pattern_name": "common-email"},
+            scanner_name="regex",
+            start_offset=0,
+            end_offset=1,
+        ),
+        text_block_path="path",
+    )
+    processor = FakeProcessor(
+        ProcessingResult(decision=ProcessingDecision.ALLOW, findings=(finding,))
+    )
+
+    response = await PrivacyGuardMiddleware(processor)._evaluate_http_request(
+        _evaluation()
+    )
+
+    assert [(item.type, item.label) for item in response.findings] == [
+        ("regex", "email/common-email")
+    ]
+
+
+@pytest.mark.asyncio
 async def test_more_than_32_finding_groups_stably_denies() -> None:
     findings = tuple(
         RequestBodyFinding(
@@ -418,7 +452,7 @@ async def test_invalid_input_maps_to_invalid_argument_with_safe_catalog_details(
     context = RecordingContext()
 
     with pytest.raises(AbortedRpc):
-        await PrivacyGuardMiddleware()._evaluate_rpc(evaluation, context)
+        await _middleware()._evaluate_rpc(evaluation, context)
 
     assert context.code is grpc.StatusCode.INVALID_ARGUMENT
     assert context.details is not None
@@ -451,7 +485,7 @@ async def test_processor_runtime_failure_maps_to_internal_catalog_error() -> Non
 async def test_cataloged_scanner_failure_maps_to_internal_status() -> None:
     class RaisingScanner(Scanner[ScannerConfig]):
         @override
-        def _scan(self, text_block: str) -> tuple[Finding, ...]:
+        def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
             raise RuntimeError("sensitive-scanner-failure-8472")
 
     context = RecordingContext()
@@ -468,7 +502,7 @@ async def test_cataloged_scanner_failure_maps_to_internal_status() -> None:
 
 
 def test_servicer_repr_does_not_retain_request_or_config_content() -> None:
-    servicer = PrivacyGuardMiddleware()
+    servicer = _middleware()
 
     assert "sensitive-body-8472" not in repr(servicer)
     assert "sensitive-injection-8472" not in repr(servicer)

@@ -1,16 +1,17 @@
 # Email scanner example
 
-This self-contained example supplies a deterministic email scanner, its Privacy
-Guard server entry point, and the OpenShell gateway and sandbox policy needed to
-try redaction with Claude Code. It temporarily runs the installed OpenShell
-gateway with the config from this directory. It does not create or modify
+This self-contained example supplies a deterministic custom email scanner, its
+Privacy Guard server entry point, and the OpenShell gateway and sandbox policy
+needed to try redaction with Claude Code. It temporarily runs the installed
+OpenShell gateway with the config from this directory. It does not create or modify
 `~/.config/openshell/gateway.toml`, and it does not create a project-local state
 directory.
 
-The illustrative regex scanner in `middleware_server.py` detects email-shaped
-text in Claude Code request bodies. The policy replaces matches with `[email]`
-before Anthropic receives the request. The scanner is intentionally small and
-deterministic; it is not intended for production PII detection.
+The `EmailScanner` class in `middleware_server.py` demonstrates how to implement
+the scanner extension contract directly. It detects email-shaped text in Claude
+Code request bodies. The policy replaces matches with `[email]` before Anthropic
+receives the request. The implementation is intentionally small and is not
+intended as comprehensive production PII detection.
 
 ## Prerequisites
 

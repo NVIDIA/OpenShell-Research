@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from enum import StrEnum
+from time import monotonic
+from types import MappingProxyType
 from typing import Generic, Self, TypeVar, get_args, get_origin
 
 from pydantic import (
@@ -14,7 +17,12 @@ from pydantic import (
 )
 from typing_extensions import TypeIs
 
-from privacy_guard.constants import MAX_FINDINGS_PER_BLOCK, MAX_SCANNER_METADATA_BYTES
+from privacy_guard.constants import (
+    DEFAULT_SCAN_TIMEOUT_SECONDS,
+    MAX_FINDING_METADATA_ENTRIES,
+    MAX_FINDINGS_PER_BLOCK,
+    MAX_SCANNER_METADATA_BYTES,
+)
 from privacy_guard.validation import ScalarString, StrictDomainModel
 
 
@@ -34,6 +42,7 @@ class Finding(StrictDomainModel):
     start_offset: int = Field(..., ge=0)
     end_offset: int
     confidence: Confidence = Confidence.HIGH
+    metadata: Mapping[str, str] | None = Field(default=None, repr=False)
 
     @field_validator("entity", "scanner_name")
     @classmethod
@@ -44,6 +53,21 @@ class Finding(StrictDomainModel):
         if len(value.encode("utf-8")) > MAX_SCANNER_METADATA_BYTES:
             raise ValueError("finding metadata exceeds the UTF-8 byte limit")
         return value
+
+    @field_validator("metadata")
+    @classmethod
+    def validate_finding_metadata(
+        cls, value: Mapping[str, str] | None
+    ) -> Mapping[str, str] | None:
+        """Copy valid, bounded string metadata into an immutable mapping."""
+        if value is None:
+            return None
+        if len(value) > MAX_FINDING_METADATA_ENTRIES:
+            raise ValueError("finding metadata has too many entries")
+        for key, item in value.items():
+            cls.validate_metadata_boundary(key)
+            cls.validate_metadata_boundary(item)
+        return MappingProxyType(dict(value))
 
     @model_validator(mode="after")
     def validate_non_empty_span(self) -> Self:
@@ -73,6 +97,32 @@ class ScannerContractError(Exception):
 
 class ScannerFindingLimitExceeded(Exception):
     """The scanner exceeded the bounded per-block finding count."""
+
+
+class ScanBudgetExceeded(Exception):
+    """A content-safe signal that scanning exhausted its shared request budget."""
+
+
+class ScanBudget(StrictDomainModel):
+    """Immutable request-scoped monotonic deadline shared by all scanner calls."""
+
+    deadline: float = Field(allow_inf_nan=False)
+
+    @classmethod
+    def from_timeout(cls, timeout_seconds: float) -> Self:
+        if (
+            isinstance(timeout_seconds, bool)
+            or not isinstance(timeout_seconds, int | float)
+            or timeout_seconds <= 0
+        ):
+            raise ValueError("scan timeout must be finite and positive")
+        return cls(deadline=monotonic() + timeout_seconds)
+
+    def remaining_seconds(self) -> float:
+        remaining = self.deadline - monotonic()
+        if remaining <= 0:
+            raise ScanBudgetExceeded
+        return remaining
 
 
 def parse_scanner_output(result: object) -> tuple[Finding, ...]:
@@ -107,6 +157,7 @@ class Scanner(ABC, Generic[_ScannerConfigT]):
             raise ScannerContractError("scanner configuration is invalid") from None
         self.__config = validated_config
         self.__scanner_name = validated_config.name
+        self._initialize()
 
     @classmethod
     def get_config_type(cls) -> type[_ScannerConfigT]:
@@ -133,14 +184,30 @@ class Scanner(ABC, Generic[_ScannerConfigT]):
         """Return the complete entity catalog declared by the scanner config."""
         return self.config.entity_types
 
-    def scan(self, text_block: ScalarString) -> tuple[Finding, ...]:
-        """Run the implementation and validate its observable output shape."""
-        result: object = self._scan(text_block)
+    def _initialize(self) -> None:
+        """Optionally initialize scanner state after validated config is retained."""
+
+    def scan(
+        self, text_block: ScalarString, *, budget: ScanBudget | None = None
+    ) -> tuple[Finding, ...]:
+        """Scan one block using a shared or standalone request deadline.
+
+        RequestProcessor supplies one budget to every scanner and text block in a
+        request. Standalone callers may omit it and receive a fresh default budget.
+        """
+        effective_budget = budget or ScanBudget.from_timeout(
+            DEFAULT_SCAN_TIMEOUT_SECONDS
+        )
+        result: object = self._scan(text_block, effective_budget)
         return parse_scanner_output(result)
 
     @abstractmethod
-    def _scan(self, text_block: str) -> tuple[Finding, ...]:
-        """Return block-relative findings for one block of text."""
+    def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
+        """Return block-relative findings for one block of text.
+
+        Implementations with potentially expensive work should call
+        ``budget.remaining_seconds()`` at practical interruption points.
+        """
         raise NotImplementedError
 
 
@@ -148,6 +215,8 @@ __all__ = [
     "Confidence",
     "Finding",
     "RequestBodyFinding",
+    "ScanBudget",
+    "ScanBudgetExceeded",
     "Scanner",
     "ScannerConfig",
     "ScannerContractError",

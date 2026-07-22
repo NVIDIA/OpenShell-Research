@@ -41,6 +41,7 @@ class ErrorCode(StrEnum):
     FORMAT_HANDLER_EXECUTION_FAILED = "format_handler_execution_failed"
     SCANNER_OUTPUT_INVALID = "scanner_output_invalid"
     SCANNER_EXECUTION_FAILED = "scanner_execution_failed"
+    SCANNER_CONFIG_INVALID = "scanner_config_invalid"
     FINDING_LIMIT_EXCEEDED = "finding_limit_exceeded"
     RESULT_LIMIT_EXCEEDED = "result_limit_exceeded"
     SERVER_BIND_FAILED = "server_bind_failed"
@@ -94,6 +95,15 @@ class PrivacyGuardError(Exception):
         )
 
 
+class InternalPrivacyGuardError(PrivacyGuardError):
+    """A cataloged failure reclassified as internal for its runtime context."""
+
+    @property
+    @override
+    def kind(self) -> ErrorKind:
+        return ErrorKind.INTERNAL
+
+
 _ERROR_SPECS: dict[ErrorCode, ErrorSpec] = {
     ErrorCode.CONFIG_INVALID: ErrorSpec(
         ErrorKind.INVALID_INPUT,
@@ -102,6 +112,14 @@ _ERROR_SPECS: dict[ErrorCode, ErrorSpec] = {
         "Policy configuration is invalid.",
         "Check allowed fields, strict string types, finding action, confidence, "
         "entity filters, and redact template syntax.",
+    ),
+    ErrorCode.SCANNER_CONFIG_INVALID: ErrorSpec(
+        ErrorKind.INVALID_INPUT,
+        ErrorComponent.SCANNER,
+        "configure",
+        "Scanner configuration is invalid.",
+        "Check the YAML shape, selected profile, catalog limits, names, and "
+        "regular expressions.",
     ),
     ErrorCode.REQUEST_PHASE_INVALID: ErrorSpec(
         ErrorKind.INVALID_INPUT,

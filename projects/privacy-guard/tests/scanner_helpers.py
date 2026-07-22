@@ -9,6 +9,7 @@ from typing_extensions import override
 from privacy_guard.scanners import (
     Confidence,
     Finding,
+    ScanBudget,
     Scanner,
     ScannerConfig,
 )
@@ -20,7 +21,7 @@ class DeterministicEmailScanner(Scanner[ScannerConfig]):
     )
 
     @override
-    def _scan(self, text_block: str) -> tuple[Finding, ...]:
+    def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
         return tuple(
             Finding(
                 entity="email",

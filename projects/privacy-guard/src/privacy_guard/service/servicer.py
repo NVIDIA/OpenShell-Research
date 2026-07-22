@@ -27,6 +27,7 @@ from privacy_guard.constants import (
     MAX_CONCURRENT_SCANS,
     MAX_PROTO_FINDING_BYTES,
     MAX_PROTO_FINDING_GROUPS,
+    PATTERN_NAME_METADATA_KEY,
     REASON_CODE_PATTERN,
     SERVICE_NAME,
     SERVICE_VERSION,
@@ -38,8 +39,7 @@ from privacy_guard.payloads import (
     ProcessingDecision,
     ProcessingResult,
 )
-from privacy_guard.processor import RequestProcessor
-from privacy_guard.scanners import PassthroughScanner, RequestBodyFinding
+from privacy_guard.scanners import RequestBodyFinding
 
 
 class RequestProcessorLike(Protocol):
@@ -53,12 +53,8 @@ class RequestProcessorLike(Protocol):
 class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
     """Translate protobuf requests and responses at the transport boundary."""
 
-    def __init__(self, processor: RequestProcessorLike | None = None) -> None:
-        self._processor = (
-            processor
-            if processor is not None
-            else RequestProcessor([PassthroughScanner()])
-        )
+    def __init__(self, processor: RequestProcessorLike) -> None:
+        self._processor = processor
         self._scan_slots = asyncio.Semaphore(MAX_CONCURRENT_SCANS)
         self._scan_executor = ThreadPoolExecutor(
             max_workers=MAX_CONCURRENT_SCANS,
@@ -299,21 +295,31 @@ def _limit_deny() -> pb2.HttpRequestResult:
 
 
 def _aggregate_findings(findings: tuple[RequestBodyFinding, ...]) -> list[pb2.Finding]:
-    groups: OrderedDict[tuple[str, str, str], int] = OrderedDict()
+    groups: OrderedDict[tuple[str, str, str | None, str], int] = OrderedDict()
     for request_body_finding in findings:
         finding = request_body_finding.finding
-        key = (finding.scanner_name, finding.entity, finding.confidence.value)
+        pattern_name = (
+            None
+            if finding.metadata is None
+            else finding.metadata.get(PATTERN_NAME_METADATA_KEY)
+        )
+        key = (
+            finding.scanner_name,
+            finding.entity,
+            pattern_name,
+            finding.confidence.value,
+        )
         groups[key] = groups.get(key, 0) + 1
     if len(groups) > MAX_PROTO_FINDING_GROUPS:
         raise PrivacyGuardError(ErrorCode.RESULT_LIMIT_EXCEEDED)
     aggregated = [
         pb2.Finding(
             type=scanner_name,
-            label=entity,
+            label=entity if pattern_name is None else f"{entity}/{pattern_name}",
             confidence=confidence,
             count=min(count, UINT32_MAX),
         )
-        for (scanner_name, entity, confidence), count in groups.items()
+        for (scanner_name, entity, pattern_name, confidence), count in groups.items()
     ]
     if any(finding.ByteSize() > MAX_PROTO_FINDING_BYTES for finding in aggregated):
         raise PrivacyGuardError(ErrorCode.RESULT_LIMIT_EXCEEDED)

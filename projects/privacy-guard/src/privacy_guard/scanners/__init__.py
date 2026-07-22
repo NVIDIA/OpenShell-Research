@@ -6,19 +6,31 @@ from privacy_guard.scanners.base import (
     Confidence,
     Finding,
     RequestBodyFinding,
+    ScanBudget,
+    ScanBudgetExceeded,
     Scanner,
     ScannerConfig,
     ScannerContractError,
     ScannerFindingLimitExceeded,
     parse_scanner_output,
 )
-from privacy_guard.scanners.passthrough import PassthroughScanner
+from privacy_guard.scanners.regex import (
+    RegexEntity,
+    RegexPattern,
+    RegexScanner,
+    RegexScannerConfig,
+)
 
 __all__ = [
     "Confidence",
     "Finding",
-    "PassthroughScanner",
     "RequestBodyFinding",
+    "RegexEntity",
+    "RegexPattern",
+    "RegexScanner",
+    "RegexScannerConfig",
+    "ScanBudget",
+    "ScanBudgetExceeded",
     "Scanner",
     "ScannerConfig",
     "ScannerContractError",

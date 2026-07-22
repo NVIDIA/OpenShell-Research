@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from string import Formatter
@@ -15,12 +16,15 @@ from privacy_guard.config import (
 from privacy_guard.constants import (
     BLOCK_REASON_CODE,
     CONFIDENCE_RANK,
+    DEFAULT_SCAN_TIMEOUT_SECONDS,
     LIMIT_REASON_CODE,
     MAX_BODY_BYTES,
     MAX_FINDINGS_PER_BLOCK,
     MAX_FINDINGS_PER_REQUEST,
+    MAX_SCAN_TIMEOUT_SECONDS,
     MAX_SCANNED_CHARACTERS,
     MAX_TEXT_BLOCKS,
+    PATTERN_NAME_METADATA_KEY,
 )
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
 from privacy_guard.payloads import (
@@ -38,6 +42,8 @@ from privacy_guard.request_body import (
 from privacy_guard.scanners import (
     Finding,
     RequestBodyFinding,
+    ScanBudget,
+    ScanBudgetExceeded,
     Scanner,
     ScannerConfig,
     ScannerContractError,
@@ -56,7 +62,17 @@ class RequestProcessor:
         self,
         scanners: Sequence[Scanner[ScannerConfig]],
         format_handlers: Mapping[str, FormatHandler] = DEFAULT_FORMAT_HANDLERS,
+        *,
+        scan_timeout_seconds: float = DEFAULT_SCAN_TIMEOUT_SECONDS,
     ) -> None:
+        if (
+            isinstance(scan_timeout_seconds, bool)
+            or not isinstance(scan_timeout_seconds, int | float)
+            or not math.isfinite(scan_timeout_seconds)
+            or scan_timeout_seconds <= 0
+            or scan_timeout_seconds > MAX_SCAN_TIMEOUT_SECONDS
+        ):
+            raise ValueError("scan timeout must be finite, positive, and bounded")
         scanner_tuple = tuple(scanners)
         if not scanner_tuple:
             raise PrivacyGuardError(ErrorCode.SCANNER_OUTPUT_INVALID)
@@ -72,6 +88,7 @@ class RequestProcessor:
             supported_entities.update(item.supported_entity_types)
         self._scanners: tuple[Scanner[ScannerConfig], ...] = scanner_tuple
         self._supported_entities = frozenset(supported_entities)
+        self._scan_timeout_seconds = float(scan_timeout_seconds)
         self._format_handlers: dict[str, FormatHandler] = {}
         for format_name, handler in format_handlers.items():
             if not isinstance(handler, FormatHandler):
@@ -94,7 +111,8 @@ class RequestProcessor:
 
         request_body = _normalize_request_body(handler, request)
         verified_body = _validate_normalized_body(request_body, request.raw_body)
-        scan_result = self._scan_text_blocks(verified_body.text_blocks, action)
+        budget = ScanBudget.from_timeout(self._scan_timeout_seconds)
+        scan_result = self._scan_text_blocks(verified_body.text_blocks, action, budget)
         if scan_result.limit_exceeded:
             return ProcessingResult(
                 decision=ProcessingDecision.DENY, reason_code=LIMIT_REASON_CODE
@@ -164,14 +182,23 @@ class RequestProcessor:
             raise PrivacyGuardError(ErrorCode.CONFIG_INVALID)
 
     def _scan_and_validate(
-        self, scanner: Scanner[ScannerConfig], text_block: TextBlock
+        self,
+        scanner: Scanner[ScannerConfig],
+        text_block: TextBlock,
+        budget: ScanBudget,
     ) -> tuple[Finding, ...]:
         try:
-            result = scanner.scan(text_block.text)
+            result = scanner.scan(text_block.text, budget=budget)
+        except ScanBudgetExceeded:
+            raise
         except ScannerFindingLimitExceeded:
             raise PrivacyGuardError(ErrorCode.FINDING_LIMIT_EXCEEDED) from None
         except ScannerContractError:
             raise PrivacyGuardError(ErrorCode.SCANNER_OUTPUT_INVALID) from None
+        except PrivacyGuardError as error:
+            if error.code is ErrorCode.SCANNER_CONFIG_INVALID:
+                raise
+            raise PrivacyGuardError(ErrorCode.SCANNER_EXECUTION_FAILED) from None
         except Exception:
             raise PrivacyGuardError(ErrorCode.SCANNER_EXECUTION_FAILED) from None
         for finding in result:
@@ -182,11 +209,22 @@ class RequestProcessor:
             ):
                 raise PrivacyGuardError(ErrorCode.SCANNER_OUTPUT_INVALID)
         return tuple(
-            sorted(result, key=lambda item: (item.start_offset, item.end_offset))
+            sorted(
+                result,
+                key=lambda item: (
+                    item.start_offset,
+                    item.end_offset,
+                    item.entity,
+                    _finding_pattern_name(item),
+                ),
+            )
         )
 
     def _scan_text_blocks(
-        self, text_blocks: tuple[TextBlock, ...], action: ActionConfig
+        self,
+        text_blocks: tuple[TextBlock, ...],
+        action: ActionConfig,
+        budget: ScanBudget,
     ) -> _ScanResult:
         by_path: dict[str, tuple[Finding, ...]] = {}
         all_findings: list[RequestBodyFinding] = []
@@ -200,7 +238,7 @@ class RequestProcessor:
             block_findings: list[Finding] = []
             try:
                 for scanner in self._scanners:
-                    for finding in self._scan_and_validate(scanner, block):
+                    for finding in self._scan_and_validate(scanner, block, budget):
                         if (enabled is None or finding.entity in enabled) and (
                             threshold is None
                             or CONFIDENCE_RANK[finding.confidence] >= threshold
@@ -212,6 +250,8 @@ class RequestProcessor:
                                 > MAX_FINDINGS_PER_REQUEST
                             ):
                                 return _ScanResult((), {}, True)
+            except ScanBudgetExceeded:
+                return _ScanResult((), {}, True)
             except PrivacyGuardError as error:
                 if error.code is ErrorCode.FINDING_LIMIT_EXCEEDED:
                     return _ScanResult((), {}, True)
@@ -224,6 +264,7 @@ class RequestProcessor:
                         item.end_offset,
                         item.scanner_name,
                         item.entity,
+                        _finding_pattern_name(item),
                     ),
                 )
             )
@@ -296,6 +337,7 @@ def _resolve_overlaps(findings: tuple[Finding, ...]) -> tuple[Finding, ...]:
             item.end_offset,
             item.scanner_name,
             item.entity,
+            _finding_pattern_name(item),
         ),
     )
     for candidate in ranked:
@@ -305,7 +347,18 @@ def _resolve_overlaps(findings: tuple[Finding, ...]) -> tuple[Finding, ...]:
             for winner in winners
         ):
             winners.append(candidate)
-    return tuple(sorted(winners, key=lambda item: (item.start_offset, item.end_offset)))
+    return tuple(
+        sorted(
+            winners,
+            key=lambda item: (
+                item.start_offset,
+                item.end_offset,
+                item.scanner_name,
+                item.entity,
+                _finding_pattern_name(item),
+            ),
+        )
+    )
 
 
 def _redact_text(
@@ -378,3 +431,9 @@ def _reconstruct_body(
         raise
     except Exception:
         raise PrivacyGuardError(ErrorCode.FORMAT_HANDLER_EXECUTION_FAILED) from None
+
+
+def _finding_pattern_name(finding: Finding) -> str:
+    if finding.metadata is None:
+        return ""
+    return finding.metadata.get(PATTERN_NAME_METADATA_KEY, "")

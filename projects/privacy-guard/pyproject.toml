@@ -12,6 +12,7 @@ dependencies = [
   "grpcio>=1.81.1,<2",
   "protobuf>=6.33.5,<7",
   "pydantic>=2.11,<3",
+  "pyyaml>=6.0.2,<7",
   "typing-extensions>=4.12,<5",
 ]
 

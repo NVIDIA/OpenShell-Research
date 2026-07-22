@@ -4,7 +4,6 @@ import pytest
 
 from privacy_guard.config import PolicyConfig
 from privacy_guard.request_body import JsonHandler
-from privacy_guard.scanners import PassthroughScanner
 
 
 @pytest.mark.parametrize(
@@ -28,7 +27,7 @@ from privacy_guard.scanners import PassthroughScanner
         ),
     ],
 )
-def test_one_selected_text_block_can_be_scanned_and_explicitly_replaced(
+def test_one_selected_text_block_can_be_explicitly_replaced(
     raw_body: bytes, selected_text_block_path: str, expected_value: object
 ) -> None:
     json_handler = JsonHandler()
@@ -39,9 +38,6 @@ def test_one_selected_text_block_can_be_scanned_and_explicitly_replaced(
         if text_block.path == selected_text_block_path
     )
 
-    findings = PassthroughScanner().scan(selected_text_block.text)
-
-    assert findings == ()
     test_suffix = " [test suffix]"
     replacement_text = selected_text_block.text + test_suffix
     reconstructed_body = json_handler.reconstruct(
