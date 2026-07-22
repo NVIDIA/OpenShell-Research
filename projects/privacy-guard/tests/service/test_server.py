@@ -131,6 +131,41 @@ def test_cli_profile_is_optional_and_forwarded_only_when_supplied(
     assert calls == [("scanner-config.yaml", profile, "regex")]
 
 
+def test_cli_forwards_custom_scanner_name_after_separator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, str | None, str]] = []
+    scanner = DeterministicEmailScanner(
+        ScannerConfig(name="custom-regex", entity_types=frozenset({"email"}))
+    )
+
+    def load_scanner(
+        path: str,
+        selected_profile: str | None,
+        *,
+        scanner_name: str,
+    ) -> DeterministicEmailScanner:
+        calls.append((path, selected_profile, scanner_name))
+        return scanner
+
+    monkeypatch.setattr(server_module.RegexScanner, "from_yaml", load_scanner)
+    monkeypatch.setattr(MiddlewareServer, "serve", lambda self, listen: None)
+
+    assert (
+        main(
+            [
+                "--scanner-config",
+                "scanner-config.yaml",
+                "--",
+                "--scanner-name",
+                "custom-regex",
+            ]
+        )
+        == 0
+    )
+    assert calls == [("scanner-config.yaml", None, "custom-regex")]
+
+
 def test_cli_always_requires_scanner_configuration(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -150,6 +185,8 @@ def test_cli_exposes_separate_server_and_scanner_help(
     server_output = capsys.readouterr().out
     assert "--listen" in server_output
     assert "--scanner-config" in server_output
+    assert "Scanner-specific options follow --" in server_output
+    assert "--scanner-config PATH" in server_output
 
     with pytest.raises(SystemExit) as scanner_help:
         main(["--scanner-config", "scanner-config.yaml", "--", "--help"])

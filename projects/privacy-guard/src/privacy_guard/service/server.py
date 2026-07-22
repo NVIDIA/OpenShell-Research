@@ -68,7 +68,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Load the default scanner from its required config, then run the server."""
     command_arguments = tuple(sys.argv[1:] if argv is None else argv)
     server_arguments, scanner_arguments = _split_scanner_arguments(command_arguments)
-    parser = argparse.ArgumentParser(description="Run the Privacy Guard middleware")
+    parser = argparse.ArgumentParser(
+        description="Run the Privacy Guard middleware",
+        epilog=(
+            "Scanner-specific options follow --. Run '%(prog)s --scanner-config "
+            "PATH -- --help' to list them."
+        ),
+    )
     parser.add_argument(
         "--scanner-config",
         required=True,
@@ -107,7 +113,7 @@ def _create_regex_scanner_parser(command_name: str) -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--profile",
-        help="Select a profile from the RegexScanner configuration",
+        help="Profile required for a multi-profile RegexScanner configuration",
     )
     parser.add_argument("--scanner-name", default="regex")
     return parser
