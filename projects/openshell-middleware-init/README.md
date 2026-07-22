@@ -92,22 +92,6 @@ removing either one:
 4. Remove `owner` and `metadata.json`, then remove the empty reservation with
    `rmdir`. Stop if it contains anything unexpected.
 
-## Relationship to `middleware_dev_setup`
-
-This CLI preserves the spike's important behavior: explicit version and
-language selection, version normalization, toolchain preflight, retried pinned
-protocol downloads, protocol hashing, generated bindings, dependency locks,
-validation before publication, and non-destructive sibling staging.
-
-The scope is intentionally narrower and more project-oriented:
-
-- one invocation creates one runnable Python or Rust project;
-- project files live at the output root;
-- project identity is independent of the output directory;
-- OpenShell installation remains a separate operation; and
-- publication uses an atomic no-replace operation rather than a final checked
-  move.
-
 ## Develop the CLI
 
 Run the complete local gate from this directory:

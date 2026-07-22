@@ -15,14 +15,6 @@ Read `README.md` and `pyproject.toml` before changing this project.
   proto, bindings or build configuration, lockfile, and manifest must agree.
 - Do not install, replace, or configure the user's OpenShell installation.
 
-## Follow the reference behavior
-
-- Compare user-visible generation behavior with the repository sibling
-  `../openshell-internal-spikes/middleware_dev_setup` (resolved from the
-  repository root) before changing it.
-- Preserve the reference behavior unless the project README documents a clear,
-  project-specific reason for a difference.
-
 ## Use the project toolchain
 
 - Use `uv` for this Python project. Treat `pyproject.toml` and `uv.lock` as the
