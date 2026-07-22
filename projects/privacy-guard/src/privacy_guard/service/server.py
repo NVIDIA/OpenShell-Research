@@ -7,12 +7,13 @@ and the supervisor reaches it over gRPC. The default endpoint is loopback.
 
 from __future__ import annotations
 
-import argparse
 import asyncio
-import sys
-from collections.abc import Sequence
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Annotated
 
 import grpc
+import typer
 
 from privacy_guard.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
 from privacy_guard.constants import MAX_CONCURRENT_RPCS, MAX_RECEIVE_MESSAGE_BYTES
@@ -20,6 +21,13 @@ from privacy_guard.errors import ErrorCode, PrivacyGuardError
 from privacy_guard.processor import RequestProcessor
 from privacy_guard.scanners import RegexScanner, Scanner, ScannerConfig
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
+
+app = typer.Typer(
+    name="privacy-guard",
+    help="Run Privacy Guard with a built-in scanner.",
+    no_args_is_help=True,
+    add_completion=False,
+)
 
 
 class MiddlewareServer:
@@ -64,60 +72,54 @@ async def serve(
         await servicer.close()
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    """Load the default scanner from its required config, then run the server."""
-    command_arguments = tuple(sys.argv[1:] if argv is None else argv)
-    server_arguments, scanner_arguments = _split_scanner_arguments(command_arguments)
-    parser = argparse.ArgumentParser(
-        description="Run the Privacy Guard middleware",
-        epilog=(
-            "Scanner-specific options follow --. Run '%(prog)s --scanner-config "
-            "PATH -- --help' to list them."
-        ),
-    )
-    parser.add_argument(
-        "--scanner-config",
-        required=True,
-        help="Path to the active scanner's configuration",
-    )
-    parser.add_argument("--listen", default="127.0.0.1:50051")
-    arguments = parser.parse_args(server_arguments)
-    scanner_parser = _create_regex_scanner_parser(parser.prog)
-    scanner_options = scanner_parser.parse_args(scanner_arguments or ())
+@app.callback()
+def main(
+    context: typer.Context,
+    scanner_config: Annotated[
+        Path,
+        typer.Option(help="Path to the built-in scanner's configuration."),
+    ],
+    listen: Annotated[
+        str,
+        typer.Option(help="Address on which the middleware server listens."),
+    ] = "127.0.0.1:50051",
+) -> None:
+    """Collect options shared by every built-in scanner."""
+    context.obj = _CliOptions(scanner_config=scanner_config, listen=listen)
+
+
+@app.command("regex")
+def run_regex(
+    context: typer.Context,
+    profile: Annotated[
+        str | None,
+        typer.Option(help="Profile required for a multi-profile configuration."),
+    ] = None,
+    scanner_name: Annotated[
+        str,
+        typer.Option(help="Scanner identity attached to findings."),
+    ] = "regex",
+) -> None:
+    """Run Privacy Guard with the built-in RegexScanner."""
+    options = context.find_object(_CliOptions)
+    assert options is not None
     try:
         scanner = RegexScanner.from_yaml(
-            arguments.scanner_config,
-            scanner_options.profile,
-            scanner_name=scanner_options.scanner_name,
+            options.scanner_config,
+            profile,
+            scanner_name=scanner_name,
         )
-        MiddlewareServer(scanner=scanner).serve(arguments.listen)
+        MiddlewareServer(scanner=scanner).serve(options.listen)
     except PrivacyGuardError as error:
-        parser.exit(status=1, message=f"{error}\n")
-    return 0
+        typer.echo(str(error), err=True)
+        raise typer.Exit(code=1) from None
 
 
-def _split_scanner_arguments(
-    arguments: tuple[str, ...],
-) -> tuple[tuple[str, ...], tuple[str, ...] | None]:
-    try:
-        separator_index = arguments.index("--")
-    except ValueError:
-        return arguments, None
-    return arguments[:separator_index], arguments[separator_index + 1 :]
-
-
-def _create_regex_scanner_parser(command_name: str) -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog=f"{command_name} --",
-        description="Configure the default RegexScanner",
-    )
-    parser.add_argument(
-        "--profile",
-        help="Profile required for a multi-profile RegexScanner configuration",
-    )
-    parser.add_argument("--scanner-name", default="regex")
-    return parser
+@dataclass(frozen=True)
+class _CliOptions:
+    scanner_config: Path
+    listen: str
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    app()

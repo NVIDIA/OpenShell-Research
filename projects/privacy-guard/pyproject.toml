@@ -13,11 +13,12 @@ dependencies = [
   "protobuf>=6.33.5,<7",
   "pydantic>=2.11,<3",
   "pyyaml>=6.0.2,<7",
+  "typer>=0.16,<1",
   "typing-extensions>=4.12,<5",
 ]
 
 [project.scripts]
-privacy-guard = "privacy_guard.service.server:main"
+privacy-guard = "privacy_guard.service.server:app"
 
 [project.urls]
 Repository = "https://github.com/NVIDIA/OpenShell-Research"

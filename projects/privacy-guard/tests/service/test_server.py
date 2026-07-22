@@ -1,9 +1,11 @@
 from collections.abc import Sequence
+from pathlib import Path
 
 import grpc
 import pytest
 from google.protobuf import empty_pb2, message_factory
 from google.protobuf.message import Message
+from typer.testing import CliRunner
 from typing_extensions import override
 
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
@@ -13,7 +15,7 @@ from privacy_guard.errors import ErrorCode, PrivacyGuardError
 from privacy_guard.processor import RequestProcessor
 from privacy_guard.scanners import ScannerConfig
 from privacy_guard.service import server as server_module
-from privacy_guard.service.server import MiddlewareServer, create_server, main, serve
+from privacy_guard.service.server import MiddlewareServer, app, create_server, serve
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
 
 from ..scanner_helpers import DeterministicEmailScanner
@@ -83,7 +85,6 @@ def test_middleware_server_wires_scanner_and_has_a_default_listen_address(
 
 def test_cli_reports_expected_configuration_failure_without_traceback(
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
 ) -> None:
     expected = PrivacyGuardError(ErrorCode.SCANNER_CONFIG_INVALID)
 
@@ -92,14 +93,15 @@ def test_cli_reports_expected_configuration_failure_without_traceback(
 
     monkeypatch.setattr(server_module.RegexScanner, "from_yaml", reject_configuration)
 
-    with pytest.raises(SystemExit) as exception_info:
-        main(["--scanner-config", "sensitive-path-8472.yaml"])
+    result = CliRunner().invoke(
+        app,
+        ["--scanner-config", "sensitive-path-8472.yaml", "regex"],
+    )
 
-    assert exception_info.value.code == 1
-    stderr = capsys.readouterr().err
-    assert stderr == f"{expected}\n"
-    assert "Traceback" not in stderr
-    assert "8472" not in stderr
+    assert result.exit_code == 1
+    assert result.output == f"{expected}\n"
+    assert "Traceback" not in result.output
+    assert "8472" not in result.output
 
 
 @pytest.mark.parametrize("profile", [None, "customer-support"])
@@ -113,25 +115,27 @@ def test_cli_profile_is_optional_and_forwarded_only_when_supplied(
     )
 
     def load_scanner(
-        path: str,
+        path: str | Path,
         selected_profile: str | None,
         *,
         scanner_name: str,
     ) -> DeterministicEmailScanner:
-        calls.append((path, selected_profile, scanner_name))
+        calls.append((str(path), selected_profile, scanner_name))
         return scanner
 
     monkeypatch.setattr(server_module.RegexScanner, "from_yaml", load_scanner)
     monkeypatch.setattr(MiddlewareServer, "serve", lambda self, listen: None)
-    arguments = ["--scanner-config", "scanner-config.yaml"]
+    arguments = ["--scanner-config", "scanner-config.yaml", "regex"]
     if profile is not None:
-        arguments.extend(("--", "--profile", profile))
+        arguments.extend(("--profile", profile))
 
-    assert main(arguments) == 0
+    result = CliRunner().invoke(app, arguments)
+
+    assert result.exit_code == 0
     assert calls == [("scanner-config.yaml", profile, "regex")]
 
 
-def test_cli_forwards_custom_scanner_name_after_separator(
+def test_cli_forwards_custom_scanner_name_to_builtin(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[tuple[str, str | None, str]] = []
@@ -140,78 +144,75 @@ def test_cli_forwards_custom_scanner_name_after_separator(
     )
 
     def load_scanner(
-        path: str,
+        path: str | Path,
         selected_profile: str | None,
         *,
         scanner_name: str,
     ) -> DeterministicEmailScanner:
-        calls.append((path, selected_profile, scanner_name))
+        calls.append((str(path), selected_profile, scanner_name))
         return scanner
 
     monkeypatch.setattr(server_module.RegexScanner, "from_yaml", load_scanner)
     monkeypatch.setattr(MiddlewareServer, "serve", lambda self, listen: None)
 
-    assert (
-        main(
-            [
-                "--scanner-config",
-                "scanner-config.yaml",
-                "--",
-                "--scanner-name",
-                "custom-regex",
-            ]
-        )
-        == 0
+    result = CliRunner().invoke(
+        app,
+        [
+            "--scanner-config",
+            "scanner-config.yaml",
+            "regex",
+            "--scanner-name",
+            "custom-regex",
+        ],
     )
+
+    assert result.exit_code == 0
     assert calls == [("scanner-config.yaml", None, "custom-regex")]
 
 
-def test_cli_always_requires_scanner_configuration(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    with pytest.raises(SystemExit) as exception_info:
-        main(["--listen", "127.0.0.1:50051"])
+def test_cli_always_requires_scanner_configuration() -> None:
+    result = CliRunner().invoke(app, ["regex"])
 
-    assert exception_info.value.code == 2
-    assert "--scanner-config" in capsys.readouterr().err
+    assert result.exit_code == 2
+    assert "--scanner-config" in result.output
 
 
-def test_cli_exposes_separate_server_and_scanner_help(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    with pytest.raises(SystemExit) as server_help:
-        main(["--help"])
-    assert server_help.value.code == 0
-    server_output = capsys.readouterr().out
-    assert "--listen" in server_output
-    assert "--scanner-config" in server_output
-    assert "Scanner-specific options follow --" in server_output
-    assert "--scanner-config PATH" in server_output
+def test_cli_exposes_root_and_builtin_scanner_help() -> None:
+    root_help = CliRunner().invoke(app, ["--help"])
 
-    with pytest.raises(SystemExit) as scanner_help:
-        main(["--scanner-config", "scanner-config.yaml", "--", "--help"])
-    assert scanner_help.value.code == 0
-    scanner_output = capsys.readouterr().out
-    assert "--profile" in scanner_output
-    assert "--scanner-config" not in scanner_output
-    assert "--listen" not in scanner_output
+    assert root_help.exit_code == 0
+    assert "privacy-guard" in root_help.output
+    assert "--listen" in root_help.output
+    assert "--scanner-config" in root_help.output
+    assert "regex" in root_help.output
+
+    scanner_help = CliRunner().invoke(
+        app,
+        ["--scanner-config", "scanner-config.yaml", "regex", "--help"],
+    )
+
+    assert scanner_help.exit_code == 0
+    assert "built-in RegexScanner" in scanner_help.output
+    assert "--profile" in scanner_help.output
+    assert "--scanner-name" in scanner_help.output
+    assert "--scanner-config" not in scanner_help.output
+    assert "--listen" not in scanner_help.output
 
 
-def test_cli_rejects_scanner_options_before_separator(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    with pytest.raises(SystemExit) as exception_info:
-        main(
-            [
-                "--scanner-config",
-                "scanner-config.yaml",
-                "--profile",
-                "customer-support",
-            ]
-        )
+def test_cli_rejects_builtin_options_before_subcommand() -> None:
+    result = CliRunner().invoke(
+        app,
+        [
+            "--scanner-config",
+            "scanner-config.yaml",
+            "--profile",
+            "customer-support",
+            "regex",
+        ],
+    )
 
-    assert exception_info.value.code == 2
-    assert "unrecognized arguments: --profile" in capsys.readouterr().err
+    assert result.exit_code == 2
+    assert "--profile" in result.output
 
 
 @pytest.mark.asyncio

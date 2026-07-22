@@ -68,10 +68,10 @@ profiles:
           ignore_case: true
 ```
 
-The command will require `--profile NAME` after the scanner-option separator
-when the file contains `profiles`. It will reject `--profile` for a
-single-profile file, avoiding an ignored or ambiguous option. Exactly one
-selected entity catalog is active; profiles are not merged implicitly.
+The `regex` built-in command will require `--profile NAME` when the file
+contains `profiles`. It will reject `--profile` for a single-profile file,
+avoiding an ignored or ambiguous option. Exactly one selected entity catalog is
+active; profiles are not merged implicitly.
 
 Scanner identity is runtime configuration rather than rule-set content. The
 default command will use the stable name `regex`, with an explicit
@@ -214,11 +214,12 @@ they are not blamed on the request that happened to expose the pattern defect.
    the scanner implementation must not emit a response its consumer rejects.
 7. Add a loader such as `RegexScanner.from_yaml(path, profile=None)`. Update the
    packaged command to accept one required, scanner-agnostic
-   `--scanner-config PATH`. Put the conditionally required `--profile NAME` and
-   optional `--scanner-name` after the scanner-option separator. Load and compile the
-   configuration before binding a listening socket. Restore the `privacy-guard`
-   script only in the same change, so the command cannot run with an implicit
-   allow-all scanner between implementations.
+   `--scanner-config PATH`. Expose RegexScanner as the `regex` built-in command,
+   with the conditionally required `--profile NAME` and optional
+   `--scanner-name`. Load and compile the configuration before binding a
+   listening socket. Restore the `privacy-guard` script only in the same change,
+   so the command cannot run with an implicit allow-all scanner between
+   implementations.
 8. Add example rule sets under `examples/regex-configs/`: single-profile
    `customer.yaml` and `hipaa.yaml` files plus a `profiles.yaml` file showing
    both catalogs in the multi-profile shape. The HIPAA example must be
