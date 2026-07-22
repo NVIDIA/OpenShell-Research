@@ -1,0 +1,12 @@
+# OpenShell gateway configuration for the manual Privacy Guard example.
+# Replace REPLACE_WITH_HOST_IP, then pass this file to openshell-gateway with
+# --config. Do not copy it into ~/.config/openshell.
+
+[openshell]
+version = 1
+
+[[openshell.supervisor.middleware]]
+name = "privacy-guard-manual"
+grpc_endpoint = "http://REPLACE_WITH_HOST_IP:50051"
+max_body_bytes = 4194304
+timeout = "5s"
