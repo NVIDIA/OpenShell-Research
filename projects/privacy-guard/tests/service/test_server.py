@@ -95,7 +95,7 @@ def test_cli_reports_expected_configuration_failure_without_traceback(
 
     result = CliRunner().invoke(
         app,
-        ["--scanner-config", "sensitive-path-8472.yaml", "regex"],
+        ["regex", "--scanner-config", "sensitive-path-8472.yaml"],
     )
 
     assert result.exit_code == 1
@@ -125,7 +125,7 @@ def test_cli_profile_is_optional_and_forwarded_only_when_supplied(
 
     monkeypatch.setattr(server_module.RegexScanner, "from_yaml", load_scanner)
     monkeypatch.setattr(MiddlewareServer, "serve", lambda self, listen: None)
-    arguments = ["--scanner-config", "scanner-config.yaml", "regex"]
+    arguments = ["regex", "--scanner-config", "scanner-config.yaml"]
     if profile is not None:
         arguments.extend(("--profile", profile))
 
@@ -158,9 +158,9 @@ def test_cli_forwards_custom_scanner_name_to_builtin(
     result = CliRunner().invoke(
         app,
         [
+            "regex",
             "--scanner-config",
             "scanner-config.yaml",
-            "regex",
             "--scanner-name",
             "custom-regex",
         ],
@@ -182,29 +182,22 @@ def test_cli_exposes_root_and_builtin_scanner_help() -> None:
 
     assert root_help.exit_code == 0
     assert "privacy-guard" in root_help.output
-    assert "--listen" in root_help.output
-    assert "--scanner-config" in root_help.output
     assert "regex" in root_help.output
 
-    scanner_help = CliRunner().invoke(
-        app,
-        ["--scanner-config", "scanner-config.yaml", "regex", "--help"],
-    )
+    scanner_help = CliRunner().invoke(app, ["regex", "--help"])
 
     assert scanner_help.exit_code == 0
     assert "built-in RegexScanner" in scanner_help.output
+    assert "--scanner-config" in scanner_help.output
+    assert "--listen" in scanner_help.output
     assert "--profile" in scanner_help.output
     assert "--scanner-name" in scanner_help.output
-    assert "--scanner-config" not in scanner_help.output
-    assert "--listen" not in scanner_help.output
 
 
 def test_cli_rejects_builtin_options_before_subcommand() -> None:
     result = CliRunner().invoke(
         app,
         [
-            "--scanner-config",
-            "scanner-config.yaml",
             "--profile",
             "customer-support",
             "regex",

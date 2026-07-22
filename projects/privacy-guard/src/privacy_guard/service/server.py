@@ -8,7 +8,6 @@ and the supervisor reaches it over gRPC. The default endpoint is loopback.
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated
 
@@ -73,24 +72,20 @@ async def serve(
 
 
 @app.callback()
-def main(
-    context: typer.Context,
+def main() -> None:
+    """Select one of Privacy Guard's built-in scanners."""
+
+
+@app.command("regex")
+def run_regex(
     scanner_config: Annotated[
         Path,
-        typer.Option(help="Path to the built-in scanner's configuration."),
+        typer.Option(help="Path to the RegexScanner configuration."),
     ],
     listen: Annotated[
         str,
         typer.Option(help="Address on which the middleware server listens."),
     ] = "127.0.0.1:50051",
-) -> None:
-    """Collect options shared by every built-in scanner."""
-    context.obj = _CliOptions(scanner_config=scanner_config, listen=listen)
-
-
-@app.command("regex")
-def run_regex(
-    context: typer.Context,
     profile: Annotated[
         str | None,
         typer.Option(help="Profile required for a multi-profile configuration."),
@@ -101,24 +96,16 @@ def run_regex(
     ] = "regex",
 ) -> None:
     """Run Privacy Guard with the built-in RegexScanner."""
-    options = context.find_object(_CliOptions)
-    assert options is not None
     try:
         scanner = RegexScanner.from_yaml(
-            options.scanner_config,
+            scanner_config,
             profile,
             scanner_name=scanner_name,
         )
-        MiddlewareServer(scanner=scanner).serve(options.listen)
+        MiddlewareServer(scanner=scanner).serve(listen)
     except PrivacyGuardError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(code=1) from None
-
-
-@dataclass(frozen=True)
-class _CliOptions:
-    scanner_config: Path
-    listen: str
 
 
 if __name__ == "__main__":

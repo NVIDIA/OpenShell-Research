@@ -213,13 +213,12 @@ they are not blamed on the request that happened to expose the pattern defect.
    separate OpenShell protocol change before increasing Privacy Guard's limit;
    the scanner implementation must not emit a response its consumer rejects.
 7. Add a loader such as `RegexScanner.from_yaml(path, profile=None)`. Update the
-   packaged command to accept one required, scanner-agnostic
-   `--scanner-config PATH`. Expose RegexScanner as the `regex` built-in command,
-   with the conditionally required `--profile NAME` and optional
-   `--scanner-name`. Load and compile the configuration before binding a
-   listening socket. Restore the `privacy-guard` script only in the same change,
-   so the command cannot run with an implicit allow-all scanner between
-   implementations.
+   packaged command to expose RegexScanner as the `regex` built-in command with
+   one required `--scanner-config PATH`, the conditionally required
+   `--profile NAME`, and optional `--scanner-name`. Load and compile the
+   configuration before binding a listening socket. Restore the `privacy-guard`
+   script only in the same change, so the command cannot run with an implicit
+   allow-all scanner between implementations.
 8. Add example rule sets under `examples/regex-configs/`: single-profile
    `customer.yaml` and `hipaa.yaml` files plus a `profiles.yaml` file showing
    both catalogs in the multi-profile shape. The HIPAA example must be

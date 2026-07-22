@@ -88,20 +88,19 @@ and entity. A scanner sequence is passed to `RequestProcessor`; scanner names
 must be unique and remain visible in aggregated findings.
 
 The `privacy-guard` command runs built-in scanners. Every built-in requires
-`--scanner-config` on the shared command surface and owns that file's schema and
-interpretation. `RegexScanner` is available through the `regex` subcommand; its
-config path selects a YAML catalog. Single-profile files contain a non-empty
-entity list. Multi-profile files contain only a non-empty `profiles` mapping and
-require the regex-specific `--profile` option. Use `privacy-guard --help` for
-shared options and built-in scanners, or
-`privacy-guard --scanner-config PATH regex --help` for regex options. See
+`--scanner-config` and owns that file's schema and interpretation.
+`RegexScanner` is available through the `regex` subcommand; its config path
+selects a YAML catalog. Single-profile files contain a non-empty entity list.
+Multi-profile files contain only a non-empty `profiles` mapping and require the
+regex-specific `--profile` option. Use `privacy-guard --help` for the built-in
+scanner list or `privacy-guard regex --help` for regex options. See
 [examples/regex-configs](examples/regex-configs) for both configuration forms.
 
 ```bash
 uv run privacy-guard \
+  regex \
   --scanner-config examples/regex-configs/customer.yaml \
-  --listen 127.0.0.1:50051 \
-  regex
+  --listen 127.0.0.1:50051
 ```
 
 Each entity has a unique name and a non-empty `patterns` list. Patterns declare
