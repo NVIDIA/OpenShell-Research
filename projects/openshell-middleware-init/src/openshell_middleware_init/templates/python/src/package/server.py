@@ -34,7 +34,6 @@ def build_manifest() -> pb2.MiddlewareManifest:
 
 def validate_config(request: pb2.ValidateConfigRequest) -> pb2.ValidateConfigResponse:
     """Validate service-specific config before OpenShell admits a policy."""
-    del request
     return pb2.ValidateConfigResponse(valid=True)
 
 
@@ -57,7 +56,6 @@ class Middleware(pb2_grpc.SupervisorMiddlewareServicer):
         request: object,
         context: grpc.aio.ServicerContext,
     ) -> pb2.MiddlewareManifest:
-        del request, context
         return build_manifest()
 
     async def ValidateConfig(
@@ -65,7 +63,6 @@ class Middleware(pb2_grpc.SupervisorMiddlewareServicer):
         request: pb2.ValidateConfigRequest,
         context: grpc.aio.ServicerContext,
     ) -> pb2.ValidateConfigResponse:
-        del context
         return validate_config(request)
 
     async def EvaluateHttpRequest(
@@ -73,7 +70,6 @@ class Middleware(pb2_grpc.SupervisorMiddlewareServicer):
         request: pb2.HttpRequestEvaluation,
         context: grpc.aio.ServicerContext,
     ) -> pb2.HttpRequestResult:
-        del context
         return evaluate_http_request(request)
 
 
