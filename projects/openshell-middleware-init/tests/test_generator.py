@@ -3,8 +3,10 @@ from __future__ import annotations
 import ctypes
 import email.message
 import errno
+import http.client
 import json
 import os
+import stat
 import subprocess
 import sys
 import urllib.error
@@ -77,8 +79,11 @@ def test_generates_rust_project_with_normalized_crate_name(tmp_path: Path) -> No
     )
 
     assert result.run_command == "cargo run -- 127.0.0.1:50051"
-    assert 'name = "request-audit"' in (destination / "Cargo.toml").read_text()
+    cargo = (destination / "Cargo.toml").read_text()
+    assert 'name = "request-audit"' in cargo
+    assert '[lib]\nname = "request_audit"' in cargo
     assert "use request_audit::" in (destination / "src/main.rs").read_text()
+    assert stat.S_IMODE(destination.stat().st_mode) == 0o755
     manifest = json.loads((destination / "middleware-dev-manifest.json").read_text())
     assert manifest["languages"] == ["rust"]
     assert manifest["python_package"] is None
@@ -113,6 +118,33 @@ def test_numeric_project_name_gets_importable_python_package(tmp_path: Path) -> 
     )
 
     assert (destination / "src/middleware_123/server.py").is_file()
+
+
+@pytest.mark.parametrize(
+    ("name", "crate", "library"),
+    [
+        ("123", "middleware-123", "middleware_123"),
+        ("type", "middleware-type", "middleware_type"),
+    ],
+)
+def test_rust_project_names_get_valid_explicit_library_names(
+    tmp_path: Path, name: str, crate: str, library: str
+) -> None:
+    destination = tmp_path / name
+
+    initialize_project(
+        name=name,
+        language="rust",
+        requested_version="v0.0.86",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+
+    cargo = (destination / "Cargo.toml").read_text()
+    assert f'name = "{crate}"' in cargo
+    assert f'[lib]\nname = "{library}"' in cargo
+    assert f"use {library}::middleware_service;" in (destination / "src/main.rs").read_text()
 
 
 def test_unsupported_platform_fails_before_filesystem_changes(
@@ -378,7 +410,7 @@ def test_download_proto_translates_network_failure(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(generator.urllib.request, "urlopen", fail)
     monkeypatch.setattr(generator.time, "sleep", lambda _: None)
 
-    with pytest.raises(InitializationError, match="middleware-capable release"):
+    with pytest.raises(InitializationError, match=r"could not download.*missing"):
         generator._download_proto("v1.2.3")
 
 
@@ -399,6 +431,26 @@ def test_download_retries_transient_failures(monkeypatch: pytest.MonkeyPatch) ->
 
     assert generator._download_proto("v1.2.3")[0] == PROTO
     assert attempts == 3
+
+
+def test_download_retries_interrupted_response_body(monkeypatch: pytest.MonkeyPatch) -> None:
+    attempts = 0
+
+    class InterruptedResponse(FakeResponse):
+        def read(self) -> bytes:
+            raise http.client.IncompleteRead(b"partial")
+
+    def interrupted_then_complete(*args: object, **kwargs: object) -> FakeResponse:
+        nonlocal attempts
+        del args, kwargs
+        attempts += 1
+        return InterruptedResponse() if attempts == 1 else FakeResponse(body=PROTO)
+
+    monkeypatch.setattr(generator.urllib.request, "urlopen", interrupted_then_complete)
+    monkeypatch.setattr(generator.time, "sleep", lambda _: None)
+
+    assert generator._download_proto("v1.2.3")[0] == PROTO
+    assert attempts == 2
 
 
 @pytest.mark.parametrize(("status", "expected_attempts"), [(503, 4), (404, 1)])
@@ -422,7 +474,8 @@ def test_download_retries_only_retryable_http_statuses(
     monkeypatch.setattr(generator.urllib.request, "urlopen", fail)
     monkeypatch.setattr(generator.time, "sleep", lambda _: None)
 
-    with pytest.raises(InitializationError, match="middleware-capable release"):
+    expected_message = "middleware-capable release" if status == 404 else "HTTP 503"
+    with pytest.raises(InitializationError, match=expected_message):
         generator._download_proto("v1.2.3")
 
     assert attempts == expected_attempts

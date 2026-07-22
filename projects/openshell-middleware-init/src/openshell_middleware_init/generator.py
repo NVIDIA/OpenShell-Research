@@ -5,6 +5,7 @@ from __future__ import annotations
 import ctypes
 import errno
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -24,7 +25,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from importlib.resources import files
 from pathlib import Path
-from typing import Any
 
 from openshell_middleware_init import __version__
 
@@ -36,6 +36,61 @@ _VERSION_PATTERN = re.compile(r"^v\d+\.\d+\.\d+(?:[+-][0-9A-Za-z._-]+)?$")
 _PYTHON_PACKAGE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 _PROJECT_NAME_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$")
 _NETWORK_ATTEMPTS = 4
+_RUST_KEYWORDS = {
+    "abstract",
+    "as",
+    "async",
+    "await",
+    "become",
+    "box",
+    "break",
+    "const",
+    "continue",
+    "crate",
+    "do",
+    "dyn",
+    "else",
+    "enum",
+    "extern",
+    "false",
+    "final",
+    "fn",
+    "for",
+    "gen",
+    "if",
+    "impl",
+    "in",
+    "let",
+    "loop",
+    "macro",
+    "match",
+    "mod",
+    "move",
+    "mut",
+    "override",
+    "priv",
+    "pub",
+    "ref",
+    "return",
+    "self",
+    "Self",
+    "static",
+    "struct",
+    "super",
+    "trait",
+    "true",
+    "try",
+    "type",
+    "typeof",
+    "union",
+    "unsized",
+    "unsafe",
+    "use",
+    "virtual",
+    "where",
+    "while",
+    "yield",
+}
 
 
 class InitializationError(RuntimeError):
@@ -74,6 +129,7 @@ class TemplateContext:
     distribution_name: str
     package_name: str
     rust_crate_name: str
+    rust_lib_name: str
     service_name: str
 
     @property
@@ -83,6 +139,7 @@ class TemplateContext:
             "__DISTRIBUTION_NAME__": self.distribution_name,
             "__PACKAGE_NAME__": self.package_name,
             "__RUST_CRATE_NAME__": self.rust_crate_name,
+            "__RUST_LIB_NAME__": self.rust_lib_name,
             "__SERVICE_NAME__": self.service_name,
         }
 
@@ -125,6 +182,7 @@ def initialize_project(
                 dir=destination.parent,
             )
         )
+        staging_path.chmod(0o755)
         _write_reservation_metadata(reservation, staging_path)
         proto, proto_url = downloader(version)
         _validate_proto(proto, version)
@@ -185,7 +243,8 @@ def _template_context(name: str, language: str, package_name: str | None) -> Tem
         raise InitializationError("--package-name is only valid with --language python")
 
     distribution_name = re.sub(r"[._]+", "-", normalized_name)
-    derived_package = re.sub(r"[^a-z0-9]+", "_", normalized_name).strip("_")
+    identifier = re.sub(r"[^a-z0-9]+", "_", normalized_name).strip("_")
+    derived_package = identifier
     if not derived_package or not derived_package[0].isalpha():
         derived_package = f"middleware_{derived_package}".rstrip("_")
     effective_package = package_name if package_name is not None else derived_package
@@ -195,11 +254,17 @@ def _template_context(name: str, language: str, package_name: str | None) -> Tem
             "lowercase letters, digits, and underscores"
         )
     service_name = normalized_name.replace("_", "-").replace(".", "-")
+    rust_lib_name = identifier
+    rust_crate_name = distribution_name
+    if not rust_lib_name[0].isalpha() or rust_lib_name in _RUST_KEYWORDS:
+        rust_lib_name = f"middleware_{rust_lib_name}"
+        rust_crate_name = f"middleware-{distribution_name}"
     return TemplateContext(
         project_name=normalized_name,
         distribution_name=distribution_name,
         package_name=effective_package,
-        rust_crate_name=distribution_name,
+        rust_crate_name=rust_crate_name,
+        rust_lib_name=rust_lib_name,
         service_name=service_name,
     )
 
@@ -223,9 +288,8 @@ def _resolve_latest_version() -> str:
         headers={"User-Agent": f"openshell-middleware-init/{__version__}"},
     )
     try:
-        with _urlopen_with_retries(request) as response:
-            resolved_url = response.geturl()
-    except (OSError, urllib.error.URLError) as error:
+        _, resolved_url = _fetch_url(request)
+    except (OSError, urllib.error.URLError, http.client.IncompleteRead) as error:
         raise InitializationError("could not resolve OpenShell's latest release") from error
     prefix = f"{_REPOSITORY_URL}/releases/tag/"
     if not resolved_url.startswith(prefix):
@@ -243,28 +307,45 @@ def _download_proto(version: str) -> tuple[bytes, str]:
         headers={"User-Agent": f"openshell-middleware-init/{__version__}"},
     )
     try:
-        with _urlopen_with_retries(request) as response:
-            return response.read(), url
-    except (OSError, urllib.error.URLError) as error:
+        body, _ = _fetch_url(request)
+        return body, url
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            raise InitializationError(
+                f"{version} does not expose {_PROTO_PATH}; choose a middleware-capable release"
+            ) from error
         raise InitializationError(
-            f"{version} does not expose {_PROTO_PATH}; choose a middleware-capable release"
+            f"could not download {_PROTO_PATH} for {version}: HTTP {error.code}"
+        ) from error
+    except (OSError, urllib.error.URLError, http.client.IncompleteRead) as error:
+        raise InitializationError(
+            f"could not download {_PROTO_PATH} for {version}: {_network_error_reason(error)}"
         ) from error
 
 
-def _urlopen_with_retries(request: urllib.request.Request) -> Any:
-    """Open a URL with the same initial attempt plus three retries as the spike."""
+def _fetch_url(request: urllib.request.Request) -> tuple[bytes, str]:
+    """Fetch a complete response with the same transfer retries as the spike."""
     for attempt in range(_NETWORK_ATTEMPTS):
         try:
-            return urllib.request.urlopen(request, timeout=30)
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return response.read(), response.geturl()
         except urllib.error.HTTPError as error:
             retryable = error.code in {408, 429} or 500 <= error.code < 600
             if not retryable or attempt == _NETWORK_ATTEMPTS - 1:
                 raise
-        except (OSError, urllib.error.URLError):
+        except (OSError, urllib.error.URLError, http.client.IncompleteRead):
             if attempt == _NETWORK_ATTEMPTS - 1:
                 raise
         time.sleep(0.25 * (2**attempt))
     raise AssertionError("network retry loop exhausted without returning or raising")
+
+
+def _network_error_reason(
+    error: OSError | urllib.error.URLError | http.client.IncompleteRead,
+) -> str:
+    if isinstance(error, urllib.error.URLError):
+        return str(error.reason)
+    return str(error)
 
 
 def _validate_proto(proto: bytes, version: str) -> None:

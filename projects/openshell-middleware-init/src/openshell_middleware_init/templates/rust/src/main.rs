@@ -1,6 +1,6 @@
 use std::{env, error::Error, net::SocketAddr};
 
-use __PACKAGE_NAME__::middleware_service;
+use __RUST_LIB_NAME__::middleware_service;
 use tonic::transport::Server;
 
 #[tokio::main]
