@@ -14,6 +14,7 @@ from __PACKAGE_NAME__.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
 SERVICE_NAME = "__SERVICE_NAME__"
 SERVICE_VERSION = "0.1.0"
 MAX_BODY_BYTES = 4 * 1024 * 1024
+MAX_MESSAGE_BYTES = MAX_BODY_BYTES + 1024 * 1024
 
 
 def build_manifest() -> pb2.MiddlewareManifest:
@@ -76,10 +77,21 @@ class Middleware(pb2_grpc.SupervisorMiddlewareServicer):
         return evaluate_http_request(request)
 
 
+def create_server() -> grpc.aio.Server:
+    """Create an unstarted server that accepts a maximum-sized body envelope."""
+    server = grpc.aio.server(
+        options=(
+            ("grpc.max_receive_message_length", MAX_MESSAGE_BYTES),
+            ("grpc.max_send_message_length", MAX_MESSAGE_BYTES),
+        )
+    )
+    pb2_grpc.add_SupervisorMiddlewareServicer_to_server(Middleware(), server)
+    return server
+
+
 async def serve(listen: str) -> None:
     """Serve the middleware until termination."""
-    server = grpc.aio.server()
-    pb2_grpc.add_SupervisorMiddlewareServicer_to_server(Middleware(), server)
+    server = create_server()
     if server.add_insecure_port(listen) == 0:
         raise RuntimeError(f"could not bind middleware server to {listen}")
     await server.start()
@@ -92,7 +104,7 @@ async def serve(listen: str) -> None:
 def main(argv: Sequence[str] | None = None) -> None:
     """Run the middleware server."""
     parser = argparse.ArgumentParser(description="Run the __PROJECT_NAME__ middleware")
-    parser.add_argument("--listen", default="127.0.0.1:50051")
+    parser.add_argument("--listen", default="0.0.0.0:50051")
     arguments = parser.parse_args(argv)
     asyncio.run(serve(arguments.listen))
 

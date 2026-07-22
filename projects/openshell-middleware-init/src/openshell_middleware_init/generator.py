@@ -2,18 +2,25 @@
 
 from __future__ import annotations
 
+import ctypes
+import errno
 import hashlib
 import json
 import os
 import re
 import secrets
 import shutil
+import socket
+import stat
 import subprocess
+import sys
 import tempfile
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import suppress
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from importlib.resources import files
 from pathlib import Path
 
@@ -40,6 +47,19 @@ class InitializationResult:
     language: str
     openshell_version: str
     run_command: str
+
+
+@dataclass(frozen=True)
+class OutputReservation:
+    """Identity and recovery data for an output-path reservation."""
+
+    path: Path
+    token: str
+    device: int
+    inode: int
+    destination: Path
+    version: str
+    started_at: str
 
 
 @dataclass(frozen=True)
@@ -88,7 +108,7 @@ def initialize_project(
     destination.parent.mkdir(parents=True, exist_ok=True)
     lock_path = destination.parent / f".{destination.name}.openshell-middleware-init.lock"
     lock_token = secrets.token_hex(16)
-    _acquire_lock(lock_path, lock_token, destination, version)
+    reservation = _acquire_lock(lock_path, lock_token, destination, version)
     staging_path: Path | None = None
     try:
         _validate_destination(destination)
@@ -98,6 +118,7 @@ def initialize_project(
                 dir=destination.parent,
             )
         )
+        _write_reservation_metadata(reservation, staging_path)
         proto, proto_url = downloader(version)
         _validate_proto(proto, version)
         _render_project(staging_path, language, context)
@@ -113,9 +134,8 @@ def initialize_project(
             python_package=context.package_name if language == "python" else None,
         )
         runner(language, staging_path, context.package_name)
-        _verify_lock(lock_path, lock_token)
-        _validate_destination(destination)
-        staging_path.replace(destination)
+        _verify_lock(reservation)
+        _publish_no_replace(staging_path, destination)
         staging_path = None
     except InitializationError:
         raise
@@ -124,7 +144,7 @@ def initialize_project(
     finally:
         if staging_path is not None:
             shutil.rmtree(staging_path, ignore_errors=True)
-        _release_lock(lock_path, lock_token)
+        _release_lock(reservation)
 
     return InitializationResult(
         destination=destination,
@@ -133,7 +153,7 @@ def initialize_project(
         run_command=(
             f"uv run {context.distribution_name}"
             if language == "python"
-            else "cargo run -- 127.0.0.1:50051"
+            else "cargo run -- 0.0.0.0:50051"
         ),
     )
 
@@ -235,48 +255,156 @@ def _validate_destination(destination: Path) -> None:
         raise InitializationError(f"invalid output path: {destination}")
 
 
-def _acquire_lock(lock_path: Path, token: str, destination: Path, version: str) -> None:
+def _acquire_lock(
+    lock_path: Path, token: str, destination: Path, version: str
+) -> OutputReservation:
     try:
-        lock_path.mkdir()
+        lock_path.mkdir(mode=0o700)
     except FileExistsError as error:
         raise InitializationError(
             f"output path is reserved by another initializer: {destination}; "
-            f"inspect {lock_path} before removing a stale reservation"
+            f"inspect {lock_path / 'metadata.json'} and follow the stale-reservation "
+            "recovery steps in the openshell-middleware-init README"
         ) from error
+    lock_stat = lock_path.stat(follow_symlinks=False)
+    reservation = OutputReservation(
+        path=lock_path,
+        token=token,
+        device=lock_stat.st_dev,
+        inode=lock_stat.st_ino,
+        destination=destination,
+        version=version,
+        started_at=datetime.now(timezone.utc).isoformat(),
+    )
     try:
         (lock_path / "owner").write_text(token)
-        (lock_path / "metadata.json").write_text(
-            json.dumps(
-                {
-                    "pid": os.getpid(),
-                    "target_version": version,
-                    "final_output": str(destination),
-                },
-                indent=2,
-            )
-            + "\n"
-        )
+        _write_reservation_metadata(reservation, None)
     except OSError:
-        shutil.rmtree(lock_path, ignore_errors=True)
+        _remove_reservation_files(lock_path)
         raise
+    return reservation
 
 
-def _verify_lock(lock_path: Path, token: str) -> None:
+def _write_reservation_metadata(reservation: OutputReservation, staging_path: Path | None) -> None:
+    (reservation.path / "metadata.json").write_text(
+        json.dumps(
+            {
+                "pid": os.getpid(),
+                "host": socket.gethostname(),
+                "started_at": reservation.started_at,
+                "target_version": reservation.version,
+                "final_output": str(reservation.destination),
+                "staging_output": str(staging_path) if staging_path is not None else None,
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+
+
+def _verify_lock(reservation: OutputReservation) -> None:
     try:
-        recorded = (lock_path / "owner").read_text()
+        lock_stat = reservation.path.stat(follow_symlinks=False)
+        if (
+            not stat.S_ISDIR(lock_stat.st_mode)
+            or lock_stat.st_dev != reservation.device
+            or lock_stat.st_ino != reservation.inode
+        ):
+            raise OSError("reservation identity changed")
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(reservation.path / "owner", flags)
+        with os.fdopen(descriptor) as owner:
+            owner_stat = os.fstat(owner.fileno())
+            if not stat.S_ISREG(owner_stat.st_mode):
+                raise OSError("reservation owner is not a regular file")
+            recorded = owner.read()
     except OSError as error:
         raise InitializationError("output reservation was lost; refusing to publish") from error
-    if recorded != token:
+    if recorded != reservation.token:
         raise InitializationError("output reservation ownership changed; refusing to publish")
 
 
-def _release_lock(lock_path: Path, token: str) -> None:
+def _remove_reservation_files(lock_path: Path) -> None:
+    known_names = {"owner", "metadata.json"}
     try:
-        if (lock_path / "owner").read_text() != token:
+        lock_stat = lock_path.stat(follow_symlinks=False)
+        if not stat.S_ISDIR(lock_stat.st_mode):
+            return
+        if {entry.name for entry in lock_path.iterdir()} - known_names:
             return
     except OSError:
         return
-    shutil.rmtree(lock_path, ignore_errors=True)
+    for name in known_names:
+        try:
+            (lock_path / name).unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            return
+    with suppress(OSError):
+        lock_path.rmdir()
+
+
+def _release_lock(reservation: OutputReservation) -> None:
+    try:
+        _verify_lock(reservation)
+    except InitializationError:
+        return
+    _remove_reservation_files(reservation.path)
+
+
+def _publish_no_replace(source: Path, destination: Path) -> None:
+    """Atomically publish ``source`` without replacing any destination entry."""
+    source_bytes = os.fsencode(source)
+    destination_bytes = os.fsencode(destination)
+    if sys.platform.startswith("linux"):
+        library = ctypes.CDLL(None, use_errno=True)
+        try:
+            rename = library.renameat2
+        except AttributeError as error:  # pragma: no cover - old Linux libc
+            raise InitializationError(
+                "this Linux runtime cannot publish atomically without replacing an output"
+            ) from error
+        rename.argtypes = (
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_uint,
+        )
+        rename.restype = ctypes.c_int
+        result = rename(-100, source_bytes, -100, destination_bytes, 1)
+    elif sys.platform == "darwin":  # pragma: no cover - platform-specific
+        library = ctypes.CDLL(None, use_errno=True)
+        rename = library.renamex_np
+        rename.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint)
+        rename.restype = ctypes.c_int
+        result = rename(source_bytes, destination_bytes, 0x00000004)
+    elif os.name == "nt":  # pragma: no cover - platform-specific
+        try:
+            source.rename(destination)
+        except FileExistsError as error:
+            raise InitializationError(
+                f"output path appeared during setup; refusing to overwrite it: {destination}"
+            ) from error
+        return
+    else:  # pragma: no cover - unsupported platform
+        raise InitializationError(
+            "this platform cannot publish atomically without replacing an output"
+        )
+
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number in {errno.EEXIST, errno.ENOTEMPTY}:
+        raise InitializationError(
+            f"output path appeared during setup; refusing to overwrite it: {destination}"
+        )
+    if error_number in {errno.EINVAL, errno.ENOSYS, errno.EOPNOTSUPP}:
+        raise InitializationError(
+            "the output filesystem does not support atomic no-replace publication"
+        )
+    raise OSError(error_number, os.strerror(error_number), destination)
 
 
 def _render_project(destination: Path, language: str, context: TemplateContext) -> None:

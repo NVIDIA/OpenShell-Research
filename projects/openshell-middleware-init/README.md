@@ -75,6 +75,27 @@ Unlike the original `middleware_dev_setup` spike, this project initializer does
 not install or replace OpenShell. Install the desired OpenShell release through
 its official installer separately.
 
+### Recover a stale reservation
+
+A process killed without cleanup can leave
+`.<output>.openshell-middleware-init.lock` and its hidden staging directory. The
+initializer deliberately leaves ambiguous state in place instead of guessing
+that it is stale.
+
+1. Read the reservation's `metadata.json`. It records the hostname, PID, start
+   time, target version, final output, and staging output.
+2. On the recorded host, confirm that the PID is no longer an
+   `openshell-middleware-init` process. Account for PID reuse by comparing the
+   process start time and command. Confirm that the final output still does not
+   exist.
+3. Inspect the recorded staging directory and preserve anything needed for
+   diagnosis. Remove it only after confirming the initializer is no longer
+   active.
+4. Remove only `owner` and `metadata.json` from the reservation, then remove the
+   empty reservation directory with `rmdir`. If it contains any other entry,
+   stop and investigate rather than deleting recursively.
+5. Run the initializer again.
+
 ## Requirements
 
 - All generation: network access to GitHub and the selected OpenShell release.

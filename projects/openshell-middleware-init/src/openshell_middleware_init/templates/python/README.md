@@ -17,10 +17,11 @@ uv run pytest
 uv build
 ```
 
-Start the middleware on loopback:
+Start the middleware on all host interfaces so containerized supervisors can
+reach it:
 
 ```sh
-uv run __DISTRIBUTION_NAME__ --listen 127.0.0.1:50051
+uv run __DISTRIBUTION_NAME__ --listen 0.0.0.0:50051
 ```
 
 The server implementation is in `src/__PACKAGE_NAME__/server.py`. Extend
@@ -35,14 +36,17 @@ Register the running service in the gateway configuration:
 ```toml
 [[openshell.supervisor.middleware]]
 name = "__SERVICE_NAME__"
-grpc_endpoint = "http://127.0.0.1:50051"
+grpc_endpoint = "http://<supervisor-reachable-host>:50051"
 max_body_bytes = 4194304
 timeout = "500ms"
 ```
 
-Then reference `__SERVICE_NAME__` from a sandbox policy's middleware stage.
-Review the supervisor middleware documentation for the policy syntax supported
-by your pinned OpenShell release.
+Replace `<supervisor-reachable-host>` with a host IP or DNS name reachable from
+both the gateway and sandbox supervisors; loopback works only when every process
+shares the middleware's network namespace. The development server is insecure,
+so restrict port exposure to trusted networks. Then reference `__SERVICE_NAME__`
+from a sandbox policy's middleware stage. Review the supervisor middleware
+documentation for the policy syntax supported by your pinned OpenShell release.
 
 ## Version-matched generated files
 

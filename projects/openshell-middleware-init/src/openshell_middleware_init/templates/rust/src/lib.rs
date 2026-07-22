@@ -6,14 +6,21 @@ pub mod pb {
     tonic::include_proto!("openshell.middleware.v1");
 }
 
-use pb::supervisor_middleware_server::SupervisorMiddleware;
+use pb::supervisor_middleware_server::{SupervisorMiddleware, SupervisorMiddlewareServer};
 
 pub const SERVICE_NAME: &str = "__SERVICE_NAME__";
 pub const SERVICE_VERSION: &str = "0.1.0";
 pub const MAX_BODY_BYTES: u64 = 4 * 1024 * 1024;
+pub const MAX_MESSAGE_BYTES: usize = MAX_BODY_BYTES as usize + 1024 * 1024;
 
 #[derive(Debug, Default)]
 pub struct Middleware;
+
+pub fn middleware_service() -> SupervisorMiddlewareServer<Middleware> {
+    SupervisorMiddlewareServer::new(Middleware)
+        .max_decoding_message_size(MAX_MESSAGE_BYTES)
+        .max_encoding_message_size(MAX_MESSAGE_BYTES)
+}
 
 pub fn build_manifest() -> pb::MiddlewareManifest {
     pb::MiddlewareManifest {
@@ -77,6 +84,10 @@ impl SupervisorMiddleware for Middleware {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pb::supervisor_middleware_client::SupervisorMiddlewareClient;
+    use tokio::net::TcpListener;
+    use tokio_stream::wrappers::TcpListenerStream;
+    use tonic::transport::Server;
 
     #[test]
     fn manifest_advertises_pre_credentials_http() {
@@ -102,5 +113,46 @@ mod tests {
         let response = evaluate_http_request(pb::HttpRequestEvaluation::default());
         assert_eq!(response.decision, pb::Decision::Deny as i32);
         assert_eq!(response.reason_code, "unsupported_phase");
+    }
+
+    #[tokio::test]
+    async fn transport_accepts_maximum_body_inside_full_envelope() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            Server::builder()
+                .add_service(middleware_service())
+                .serve_with_incoming(TcpListenerStream::new(listener))
+                .await
+                .unwrap();
+        });
+        let mut client = SupervisorMiddlewareClient::connect(format!("http://{address}"))
+            .await
+            .unwrap()
+            .max_encoding_message_size(MAX_MESSAGE_BYTES)
+            .max_decoding_message_size(MAX_MESSAGE_BYTES);
+
+        let response = client
+            .evaluate_http_request(pb::HttpRequestEvaluation {
+                phase: pb::SupervisorMiddlewarePhase::PreCredentials as i32,
+                context: Some(pb::RequestContext {
+                    request_id: "max-body-request".to_owned(),
+                    sandbox_id: "max-body-sandbox".to_owned(),
+                    ..Default::default()
+                }),
+                headers: vec![pb::HttpHeader {
+                    name: "content-type".to_owned(),
+                    value: "application/octet-stream".to_owned(),
+                }],
+                body: vec![b'x'; MAX_BODY_BYTES as usize],
+                middleware_name: SERVICE_NAME.to_owned(),
+                ..Default::default()
+            })
+            .await
+            .unwrap()
+            .into_inner();
+
+        assert_eq!(response.decision, pb::Decision::Allow as i32);
+        server.abort();
     }
 }

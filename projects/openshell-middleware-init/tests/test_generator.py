@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ctypes
+import errno
 import json
 import os
 import subprocess
@@ -73,7 +75,7 @@ def test_generates_rust_project_with_normalized_crate_name(tmp_path: Path) -> No
         command_runner=no_op_runner,
     )
 
-    assert result.run_command == "cargo run -- 127.0.0.1:50051"
+    assert result.run_command == "cargo run -- 0.0.0.0:50051"
     assert 'name = "request-audit"' in (destination / "Cargo.toml").read_text()
     assert "use request_audit::" in (destination / "src/main.rs").read_text()
     manifest = json.loads((destination / "middleware-dev-manifest.json").read_text())
@@ -95,6 +97,21 @@ def test_python_package_name_can_be_overridden(tmp_path: Path) -> None:
     )
 
     assert (destination / "src/custom_package/server.py").is_file()
+
+
+def test_numeric_project_name_gets_importable_python_package(tmp_path: Path) -> None:
+    destination = tmp_path / "123"
+
+    initialize_project(
+        name="123",
+        language="python",
+        requested_version="v0.0.86",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+
+    assert (destination / "src/middleware_123/server.py").is_file()
 
 
 @pytest.mark.parametrize(
@@ -166,6 +183,33 @@ def test_refuses_a_reserved_destination(tmp_path: Path) -> None:
             download_proto=local_proto,
             command_runner=no_op_runner,
         )
+
+
+def test_concurrent_destination_is_not_replaced(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    destination = tmp_path / "contended"
+    publish_no_replace = generator._publish_no_replace
+
+    def collide_before_publish(source: Path, final_output: Path) -> None:
+        final_output.mkdir()
+        (final_output / "owned-by-other-process").write_text("keep me\n")
+        publish_no_replace(source, final_output)
+
+    monkeypatch.setattr(generator, "_publish_no_replace", collide_before_publish)
+
+    with pytest.raises(InitializationError, match="appeared during setup"):
+        initialize_project(
+            name="contended",
+            language="python",
+            requested_version="v0.0.86",
+            destination=destination,
+            download_proto=local_proto,
+            command_runner=no_op_runner,
+        )
+
+    assert (destination / "owned-by-other-process").read_text() == "keep me\n"
+    assert not (tmp_path / ".contended.openshell-middleware-init.lock").exists()
 
 
 def test_failure_cleans_staging_and_owned_reservation(tmp_path: Path) -> None:
@@ -312,17 +356,149 @@ def test_download_proto_translates_network_failure(monkeypatch: pytest.MonkeyPat
 
 def test_lock_verification_detects_loss_and_changed_owner(tmp_path: Path) -> None:
     lock = tmp_path / "lock"
+    missing = generator.OutputReservation(
+        path=lock,
+        token="mine",
+        device=0,
+        inode=0,
+        destination=tmp_path / "output",
+        version="v0.0.86",
+        started_at="2026-07-22T00:00:00+00:00",
+    )
 
     with pytest.raises(InitializationError, match="reservation was lost"):
-        generator._verify_lock(lock, "mine")
+        generator._verify_lock(missing)
 
-    lock.mkdir()
+    reservation = generator._acquire_lock(lock, "mine", tmp_path / "output", "v0.0.86")
     (lock / "owner").write_text("theirs")
     with pytest.raises(InitializationError, match="ownership changed"):
-        generator._verify_lock(lock, "mine")
+        generator._verify_lock(reservation)
 
-    generator._release_lock(lock, "mine")
+    generator._release_lock(reservation)
     assert lock.exists()
+
+
+def test_reservation_metadata_supports_safe_recovery(tmp_path: Path) -> None:
+    lock = tmp_path / "lock"
+    destination = tmp_path / "output"
+    staging = tmp_path / ".output.staging"
+    reservation = generator._acquire_lock(lock, "mine", destination, "v0.0.86")
+
+    generator._write_reservation_metadata(reservation, staging)
+
+    metadata = json.loads((lock / "metadata.json").read_text())
+    assert metadata["pid"] == os.getpid()
+    assert metadata["host"]
+    assert metadata["started_at"]
+    assert metadata["final_output"] == str(destination)
+    assert metadata["staging_output"] == str(staging)
+
+
+def test_reservation_cleanup_leaves_unrecognized_contents(tmp_path: Path) -> None:
+    lock = tmp_path / "lock"
+    reservation = generator._acquire_lock(lock, "mine", tmp_path / "output", "v0.0.86")
+    (lock / "unexpected").write_text("not ours\n")
+
+    generator._release_lock(reservation)
+
+    assert lock.is_dir()
+    assert (lock / "unexpected").read_text() == "not ours\n"
+    assert (lock / "owner").read_text() == "mine"
+    assert (lock / "metadata.json").is_file()
+
+
+def test_reservation_verification_rejects_changed_directory_identity(tmp_path: Path) -> None:
+    reservation = generator._acquire_lock(tmp_path / "lock", "mine", tmp_path / "output", "v0.0.86")
+    changed_identity = generator.OutputReservation(
+        path=reservation.path,
+        token=reservation.token,
+        device=reservation.device,
+        inode=reservation.inode + 1,
+        destination=reservation.destination,
+        version=reservation.version,
+        started_at=reservation.started_at,
+    )
+
+    with pytest.raises(InitializationError, match="reservation was lost"):
+        generator._verify_lock(changed_identity)
+
+
+def test_reservation_verification_rejects_non_file_owner(tmp_path: Path) -> None:
+    reservation = generator._acquire_lock(tmp_path / "lock", "mine", tmp_path / "output", "v0.0.86")
+    (reservation.path / "owner").unlink()
+    (reservation.path / "owner").mkdir()
+
+    with pytest.raises(InitializationError, match="reservation was lost"):
+        generator._verify_lock(reservation)
+
+
+def test_acquisition_failure_removes_only_known_reservation_files(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    lock = tmp_path / "lock"
+
+    def fail_metadata(reservation: generator.OutputReservation, staging_path: Path | None) -> None:
+        del reservation, staging_path
+        raise OSError("metadata failed")
+
+    monkeypatch.setattr(generator, "_write_reservation_metadata", fail_metadata)
+
+    with pytest.raises(OSError, match="metadata failed"):
+        generator._acquire_lock(lock, "mine", tmp_path / "output", "v0.0.86")
+
+    assert not lock.exists()
+
+
+def test_publish_no_replace_moves_into_absent_destination(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    source.mkdir()
+    (source / "generated").write_text("ready\n")
+
+    generator._publish_no_replace(source, destination)
+
+    assert not source.exists()
+    assert (destination / "generated").read_text() == "ready\n"
+
+
+class FakeRename:
+    def __init__(self, error_number: int) -> None:
+        self.error_number = error_number
+        self.argtypes: object = None
+        self.restype: object = None
+
+    def __call__(self, *arguments: object) -> int:
+        del arguments
+        ctypes.set_errno(self.error_number)
+        return -1
+
+
+class FakeLibrary:
+    def __init__(self, error_number: int) -> None:
+        self.renameat2 = FakeRename(error_number)
+
+
+@pytest.mark.parametrize("error_number", [errno.EINVAL, errno.ENOSYS, errno.EOPNOTSUPP])
+def test_publish_reports_filesystem_without_no_replace_support(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    error_number: int,
+) -> None:
+    monkeypatch.setattr(generator.ctypes, "CDLL", lambda *args, **kwargs: FakeLibrary(error_number))
+
+    with pytest.raises(InitializationError, match="does not support"):
+        generator._publish_no_replace(tmp_path / "source", tmp_path / "destination")
+
+
+def test_publish_translates_unexpected_rename_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(generator.ctypes, "CDLL", lambda *args, **kwargs: FakeLibrary(errno.EPERM))
+
+    with pytest.raises(OSError) as exception_info:
+        generator._publish_no_replace(tmp_path / "source", tmp_path / "destination")
+
+    assert exception_info.value.errno == errno.EPERM
 
 
 def test_prepare_project_dispatches_by_language(
