@@ -152,7 +152,11 @@ and 4 MiB of scanned characters. Scanning is capped at 256 findings per block,
 4,096 per request, four active scanner workers, and 16 concurrent gRPC calls.
 One default one-second monotonic scan budget is shared across every block and
 scanner in a request. `RegexScanner` checks it before and after each expression
-evaluation and while consuming overlapping matches.
+evaluation and while consuming overlapping matches. Because the standard-library
+regex engine cannot interrupt an active evaluation, one backtracking-heavy
+expression may outlast the deadline. Test catalogs against representative
+worst-case inputs before deployment and avoid expressions with pathological
+backtracking behavior.
 Shape excess is invalid input. Finding or outbound representation excess returns
 a stable `privacy_guard_limit_exceeded` deny with no body or partial findings,
 avoiding a failure-mode-dependent fail open.

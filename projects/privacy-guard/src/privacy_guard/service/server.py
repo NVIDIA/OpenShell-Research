@@ -71,12 +71,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--scanner-name", default="regex")
     parser.add_argument("--listen", default="127.0.0.1:50051")
     arguments = parser.parse_args(argv)
-    scanner = RegexScanner.from_yaml(
-        arguments.scanner_config,
-        arguments.profile,
-        scanner_name=arguments.scanner_name,
-    )
-    MiddlewareServer(scanner=scanner).serve(arguments.listen)
+    try:
+        scanner = RegexScanner.from_yaml(
+            arguments.scanner_config,
+            arguments.profile,
+            scanner_name=arguments.scanner_name,
+        )
+        MiddlewareServer(scanner=scanner).serve(arguments.listen)
+    except PrivacyGuardError as error:
+        parser.exit(status=1, message=f"{error}\n")
     return 0
 
 

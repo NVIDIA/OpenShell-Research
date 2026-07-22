@@ -49,6 +49,11 @@ Only the checked-out `gateway.toml` is edited. Do not copy it into
 
 ## 2. Start Privacy Guard
 
+This development server uses unauthenticated plaintext gRPC and receives request
+bodies that may contain sensitive content. Restrict it to a trusted network and
+firewall the port. When possible, bind `--listen` to the specific host interface
+that Docker must reach instead of every interface.
+
 In terminal 1:
 
 ```bash

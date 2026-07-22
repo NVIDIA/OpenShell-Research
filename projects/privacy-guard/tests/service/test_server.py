@@ -13,7 +13,7 @@ from privacy_guard.errors import ErrorCode, PrivacyGuardError
 from privacy_guard.processor import RequestProcessor
 from privacy_guard.scanners import ScannerConfig
 from privacy_guard.service import server as server_module
-from privacy_guard.service.server import MiddlewareServer, create_server, serve
+from privacy_guard.service.server import MiddlewareServer, create_server, main, serve
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
 
 from ..scanner_helpers import DeterministicEmailScanner
@@ -79,6 +79,27 @@ def test_middleware_server_wires_scanner_and_has_a_default_listen_address(
     assert len(served) == 1
     assert served[0][0] == "127.0.0.1:50051"
     assert isinstance(served[0][1], PrivacyGuardMiddleware)
+
+
+def test_cli_reports_expected_configuration_failure_without_traceback(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    expected = PrivacyGuardError(ErrorCode.SCANNER_CONFIG_INVALID)
+
+    def reject_configuration(*args: object, **kwargs: object) -> None:
+        raise expected
+
+    monkeypatch.setattr(server_module.RegexScanner, "from_yaml", reject_configuration)
+
+    with pytest.raises(SystemExit) as exception_info:
+        main(["--scanner-config", "sensitive-path-8472.yaml"])
+
+    assert exception_info.value.code == 1
+    stderr = capsys.readouterr().err
+    assert stderr == f"{expected}\n"
+    assert "Traceback" not in stderr
+    assert "8472" not in stderr
 
 
 @pytest.mark.asyncio
