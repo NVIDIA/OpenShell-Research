@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import sys
 from collections.abc import Sequence
 
 import grpc
@@ -64,29 +65,52 @@ async def serve(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Load the required regex catalog, then run the middleware server."""
+    """Load the default scanner from its required config, then run the server."""
+    command_arguments = tuple(sys.argv[1:] if argv is None else argv)
+    server_arguments, scanner_arguments = _split_scanner_arguments(command_arguments)
     parser = argparse.ArgumentParser(description="Run the Privacy Guard middleware")
-    parser.add_argument("--scanner-config", required=True)
     parser.add_argument(
-        "--profile",
-        help=(
-            "Regex catalog profile; required only when --scanner-config contains "
-            "profiles"
-        ),
+        "--scanner-config",
+        required=True,
+        help="Path to the active scanner's configuration",
     )
-    parser.add_argument("--scanner-name", default="regex")
     parser.add_argument("--listen", default="127.0.0.1:50051")
-    arguments = parser.parse_args(argv)
+    arguments = parser.parse_args(server_arguments)
+    scanner_parser = _create_regex_scanner_parser(parser.prog)
+    scanner_options = scanner_parser.parse_args(scanner_arguments or ())
     try:
         scanner = RegexScanner.from_yaml(
             arguments.scanner_config,
-            arguments.profile,
-            scanner_name=arguments.scanner_name,
+            scanner_options.profile,
+            scanner_name=scanner_options.scanner_name,
         )
         MiddlewareServer(scanner=scanner).serve(arguments.listen)
     except PrivacyGuardError as error:
         parser.exit(status=1, message=f"{error}\n")
     return 0
+
+
+def _split_scanner_arguments(
+    arguments: tuple[str, ...],
+) -> tuple[tuple[str, ...], tuple[str, ...] | None]:
+    try:
+        separator_index = arguments.index("--")
+    except ValueError:
+        return arguments, None
+    return arguments[:separator_index], arguments[separator_index + 1 :]
+
+
+def _create_regex_scanner_parser(command_name: str) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog=f"{command_name} --",
+        description="Configure the default RegexScanner",
+    )
+    parser.add_argument(
+        "--profile",
+        help="Select a profile from the RegexScanner configuration",
+    )
+    parser.add_argument("--scanner-name", default="regex")
+    return parser
 
 
 if __name__ == "__main__":

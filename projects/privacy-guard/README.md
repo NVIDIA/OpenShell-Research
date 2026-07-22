@@ -87,11 +87,16 @@ winners deterministically by confidence, span length, offsets, scanner identity,
 and entity. A scanner sequence is passed to `RequestProcessor`; scanner names
 must be unique and remain visible in aggregated findings.
 
-`RegexScanner` is the packaged command's default implementation. Its entity
-catalog remains explicit: the command refuses to start without
-`--scanner-config`. Single-profile files contain a non-empty entity list;
-multi-profile files contain only a non-empty `profiles` mapping and require
-`--profile`. See [examples/regex-configs](examples/regex-configs) for both forms.
+`RegexScanner` is the packaged command's default implementation. Every scanner
+requires `--scanner-config` on the standard command surface; the active scanner
+owns that file's schema and interpretation. For `RegexScanner`, the path selects
+its YAML catalog. Single-profile files contain a non-empty entity list;
+multi-profile files contain only a non-empty `profiles` mapping and require the
+scanner-specific `--profile` option after `--`. The separator is unnecessary
+when no scanner-specific options are supplied. Use `privacy-guard --help` for
+standard options and `privacy-guard --scanner-config PATH -- --help` for regex
+scanner options. See [examples/regex-configs](examples/regex-configs) for both
+configuration forms.
 
 ```bash
 uv run privacy-guard \

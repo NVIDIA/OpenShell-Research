@@ -123,12 +123,58 @@ def test_cli_profile_is_optional_and_forwarded_only_when_supplied(
 
     monkeypatch.setattr(server_module.RegexScanner, "from_yaml", load_scanner)
     monkeypatch.setattr(MiddlewareServer, "serve", lambda self, listen: None)
-    arguments = ["--scanner-config", "entities.yaml"]
+    arguments = ["--scanner-config", "scanner-config.yaml"]
     if profile is not None:
-        arguments.extend(("--profile", profile))
+        arguments.extend(("--", "--profile", profile))
 
     assert main(arguments) == 0
-    assert calls == [("entities.yaml", profile, "regex")]
+    assert calls == [("scanner-config.yaml", profile, "regex")]
+
+
+def test_cli_always_requires_scanner_configuration(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exception_info:
+        main(["--listen", "127.0.0.1:50051"])
+
+    assert exception_info.value.code == 2
+    assert "--scanner-config" in capsys.readouterr().err
+
+
+def test_cli_exposes_separate_server_and_scanner_help(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as server_help:
+        main(["--help"])
+    assert server_help.value.code == 0
+    server_output = capsys.readouterr().out
+    assert "--listen" in server_output
+    assert "--scanner-config" in server_output
+
+    with pytest.raises(SystemExit) as scanner_help:
+        main(["--scanner-config", "scanner-config.yaml", "--", "--help"])
+    assert scanner_help.value.code == 0
+    scanner_output = capsys.readouterr().out
+    assert "--profile" in scanner_output
+    assert "--scanner-config" not in scanner_output
+    assert "--listen" not in scanner_output
+
+
+def test_cli_rejects_scanner_options_before_separator(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exception_info:
+        main(
+            [
+                "--scanner-config",
+                "scanner-config.yaml",
+                "--profile",
+                "customer-support",
+            ]
+        )
+
+    assert exception_info.value.code == 2
+    assert "unrecognized arguments: --profile" in capsys.readouterr().err
 
 
 @pytest.mark.asyncio
