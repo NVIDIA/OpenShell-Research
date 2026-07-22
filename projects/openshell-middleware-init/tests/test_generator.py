@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+import email.message
 import errno
 import json
 import os
@@ -343,14 +344,20 @@ def test_latest_version_rejects_unexpected_redirects(
 
 
 def test_latest_version_translates_network_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    attempts = 0
+
     def fail(*args: object, **kwargs: object) -> None:
+        nonlocal attempts
         del args, kwargs
+        attempts += 1
         raise urllib.error.URLError("offline")
 
     monkeypatch.setattr(generator.urllib.request, "urlopen", fail)
+    monkeypatch.setattr(generator.time, "sleep", lambda _: None)
 
     with pytest.raises(InitializationError, match="could not resolve"):
         generator._resolve_latest_version()
+    assert attempts == 4
 
 
 def test_download_proto_returns_content_and_source(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -369,9 +376,81 @@ def test_download_proto_translates_network_failure(monkeypatch: pytest.MonkeyPat
         raise urllib.error.URLError("missing")
 
     monkeypatch.setattr(generator.urllib.request, "urlopen", fail)
+    monkeypatch.setattr(generator.time, "sleep", lambda _: None)
 
     with pytest.raises(InitializationError, match="middleware-capable release"):
         generator._download_proto("v1.2.3")
+
+
+def test_download_retries_transient_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    attempts = 0
+    response = FakeResponse(body=PROTO)
+
+    def transient(*args: object, **kwargs: object) -> FakeResponse:
+        nonlocal attempts
+        del args, kwargs
+        attempts += 1
+        if attempts < 3:
+            raise urllib.error.URLError("temporary")
+        return response
+
+    monkeypatch.setattr(generator.urllib.request, "urlopen", transient)
+    monkeypatch.setattr(generator.time, "sleep", lambda _: None)
+
+    assert generator._download_proto("v1.2.3")[0] == PROTO
+    assert attempts == 3
+
+
+@pytest.mark.parametrize(("status", "expected_attempts"), [(503, 4), (404, 1)])
+def test_download_retries_only_retryable_http_statuses(
+    monkeypatch: pytest.MonkeyPatch, status: int, expected_attempts: int
+) -> None:
+    attempts = 0
+
+    def fail(*args: object, **kwargs: object) -> None:
+        nonlocal attempts
+        del args, kwargs
+        attempts += 1
+        raise urllib.error.HTTPError(
+            "https://example.test/proto",
+            status,
+            "failure",
+            hdrs=email.message.Message(),
+            fp=None,
+        )
+
+    monkeypatch.setattr(generator.urllib.request, "urlopen", fail)
+    monkeypatch.setattr(generator.time, "sleep", lambda _: None)
+
+    with pytest.raises(InitializationError, match="middleware-capable release"):
+        generator._download_proto("v1.2.3")
+
+    assert attempts == expected_attempts
+
+
+@pytest.mark.parametrize(("language", "command"), [("python", "uv"), ("rust", "cargo")])
+def test_toolchain_preflight_precedes_latest_resolution_and_output_changes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, language: str, command: str
+) -> None:
+    destination = tmp_path / "generated"
+    monkeypatch.setattr(generator.shutil, "which", lambda _: None)
+    monkeypatch.setattr(
+        generator,
+        "_resolve_latest_version",
+        lambda: pytest.fail("latest must not be resolved before toolchain preflight"),
+    )
+
+    with pytest.raises(InitializationError, match=rf"'{command}' is required"):
+        generator.initialize_project(
+            name="audit-headers",
+            language=language,
+            requested_version="latest",
+            destination=destination,
+            download_proto=local_proto,
+        )
+
+    assert not destination.exists()
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_lock_verification_detects_loss_and_changed_owner(tmp_path: Path) -> None:

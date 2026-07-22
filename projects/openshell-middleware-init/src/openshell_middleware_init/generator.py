@@ -15,6 +15,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping, Sequence
@@ -23,6 +24,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from importlib.resources import files
 from pathlib import Path
+from typing import Any
 
 from openshell_middleware_init import __version__
 
@@ -33,6 +35,7 @@ _GRPCIO_TOOLS_VERSION = "1.81.1"
 _VERSION_PATTERN = re.compile(r"^v\d+\.\d+\.\d+(?:[+-][0-9A-Za-z._-]+)?$")
 _PYTHON_PACKAGE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 _PROJECT_NAME_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$")
+_NETWORK_ATTEMPTS = 4
 
 
 class InitializationError(RuntimeError):
@@ -101,6 +104,8 @@ def initialize_project(
     """Generate and validate a project, then publish it atomically."""
     _validate_platform()
     context = _template_context(name, language, package_name)
+    if command_runner is None:
+        _preflight_language(language)
     version = _normalize_version(requested_version)
     destination = destination.expanduser().resolve()
     _validate_destination(destination)
@@ -218,7 +223,7 @@ def _resolve_latest_version() -> str:
         headers={"User-Agent": f"openshell-middleware-init/{__version__}"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with _urlopen_with_retries(request) as response:
             resolved_url = response.geturl()
     except (OSError, urllib.error.URLError) as error:
         raise InitializationError("could not resolve OpenShell's latest release") from error
@@ -238,12 +243,28 @@ def _download_proto(version: str) -> tuple[bytes, str]:
         headers={"User-Agent": f"openshell-middleware-init/{__version__}"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with _urlopen_with_retries(request) as response:
             return response.read(), url
     except (OSError, urllib.error.URLError) as error:
         raise InitializationError(
             f"{version} does not expose {_PROTO_PATH}; choose a middleware-capable release"
         ) from error
+
+
+def _urlopen_with_retries(request: urllib.request.Request) -> Any:
+    """Open a URL with the same initial attempt plus three retries as the spike."""
+    for attempt in range(_NETWORK_ATTEMPTS):
+        try:
+            return urllib.request.urlopen(request, timeout=30)
+        except urllib.error.HTTPError as error:
+            retryable = error.code in {408, 429} or 500 <= error.code < 600
+            if not retryable or attempt == _NETWORK_ATTEMPTS - 1:
+                raise
+        except (OSError, urllib.error.URLError):
+            if attempt == _NETWORK_ATTEMPTS - 1:
+                raise
+        time.sleep(0.25 * (2**attempt))
+    raise AssertionError("network retry loop exhausted without returning or raising")
 
 
 def _validate_proto(proto: bytes, version: str) -> None:
@@ -519,6 +540,10 @@ def _require_command(command: str) -> str:
     if resolved is None:
         raise InitializationError(f"'{command}' is required to initialize this project")
     return resolved
+
+
+def _preflight_language(language: str) -> None:
+    _require_command("uv" if language == "python" else "cargo")
 
 
 def _run(

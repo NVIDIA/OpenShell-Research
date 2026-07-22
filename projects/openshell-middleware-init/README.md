@@ -75,6 +75,33 @@ Unlike the original `middleware_dev_setup` spike, this project initializer does
 not install or replace OpenShell. Install the desired OpenShell release through
 its official installer separately.
 
+## Compatibility with `middleware_dev_setup`
+
+The initializer deliberately carries forward the spike's observable generation
+rules: explicit language and OpenShell version selection; `latest` and bare-tag
+normalization; toolchain preflight before network or output changes; one initial
+download attempt plus three retries; a destination that must not exist; pinned
+protocol download and SHA-256 manifest; `grpcio-tools==1.81.1` with package-safe
+imports; the Rust 1.90 / edition 2024 Tonic stack with bundled `protoc`; locked
+dependencies; compile/import validation; and hidden sibling staging with a
+per-output reservation.
+
+The intentional differences are scoped to making one runnable middleware
+project rather than a bindings workspace:
+
+| Difference | Reason |
+| --- | --- |
+| One of `python` or `rust`, rather than `all` or `none` | A generated directory is one runnable, conventional language project. Run the initializer twice when both implementations are wanted. |
+| Project files at the output root, rather than nested `python/` or `rust/` directories | The output is directly usable with `uv` or Cargo and can become its own repository. |
+| Required project name and optional `--output` | The name is stable project identity; output defaults to that name but remains overridable. Python import names derive from project identity, so moving the directory cannot silently rename the package. |
+| No OpenShell install or replacement flags | Project initialization stays local and never mutates a developer's system installation. OpenShell installation remains a separate, explicit operation. |
+| Python standard-library HTTP and hashing rather than requiring `curl` and a SHA utility | This removes unrelated host-tool prerequisites while preserving pinned-source, retry, and digest behavior. |
+| Runnable service, tests, and development configuration | The CLI produces middleware boilerplate, not only generated protocol bindings. |
+| Native atomic no-replace publication | This strengthens the spike's final absence check by preventing a concurrent writer from being overwritten. It is why Linux and macOS are the explicitly supported hosts. |
+
+The manifest retains the spike's fields and adds a `generator` object for CLI
+provenance.
+
 ### Recover a stale reservation
 
 A process killed without cleanup can leave
