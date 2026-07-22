@@ -20,8 +20,12 @@ read `docs/development/index.md`.
 ## Repository rules
 
 - Make the smallest change that satisfies the task and preserve unrelated work.
-- Use `uv` and the committed `uv.lock` within Python projects. Do not hand-edit
-  generated dependency exports such as `requirements.txt`.
+- Use `uv` for Python dependency management, environments, locking, builds, and
+  command execution unless a project explicitly documents an exception. Treat
+  `pyproject.toml` and the committed `uv.lock` as the dependency sources of truth.
+- Do not add `requirements.txt` or another generated dependency export by
+  default. Commit one only when a named non-uv consumer requires it and that
+  workflow is documented; regenerate exports with `uv`, never by hand.
 - Never commit credentials or populated `.env` files. Document configuration in
   `.env.example`.
 - Do not hand-edit generated Dev Notes cards, bylines, or navigation; use
