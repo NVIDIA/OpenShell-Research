@@ -14,18 +14,38 @@ The initializer does not install or replace OpenShell.
 - Network access to GitHub and the selected OpenShell release
 - For Rust projects: Cargo and a Rust 1.90-compatible toolchain
 
-## Quick start
+## Install the CLI
 
-From this directory, install the CLI's locked development environment:
+Install the command in an isolated tool environment from GitHub:
+
+```sh
+uv tool install \
+  "openshell-middleware-init @ git+https://github.com/NVIDIA/OpenShell-Research.git#subdirectory=projects/openshell-middleware-init"
+```
+
+If you already have this repository checked out, install from its local path
+instead:
+
+```sh
+uv tool install /path/to/OpenShell-Research/projects/openshell-middleware-init
+```
+
+Both forms make `openshell-middleware-init` available outside the source tree
+without running `uv sync` in this project.
+
+Contributors working on the CLI should use the locked project environment:
 
 ```sh
 uv sync --locked
+uv run openshell-middleware-init --help
 ```
 
-Generate and run a Python starter:
+## Quick start
+
+Generate and run a Python starter with the installed command:
 
 ```sh
-uv run openshell-middleware-init audit-headers \
+openshell-middleware-init audit-headers \
   --language python \
   --openshell-version v0.0.86 \
   --output /tmp/audit-headers
@@ -38,7 +58,7 @@ uv run audit-headers
 Or generate and run a Rust starter:
 
 ```sh
-uv run openshell-middleware-init audit-headers \
+openshell-middleware-init audit-headers \
   --language rust \
   --openshell-version v0.0.86 \
   --output /tmp/audit-headers-rust
@@ -52,9 +72,8 @@ The output path must not already exist. Use a pinned OpenShell tag for
 reproducible projects; `--openshell-version latest` is available for
 experimentation.
 
-Run `uv run openshell-middleware-init --help` for all options. Python package
-names default to a normalized project name and can be changed with
-`--package-name`.
+Run `openshell-middleware-init --help` for all options. Python package names
+default to a normalized project name and can be changed with `--package-name`.
 
 ## What you get
 
