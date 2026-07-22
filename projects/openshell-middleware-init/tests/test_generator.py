@@ -536,6 +536,7 @@ def test_lock_verification_detects_loss_and_changed_owner(tmp_path: Path) -> Non
         device=0,
         inode=0,
         destination=tmp_path / "output",
+        staging_path=tmp_path / ".output.staging",
         version="v0.0.86",
         started_at="2026-07-22T00:00:00+00:00",
     )
@@ -555,17 +556,16 @@ def test_lock_verification_detects_loss_and_changed_owner(tmp_path: Path) -> Non
 def test_reservation_metadata_supports_safe_recovery(tmp_path: Path) -> None:
     lock = tmp_path / "lock"
     destination = tmp_path / "output"
-    staging = tmp_path / ".output.staging"
     reservation = generator._acquire_lock(lock, "mine", destination, "v0.0.86")
-
-    generator._write_reservation_metadata(reservation, staging)
 
     metadata = json.loads((lock / "metadata.json").read_text())
     assert metadata["pid"] == os.getpid()
     assert metadata["host"]
     assert metadata["started_at"]
     assert metadata["final_output"] == str(destination)
-    assert metadata["staging_output"] == str(staging)
+    assert metadata["staging_output"] == str(reservation.staging_path)
+    assert reservation.token in reservation.staging_path.name
+    assert not reservation.staging_path.exists()
     generator._release_lock(reservation)
 
 
@@ -591,6 +591,7 @@ def test_reservation_verification_rejects_changed_directory_identity(tmp_path: P
         device=reservation.device,
         inode=reservation.inode + 1,
         destination=reservation.destination,
+        staging_path=reservation.staging_path,
         version=reservation.version,
         started_at=reservation.started_at,
     )
@@ -640,8 +641,8 @@ def test_acquisition_failure_removes_only_known_reservation_files(
 ) -> None:
     lock = tmp_path / "lock"
 
-    def fail_metadata(reservation: generator.OutputReservation, staging_path: Path | None) -> None:
-        del reservation, staging_path
+    def fail_metadata(reservation: generator.OutputReservation) -> None:
+        del reservation
         raise OSError("metadata failed")
 
     monkeypatch.setattr(generator, "_write_reservation_metadata", fail_metadata)

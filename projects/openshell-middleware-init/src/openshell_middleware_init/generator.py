@@ -128,6 +128,7 @@ class OutputReservation:
     device: int
     inode: int
     destination: Path
+    staging_path: Path
     version: str
     started_at: str
 
@@ -189,14 +190,9 @@ def initialize_project(
     staging_path: Path | None = None
     try:
         _validate_destination(destination)
-        staging_path = Path(
-            tempfile.mkdtemp(
-                prefix=f".{destination.name}.openshell-middleware-init.",
-                dir=destination.parent,
-            )
-        )
+        reservation.staging_path.mkdir(mode=0o700)
+        staging_path = reservation.staging_path
         staging_path.chmod(0o755)
-        _write_reservation_metadata(reservation, staging_path)
         proto, proto_url = downloader(version)
         _validate_proto(proto, version)
         _render_project(staging_path, language, context)
@@ -409,12 +405,15 @@ def _acquire_lock(
         device=lock_stat.st_dev,
         inode=lock_stat.st_ino,
         destination=destination,
+        staging_path=(
+            destination.parent / f".{destination.name}.openshell-middleware-init.{token}"
+        ),
         version=version,
         started_at=datetime.now(timezone.utc).isoformat(),
     )
     try:
         _write_reservation_file(reservation, "owner", token)
-        _write_reservation_metadata(reservation, None)
+        _write_reservation_metadata(reservation)
     except OSError:
         _cleanup_reservation(reservation)
         raise
@@ -432,7 +431,7 @@ def _write_reservation_file(reservation: OutputReservation, name: str, content: 
         reservation_file.write(content)
 
 
-def _write_reservation_metadata(reservation: OutputReservation, staging_path: Path | None) -> None:
+def _write_reservation_metadata(reservation: OutputReservation) -> None:
     _write_reservation_file(
         reservation,
         "metadata.json",
@@ -443,7 +442,7 @@ def _write_reservation_metadata(reservation: OutputReservation, staging_path: Pa
                 "started_at": reservation.started_at,
                 "target_version": reservation.version,
                 "final_output": str(reservation.destination),
-                "staging_output": str(staging_path) if staging_path is not None else None,
+                "staging_output": str(reservation.staging_path),
             },
             indent=2,
         )
