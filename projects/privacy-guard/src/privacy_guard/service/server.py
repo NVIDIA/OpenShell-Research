@@ -61,7 +61,10 @@ async def serve(
     """Bind ``listen``, start the server, and serve until terminated."""
     server = create_server(servicer)
     try:
-        bound_port = server.add_insecure_port(listen)
+        try:
+            bound_port = server.add_insecure_port(listen)
+        except RuntimeError:
+            raise PrivacyGuardError(ErrorCode.SERVER_BIND_FAILED) from None
         if bound_port == 0:
             raise PrivacyGuardError(ErrorCode.SERVER_BIND_FAILED)
         await server.start()

@@ -104,6 +104,36 @@ def test_cli_reports_expected_configuration_failure_without_traceback(
     assert "8472" not in result.output
 
 
+def test_cli_reports_bind_failure_without_traceback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = PrivacyGuardError(ErrorCode.SERVER_BIND_FAILED)
+    scanner = DeterministicEmailScanner(
+        ScannerConfig(name="regex", entity_types=frozenset({"email"}))
+    )
+
+    monkeypatch.setattr(
+        server_module.RegexScanner,
+        "from_yaml",
+        lambda *args, **kwargs: scanner,
+    )
+
+    def reject_listen_address(self: MiddlewareServer, listen: str) -> None:
+        raise expected
+
+    monkeypatch.setattr(MiddlewareServer, "serve", reject_listen_address)
+
+    result = CliRunner().invoke(
+        app,
+        ["regex", "--config", "scanner-config.yaml", "--listen", "bad:8472"],
+    )
+
+    assert result.exit_code == 1
+    assert result.output == f"{expected}\n"
+    assert "Traceback" not in result.output
+    assert "8472" not in result.output
+
+
 @pytest.mark.parametrize("profile", [None, "customer-support"])
 def test_cli_profile_is_optional_and_forwarded_only_when_supplied(
     monkeypatch: pytest.MonkeyPatch,
@@ -390,6 +420,35 @@ async def test_serve_rejects_bind_failure_and_stops_server(
 
     assert exception_info.value.code is ErrorCode.SERVER_BIND_FAILED
     assert "Hint:" in str(exception_info.value)
+    assert "8472" not in str(exception_info.value)
+    assert fake_server.stopped is True
+
+
+@pytest.mark.asyncio
+async def test_serve_translates_runtime_bind_failure_and_stops_server(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class BindFailureServer(LifecycleServerFake):
+        @override
+        def add_insecure_port(self, address: str) -> int:
+            raise RuntimeError("invalid-sensitive-listen-8472")
+
+        @override
+        async def start(self) -> None:
+            raise AssertionError("start must not run after bind failure")
+
+        @override
+        async def wait_for_termination(self, timeout: float | None = None) -> bool:
+            raise AssertionError("wait must not run after bind failure")
+
+    fake_server = BindFailureServer()
+    monkeypatch.setattr(server_module, "create_server", lambda _: fake_server)
+
+    with pytest.raises(PrivacyGuardError) as exception_info:
+        await serve(_middleware(), "invalid-sensitive-listen-8472")
+
+    assert exception_info.value.code is ErrorCode.SERVER_BIND_FAILED
+    assert exception_info.value.__cause__ is None
     assert "8472" not in str(exception_info.value)
     assert fake_server.stopped is True
 
