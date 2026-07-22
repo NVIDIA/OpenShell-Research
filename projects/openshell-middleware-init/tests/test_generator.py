@@ -58,7 +58,6 @@ def test_generates_python_project_with_provenance(tmp_path: Path) -> None:
     assert (destination / "tests/test_server.py").is_file()
     assert (destination / "proto/supervisor_middleware.proto").read_bytes() == PROTO
     assert "__PACKAGE_NAME__" not in (destination / "pyproject.toml").read_text()
-    assert "allow_insecure = true" in (destination / "README.md").read_text()
     manifest = json.loads((destination / "middleware-dev-manifest.json").read_text())
     assert manifest["openshell_version"] == "v0.0.86"
     assert manifest["languages"] == ["python"]
@@ -84,7 +83,6 @@ def test_generates_rust_project_with_normalized_crate_name(tmp_path: Path) -> No
     assert 'name = "request-audit"' in cargo
     assert '[lib]\nname = "request_audit"' in cargo
     assert "use request_audit::" in (destination / "src/main.rs").read_text()
-    assert "allow_insecure = true" in (destination / "README.md").read_text()
     assert stat.S_IMODE(destination.stat().st_mode) == 0o755
     manifest = json.loads((destination / "middleware-dev-manifest.json").read_text())
     assert manifest["languages"] == ["rust"]

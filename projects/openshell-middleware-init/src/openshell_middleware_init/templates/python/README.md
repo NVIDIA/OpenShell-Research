@@ -43,7 +43,6 @@ Register the running service in the gateway configuration:
 [[openshell.supervisor.middleware]]
 name = "__SERVICE_NAME__"
 grpc_endpoint = "http://<supervisor-reachable-host>:50051"
-allow_insecure = true
 max_body_bytes = 4194304
 timeout = "500ms"
 ```
@@ -52,12 +51,9 @@ Replace `<supervisor-reachable-host>` with a host IP or DNS name reachable from
 both the gateway and sandbox supervisors; loopback works only when every process
 shares the middleware's network namespace. Binding outside loopback is an
 explicit opt-in because the development server is unauthenticated and insecure;
-restrict port exposure to trusted networks. `allow_insecure = true` is required
-for this plaintext development endpoint and is only appropriate on trusted local
-or isolated networks. Production and shared deployments should use an
-authenticated TLS endpoint instead. Then reference `__SERVICE_NAME__` from a
-sandbox policy's middleware stage. Review the supervisor middleware
-documentation for the policy syntax supported by your pinned OpenShell release.
+restrict port exposure to trusted networks. Then reference `__SERVICE_NAME__` from
+a sandbox policy's middleware stage. Review the supervisor middleware documentation
+for the policy syntax supported by your pinned OpenShell release.
 
 ## Version-matched generated files
 
