@@ -55,6 +55,7 @@ class OutputReservation:
 
     path: Path
     token: str
+    directory_fd: int
     device: int
     inode: int
     destination: Path
@@ -153,7 +154,7 @@ def initialize_project(
         run_command=(
             f"uv run {context.distribution_name}"
             if language == "python"
-            else "cargo run -- 0.0.0.0:50051"
+            else "cargo run -- 127.0.0.1:50051"
         ),
     )
 
@@ -266,10 +267,21 @@ def _acquire_lock(
             f"inspect {lock_path / 'metadata.json'} and follow the stale-reservation "
             "recovery steps in the openshell-middleware-init README"
         ) from error
-    lock_stat = lock_path.stat(follow_symlinks=False)
+    directory_fd = -1
+    try:
+        directory_fd = os.open(
+            lock_path,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0),
+        )
+        lock_stat = os.fstat(directory_fd)
+    except OSError:
+        with suppress(OSError):
+            lock_path.rmdir()
+        raise
     reservation = OutputReservation(
         path=lock_path,
         token=token,
+        directory_fd=directory_fd,
         device=lock_stat.st_dev,
         inode=lock_stat.st_ino,
         destination=destination,
@@ -277,16 +289,29 @@ def _acquire_lock(
         started_at=datetime.now(timezone.utc).isoformat(),
     )
     try:
-        (lock_path / "owner").write_text(token)
+        _write_reservation_file(reservation, "owner", token)
         _write_reservation_metadata(reservation, None)
     except OSError:
-        _remove_reservation_files(lock_path)
+        _cleanup_reservation(reservation)
         raise
     return reservation
 
 
+def _write_reservation_file(reservation: OutputReservation, name: str, content: str) -> None:
+    descriptor = os.open(
+        name,
+        os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0),
+        0o600,
+        dir_fd=reservation.directory_fd,
+    )
+    with os.fdopen(descriptor, "w") as reservation_file:
+        reservation_file.write(content)
+
+
 def _write_reservation_metadata(reservation: OutputReservation, staging_path: Path | None) -> None:
-    (reservation.path / "metadata.json").write_text(
+    _write_reservation_file(
+        reservation,
+        "metadata.json",
         json.dumps(
             {
                 "pid": os.getpid(),
@@ -298,21 +323,25 @@ def _write_reservation_metadata(reservation: OutputReservation, staging_path: Pa
             },
             indent=2,
         )
-        + "\n"
+        + "\n",
     )
 
 
 def _verify_lock(reservation: OutputReservation) -> None:
     try:
-        lock_stat = reservation.path.stat(follow_symlinks=False)
+        lock_stat = os.fstat(reservation.directory_fd)
+        path_stat = reservation.path.stat(follow_symlinks=False)
         if (
             not stat.S_ISDIR(lock_stat.st_mode)
             or lock_stat.st_dev != reservation.device
             or lock_stat.st_ino != reservation.inode
+            or not stat.S_ISDIR(path_stat.st_mode)
+            or path_stat.st_dev != reservation.device
+            or path_stat.st_ino != reservation.inode
         ):
             raise OSError("reservation identity changed")
         flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
-        descriptor = os.open(reservation.path / "owner", flags)
+        descriptor = os.open("owner", flags, dir_fd=reservation.directory_fd)
         with os.fdopen(descriptor) as owner:
             owner_stat = os.fstat(owner.fileno())
             if not stat.S_ISREG(owner_stat.st_mode):
@@ -324,33 +353,49 @@ def _verify_lock(reservation: OutputReservation) -> None:
         raise InitializationError("output reservation ownership changed; refusing to publish")
 
 
-def _remove_reservation_files(lock_path: Path) -> None:
+def _remove_reservation_files(reservation: OutputReservation) -> bool:
     known_names = {"owner", "metadata.json"}
     try:
-        lock_stat = lock_path.stat(follow_symlinks=False)
-        if not stat.S_ISDIR(lock_stat.st_mode):
-            return
-        if {entry.name for entry in lock_path.iterdir()} - known_names:
-            return
+        if set(os.listdir(reservation.directory_fd)) - known_names:
+            return False
     except OSError:
-        return
+        return False
     for name in known_names:
         try:
-            (lock_path / name).unlink()
+            os.unlink(name, dir_fd=reservation.directory_fd)
         except FileNotFoundError:
             pass
         except OSError:
-            return
+            return False
+    return True
+
+
+def _cleanup_reservation(reservation: OutputReservation) -> None:
+    files_removed = _remove_reservation_files(reservation)
+    try:
+        path_stat = reservation.path.stat(follow_symlinks=False)
+        path_is_same = (
+            stat.S_ISDIR(path_stat.st_mode)
+            and path_stat.st_dev == reservation.device
+            and path_stat.st_ino == reservation.inode
+        )
+    except OSError:
+        path_is_same = False
     with suppress(OSError):
-        lock_path.rmdir()
+        os.close(reservation.directory_fd)
+    if files_removed and path_is_same:
+        with suppress(OSError):
+            reservation.path.rmdir()
 
 
 def _release_lock(reservation: OutputReservation) -> None:
     try:
         _verify_lock(reservation)
     except InitializationError:
+        with suppress(OSError):
+            os.close(reservation.directory_fd)
         return
-    _remove_reservation_files(reservation.path)
+    _cleanup_reservation(reservation)
 
 
 def _publish_no_replace(source: Path, destination: Path) -> None:

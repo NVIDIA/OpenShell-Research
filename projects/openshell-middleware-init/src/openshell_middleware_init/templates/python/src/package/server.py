@@ -104,7 +104,7 @@ async def serve(listen: str) -> None:
 def main(argv: Sequence[str] | None = None) -> None:
     """Run the middleware server."""
     parser = argparse.ArgumentParser(description="Run the __PROJECT_NAME__ middleware")
-    parser.add_argument("--listen", default="0.0.0.0:50051")
+    parser.add_argument("--listen", default="127.0.0.1:50051")
     arguments = parser.parse_args(argv)
     asyncio.run(serve(arguments.listen))
 

@@ -14,11 +14,10 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --locked
 ```
 
-Start the middleware on all host interfaces so containerized supervisors can
-reach it:
+Start the middleware on loopback for local development:
 
 ```sh
-cargo run --locked -- 0.0.0.0:50051
+cargo run --locked -- 127.0.0.1:50051
 ```
 
 The service implementation is in `src/lib.rs`. Extend `validate_config` and
@@ -27,6 +26,13 @@ adaptation at this boundary and move substantial domain logic into separate
 modules.
 
 ## Connect OpenShell
+
+When the gateway or supervisors use another network namespace, explicitly bind
+the development server to a reachable interface:
+
+```sh
+cargo run --locked -- 0.0.0.0:50051
+```
 
 Register the running service in the gateway configuration:
 
@@ -40,10 +46,11 @@ timeout = "500ms"
 
 Replace `<supervisor-reachable-host>` with a host IP or DNS name reachable from
 both the gateway and sandbox supervisors; loopback works only when every process
-shares the middleware's network namespace. The development server is insecure,
-so restrict port exposure to trusted networks. Then reference `__SERVICE_NAME__`
-from a sandbox policy's middleware stage. Review the supervisor middleware
-documentation for the policy syntax supported by your pinned OpenShell release.
+shares the middleware's network namespace. Binding outside loopback is an
+explicit opt-in because the development server is unauthenticated and insecure;
+restrict port exposure to trusted networks. Then reference `__SERVICE_NAME__` from
+a sandbox policy's middleware stage. Review the supervisor middleware documentation
+for the policy syntax supported by your pinned OpenShell release.
 
 ## Version-matched generated files
 

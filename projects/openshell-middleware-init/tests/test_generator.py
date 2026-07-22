@@ -75,7 +75,7 @@ def test_generates_rust_project_with_normalized_crate_name(tmp_path: Path) -> No
         command_runner=no_op_runner,
     )
 
-    assert result.run_command == "cargo run -- 0.0.0.0:50051"
+    assert result.run_command == "cargo run -- 127.0.0.1:50051"
     assert 'name = "request-audit"' in (destination / "Cargo.toml").read_text()
     assert "use request_audit::" in (destination / "src/main.rs").read_text()
     manifest = json.loads((destination / "middleware-dev-manifest.json").read_text())
@@ -359,6 +359,7 @@ def test_lock_verification_detects_loss_and_changed_owner(tmp_path: Path) -> Non
     missing = generator.OutputReservation(
         path=lock,
         token="mine",
+        directory_fd=-1,
         device=0,
         inode=0,
         destination=tmp_path / "output",
@@ -392,6 +393,7 @@ def test_reservation_metadata_supports_safe_recovery(tmp_path: Path) -> None:
     assert metadata["started_at"]
     assert metadata["final_output"] == str(destination)
     assert metadata["staging_output"] == str(staging)
+    generator._release_lock(reservation)
 
 
 def test_reservation_cleanup_leaves_unrecognized_contents(tmp_path: Path) -> None:
@@ -412,6 +414,7 @@ def test_reservation_verification_rejects_changed_directory_identity(tmp_path: P
     changed_identity = generator.OutputReservation(
         path=reservation.path,
         token=reservation.token,
+        directory_fd=reservation.directory_fd,
         device=reservation.device,
         inode=reservation.inode + 1,
         destination=reservation.destination,
@@ -421,6 +424,7 @@ def test_reservation_verification_rejects_changed_directory_identity(tmp_path: P
 
     with pytest.raises(InitializationError, match="reservation was lost"):
         generator._verify_lock(changed_identity)
+    generator._cleanup_reservation(reservation)
 
 
 def test_reservation_verification_rejects_non_file_owner(tmp_path: Path) -> None:
@@ -430,6 +434,32 @@ def test_reservation_verification_rejects_non_file_owner(tmp_path: Path) -> None
 
     with pytest.raises(InitializationError, match="reservation was lost"):
         generator._verify_lock(reservation)
+    generator._release_lock(reservation)
+
+
+def test_reservation_cleanup_does_not_touch_path_swapped_after_verification(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    lock = tmp_path / "lock"
+    moved_lock = tmp_path / "moved-lock"
+    reservation = generator._acquire_lock(lock, "mine", tmp_path / "output", "v0.0.86")
+    verify_lock = generator._verify_lock
+
+    def verify_then_swap(current: generator.OutputReservation) -> None:
+        verify_lock(current)
+        lock.rename(moved_lock)
+        lock.mkdir()
+        (lock / "owner").write_text("replacement owner\n")
+        (lock / "metadata.json").write_text("replacement metadata\n")
+
+    monkeypatch.setattr(generator, "_verify_lock", verify_then_swap)
+
+    generator._release_lock(reservation)
+
+    assert (lock / "owner").read_text() == "replacement owner\n"
+    assert (lock / "metadata.json").read_text() == "replacement metadata\n"
+    assert moved_lock.is_dir()
+    assert list(moved_lock.iterdir()) == []
 
 
 def test_acquisition_failure_removes_only_known_reservation_files(
