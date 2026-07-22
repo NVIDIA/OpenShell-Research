@@ -98,6 +98,9 @@ that it is stale.
 
 ## Requirements
 
+- Linux or macOS. The initializer uses POSIX directory descriptors and native
+  no-replace rename operations to preserve its non-destructive publication
+  guarantee.
 - All generation: network access to GitHub and the selected OpenShell release.
 - Python output: `uv`.
 - Rust output: Cargo and a toolchain compatible with Rust 1.90 / edition 2024.

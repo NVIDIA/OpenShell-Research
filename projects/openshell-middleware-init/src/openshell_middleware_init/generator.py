@@ -99,6 +99,7 @@ def initialize_project(
     command_runner: CommandRunner | None = None,
 ) -> InitializationResult:
     """Generate and validate a project, then publish it atomically."""
+    _validate_platform()
     context = _template_context(name, language, package_name)
     version = _normalize_version(requested_version)
     destination = destination.expanduser().resolve()
@@ -157,6 +158,14 @@ def initialize_project(
             else "cargo run -- 127.0.0.1:50051"
         ),
     )
+
+
+def _validate_platform() -> None:
+    if sys.platform != "darwin" and not sys.platform.startswith("linux"):
+        raise InitializationError(
+            "openshell-middleware-init supports Linux and macOS; "
+            f"unsupported platform: {sys.platform}"
+        )
 
 
 def _template_context(name: str, language: str, package_name: str | None) -> TemplateContext:
@@ -425,14 +434,6 @@ def _publish_no_replace(source: Path, destination: Path) -> None:
         rename.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint)
         rename.restype = ctypes.c_int
         result = rename(source_bytes, destination_bytes, 0x00000004)
-    elif os.name == "nt":  # pragma: no cover - platform-specific
-        try:
-            source.rename(destination)
-        except FileExistsError as error:
-            raise InitializationError(
-                f"output path appeared during setup; refusing to overwrite it: {destination}"
-            ) from error
-        return
     else:  # pragma: no cover - unsupported platform
         raise InitializationError(
             "this platform cannot publish atomically without replacing an output"

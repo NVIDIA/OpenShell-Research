@@ -114,6 +114,26 @@ def test_numeric_project_name_gets_importable_python_package(tmp_path: Path) -> 
     assert (destination / "src/middleware_123/server.py").is_file()
 
 
+def test_unsupported_platform_fails_before_filesystem_changes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    destination = tmp_path / "output"
+    monkeypatch.setattr(generator.sys, "platform", "win32")
+
+    with pytest.raises(InitializationError, match="supports Linux and macOS"):
+        initialize_project(
+            name="project",
+            language="python",
+            requested_version="v0.0.86",
+            destination=destination,
+            download_proto=local_proto,
+            command_runner=no_op_runner,
+        )
+
+    assert not destination.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
 @pytest.mark.parametrize(
     ("name", "language", "package_name", "message"),
     [
