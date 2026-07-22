@@ -58,6 +58,7 @@ def test_generates_python_project_with_provenance(tmp_path: Path) -> None:
     assert (destination / "tests/test_server.py").is_file()
     assert (destination / "proto/supervisor_middleware.proto").read_bytes() == PROTO
     assert "__PACKAGE_NAME__" not in (destination / "pyproject.toml").read_text()
+    assert "allow_insecure = true" in (destination / "README.md").read_text()
     manifest = json.loads((destination / "middleware-dev-manifest.json").read_text())
     assert manifest["openshell_version"] == "v0.0.86"
     assert manifest["languages"] == ["python"]
@@ -83,6 +84,7 @@ def test_generates_rust_project_with_normalized_crate_name(tmp_path: Path) -> No
     assert 'name = "request-audit"' in cargo
     assert '[lib]\nname = "request_audit"' in cargo
     assert "use request_audit::" in (destination / "src/main.rs").read_text()
+    assert "allow_insecure = true" in (destination / "README.md").read_text()
     assert stat.S_IMODE(destination.stat().st_mode) == 0o755
     manifest = json.loads((destination / "middleware-dev-manifest.json").read_text())
     assert manifest["languages"] == ["rust"]
@@ -223,6 +225,25 @@ def test_refuses_an_existing_destination(tmp_path: Path) -> None:
             download_proto=local_proto,
             command_runner=no_op_runner,
         )
+
+
+def test_refuses_a_dangling_destination_symlink(tmp_path: Path) -> None:
+    destination = tmp_path / "requested"
+    target = tmp_path / "symlink-target"
+    destination.symlink_to(target, target_is_directory=True)
+
+    with pytest.raises(InitializationError, match="must not already exist"):
+        initialize_project(
+            name="project",
+            language="python",
+            requested_version="v0.0.86",
+            destination=destination,
+            download_proto=local_proto,
+            command_runner=no_op_runner,
+        )
+
+    assert destination.is_symlink()
+    assert not target.exists()
 
 
 def test_refuses_a_reserved_destination(tmp_path: Path) -> None:

@@ -175,7 +175,9 @@ def initialize_project(
     if command_runner is None:
         _preflight_language(language)
     version = _normalize_version(requested_version)
-    destination = destination.expanduser().resolve()
+    destination = destination.expanduser()
+    _validate_destination(destination)
+    destination = destination.parent.resolve() / destination.name
     _validate_destination(destination)
     downloader = download_proto if download_proto is not None else _download_proto
     runner = command_runner if command_runner is not None else _prepare_project
