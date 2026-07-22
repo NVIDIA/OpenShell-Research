@@ -1,140 +1,116 @@
 # OpenShell Middleware Init
 
-`openshell-middleware-init` is a Typer-based Python CLI that creates runnable
-OpenShell supervisor middleware projects in Python or Rust. Every generated
-project uses the protocol contract from one explicit OpenShell release and
-records its source and SHA-256 in a manifest.
+`openshell-middleware-init` creates a runnable Python or Rust starter for an
+OpenShell supervisor middleware service. The starter implements the complete
+gRPC service as a pass-through, pins its protocol contract to one OpenShell
+release, and includes tests, dependency locks, and registration guidance.
 
-The generated service is a small pass-through implementation of all three
-`SupervisorMiddleware` RPCs: `Describe`, `ValidateConfig`, and
-`EvaluateHttpRequest`. It provides the transport and build boilerplate without
-guessing the middleware's policy or domain behavior.
+The initializer does not install or replace OpenShell.
 
-## Install for development
+## Requirements
 
-Install [uv](https://docs.astral.sh/uv/), then create the locked environment:
+- Linux or macOS
+- [uv](https://docs.astral.sh/uv/)
+- Network access to GitHub and the selected OpenShell release
+- For Rust projects: Cargo and a Rust 1.90-compatible toolchain
+
+## Quick start
+
+From this directory, install the CLI's locked development environment:
 
 ```sh
 uv sync --locked
 ```
 
-## Generate a project
-
-Every material choice is explicit:
+Generate and run a Python starter:
 
 ```sh
 uv run openshell-middleware-init audit-headers \
   --language python \
-  --openshell-version v0.0.86
+  --openshell-version v0.0.86 \
+  --output /tmp/audit-headers
+
+cd /tmp/audit-headers
+uv run pytest
+uv run audit-headers
 ```
 
-For Rust:
+Or generate and run a Rust starter:
 
 ```sh
 uv run openshell-middleware-init audit-headers \
   --language rust \
   --openshell-version v0.0.86 \
-  --output ../audit-headers
+  --output /tmp/audit-headers-rust
+
+cd /tmp/audit-headers-rust
+cargo test --locked
+cargo run --locked -- 127.0.0.1:50051
 ```
 
-Use `--openshell-version latest` to resolve the current release. For shared
-middleware, prefer a pinned tag so regeneration remains reproducible.
+The output path must not already exist. Use a pinned OpenShell tag for
+reproducible projects; `--openshell-version latest` is available for
+experimentation.
 
-Python package names default to a normalized form of the project name
-(`audit-headers` becomes `audit_headers`) and can be overridden:
+Run `uv run openshell-middleware-init --help` for all options. Python package
+names default to a normalized project name and can be changed with
+`--package-name`.
 
-```sh
-uv run openshell-middleware-init audit-headers \
-  --language python \
-  --openshell-version v0.0.86 \
-  --package-name request_auditor
-```
+## What you get
 
-Run `uv run openshell-middleware-init --help` for the complete interface.
+Each generated project contains:
 
-## What generation does
+- a pass-through implementation of `Describe`, `ValidateConfig`, and
+  `EvaluateHttpRequest`;
+- the exact `supervisor_middleware.proto` from the selected OpenShell release;
+- generated Python gRPC bindings or Rust Tonic build configuration;
+- tests and lint/type-check configuration;
+- `uv.lock` or `Cargo.lock`; and
+- `middleware-dev-manifest.json` with the release, source URL, and protocol
+  SHA-256.
 
-The initializer:
+Start by implementing policy behavior in the generated `validate_config` and
+`evaluate_http_request` functions. The generated README explains how to run the
+service and register it with OpenShell.
 
-1. resolves and downloads `proto/supervisor_middleware.proto` from the selected
-   OpenShell release;
-2. renders a runnable pass-through service, tests, development configuration,
-   and registration guidance;
-3. generates package-safe Python protobuf/gRPC modules or configures Rust Tonic
-   generation with a bundled `protoc`;
-4. creates `uv.lock` or `Cargo.lock` and compile/import-checks the project;
-5. writes `middleware-dev-manifest.json`; and
-6. publishes the project only after validation succeeds.
+## Safety and failure behavior
 
-Generation happens in a hidden sibling staging directory. The final output must
-not already exist, and a reservation directory prevents concurrent initializers
-from publishing to the same path. A failed run removes its own staging and
-reservation data and does not merge into an existing project.
+Generation is non-destructive. The initializer validates a hidden sibling
+staging directory, then publishes it atomically. It refuses an existing output,
+including a symlink, and uses a per-output reservation to prevent concurrent
+writers. A normal failure removes the initializer's own staging and reservation
+without publishing a partial project.
 
-Unlike the original `middleware_dev_setup` spike, this project initializer does
-not install or replace OpenShell. Install the desired OpenShell release through
-its official installer separately.
+If the process is killed, it may leave
+`.<output>.openshell-middleware-init.lock` and a hidden staging directory. Before
+removing either one:
 
-## Compatibility with `middleware_dev_setup`
+1. Read `metadata.json` in the reservation.
+2. On the recorded host, confirm that the recorded PID is no longer the same
+   initializer process and that the final output does not exist.
+3. Inspect and remove only the recorded staging directory.
+4. Remove `owner` and `metadata.json`, then remove the empty reservation with
+   `rmdir`. Stop if it contains anything unexpected.
 
-The initializer deliberately carries forward the spike's observable generation
-rules: explicit language and OpenShell version selection; `latest` and bare-tag
-normalization; toolchain preflight before network or output changes; one initial
-download attempt plus three retries; a destination that must not exist; pinned
-protocol download and SHA-256 manifest; `grpcio-tools==1.81.1` with package-safe
-imports; the Rust 1.90 / edition 2024 Tonic stack with bundled `protoc`; locked
-dependencies; compile/import validation; and hidden sibling staging with a
-per-output reservation.
+## Relationship to `middleware_dev_setup`
 
-The intentional differences are scoped to making one runnable middleware
-project rather than a bindings workspace:
+This CLI preserves the spike's important behavior: explicit version and
+language selection, version normalization, toolchain preflight, retried pinned
+protocol downloads, protocol hashing, generated bindings, dependency locks,
+validation before publication, and non-destructive sibling staging.
 
-| Difference | Reason |
-| --- | --- |
-| One of `python` or `rust`, rather than `all` or `none` | A generated directory is one runnable, conventional language project. Run the initializer twice when both implementations are wanted. |
-| Project files at the output root, rather than nested `python/` or `rust/` directories | The output is directly usable with `uv` or Cargo and can become its own repository. |
-| Required project name and optional `--output` | The name is stable project identity; output defaults to that name but remains overridable. Python import names derive from project identity, so moving the directory cannot silently rename the package. |
-| No OpenShell install or replacement flags | Project initialization stays local and never mutates a developer's system installation. OpenShell installation remains a separate, explicit operation. |
-| Python standard-library HTTP and hashing rather than requiring `curl` and a SHA utility | This removes unrelated host-tool prerequisites while preserving pinned-source, retry, and digest behavior. |
-| Runnable service, tests, and development configuration | The CLI produces middleware boilerplate, not only generated protocol bindings. |
-| Native atomic no-replace publication | This strengthens the spike's final absence check by preventing a concurrent writer from being overwritten. It is why Linux and macOS are the explicitly supported hosts. |
+The scope is intentionally narrower and more project-oriented:
 
-The manifest retains the spike's fields and adds a `generator` object for CLI
-provenance.
+- one invocation creates one runnable Python or Rust project;
+- project files live at the output root;
+- project identity is independent of the output directory;
+- OpenShell installation remains a separate operation; and
+- publication uses an atomic no-replace operation rather than a final checked
+  move.
 
-### Recover a stale reservation
+## Develop the CLI
 
-A process killed without cleanup can leave
-`.<output>.openshell-middleware-init.lock` and its hidden staging directory. The
-initializer deliberately leaves ambiguous state in place instead of guessing
-that it is stale.
-
-1. Read the reservation's `metadata.json`. It records the hostname, PID, start
-   time, target version, final output, and staging output.
-2. On the recorded host, confirm that the PID is no longer an
-   `openshell-middleware-init` process. Account for PID reuse by comparing the
-   process start time and command. Confirm that the final output still does not
-   exist.
-3. Inspect the recorded staging directory and preserve anything needed for
-   diagnosis. Remove it only after confirming the initializer is no longer
-   active.
-4. Remove only `owner` and `metadata.json` from the reservation, then remove the
-   empty reservation directory with `rmdir`. If it contains any other entry,
-   stop and investigate rather than deleting recursively.
-5. Run the initializer again.
-
-## Requirements
-
-- Linux or macOS. The initializer uses POSIX directory descriptors and native
-  no-replace rename operations to preserve its non-destructive publication
-  guarantee.
-- All generation: network access to GitHub and the selected OpenShell release.
-- Python output: `uv`.
-- Rust output: Cargo and a toolchain compatible with Rust 1.90 / edition 2024.
-
-## Develop this CLI
-
-Run the full local gate from this directory:
+Run the complete local gate from this directory:
 
 ```sh
 uv run ruff format --check .
@@ -144,6 +120,5 @@ uv run pytest
 uv build
 ```
 
-`src/openshell_middleware_init/templates/` contains the generated project
-assets. Tests use local protocol fixtures and do not contact GitHub or invoke
-language package managers.
+Unit tests are hermetic: they use local protocol fixtures and do not contact
+GitHub or invoke uv or Cargo for generated projects.
