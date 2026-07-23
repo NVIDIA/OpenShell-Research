@@ -1,1 +1,4 @@
 gateway.local.toml
+auth.json
+pi-models.local.json
+policy.local.yaml

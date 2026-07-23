@@ -6,7 +6,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 uv_run=(uv run --frozen)
 if [[ $# -gt 0 ]]; then
   if [[ $1 != "--python" || $# -ne 2 ]]; then
-    echo "usage: scripts/validate.sh [--python VERSION]" >&2
+    echo "usage: scripts/check.sh [--python VERSION]" >&2
     exit 2
   fi
   uv_run+=(--python "$2")

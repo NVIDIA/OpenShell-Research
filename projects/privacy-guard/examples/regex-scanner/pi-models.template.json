@@ -1,0 +1,16 @@
+{
+  "providers": {
+    "custom": {
+      "baseUrl": "REPLACE_WITH_MODEL_ENDPOINT",
+      "api": "openai-completions",
+      "apiKey": "$PI_MODEL_API_KEY",
+      "authHeader": true,
+      "models": [
+        {
+          "id": "REPLACE_WITH_MODEL_ID",
+          "name": "REPLACE_WITH_MODEL_ID"
+        }
+      ]
+    }
+  }
+}

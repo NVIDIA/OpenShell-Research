@@ -24,6 +24,8 @@ network_policies:
         protocol: rest
         enforcement: enforce
         access: full
+      - host: claude.ai
+        port: 443
       - { host: statsig.anthropic.com, port: 443 }
       - { host: sentry.io, port: 443 }
     binaries:

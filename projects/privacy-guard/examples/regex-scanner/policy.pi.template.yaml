@@ -11,25 +11,18 @@ process:
   run_as_group: sandbox
 
 network_policies:
-  claude_code:
-    name: Claude Code subscription access
+  pi:
+    name: Pi access to the configured model endpoint
     endpoints:
-      - host: api.anthropic.com
+      - host: REPLACE_WITH_MODEL_HOST
         port: 443
         protocol: rest
         enforcement: enforce
         access: full
-      - host: claude.ai
-        port: 443
-      - host: platform.claude.com
-        port: 443
-        protocol: rest
-        enforcement: enforce
-        access: full
-      - { host: statsig.anthropic.com, port: 443 }
-      - { host: sentry.io, port: 443 }
+      - { host: pi.dev, port: 443 }
     binaries:
-      - { path: /usr/local/bin/claude }
+      - { path: /usr/bin/pi }
+      - { path: /usr/lib/node_modules/@earendil-works/pi-coding-agent/dist/cli.js }
       - { path: /usr/bin/node }
 
 network_middlewares:
@@ -46,4 +39,4 @@ network_middlewares:
     on_error: fail_closed
     endpoints:
       include:
-        - api.anthropic.com
+        - REPLACE_WITH_MODEL_HOST

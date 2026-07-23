@@ -15,9 +15,9 @@ original.
 The self-contained
 [built-in regex scanner walkthrough](examples/regex-scanner/README.md) provides
 a scanner configuration, gateway registration, sandbox policy, and manual
-Claude Code workflow for a typical deployment. The separate
-[email scanner example](examples/email-scanner/README.md) demonstrates how to
-implement a custom scanner.
+Claude Code and custom-endpoint Pi workflows for a typical deployment. The
+separate [email scanner example](examples/email-scanner/README.md) demonstrates
+how to implement a custom scanner.
 
 ## Request flow
 
@@ -114,10 +114,10 @@ in general finding metadata and is reported as `entity/pattern-name` by the
 service. Policy filtering remains at entity level.
 
 A scanner is a nominal extension: declare its strict configuration type and
-implement `_scan`. Scanners that need derived, reusable state may also override
-`_initialize`; the base constructor calls it after validating and retaining the
-configuration. The public `scan` wrapper validates the returned tuple and each
-`Finding`.
+implement `_scan`. Use `_initialize` for any custom initialization logic rather
+than defining `__init__`; the base constructor runs the hook at the end of
+initialization, after validating and retaining the configuration. The public
+`scan` wrapper validates the returned tuple and each `Finding`.
 
 ```python
 from privacy_guard.scanners import Finding, ScanBudget, Scanner, ScannerConfig
@@ -191,6 +191,36 @@ release its scanner slot until its synchronous worker really exits.
 | `service` | High-level `MiddlewareServer`, gRPC lifecycle, and servicer adapter |
 | `bindings` | generated protobuf stubs — do not edit by hand |
 
+## Updating the OpenShell protocol
+
+Privacy Guard uses
+[`middleware-kit`](../middleware-kit/README.md) to keep its checked-in
+OpenShell protocol and generated Python bindings aligned with a released
+OpenShell version. Install the repository's local copy as the `mkit` tool:
+
+```bash
+uv tool install --force ../middleware-kit
+```
+
+From this directory, update to the latest OpenShell release with:
+
+```bash
+mkit update
+```
+
+For a reproducible update to a specific release, pin the version:
+
+```bash
+mkit update --openshell-version v0.0.90
+```
+
+The updater works on a validated temporary copy and replaces only
+`proto/supervisor_middleware.proto`, `src/privacy_guard/bindings/`, `uv.lock`,
+and `middleware-dev-manifest.json`. The manifest records the selected OpenShell
+release, protocol source and checksum, and `middleware-kit` version. Review all
+generated changes, then run `make check`; never edit generated bindings by
+hand.
+
 ## Notes for implementers
 
 - **Scanner metadata.** Applications pass an explicit `ScannerConfig` subtype to
@@ -252,18 +282,31 @@ release its scanner slot until its synchronous worker really exits.
   arbitrary tracebacks. Cataloged errors and gRPC status details are
   content-safe, and caught collaborator exception chains must never be logged.
 
-## Development validation
+## Development checks
 
-Run the complete local gate from this directory:
+The project Makefile provides development shortcuts:
 
 ```bash
-scripts/validate.sh
+make help
+make test PYTEST_ARGS="tests/test_processor.py -k redact"
+make fix
+make check
 ```
 
+`make check` delegates to the authoritative complete local check:
+
+```bash
+scripts/check.sh
+```
+
+The top-level
+`.github/workflows/privacy-guard.yml` workflow runs the same check in isolated
+uv environments on the minimum and latest supported Python versions.
+
 To exercise the package with the minimum supported interpreter, run
-`scripts/validate.sh --python 3.11`. This project has no dedicated CI workflow,
-so this committed entry point is the authoritative contributor gate. It runs the
-full tests, formatting, lint, curated `ty` rules, import smoke, and package build.
+`scripts/check.sh --python 3.11`. This committed script is the authoritative
+project check used locally and in CI. It runs the full tests, formatting, lint,
+curated `ty` rules, import smoke, and package build.
 The AST policy test rejects cast operations and explicit dynamic typing in
 handwritten `src`, `tests`, and `examples`; only generated protobuf/gRPC bindings
 are excluded.
@@ -277,7 +320,7 @@ uv run --frozen python scripts/benchmark_privacy_guard.py
 ```
 
 Use it manually when changing performance-sensitive processing code; it is not
-part of `scripts/validate.sh` and does not enforce regression thresholds. For
+part of `scripts/check.sh` and does not enforce regression thresholds. For
 the broader scenario set and seven samples per median, pass `--suite full`.
 Pass `--profile profile.out` to either suite to record a `cProfile` artifact.
 The harness reports median wall time and median peak traced allocation for the

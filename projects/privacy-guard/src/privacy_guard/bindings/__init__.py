@@ -1,1 +1,1 @@
-"""Generated OpenShell supervisor middleware bindings."""
+"""Generated OpenShell supervisor middleware bindings. Do not edit."""
