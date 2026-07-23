@@ -1,29 +1,32 @@
 # __PROJECT_NAME__
 
-A Rust OpenShell supervisor middleware starter. It is pinned to the OpenShell
+A Python OpenShell supervisor middleware starter. It is pinned to the OpenShell
 contract recorded in `middleware-dev-manifest.json` and starts as a pass-through:
 valid pre-credentials HTTP requests are allowed without mutation.
 
 ## Develop
 
-Use Rust 1.90 or newer, then run:
+Install [uv](https://docs.astral.sh/uv/), then run the local checks:
 
 ```sh
-cargo fmt --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --locked
+uv sync --locked
+uv run ruff format --check .
+uv run ruff check .
+uv run ty check
+uv run pytest
+uv build
 ```
 
 Start the middleware on loopback for local development:
 
 ```sh
-cargo run --locked -- 127.0.0.1:50051
+uv run __DISTRIBUTION_NAME__ --listen 127.0.0.1:50051
 ```
 
-The service implementation is in `src/lib.rs`. Extend `validate_config` and
-`evaluate_http_request` with your policy and request handling. Keep transport
-adaptation at this boundary and move substantial domain logic into separate
-modules.
+The server implementation is in `src/__PACKAGE_NAME__/server.py`. Extend
+`validate_config` and `evaluate_http_request` with your policy and request
+handling. Keep transport adaptation at this boundary and move substantial
+domain logic into separate modules.
 
 ## Connect OpenShell
 
@@ -31,7 +34,7 @@ When the gateway or supervisors use another network namespace, explicitly bind
 the development server to a reachable interface:
 
 ```sh
-cargo run --locked -- 0.0.0.0:50051
+uv run __DISTRIBUTION_NAME__ --listen 0.0.0.0:50051
 ```
 
 Register the running service in the gateway configuration:
@@ -55,12 +58,17 @@ for the policy syntax supported by your pinned OpenShell release.
 ## Version-matched generated files
 
 - `proto/supervisor_middleware.proto` is the exact downloaded contract.
-- `build.rs` generates Rust modules into Cargo's `OUT_DIR` from that contract.
+- `src/__PACKAGE_NAME__/bindings/` contains generated protobuf and gRPC modules.
 - `middleware-dev-manifest.json` records the release, source URL, and SHA-256.
-- `Cargo.lock` records the Rust dependency solution.
+- `uv.lock` records the Python dependency solution.
 
-Commit these files. When changing the OpenShell version, regenerate the project
-or deliberately update the contract and manifest together.
+Commit these files. Refresh all version-matched artifacts together with:
+
+```sh
+mkit update --openshell-version latest
+```
+
+Use a release tag instead of `latest` for a reproducible update.
 
 The starter is deliberately permissive. Before deployment, validate untrusted
 configuration, bound request and response work, avoid logging request content,

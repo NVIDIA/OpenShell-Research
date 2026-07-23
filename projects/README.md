@@ -6,8 +6,8 @@ layout.
 
 Current projects:
 
-- `openshell-middleware-init`: Typer CLI that generates version-matched Python
-  and Rust OpenShell supervisor middleware projects.
+- `middleware-kit`: `mkit` CLI that creates and updates version-matched
+  Python and Rust OpenShell supervisor middleware projects.
 - `privacy-guard`: OpenShell supervisor middleware for inspecting and enforcing
   policy on provider-bound requests before credentials are attached.
 - `python-project-template`: Minimal, production-ready Python project scaffold

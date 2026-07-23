@@ -1,4 +1,4 @@
-"""Typer command-line interface for the middleware project generator."""
+"""Typer command-line interface for OpenShell middleware projects."""
 
 from __future__ import annotations
 
@@ -8,7 +8,11 @@ from typing import Annotated
 
 import typer
 
-from openshell_middleware_init.generator import InitializationError, initialize_project
+from middleware_kit.generator import (
+    ProjectError,
+    create_project,
+    update_project,
+)
 
 
 class Language(str, Enum):
@@ -22,12 +26,12 @@ app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
     pretty_exceptions_enable=False,
-    help="Generate a runnable, version-matched OpenShell middleware project.",
+    help="Create or update a version-matched OpenShell middleware project.",
 )
 
 
 @app.command()
-def init(
+def create(
     name: Annotated[
         str,
         typer.Argument(help="Project name, such as audit-headers."),
@@ -63,20 +67,54 @@ def init(
     """Create a new OpenShell supervisor middleware project."""
     destination = output if output is not None else Path.cwd() / name
     try:
-        result = initialize_project(
+        result = create_project(
             name=name,
             language=language.value,
             requested_version=openshell_version,
             destination=destination,
             package_name=package_name,
         )
-    except InitializationError as error:
-        typer.echo(f"openshell-middleware-init: error: {error}", err=True)
-        raise typer.Exit(code=1) from error
+    except ProjectError as error:
+        _report_error(error)
 
     typer.echo(f"Created {result.language} middleware project at {result.destination}")
     typer.echo(f"OpenShell contract: {result.openshell_version}")
     typer.echo(f"Next: cd {result.destination} && {result.run_command}")
+
+
+@app.command()
+def update(
+    project: Annotated[
+        Path,
+        typer.Argument(
+            help="Existing generated middleware project. Defaults to the current directory."
+        ),
+    ] = Path("."),
+    openshell_version: Annotated[
+        str,
+        typer.Option(
+            "--openshell-version",
+            "--version",
+            help="OpenShell release tag (for example v0.0.86), or latest.",
+        ),
+    ] = "latest",
+) -> None:
+    """Update an existing middleware project's OpenShell contract and generated files."""
+    try:
+        result = update_project(
+            project_dir=project,
+            requested_version=openshell_version,
+        )
+    except ProjectError as error:
+        _report_error(error)
+
+    typer.echo(f"Updated {result.language} middleware project at {result.destination}")
+    typer.echo(f"OpenShell contract: {result.openshell_version}")
+
+
+def _report_error(error: ProjectError) -> None:
+    typer.echo(f"mkit: error: {error}", err=True)
+    raise typer.Exit(code=1) from error
 
 
 def main() -> None:

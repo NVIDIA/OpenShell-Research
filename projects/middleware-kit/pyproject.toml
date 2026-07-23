@@ -1,7 +1,7 @@
 [project]
-name = "openshell-middleware-init"
+name = "middleware-kit"
 version = "0.1.0"
-description = "Generate version-matched OpenShell supervisor middleware projects."
+description = "Create and update version-matched OpenShell middleware projects."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-openshell-middleware-init = "openshell_middleware_init.cli:main"
+mkit = "middleware_kit.cli:main"
 
 [project.urls]
 Repository = "https://github.com/NVIDIA/OpenShell-Research"
@@ -34,7 +34,7 @@ build-backend = "uv_build"
 addopts = [
     "--strict-config",
     "--strict-markers",
-    "--cov=openshell_middleware_init",
+    "--cov=middleware_kit",
     "--cov-report=term-missing",
     "--cov-fail-under=95",
 ]
@@ -43,14 +43,14 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
-extend-exclude = ["src/openshell_middleware_init/templates"]
+extend-exclude = ["src/middleware_kit/templates"]
 
 [tool.ruff.lint]
 select = ["B", "E", "F", "I", "RUF", "SIM", "UP"]
 
 [tool.ty.src]
 include = ["src", "tests"]
-exclude = ["src/openshell_middleware_init/templates"]
+exclude = ["src/middleware_kit/templates"]
 
 [tool.uv]
 required-version = ">=0.11.0"
