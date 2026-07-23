@@ -37,7 +37,6 @@ _PYTHON_PACKAGE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 _PROJECT_NAME_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$")
 _NETWORK_ATTEMPTS = 4
 _TOOL_NAME = "middleware-kit"
-_LEGACY_TOOL_NAMES = {"middleware-project", "openshell-middleware-init"}
 _STAGING_IGNORED_ROOT_ENTRIES = {
     ".coverage",
     ".git",
@@ -118,16 +117,16 @@ _RUST_RESERVED_IDENTIFIERS = _RUST_KEYWORDS | {
 }
 
 
-class InitializationError(RuntimeError):
+class ProjectError(RuntimeError):
     """A user-actionable middleware project operation failure."""
 
 
-class PublicationRollbackError(InitializationError):
+class PublicationRollbackError(ProjectError):
     """An update failure whose recovery artifacts must be preserved."""
 
 
 @dataclass(frozen=True)
-class InitializationResult:
+class ProjectResult:
     """Details about a successful middleware project operation."""
 
     destination: Path
@@ -186,7 +185,7 @@ DownloadProto = Callable[[str], tuple[bytes, str]]
 CommandRunner = Callable[[str, Path, str], None]
 
 
-def initialize_project(
+def create_project(
     *,
     name: str,
     language: str,
@@ -195,7 +194,7 @@ def initialize_project(
     package_name: str | None = None,
     download_proto: DownloadProto | None = None,
     command_runner: CommandRunner | None = None,
-) -> InitializationResult:
+) -> ProjectResult:
     """Generate and validate a project, then publish it atomically."""
     _validate_platform()
     context = _template_context(name, language, package_name)
@@ -237,16 +236,16 @@ def initialize_project(
         _verify_lock(reservation)
         _publish_no_replace(staging_path, destination)
         staging_path = None
-    except InitializationError:
+    except ProjectError:
         raise
     except (OSError, subprocess.SubprocessError) as error:
-        raise InitializationError(str(error)) from error
+        raise ProjectError(str(error)) from error
     finally:
         if staging_path is not None:
             shutil.rmtree(staging_path, ignore_errors=True)
         _release_lock(reservation)
 
-    return InitializationResult(
+    return ProjectResult(
         destination=destination,
         language=language,
         openshell_version=version,
@@ -264,7 +263,7 @@ def update_project(
     requested_version: str = "latest",
     download_proto: DownloadProto | None = None,
     command_runner: CommandRunner | None = None,
-) -> InitializationResult:
+) -> ProjectResult:
     """Refresh generator-owned artifacts and atomically publish a validated update."""
     _validate_platform()
     project_dir = project_dir.expanduser()
@@ -315,10 +314,10 @@ def update_project(
     except PublicationRollbackError:
         preserve_recovery = True
         raise
-    except InitializationError:
+    except ProjectError:
         raise
     except (OSError, subprocess.SubprocessError) as error:
-        raise InitializationError(str(error)) from error
+        raise ProjectError(str(error)) from error
     finally:
         if preserve_recovery:
             with suppress(OSError):
@@ -330,7 +329,7 @@ def update_project(
 
     if not published:  # pragma: no cover - defensive; failures raise above
         raise AssertionError("updated project was not published")
-    return InitializationResult(
+    return ProjectResult(
         destination=project_dir,
         language=metadata.language,
         openshell_version=version,
@@ -340,7 +339,7 @@ def update_project(
 
 def _validate_platform() -> None:
     if sys.platform != "darwin" and not sys.platform.startswith("linux"):
-        raise InitializationError(
+        raise ProjectError(
             f"{_TOOL_NAME} supports Linux and macOS; unsupported platform: {sys.platform}"
         )
 
@@ -348,13 +347,13 @@ def _validate_platform() -> None:
 def _template_context(name: str, language: str, package_name: str | None) -> TemplateContext:
     normalized_name = name.strip().lower()
     if not _PROJECT_NAME_PATTERN.fullmatch(normalized_name):
-        raise InitializationError(
+        raise ProjectError(
             "project name must use lowercase letters, digits, dots, hyphens, or underscores"
         )
     if language not in {"python", "rust"}:
-        raise InitializationError("language must be 'python' or 'rust'")
+        raise ProjectError("language must be 'python' or 'rust'")
     if language == "rust" and package_name is not None:
-        raise InitializationError("--package-name is only valid with --language python")
+        raise ProjectError("--package-name is only valid with --language python")
 
     distribution_name = re.sub(r"[._]+", "-", normalized_name)
     identifier = re.sub(r"[^a-z0-9]+", "_", normalized_name).strip("_")
@@ -363,7 +362,7 @@ def _template_context(name: str, language: str, package_name: str | None) -> Tem
         derived_package = f"middleware_{derived_package}".rstrip("_")
     effective_package = package_name if package_name is not None else derived_package
     if not _PYTHON_PACKAGE_PATTERN.fullmatch(effective_package):
-        raise InitializationError(
+        raise ProjectError(
             "Python package name must start with a lowercase letter and contain only "
             "lowercase letters, digits, and underscores"
         )
@@ -390,7 +389,7 @@ def _normalize_version(requested: str) -> str:
     if not value.startswith("v"):
         value = f"v{value}"
     if not _VERSION_PATTERN.fullmatch(value):
-        raise InitializationError(
+        raise ProjectError(
             f"invalid OpenShell version '{requested}'; expected a tag such as v0.0.86"
         )
     return value
@@ -404,13 +403,13 @@ def _resolve_latest_version() -> str:
     try:
         _, resolved_url = _fetch_url(request)
     except (OSError, urllib.error.URLError, http.client.IncompleteRead) as error:
-        raise InitializationError("could not resolve OpenShell's latest release") from error
+        raise ProjectError("could not resolve OpenShell's latest release") from error
     prefix = f"{_REPOSITORY_URL}/releases/tag/"
     if not resolved_url.startswith(prefix):
-        raise InitializationError(f"unexpected latest-release redirect: {resolved_url}")
+        raise ProjectError(f"unexpected latest-release redirect: {resolved_url}")
     version = resolved_url.removeprefix(prefix)
     if not _VERSION_PATTERN.fullmatch(version):
-        raise InitializationError(f"latest release has an unexpected tag: {version}")
+        raise ProjectError(f"latest release has an unexpected tag: {version}")
     return version
 
 
@@ -425,14 +424,14 @@ def _download_proto(version: str) -> tuple[bytes, str]:
         return body, url
     except urllib.error.HTTPError as error:
         if error.code == 404:
-            raise InitializationError(
+            raise ProjectError(
                 f"{version} does not expose {_PROTO_PATH}; choose a middleware-capable release"
             ) from error
-        raise InitializationError(
+        raise ProjectError(
             f"could not download {_PROTO_PATH} for {version}: HTTP {error.code}"
         ) from error
     except (OSError, urllib.error.URLError, http.client.IncompleteRead) as error:
-        raise InitializationError(
+        raise ProjectError(
             f"could not download {_PROTO_PATH} for {version}: {_network_error_reason(error)}"
         ) from error
 
@@ -469,70 +468,63 @@ def _validate_proto(proto: bytes, version: str) -> None:
         b"rpc EvaluateHttpRequest",
     )
     if not proto or any(fragment not in proto for fragment in required_fragments):
-        raise InitializationError(
+        raise ProjectError(
             f"downloaded contract for {version} is not a supported supervisor middleware proto"
         )
 
 
 def _validate_destination(destination: Path) -> None:
     if os.path.lexists(destination):
-        raise InitializationError(f"output path must not already exist: {destination}")
+        raise ProjectError(f"output path must not already exist: {destination}")
     if destination.name in {"", ".", ".."}:
-        raise InitializationError(f"invalid output path: {destination}")
+        raise ProjectError(f"invalid output path: {destination}")
 
 
 def _validate_existing_project(project_dir: Path) -> None:
     if project_dir.is_symlink():
-        raise InitializationError(f"project path must not be a symlink: {project_dir}")
+        raise ProjectError(f"project path must not be a symlink: {project_dir}")
     if not project_dir.is_dir():
-        raise InitializationError(f"project path must be an existing directory: {project_dir}")
+        raise ProjectError(f"project path must be an existing directory: {project_dir}")
 
 
 def _verify_project_identity(project_dir: Path, device: int, inode: int) -> None:
     try:
         current = project_dir.stat(follow_symlinks=False)
     except OSError as error:
-        raise InitializationError(
-            "project path changed during update; refusing to publish"
-        ) from error
+        raise ProjectError("project path changed during update; refusing to publish") from error
     if not stat.S_ISDIR(current.st_mode) or current.st_dev != device or current.st_ino != inode:
-        raise InitializationError("project path changed during update; refusing to publish")
+        raise ProjectError("project path changed during update; refusing to publish")
 
 
 def _read_project_metadata(project_dir: Path) -> ProjectMetadata:
     manifest_path = project_dir / "middleware-dev-manifest.json"
     if manifest_path.is_symlink() or not manifest_path.is_file():
-        raise InitializationError(
+        raise ProjectError(
             f"not a generated middleware project; missing regular manifest: {manifest_path}"
         )
     try:
         manifest = json.loads(manifest_path.read_text())
     except (OSError, json.JSONDecodeError) as error:
-        raise InitializationError(f"could not read project manifest: {error}") from error
+        raise ProjectError(f"could not read project manifest: {error}") from error
     if not isinstance(manifest, dict):
-        raise InitializationError("project manifest must contain a JSON object")
+        raise ProjectError("project manifest must contain a JSON object")
 
     generator = manifest.get("generator")
     generator_name = generator.get("name") if isinstance(generator, dict) else None
-    if generator_name != _TOOL_NAME and generator_name not in _LEGACY_TOOL_NAMES:
-        raise InitializationError(
-            "project manifest was not created by middleware-kit, middleware-project, "
-            "or openshell-middleware-init"
-        )
+    if generator_name != _TOOL_NAME:
+        raise ProjectError("project manifest generator must be middleware-kit")
     languages = manifest.get("languages")
     if languages not in (["python"], ["rust"]):
-        raise InitializationError("project manifest must identify exactly one supported language")
+        raise ProjectError("project manifest must identify exactly one supported language")
     language = languages[0]
     python_package = manifest.get("python_package")
     if language == "python":
         if not isinstance(python_package, str) or not _PYTHON_PACKAGE_PATTERN.fullmatch(
             python_package
         ):
-            raise InitializationError(
-                "Python project manifest has an invalid or missing python_package"
-            )
+            raise ProjectError("Python project manifest has an invalid or missing python_package")
     elif python_package is not None:
-        raise InitializationError("Rust project manifest must set python_package to null")
+        raise ProjectError("Rust project manifest must set python_package to null")
 
     _validate_refresh_targets(project_dir, language, python_package)
     return ProjectMetadata(language=language, python_package=python_package)
@@ -547,7 +539,7 @@ def _validate_refresh_targets(project_dir: Path, language: str, python_package: 
     for path in regular_files:
         _reject_symlink_components(project_dir, path)
         if path.is_symlink() or not path.is_file():
-            raise InitializationError(f"generated artifact must be a regular file: {path}")
+            raise ProjectError(f"generated artifact must be a regular file: {path}")
 
     if language == "python":
         if python_package is None:  # pragma: no cover - checked by caller
@@ -555,9 +547,7 @@ def _validate_refresh_targets(project_dir: Path, language: str, python_package: 
         bindings_dir = project_dir / "src" / python_package / "bindings"
         _reject_symlink_components(project_dir, bindings_dir)
         if bindings_dir.is_symlink() or not bindings_dir.is_dir():
-            raise InitializationError(
-                f"generated bindings must be an existing directory: {bindings_dir}"
-            )
+            raise ProjectError(f"generated bindings must be an existing directory: {bindings_dir}")
 
 
 def _reject_symlink_components(project_dir: Path, target: Path) -> None:
@@ -570,9 +560,7 @@ def _reject_symlink_components(project_dir: Path, target: Path) -> None:
         except FileNotFoundError:
             return
         if stat.S_ISLNK(current_stat.st_mode):
-            raise InitializationError(
-                f"generated artifact path must not contain symlinks: {current}"
-            )
+            raise ProjectError(f"generated artifact path must not contain symlinks: {current}")
 
 
 def _copy_project_to_staging(project_dir: Path, staging_path: Path) -> None:
@@ -631,7 +619,7 @@ def _acquire_lock(
     try:
         lock_path.mkdir(mode=0o700)
     except FileExistsError as error:
-        raise InitializationError(
+        raise ProjectError(
             f"project path is reserved by another {_TOOL_NAME} process: {destination}; "
             f"inspect {lock_path / 'metadata.json'} and follow the stale-reservation "
             f"recovery steps in the {_TOOL_NAME} README"
@@ -718,9 +706,9 @@ def _verify_lock(reservation: OutputReservation) -> None:
                 raise OSError("reservation owner is not a regular file")
             recorded = owner.read()
     except OSError as error:
-        raise InitializationError("output reservation was lost; refusing to publish") from error
+        raise ProjectError("output reservation was lost; refusing to publish") from error
     if recorded != reservation.token:
-        raise InitializationError("output reservation ownership changed; refusing to publish")
+        raise ProjectError("output reservation ownership changed; refusing to publish")
 
 
 def _remove_reservation_files(reservation: OutputReservation) -> bool:
@@ -761,7 +749,7 @@ def _cleanup_reservation(reservation: OutputReservation) -> None:
 def _release_lock(reservation: OutputReservation) -> None:
     try:
         _verify_lock(reservation)
-    except InitializationError:
+    except ProjectError:
         with suppress(OSError):
             os.close(reservation.directory_fd)
         return
@@ -777,7 +765,7 @@ def _publish_no_replace(source: Path, destination: Path) -> None:
         try:
             rename = library.renameat2
         except AttributeError as error:  # pragma: no cover - old Linux libc
-            raise InitializationError(
+            raise ProjectError(
                 "this Linux runtime cannot publish atomically without replacing an output"
             ) from error
         rename.argtypes = (
@@ -796,21 +784,17 @@ def _publish_no_replace(source: Path, destination: Path) -> None:
         rename.restype = ctypes.c_int
         result = rename(source_bytes, destination_bytes, 0x00000004)
     else:  # pragma: no cover - unsupported platform
-        raise InitializationError(
-            "this platform cannot publish atomically without replacing an output"
-        )
+        raise ProjectError("this platform cannot publish atomically without replacing an output")
 
     if result == 0:
         return
     error_number = ctypes.get_errno()
     if error_number in {errno.EEXIST, errno.ENOTEMPTY}:
-        raise InitializationError(
+        raise ProjectError(
             f"output path appeared during setup; refusing to overwrite it: {destination}"
         )
     if error_number in {errno.EINVAL, errno.ENOSYS, errno.EOPNOTSUPP}:
-        raise InitializationError(
-            "the output filesystem does not support atomic no-replace publication"
-        )
+        raise ProjectError("the output filesystem does not support atomic no-replace publication")
     raise OSError(error_number, os.strerror(error_number), destination)
 
 
@@ -855,7 +839,7 @@ def _publish_exchange(source: Path, destination: Path) -> None:
                 "an artifact parent changed during publication and the anchored exchange "
                 f"could not be reversed: {os.strerror(error_number)}"
             )
-        raise InitializationError(
+        raise ProjectError(
             "an artifact parent changed during publication; the exchange was reversed"
         )
     finally:
@@ -874,7 +858,7 @@ def _exchange_at(
         try:
             rename = library.renameat2
         except AttributeError as error:  # pragma: no cover - old Linux libc
-            raise InitializationError(
+            raise ProjectError(
                 "this Linux runtime cannot atomically publish a project update"
             ) from error
         exchange_flag = 2
@@ -883,7 +867,7 @@ def _exchange_at(
         rename = library.renameatx_np
         exchange_flag = 0x00000002
     else:  # pragma: no cover - unsupported platform
-        raise InitializationError("this platform cannot atomically publish a project update")
+        raise ProjectError("this platform cannot atomically publish a project update")
     rename.argtypes = (
         ctypes.c_int,
         ctypes.c_char_p,
@@ -904,9 +888,7 @@ def _exchange_at(
 def _raise_exchange_error(destination: Path) -> None:
     error_number = ctypes.get_errno()
     if error_number in {errno.EINVAL, errno.ENOSYS, errno.EOPNOTSUPP}:
-        raise InitializationError(
-            "the project filesystem does not support atomic update publication"
-        )
+        raise ProjectError("the project filesystem does not support atomic update publication")
     raise OSError(error_number, os.strerror(error_number), destination)
 
 
@@ -916,7 +898,7 @@ def _open_parent_directory_no_follow(path: Path) -> int:
 
 def _open_directory_no_follow(path: Path) -> int:
     if not path.is_absolute():
-        raise InitializationError(f"artifact path must be absolute: {path}")
+        raise ProjectError(f"artifact path must be absolute: {path}")
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(path.anchor, flags)
     try:
@@ -933,7 +915,7 @@ def _open_directory_no_follow(path: Path) -> int:
 def _directory_fd_matches_path(path: Path, expected_descriptor: int) -> bool:
     try:
         current_descriptor = _open_directory_no_follow(path)
-    except (InitializationError, OSError):
+    except (ProjectError, OSError):
         return False
     try:
         expected_stat = os.fstat(expected_descriptor)
@@ -966,9 +948,7 @@ def _validate_exchange_entries(
         (source_is_directory and destination_is_directory)
         or (source_is_regular and destination_is_regular)
     ):
-        raise InitializationError(
-            "generated artifacts changed type during update; refusing to publish"
-        )
+        raise ProjectError("generated artifacts changed type during update; refusing to publish")
 
 
 def _publish_generated_artifacts(
@@ -993,14 +973,14 @@ def _publish_generated_artifacts(
                 project_dir / relative_path,
             )
             exchanged.append(relative_path)
-    except (InitializationError, OSError) as publish_error:
+    except (ProjectError, OSError) as publish_error:
         try:
             for relative_path in reversed(exchanged):
                 _publish_exchange(
                     staged_project / relative_path,
                     project_dir / relative_path,
                 )
-        except (InitializationError, OSError) as rollback_error:
+        except (ProjectError, OSError) as rollback_error:
             raise PublicationRollbackError(
                 "artifact publication and rollback both failed; inspect the project and "
                 f"{staged_project} before removing the reservation"
@@ -1072,7 +1052,7 @@ def _prepare_project(language: str, project_dir: Path, package_name: str) -> Non
 def _require_command(command: str) -> str:
     resolved = shutil.which(command)
     if resolved is None:
-        raise InitializationError(f"'{command}' is required to prepare this project")
+        raise ProjectError(f"'{command}' is required to prepare this project")
     return resolved
 
 
@@ -1094,7 +1074,7 @@ def _run(
             check=True,
         )
     except subprocess.CalledProcessError as error:
-        raise InitializationError(
+        raise ProjectError(
             f"validation command failed with exit code {error.returncode}: {' '.join(command)}"
         ) from error
 
@@ -1127,7 +1107,7 @@ def _prepare_python_project(project_dir: Path, package_name: str) -> None:
     absolute_import = "import supervisor_middleware_pb2 as supervisor__middleware__pb2"
     relative_import = "from . import supervisor_middleware_pb2 as supervisor__middleware__pb2"
     if absolute_import not in generated:
-        raise InitializationError(
+        raise ProjectError(
             "generated gRPC module has an unexpected import layout; no project was published"
         )
     grpc_module.write_text(generated.replace(absolute_import, relative_import, 1))

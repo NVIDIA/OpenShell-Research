@@ -40,29 +40,6 @@ uv sync --locked
 uv run mkit --help
 ```
 
-## Migrate from the initializer
-
-The distribution, executable, and creation syntax have changed:
-
-| Aspect | Before | Now |
-| --- | --- | --- |
-| Distribution | `openshell-middleware-init` | `middleware-kit` |
-| Executable | `openshell-middleware-init` | `mkit` |
-| Repository path | `projects/openshell-middleware-init` | `projects/middleware-kit` |
-| Create syntax | `openshell-middleware-init <name> ...` | `mkit create <name> ...` |
-
-Replace an existing tool installation with:
-
-```sh
-uv tool uninstall openshell-middleware-init
-uv tool install \
-  "middleware-kit @ git+https://github.com/NVIDIA/OpenShell-Research.git#subdirectory=projects/middleware-kit"
-```
-
-Generated projects do not need to be recreated. `mkit update` recognizes
-manifests written by both `openshell-middleware-init` and the interim
-`middleware-project` name.
-
 ## Quick start
 
 Generate and run a Python starter with the installed command:
@@ -117,8 +94,8 @@ The update command reads `middleware-dev-manifest.json` to discover the
 project language and Python package. It downloads the selected
 `supervisor_middleware.proto`, regenerates Python protobuf and gRPC bindings
 when applicable, refreshes `uv.lock` or `Cargo.lock`, and records the new
-version and protocol checksum in the manifest. Projects created under the
-former `middleware-project` and `openshell-middleware-init` names are supported.
+version and protocol checksum in the manifest. The update command accepts only
+manifests that identify `middleware-kit` as their generator.
 
 ## What you get
 

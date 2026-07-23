@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 from middleware_kit import generator
-from middleware_kit.generator import InitializationError, initialize_project, update_project
+from middleware_kit.generator import ProjectError, create_project, update_project
 
 PROTO = b"""syntax = "proto3";
 package openshell.middleware.v1;
@@ -43,7 +43,7 @@ def no_op_runner(language: str, project: Path, package: str) -> None:
 def test_generates_python_project_with_provenance(tmp_path: Path) -> None:
     destination = tmp_path / "audit-headers"
 
-    result = initialize_project(
+    result = create_project(
         name="audit-headers",
         language="python",
         requested_version="0.0.86",
@@ -70,7 +70,7 @@ def test_generates_python_project_with_provenance(tmp_path: Path) -> None:
 def test_generates_rust_project_with_normalized_crate_name(tmp_path: Path) -> None:
     destination = tmp_path / "request.audit"
 
-    result = initialize_project(
+    result = create_project(
         name="request.audit",
         language="rust",
         requested_version="v0.0.86",
@@ -95,7 +95,7 @@ def test_generates_rust_project_with_normalized_crate_name(tmp_path: Path) -> No
 
 def test_updates_python_generated_artifacts_and_preserves_user_code(tmp_path: Path) -> None:
     destination = tmp_path / "audit-headers"
-    initialize_project(
+    create_project(
         name="audit-headers",
         language="python",
         requested_version="v0.0.86",
@@ -134,41 +134,9 @@ def test_updates_python_generated_artifacts_and_preserves_user_code(tmp_path: Pa
     assert not list(tmp_path.glob(".audit-headers.middleware-kit.*"))
 
 
-@pytest.mark.parametrize(
-    "legacy_name",
-    ["middleware-project", "openshell-middleware-init"],
-)
-def test_updates_rust_project_created_by_legacy_tool(tmp_path: Path, legacy_name: str) -> None:
-    destination = tmp_path / "audit"
-    initialize_project(
-        name="audit",
-        language="rust",
-        requested_version="v0.0.86",
-        destination=destination,
-        download_proto=local_proto,
-        command_runner=no_op_runner,
-    )
-    manifest_path = destination / "middleware-dev-manifest.json"
-    manifest = json.loads(manifest_path.read_text())
-    manifest["generator"]["name"] = legacy_name
-    manifest_path.write_text(json.dumps(manifest))
-
-    result = update_project(
-        project_dir=destination,
-        requested_version="v1.2.3",
-        download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
-        command_runner=no_op_runner,
-    )
-
-    assert result.language == "rust"
-    assert (destination / "proto/supervisor_middleware.proto").read_bytes() == UPDATED_PROTO
-    updated_manifest = json.loads(manifest_path.read_text())
-    assert updated_manifest["generator"]["name"] == "middleware-kit"
-
-
 def test_failed_update_keeps_original_project_unchanged(tmp_path: Path) -> None:
     destination = tmp_path / "audit"
-    initialize_project(
+    create_project(
         name="audit",
         language="rust",
         requested_version="v0.0.86",
@@ -181,9 +149,9 @@ def test_failed_update_keeps_original_project_unchanged(tmp_path: Path) -> None:
 
     def fail_runner(language: str, project: Path, package: str) -> None:
         del language, project, package
-        raise InitializationError("validation failed")
+        raise ProjectError("validation failed")
 
-    with pytest.raises(InitializationError, match="validation failed"):
+    with pytest.raises(ProjectError, match="validation failed"):
         update_project(
             project_dir=destination,
             requested_version="v1.2.3",
@@ -201,7 +169,7 @@ def test_publication_failure_rolls_back_exchanged_artifacts(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     destination = tmp_path / "audit"
-    initialize_project(
+    create_project(
         name="audit",
         language="rust",
         requested_version="v0.0.86",
@@ -218,12 +186,12 @@ def test_publication_failure_rolls_back_exchanged_artifacts(
         nonlocal calls
         calls += 1
         if calls == 2:
-            raise InitializationError("publication failed")
+            raise ProjectError("publication failed")
         original_exchange(source, target)
 
     monkeypatch.setattr(generator, "_publish_exchange", fail_second_exchange)
 
-    with pytest.raises(InitializationError, match="publication failed"):
+    with pytest.raises(ProjectError, match="publication failed"):
         update_project(
             project_dir=destination,
             requested_version="v1.2.3",
@@ -240,7 +208,7 @@ def test_failed_publication_rollback_preserves_recovery_artifacts(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     destination = tmp_path / "audit"
-    initialize_project(
+    create_project(
         name="audit",
         language="rust",
         requested_version="v0.0.86",
@@ -255,7 +223,7 @@ def test_failed_publication_rollback_preserves_recovery_artifacts(
         nonlocal calls
         calls += 1
         if calls >= 2:
-            raise InitializationError("exchange failed")
+            raise ProjectError("exchange failed")
         original_exchange(source, target)
 
     monkeypatch.setattr(generator, "_publish_exchange", fail_publication_and_rollback)
@@ -277,7 +245,7 @@ def test_update_rejects_non_generated_project(tmp_path: Path) -> None:
     destination = tmp_path / "not-generated"
     destination.mkdir()
 
-    with pytest.raises(InitializationError, match="missing regular manifest"):
+    with pytest.raises(ProjectError, match="missing regular manifest"):
         update_project(
             project_dir=destination,
             requested_version="v1.2.3",
@@ -291,13 +259,13 @@ def test_update_rejects_symlink_and_missing_project_paths(tmp_path: Path) -> Non
     symlink = tmp_path / "symlink"
     symlink.symlink_to(missing, target_is_directory=True)
 
-    with pytest.raises(InitializationError, match="must not be a symlink"):
+    with pytest.raises(ProjectError, match="must not be a symlink"):
         update_project(
             project_dir=symlink,
             download_proto=local_proto,
             command_runner=no_op_runner,
         )
-    with pytest.raises(InitializationError, match="existing directory"):
+    with pytest.raises(ProjectError, match="existing directory"):
         update_project(
             project_dir=missing,
             download_proto=local_proto,
@@ -310,7 +278,7 @@ def test_update_rejects_symlink_and_missing_project_paths(tmp_path: Path) -> Non
     [
         ("not json", "could not read"),
         ("[]", "JSON object"),
-        ('{"generator": {"name": "other"}}', "was not created"),
+        ('{"generator": {"name": "other"}}', "generator must be middleware-kit"),
         (
             '{"generator": {"name": "middleware-kit"}, "languages": ["python", "rust"]}',
             "exactly one",
@@ -332,7 +300,7 @@ def test_update_rejects_invalid_manifest(tmp_path: Path, manifest: str, message:
     destination.mkdir()
     (destination / "middleware-dev-manifest.json").write_text(manifest)
 
-    with pytest.raises(InitializationError, match=message):
+    with pytest.raises(ProjectError, match=message):
         update_project(
             project_dir=destination,
             download_proto=local_proto,
@@ -353,7 +321,7 @@ def test_update_requires_regular_generated_artifacts(tmp_path: Path) -> None:
         )
     )
 
-    with pytest.raises(InitializationError, match="regular file"):
+    with pytest.raises(ProjectError, match="regular file"):
         update_project(
             project_dir=destination,
             download_proto=local_proto,
@@ -376,7 +344,7 @@ def test_update_requires_python_bindings_directory(tmp_path: Path) -> None:
         )
     )
 
-    with pytest.raises(InitializationError, match="bindings must be"):
+    with pytest.raises(ProjectError, match="bindings must be"):
         update_project(
             project_dir=destination,
             download_proto=local_proto,
@@ -388,7 +356,7 @@ def test_update_rejects_symlinked_proto_directory_without_touching_target(
     tmp_path: Path,
 ) -> None:
     destination = tmp_path / "project"
-    initialize_project(
+    create_project(
         name="project",
         language="rust",
         requested_version="v0.0.86",
@@ -403,7 +371,7 @@ def test_update_rejects_symlinked_proto_directory_without_touching_target(
     sentinel.write_text("external contract\n")
     (destination / "proto").symlink_to(external_proto, target_is_directory=True)
 
-    with pytest.raises(InitializationError, match="must not contain symlinks"):
+    with pytest.raises(ProjectError, match="must not contain symlinks"):
         update_project(
             project_dir=destination,
             requested_version="v1.2.3",
@@ -418,7 +386,7 @@ def test_update_rejects_symlinked_python_package_without_touching_target(
     tmp_path: Path,
 ) -> None:
     destination = tmp_path / "project"
-    initialize_project(
+    create_project(
         name="project",
         language="python",
         requested_version="v0.0.86",
@@ -435,7 +403,7 @@ def test_update_rejects_symlinked_python_package_without_touching_target(
     sentinel.write_text("external binding\n")
     package_dir.symlink_to(external_package, target_is_directory=True)
 
-    with pytest.raises(InitializationError, match="must not contain symlinks"):
+    with pytest.raises(ProjectError, match="must not contain symlinks"):
         update_project(
             project_dir=destination,
             requested_version="v1.2.3",
@@ -448,7 +416,7 @@ def test_update_rejects_symlinked_python_package_without_touching_target(
 
 def test_update_omits_disposable_directories_from_staging(tmp_path: Path) -> None:
     destination = tmp_path / "project"
-    initialize_project(
+    create_project(
         name="project",
         language="python",
         requested_version="v0.0.86",
@@ -491,7 +459,7 @@ def test_update_revalidates_symlink_ancestors_after_project_validation(
     tmp_path: Path, replace_live_path: bool
 ) -> None:
     destination = tmp_path / "project"
-    initialize_project(
+    create_project(
         name="project",
         language="rust",
         requested_version="v0.0.86",
@@ -511,7 +479,7 @@ def test_update_revalidates_symlink_ancestors_after_project_validation(
         (project_to_change / "proto").rename(project_to_change / "original-proto")
         (project_to_change / "proto").symlink_to(external_proto, target_is_directory=True)
 
-    with pytest.raises(InitializationError, match="must not contain symlinks"):
+    with pytest.raises(ProjectError, match="must not contain symlinks"):
         update_project(
             project_dir=destination,
             requested_version="v1.2.3",
@@ -527,7 +495,7 @@ def test_exchange_refuses_symlinked_parent_created_immediately_before_publish(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     destination = tmp_path / "project"
-    initialize_project(
+    create_project(
         name="project",
         language="rust",
         requested_version="v0.0.86",
@@ -552,7 +520,7 @@ def test_exchange_refuses_symlinked_parent_created_immediately_before_publish(
 
     monkeypatch.setattr(generator, "_publish_exchange", replace_parent_then_exchange)
 
-    with pytest.raises(InitializationError):
+    with pytest.raises(ProjectError):
         update_project(
             project_dir=destination,
             requested_version="v1.2.3",
@@ -571,18 +539,18 @@ def test_update_detects_replaced_project_before_publication(tmp_path: Path) -> N
     project.rename(replacement)
     project.mkdir()
 
-    with pytest.raises(InitializationError, match="changed during update"):
+    with pytest.raises(ProjectError, match="changed during update"):
         generator._verify_project_identity(project, original.st_dev, original.st_ino)
 
     project.rmdir()
-    with pytest.raises(InitializationError, match="changed during update"):
+    with pytest.raises(ProjectError, match="changed during update"):
         generator._verify_project_identity(project, original.st_dev, original.st_ino)
 
 
 def test_python_package_name_can_be_overridden(tmp_path: Path) -> None:
     destination = tmp_path / "project"
 
-    initialize_project(
+    create_project(
         name="project",
         language="python",
         requested_version="v0.0.86",
@@ -598,7 +566,7 @@ def test_python_package_name_can_be_overridden(tmp_path: Path) -> None:
 def test_numeric_project_name_gets_importable_python_package(tmp_path: Path) -> None:
     destination = tmp_path / "123"
 
-    initialize_project(
+    create_project(
         name="123",
         language="python",
         requested_version="v0.0.86",
@@ -624,7 +592,7 @@ def test_rust_project_names_get_valid_explicit_library_names(
 ) -> None:
     destination = tmp_path / name
 
-    initialize_project(
+    create_project(
         name=name,
         language="rust",
         requested_version="v0.0.86",
@@ -648,8 +616,8 @@ def test_unsupported_platform_fails_before_filesystem_changes(
     destination = tmp_path / "output"
     monkeypatch.setattr(generator.sys, "platform", "win32")
 
-    with pytest.raises(InitializationError, match="supports Linux and macOS"):
-        initialize_project(
+    with pytest.raises(ProjectError, match="supports Linux and macOS"):
+        create_project(
             name="project",
             language="python",
             requested_version="v0.0.86",
@@ -678,8 +646,8 @@ def test_rejects_invalid_project_choices(
     package_name: str | None,
     message: str,
 ) -> None:
-    with pytest.raises(InitializationError, match=message):
-        initialize_project(
+    with pytest.raises(ProjectError, match=message):
+        create_project(
             name=name,
             language=language,
             requested_version="v0.0.86",
@@ -692,8 +660,8 @@ def test_rejects_invalid_project_choices(
 
 @pytest.mark.parametrize("version", ["", "main", "v1", "v1.2", "v1.2.x"])
 def test_rejects_invalid_versions(tmp_path: Path, version: str) -> None:
-    with pytest.raises(InitializationError, match="invalid OpenShell version"):
-        initialize_project(
+    with pytest.raises(ProjectError, match="invalid OpenShell version"):
+        create_project(
             name="project",
             language="python",
             requested_version=version,
@@ -707,8 +675,8 @@ def test_refuses_an_existing_destination(tmp_path: Path) -> None:
     destination = tmp_path / "existing"
     destination.mkdir()
 
-    with pytest.raises(InitializationError, match="must not already exist"):
-        initialize_project(
+    with pytest.raises(ProjectError, match="must not already exist"):
+        create_project(
             name="existing",
             language="python",
             requested_version="v0.0.86",
@@ -723,8 +691,8 @@ def test_refuses_a_dangling_destination_symlink(tmp_path: Path) -> None:
     target = tmp_path / "symlink-target"
     destination.symlink_to(target, target_is_directory=True)
 
-    with pytest.raises(InitializationError, match="must not already exist"):
-        initialize_project(
+    with pytest.raises(ProjectError, match="must not already exist"):
+        create_project(
             name="project",
             language="python",
             requested_version="v0.0.86",
@@ -741,8 +709,8 @@ def test_refuses_a_reserved_destination(tmp_path: Path) -> None:
     destination = tmp_path / "reserved"
     (tmp_path / ".reserved.middleware-kit.lock").mkdir()
 
-    with pytest.raises(InitializationError, match="reserved by another middleware-kit"):
-        initialize_project(
+    with pytest.raises(ProjectError, match="reserved by another middleware-kit"):
+        create_project(
             name="reserved",
             language="rust",
             requested_version="v0.0.86",
@@ -765,8 +733,8 @@ def test_concurrent_destination_is_not_replaced(
 
     monkeypatch.setattr(generator, "_publish_no_replace", collide_before_publish)
 
-    with pytest.raises(InitializationError, match="appeared during setup"):
-        initialize_project(
+    with pytest.raises(ProjectError, match="appeared during setup"):
+        create_project(
             name="contended",
             language="python",
             requested_version="v0.0.86",
@@ -784,10 +752,10 @@ def test_failure_cleans_staging_and_owned_reservation(tmp_path: Path) -> None:
 
     def fail_runner(language: str, project: Path, package: str) -> None:
         del language, project, package
-        raise InitializationError("validation failed")
+        raise ProjectError("validation failed")
 
-    with pytest.raises(InitializationError, match="validation failed"):
-        initialize_project(
+    with pytest.raises(ProjectError, match="validation failed"):
+        create_project(
             name="failing",
             language="python",
             requested_version="v0.0.86",
@@ -805,8 +773,8 @@ def test_rejects_an_unexpected_proto(tmp_path: Path) -> None:
     def invalid_proto(version: str) -> tuple[bytes, str]:
         return b"not a proto", f"https://example.test/{version}"
 
-    with pytest.raises(InitializationError, match="not a supported"):
-        initialize_project(
+    with pytest.raises(ProjectError, match="not a supported"):
+        create_project(
             name="invalid-proto",
             language="rust",
             requested_version="v0.0.86",
@@ -819,12 +787,12 @@ def test_rejects_an_unexpected_proto(tmp_path: Path) -> None:
 def test_missing_required_command_has_actionable_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(generator.shutil, "which", lambda command: None)
 
-    with pytest.raises(InitializationError, match="'uv' is required"):
+    with pytest.raises(ProjectError, match="'uv' is required"):
         generator._require_command("uv")
 
 
 def test_failed_subprocess_is_translated(tmp_path: Path) -> None:
-    with pytest.raises(InitializationError, match="validation command failed"):
+    with pytest.raises(ProjectError, match="validation command failed"):
         generator._run(
             (sys.executable, "-c", "raise SystemExit(7)"),
             cwd=tmp_path,
@@ -836,8 +804,8 @@ def test_unexpected_subprocess_error_is_wrapped(tmp_path: Path) -> None:
         del language, project, package
         raise subprocess.SubprocessError("tool failed")
 
-    with pytest.raises(InitializationError, match="tool failed"):
-        initialize_project(
+    with pytest.raises(ProjectError, match="tool failed"):
+        create_project(
             name="failure",
             language="rust",
             requested_version="v0.0.86",
@@ -885,7 +853,7 @@ def test_latest_version_rejects_unexpected_redirects(
     response = FakeResponse(url=resolved_url)
     monkeypatch.setattr(generator.urllib.request, "urlopen", lambda *args, **kwargs: response)
 
-    with pytest.raises(InitializationError, match=message):
+    with pytest.raises(ProjectError, match=message):
         generator._resolve_latest_version()
 
 
@@ -901,7 +869,7 @@ def test_latest_version_translates_network_failure(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(generator.urllib.request, "urlopen", fail)
     monkeypatch.setattr(generator.time, "sleep", lambda _: None)
 
-    with pytest.raises(InitializationError, match="could not resolve"):
+    with pytest.raises(ProjectError, match="could not resolve"):
         generator._resolve_latest_version()
     assert attempts == 4
 
@@ -924,7 +892,7 @@ def test_download_proto_translates_network_failure(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(generator.urllib.request, "urlopen", fail)
     monkeypatch.setattr(generator.time, "sleep", lambda _: None)
 
-    with pytest.raises(InitializationError, match=r"could not download.*missing"):
+    with pytest.raises(ProjectError, match=r"could not download.*missing"):
         generator._download_proto("v1.2.3")
 
 
@@ -993,7 +961,7 @@ def test_download_retries_only_retryable_http_statuses(
     monkeypatch.setattr(generator.time, "sleep", lambda _: None)
 
     expected_message = "middleware-capable release" if status == 404 else "HTTP 503"
-    with pytest.raises(InitializationError, match=expected_message):
+    with pytest.raises(ProjectError, match=expected_message):
         generator._download_proto("v1.2.3")
 
     assert attempts == expected_attempts
@@ -1011,8 +979,8 @@ def test_toolchain_preflight_precedes_latest_resolution_and_output_changes(
         lambda: pytest.fail("latest must not be resolved before toolchain preflight"),
     )
 
-    with pytest.raises(InitializationError, match=rf"'{command}' is required"):
-        generator.initialize_project(
+    with pytest.raises(ProjectError, match=rf"'{command}' is required"):
+        generator.create_project(
             name="audit-headers",
             language=language,
             requested_version="latest",
@@ -1038,12 +1006,12 @@ def test_lock_verification_detects_loss_and_changed_owner(tmp_path: Path) -> Non
         started_at="2026-07-22T00:00:00+00:00",
     )
 
-    with pytest.raises(InitializationError, match="reservation was lost"):
+    with pytest.raises(ProjectError, match="reservation was lost"):
         generator._verify_lock(missing)
 
     reservation = generator._acquire_lock(lock, "mine", tmp_path / "output", "v0.0.86")
     (lock / "owner").write_text("theirs")
-    with pytest.raises(InitializationError, match="ownership changed"):
+    with pytest.raises(ProjectError, match="ownership changed"):
         generator._verify_lock(reservation)
 
     generator._release_lock(reservation)
@@ -1093,7 +1061,7 @@ def test_reservation_verification_rejects_changed_directory_identity(tmp_path: P
         started_at=reservation.started_at,
     )
 
-    with pytest.raises(InitializationError, match="reservation was lost"):
+    with pytest.raises(ProjectError, match="reservation was lost"):
         generator._verify_lock(changed_identity)
     generator._cleanup_reservation(reservation)
 
@@ -1103,7 +1071,7 @@ def test_reservation_verification_rejects_non_file_owner(tmp_path: Path) -> None
     (reservation.path / "owner").unlink()
     (reservation.path / "owner").mkdir()
 
-    with pytest.raises(InitializationError, match="reservation was lost"):
+    with pytest.raises(ProjectError, match="reservation was lost"):
         generator._verify_lock(reservation)
     generator._release_lock(reservation)
 
@@ -1184,7 +1152,7 @@ def test_exchange_reverses_when_open_parent_is_detached(
 
     monkeypatch.setattr(generator, "_validate_exchange_entries", validate_then_detach)
 
-    with pytest.raises(InitializationError, match=r"parent changed.*exchange was reversed"):
+    with pytest.raises(ProjectError, match=r"parent changed.*exchange was reversed"):
         generator._publish_exchange(source, destination)
 
     assert source.read_text() == "new contract\n"
@@ -1217,7 +1185,7 @@ def test_publish_reports_filesystem_without_no_replace_support(
 ) -> None:
     monkeypatch.setattr(generator.ctypes, "CDLL", lambda *args, **kwargs: FakeLibrary(error_number))
 
-    with pytest.raises(InitializationError, match="does not support"):
+    with pytest.raises(ProjectError, match="does not support"):
         generator._publish_no_replace(tmp_path / "source", tmp_path / "destination")
 
 
@@ -1264,13 +1232,13 @@ def test_require_command_returns_resolved_path(monkeypatch: pytest.MonkeyPatch) 
 
 def test_run_passes_environment_to_subprocess(tmp_path: Path) -> None:
     environment = os.environ.copy()
-    environment["MIDDLEWARE_INIT_TEST_VALUE"] = "present"
+    environment["MIDDLEWARE_KIT_TEST_VALUE"] = "present"
 
     generator._run(
         (
             sys.executable,
             "-c",
-            "import os; assert os.environ['MIDDLEWARE_INIT_TEST_VALUE'] == 'present'",
+            "import os; assert os.environ['MIDDLEWARE_KIT_TEST_VALUE'] == 'present'",
         ),
         cwd=tmp_path,
         environment=environment,
@@ -1322,7 +1290,7 @@ def test_prepare_python_rejects_unexpected_generated_import(
 
     monkeypatch.setattr(generator, "_run", fake_run)
 
-    with pytest.raises(InitializationError, match="unexpected import layout"):
+    with pytest.raises(ProjectError, match="unexpected import layout"):
         generator._prepare_python_project(tmp_path, "audit")
 
 

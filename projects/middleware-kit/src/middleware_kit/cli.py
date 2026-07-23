@@ -9,8 +9,8 @@ from typing import Annotated
 import typer
 
 from middleware_kit.generator import (
-    InitializationError,
-    initialize_project,
+    ProjectError,
+    create_project,
     update_project,
 )
 
@@ -67,14 +67,14 @@ def create(
     """Create a new OpenShell supervisor middleware project."""
     destination = output if output is not None else Path.cwd() / name
     try:
-        result = initialize_project(
+        result = create_project(
             name=name,
             language=language.value,
             requested_version=openshell_version,
             destination=destination,
             package_name=package_name,
         )
-    except InitializationError as error:
+    except ProjectError as error:
         _report_error(error)
 
     typer.echo(f"Created {result.language} middleware project at {result.destination}")
@@ -105,14 +105,14 @@ def update(
             project_dir=project,
             requested_version=openshell_version,
         )
-    except InitializationError as error:
+    except ProjectError as error:
         _report_error(error)
 
     typer.echo(f"Updated {result.language} middleware project at {result.destination}")
     typer.echo(f"OpenShell contract: {result.openshell_version}")
 
 
-def _report_error(error: InitializationError) -> None:
+def _report_error(error: ProjectError) -> None:
     typer.echo(f"mkit: error: {error}", err=True)
     raise typer.Exit(code=1) from error
 

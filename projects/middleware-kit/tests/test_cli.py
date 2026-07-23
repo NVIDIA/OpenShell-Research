@@ -3,7 +3,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from middleware_kit import cli
-from middleware_kit.generator import InitializationError, InitializationResult
+from middleware_kit.generator import ProjectError, ProjectResult
 
 runner = CliRunner()
 
@@ -25,18 +25,18 @@ def test_help_describes_required_choices() -> None:
 def test_cli_reports_success(monkeypatch, tmp_path: Path) -> None:
     destination = tmp_path / "audit"
 
-    def fake_initialize_project(**options):
+    def fake_create_project(**options):
         assert options["name"] == "audit"
         assert options["language"] == "python"
         assert options["destination"] == destination
-        return InitializationResult(
+        return ProjectResult(
             destination=destination,
             language="python",
             openshell_version="v0.0.86",
             run_command="uv run audit",
         )
 
-    monkeypatch.setattr(cli, "initialize_project", fake_initialize_project)
+    monkeypatch.setattr(cli, "create_project", fake_create_project)
 
     result = runner.invoke(
         cli.app,
@@ -57,12 +57,12 @@ def test_cli_reports_success(monkeypatch, tmp_path: Path) -> None:
     assert "OpenShell contract: v0.0.86" in result.stdout
 
 
-def test_cli_reports_initialization_error(monkeypatch, tmp_path: Path) -> None:
-    def fake_initialize_project(**options):
+def test_cli_reports_project_error(monkeypatch, tmp_path: Path) -> None:
+    def fake_create_project(**options):
         del options
-        raise InitializationError("output exists")
+        raise ProjectError("output exists")
 
-    monkeypatch.setattr(cli, "initialize_project", fake_initialize_project)
+    monkeypatch.setattr(cli, "create_project", fake_create_project)
 
     result = runner.invoke(
         cli.app,
@@ -90,7 +90,7 @@ def test_cli_reports_update_success(monkeypatch, tmp_path: Path) -> None:
             "project_dir": destination,
             "requested_version": "v1.2.3",
         }
-        return InitializationResult(
+        return ProjectResult(
             destination=destination,
             language="rust",
             openshell_version="v1.2.3",
@@ -117,7 +117,7 @@ def test_cli_reports_update_success(monkeypatch, tmp_path: Path) -> None:
 def test_cli_reports_update_error(monkeypatch, tmp_path: Path) -> None:
     def fake_update_project(**options):
         del options
-        raise InitializationError("not generated")
+        raise ProjectError("not generated")
 
     monkeypatch.setattr(cli, "update_project", fake_update_project)
 
