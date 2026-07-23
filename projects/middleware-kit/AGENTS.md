@@ -4,11 +4,12 @@ Read `README.md` and `pyproject.toml` before changing this project.
 
 ## Preserve these invariants
 
-- Keep initialization non-destructive. Never merge into, follow, or replace an
+- Keep creation non-destructive. Never merge into, follow, or replace an
   existing output path, including a symlink.
 - Build and validate in a hidden sibling staging directory. Publish only after
   all generation and validation steps succeed.
-- Preserve reservation ownership checks and atomic no-replace publication.
+- Preserve reservation ownership checks, atomic no-replace creation, and atomic
+  exchange publication for updates.
 - Support Linux and macOS explicitly. Do not weaken publication guarantees to
   add another platform implicitly.
 - Keep every generated project version-matched: the OpenShell tag, downloaded
@@ -25,7 +26,7 @@ Read `README.md` and `pyproject.toml` before changing this project.
 
 ## Change templates carefully
 
-- Keep templates under `src/openshell_middleware_init/templates/` runnable as
+- Keep templates under `src/middleware_kit/templates/` runnable as
   standalone projects.
 - Use `__UPPER_SNAKE_CASE__` for template markers. Add every marker to
   `TemplateContext.replacements` and cover it with a rendering test.
@@ -36,7 +37,7 @@ Read `README.md` and `pyproject.toml` before changing this project.
 
 ## Test behavior, not implementation details
 
-- Keep initializer unit tests hermetic. Inject protocol downloads and project
+- Keep project-tool unit tests hermetic. Inject protocol downloads and project
   preparation instead of contacting GitHub or invoking uv or Cargo.
 - Add regression tests for changes to output safety, failure cleanup, naming,
   manifests, network behavior, or rendered files.

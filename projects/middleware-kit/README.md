@@ -1,11 +1,11 @@
-# OpenShell Middleware Init
+# OpenShell Middleware Kit
 
-`openshell-middleware-init` creates a runnable Python or Rust starter for an
-OpenShell supervisor middleware service. The starter implements the complete
-gRPC service as a pass-through, pins its protocol contract to one OpenShell
-release, and includes tests, dependency locks, and registration guidance.
+`middleware-kit` creates and updates runnable Python or Rust OpenShell
+supervisor middleware services. A new project implements the complete gRPC
+service as a pass-through, pins its protocol contract to one OpenShell release,
+and includes tests, dependency locks, and registration guidance.
 
-The initializer does not install or replace OpenShell.
+The project tool does not install or replace OpenShell.
 
 ## Requirements
 
@@ -20,24 +20,24 @@ Install the command in an isolated tool environment from GitHub:
 
 ```sh
 uv tool install \
-  "openshell-middleware-init @ git+https://github.com/NVIDIA/OpenShell-Research.git#subdirectory=projects/openshell-middleware-init"
+  "middleware-kit @ git+https://github.com/NVIDIA/OpenShell-Research.git#subdirectory=projects/middleware-kit"
 ```
 
 If you already have this repository checked out, install from its local path
 instead:
 
 ```sh
-uv tool install /path/to/OpenShell-Research/projects/openshell-middleware-init
+uv tool install /path/to/OpenShell-Research/projects/middleware-kit
 ```
 
-Both forms make `openshell-middleware-init` available outside the source tree
+Both forms make `mkit` available outside the source tree
 without running `uv sync` in this project.
 
 Contributors working on the CLI should use the locked project environment:
 
 ```sh
 uv sync --locked
-uv run openshell-middleware-init --help
+uv run mkit --help
 ```
 
 ## Quick start
@@ -45,7 +45,7 @@ uv run openshell-middleware-init --help
 Generate and run a Python starter with the installed command:
 
 ```sh
-openshell-middleware-init audit-headers \
+mkit create audit-headers \
   --language python \
   --openshell-version v0.0.86 \
   --output /tmp/audit-headers
@@ -58,7 +58,7 @@ uv run audit-headers
 Or generate and run a Rust starter:
 
 ```sh
-openshell-middleware-init audit-headers \
+mkit create audit-headers \
   --language rust \
   --openshell-version v0.0.86 \
   --output /tmp/audit-headers-rust
@@ -72,8 +72,30 @@ The output path must not already exist. Use a pinned OpenShell tag for
 reproducible projects; `--openshell-version latest` is available for
 experimentation.
 
-Run `openshell-middleware-init --help` for all options. Python package names
+Run `mkit --help` for all options. Python package names
 default to a normalized project name and can be changed with `--package-name`.
+
+## Update a project
+
+From a generated project, refresh to the latest OpenShell release:
+
+```sh
+mkit update
+```
+
+To select a release or update a project from another directory:
+
+```sh
+mkit update /path/to/audit-headers \
+  --openshell-version v0.0.90
+```
+
+The update command reads `middleware-dev-manifest.json` to discover the
+project language and Python package. It downloads the selected
+`supervisor_middleware.proto`, regenerates Python protobuf and gRPC bindings
+when applicable, refreshes `uv.lock` or `Cargo.lock`, and records the new
+version and protocol checksum in the manifest. Projects created under the
+former `middleware-project` and `openshell-middleware-init` names are supported.
 
 ## What you get
 
@@ -94,19 +116,25 @@ service and register it with OpenShell.
 
 ## Safety and failure behavior
 
-Generation is non-destructive. The initializer validates a hidden sibling
+Creation is non-destructive. The project tool validates a hidden sibling
 staging directory, then publishes it atomically. It refuses an existing output,
-including a symlink, and uses a per-output reservation to prevent concurrent
-writers. A normal failure removes the initializer's own staging and reservation
-without publishing a partial project.
+including a symlink. Updates copy the complete existing project into a hidden
+sibling staging directory, change only generator-owned protocol artifacts
+there, validate the staged project, then atomically exchange those artifacts
+in place. User implementation files and the project directory itself are
+preserved. If publication fails, completed exchanges are rolled back in reverse
+order. Both operations use a per-project reservation to prevent concurrent
+writers; a normal failure removes the tool's own staging and reservation
+without leaving partial changes.
 
 If the process is killed, it may leave
-`.<output>.openshell-middleware-init.lock` and a hidden staging directory. Before
+`.<output>.middleware-kit.lock` and a hidden staging directory. Before
 removing either one:
 
 1. Read `metadata.json` in the reservation.
 2. On the recorded host, confirm that the recorded PID is no longer the same
-   initializer process and that the final output does not exist.
+   project tool process. For a create operation, confirm that the final output
+   does not exist. For an update, do not remove the final project.
 3. Inspect and remove only the recorded staging directory.
 4. Remove `owner` and `metadata.json`, then remove the empty reservation with
    `rmdir`. Stop if it contains anything unexpected.

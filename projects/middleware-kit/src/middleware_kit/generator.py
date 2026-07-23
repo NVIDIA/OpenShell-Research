@@ -1,4 +1,4 @@
-"""Safe, version-matched project generation."""
+"""Safe, version-matched project creation and updates."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 from importlib.resources import files
 from pathlib import Path
 
-from openshell_middleware_init import __version__
+from middleware_kit import __version__
 
 _REPOSITORY_URL = "https://github.com/NVIDIA/OpenShell"
 _RAW_URL = "https://raw.githubusercontent.com/NVIDIA/OpenShell"
@@ -36,6 +36,8 @@ _VERSION_PATTERN = re.compile(r"^v\d+\.\d+\.\d+(?:[+-][0-9A-Za-z._-]+)?$")
 _PYTHON_PACKAGE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 _PROJECT_NAME_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$")
 _NETWORK_ATTEMPTS = 4
+_TOOL_NAME = "middleware-kit"
+_LEGACY_TOOL_NAMES = {"middleware-project", "openshell-middleware-init"}
 _RUST_KEYWORDS = {
     "abstract",
     "as",
@@ -105,17 +107,29 @@ _RUST_RESERVED_IDENTIFIERS = _RUST_KEYWORDS | {
 
 
 class InitializationError(RuntimeError):
-    """A user-actionable project initialization failure."""
+    """A user-actionable middleware project operation failure."""
+
+
+class PublicationRollbackError(InitializationError):
+    """An update failure whose recovery artifacts must be preserved."""
 
 
 @dataclass(frozen=True)
 class InitializationResult:
-    """Details about a successfully generated project."""
+    """Details about a successful middleware project operation."""
 
     destination: Path
     language: str
     openshell_version: str
     run_command: str
+
+
+@dataclass(frozen=True)
+class ProjectMetadata:
+    """Metadata needed to refresh a generated middleware project."""
+
+    language: str
+    python_package: str | None
 
 
 @dataclass(frozen=True)
@@ -184,7 +198,7 @@ def initialize_project(
     runner = command_runner if command_runner is not None else _prepare_project
 
     destination.parent.mkdir(parents=True, exist_ok=True)
-    lock_path = destination.parent / f".{destination.name}.openshell-middleware-init.lock"
+    lock_path = destination.parent / f".{destination.name}.{_TOOL_NAME}.lock"
     lock_token = secrets.token_hex(16)
     reservation = _acquire_lock(lock_path, lock_token, destination, version)
     staging_path: Path | None = None
@@ -232,11 +246,80 @@ def initialize_project(
     )
 
 
+def update_project(
+    *,
+    project_dir: Path,
+    requested_version: str = "latest",
+    download_proto: DownloadProto | None = None,
+    command_runner: CommandRunner | None = None,
+) -> InitializationResult:
+    """Refresh generator-owned artifacts and atomically publish a validated update."""
+    _validate_platform()
+    project_dir = project_dir.expanduser()
+    _validate_existing_project(project_dir)
+    project_dir = project_dir.resolve()
+    project_stat = project_dir.stat(follow_symlinks=False)
+    metadata = _read_project_metadata(project_dir)
+    if command_runner is None:
+        _preflight_language(metadata.language)
+    version = _normalize_version(requested_version)
+    downloader = download_proto if download_proto is not None else _download_proto
+    runner = command_runner if command_runner is not None else _prepare_project
+
+    lock_path = project_dir.parent / f".{project_dir.name}.{_TOOL_NAME}.lock"
+    lock_token = secrets.token_hex(16)
+    reservation = _acquire_lock(lock_path, lock_token, project_dir, version)
+    staging_path: Path | None = None
+    published = False
+    preserve_recovery = False
+    try:
+        _validate_existing_project(project_dir)
+        shutil.copytree(project_dir, reservation.staging_path, symlinks=True)
+        staging_path = reservation.staging_path
+        proto, proto_url = downloader(version)
+        _validate_proto(proto, version)
+        _refresh_generated_artifacts(
+            staging_path,
+            metadata=metadata,
+            version=version,
+            proto_url=proto_url,
+            proto=proto,
+        )
+        runner(metadata.language, staging_path, metadata.python_package or "unused")
+        _verify_lock(reservation)
+        _verify_project_identity(project_dir, project_stat.st_dev, project_stat.st_ino)
+        _publish_generated_artifacts(staging_path, project_dir, metadata)
+        published = True
+    except PublicationRollbackError:
+        preserve_recovery = True
+        raise
+    except InitializationError:
+        raise
+    except (OSError, subprocess.SubprocessError) as error:
+        raise InitializationError(str(error)) from error
+    finally:
+        if preserve_recovery:
+            with suppress(OSError):
+                os.close(reservation.directory_fd)
+        else:
+            if staging_path is not None:
+                shutil.rmtree(staging_path, ignore_errors=True)
+            _release_lock(reservation)
+
+    if not published:  # pragma: no cover - defensive; failures raise above
+        raise AssertionError("updated project was not published")
+    return InitializationResult(
+        destination=project_dir,
+        language=metadata.language,
+        openshell_version=version,
+        run_command="",
+    )
+
+
 def _validate_platform() -> None:
     if sys.platform != "darwin" and not sys.platform.startswith("linux"):
         raise InitializationError(
-            "openshell-middleware-init supports Linux and macOS; "
-            f"unsupported platform: {sys.platform}"
+            f"{_TOOL_NAME} supports Linux and macOS; unsupported platform: {sys.platform}"
         )
 
 
@@ -294,7 +377,7 @@ def _normalize_version(requested: str) -> str:
 def _resolve_latest_version() -> str:
     request = urllib.request.Request(
         f"{_REPOSITORY_URL}/releases/latest",
-        headers={"User-Agent": f"openshell-middleware-init/{__version__}"},
+        headers={"User-Agent": f"{_TOOL_NAME}/{__version__}"},
     )
     try:
         _, resolved_url = _fetch_url(request)
@@ -313,7 +396,7 @@ def _download_proto(version: str) -> tuple[bytes, str]:
     url = f"{_RAW_URL}/{version}/{_PROTO_PATH}"
     request = urllib.request.Request(
         url,
-        headers={"User-Agent": f"openshell-middleware-init/{__version__}"},
+        headers={"User-Agent": f"{_TOOL_NAME}/{__version__}"},
     )
     try:
         body, _ = _fetch_url(request)
@@ -376,6 +459,112 @@ def _validate_destination(destination: Path) -> None:
         raise InitializationError(f"invalid output path: {destination}")
 
 
+def _validate_existing_project(project_dir: Path) -> None:
+    if project_dir.is_symlink():
+        raise InitializationError(f"project path must not be a symlink: {project_dir}")
+    if not project_dir.is_dir():
+        raise InitializationError(f"project path must be an existing directory: {project_dir}")
+
+
+def _verify_project_identity(project_dir: Path, device: int, inode: int) -> None:
+    try:
+        current = project_dir.stat(follow_symlinks=False)
+    except OSError as error:
+        raise InitializationError(
+            "project path changed during update; refusing to publish"
+        ) from error
+    if not stat.S_ISDIR(current.st_mode) or current.st_dev != device or current.st_ino != inode:
+        raise InitializationError("project path changed during update; refusing to publish")
+
+
+def _read_project_metadata(project_dir: Path) -> ProjectMetadata:
+    manifest_path = project_dir / "middleware-dev-manifest.json"
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise InitializationError(
+            f"not a generated middleware project; missing regular manifest: {manifest_path}"
+        )
+    try:
+        manifest = json.loads(manifest_path.read_text())
+    except (OSError, json.JSONDecodeError) as error:
+        raise InitializationError(f"could not read project manifest: {error}") from error
+    if not isinstance(manifest, dict):
+        raise InitializationError("project manifest must contain a JSON object")
+
+    generator = manifest.get("generator")
+    generator_name = generator.get("name") if isinstance(generator, dict) else None
+    if generator_name != _TOOL_NAME and generator_name not in _LEGACY_TOOL_NAMES:
+        raise InitializationError(
+            "project manifest was not created by middleware-kit, middleware-project, "
+            "or openshell-middleware-init"
+        )
+    languages = manifest.get("languages")
+    if languages not in (["python"], ["rust"]):
+        raise InitializationError("project manifest must identify exactly one supported language")
+    language = languages[0]
+    python_package = manifest.get("python_package")
+    if language == "python":
+        if not isinstance(python_package, str) or not _PYTHON_PACKAGE_PATTERN.fullmatch(
+            python_package
+        ):
+            raise InitializationError(
+                "Python project manifest has an invalid or missing python_package"
+            )
+    elif python_package is not None:
+        raise InitializationError("Rust project manifest must set python_package to null")
+
+    _validate_refresh_targets(project_dir, language, python_package)
+    return ProjectMetadata(language=language, python_package=python_package)
+
+
+def _validate_refresh_targets(project_dir: Path, language: str, python_package: str | None) -> None:
+    regular_files = [
+        project_dir / "middleware-dev-manifest.json",
+        project_dir / "proto" / "supervisor_middleware.proto",
+    ]
+    regular_files.append(project_dir / ("uv.lock" if language == "python" else "Cargo.lock"))
+    for path in regular_files:
+        if path.is_symlink() or not path.is_file():
+            raise InitializationError(f"generated artifact must be a regular file: {path}")
+
+    if language == "python":
+        if python_package is None:  # pragma: no cover - checked by caller
+            raise AssertionError("Python package is required")
+        bindings_dir = project_dir / "src" / python_package / "bindings"
+        if bindings_dir.is_symlink() or not bindings_dir.is_dir():
+            raise InitializationError(
+                f"generated bindings must be an existing directory: {bindings_dir}"
+            )
+
+
+def _refresh_generated_artifacts(
+    project_dir: Path,
+    *,
+    metadata: ProjectMetadata,
+    version: str,
+    proto_url: str,
+    proto: bytes,
+) -> None:
+    proto_path = project_dir / "proto" / "supervisor_middleware.proto"
+    proto_path.write_bytes(proto)
+    if metadata.language == "python":
+        if metadata.python_package is None:  # pragma: no cover - checked during discovery
+            raise AssertionError("Python package is required")
+        bindings_dir = project_dir / "src" / metadata.python_package / "bindings"
+        shutil.rmtree(bindings_dir)
+        bindings_dir.mkdir()
+        bindings_dir.joinpath("__init__.py").write_text(
+            '"""Generated OpenShell supervisor middleware bindings. Do not edit."""\n'
+        )
+    _write_manifest(
+        project_dir,
+        version=version,
+        proto_url=proto_url,
+        proto=proto,
+        language=metadata.language,
+        python_package=metadata.python_package,
+    )
+
+
 def _acquire_lock(
     lock_path: Path, token: str, destination: Path, version: str
 ) -> OutputReservation:
@@ -383,9 +572,9 @@ def _acquire_lock(
         lock_path.mkdir(mode=0o700)
     except FileExistsError as error:
         raise InitializationError(
-            f"output path is reserved by another initializer: {destination}; "
+            f"project path is reserved by another {_TOOL_NAME} process: {destination}; "
             f"inspect {lock_path / 'metadata.json'} and follow the stale-reservation "
-            "recovery steps in the openshell-middleware-init README"
+            f"recovery steps in the {_TOOL_NAME} README"
         ) from error
     directory_fd = -1
     try:
@@ -405,9 +594,7 @@ def _acquire_lock(
         device=lock_stat.st_dev,
         inode=lock_stat.st_ino,
         destination=destination,
-        staging_path=(
-            destination.parent / f".{destination.name}.openshell-middleware-init.{token}"
-        ),
+        staging_path=(destination.parent / f".{destination.name}.{_TOOL_NAME}.{token}"),
         version=version,
         started_at=datetime.now(timezone.utc).isoformat(),
     )
@@ -567,8 +754,85 @@ def _publish_no_replace(source: Path, destination: Path) -> None:
     raise OSError(error_number, os.strerror(error_number), destination)
 
 
+def _publish_exchange(source: Path, destination: Path) -> None:
+    """Atomically exchange a validated staged project with its existing project."""
+    source_bytes = os.fsencode(source)
+    destination_bytes = os.fsencode(destination)
+    if sys.platform.startswith("linux"):
+        library = ctypes.CDLL(None, use_errno=True)
+        try:
+            rename = library.renameat2
+        except AttributeError as error:  # pragma: no cover - old Linux libc
+            raise InitializationError(
+                "this Linux runtime cannot atomically publish a project update"
+            ) from error
+        rename.argtypes = (
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_uint,
+        )
+        rename.restype = ctypes.c_int
+        result = rename(-100, source_bytes, -100, destination_bytes, 2)
+    elif sys.platform == "darwin":  # pragma: no cover - platform-specific
+        library = ctypes.CDLL(None, use_errno=True)
+        rename = library.renamex_np
+        rename.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint)
+        rename.restype = ctypes.c_int
+        result = rename(source_bytes, destination_bytes, 0x00000002)
+    else:  # pragma: no cover - unsupported platform
+        raise InitializationError("this platform cannot atomically publish a project update")
+
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number in {errno.EINVAL, errno.ENOSYS, errno.EOPNOTSUPP}:
+        raise InitializationError(
+            "the project filesystem does not support atomic update publication"
+        )
+    raise OSError(error_number, os.strerror(error_number), destination)
+
+
+def _publish_generated_artifacts(
+    staged_project: Path, project_dir: Path, metadata: ProjectMetadata
+) -> None:
+    """Exchange refreshed artifacts in place, rolling back a normal publication failure."""
+    relative_paths = [
+        Path("proto/supervisor_middleware.proto"),
+        Path("uv.lock" if metadata.language == "python" else "Cargo.lock"),
+    ]
+    if metadata.language == "python":
+        if metadata.python_package is None:  # pragma: no cover - checked during discovery
+            raise AssertionError("Python package is required")
+        relative_paths.append(Path("src") / metadata.python_package / "bindings")
+    relative_paths.append(Path("middleware-dev-manifest.json"))
+
+    exchanged: list[Path] = []
+    try:
+        for relative_path in relative_paths:
+            _publish_exchange(
+                staged_project / relative_path,
+                project_dir / relative_path,
+            )
+            exchanged.append(relative_path)
+    except (InitializationError, OSError) as publish_error:
+        try:
+            for relative_path in reversed(exchanged):
+                _publish_exchange(
+                    staged_project / relative_path,
+                    project_dir / relative_path,
+                )
+        except (InitializationError, OSError) as rollback_error:
+            raise PublicationRollbackError(
+                "artifact publication and rollback both failed; inspect the project and "
+                f"{staged_project} before removing the reservation"
+            ) from rollback_error
+        raise publish_error
+
+
 def _render_project(destination: Path, language: str, context: TemplateContext) -> None:
-    template_root = files("openshell_middleware_init").joinpath("templates").joinpath(language)
+    template_root = files("middleware_kit").joinpath("templates").joinpath(language)
     template_paths = {
         "python": (
             ".gitignore",
@@ -614,7 +878,7 @@ def _write_manifest(
         "languages": [language],
         "python_package": python_package,
         "generator": {
-            "name": "openshell-middleware-init",
+            "name": _TOOL_NAME,
             "version": __version__,
         },
     }
@@ -631,7 +895,7 @@ def _prepare_project(language: str, project_dir: Path, package_name: str) -> Non
 def _require_command(command: str) -> str:
     resolved = shutil.which(command)
     if resolved is None:
-        raise InitializationError(f"'{command}' is required to initialize this project")
+        raise InitializationError(f"'{command}' is required to prepare this project")
     return resolved
 
 
@@ -691,7 +955,7 @@ def _prepare_python_project(project_dir: Path, package_name: str) -> None:
         )
     grpc_module.write_text(generated.replace(absolute_import, relative_import, 1))
 
-    with tempfile.TemporaryDirectory(prefix="openshell-middleware-init-python-") as environment:
+    with tempfile.TemporaryDirectory(prefix=f"{_TOOL_NAME}-python-") as environment:
         process_environment = os.environ.copy()
         process_environment.pop("VIRTUAL_ENV", None)
         process_environment["UV_PROJECT_ENVIRONMENT"] = environment
@@ -717,7 +981,7 @@ def _prepare_python_project(project_dir: Path, package_name: str) -> None:
 
 def _prepare_rust_project(project_dir: Path) -> None:
     cargo = _require_command("cargo")
-    with tempfile.TemporaryDirectory(prefix="openshell-middleware-init-rust-") as target_dir:
+    with tempfile.TemporaryDirectory(prefix=f"{_TOOL_NAME}-rust-") as target_dir:
         process_environment = os.environ.copy()
         process_environment["CARGO_TARGET_DIR"] = target_dir
         _run(

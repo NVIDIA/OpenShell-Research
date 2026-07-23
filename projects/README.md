@@ -6,8 +6,8 @@ layout.
 
 Current projects:
 
-- `openshell-middleware-init`: Typer CLI that generates version-matched Python
-  and Rust OpenShell supervisor middleware projects.
+- `middleware-kit`: `mkit` CLI that creates and updates version-matched
+  Python and Rust OpenShell supervisor middleware projects.
 - `python-project-template`: Minimal, production-ready Python project scaffold
   managed with uv.
 - `reachy-mini-openshell`: Reachy Mini conversation demo for OpenShell.

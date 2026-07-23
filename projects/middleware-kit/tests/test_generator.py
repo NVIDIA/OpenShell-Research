@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from openshell_middleware_init import generator
-from openshell_middleware_init.generator import InitializationError, initialize_project
+from middleware_kit import generator
+from middleware_kit.generator import InitializationError, initialize_project, update_project
 
 PROTO = b"""syntax = "proto3";
 package openshell.middleware.v1;
@@ -25,6 +25,7 @@ service SupervisorMiddleware {
 message HttpRequestEvaluation {}
 message HttpRequestResult {}
 """
+UPDATED_PROTO = PROTO + b"// refreshed contract\n"
 
 
 def local_proto(version: str) -> tuple[bytes, str]:
@@ -63,7 +64,7 @@ def test_generates_python_project_with_provenance(tmp_path: Path) -> None:
     assert manifest["languages"] == ["python"]
     assert manifest["python_package"] == "audit_headers"
     assert len(manifest["proto_sha256"]) == 64
-    assert not (tmp_path / ".audit-headers.openshell-middleware-init.lock").exists()
+    assert not (tmp_path / ".audit-headers.middleware-kit.lock").exists()
 
 
 def test_generates_rust_project_with_normalized_crate_name(tmp_path: Path) -> None:
@@ -87,6 +88,313 @@ def test_generates_rust_project_with_normalized_crate_name(tmp_path: Path) -> No
     manifest = json.loads((destination / "middleware-dev-manifest.json").read_text())
     assert manifest["languages"] == ["rust"]
     assert manifest["python_package"] is None
+
+
+def test_updates_python_generated_artifacts_and_preserves_user_code(tmp_path: Path) -> None:
+    destination = tmp_path / "audit-headers"
+    initialize_project(
+        name="audit-headers",
+        language="python",
+        requested_version="v0.0.86",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+    server_path = destination / "src/audit_headers/server.py"
+    server_path.write_text(server_path.read_text() + "\n# user policy\n")
+    old_binding = destination / "src/audit_headers/bindings/old_generated.py"
+    old_binding.write_text("old generated code\n")
+    project_inode = destination.stat().st_ino
+
+    def updated_proto(version: str) -> tuple[bytes, str]:
+        return UPDATED_PROTO, f"https://example.test/OpenShell/{version}/proto"
+
+    result = update_project(
+        project_dir=destination,
+        requested_version="1.2.3",
+        download_proto=updated_proto,
+        command_runner=no_op_runner,
+    )
+
+    assert result.destination == destination
+    assert result.language == "python"
+    assert result.openshell_version == "v1.2.3"
+    assert destination.stat().st_ino == project_inode
+    assert server_path.read_text().endswith("# user policy\n")
+    assert (destination / "proto/supervisor_middleware.proto").read_bytes() == UPDATED_PROTO
+    assert not old_binding.exists()
+    assert (destination / "src/audit_headers/bindings/__init__.py").is_file()
+    manifest = json.loads((destination / "middleware-dev-manifest.json").read_text())
+    assert manifest["openshell_version"] == "v1.2.3"
+    assert manifest["generator"]["name"] == "middleware-kit"
+    assert not (tmp_path / ".audit-headers.middleware-kit.lock").exists()
+    assert not list(tmp_path.glob(".audit-headers.middleware-kit.*"))
+
+
+@pytest.mark.parametrize(
+    "legacy_name",
+    ["middleware-project", "openshell-middleware-init"],
+)
+def test_updates_rust_project_created_by_legacy_tool(tmp_path: Path, legacy_name: str) -> None:
+    destination = tmp_path / "audit"
+    initialize_project(
+        name="audit",
+        language="rust",
+        requested_version="v0.0.86",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+    manifest_path = destination / "middleware-dev-manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["generator"]["name"] = legacy_name
+    manifest_path.write_text(json.dumps(manifest))
+
+    result = update_project(
+        project_dir=destination,
+        requested_version="v1.2.3",
+        download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
+        command_runner=no_op_runner,
+    )
+
+    assert result.language == "rust"
+    assert (destination / "proto/supervisor_middleware.proto").read_bytes() == UPDATED_PROTO
+    updated_manifest = json.loads(manifest_path.read_text())
+    assert updated_manifest["generator"]["name"] == "middleware-kit"
+
+
+def test_failed_update_keeps_original_project_unchanged(tmp_path: Path) -> None:
+    destination = tmp_path / "audit"
+    initialize_project(
+        name="audit",
+        language="rust",
+        requested_version="v0.0.86",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+    original_manifest = (destination / "middleware-dev-manifest.json").read_bytes()
+    original_proto = (destination / "proto/supervisor_middleware.proto").read_bytes()
+
+    def fail_runner(language: str, project: Path, package: str) -> None:
+        del language, project, package
+        raise InitializationError("validation failed")
+
+    with pytest.raises(InitializationError, match="validation failed"):
+        update_project(
+            project_dir=destination,
+            requested_version="v1.2.3",
+            download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
+            command_runner=fail_runner,
+        )
+
+    assert (destination / "middleware-dev-manifest.json").read_bytes() == original_manifest
+    assert (destination / "proto/supervisor_middleware.proto").read_bytes() == original_proto
+    assert not (tmp_path / ".audit.middleware-kit.lock").exists()
+    assert not list(tmp_path.glob(".audit.middleware-kit.*"))
+
+
+def test_publication_failure_rolls_back_exchanged_artifacts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    destination = tmp_path / "audit"
+    initialize_project(
+        name="audit",
+        language="rust",
+        requested_version="v0.0.86",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+    original_manifest = (destination / "middleware-dev-manifest.json").read_bytes()
+    original_proto = (destination / "proto/supervisor_middleware.proto").read_bytes()
+    original_exchange = generator._publish_exchange
+    calls = 0
+
+    def fail_second_exchange(source: Path, target: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise InitializationError("publication failed")
+        original_exchange(source, target)
+
+    monkeypatch.setattr(generator, "_publish_exchange", fail_second_exchange)
+
+    with pytest.raises(InitializationError, match="publication failed"):
+        update_project(
+            project_dir=destination,
+            requested_version="v1.2.3",
+            download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
+            command_runner=no_op_runner,
+        )
+
+    assert calls == 3
+    assert (destination / "middleware-dev-manifest.json").read_bytes() == original_manifest
+    assert (destination / "proto/supervisor_middleware.proto").read_bytes() == original_proto
+
+
+def test_failed_publication_rollback_preserves_recovery_artifacts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    destination = tmp_path / "audit"
+    initialize_project(
+        name="audit",
+        language="rust",
+        requested_version="v0.0.86",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+    original_exchange = generator._publish_exchange
+    calls = 0
+
+    def fail_publication_and_rollback(source: Path, target: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls >= 2:
+            raise InitializationError("exchange failed")
+        original_exchange(source, target)
+
+    monkeypatch.setattr(generator, "_publish_exchange", fail_publication_and_rollback)
+
+    with pytest.raises(generator.PublicationRollbackError, match="rollback both failed"):
+        update_project(
+            project_dir=destination,
+            requested_version="v1.2.3",
+            download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
+            command_runner=no_op_runner,
+        )
+
+    assert calls == 3
+    assert (tmp_path / ".audit.middleware-kit.lock").is_dir()
+    assert len(list(tmp_path.glob(".audit.middleware-kit.*"))) == 2
+
+
+def test_update_rejects_non_generated_project(tmp_path: Path) -> None:
+    destination = tmp_path / "not-generated"
+    destination.mkdir()
+
+    with pytest.raises(InitializationError, match="missing regular manifest"):
+        update_project(
+            project_dir=destination,
+            requested_version="v1.2.3",
+            download_proto=local_proto,
+            command_runner=no_op_runner,
+        )
+
+
+def test_update_rejects_symlink_and_missing_project_paths(tmp_path: Path) -> None:
+    missing = tmp_path / "missing"
+    symlink = tmp_path / "symlink"
+    symlink.symlink_to(missing, target_is_directory=True)
+
+    with pytest.raises(InitializationError, match="must not be a symlink"):
+        update_project(
+            project_dir=symlink,
+            download_proto=local_proto,
+            command_runner=no_op_runner,
+        )
+    with pytest.raises(InitializationError, match="existing directory"):
+        update_project(
+            project_dir=missing,
+            download_proto=local_proto,
+            command_runner=no_op_runner,
+        )
+
+
+@pytest.mark.parametrize(
+    ("manifest", "message"),
+    [
+        ("not json", "could not read"),
+        ("[]", "JSON object"),
+        ('{"generator": {"name": "other"}}', "was not created"),
+        (
+            '{"generator": {"name": "middleware-kit"}, "languages": ["python", "rust"]}',
+            "exactly one",
+        ),
+        (
+            '{"generator": {"name": "middleware-kit"}, '
+            '"languages": ["python"], "python_package": "Bad-Package"}',
+            "invalid or missing",
+        ),
+        (
+            '{"generator": {"name": "middleware-kit"}, '
+            '"languages": ["rust"], "python_package": "unexpected"}',
+            "must set python_package",
+        ),
+    ],
+)
+def test_update_rejects_invalid_manifest(tmp_path: Path, manifest: str, message: str) -> None:
+    destination = tmp_path / "project"
+    destination.mkdir()
+    (destination / "middleware-dev-manifest.json").write_text(manifest)
+
+    with pytest.raises(InitializationError, match=message):
+        update_project(
+            project_dir=destination,
+            download_proto=local_proto,
+            command_runner=no_op_runner,
+        )
+
+
+def test_update_requires_regular_generated_artifacts(tmp_path: Path) -> None:
+    destination = tmp_path / "project"
+    destination.mkdir()
+    (destination / "middleware-dev-manifest.json").write_text(
+        json.dumps(
+            {
+                "generator": {"name": "middleware-kit"},
+                "languages": ["rust"],
+                "python_package": None,
+            }
+        )
+    )
+
+    with pytest.raises(InitializationError, match="regular file"):
+        update_project(
+            project_dir=destination,
+            download_proto=local_proto,
+            command_runner=no_op_runner,
+        )
+
+
+def test_update_requires_python_bindings_directory(tmp_path: Path) -> None:
+    destination = tmp_path / "project"
+    (destination / "proto").mkdir(parents=True)
+    (destination / "proto/supervisor_middleware.proto").write_bytes(PROTO)
+    (destination / "uv.lock").write_text("test lock\n")
+    (destination / "middleware-dev-manifest.json").write_text(
+        json.dumps(
+            {
+                "generator": {"name": "middleware-kit"},
+                "languages": ["python"],
+                "python_package": "audit",
+            }
+        )
+    )
+
+    with pytest.raises(InitializationError, match="bindings must be"):
+        update_project(
+            project_dir=destination,
+            download_proto=local_proto,
+            command_runner=no_op_runner,
+        )
+
+
+def test_update_detects_replaced_project_before_publication(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    replacement = tmp_path / "replacement"
+    project.mkdir()
+    original = project.stat()
+    project.rename(replacement)
+    project.mkdir()
+
+    with pytest.raises(InitializationError, match="changed during update"):
+        generator._verify_project_identity(project, original.st_dev, original.st_ino)
+
+    project.rmdir()
+    with pytest.raises(InitializationError, match="changed during update"):
+        generator._verify_project_identity(project, original.st_dev, original.st_ino)
 
 
 def test_python_package_name_can_be_overridden(tmp_path: Path) -> None:
@@ -246,9 +554,9 @@ def test_refuses_a_dangling_destination_symlink(tmp_path: Path) -> None:
 
 def test_refuses_a_reserved_destination(tmp_path: Path) -> None:
     destination = tmp_path / "reserved"
-    (tmp_path / ".reserved.openshell-middleware-init.lock").mkdir()
+    (tmp_path / ".reserved.middleware-kit.lock").mkdir()
 
-    with pytest.raises(InitializationError, match="reserved by another initializer"):
+    with pytest.raises(InitializationError, match="reserved by another middleware-kit"):
         initialize_project(
             name="reserved",
             language="rust",
@@ -283,7 +591,7 @@ def test_concurrent_destination_is_not_replaced(
         )
 
     assert (destination / "owned-by-other-process").read_text() == "keep me\n"
-    assert not (tmp_path / ".contended.openshell-middleware-init.lock").exists()
+    assert not (tmp_path / ".contended.middleware-kit.lock").exists()
 
 
 def test_failure_cleans_staging_and_owned_reservation(tmp_path: Path) -> None:
@@ -304,8 +612,8 @@ def test_failure_cleans_staging_and_owned_reservation(tmp_path: Path) -> None:
         )
 
     assert not destination.exists()
-    assert not (tmp_path / ".failing.openshell-middleware-init.lock").exists()
-    assert not list(tmp_path.glob(".failing.openshell-middleware-init.*"))
+    assert not (tmp_path / ".failing.middleware-kit.lock").exists()
+    assert not list(tmp_path.glob(".failing.middleware-kit.*"))
 
 
 def test_rejects_an_unexpected_proto(tmp_path: Path) -> None:
@@ -433,6 +741,10 @@ def test_download_proto_translates_network_failure(monkeypatch: pytest.MonkeyPat
 
     with pytest.raises(InitializationError, match=r"could not download.*missing"):
         generator._download_proto("v1.2.3")
+
+
+def test_network_error_reason_handles_plain_os_error() -> None:
+    assert generator._network_error_reason(OSError("offline")) == "offline"
 
 
 def test_download_retries_transient_failures(monkeypatch: pytest.MonkeyPatch) -> None:
