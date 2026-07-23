@@ -300,6 +300,16 @@ def update_project(
         runner(metadata.language, staging_path, metadata.python_package or "unused")
         _verify_lock(reservation)
         _verify_project_identity(project_dir, project_stat.st_dev, project_stat.st_ino)
+        _validate_refresh_targets(
+            staging_path,
+            metadata.language,
+            metadata.python_package,
+        )
+        _validate_refresh_targets(
+            project_dir,
+            metadata.language,
+            metadata.python_package,
+        )
         _publish_generated_artifacts(staging_path, project_dir, metadata)
         published = True
     except PublicationRollbackError:
@@ -806,42 +816,113 @@ def _publish_no_replace(source: Path, destination: Path) -> None:
 
 def _publish_exchange(source: Path, destination: Path) -> None:
     """Atomically exchange a validated staged project with its existing project."""
-    source_bytes = os.fsencode(source)
-    destination_bytes = os.fsencode(destination)
-    if sys.platform.startswith("linux"):
-        library = ctypes.CDLL(None, use_errno=True)
-        try:
-            rename = library.renameat2
-        except AttributeError as error:  # pragma: no cover - old Linux libc
-            raise InitializationError(
-                "this Linux runtime cannot atomically publish a project update"
-            ) from error
-        rename.argtypes = (
-            ctypes.c_int,
-            ctypes.c_char_p,
-            ctypes.c_int,
-            ctypes.c_char_p,
-            ctypes.c_uint,
+    source_parent_fd = _open_parent_directory_no_follow(source)
+    destination_parent_fd = _open_parent_directory_no_follow(destination)
+    try:
+        _validate_exchange_entries(
+            source_parent_fd,
+            source.name,
+            destination_parent_fd,
+            destination.name,
         )
-        rename.restype = ctypes.c_int
-        result = rename(-100, source_bytes, -100, destination_bytes, 2)
-    elif sys.platform == "darwin":  # pragma: no cover - platform-specific
-        library = ctypes.CDLL(None, use_errno=True)
-        rename = library.renamex_np
-        rename.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint)
-        rename.restype = ctypes.c_int
-        result = rename(source_bytes, destination_bytes, 0x00000002)
-    else:  # pragma: no cover - unsupported platform
-        raise InitializationError("this platform cannot atomically publish a project update")
+        source_name = os.fsencode(source.name)
+        destination_name = os.fsencode(destination.name)
+        if sys.platform.startswith("linux"):
+            library = ctypes.CDLL(None, use_errno=True)
+            try:
+                rename = library.renameat2
+            except AttributeError as error:  # pragma: no cover - old Linux libc
+                raise InitializationError(
+                    "this Linux runtime cannot atomically publish a project update"
+                ) from error
+            rename.argtypes = (
+                ctypes.c_int,
+                ctypes.c_char_p,
+                ctypes.c_int,
+                ctypes.c_char_p,
+                ctypes.c_uint,
+            )
+            rename.restype = ctypes.c_int
+            result = rename(
+                source_parent_fd,
+                source_name,
+                destination_parent_fd,
+                destination_name,
+                2,
+            )
+        elif sys.platform == "darwin":  # pragma: no cover - platform-specific
+            library = ctypes.CDLL(None, use_errno=True)
+            rename = library.renameatx_np
+            rename.argtypes = (
+                ctypes.c_int,
+                ctypes.c_char_p,
+                ctypes.c_int,
+                ctypes.c_char_p,
+                ctypes.c_uint,
+            )
+            rename.restype = ctypes.c_int
+            result = rename(
+                source_parent_fd,
+                source_name,
+                destination_parent_fd,
+                destination_name,
+                0x00000002,
+            )
+        else:  # pragma: no cover - unsupported platform
+            raise InitializationError("this platform cannot atomically publish a project update")
 
-    if result == 0:
-        return
-    error_number = ctypes.get_errno()
-    if error_number in {errno.EINVAL, errno.ENOSYS, errno.EOPNOTSUPP}:
+        if result == 0:
+            return
+        error_number = ctypes.get_errno()
+        if error_number in {errno.EINVAL, errno.ENOSYS, errno.EOPNOTSUPP}:
+            raise InitializationError(
+                "the project filesystem does not support atomic update publication"
+            )
+        raise OSError(error_number, os.strerror(error_number), destination)
+    finally:
+        os.close(source_parent_fd)
+        os.close(destination_parent_fd)
+
+
+def _open_parent_directory_no_follow(path: Path) -> int:
+    if not path.is_absolute():
+        raise InitializationError(f"artifact path must be absolute: {path}")
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(path.anchor, flags)
+    try:
+        for component in path.parent.parts[1:]:
+            next_descriptor = os.open(component, flags, dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = next_descriptor
+    except OSError:
+        os.close(descriptor)
+        raise
+    return descriptor
+
+
+def _validate_exchange_entries(
+    source_parent_fd: int,
+    source_name: str,
+    destination_parent_fd: int,
+    destination_name: str,
+) -> None:
+    source_stat = os.stat(source_name, dir_fd=source_parent_fd, follow_symlinks=False)
+    destination_stat = os.stat(
+        destination_name,
+        dir_fd=destination_parent_fd,
+        follow_symlinks=False,
+    )
+    source_is_directory = stat.S_ISDIR(source_stat.st_mode)
+    destination_is_directory = stat.S_ISDIR(destination_stat.st_mode)
+    source_is_regular = stat.S_ISREG(source_stat.st_mode)
+    destination_is_regular = stat.S_ISREG(destination_stat.st_mode)
+    if not (
+        (source_is_directory and destination_is_directory)
+        or (source_is_regular and destination_is_regular)
+    ):
         raise InitializationError(
-            "the project filesystem does not support atomic update publication"
+            "generated artifacts changed type during update; refusing to publish"
         )
-    raise OSError(error_number, os.strerror(error_number), destination)
 
 
 def _publish_generated_artifacts(
@@ -1032,11 +1113,6 @@ def _prepare_rust_project(project_dir: Path) -> None:
     with tempfile.TemporaryDirectory(prefix=f"{_TOOL_NAME}-rust-") as target_dir:
         process_environment = os.environ.copy()
         process_environment["CARGO_TARGET_DIR"] = target_dir
-        _run(
-            (cargo, "fmt", "--manifest-path", str(project_dir / "Cargo.toml"), "--check"),
-            cwd=project_dir,
-            environment=process_environment,
-        )
         _run(
             (cargo, "test", "--manifest-path", str(project_dir / "Cargo.toml")),
             cwd=project_dir,

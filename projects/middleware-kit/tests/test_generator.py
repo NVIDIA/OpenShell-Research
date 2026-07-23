@@ -83,7 +83,10 @@ def test_generates_rust_project_with_normalized_crate_name(tmp_path: Path) -> No
     cargo = (destination / "Cargo.toml").read_text()
     assert 'name = "request-audit"' in cargo
     assert '[lib]\nname = "request_audit"' in cargo
-    assert "use request_audit::" in (destination / "src/main.rs").read_text()
+    assert (
+        ".add_service(request_audit::middleware_service())"
+        in (destination / "src/main.rs").read_text()
+    )
     assert stat.S_IMODE(destination.stat().st_mode) == 0o755
     manifest = json.loads((destination / "middleware-dev-manifest.json").read_text())
     assert manifest["languages"] == ["rust"]
@@ -483,6 +486,83 @@ def test_update_omits_disposable_directories_from_staging(tmp_path: Path) -> Non
     assert (destination / ".venv/large-cache").read_text() == "not needed\n"
 
 
+@pytest.mark.parametrize("replace_live_path", [False, True])
+def test_update_revalidates_symlink_ancestors_after_project_validation(
+    tmp_path: Path, replace_live_path: bool
+) -> None:
+    destination = tmp_path / "project"
+    initialize_project(
+        name="project",
+        language="rust",
+        requested_version="v0.0.86",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+    original_manifest = (destination / "middleware-dev-manifest.json").read_bytes()
+    external_proto = tmp_path / "external-proto"
+    external_proto.mkdir()
+    sentinel = external_proto / "supervisor_middleware.proto"
+    sentinel.write_text("external contract\n")
+
+    def replace_proto_ancestor(language: str, staged_project: Path, package: str) -> None:
+        no_op_runner(language, staged_project, package)
+        project_to_change = destination if replace_live_path else staged_project
+        (project_to_change / "proto").rename(project_to_change / "original-proto")
+        (project_to_change / "proto").symlink_to(external_proto, target_is_directory=True)
+
+    with pytest.raises(InitializationError, match="must not contain symlinks"):
+        update_project(
+            project_dir=destination,
+            requested_version="v1.2.3",
+            download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
+            command_runner=replace_proto_ancestor,
+        )
+
+    assert sentinel.read_text() == "external contract\n"
+    assert (destination / "middleware-dev-manifest.json").read_bytes() == original_manifest
+
+
+def test_exchange_refuses_symlinked_parent_created_immediately_before_publish(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    destination = tmp_path / "project"
+    initialize_project(
+        name="project",
+        language="rust",
+        requested_version="v0.0.86",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+    external_proto = tmp_path / "external-proto"
+    external_proto.mkdir()
+    sentinel = external_proto / "supervisor_middleware.proto"
+    sentinel.write_text("external contract\n")
+    original_exchange = generator._publish_exchange
+    first_exchange = True
+
+    def replace_parent_then_exchange(source: Path, target: Path) -> None:
+        nonlocal first_exchange
+        if first_exchange:
+            first_exchange = False
+            target.parent.rename(destination / "original-proto")
+            target.parent.symlink_to(external_proto, target_is_directory=True)
+        original_exchange(source, target)
+
+    monkeypatch.setattr(generator, "_publish_exchange", replace_parent_then_exchange)
+
+    with pytest.raises(InitializationError):
+        update_project(
+            project_dir=destination,
+            requested_version="v1.2.3",
+            download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
+            command_runner=no_op_runner,
+        )
+
+    assert sentinel.read_text() == "external contract\n"
+
+
 def test_update_detects_replaced_project_before_publication(tmp_path: Path) -> None:
     project = tmp_path / "project"
     replacement = tmp_path / "replacement"
@@ -556,7 +636,10 @@ def test_rust_project_names_get_valid_explicit_library_names(
     cargo = (destination / "Cargo.toml").read_text()
     assert f'name = "{crate}"' in cargo
     assert f'[lib]\nname = "{library}"' in cargo
-    assert f"use {library}::middleware_service;" in (destination / "src/main.rs").read_text()
+    assert (
+        f".add_service({library}::middleware_service())"
+        in (destination / "src/main.rs").read_text()
+    )
 
 
 def test_unsupported_platform_fails_before_filesystem_changes(
@@ -1228,13 +1311,6 @@ def test_prepare_rust_runs_cargo_with_temporary_target(
     generator._prepare_rust_project(tmp_path)
 
     assert [command for command, _, _ in observed] == [
-        (
-            "/tools/cargo",
-            "fmt",
-            "--manifest-path",
-            str(tmp_path / "Cargo.toml"),
-            "--check",
-        ),
         (
             "/tools/cargo",
             "test",

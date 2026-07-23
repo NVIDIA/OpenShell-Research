@@ -1,7 +1,6 @@
 use std::{env, error::Error, net::SocketAddr};
 
 use tonic::transport::Server;
-use __RUST_LIB_NAME__::middleware_service;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -12,7 +11,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     println!("serving __SERVICE_NAME__ on {address}");
     Server::builder()
-        .add_service(middleware_service())
+        .add_service(__RUST_LIB_NAME__::middleware_service())
         .serve(address)
         .await?;
     Ok(())
