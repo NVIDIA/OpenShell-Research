@@ -827,70 +827,100 @@ def _publish_exchange(source: Path, destination: Path) -> None:
         )
         source_name = os.fsencode(source.name)
         destination_name = os.fsencode(destination.name)
-        if sys.platform.startswith("linux"):
-            library = ctypes.CDLL(None, use_errno=True)
-            try:
-                rename = library.renameat2
-            except AttributeError as error:  # pragma: no cover - old Linux libc
-                raise InitializationError(
-                    "this Linux runtime cannot atomically publish a project update"
-                ) from error
-            rename.argtypes = (
-                ctypes.c_int,
-                ctypes.c_char_p,
-                ctypes.c_int,
-                ctypes.c_char_p,
-                ctypes.c_uint,
-            )
-            rename.restype = ctypes.c_int
-            result = rename(
-                source_parent_fd,
-                source_name,
-                destination_parent_fd,
-                destination_name,
-                2,
-            )
-        elif sys.platform == "darwin":  # pragma: no cover - platform-specific
-            library = ctypes.CDLL(None, use_errno=True)
-            rename = library.renameatx_np
-            rename.argtypes = (
-                ctypes.c_int,
-                ctypes.c_char_p,
-                ctypes.c_int,
-                ctypes.c_char_p,
-                ctypes.c_uint,
-            )
-            rename.restype = ctypes.c_int
-            result = rename(
-                source_parent_fd,
-                source_name,
-                destination_parent_fd,
-                destination_name,
-                0x00000002,
-            )
-        else:  # pragma: no cover - unsupported platform
-            raise InitializationError("this platform cannot atomically publish a project update")
-
-        if result == 0:
+        result = _exchange_at(
+            source_parent_fd,
+            source_name,
+            destination_parent_fd,
+            destination_name,
+        )
+        if result != 0:
+            _raise_exchange_error(destination)
+        source_attached = _directory_fd_matches_path(source.parent, source_parent_fd)
+        destination_attached = _directory_fd_matches_path(
+            destination.parent,
+            destination_parent_fd,
+        )
+        if source_attached and destination_attached:
             return
-        error_number = ctypes.get_errno()
-        if error_number in {errno.EINVAL, errno.ENOSYS, errno.EOPNOTSUPP}:
-            raise InitializationError(
-                "the project filesystem does not support atomic update publication"
+
+        reverse_result = _exchange_at(
+            source_parent_fd,
+            source_name,
+            destination_parent_fd,
+            destination_name,
+        )
+        if reverse_result != 0:
+            error_number = ctypes.get_errno()
+            raise PublicationRollbackError(
+                "an artifact parent changed during publication and the anchored exchange "
+                f"could not be reversed: {os.strerror(error_number)}"
             )
-        raise OSError(error_number, os.strerror(error_number), destination)
+        raise InitializationError(
+            "an artifact parent changed during publication; the exchange was reversed"
+        )
     finally:
         os.close(source_parent_fd)
         os.close(destination_parent_fd)
 
 
+def _exchange_at(
+    source_parent_fd: int,
+    source_name: bytes,
+    destination_parent_fd: int,
+    destination_name: bytes,
+) -> int:
+    if sys.platform.startswith("linux"):
+        library = ctypes.CDLL(None, use_errno=True)
+        try:
+            rename = library.renameat2
+        except AttributeError as error:  # pragma: no cover - old Linux libc
+            raise InitializationError(
+                "this Linux runtime cannot atomically publish a project update"
+            ) from error
+        exchange_flag = 2
+    elif sys.platform == "darwin":  # pragma: no cover - platform-specific
+        library = ctypes.CDLL(None, use_errno=True)
+        rename = library.renameatx_np
+        exchange_flag = 0x00000002
+    else:  # pragma: no cover - unsupported platform
+        raise InitializationError("this platform cannot atomically publish a project update")
+    rename.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    rename.restype = ctypes.c_int
+    return rename(
+        source_parent_fd,
+        source_name,
+        destination_parent_fd,
+        destination_name,
+        exchange_flag,
+    )
+
+
+def _raise_exchange_error(destination: Path) -> None:
+    error_number = ctypes.get_errno()
+    if error_number in {errno.EINVAL, errno.ENOSYS, errno.EOPNOTSUPP}:
+        raise InitializationError(
+            "the project filesystem does not support atomic update publication"
+        )
+    raise OSError(error_number, os.strerror(error_number), destination)
+
+
 def _open_parent_directory_no_follow(path: Path) -> int:
+    return _open_directory_no_follow(path.parent)
+
+
+def _open_directory_no_follow(path: Path) -> int:
     if not path.is_absolute():
         raise InitializationError(f"artifact path must be absolute: {path}")
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
     descriptor = os.open(path.anchor, flags)
     try:
-        for component in path.parent.parts[1:]:
+        for component in path.parts[1:]:
             next_descriptor = os.open(component, flags, dir_fd=descriptor)
             os.close(descriptor)
             descriptor = next_descriptor
@@ -898,6 +928,22 @@ def _open_parent_directory_no_follow(path: Path) -> int:
         os.close(descriptor)
         raise
     return descriptor
+
+
+def _directory_fd_matches_path(path: Path, expected_descriptor: int) -> bool:
+    try:
+        current_descriptor = _open_directory_no_follow(path)
+    except (InitializationError, OSError):
+        return False
+    try:
+        expected_stat = os.fstat(expected_descriptor)
+        current_stat = os.fstat(current_descriptor)
+        return (
+            expected_stat.st_dev == current_stat.st_dev
+            and expected_stat.st_ino == current_stat.st_ino
+        )
+    finally:
+        os.close(current_descriptor)
 
 
 def _validate_exchange_entries(

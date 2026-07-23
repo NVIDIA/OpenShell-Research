@@ -1162,6 +1162,36 @@ def test_publish_no_replace_moves_into_absent_destination(tmp_path: Path) -> Non
     assert (destination / "generated").read_text() == "ready\n"
 
 
+def test_exchange_reverses_when_open_parent_is_detached(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    source_parent = tmp_path / "staged/proto"
+    destination_parent = tmp_path / "project/proto"
+    source_parent.mkdir(parents=True)
+    destination_parent.mkdir(parents=True)
+    source = source_parent / "supervisor_middleware.proto"
+    destination = destination_parent / "supervisor_middleware.proto"
+    source.write_text("new contract\n")
+    destination.write_text("old contract\n")
+    moved_destination_parent = tmp_path / "project/moved-proto"
+    validate_exchange_entries = generator._validate_exchange_entries
+
+    def validate_then_detach(*arguments) -> None:
+        validate_exchange_entries(*arguments)
+        destination_parent.rename(moved_destination_parent)
+        destination_parent.mkdir()
+        (destination_parent / destination.name).write_text("concurrent replacement\n")
+
+    monkeypatch.setattr(generator, "_validate_exchange_entries", validate_then_detach)
+
+    with pytest.raises(InitializationError, match=r"parent changed.*exchange was reversed"):
+        generator._publish_exchange(source, destination)
+
+    assert source.read_text() == "new contract\n"
+    assert (moved_destination_parent / destination.name).read_text() == "old contract\n"
+    assert destination.read_text() == "concurrent replacement\n"
+
+
 class FakeRename:
     def __init__(self, error_number: int) -> None:
         self.error_number = error_number
