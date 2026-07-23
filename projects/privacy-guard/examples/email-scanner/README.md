@@ -35,15 +35,14 @@ directories, so the commands do not need a `--project` option.
 ## 1. Start Privacy Guard
 
 This development server uses unauthenticated plaintext gRPC and receives request
-bodies that may contain sensitive content. Restrict it to a trusted network and
-firewall the port. When possible, bind `--listen` to the specific host interface
-that Docker must reach instead of every interface.
+bodies that may contain sensitive content. It listens only on loopback because
+the gateway and Privacy Guard both run on the host.
 
 In terminal 1:
 
 ```bash
 uv run python middleware_server.py \
-  --listen 0.0.0.0:50051
+  --listen 127.0.0.1:50051
 ```
 
 Leave it running.
@@ -63,6 +62,10 @@ The first command stops the background service so the foreground gateway can use
 the standard port. The second command reuses the credentials and state created
 by the recommended macOS installation, but loads this example's `gateway.toml`.
 It should stay in the foreground; `Server listening` means it is ready.
+
+The gateway connects to Privacy Guard over host loopback. The
+`host.openshell.internal` hostname is only needed when a process inside a
+sandbox connects back to a service on the host.
 
 Middleware registration is static. After editing `gateway.toml`, stop this
 foreground process with `Ctrl-C` and run the second command again.

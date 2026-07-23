@@ -29,12 +29,13 @@ def test_example_configuration_and_walkthrough_are_aligned() -> None:
 
     assert "middleware: privacy-guard-regex-scanner" in policy
     assert 'name = "privacy-guard-regex-scanner"' in gateway
-    assert 'grpc_endpoint = "http://host.openshell.internal:50051"' in gateway
+    assert 'grpc_endpoint = "http://127.0.0.1:50051"' in gateway
     assert "action: redact" in policy
     assert "entity_types: [email, customer-id]" in policy
     assert "cd projects/privacy-guard/examples/regex-scanner" in readme
     assert "privacy-guard regex" in readme
     assert "--config regex-scanner.yaml" in readme
+    assert "--listen 127.0.0.1:50051" in readme
     assert 'openshell-gateway --config "$PWD/gateway.toml"' in readme
     assert "privacy-guard-regex-lab" in readme
     assert "uv run --project" not in readme

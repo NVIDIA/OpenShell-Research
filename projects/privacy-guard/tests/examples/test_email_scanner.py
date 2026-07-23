@@ -31,10 +31,11 @@ def test_example_configuration_targets_its_local_middleware() -> None:
 
     assert "middleware: privacy-guard-email-scanner" in policy
     assert 'name = "privacy-guard-email-scanner"' in gateway
-    assert 'grpc_endpoint = "http://host.openshell.internal:50051"' in gateway
+    assert 'grpc_endpoint = "http://127.0.0.1:50051"' in gateway
     assert "action: redact" in policy
     assert "entity_types: [email]" in policy
     assert "cd projects/privacy-guard/examples/email-scanner" in readme
     assert "uv run python middleware_server.py" in readme
+    assert "--listen 127.0.0.1:50051" in readme
     assert 'openshell-gateway --config "$PWD/gateway.toml"' in readme
     assert "uv run --project" not in readme
