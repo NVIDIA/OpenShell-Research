@@ -1,7 +1,7 @@
 use std::{env, error::Error, net::SocketAddr};
 
-use __RUST_LIB_NAME__::middleware_service;
 use tonic::transport::Server;
+use __RUST_LIB_NAME__::middleware_service;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {

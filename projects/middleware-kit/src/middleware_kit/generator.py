@@ -38,6 +38,18 @@ _PROJECT_NAME_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$")
 _NETWORK_ATTEMPTS = 4
 _TOOL_NAME = "middleware-kit"
 _LEGACY_TOOL_NAMES = {"middleware-project", "openshell-middleware-init"}
+_STAGING_IGNORED_ROOT_ENTRIES = {
+    ".coverage",
+    ".git",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".ty_cache",
+    ".venv",
+    "dist",
+    "htmlcov",
+    "target",
+}
 _RUST_KEYWORDS = {
     "abstract",
     "as",
@@ -274,7 +286,7 @@ def update_project(
     preserve_recovery = False
     try:
         _validate_existing_project(project_dir)
-        shutil.copytree(project_dir, reservation.staging_path, symlinks=True)
+        _copy_project_to_staging(project_dir, reservation.staging_path)
         staging_path = reservation.staging_path
         proto, proto_url = downloader(version)
         _validate_proto(proto, version)
@@ -523,6 +535,7 @@ def _validate_refresh_targets(project_dir: Path, language: str, python_package: 
     ]
     regular_files.append(project_dir / ("uv.lock" if language == "python" else "Cargo.lock"))
     for path in regular_files:
+        _reject_symlink_components(project_dir, path)
         if path.is_symlink() or not path.is_file():
             raise InitializationError(f"generated artifact must be a regular file: {path}")
 
@@ -530,10 +543,42 @@ def _validate_refresh_targets(project_dir: Path, language: str, python_package: 
         if python_package is None:  # pragma: no cover - checked by caller
             raise AssertionError("Python package is required")
         bindings_dir = project_dir / "src" / python_package / "bindings"
+        _reject_symlink_components(project_dir, bindings_dir)
         if bindings_dir.is_symlink() or not bindings_dir.is_dir():
             raise InitializationError(
                 f"generated bindings must be an existing directory: {bindings_dir}"
             )
+
+
+def _reject_symlink_components(project_dir: Path, target: Path) -> None:
+    relative_target = target.relative_to(project_dir)
+    current = project_dir
+    for component in relative_target.parts:
+        current /= component
+        try:
+            current_stat = current.lstat()
+        except FileNotFoundError:
+            return
+        if stat.S_ISLNK(current_stat.st_mode):
+            raise InitializationError(
+                f"generated artifact path must not contain symlinks: {current}"
+            )
+
+
+def _copy_project_to_staging(project_dir: Path, staging_path: Path) -> None:
+    def ignore_disposable_entries(directory: str, names: list[str]) -> set[str]:
+        ignored = {"__pycache__"} & set(names)
+        if Path(directory) == project_dir:
+            ignored.update(_STAGING_IGNORED_ROOT_ENTRIES & set(names))
+        return ignored
+
+    shutil.copytree(
+        project_dir,
+        staging_path,
+        symlinks=True,
+        ignore=ignore_disposable_entries,
+    )
+    staging_path.chmod(0o700)
 
 
 def _refresh_generated_artifacts(
@@ -544,6 +589,11 @@ def _refresh_generated_artifacts(
     proto_url: str,
     proto: bytes,
 ) -> None:
+    _validate_refresh_targets(
+        project_dir,
+        metadata.language,
+        metadata.python_package,
+    )
     proto_path = project_dir / "proto" / "supervisor_middleware.proto"
     proto_path.write_bytes(proto)
     if metadata.language == "python":
@@ -970,9 +1020,7 @@ def _prepare_python_project(project_dir: Path, package_name: str) -> None:
                 "run",
                 "--project",
                 str(project_dir),
-                "python",
-                "-c",
-                f"from {package_name}.server import Middleware",
+                "pytest",
             ),
             cwd=project_dir,
             environment=process_environment,
@@ -985,7 +1033,12 @@ def _prepare_rust_project(project_dir: Path) -> None:
         process_environment = os.environ.copy()
         process_environment["CARGO_TARGET_DIR"] = target_dir
         _run(
-            (cargo, "check", "--manifest-path", str(project_dir / "Cargo.toml")),
+            (cargo, "fmt", "--manifest-path", str(project_dir / "Cargo.toml"), "--check"),
+            cwd=project_dir,
+            environment=process_environment,
+        )
+        _run(
+            (cargo, "test", "--manifest-path", str(project_dir / "Cargo.toml")),
             cwd=project_dir,
             environment=process_environment,
         )

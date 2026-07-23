@@ -381,6 +381,108 @@ def test_update_requires_python_bindings_directory(tmp_path: Path) -> None:
         )
 
 
+def test_update_rejects_symlinked_proto_directory_without_touching_target(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "project"
+    initialize_project(
+        name="project",
+        language="rust",
+        requested_version="v0.0.86",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+    (destination / "proto").rename(destination / "original-proto")
+    external_proto = tmp_path / "external-proto"
+    external_proto.mkdir()
+    sentinel = external_proto / "supervisor_middleware.proto"
+    sentinel.write_text("external contract\n")
+    (destination / "proto").symlink_to(external_proto, target_is_directory=True)
+
+    with pytest.raises(InitializationError, match="must not contain symlinks"):
+        update_project(
+            project_dir=destination,
+            requested_version="v1.2.3",
+            download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
+            command_runner=no_op_runner,
+        )
+
+    assert sentinel.read_text() == "external contract\n"
+
+
+def test_update_rejects_symlinked_python_package_without_touching_target(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "project"
+    initialize_project(
+        name="project",
+        language="python",
+        requested_version="v0.0.86",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+    package_dir = destination / "src/project"
+    package_dir.rename(destination / "original-package")
+    external_package = tmp_path / "external-package"
+    bindings = external_package / "bindings"
+    bindings.mkdir(parents=True)
+    sentinel = bindings / "keep.txt"
+    sentinel.write_text("external binding\n")
+    package_dir.symlink_to(external_package, target_is_directory=True)
+
+    with pytest.raises(InitializationError, match="must not contain symlinks"):
+        update_project(
+            project_dir=destination,
+            requested_version="v1.2.3",
+            download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
+            command_runner=no_op_runner,
+        )
+
+    assert sentinel.read_text() == "external binding\n"
+
+
+def test_update_omits_disposable_directories_from_staging(tmp_path: Path) -> None:
+    destination = tmp_path / "project"
+    initialize_project(
+        name="project",
+        language="python",
+        requested_version="v0.0.86",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+    for directory_name in (".git", ".venv", ".pytest_cache", "dist", "target"):
+        disposable = destination / directory_name
+        disposable.mkdir()
+        (disposable / "large-cache").write_text("not needed\n")
+    nested_cache = destination / "src/project/__pycache__"
+    nested_cache.mkdir()
+    (nested_cache / "server.pyc").write_bytes(b"cache")
+    user_file = destination / "policy-notes.txt"
+    user_file.write_text("preserve me\n")
+
+    def inspect_staging(language: str, project: Path, package: str) -> None:
+        assert language == "python"
+        assert package == "project"
+        assert user_file.name in {path.name for path in project.iterdir()}
+        for directory_name in (".git", ".venv", ".pytest_cache", "dist", "target"):
+            assert not (project / directory_name).exists()
+        assert not (project / "src/project/__pycache__").exists()
+        no_op_runner(language, project, package)
+
+    update_project(
+        project_dir=destination,
+        requested_version="v1.2.3",
+        download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
+        command_runner=inspect_staging,
+    )
+
+    assert user_file.read_text() == "preserve me\n"
+    assert (destination / ".venv/large-cache").read_text() == "not needed\n"
+
+
 def test_update_detects_replaced_project_before_publication(tmp_path: Path) -> None:
     project = tmp_path / "project"
     replacement = tmp_path / "replacement"
@@ -1089,6 +1191,7 @@ def test_prepare_python_generates_relative_import_and_smoke_checks(
     assert generated.startswith("from . import supervisor_middleware_pb2")
     assert len(calls) == 3
     assert calls[1][1] == "sync"
+    assert calls[2][-1] == "pytest"
 
 
 def test_prepare_python_rejects_unexpected_generated_import(
@@ -1113,23 +1216,31 @@ def test_prepare_python_rejects_unexpected_generated_import(
 def test_prepare_rust_runs_cargo_with_temporary_target(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    observed: dict[str, object] = {}
+    observed: list[tuple[tuple[str, ...], Path, dict[str, str]]] = []
     monkeypatch.setattr(generator, "_require_command", lambda command: f"/tools/{command}")
 
     def fake_run(command, *, cwd, environment=None) -> None:
-        observed.update(command=command, cwd=cwd, environment=environment)
+        assert environment is not None
+        observed.append((tuple(command), cwd, environment))
 
     monkeypatch.setattr(generator, "_run", fake_run)
 
     generator._prepare_rust_project(tmp_path)
 
-    assert observed["command"] == (
-        "/tools/cargo",
-        "check",
-        "--manifest-path",
-        str(tmp_path / "Cargo.toml"),
-    )
-    assert observed["cwd"] == tmp_path
-    environment = observed["environment"]
-    assert isinstance(environment, dict)
-    assert "CARGO_TARGET_DIR" in environment
+    assert [command for command, _, _ in observed] == [
+        (
+            "/tools/cargo",
+            "fmt",
+            "--manifest-path",
+            str(tmp_path / "Cargo.toml"),
+            "--check",
+        ),
+        (
+            "/tools/cargo",
+            "test",
+            "--manifest-path",
+            str(tmp_path / "Cargo.toml"),
+        ),
+    ]
+    assert all(cwd == tmp_path for _, cwd, _ in observed)
+    assert all("CARGO_TARGET_DIR" in environment for _, _, environment in observed)
