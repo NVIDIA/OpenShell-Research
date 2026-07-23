@@ -1,4 +1,5 @@
 import logging
+import re
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -6,7 +7,7 @@ import grpc
 import pytest
 from google.protobuf import empty_pb2, message_factory
 from google.protobuf.message import Message
-from typer.testing import CliRunner
+from typer.testing import CliRunner, Result
 from typing_extensions import override
 
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
@@ -20,6 +21,8 @@ from privacy_guard.service.server import MiddlewareServer, app, create_server, s
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
 
 from ..scanner_helpers import DeterministicEmailScanner
+
+_ANSI_STYLE_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
 
 
 class LifecycleServerFake(grpc.aio.Server):
@@ -62,6 +65,10 @@ def _middleware() -> PrivacyGuardMiddleware:
         ScannerConfig(name="test_email", entity_types=frozenset({"email"}))
     )
     return PrivacyGuardMiddleware(RequestProcessor([scanner]))
+
+
+def _plain_output(result: Result) -> str:
+    return _ANSI_STYLE_PATTERN.sub("", result.output)
 
 
 def test_middleware_server_wires_scanner_and_has_a_default_listen_address(
@@ -240,26 +247,28 @@ def test_cli_always_requires_scanner_configuration() -> None:
     result = CliRunner().invoke(app, ["regex"])
 
     assert result.exit_code == 2
-    assert "--config" in result.output
+    assert "--config" in _plain_output(result)
 
 
 def test_cli_exposes_root_and_builtin_scanner_help() -> None:
     root_help = CliRunner().invoke(app, ["--help"])
 
     assert root_help.exit_code == 0
-    assert "privacy-guard" in root_help.output
-    assert "regex" in root_help.output
-    assert "--debug" in root_help.output
-    assert "--debug-log-content" in root_help.output
+    plain_root_help = _plain_output(root_help)
+    assert "privacy-guard" in plain_root_help
+    assert "regex" in plain_root_help
+    assert "--debug" in plain_root_help
+    assert "--debug-log-content" in plain_root_help
 
     scanner_help = CliRunner().invoke(app, ["regex", "--help"])
 
     assert scanner_help.exit_code == 0
-    assert "built-in RegexScanner" in scanner_help.output
-    assert "--config" in scanner_help.output
-    assert "--listen" in scanner_help.output
-    assert "--profile" in scanner_help.output
-    assert "--scanner-name" in scanner_help.output
+    plain_scanner_help = _plain_output(scanner_help)
+    assert "built-in RegexScanner" in plain_scanner_help
+    assert "--config" in plain_scanner_help
+    assert "--listen" in plain_scanner_help
+    assert "--profile" in plain_scanner_help
+    assert "--scanner-name" in plain_scanner_help
 
 
 def test_cli_enables_explicit_request_content_logging(
@@ -319,7 +328,7 @@ def test_cli_rejects_builtin_options_before_subcommand() -> None:
     )
 
     assert result.exit_code == 2
-    assert "--profile" in result.output
+    assert "--profile" in _plain_output(result)
 
 
 @pytest.mark.asyncio
