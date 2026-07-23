@@ -2,49 +2,49 @@
 
 Read `README.md` and `pyproject.toml` before changing this project.
 
-## Preserve these invariants
+## Safety rules
 
-- Keep creation non-destructive. Never merge into, follow, or replace an
-  existing output path, including a symlink.
-- Build and validate in a hidden sibling staging directory. Publish only after
-  all generation and validation steps succeed.
-- Preserve reservation ownership checks, atomic no-replace creation, and atomic
-  exchange publication for updates.
-- Support Linux and macOS explicitly. Do not weaken publication guarantees to
-  add another platform implicitly.
-- Keep every generated project version-matched: the OpenShell tag, downloaded
-  proto, bindings or build configuration, lockfile, and manifest must agree.
-- Do not install, replace, or configure the user's OpenShell installation.
+- `mkit create` must never write into, follow, or replace an existing output
+  path, including a symlink.
+- Build and check the project in a temporary directory next to its destination.
+  Move it into place only after every check passes.
+- Check lock ownership before writing. Creation must not overwrite an existing
+  path. Updates must swap each generated file atomically and undo earlier swaps
+  if one fails.
+- Support only Linux and macOS. Do not add a platform unless it can provide the
+  same file-safety guarantees.
+- Keep the OpenShell tag, downloaded proto, bindings or Rust build files,
+  lockfile, and manifest on the same version.
+- Never install, replace, or configure OpenShell.
 
-## Use the project toolchain
+## Dependencies
 
-- Use `uv` for this Python project. Treat `pyproject.toml` and `uv.lock` as the
-  dependency sources of truth.
+- Use `uv`. `pyproject.toml` and `uv.lock` define the dependencies.
 - Do not add `requirements.txt` or another dependency export unless a documented
-  non-uv consumer requires it.
-- Use `uv add` or `uv remove` for dependency changes; do not hand-edit the lock.
+  tool needs one.
+- Use `uv add` or `uv remove` to change dependencies. Do not edit `uv.lock` by
+  hand.
 
-## Change templates carefully
+## Templates
 
-- Keep templates under `src/middleware_kit/templates/` runnable as
-  standalone projects.
-- Use `__UPPER_SNAKE_CASE__` for template markers. Add every marker to
-  `TemplateContext.replacements` and cover it with a rendering test.
-- Treat generated Python protobuf and gRPC modules as generator-owned. Do not
-  format, type-check, or hand-edit them.
-- When changing a template, generate the affected language project in isolated
-  scratch storage and run its documented checks when practical.
+- Templates in `src/middleware_kit/templates/` must produce working standalone
+  projects.
+- Write template markers as `__UPPER_SNAKE_CASE__`. Add each marker to
+  `TemplateContext.replacements` and test its rendered value.
+- Do not format, type-check, or edit generated Python protobuf and gRPC files.
+- After changing a template, generate a project in a temporary directory and
+  run its documented checks when practical.
 
-## Test behavior, not implementation details
+## Tests
 
-- Keep project-tool unit tests hermetic. Inject protocol downloads and project
-  preparation instead of contacting GitHub or invoking uv or Cargo.
-- Add regression tests for changes to output safety, failure cleanup, naming,
-  manifests, network behavior, or rendered files.
-- Use isolated temporary paths for end-to-end generation. Never generate over an
-  existing directory.
+- Unit tests must not contact GitHub or run `uv` or Cargo in generated projects.
+  Pass test doubles for downloads and command execution.
+- Add regression tests when changing file safety, failure cleanup, names,
+  manifests, network handling, or generated files.
+- Run end-to-end generation in a new temporary directory. Never generate over
+  an existing directory.
 
-## Validate every change
+## Checks
 
 Run these commands from this directory:
 

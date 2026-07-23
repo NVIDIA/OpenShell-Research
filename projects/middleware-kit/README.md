@@ -1,11 +1,11 @@
 # OpenShell Middleware Kit
 
-`middleware-kit` creates and updates runnable Python or Rust OpenShell
-supervisor middleware services. A new project implements the complete gRPC
-service as a pass-through, pins its protocol contract to one OpenShell release,
-and includes tests, dependency locks, and registration guidance.
+`middleware-kit` creates and updates Python or Rust services for OpenShell
+supervisor middleware. Each new project starts as a working pass-through gRPC
+service. It includes the protocol file for one OpenShell release, tests,
+dependency locks, and instructions for registering the service.
 
-The project tool does not install or replace OpenShell.
+The CLI does not install or change OpenShell.
 
 ## Requirements
 
@@ -16,7 +16,7 @@ The project tool does not install or replace OpenShell.
 
 ## Install the CLI
 
-Install the command in an isolated tool environment from GitHub:
+Install `mkit` from GitHub with `uv`:
 
 ```sh
 uv tool install \
@@ -30,10 +30,9 @@ instead:
 uv tool install /path/to/OpenShell-Research/projects/middleware-kit
 ```
 
-Both forms make `mkit` available outside the source tree
-without running `uv sync` in this project.
+Both commands install `mkit` for use outside this repository.
 
-Contributors working on the CLI should use the locked project environment:
+To work on the CLI itself, use the locked project environment:
 
 ```sh
 uv sync --locked
@@ -68,38 +67,36 @@ cargo test --locked
 cargo run --locked -- 127.0.0.1:50051
 ```
 
-The output path must not already exist. Use a pinned OpenShell tag for
-reproducible projects; `--openshell-version latest` is available for
-experimentation.
+The output path must not exist. Pin an OpenShell tag when you need repeatable
+builds. Use `--openshell-version latest` when you want the newest release.
 
-Run `mkit --help` for all options. Python package names
-default to a normalized project name and can be changed with `--package-name`.
+Run `mkit --help` for all options. By default, `mkit` derives the Python package
+name from the project name. Use `--package-name` to set it yourself.
 
 ## Update a project
 
-From a generated project, refresh to the latest OpenShell release:
+Run this inside a generated project to use the latest OpenShell release:
 
 ```sh
 mkit update
 ```
 
-To select a release or update a project from another directory:
+To choose a release or update a project in another directory:
 
 ```sh
 mkit update /path/to/audit-headers \
   --openshell-version v0.0.90
 ```
 
-The update command reads `middleware-dev-manifest.json` to discover the
-project language and Python package. It downloads the selected
-`supervisor_middleware.proto`, regenerates Python protobuf and gRPC bindings
-when applicable, refreshes `uv.lock` or `Cargo.lock`, and records the new
-version and protocol checksum in the manifest. The update command accepts only
-manifests that identify `middleware-kit` as their generator.
+`mkit update` reads `middleware-dev-manifest.json` to find the project language
+and Python package. It downloads the selected `supervisor_middleware.proto`,
+regenerates Python protobuf and gRPC bindings when needed, updates `uv.lock` or
+`Cargo.lock`, and writes the version and protocol checksum to the manifest.
+The manifest must name `middleware-kit` as its generator.
 
 ## What you get
 
-Each generated project contains:
+Each project contains:
 
 - a pass-through implementation of `Describe`, `ValidateConfig`, and
   `EvaluateHttpRequest`;
@@ -108,40 +105,45 @@ Each generated project contains:
 - tests and lint/type-check configuration;
 - `uv.lock` or `Cargo.lock`; and
 - `middleware-dev-manifest.json` with the release, source URL, and protocol
-  SHA-256.
+  checksum.
 
 Start by implementing policy behavior in the generated `validate_config` and
 `evaluate_http_request` functions. The generated README explains how to run the
 service and register it with OpenShell.
 
-## Safety and failure behavior
+## How `mkit` protects your files
 
-Creation is non-destructive. The project tool validates a hidden sibling
-staging directory, then publishes it atomically. It refuses an existing output,
-including a symlink. Updates copy the complete existing project into a hidden
-sibling staging directory, change only generator-owned protocol artifacts
-there, validate the staged project, then atomically exchange those artifacts
-in place. User implementation files and the project directory itself are
-preserved. If publication fails, completed exchanges are rolled back in reverse
-order. Both operations use a per-project reservation to prevent concurrent
-writers; a normal failure removes the tool's own staging and reservation
-without leaving partial changes.
+`mkit create` builds and checks the project in a temporary directory next to
+the output path. It moves the finished project into place only after every
+check passes. If the output path already exists, including as a symlink, the
+command stops without changing it.
 
-If the process is killed, it may leave
-`.<output>.middleware-kit.lock` and a hidden staging directory. Before
-removing either one:
+`mkit update` works on a temporary copy of the project. It changes only the
+protocol, generated bindings or Rust build files, lockfile, and manifest. It
+runs the project checks before replacing those files. Your implementation files
+stay unchanged. If a file replacement fails, `mkit` restores the files it
+already replaced.
 
-1. Read `metadata.json` in the reservation.
-2. On the recorded host, confirm that the recorded PID is no longer the same
-   project tool process. For a create operation, confirm that the final output
-   does not exist. For an update, do not remove the final project.
-3. Inspect and remove only the recorded staging directory.
-4. Remove `owner` and `metadata.json`, then remove the empty reservation with
-   `rmdir`. Stop if it contains anything unexpected.
+A lock prevents two `mkit` processes from changing the same path at once.
+Normal failures remove the lock and temporary files. If an update and its
+rollback both fail, `mkit` keeps the recovery files and prints their locations.
+
+If the process is killed, it may leave a `.<output>.middleware-kit.lock`
+directory and a temporary project directory. Clean them up as follows:
+
+1. Open `metadata.json` in the lock directory.
+2. On the host listed in that file, check that the listed PID is no longer an
+   `mkit` process.
+3. For `create`, also check that the requested output path does not exist.
+   Never remove the project directory after an interrupted `update`.
+4. Inspect the temporary directory listed in `metadata.json`, then remove only
+   that directory.
+5. Remove `owner` and `metadata.json`. Use `rmdir` to remove the empty lock
+   directory. Stop if the lock directory contains any other files.
 
 ## Develop the CLI
 
-Run the complete local gate from this directory:
+Run these checks from this directory:
 
 ```sh
 uv run ruff format --check .
@@ -151,5 +153,5 @@ uv run pytest
 uv build
 ```
 
-Unit tests are hermetic: they use local protocol fixtures and do not contact
-GitHub or invoke uv or Cargo for generated projects.
+Unit tests use local protocol fixtures. They do not contact GitHub or run `uv`
+or Cargo inside generated projects.
