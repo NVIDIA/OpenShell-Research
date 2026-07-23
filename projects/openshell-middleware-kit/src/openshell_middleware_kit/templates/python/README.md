@@ -65,7 +65,7 @@ for the policy syntax supported by your pinned OpenShell release.
 Commit these files. Refresh all version-matched artifacts together with:
 
 ```sh
-mkit update --openshell-version latest
+omkit update --openshell-version latest
 ```
 
 Use a release tag instead of `latest` for a reproducible update.

@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from middleware_kit import generator
-from middleware_kit.generator import ProjectError, create_project, update_project
+from openshell_middleware_kit import generator
+from openshell_middleware_kit.generator import ProjectError, create_project, update_project
 
 PROTO = b"""syntax = "proto3";
 package openshell.middleware.v1;
@@ -64,7 +64,7 @@ def test_generates_python_project_with_provenance(tmp_path: Path) -> None:
     assert manifest["languages"] == ["python"]
     assert manifest["python_package"] == "audit_headers"
     assert len(manifest["proto_sha256"]) == 64
-    assert not (tmp_path / ".audit-headers.middleware-kit.lock").exists()
+    assert not (tmp_path / ".audit-headers.openshell-middleware-kit.lock").exists()
 
 
 def test_generates_rust_project_with_normalized_crate_name(tmp_path: Path) -> None:
@@ -129,9 +129,9 @@ def test_updates_python_generated_artifacts_and_preserves_user_code(tmp_path: Pa
     assert (destination / "src/audit_headers/bindings/__init__.py").is_file()
     manifest = json.loads((destination / "middleware-dev-manifest.json").read_text())
     assert manifest["openshell_version"] == "v1.2.3"
-    assert manifest["generator"]["name"] == "middleware-kit"
-    assert not (tmp_path / ".audit-headers.middleware-kit.lock").exists()
-    assert not list(tmp_path.glob(".audit-headers.middleware-kit.*"))
+    assert manifest["generator"]["name"] == "openshell-middleware-kit"
+    assert not (tmp_path / ".audit-headers.openshell-middleware-kit.lock").exists()
+    assert not list(tmp_path.glob(".audit-headers.openshell-middleware-kit.*"))
 
 
 def test_failed_update_keeps_original_project_unchanged(tmp_path: Path) -> None:
@@ -161,8 +161,8 @@ def test_failed_update_keeps_original_project_unchanged(tmp_path: Path) -> None:
 
     assert (destination / "middleware-dev-manifest.json").read_bytes() == original_manifest
     assert (destination / "proto/supervisor_middleware.proto").read_bytes() == original_proto
-    assert not (tmp_path / ".audit.middleware-kit.lock").exists()
-    assert not list(tmp_path.glob(".audit.middleware-kit.*"))
+    assert not (tmp_path / ".audit.openshell-middleware-kit.lock").exists()
+    assert not list(tmp_path.glob(".audit.openshell-middleware-kit.*"))
 
 
 def test_publication_failure_rolls_back_exchanged_artifacts(
@@ -237,8 +237,8 @@ def test_failed_publication_rollback_preserves_recovery_artifacts(
         )
 
     assert calls == 3
-    assert (tmp_path / ".audit.middleware-kit.lock").is_dir()
-    assert len(list(tmp_path.glob(".audit.middleware-kit.*"))) == 2
+    assert (tmp_path / ".audit.openshell-middleware-kit.lock").is_dir()
+    assert len(list(tmp_path.glob(".audit.openshell-middleware-kit.*"))) == 2
 
 
 def test_update_rejects_non_generated_project(tmp_path: Path) -> None:
@@ -278,18 +278,18 @@ def test_update_rejects_symlink_and_missing_project_paths(tmp_path: Path) -> Non
     [
         ("not json", "could not read"),
         ("[]", "JSON object"),
-        ('{"generator": {"name": "other"}}', "generator must be middleware-kit"),
+        ('{"generator": {"name": "other"}}', "generator must be openshell-middleware-kit"),
         (
-            '{"generator": {"name": "middleware-kit"}, "languages": ["python", "rust"]}',
+            '{"generator": {"name": "openshell-middleware-kit"}, "languages": ["python", "rust"]}',
             "exactly one",
         ),
         (
-            '{"generator": {"name": "middleware-kit"}, '
+            '{"generator": {"name": "openshell-middleware-kit"}, '
             '"languages": ["python"], "python_package": "Bad-Package"}',
             "invalid or missing",
         ),
         (
-            '{"generator": {"name": "middleware-kit"}, '
+            '{"generator": {"name": "openshell-middleware-kit"}, '
             '"languages": ["rust"], "python_package": "unexpected"}',
             "must set python_package",
         ),
@@ -314,7 +314,7 @@ def test_update_requires_regular_generated_artifacts(tmp_path: Path) -> None:
     (destination / "middleware-dev-manifest.json").write_text(
         json.dumps(
             {
-                "generator": {"name": "middleware-kit"},
+                "generator": {"name": "openshell-middleware-kit"},
                 "languages": ["rust"],
                 "python_package": None,
             }
@@ -337,7 +337,7 @@ def test_update_requires_python_bindings_directory(tmp_path: Path) -> None:
     (destination / "middleware-dev-manifest.json").write_text(
         json.dumps(
             {
-                "generator": {"name": "middleware-kit"},
+                "generator": {"name": "openshell-middleware-kit"},
                 "languages": ["python"],
                 "python_package": "audit",
             }
@@ -707,9 +707,9 @@ def test_refuses_a_dangling_destination_symlink(tmp_path: Path) -> None:
 
 def test_refuses_a_reserved_destination(tmp_path: Path) -> None:
     destination = tmp_path / "reserved"
-    (tmp_path / ".reserved.middleware-kit.lock").mkdir()
+    (tmp_path / ".reserved.openshell-middleware-kit.lock").mkdir()
 
-    with pytest.raises(ProjectError, match="reserved by another middleware-kit"):
+    with pytest.raises(ProjectError, match="reserved by another openshell-middleware-kit"):
         create_project(
             name="reserved",
             language="rust",
@@ -744,7 +744,7 @@ def test_concurrent_destination_is_not_replaced(
         )
 
     assert (destination / "owned-by-other-process").read_text() == "keep me\n"
-    assert not (tmp_path / ".contended.middleware-kit.lock").exists()
+    assert not (tmp_path / ".contended.openshell-middleware-kit.lock").exists()
 
 
 def test_failure_cleans_staging_and_owned_reservation(tmp_path: Path) -> None:
@@ -765,8 +765,8 @@ def test_failure_cleans_staging_and_owned_reservation(tmp_path: Path) -> None:
         )
 
     assert not destination.exists()
-    assert not (tmp_path / ".failing.middleware-kit.lock").exists()
-    assert not list(tmp_path.glob(".failing.middleware-kit.*"))
+    assert not (tmp_path / ".failing.openshell-middleware-kit.lock").exists()
+    assert not list(tmp_path.glob(".failing.openshell-middleware-kit.*"))
 
 
 def test_rejects_an_unexpected_proto(tmp_path: Path) -> None:
