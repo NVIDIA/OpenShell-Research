@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 import math
+import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from string import Formatter
@@ -64,6 +66,7 @@ class RequestProcessor:
         format_handlers: Mapping[str, FormatHandler] = DEFAULT_FORMAT_HANDLERS,
         *,
         scan_timeout_seconds: float = DEFAULT_SCAN_TIMEOUT_SECONDS,
+        log_request_content: bool = False,
     ) -> None:
         if (
             isinstance(scan_timeout_seconds, bool)
@@ -89,6 +92,7 @@ class RequestProcessor:
         self._scanners: tuple[Scanner[ScannerConfig], ...] = scanner_tuple
         self._supported_entities = frozenset(supported_entities)
         self._scan_timeout_seconds = float(scan_timeout_seconds)
+        self._log_request_content = log_request_content
         self._format_handlers: dict[str, FormatHandler] = {}
         for format_name, handler in format_handlers.items():
             if not isinstance(handler, FormatHandler):
@@ -102,17 +106,69 @@ class RequestProcessor:
         self._validate_entity_filter(policy_config.on_finding)
 
     def process(self, request: InterceptedRequest) -> ProcessingResult:
+        if self._log_request_content:
+            _LOGGER.debug(
+                "privacy_guard_request_content request_id=%s stage=received body=%r",
+                request.request_id,
+                request.raw_body,
+            )
+        _LOGGER.debug(
+            "privacy_guard_processing_started request_id=%s body_bytes=%d",
+            request.request_id,
+            len(request.raw_body),
+        )
         policy = request.policy_config
         action = policy.on_finding
         handler = self._select_handler(policy.body_format)
         self._validate_entity_filter(action)
         if request.raw_body == b"":
+            _LOGGER.debug(
+                "privacy_guard_processing_bodyless request_id=%s",
+                request.request_id,
+            )
+            if self._log_request_content:
+                _LOGGER.debug(
+                    "privacy_guard_request_content request_id=%s "
+                    "stage=forwarded body=%r",
+                    request.request_id,
+                    request.raw_body,
+                )
             return ProcessingResult(decision=ProcessingDecision.ALLOW)
 
+        phase_started = time.monotonic()
+        _LOGGER.debug(
+            "privacy_guard_processing_phase_started request_id=%s phase=normalize",
+            request.request_id,
+        )
         request_body = _normalize_request_body(handler, request)
         verified_body = _validate_normalized_body(request_body, request.raw_body)
+        scanned_characters = sum(
+            len(text_block.text) for text_block in verified_body.text_blocks
+        )
+        _LOGGER.debug(
+            "privacy_guard_processing_phase_completed request_id=%s "
+            "phase=normalize duration_ms=%.3f text_block_count=%d "
+            "scanned_characters=%d",
+            request.request_id,
+            (time.monotonic() - phase_started) * 1000,
+            len(verified_body.text_blocks),
+            scanned_characters,
+        )
         budget = ScanBudget.from_timeout(self._scan_timeout_seconds)
+        phase_started = time.monotonic()
+        _LOGGER.debug(
+            "privacy_guard_processing_phase_started request_id=%s phase=scan",
+            request.request_id,
+        )
         scan_result = self._scan_text_blocks(verified_body.text_blocks, action, budget)
+        _LOGGER.debug(
+            "privacy_guard_processing_phase_completed request_id=%s phase=scan "
+            "duration_ms=%.3f finding_count=%d limit_exceeded=%s",
+            request.request_id,
+            (time.monotonic() - phase_started) * 1000,
+            len(scan_result.findings),
+            scan_result.limit_exceeded,
+        )
         if scan_result.limit_exceeded:
             return ProcessingResult(
                 decision=ProcessingDecision.DENY, reason_code=LIMIT_REASON_CODE
@@ -155,10 +211,29 @@ class RequestProcessor:
                     replacement, projected_size = redaction
                     redacted_text_bytes += projected_size
                     replacements[block.path] = replacement
+        phase_started = time.monotonic()
+        _LOGGER.debug(
+            "privacy_guard_processing_phase_started request_id=%s phase=reconstruct",
+            request.request_id,
+        )
         reconstructed = _reconstruct_body(handler, verified_body.source, replacements)
+        _LOGGER.debug(
+            "privacy_guard_processing_phase_completed request_id=%s "
+            "phase=reconstruct duration_ms=%.3f output_bytes=%d transformed=%s",
+            request.request_id,
+            (time.monotonic() - phase_started) * 1000,
+            len(reconstructed),
+            reconstructed != request.raw_body,
+        )
         if len(reconstructed) > MAX_BODY_BYTES:
             return ProcessingResult(
                 decision=ProcessingDecision.DENY, reason_code=LIMIT_REASON_CODE
+            )
+        if self._log_request_content:
+            _LOGGER.debug(
+                "privacy_guard_request_content request_id=%s stage=forwarded body=%r",
+                request.request_id,
+                reconstructed,
             )
         return ProcessingResult(
             decision=ProcessingDecision.ALLOW,
@@ -437,3 +512,6 @@ def _finding_pattern_name(finding: Finding) -> str:
     if finding.metadata is None:
         return ""
     return finding.metadata.get(PATTERN_NAME_METADATA_KEY, "")
+
+
+_LOGGER = logging.getLogger(__name__)

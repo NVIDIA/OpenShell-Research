@@ -1,3 +1,4 @@
+import logging
 import math
 from collections.abc import Mapping
 
@@ -164,6 +165,56 @@ def test_scanner_visits_each_text_block_and_reconstructs_once() -> None:
     assert handler.normalize_calls == 1
     assert handler.reconstruct_calls == 1
     assert handler.replacements == {}
+
+
+def test_debug_log_reports_safe_processing_phase_metrics(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    sentinel = "sensitive@example.com"
+    scanner = RecordingScanner(
+        {sentinel: (_finding(0, len(sentinel), entity="email"),)}
+    )
+    handler = RecordingHandler(
+        (TextBlock(path="sensitive-path-8472", text=sentinel),),
+        reconstructed=b"[email]",
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="privacy_guard.processor"):
+        _processor(scanner, handler).process(_request(raw_body=sentinel.encode()))
+
+    assert "phase=normalize" in caplog.text
+    assert "phase=scan" in caplog.text
+    assert "phase=reconstruct" in caplog.text
+    assert f"body_bytes={len(sentinel.encode())}" in caplog.text
+    assert "text_block_count=1" in caplog.text
+    assert f"scanned_characters={len(sentinel)}" in caplog.text
+    assert "finding_count=1" in caplog.text
+    assert sentinel not in caplog.text
+    assert "8472" not in caplog.text
+
+
+def test_request_content_logging_reports_received_and_forwarded_bodies(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    sentinel = "sensitive@example.com"
+    scanner = RecordingScanner(
+        {sentinel: (_finding(0, len(sentinel), entity="email"),)}
+    )
+    handler = RecordingHandler(
+        (TextBlock(path="email", text=sentinel),),
+        reconstructed=b"[email]",
+    )
+    processor = RequestProcessor(
+        [scanner],
+        {handler.format_name: handler},
+        log_request_content=True,
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="privacy_guard.processor"):
+        processor.process(_request(raw_body=sentinel.encode()))
+
+    assert f"stage=received body={sentinel.encode()!r}" in caplog.text
+    assert "stage=forwarded body=b'[email]'" in caplog.text
 
 
 def test_empty_scanner_sequence_is_rejected_at_construction() -> None:

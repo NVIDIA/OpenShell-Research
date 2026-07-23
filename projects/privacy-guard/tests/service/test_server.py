@@ -249,6 +249,8 @@ def test_cli_exposes_root_and_builtin_scanner_help() -> None:
     assert root_help.exit_code == 0
     assert "privacy-guard" in root_help.output
     assert "regex" in root_help.output
+    assert "--debug" in root_help.output
+    assert "--debug-log-content" in root_help.output
 
     scanner_help = CliRunner().invoke(app, ["regex", "--help"])
 
@@ -258,6 +260,52 @@ def test_cli_exposes_root_and_builtin_scanner_help() -> None:
     assert "--listen" in scanner_help.output
     assert "--profile" in scanner_help.output
     assert "--scanner-name" in scanner_help.output
+
+
+def test_cli_enables_explicit_request_content_logging(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    processor_options: list[bool] = []
+    scanner = DeterministicEmailScanner(
+        ScannerConfig(name="regex", entity_types=frozenset({"email"}))
+    )
+    real_request_processor = server_module.RequestProcessor
+
+    def create_processor(
+        scanners: Sequence[DeterministicEmailScanner],
+        *,
+        log_request_content: bool = False,
+    ) -> RequestProcessor:
+        processor_options.append(log_request_content)
+        return real_request_processor(
+            scanners,
+            log_request_content=log_request_content,
+        )
+
+    monkeypatch.setattr(
+        server_module.RegexScanner,
+        "from_yaml",
+        lambda *args, **kwargs: scanner,
+    )
+    monkeypatch.setattr(server_module, "RequestProcessor", create_processor)
+    monkeypatch.setattr(MiddlewareServer, "serve", lambda self, listen: None)
+
+    with caplog.at_level(logging.WARNING, logger="privacy_guard.service.server"):
+        result = CliRunner().invoke(
+            app,
+            [
+                "--debug-log-content",
+                "regex",
+                "--config",
+                "scanner-config.yaml",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert processor_options == [True]
+    assert "privacy_guard_request_content_logging_enabled" in caplog.text
+    assert "complete_request_bodies_may_contain_secrets" in caplog.text
 
 
 def test_cli_rejects_builtin_options_before_subcommand() -> None:

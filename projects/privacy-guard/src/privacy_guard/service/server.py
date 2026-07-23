@@ -33,8 +33,18 @@ app = typer.Typer(
 class MiddlewareServer:
     """High-level server that wires a scanner into the Privacy Guard service."""
 
-    def __init__(self, *, scanner: Scanner[ScannerConfig]) -> None:
-        self._servicer = PrivacyGuardMiddleware(RequestProcessor([scanner]))
+    def __init__(
+        self,
+        *,
+        scanner: Scanner[ScannerConfig],
+        log_request_content: bool = False,
+    ) -> None:
+        self._servicer = PrivacyGuardMiddleware(
+            RequestProcessor(
+                [scanner],
+                log_request_content=log_request_content,
+            )
+        )
 
     def serve(self, listen: str = "127.0.0.1:50051") -> None:
         """Serve until termination using a managed synchronous entry point."""
@@ -76,16 +86,45 @@ async def serve(
 
 
 @app.callback()
-def main() -> None:
+def main(
+    context: typer.Context,
+    debug: Annotated[
+        bool,
+        typer.Option(
+            "--debug",
+            help="Log content-safe request processing and phase timings.",
+        ),
+    ] = False,
+    debug_log_content: Annotated[
+        bool,
+        typer.Option(
+            "--debug-log-content",
+            help=(
+                "DANGEROUS: log complete request bodies before and after "
+                "Privacy Guard processing."
+            ),
+        ),
+    ] = False,
+) -> None:
     """Select one of Privacy Guard's built-in scanners."""
     logging.basicConfig(
         level=logging.INFO,
-        format="%(levelname)s %(name)s: %(message)s",
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    logging.getLogger("privacy_guard").setLevel(
+        logging.DEBUG if debug or debug_log_content else logging.INFO
+    )
+    context.obj = debug_log_content
+    if debug_log_content:
+        _LOGGER.warning(
+            "privacy_guard_request_content_logging_enabled "
+            "complete_request_bodies_may_contain_secrets"
+        )
 
 
 @app.command("regex")
 def run_regex(
+    context: typer.Context,
     config: Annotated[
         Path,
         typer.Option(help="Path to the RegexScanner configuration."),
@@ -115,7 +154,10 @@ def run_regex(
             scanner.scanner_name,
             listen,
         )
-        MiddlewareServer(scanner=scanner).serve(listen)
+        MiddlewareServer(
+            scanner=scanner,
+            log_request_content=context.obj is True,
+        ).serve(listen)
     except PrivacyGuardError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(code=1) from None

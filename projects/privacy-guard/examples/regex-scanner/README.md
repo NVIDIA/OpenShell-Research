@@ -68,6 +68,33 @@ uv run privacy-guard regex \
 Leave it running. Privacy Guard loads and compiles the scanner configuration
 before it binds the port.
 
+To investigate request latency without logging request content, restart Privacy
+Guard with `--debug` before the `regex` command:
+
+```bash
+uv run privacy-guard --debug regex \
+  --config regex-scanner.yaml \
+  --listen 0.0.0.0:50051
+```
+
+Debug output reports body size, text-block count, scanned character count, and
+normalize, scan, and reconstruction timings. It never reports body content,
+matched values, JSON paths, headers, or scanner configuration.
+
+To compare the complete body received by Privacy Guard with the body it returns
+to OpenShell, use the explicit content-logging mode instead:
+
+```bash
+uv run privacy-guard --debug-log-content regex \
+  --config regex-scanner.yaml \
+  --listen 0.0.0.0:50051
+```
+
+Look for `stage=received` and `stage=forwarded` entries with the same
+`request_id`. This mode also enables phase timings. It logs secrets by design,
+so use it only for local debugging and disable it after capturing the failing
+request.
+
 ## 4. Run the installed gateway with the example config
 
 In terminal 2:

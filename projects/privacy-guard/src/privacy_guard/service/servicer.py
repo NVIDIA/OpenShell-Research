@@ -132,6 +132,11 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         """Run one evaluation using only the context's abort capability."""
         started = time.monotonic()
         request_id = request.context.request_id
+        _LOGGER.debug(
+            "privacy_guard_evaluation_received request_id=%s body_bytes=%d",
+            request_id,
+            len(request.body),
+        )
         failure: PrivacyGuardError | None = None
         action = "error"
         finding_count = 0
@@ -153,7 +158,13 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                 failure=failure,
             )
             _LOGGER.info(
-                "privacy_guard_evaluation",
+                "privacy_guard_evaluation request_id=%s duration_ms=%.3f "
+                "action=%s finding_count=%d error_code=%s",
+                log_extra["request_id"],
+                log_extra["duration_ms"],
+                log_extra["action"],
+                log_extra["finding_count"],
+                log_extra["error_code"] or "none",
                 extra=log_extra,
             )
 
