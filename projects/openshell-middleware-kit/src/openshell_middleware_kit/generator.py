@@ -37,6 +37,7 @@ _PYTHON_PACKAGE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 _PROJECT_NAME_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$")
 _NETWORK_ATTEMPTS = 4
 _TOOL_NAME = "openshell-middleware-kit"
+_MANIFEST_FILENAME = ".openshell-middleware-manifest.json"
 _STAGING_IGNORED_ROOT_ENTRIES = {
     ".coverage",
     ".git",
@@ -497,7 +498,7 @@ def _verify_project_identity(project_dir: Path, device: int, inode: int) -> None
 
 
 def _read_project_metadata(project_dir: Path) -> ProjectMetadata:
-    manifest_path = project_dir / "middleware-dev-manifest.json"
+    manifest_path = project_dir / _MANIFEST_FILENAME
     if manifest_path.is_symlink() or not manifest_path.is_file():
         raise ProjectError(
             f"not a generated middleware project; missing regular manifest: {manifest_path}"
@@ -532,7 +533,7 @@ def _read_project_metadata(project_dir: Path) -> ProjectMetadata:
 
 def _validate_refresh_targets(project_dir: Path, language: str, python_package: str | None) -> None:
     regular_files = [
-        project_dir / "middleware-dev-manifest.json",
+        project_dir / _MANIFEST_FILENAME,
         project_dir / "proto" / "supervisor_middleware.proto",
     ]
     regular_files.append(project_dir / ("uv.lock" if language == "python" else "Cargo.lock"))
@@ -963,7 +964,7 @@ def _publish_generated_artifacts(
         if metadata.python_package is None:  # pragma: no cover - checked during discovery
             raise AssertionError("Python package is required")
         relative_paths.append(Path("src") / metadata.python_package / "bindings")
-    relative_paths.append(Path("middleware-dev-manifest.json"))
+    relative_paths.append(Path(_MANIFEST_FILENAME))
 
     exchanged: list[Path] = []
     try:
@@ -1039,7 +1040,7 @@ def _write_manifest(
             "version": __version__,
         },
     }
-    (project_dir / "middleware-dev-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    (project_dir / _MANIFEST_FILENAME).write_text(json.dumps(manifest, indent=2) + "\n")
 
 
 def _prepare_project(language: str, project_dir: Path, package_name: str) -> None:
