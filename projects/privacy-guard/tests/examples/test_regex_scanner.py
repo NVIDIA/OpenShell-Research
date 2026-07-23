@@ -33,7 +33,7 @@ def test_example_configuration_and_walkthrough_are_aligned() -> None:
     assert "action: redact" in policy
     assert "entity_types: [email, customer-id]" in policy
     assert "cd projects/privacy-guard" in readme
-    assert 'sed "s/REPLACE_WITH_HOST_IP/$HOST_IP/"' in readme
+    assert 'sed "s/REPLACE_WITH_HOST_IP/$(ipconfig getifaddr en0)/"' in readme
     assert "privacy-guard regex" in readme
     assert "--config examples/regex-scanner/regex-scanner.yaml" in readme
     assert "examples/regex-scanner/gateway.local.toml" in readme

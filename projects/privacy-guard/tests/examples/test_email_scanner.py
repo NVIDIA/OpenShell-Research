@@ -35,7 +35,7 @@ def test_example_configuration_targets_its_local_middleware() -> None:
     assert "action: redact" in policy
     assert "entity_types: [email]" in policy
     assert "cd projects/privacy-guard" in readme
-    assert 'sed "s/REPLACE_WITH_HOST_IP/$HOST_IP/"' in readme
+    assert 'sed "s/REPLACE_WITH_HOST_IP/$(ipconfig getifaddr en0)/"' in readme
     assert "uv run python examples/email-scanner/middleware_server.py" in readme
     assert "examples/email-scanner/gateway.local.toml" in readme
     assert "gateway.local.toml" in gitignore

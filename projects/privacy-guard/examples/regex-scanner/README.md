@@ -44,13 +44,12 @@ Generate `gateway.local.toml` with the address of the host interface Docker can
 reach:
 
 ```bash
-HOST_INTERFACE="$(route get default | awk '/interface:/{print $2}')"
-HOST_IP="$(ipconfig getifaddr "$HOST_INTERFACE")"
-test -n "$HOST_IP"
-sed "s/REPLACE_WITH_HOST_IP/$HOST_IP/" \
+sed "s/REPLACE_WITH_HOST_IP/$(ipconfig getifaddr en0)/" \
   examples/regex-scanner/gateway.toml \
   > examples/regex-scanner/gateway.local.toml
 ```
+
+If the active interface is not `en0`, replace it in the command.
 
 The checked-in `gateway.toml` remains an example-specific template.
 `gateway.local.toml` is ignored by Git. Do not copy either file into
