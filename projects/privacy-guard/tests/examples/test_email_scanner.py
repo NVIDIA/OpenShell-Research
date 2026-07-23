@@ -27,17 +27,21 @@ assert findings[0].end_offset == 21
 def test_example_configuration_targets_its_local_middleware() -> None:
     policy = (EXAMPLE_DIRECTORY / "policy.yaml").read_text()
     gateway = (EXAMPLE_DIRECTORY / "gateway.toml").read_text()
+    gitignore = (EXAMPLE_DIRECTORY / ".gitignore").read_text()
     readme = (EXAMPLE_DIRECTORY / "README.md").read_text()
 
     assert "middleware: privacy-guard-email-scanner" in policy
     assert 'name = "privacy-guard-email-scanner"' in gateway
-    assert 'grpc_endpoint = "http://127.0.0.1:50051"' in gateway
+    assert 'grpc_endpoint = "http://REPLACE_WITH_HOST_IP:50051"' in gateway
+    assert "gateway.local.toml" in gitignore
+    assert (EXAMPLE_DIRECTORY / "generate_gateway_config.py").is_file()
     assert "action: redact" in policy
     assert "entity_types: [email]" in policy
     assert "cd projects/privacy-guard/examples/email-scanner" in readme
     assert "uv run python middleware_server.py" in readme
-    assert "--listen 127.0.0.1:50051" in readme
-    assert 'openshell-gateway --config "$PWD/gateway.toml"' in readme
+    assert "uv run python generate_gateway_config.py" in readme
+    assert "--listen 0.0.0.0:50051" in readme
+    assert 'openshell-gateway --config "$PWD/gateway.local.toml"' in readme
     assert "openshell gateway add" in readme
     assert "https://127.0.0.1:17670" in readme
     assert "--name openshell" in readme

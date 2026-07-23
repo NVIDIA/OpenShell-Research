@@ -39,24 +39,36 @@ directories, so the commands do not need a `--project` option.
 The patterns are intentionally small and understandable. Treat them as a
 starting point, not comprehensive production detection.
 
-## 2. Start Privacy Guard
+## 2. Generate the local gateway config
+
+Generate a local config containing a host address that both the gateway and
+sandboxes can reach:
+
+```bash
+uv run python generate_gateway_config.py
+```
+
+This writes the ignored `gateway.local.toml`. The checked-in `gateway.toml`
+remains a reusable template.
+
+## 3. Start Privacy Guard
 
 This development server uses unauthenticated plaintext gRPC and receives request
-bodies that may contain sensitive content. It listens only on loopback because
-the gateway and Privacy Guard both run on the host.
+bodies that may contain sensitive content. Restrict access to port 50051 with a
+host firewall because sandboxes must be able to reach it.
 
 In terminal 1:
 
 ```bash
 uv run privacy-guard regex \
   --config regex-scanner.yaml \
-  --listen 127.0.0.1:50051
+  --listen 0.0.0.0:50051
 ```
 
 Leave it running. Privacy Guard loads and compiles the scanner configuration
 before it binds the port.
 
-## 3. Run the installed gateway with the example config
+## 4. Run the installed gateway with the example config
 
 In terminal 2:
 
@@ -64,22 +76,19 @@ In terminal 2:
 brew services stop openshell
 
 OPENSHELL_LOCAL_TLS_DIR="$HOME/.local/state/openshell/homebrew/tls" \
-openshell-gateway --config "$PWD/gateway.toml"
+openshell-gateway --config "$PWD/gateway.local.toml"
 ```
 
 The first command stops the background service so the foreground gateway can use
 the standard port. The second command reuses the credentials and state created
-by the recommended macOS installation, but loads this example's `gateway.toml`.
-Keep it in the foreground; `Server listening` means it is ready.
+by the recommended macOS installation, but loads this example's generated
+`gateway.local.toml`. Keep it in the foreground; `Server listening` means it is
+ready.
 
-The gateway connects to Privacy Guard over host loopback. The
-`host.openshell.internal` hostname is only needed when a process inside a
-sandbox connects back to a service on the host.
+Middleware registration is static. After regenerating `gateway.local.toml`, stop
+this foreground process with `Ctrl-C` and run the second command again.
 
-Middleware registration is static. After editing `gateway.toml`, stop this
-foreground process with `Ctrl-C` and run the second command again.
-
-## 4. Create the sandbox and run Claude
+## 5. Create the sandbox and run Claude
 
 In terminal 3:
 

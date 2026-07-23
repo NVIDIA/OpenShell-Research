@@ -7,6 +7,6 @@ version = 1
 
 [[openshell.supervisor.middleware]]
 name = "privacy-guard-regex-scanner"
-grpc_endpoint = "http://127.0.0.1:50051"
+grpc_endpoint = "http://REPLACE_WITH_HOST_IP:50051"
 max_body_bytes = 4194304
 timeout = "5s"
