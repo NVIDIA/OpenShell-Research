@@ -88,7 +88,7 @@ omkit update /path/to/audit-headers \
   --openshell-version v0.0.90
 ```
 
-`omkit update` reads `middleware-dev-manifest.json` to find the project language
+`omkit update` reads `.openshell-middleware-manifest.json` to find the project language
 and Python package. It downloads the selected `supervisor_middleware.proto`,
 regenerates Python protobuf and gRPC bindings when needed, updates `uv.lock` or
 `Cargo.lock`, and writes the version and protocol checksum to the manifest.
@@ -104,7 +104,7 @@ Each project contains:
 - generated Python gRPC bindings or Rust Tonic build configuration;
 - tests and lint/type-check configuration;
 - `uv.lock` or `Cargo.lock`; and
-- `middleware-dev-manifest.json` with the release, source URL, and protocol
+- `.openshell-middleware-manifest.json` with the release, source URL, and protocol
   checksum.
 
 Start by implementing policy behavior in the generated `validate_config` and

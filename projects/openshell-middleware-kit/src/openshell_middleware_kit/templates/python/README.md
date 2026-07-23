@@ -1,7 +1,7 @@
 # __PROJECT_NAME__
 
 A Python OpenShell supervisor middleware starter. It is pinned to the OpenShell
-contract recorded in `middleware-dev-manifest.json` and starts as a pass-through:
+contract recorded in `.openshell-middleware-manifest.json` and starts as a pass-through:
 valid pre-credentials HTTP requests are allowed without mutation.
 
 ## Develop
@@ -59,7 +59,7 @@ for the policy syntax supported by your pinned OpenShell release.
 
 - `proto/supervisor_middleware.proto` is the exact downloaded contract.
 - `src/__PACKAGE_NAME__/bindings/` contains generated protobuf and gRPC modules.
-- `middleware-dev-manifest.json` records the release, source URL, and SHA-256.
+- `.openshell-middleware-manifest.json` records the release, source URL, and SHA-256.
 - `uv.lock` records the Python dependency solution.
 
 Commit these files. Refresh all version-matched artifacts together with:

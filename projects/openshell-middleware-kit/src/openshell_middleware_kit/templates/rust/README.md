@@ -1,7 +1,7 @@
 # __PROJECT_NAME__
 
 A Rust OpenShell supervisor middleware starter. It is pinned to the OpenShell
-contract recorded in `middleware-dev-manifest.json` and starts as a pass-through:
+contract recorded in `.openshell-middleware-manifest.json` and starts as a pass-through:
 valid pre-credentials HTTP requests are allowed without mutation.
 
 ## Develop
@@ -56,7 +56,7 @@ for the policy syntax supported by your pinned OpenShell release.
 
 - `proto/supervisor_middleware.proto` is the exact downloaded contract.
 - `build.rs` generates Rust modules into Cargo's `OUT_DIR` from that contract.
-- `middleware-dev-manifest.json` records the release, source URL, and SHA-256.
+- `.openshell-middleware-manifest.json` records the release, source URL, and SHA-256.
 - `Cargo.lock` records the Rust dependency solution.
 
 Commit these files. Refresh all version-matched artifacts together with:

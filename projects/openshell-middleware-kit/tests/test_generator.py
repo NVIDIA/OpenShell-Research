@@ -59,7 +59,7 @@ def test_generates_python_project_with_provenance(tmp_path: Path) -> None:
     assert (destination / "tests/test_server.py").is_file()
     assert (destination / "proto/supervisor_middleware.proto").read_bytes() == PROTO
     assert "__PACKAGE_NAME__" not in (destination / "pyproject.toml").read_text()
-    manifest = json.loads((destination / "middleware-dev-manifest.json").read_text())
+    manifest = json.loads((destination / ".openshell-middleware-manifest.json").read_text())
     assert manifest["openshell_version"] == "v0.0.86"
     assert manifest["languages"] == ["python"]
     assert manifest["python_package"] == "audit_headers"
@@ -88,7 +88,7 @@ def test_generates_rust_project_with_normalized_crate_name(tmp_path: Path) -> No
         in (destination / "src/main.rs").read_text()
     )
     assert stat.S_IMODE(destination.stat().st_mode) == 0o755
-    manifest = json.loads((destination / "middleware-dev-manifest.json").read_text())
+    manifest = json.loads((destination / ".openshell-middleware-manifest.json").read_text())
     assert manifest["languages"] == ["rust"]
     assert manifest["python_package"] is None
 
@@ -127,7 +127,7 @@ def test_updates_python_generated_artifacts_and_preserves_user_code(tmp_path: Pa
     assert (destination / "proto/supervisor_middleware.proto").read_bytes() == UPDATED_PROTO
     assert not old_binding.exists()
     assert (destination / "src/audit_headers/bindings/__init__.py").is_file()
-    manifest = json.loads((destination / "middleware-dev-manifest.json").read_text())
+    manifest = json.loads((destination / ".openshell-middleware-manifest.json").read_text())
     assert manifest["openshell_version"] == "v1.2.3"
     assert manifest["generator"]["name"] == "openshell-middleware-kit"
     assert not (tmp_path / ".audit-headers.openshell-middleware-kit.lock").exists()
@@ -144,7 +144,7 @@ def test_failed_update_keeps_original_project_unchanged(tmp_path: Path) -> None:
         download_proto=local_proto,
         command_runner=no_op_runner,
     )
-    original_manifest = (destination / "middleware-dev-manifest.json").read_bytes()
+    original_manifest = (destination / ".openshell-middleware-manifest.json").read_bytes()
     original_proto = (destination / "proto/supervisor_middleware.proto").read_bytes()
 
     def fail_runner(language: str, project: Path, package: str) -> None:
@@ -159,7 +159,7 @@ def test_failed_update_keeps_original_project_unchanged(tmp_path: Path) -> None:
             command_runner=fail_runner,
         )
 
-    assert (destination / "middleware-dev-manifest.json").read_bytes() == original_manifest
+    assert (destination / ".openshell-middleware-manifest.json").read_bytes() == original_manifest
     assert (destination / "proto/supervisor_middleware.proto").read_bytes() == original_proto
     assert not (tmp_path / ".audit.openshell-middleware-kit.lock").exists()
     assert not list(tmp_path.glob(".audit.openshell-middleware-kit.*"))
@@ -177,7 +177,7 @@ def test_publication_failure_rolls_back_exchanged_artifacts(
         download_proto=local_proto,
         command_runner=no_op_runner,
     )
-    original_manifest = (destination / "middleware-dev-manifest.json").read_bytes()
+    original_manifest = (destination / ".openshell-middleware-manifest.json").read_bytes()
     original_proto = (destination / "proto/supervisor_middleware.proto").read_bytes()
     original_exchange = generator._publish_exchange
     calls = 0
@@ -200,7 +200,7 @@ def test_publication_failure_rolls_back_exchanged_artifacts(
         )
 
     assert calls == 3
-    assert (destination / "middleware-dev-manifest.json").read_bytes() == original_manifest
+    assert (destination / ".openshell-middleware-manifest.json").read_bytes() == original_manifest
     assert (destination / "proto/supervisor_middleware.proto").read_bytes() == original_proto
 
 
@@ -298,7 +298,7 @@ def test_update_rejects_symlink_and_missing_project_paths(tmp_path: Path) -> Non
 def test_update_rejects_invalid_manifest(tmp_path: Path, manifest: str, message: str) -> None:
     destination = tmp_path / "project"
     destination.mkdir()
-    (destination / "middleware-dev-manifest.json").write_text(manifest)
+    (destination / ".openshell-middleware-manifest.json").write_text(manifest)
 
     with pytest.raises(ProjectError, match=message):
         update_project(
@@ -311,7 +311,7 @@ def test_update_rejects_invalid_manifest(tmp_path: Path, manifest: str, message:
 def test_update_requires_regular_generated_artifacts(tmp_path: Path) -> None:
     destination = tmp_path / "project"
     destination.mkdir()
-    (destination / "middleware-dev-manifest.json").write_text(
+    (destination / ".openshell-middleware-manifest.json").write_text(
         json.dumps(
             {
                 "generator": {"name": "openshell-middleware-kit"},
@@ -334,7 +334,7 @@ def test_update_requires_python_bindings_directory(tmp_path: Path) -> None:
     (destination / "proto").mkdir(parents=True)
     (destination / "proto/supervisor_middleware.proto").write_bytes(PROTO)
     (destination / "uv.lock").write_text("test lock\n")
-    (destination / "middleware-dev-manifest.json").write_text(
+    (destination / ".openshell-middleware-manifest.json").write_text(
         json.dumps(
             {
                 "generator": {"name": "openshell-middleware-kit"},
@@ -467,7 +467,7 @@ def test_update_revalidates_symlink_ancestors_after_project_validation(
         download_proto=local_proto,
         command_runner=no_op_runner,
     )
-    original_manifest = (destination / "middleware-dev-manifest.json").read_bytes()
+    original_manifest = (destination / ".openshell-middleware-manifest.json").read_bytes()
     external_proto = tmp_path / "external-proto"
     external_proto.mkdir()
     sentinel = external_proto / "supervisor_middleware.proto"
@@ -488,7 +488,7 @@ def test_update_revalidates_symlink_ancestors_after_project_validation(
         )
 
     assert sentinel.read_text() == "external contract\n"
-    assert (destination / "middleware-dev-manifest.json").read_bytes() == original_manifest
+    assert (destination / ".openshell-middleware-manifest.json").read_bytes() == original_manifest
 
 
 def test_exchange_refuses_symlinked_parent_created_immediately_before_publish(
