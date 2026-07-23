@@ -8,7 +8,7 @@ from typing import Annotated
 
 import typer
 
-from middleware_kit.generator import (
+from openshell_middleware_kit.generator import (
     ProjectError,
     create_project,
     update_project,
@@ -113,7 +113,7 @@ def update(
 
 
 def _report_error(error: ProjectError) -> None:
-    typer.echo(f"mkit: error: {error}", err=True)
+    typer.echo(f"omkit: error: {error}", err=True)
     raise typer.Exit(code=1) from error
 
 
