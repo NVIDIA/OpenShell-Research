@@ -38,4 +38,7 @@ def test_example_configuration_targets_its_local_middleware() -> None:
     assert "uv run python middleware_server.py" in readme
     assert "--listen 127.0.0.1:50051" in readme
     assert 'openshell-gateway --config "$PWD/gateway.toml"' in readme
+    assert "openshell gateway add" in readme
+    assert "https://127.0.0.1:17670" in readme
+    assert "--name openshell" in readme
     assert "uv run --project" not in readme

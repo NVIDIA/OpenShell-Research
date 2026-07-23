@@ -6,9 +6,9 @@ email address and customer ID before Claude Code sends a request to Anthropic.
 It is intended to be worked through by hand.
 
 The example temporarily runs the installed OpenShell gateway with the config in
-this directory. It does not create or modify
-`~/.config/openshell/gateway.toml`, and it does not create a project-local state
-directory.
+this directory. It does not create or modify `~/.config/openshell/gateway.toml`
+or create a project-local state directory. It registers the standard local
+gateway endpoint with the OpenShell CLI.
 
 ## Prerequisites
 
@@ -84,6 +84,11 @@ foreground process with `Ctrl-C` and run the second command again.
 In terminal 3:
 
 ```bash
+openshell gateway add \
+  https://127.0.0.1:17670 \
+  --local \
+  --name openshell
+
 openshell status
 
 openshell sandbox create \
@@ -93,6 +98,10 @@ openshell sandbox create \
   --policy "$PWD/policy.yaml" \
   -- claude
 ```
+
+`gateway add` saves the endpoint as the CLI's active gateway and refreshes its
+package-managed mTLS credentials. The registration continues to target the
+normal local gateway after this walkthrough.
 
 Choose Claude Code's subscription-account login and complete authentication.
 Then enter:
@@ -154,8 +163,8 @@ background gateway:
 brew services start openshell
 ```
 
-Stop Privacy Guard with `Ctrl-C` in terminal 1. No default OpenShell config was
-changed.
+Stop Privacy Guard with `Ctrl-C` in terminal 1. The example-specific gateway
+configuration was never installed as the default configuration.
 
 This example uses Claude Code because subscription prompts are sent in
 inspectable HTTP request bodies. ChatGPT-subscription Codex currently sends
