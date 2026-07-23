@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -198,6 +199,41 @@ def test_cli_forwards_custom_scanner_name_to_builtin(
 
     assert result.exit_code == 0
     assert calls == [("scanner-config.yaml", None, "custom-regex")]
+
+
+def test_cli_logs_server_start_without_configuration_details(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    scanner = DeterministicEmailScanner(
+        ScannerConfig(name="custom-regex", entity_types=frozenset({"email"}))
+    )
+    monkeypatch.setattr(
+        server_module.RegexScanner,
+        "from_yaml",
+        lambda *args, **kwargs: scanner,
+    )
+    monkeypatch.setattr(MiddlewareServer, "serve", lambda self, listen: None)
+
+    with caplog.at_level(logging.INFO, logger="privacy_guard.service.server"):
+        result = CliRunner().invoke(
+            app,
+            [
+                "regex",
+                "--config",
+                "sensitive-config-8472.yaml",
+                "--listen",
+                "127.0.0.1:50051",
+                "--scanner-name",
+                "custom-regex",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert "privacy_guard_server_starting" in caplog.text
+    assert "scanner=custom-regex" in caplog.text
+    assert "listen=127.0.0.1:50051" in caplog.text
+    assert "8472" not in caplog.text
 
 
 def test_cli_always_requires_scanner_configuration() -> None:

@@ -8,6 +8,7 @@ and the supervisor reaches it over gRPC. The default endpoint is loopback.
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
 from typing import Annotated
 
@@ -77,6 +78,10 @@ async def serve(
 @app.callback()
 def main() -> None:
     """Select one of Privacy Guard's built-in scanners."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(levelname)s %(name)s: %(message)s",
+    )
 
 
 @app.command("regex")
@@ -105,10 +110,18 @@ def run_regex(
             profile,
             scanner_name=scanner_name,
         )
+        _LOGGER.info(
+            "privacy_guard_server_starting scanner=%s listen=%s",
+            scanner.scanner_name,
+            listen,
+        )
         MiddlewareServer(scanner=scanner).serve(listen)
     except PrivacyGuardError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(code=1) from None
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 if __name__ == "__main__":
