@@ -44,5 +44,6 @@ def test_example_configuration_and_walkthrough_are_aligned() -> None:
     assert "openshell gateway add" in readme
     assert "https://127.0.0.1:17670" in readme
     assert "--name openshell" in readme
+    assert "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude" in readme
     assert "privacy-guard-regex-lab" in readme
     assert "uv run --project" not in readme

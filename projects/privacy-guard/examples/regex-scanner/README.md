@@ -105,12 +105,16 @@ openshell sandbox create \
   --from base \
   --no-auto-providers \
   --policy "$PWD/policy.yaml" \
-  -- claude
+  -- env CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude
 ```
 
 `gateway add` saves the endpoint as the CLI's active gateway and refreshes its
 package-managed mTLS credentials. The registration continues to target the
 normal local gateway after this walkthrough.
+
+Disabling nonessential Claude Code traffic keeps telemetry and error-reporting
+batches out of this focused redaction exercise. Privacy Guard still processes
+the model requests sent to `api.anthropic.com`.
 
 Choose Claude Code's subscription-account login and complete authentication.
 Then enter:
