@@ -20,13 +20,14 @@ directory.
   curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
   ```
 
-Run all commands in this walkthrough from the Privacy Guard project root:
+Run all commands in this walkthrough from the example directory:
 
 ```bash
-cd projects/privacy-guard
+cd projects/privacy-guard/examples/regex-scanner
 ```
 
-In particular, every `uv run` command below assumes this working directory.
+`uv` automatically discovers the Privacy Guard project in the parent
+directories, so the commands do not need a `--project` option.
 
 ## 1. Review the scanner configuration
 
@@ -38,24 +39,7 @@ In particular, every `uv run` command below assumes this working directory.
 The patterns are intentionally small and understandable. Treat them as a
 starting point, not comprehensive production detection.
 
-## 2. Generate the local gateway config
-
-Generate `gateway.local.toml` with the address of the host interface Docker can
-reach:
-
-```bash
-sed "s/REPLACE_WITH_HOST_IP/$(ipconfig getifaddr en0)/" \
-  examples/regex-scanner/gateway.toml \
-  > examples/regex-scanner/gateway.local.toml
-```
-
-If the active interface is not `en0`, replace it in the command.
-
-The checked-in `gateway.toml` remains an example-specific template.
-`gateway.local.toml` is ignored by Git. Do not copy either file into
-`~/.config/openshell`.
-
-## 3. Start Privacy Guard
+## 2. Start Privacy Guard
 
 This development server uses unauthenticated plaintext gRPC and receives request
 bodies that may contain sensitive content. Restrict it to a trusted network and
@@ -66,14 +50,14 @@ In terminal 1:
 
 ```bash
 uv run privacy-guard regex \
-  --config examples/regex-scanner/regex-scanner.yaml \
+  --config regex-scanner.yaml \
   --listen 0.0.0.0:50051
 ```
 
 Leave it running. Privacy Guard loads and compiles the scanner configuration
 before it binds the port.
 
-## 4. Run the installed gateway with the example config
+## 3. Run the installed gateway with the example config
 
 In terminal 2:
 
@@ -81,18 +65,18 @@ In terminal 2:
 brew services stop openshell
 
 OPENSHELL_LOCAL_TLS_DIR="$HOME/.local/state/openshell/homebrew/tls" \
-openshell-gateway --config "$PWD/examples/regex-scanner/gateway.local.toml"
+openshell-gateway --config "$PWD/gateway.toml"
 ```
 
 The first command stops the background service so the foreground gateway can use
 the standard port. The second command reuses the credentials and state created
-by the recommended macOS installation, but loads the generated local config.
+by the recommended macOS installation, but loads this example's `gateway.toml`.
 Keep it in the foreground; `Server listening` means it is ready.
 
-Middleware registration is static. After regenerating `gateway.local.toml`, stop
-this foreground process with `Ctrl-C` and run the second command again.
+Middleware registration is static. After editing `gateway.toml`, stop this
+foreground process with `Ctrl-C` and run the second command again.
 
-## 5. Create the sandbox and run Claude
+## 4. Create the sandbox and run Claude
 
 In terminal 3:
 
@@ -103,7 +87,7 @@ openshell sandbox create \
   --name privacy-guard-regex-lab \
   --from base \
   --no-auto-providers \
-  --policy "$PWD/examples/regex-scanner/policy.yaml" \
+  --policy "$PWD/policy.yaml" \
   -- claude
 ```
 
@@ -127,13 +111,12 @@ findings for both configured entities.
 
 ## Change the behavior
 
-To change enforcement, edit `examples/regex-scanner/policy.yaml` and set
-`on_finding.action` to `observe`, `block`, or `redact`, then apply it without
-recreating the sandbox:
+To change enforcement, edit `policy.yaml` and set `on_finding.action` to
+`observe`, `block`, or `redact`, then apply it without recreating the sandbox:
 
 ```bash
 openshell policy set privacy-guard-regex-lab \
-  --policy "$PWD/examples/regex-scanner/policy.yaml" \
+  --policy "$PWD/policy.yaml" \
   --wait
 ```
 
@@ -141,9 +124,9 @@ openshell policy set privacy-guard-regex-lab \
 - `observe` records findings but sends the original values.
 - `block` denies a request containing either configured entity.
 
-To change detection, edit `examples/regex-scanner/regex-scanner.yaml`, stop
-Privacy Guard with `Ctrl-C`, and run the terminal 1 command again. Scanner
-configuration is loaded only at startup.
+To change detection, edit `regex-scanner.yaml`, stop Privacy Guard with `Ctrl-C`,
+and run the terminal 1 command again. Scanner configuration is loaded only at
+startup.
 
 To reconnect later:
 

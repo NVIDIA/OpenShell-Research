@@ -1,12 +1,12 @@
 # OpenShell gateway configuration for the email-scanner example.
-# Generate the ignored gateway.local.toml from this template using the README.
-# Do not copy either file into ~/.config/openshell.
+# Pass this example-specific config directly to openshell-gateway.
+# Do not copy it into ~/.config/openshell.
 
 [openshell]
 version = 1
 
 [[openshell.supervisor.middleware]]
 name = "privacy-guard-email-scanner"
-grpc_endpoint = "http://REPLACE_WITH_HOST_IP:50051"
+grpc_endpoint = "http://host.openshell.internal:50051"
 max_body_bytes = 4194304
 timeout = "5s"
