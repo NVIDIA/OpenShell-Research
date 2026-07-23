@@ -1,8 +1,0 @@
-# Starting rules only. This file does not establish HIPAA compliance; deployers
-# remain responsible for operational controls, validation, and risk assessment.
-- name: medical-record-number
-  patterns:
-    - name: prefixed-mrn
-      regex: '\bMRN[ :]?[0-9]{6,10}\b'
-      confidence: high
-      ignore_case: true

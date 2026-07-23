@@ -12,9 +12,12 @@ original.
 > the generic JSON handler, safe gRPC adaptation, and a loopback server are
 > implemented.
 
-The self-contained [email scanner example](examples/email-scanner/README.md)
-provides a deterministic scanner, middleware entry point, gateway registration,
-sandbox policy, and manual Claude Code workflow.
+The self-contained
+[built-in regex scanner walkthrough](examples/regex-scanner/README.md) provides
+a scanner configuration, gateway registration, sandbox policy, and manual
+Claude Code workflow for a typical deployment. The separate
+[email scanner example](examples/email-scanner/README.md) demonstrates how to
+implement a custom scanner.
 
 ## Request flow
 
@@ -94,12 +97,13 @@ selects a YAML catalog. Single-profile files contain a non-empty entity list.
 Multi-profile files contain only a non-empty `profiles` mapping and require the
 regex-specific `--profile` option. Use `privacy-guard --help` for the built-in
 scanner list or `privacy-guard regex --help` for regex options. See
-[examples/regex-configs](examples/regex-configs) for both configuration forms.
+[the built-in regex scanner walkthrough](examples/regex-scanner/README.md) for a
+complete manual deployment.
 
 ```bash
 uv run privacy-guard \
   regex \
-  --config examples/regex-configs/customer.yaml \
+  --config examples/regex-scanner/regex-scanner.yaml \
   --listen 127.0.0.1:50051
 ```
 
