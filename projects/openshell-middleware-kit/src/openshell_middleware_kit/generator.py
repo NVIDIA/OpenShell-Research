@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 from importlib.resources import files
 from pathlib import Path
 
-from middleware_kit import __version__
+from openshell_middleware_kit import __version__
 
 _REPOSITORY_URL = "https://github.com/NVIDIA/OpenShell"
 _RAW_URL = "https://raw.githubusercontent.com/NVIDIA/OpenShell"
@@ -36,7 +36,7 @@ _VERSION_PATTERN = re.compile(r"^v\d+\.\d+\.\d+(?:[+-][0-9A-Za-z._-]+)?$")
 _PYTHON_PACKAGE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 _PROJECT_NAME_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$")
 _NETWORK_ATTEMPTS = 4
-_TOOL_NAME = "middleware-kit"
+_TOOL_NAME = "openshell-middleware-kit"
 _STAGING_IGNORED_ROOT_ENTRIES = {
     ".coverage",
     ".git",
@@ -512,7 +512,7 @@ def _read_project_metadata(project_dir: Path) -> ProjectMetadata:
     generator = manifest.get("generator")
     generator_name = generator.get("name") if isinstance(generator, dict) else None
     if generator_name != _TOOL_NAME:
-        raise ProjectError("project manifest generator must be middleware-kit")
+        raise ProjectError("project manifest generator must be openshell-middleware-kit")
     languages = manifest.get("languages")
     if languages not in (["python"], ["rust"]):
         raise ProjectError("project manifest must identify exactly one supported language")
@@ -989,7 +989,7 @@ def _publish_generated_artifacts(
 
 
 def _render_project(destination: Path, language: str, context: TemplateContext) -> None:
-    template_root = files("middleware_kit").joinpath("templates").joinpath(language)
+    template_root = files("openshell_middleware_kit").joinpath("templates").joinpath(language)
     template_paths = {
         "python": (
             ".gitignore",

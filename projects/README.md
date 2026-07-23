@@ -6,7 +6,7 @@ layout.
 
 Current projects:
 
-- `middleware-kit`: `mkit` CLI that creates and updates version-matched
+- `openshell-middleware-kit`: `omkit` CLI that creates and updates version-matched
   Python and Rust OpenShell supervisor middleware projects.
 - `python-project-template`: Minimal, production-ready Python project scaffold
   managed with uv.

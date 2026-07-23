@@ -4,7 +4,7 @@ Read `README.md` and `pyproject.toml` before changing this project.
 
 ## Safety rules
 
-- `mkit create` must never write into, follow, or replace an existing output
+- `omkit create` must never write into, follow, or replace an existing output
   path, including a symlink.
 - Build and check the project in a temporary directory next to its destination.
   Move it into place only after every check passes.
@@ -27,7 +27,7 @@ Read `README.md` and `pyproject.toml` before changing this project.
 
 ## Templates
 
-- Templates in `src/middleware_kit/templates/` must produce working standalone
+- Templates in `src/openshell_middleware_kit/templates/` must produce working standalone
   projects.
 - Write template markers as `__UPPER_SNAKE_CASE__`. Add each marker to
   `TemplateContext.replacements` and test its rendered value.
