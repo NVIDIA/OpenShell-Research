@@ -27,10 +27,15 @@ assert findings[0].end_offset == 21
 def test_example_configuration_targets_its_local_middleware() -> None:
     policy = (EXAMPLE_DIRECTORY / "policy.yaml").read_text()
     gateway = (EXAMPLE_DIRECTORY / "gateway.toml").read_text()
+    gitignore = (EXAMPLE_DIRECTORY / ".gitignore").read_text()
     readme = (EXAMPLE_DIRECTORY / "README.md").read_text()
 
     assert "middleware: privacy-guard-email-scanner" in policy
     assert 'name = "privacy-guard-email-scanner"' in gateway
     assert "action: redact" in policy
     assert "entity_types: [email]" in policy
-    assert "python middleware_server.py" in readme
+    assert "cd projects/privacy-guard" in readme
+    assert 'sed "s/REPLACE_WITH_HOST_IP/$HOST_IP/"' in readme
+    assert "uv run python examples/email-scanner/middleware_server.py" in readme
+    assert "examples/email-scanner/gateway.local.toml" in readme
+    assert "gateway.local.toml" in gitignore

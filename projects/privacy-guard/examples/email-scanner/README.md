@@ -23,28 +23,30 @@ intended as comprehensive production PII detection.
   curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/main/install.sh | sh
   ```
 
-Run the example commands from this directory:
+Run all commands in this walkthrough from the Privacy Guard project root:
 
 ```bash
-cd projects/privacy-guard/examples/email-scanner
+cd projects/privacy-guard
 ```
 
-## 1. Edit the example config
+In particular, every `uv run` command below assumes this working directory.
 
-Find the host address that Docker can reach:
+## 1. Generate the local gateway config
+
+Generate `gateway.local.toml` with the address of the host interface Docker can
+reach:
 
 ```bash
-ipconfig getifaddr en0
+HOST_INTERFACE="$(route get default | awk '/interface:/{print $2}')"
+HOST_IP="$(ipconfig getifaddr "$HOST_INTERFACE")"
+test -n "$HOST_IP"
+sed "s/REPLACE_WITH_HOST_IP/$HOST_IP/" \
+  examples/email-scanner/gateway.toml \
+  > examples/email-scanner/gateway.local.toml
 ```
 
-Replace `REPLACE_WITH_HOST_IP` in `gateway.toml` with that address. If `en0`
-does not return an address, find the active interface with:
-
-```bash
-route get default | grep interface
-```
-
-Only the checked-out `gateway.toml` is edited. Do not copy it into
+The checked-in `gateway.toml` remains an example-specific template.
+`gateway.local.toml` is ignored by Git. Do not copy either file into
 `~/.config/openshell`.
 
 ## 2. Start Privacy Guard
@@ -57,7 +59,7 @@ that Docker must reach instead of every interface.
 In terminal 1:
 
 ```bash
-uv run --project ../.. python middleware_server.py \
+uv run python examples/email-scanner/middleware_server.py \
   --listen 0.0.0.0:50051
 ```
 
@@ -71,17 +73,16 @@ In terminal 2:
 brew services stop openshell
 
 OPENSHELL_LOCAL_TLS_DIR="$HOME/.local/state/openshell/homebrew/tls" \
-openshell-gateway --config "$PWD/gateway.toml"
+openshell-gateway --config "$PWD/examples/email-scanner/gateway.local.toml"
 ```
 
 The first command stops the background service so the foreground gateway can use
 the standard port. The second command reuses the credentials and state created
-by the recommended macOS installation, but loads `gateway.toml` from this
-directory. It should stay in the foreground; `Server listening` means it is
-ready.
+by the recommended macOS installation, but loads the generated local config. It
+should stay in the foreground; `Server listening` means it is ready.
 
-Middleware registration is static. After editing `gateway.toml`, stop this
-foreground process with `Ctrl-C` and run the second command again.
+Middleware registration is static. After regenerating `gateway.local.toml`, stop
+this foreground process with `Ctrl-C` and run the second command again.
 
 ## 4. Create the sandbox and run Claude
 
@@ -94,7 +95,7 @@ openshell sandbox create \
   --name privacy-guard-lab \
   --from base \
   --no-auto-providers \
-  --policy "$PWD/policy.yaml" \
+  --policy "$PWD/examples/email-scanner/policy.yaml" \
   -- claude
 ```
 
@@ -118,11 +119,13 @@ an email finding.
 
 ## Change the behavior
 
-Edit `policy.yaml` and change `on_finding.action` to `observe`, `block`, or
-`redact`, then apply it without recreating the sandbox:
+Edit `examples/email-scanner/policy.yaml` and change `on_finding.action` to
+`observe`, `block`, or `redact`, then apply it without recreating the sandbox:
 
 ```bash
-openshell policy set privacy-guard-lab --policy "$PWD/policy.yaml" --wait
+openshell policy set privacy-guard-lab \
+  --policy "$PWD/examples/email-scanner/policy.yaml" \
+  --wait
 ```
 
 - `redact` sends `[email]` to Claude.
