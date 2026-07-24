@@ -12,6 +12,7 @@ dependencies = [
   "grpcio>=1.81.1,<2",
   "protobuf>=6.33.5,<7",
   "pydantic>=2.11,<3",
+  "pyyaml>=6,<7",
   "regex>=2026.7.19,<2027",
   "typer>=0.16,<1",
   "typing-extensions>=4.12,<5",

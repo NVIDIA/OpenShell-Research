@@ -1,0 +1,11 @@
+# OpenShell gateway configuration for the RegexEngine example.
+# Generate gateway.local.toml with the host address reachable by supervisors.
+
+[openshell]
+version = 1
+
+[[openshell.supervisor.middleware]]
+name = "privacy-guard-regex"
+grpc_endpoint = "http://REPLACE_WITH_HOST_IP:50051"
+max_body_bytes = 4194304
+timeout = "5s"

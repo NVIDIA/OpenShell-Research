@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
+import privacy_guard.engines.regex as regex_module
 from privacy_guard.config import (
     PolicyAction,
     configuration_fingerprint,
@@ -136,11 +139,182 @@ def _required_dict(mapping: object, key: str):
     return value
 
 
-def test_runtime_config_rejects_a_catalog_file_path() -> None:
+def test_catalog_file_and_inline_catalog_produce_the_same_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = _registry()
+    inline_values = _config()
+    file_values = deepcopy(inline_values)
+    inline_catalog = file_values["entity_processing"]["stages"][0]["config"][
+        "pattern_catalog"
+    ]
+    (tmp_path / "patterns.yaml").write_text(
+        yaml.safe_dump(inline_catalog),
+        encoding="utf-8",
+    )
+    file_values["entity_processing"]["stages"][0]["config"]["pattern_catalog"] = (
+        "patterns.yaml"
+    )
+    monkeypatch.chdir(tmp_path)
+
+    inline_config = registry.validate_config(inline_values)
+    file_config = registry.validate_config(file_values)
+
+    assert file_config == inline_config
+    assert configuration_fingerprint(file_config) == configuration_fingerprint(
+        inline_config
+    )
+    serialized_catalog = file_config.model_dump(mode="json")["entity_processing"][
+        "stages"
+    ][0]["config"]["pattern_catalog"]
+    inline_serialized_catalog = inline_config.model_dump(mode="json")[
+        "entity_processing"
+    ]["stages"][0]["config"]["pattern_catalog"]
+    assert serialized_catalog == inline_serialized_catalog
+    assert isinstance(serialized_catalog, dict)
+
+
+def test_catalog_file_change_produces_a_new_fingerprint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    catalog_path = tmp_path / "patterns.yaml"
+    values = _config()
+    catalog = values["entity_processing"]["stages"][0]["config"]["pattern_catalog"]
+    catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+    values["entity_processing"]["stages"][0]["config"]["pattern_catalog"] = (
+        "patterns.yaml"
+    )
+    monkeypatch.chdir(tmp_path)
+    registry = _registry()
+    first = registry.validate_config(values)
+
+    catalog["entities"][0]["patterns"][0]["confidence"] = "low"
+    catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+    second = registry.validate_config(values)
+
+    assert configuration_fingerprint(first) != configuration_fingerprint(second)
+
+
+@pytest.mark.parametrize(
+    "catalog_path",
+    [
+        "missing.yaml",
+        "../patterns.yaml",
+        "patterns.json",
+    ],
+)
+def test_catalog_file_rejects_invalid_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    catalog_path: str,
+) -> None:
+    values = _config()
+    values["entity_processing"]["stages"][0]["config"]["pattern_catalog"] = catalog_path
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(PrivacyGuardError) as exception_info:
+        _registry().validate_config(values)
+
+    assert exception_info.value.code is ErrorCode.CONFIG_INVALID
+
+
+def test_catalog_file_rejects_absolute_paths(
+    tmp_path: Path,
+) -> None:
+    values = _config()
+    values["entity_processing"]["stages"][0]["config"]["pattern_catalog"] = str(
+        tmp_path / "patterns.yaml"
+    )
+
+    with pytest.raises(PrivacyGuardError) as exception_info:
+        _registry().validate_config(values)
+
+    assert exception_info.value.code is ErrorCode.CONFIG_INVALID
+
+
+def test_catalog_file_rejects_symlinks(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = tmp_path / "target.yaml"
+    target.write_text("entities: []\n", encoding="utf-8")
+    (tmp_path / "patterns.yaml").symlink_to(target)
     values = _config()
     values["entity_processing"]["stages"][0]["config"]["pattern_catalog"] = (
-        "./patterns.yaml"
+        "patterns.yaml"
     )
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(PrivacyGuardError) as exception_info:
+        _registry().validate_config(values)
+
+    assert exception_info.value.code is ErrorCode.CONFIG_INVALID
+
+
+@pytest.mark.parametrize(
+    "contents",
+    [
+        "entities:\n  - name: first\n    name: duplicate\n    patterns: []\n",
+        (
+            "entities:\n"
+            "  - &shared\n"
+            "    name: first\n"
+            "    patterns:\n"
+            "      - pattern: x\n"
+            "        confidence: high\n"
+            "  - *shared\n"
+        ),
+        "entities: !!python/object/apply:builtins.list []\n",
+    ],
+)
+def test_catalog_file_rejects_unsafe_yaml(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    contents: str,
+) -> None:
+    (tmp_path / "patterns.yaml").write_text(contents, encoding="utf-8")
+    values = _config()
+    values["entity_processing"]["stages"][0]["config"]["pattern_catalog"] = (
+        "patterns.yaml"
+    )
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(PrivacyGuardError) as exception_info:
+        _registry().validate_config(values)
+
+    assert exception_info.value.code is ErrorCode.CONFIG_INVALID
+
+
+def test_catalog_file_rejects_invalid_utf8(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (tmp_path / "patterns.yaml").write_bytes(b"\xff")
+    values = _config()
+    values["entity_processing"]["stages"][0]["config"]["pattern_catalog"] = (
+        "patterns.yaml"
+    )
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(PrivacyGuardError) as exception_info:
+        _registry().validate_config(values)
+
+    assert exception_info.value.code is ErrorCode.CONFIG_INVALID
+
+
+def test_catalog_file_rejects_oversized_content(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(regex_module, "MAX_REGEX_CATALOG_FILE_BYTES", 1)
+    (tmp_path / "patterns.yaml").write_text("entities: []\n", encoding="utf-8")
+    values = _config()
+    values["entity_processing"]["stages"][0]["config"]["pattern_catalog"] = (
+        "patterns.yaml"
+    )
+    monkeypatch.chdir(tmp_path)
 
     with pytest.raises(PrivacyGuardError) as exception_info:
         _registry().validate_config(values)

@@ -4,11 +4,19 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
+from stat import S_ISREG
 from string import Formatter
 from typing import Literal, Protocol, Self
 
 import regex
+import yaml
 from pydantic import Field, field_validator, model_validator
+from yaml.constructor import ConstructorError
+from yaml.events import AliasEvent
+from yaml.nodes import MappingNode
+from yaml.resolver import BaseResolver
 
 from privacy_guard.base import StrictDomainModel
 from privacy_guard.constants import (
@@ -17,6 +25,8 @@ from privacy_guard.constants import (
     MAX_DETECTIONS_PER_STAGE,
     MAX_DIAGNOSTIC_TEXT_BYTES,
     MAX_MATCHES_PER_PATTERN,
+    MAX_REGEX_CATALOG_FILE_BYTES,
+    MAX_REGEX_CATALOG_PATH_BYTES,
     MAX_REGEX_ENTITIES_PER_CATALOG,
     MAX_REGEX_NAME_BYTES,
     MAX_REGEX_PATTERN_BYTES,
@@ -153,8 +163,28 @@ class RegexEngineConfig(EngineConfig):
     """Exact policy configuration owned by ``RegexEngine``."""
 
     engine: Literal["regex"] = "regex"
-    pattern_catalog: RegexPatternCatalog = Field(repr=False)
+    pattern_catalog: RegexPatternCatalog = Field(
+        repr=False,
+        description=(
+            "Complete structured catalog or relative path to a complete YAML catalog."
+        ),
+    )
     replacement: RegexReplacement | None = None
+
+    @field_validator(
+        "pattern_catalog",
+        mode="before",
+        json_schema_input_type=RegexPatternCatalog | str,
+    )
+    @classmethod
+    def _load_pattern_catalog(
+        cls,
+        value: object,
+    ) -> object:
+        del cls
+        if isinstance(value, str):
+            return _load_pattern_catalog_file(value)
+        return value
 
     @model_validator(mode="after")
     def _patterns_are_valid(self) -> Self:
@@ -315,6 +345,128 @@ class _CompiledPattern(Protocol):
     ) -> _RegexMatch | None:
         """Search from a code-point offset with a bounded timeout."""
         ...
+
+
+class _StrictCatalogLoader(yaml.SafeLoader):
+    """Safe YAML loader that rejects aliases and duplicate mapping keys."""
+
+    def compose_node(
+        self,
+        parent: object,
+        index: object,
+    ) -> yaml.Node:
+        if self.check_event(AliasEvent):
+            raise ConstructorError(
+                None,
+                None,
+                "YAML aliases are not supported",
+                self.peek_event().start_mark,
+            )
+        return super().compose_node(parent, index)
+
+
+def _construct_unique_mapping(
+    loader: _StrictCatalogLoader,
+    node: MappingNode,
+    deep: bool = False,
+) -> dict[object, object]:
+    loader.flatten_mapping(node)
+    mapping: dict[object, object] = {}
+    for key_node, value_node in node.value:
+        key = loader.construct_object(key_node, deep=deep)
+        try:
+            duplicate = key in mapping
+        except TypeError:
+            raise ConstructorError(
+                "while constructing a mapping",
+                node.start_mark,
+                "found an unhashable key",
+                key_node.start_mark,
+            ) from None
+        if duplicate:
+            raise ConstructorError(
+                "while constructing a mapping",
+                node.start_mark,
+                "found a duplicate key",
+                key_node.start_mark,
+            )
+        mapping[key] = loader.construct_object(value_node, deep=deep)
+    return mapping
+
+
+_StrictCatalogLoader.add_constructor(
+    BaseResolver.DEFAULT_MAPPING_TAG,
+    _construct_unique_mapping,
+)
+
+
+def _load_pattern_catalog_file(value: str) -> RegexPatternCatalog:
+    try:
+        path_text = validate_scalar_string(value)
+        if (
+            not path_text
+            or len(path_text.encode("utf-8")) > MAX_REGEX_CATALOG_PATH_BYTES
+        ):
+            raise ValueError
+        relative_path = Path(path_text)
+        if (
+            relative_path.is_absolute()
+            or relative_path.suffix.lower() not in {".yaml", ".yml"}
+            or ".." in relative_path.parts
+        ):
+            raise ValueError
+
+        catalog_root = Path.cwd().resolve(strict=True)
+        catalog_path = (catalog_root / relative_path).resolve(strict=True)
+        catalog_path.relative_to(catalog_root)
+        current_path = catalog_root
+        for part in relative_path.parts:
+            current_path /= part
+            if current_path.is_symlink():
+                raise ValueError
+
+        metadata = catalog_path.stat()
+        if (
+            not S_ISREG(metadata.st_mode)
+            or metadata.st_size > MAX_REGEX_CATALOG_FILE_BYTES
+        ):
+            raise ValueError
+        return _read_pattern_catalog_file(
+            str(catalog_path),
+            metadata.st_dev,
+            metadata.st_ino,
+            metadata.st_size,
+            metadata.st_mtime_ns,
+            metadata.st_ctime_ns,
+        )
+    except (
+        OSError,
+        RecursionError,
+        UnicodeError,
+        ValueError,
+        yaml.YAMLError,
+    ):
+        raise ValueError("regex pattern catalog file is invalid") from None
+
+
+@lru_cache(maxsize=64)
+def _read_pattern_catalog_file(
+    path: str,
+    device: int,
+    inode: int,
+    size: int,
+    modified_at_ns: int,
+    changed_at_ns: int,
+) -> RegexPatternCatalog:
+    del device, inode, modified_at_ns, changed_at_ns
+    contents = Path(path).read_bytes()
+    if len(contents) != size or len(contents) > MAX_REGEX_CATALOG_FILE_BYTES:
+        raise ValueError
+    values = yaml.load(
+        contents.decode("utf-8", errors="strict"),
+        Loader=_StrictCatalogLoader,
+    )
+    return RegexPatternCatalog.model_validate(values)
 
 
 def _validate_name(value: str) -> str:

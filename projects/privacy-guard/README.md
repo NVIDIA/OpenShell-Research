@@ -38,11 +38,14 @@ preceding stage's processed text. Detect and block run the same engines with the
 detection-only strategy, so replacement recipes may remain configured but
 dormant.
 
-Privacy Guard accepts a structured catalog, not a filesystem path. The
-[regex engine example](examples/regex-engine/README.md) includes a reference
-catalog to copy and adapt. Transparent catalog-file expansion belongs in
-OpenShell's policy installation flow and is not yet supported by the current
-protocol.
+`pattern_catalog` accepts either the structured catalog or a relative path to a
+complete `.yaml` or `.yml` catalog. File-backed catalogs are resolved beneath
+Privacy Guard's working directory and normalized to the same
+`RegexPatternCatalog` model as inline input. Absolute paths, traversal, symlinks,
+unsafe YAML tags, aliases, duplicate keys, invalid UTF-8, and oversized files
+are rejected. The
+[RegexEngine end-to-end example](examples/regex-engine/README.md) passes its
+catalog as `patterns.yaml`.
 
 ## Architecture
 
