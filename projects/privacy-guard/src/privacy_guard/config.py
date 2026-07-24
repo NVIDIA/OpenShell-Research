@@ -1,135 +1,200 @@
-"""Strict middleware policy configuration at the untrusted config boundary."""
+"""Strict entity-processing policy configuration.
+
+The concrete model accepted at the policy boundary is finalized by
+``EngineRegistry``.  Its stage ``config`` field is a Pydantic discriminated
+union containing the exact config model registered by every engine.
+"""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import json
+from collections.abc import Mapping, Sequence
 from enum import StrEnum
-from string import Formatter
-from typing import Literal, Self, TypeAlias
+from functools import reduce
+from hashlib import sha256
+from operator import or_
+from typing import Annotated, Generic, Self, TypeAlias, TypeVar
 
-from pydantic import Field, field_validator
+from pydantic import (
+    Field,
+    TypeAdapter,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
+from privacy_guard.base import StrictDomainModel
+from privacy_guard.engines import EngineConfig
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
-from privacy_guard.scanners import Confidence
-from privacy_guard.validation import (
+from privacy_guard.string_validators import (
     BoundedMetadataString,
-    NonEmptyScalarString,
-    ScalarString,
-    StrictSensitiveModel,
-    parse_scalar_string,
+    validate_scalar_string,
 )
 
 
 class PolicyAction(StrEnum):
-    """Supported actions for scanner findings."""
+    """User-facing disposition applied after all configured stages run."""
 
-    OBSERVE = "observe"
-    REDACT = "redact"
+    DETECT = "detect"
     BLOCK = "block"
+    REPLACE = "replace"
 
 
-class ActionConfig(StrictSensitiveModel):
-    """Finding criteria shared by every policy action."""
+class OnDetection(StrictDomainModel):
+    """Required policy disposition for detected entities."""
 
     action: PolicyAction
-    entity_types: frozenset[BoundedMetadataString] | None = Field(
-        default=None, repr=False
-    )
-    minimum_confidence: Confidence | None = None
 
-
-class ObserveActionConfig(ActionConfig):
-    """Observe selected findings without changing or blocking the request."""
-
-    action: Literal[PolicyAction.OBSERVE] = PolicyAction.OBSERVE
-
-
-class BlockActionConfig(ActionConfig):
-    """Block the request when at least one selected finding is present."""
-
-    action: Literal[PolicyAction.BLOCK] = PolicyAction.BLOCK
-
-
-class RedactActionConfig(ActionConfig):
-    """Replace selected finding spans using a bounded text template."""
-
-    action: Literal[PolicyAction.REDACT] = PolicyAction.REDACT
-    template: ScalarString = Field(default="[{entity}]", repr=False)
-
-    @field_validator("template")
+    @field_validator("action", mode="before")
     @classmethod
-    def _validate_template(cls, value: str) -> str:
-        """Allow static text and the finding entity, but no formatting features."""
-        try:
-            parsed_fields = Formatter().parse(value)
-            for _, field_name, format_spec, conversion in parsed_fields:
-                if field_name is not None and field_name != "entity":
-                    raise ValueError("template field is unsupported")
-                if format_spec or conversion is not None:
-                    raise ValueError("template formatting options are unsupported")
-        except ValueError:
-            raise ValueError("redaction template syntax is invalid") from None
-        return value
+    def _parse_action(cls, value: object) -> PolicyAction:
+        if isinstance(value, PolicyAction):
+            return value
+        return PolicyAction(validate_scalar_string(value))
 
 
-PolicyActionConfig: TypeAlias = (
-    ObserveActionConfig | BlockActionConfig | RedactActionConfig
+_EngineConfigT = TypeVar(
+    "_EngineConfigT",
+    bound=EngineConfig[StrictDomainModel],
 )
 
 
-class PolicyConfig(StrictSensitiveModel):
-    """Strict, immutable policy parsed from the supervisor's request config."""
+class EntityProcessingStage(
+    StrictDomainModel,
+    Generic[_EngineConfigT],
+):
+    """One ordered invocation of an engine with an optional diagnostic name."""
 
-    body_format: NonEmptyScalarString = Field(default="json", repr=False)
-    on_finding: PolicyActionConfig = Field(
-        default_factory=RedactActionConfig,
-        discriminator="action",
-        repr=False,
-    )
+    name: BoundedMetadataString | None = None
+    config: _EngineConfigT = Field(repr=False)
 
+    def diagnostic_name(self, stage_number: int) -> str:
+        """Return the explicit name or a deterministic one-based source label."""
+        if self.name is not None:
+            return self.name
+        if isinstance(stage_number, bool) or stage_number < 1:
+            raise ValueError("stage number must be a positive integer")
+        engine = getattr(self.config, "engine", None)
+        if not isinstance(engine, str):
+            raise ValueError("stage config has no engine discriminator")
+        return f"{engine}[{stage_number}]"
+
+
+class EntityProcessing(
+    StrictDomainModel,
+    Generic[_EngineConfigT],
+):
+    """The ordered entity-processing stages for one policy."""
+
+    stages: tuple[EntityProcessingStage[_EngineConfigT], ...] = Field(repr=False)
+
+    @field_validator("stages", mode="before")
     @classmethod
-    def from_mapping(cls, values: object) -> Self:
-        """Parse untrusted values while discarding Pydantic error content."""
-        try:
-            if not isinstance(values, Mapping):
-                raise TypeError("configuration input must be a mapping")
-            prepared = dict(values)
-            if "on_finding" in prepared:
-                prepared["on_finding"] = _prepare_action_config(prepared["on_finding"])
-            return cls.model_validate(prepared)
-        except (TypeError, ValueError):
-            raise PrivacyGuardError(ErrorCode.CONFIG_INVALID) from None
+    def _parse_stages(cls, value: object) -> object:
+        if not isinstance(value, list | tuple) or not value:
+            raise ValueError("stages must be a non-empty list")
+        return tuple(value)
+
+    @model_validator(mode="after")
+    def _diagnostic_names_are_unique(self) -> Self:
+        names = [
+            stage.diagnostic_name(index)
+            for index, stage in enumerate(self.stages, start=1)
+        ]
+        if len(names) != len(set(names)):
+            raise ValueError("stage diagnostic names must be unique")
+        return self
 
 
-def _parse_policy_action(value: object) -> PolicyAction:
-    return PolicyAction(parse_scalar_string(value))
+class PrivacyGuardConfig(
+    StrictDomainModel,
+    Generic[_EngineConfigT],
+):
+    """Complete validated Privacy Guard behavior for one OpenShell policy."""
+
+    entity_processing: EntityProcessing[_EngineConfigT] = Field(repr=False)
+    on_detection: OnDetection = Field(repr=False)
 
 
-def _parse_confidence(value: object) -> Confidence:
-    return Confidence(parse_scalar_string(value))
+FinalizedPrivacyGuardConfig: TypeAlias = PrivacyGuardConfig[
+    EngineConfig[StrictDomainModel]
+]
+FinalizedPrivacyGuardConfigType = type[FinalizedPrivacyGuardConfig]
 
 
-def _prepare_action_config(value: object) -> dict[str, object]:
-    if not isinstance(value, Mapping):
-        raise ValueError("action configuration must be a mapping")
-    prepared = dict(value)
-    if "action" in prepared:
-        prepared["action"] = _parse_policy_action(prepared["action"])
-    if prepared.get("minimum_confidence") is not None:
-        prepared["minimum_confidence"] = _parse_confidence(
-            prepared["minimum_confidence"]
-        )
-    if "entity_types" in prepared:
-        prepared["entity_types"] = _parse_entity_type_list(prepared["entity_types"])
-    return prepared
+def build_privacy_guard_config_type(
+    config_types: Sequence[type[EngineConfig[StrictDomainModel]]],
+) -> FinalizedPrivacyGuardConfigType:
+    """Build the exact registry-dependent discriminated policy model."""
+    if not config_types:
+        raise ValueError("at least one engine config type must be registered")
+    registered_union = reduce(or_, config_types)
+    registered_config = Annotated[
+        registered_union,  # ty: ignore[invalid-type-form]
+        Field(discriminator="engine"),
+    ]
+    config_type = PrivacyGuardConfig.__class_getitem__(
+        registered_config  # ty: ignore[invalid-argument-type]
+    )
+    if not isinstance(config_type, type) or not issubclass(
+        config_type, PrivacyGuardConfig
+    ):
+        raise TypeError("Pydantic did not construct a policy config type")
+    return config_type  # ty: ignore[invalid-return-type]
 
 
-def _parse_entity_type_list(value: object) -> frozenset[str] | None:
-    if value is None:
-        return None
-    if not isinstance(value, list):
-        raise ValueError("entity types must be a list of strings or null")
-    parsed = tuple(parse_scalar_string(item) for item in value)
-    if len(set(parsed)) != len(parsed):
-        raise ValueError("entity types must be unique")
-    return frozenset(parsed)
+def build_privacy_guard_config_adapter(
+    config_types: Sequence[type[EngineConfig[StrictDomainModel]]],
+) -> TypeAdapter[FinalizedPrivacyGuardConfig]:
+    """Build the registry-dependent adapter used for validation and schemas."""
+    config_type = build_privacy_guard_config_type(config_types)
+    return TypeAdapter(config_type)
+
+
+def parse_privacy_guard_config(
+    adapter: TypeAdapter[FinalizedPrivacyGuardConfig],
+    values: object,
+) -> FinalizedPrivacyGuardConfig:
+    """Parse an expanded mapping without exposing rejected values in errors."""
+    if not isinstance(values, Mapping):
+        raise PrivacyGuardError(ErrorCode.CONFIG_INVALID)
+    try:
+        return adapter.validate_python(dict(values))
+    except (TypeError, ValueError, ValidationError):
+        raise PrivacyGuardError(ErrorCode.CONFIG_INVALID) from None
+
+
+def canonical_config_json(
+    config: PrivacyGuardConfig[EngineConfig[StrictDomainModel]],
+) -> bytes:
+    """Serialize every concrete engine field deterministically for hashing."""
+    return json.dumps(
+        config.model_dump(mode="json"),
+        allow_nan=False,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+
+
+def configuration_fingerprint(
+    config: PrivacyGuardConfig[EngineConfig[StrictDomainModel]],
+) -> str:
+    """Return the canonical SHA-256 fingerprint of an expanded policy config."""
+    return sha256(canonical_config_json(config)).hexdigest()
+
+
+__all__ = [
+    "EntityProcessing",
+    "EntityProcessingStage",
+    "FinalizedPrivacyGuardConfig",
+    "FinalizedPrivacyGuardConfigType",
+    "OnDetection",
+    "PolicyAction",
+    "PrivacyGuardConfig",
+    "build_privacy_guard_config_adapter",
+    "build_privacy_guard_config_type",
+    "canonical_config_json",
+    "configuration_fingerprint",
+    "parse_privacy_guard_config",
+]

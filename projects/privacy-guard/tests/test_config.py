@@ -1,369 +1,264 @@
+from __future__ import annotations
+
+from collections.abc import Callable
+from copy import deepcopy
+
 import pytest
 from pydantic import ValidationError
 
 from privacy_guard.config import (
-    ActionConfig,
-    BlockActionConfig,
-    ObserveActionConfig,
     PolicyAction,
-    PolicyActionConfig,
-    PolicyConfig,
-    RedactActionConfig,
+    configuration_fingerprint,
 )
-from privacy_guard.constants import MAX_SCANNER_METADATA_BYTES
+from privacy_guard.engine_registry import EngineRegistry
+from privacy_guard.engines import (
+    RegexEngine,
+    RegexEngineConfig,
+    RegexPatternCatalog,
+)
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
-from privacy_guard.request_body import select_format_handler
-from privacy_guard.scanners import Confidence
-from privacy_guard.validation import (
-    BoundedMetadataString,
-    NonEmptyScalarString,
-    ScalarString,
-    StrictDomainModel,
-)
 
 
-class _ValidationFixture(StrictDomainModel):
-    scalar: ScalarString
-    non_empty: NonEmptyScalarString
-    metadata: BoundedMetadataString
+def _registry() -> EngineRegistry:
+    registry = EngineRegistry()
+    registry.register(RegexEngine)
+    registry.finalize()
+    return registry
 
 
-class _InvalidDefaultFixture(StrictDomainModel):
-    value: NonEmptyScalarString = ""
-
-
-def _wire_on_finding(action: str, **values: object) -> dict[str, object]:
-    return {"on_finding": {"action": action, **values}}
-
-
-def test_defaults_use_a_complete_redact_action() -> None:
-    config = PolicyConfig()
-
-    assert config.body_format == "json"
-    assert type(config.on_finding) is RedactActionConfig
-    assert config.on_finding.action is PolicyAction.REDACT
-    assert config.on_finding.entity_types is None
-    assert config.on_finding.minimum_confidence is None
-    assert config.on_finding.template == "[{entity}]"
-    assert [action.value for action in PolicyAction] == ["observe", "redact", "block"]
-
-
-@pytest.mark.parametrize(
-    ("action", "expected_type"),
-    [
-        (PolicyAction.OBSERVE, ObserveActionConfig),
-        (PolicyAction.REDACT, RedactActionConfig),
-        (PolicyAction.BLOCK, BlockActionConfig),
-    ],
-)
-def test_wire_parser_selects_discriminated_action_model(
-    action: PolicyAction, expected_type: type[ActionConfig]
-) -> None:
-    config = PolicyConfig.from_mapping(_wire_on_finding(action.value))
-
-    assert type(config.on_finding) is expected_type
-    assert config.on_finding.action is action
-
-
-@pytest.mark.parametrize(
-    "action",
-    [
-        ObserveActionConfig(),
-        BlockActionConfig(
-            entity_types=frozenset({"email"}),
-            minimum_confidence=Confidence.HIGH,
-        ),
-        RedactActionConfig(template="[{entity}]"),
-    ],
-)
-def test_discriminated_action_serialization_round_trips(
-    action: PolicyActionConfig,
-) -> None:
-    serialized = PolicyConfig(on_finding=action).model_dump(mode="json")
-    reparsed = PolicyConfig.from_mapping(serialized)
-
-    assert serialized["on_finding"]["action"] == action.action.value
-    assert type(reparsed.on_finding) is type(action)
-    assert reparsed == PolicyConfig(on_finding=action)
-
-
-def test_on_finding_schema_declares_action_discriminator() -> None:
-    action_schema = PolicyConfig.model_json_schema()["properties"]["on_finding"]
-
-    assert action_schema["discriminator"] == {
-        "propertyName": "action",
-        "mapping": {
-            "observe": "#/$defs/ObserveActionConfig",
-            "block": "#/$defs/BlockActionConfig",
-            "redact": "#/$defs/RedactActionConfig",
+def _config(
+    *,
+    action: str = "detect",
+    replacement: dict[str, object] | None = None,
+    stage_name: str | None = None,
+):
+    engine_config = {
+        "engine": "regex",
+        "pattern_catalog": {
+            "entities": [
+                {
+                    "name": "email",
+                    "patterns": [
+                        {
+                            "pattern": r"\buser@example\.com\b",
+                            "confidence": "high",
+                        }
+                    ],
+                }
+            ]
         },
+    }
+    if replacement is not None:
+        engine_config["replacement"] = replacement
+    stage = {"config": engine_config}
+    if stage_name is not None:
+        stage["name"] = stage_name
+    return {
+        "entity_processing": {"stages": [stage]},
+        "on_detection": {"action": action},
     }
 
 
-@pytest.mark.parametrize("confidence", list(Confidence))
-def test_wire_parser_accepts_confidence_strings(confidence: Confidence) -> None:
-    config = PolicyConfig.from_mapping(
-        _wire_on_finding("observe", minimum_confidence=confidence.value)
+@pytest.mark.parametrize("action", list(PolicyAction))
+def test_policy_action_uses_detect_block_replace(action: PolicyAction) -> None:
+    replacement: dict[str, object] | None = (
+        {"strategy": "template", "template": "[{entity}]"}
+        if action is PolicyAction.REPLACE
+        else None
+    )
+    config = _registry().validate_config(
+        _config(action=action.value, replacement=replacement)
     )
 
-    assert config.on_finding.minimum_confidence is confidence
+    assert config.on_detection.action is action
+    assert [item.value for item in PolicyAction] == ["detect", "block", "replace"]
 
 
-def test_null_minimum_confidence_selects_every_confidence() -> None:
-    config = PolicyConfig.from_mapping(
-        _wire_on_finding("observe", minimum_confidence=None)
+def test_known_discriminator_constructs_the_exact_engine_config() -> None:
+    config = _registry().validate_config(_config())
+    stage = config.entity_processing.stages[0]
+
+    assert type(stage.config) is RegexEngineConfig
+    assert type(stage.config.pattern_catalog) is RegexPatternCatalog
+    assert stage.config.pattern_catalog.entities[0].patterns[0].name is None
+    assert stage.diagnostic_name(1) == "regex[1]"
+
+
+def test_explicit_stage_name_is_the_diagnostic_source() -> None:
+    config = _registry().validate_config(_config(stage_name="credentials"))
+
+    assert config.entity_processing.stages[0].diagnostic_name(1) == "credentials"
+
+
+def test_discriminated_union_round_trip_preserves_concrete_fields() -> None:
+    registry = _registry()
+    parsed = registry.validate_config(
+        _config(
+            action="replace",
+            replacement={"strategy": "template", "template": "[{entity}]"},
+        )
+    )
+    serialized = parsed.model_dump(mode="json")
+    reparsed = registry.validate_config(serialized)
+
+    assert type(reparsed.entity_processing.stages[0].config) is RegexEngineConfig
+    assert reparsed == parsed
+    assert serialized["entity_processing"]["stages"][0]["config"]["engine"] == "regex"
+    assert (
+        serialized["entity_processing"]["stages"][0]["config"]["replacement"][
+            "strategy"
+        ]
+        == "template"
     )
 
-    assert config.on_finding.minimum_confidence is None
+
+def test_generated_schema_declares_the_engine_discriminator() -> None:
+    schema = _registry().configuration_json_schema()
+    definitions = _required_dict(schema, "$defs")
+    stage_definition = next(
+        definition
+        for name, definition in definitions.items()
+        if isinstance(name, str) and name.startswith("EntityProcessingStage")
+    )
+    properties = _required_dict(stage_definition, "properties")
+    config_schema = _required_dict(properties, "config")
+
+    assert config_schema["discriminator"] == {
+        "mapping": {"regex": "#/$defs/RegexEngineConfig"},
+        "propertyName": "engine",
+    }
 
 
-@pytest.mark.parametrize(
-    "values",
-    [
-        {"unknown": "value"},
-        {"action": {"kind": "observe"}},
-        {"on_finding": "observe"},
-        {"on_finding": {"kind": "observe"}},
-        {"on_finding": {"action": "audit"}},
-        {"on_finding": {}},
-        {"body_format": ""},
-        {"debug_inject_path": "/message"},
-        {"debug_inject_text": " suffix"},
-        {"redaction_template": "[redacted]"},
-        {"entity_types": ["email"]},
-        {"minimum_confidence": "high"},
-    ],
-)
-def test_rejects_invalid_or_misplaced_fields(values: dict[str, object]) -> None:
+def _required_dict(mapping: object, key: str):
+    assert isinstance(mapping, dict)
+    value = mapping.get(key)
+    assert isinstance(value, dict)
+    return value
+
+
+def test_runtime_config_rejects_a_catalog_file_path() -> None:
+    values = _config()
+    values["entity_processing"]["stages"][0]["config"]["pattern_catalog"] = (
+        "./patterns.yaml"
+    )
+
     with pytest.raises(PrivacyGuardError) as exception_info:
-        PolicyConfig.from_mapping(values)
-
-    assert exception_info.value.code is ErrorCode.CONFIG_INVALID
-    assert exception_info.value.__cause__ is None
-
-
-@pytest.mark.parametrize(
-    "values",
-    [
-        {"body_format": True},
-        _wire_on_finding("redact", template=True),
-        _wire_on_finding("observe", minimum_confidence=True),
-        {"on_finding": {"action": True}},
-    ],
-)
-def test_does_not_coerce_wrong_scalar_types(values: dict[str, object]) -> None:
-    with pytest.raises(PrivacyGuardError) as exception_info:
-        PolicyConfig.from_mapping(values)
+        _registry().validate_config(values)
 
     assert exception_info.value.code is ErrorCode.CONFIG_INVALID
 
 
-@pytest.mark.parametrize(
-    "values",
-    [
-        {"body_format": "safe\ud800sentinel"},
-        {"on_finding": {"action": "safe\ud800sentinel"}},
-        _wire_on_finding("redact", template="safe\ud800sentinel"),
-        _wire_on_finding("observe", minimum_confidence="safe\ud800sentinel"),
-    ],
-)
-def test_rejects_unpaired_unicode_surrogates(values: dict[str, object]) -> None:
+def test_replace_requires_a_replacement_recipe_on_every_stage() -> None:
     with pytest.raises(PrivacyGuardError) as exception_info:
-        PolicyConfig.from_mapping(values)
+        _registry().validate_config(_config(action="replace"))
 
     assert exception_info.value.code is ErrorCode.CONFIG_INVALID
 
 
-def test_accepts_action_finding_criteria() -> None:
-    config = PolicyConfig.from_mapping(
-        _wire_on_finding(
-            "block",
-            entity_types=["email", "api_key"],
-            minimum_confidence="high",
+@pytest.mark.parametrize("action", ["detect", "block"])
+def test_dormant_replacement_recipe_is_valid_for_detection_only_actions(
+    action: str,
+) -> None:
+    config = _registry().validate_config(
+        _config(
+            action=action,
+            replacement={"strategy": "template", "template": "[redacted]"},
         )
     )
 
-    assert config.on_finding.entity_types == frozenset({"email", "api_key"})
-    assert config.on_finding.minimum_confidence is Confidence.HIGH
+    assert config.entity_processing.stages[0].config.replacement is not None
 
 
 @pytest.mark.parametrize(
-    "values",
+    "mutation",
     [
-        {"on_finding": PolicyAction.BLOCK},
-        _wire_on_finding("block", entity_types=("email",)),
-        _wire_on_finding("block", entity_types={"email"}),
-        _wire_on_finding("block", entity_types="email"),
-        _wire_on_finding("block", entity_types=["email", 1]),
+        lambda values: values.update({"body_format": "json"}),
+        lambda values: values.update({"on_finding": {"action": "observe"}}),
+        lambda values: values["on_detection"].update({"action": "observe"}),
+        lambda values: values["on_detection"].update({"action": "redact"}),
+        lambda values: values["entity_processing"]["stages"][0]["config"].update(
+            {"kind": "regex"}
+        ),
+        lambda values: values["entity_processing"]["stages"][0]["config"].update(
+            {"preset": "pii"}
+        ),
     ],
 )
-def test_wire_parser_rejects_non_wire_forms(values: dict[str, object]) -> None:
-    with pytest.raises(PrivacyGuardError) as exception_info:
-        PolicyConfig.from_mapping(values)
+def test_removed_or_unknown_policy_fields_are_rejected(
+    mutation: Callable[[dict[str, object]], None],
+) -> None:
+    values = _config()
+    mutation(values)
 
-    assert exception_info.value.code is ErrorCode.CONFIG_INVALID
-
-
-@pytest.mark.parametrize(
-    "values",
-    [
-        [("on_finding", {"action": "block"})],
-        (("on_finding", {"action": "block"}),),
-        iter([("on_finding", {"action": "block"})]),
-    ],
-)
-def test_wire_parser_rejects_non_mapping_pair_iterables(values: object) -> None:
-    with pytest.raises(PrivacyGuardError) as exception_info:
-        PolicyConfig.from_mapping(values)
-
-    assert exception_info.value.code is ErrorCode.CONFIG_INVALID
-    assert exception_info.value.__cause__ is None
-
-
-def test_direct_construction_is_strict_model_to_model_use() -> None:
-    action = BlockActionConfig(
-        entity_types=frozenset({"email"}),
-        minimum_confidence=Confidence.HIGH,
-    )
-    config = PolicyConfig(on_finding=action)
-
-    assert config.on_finding is action
-
-    discriminated = PolicyConfig.model_validate({"on_finding": {"action": "block"}})
-    assert type(discriminated.on_finding) is BlockActionConfig
-    with pytest.raises(ValidationError):
-        BlockActionConfig.model_validate({"entity_types": ["email"]})
-    with pytest.raises(ValidationError):
-        BlockActionConfig.model_validate({"minimum_confidence": "high"})
-
-
-def test_template_is_valid_only_for_redact_action() -> None:
-    redact = PolicyConfig.from_mapping(
-        _wire_on_finding("redact", template="[redacted]")
-    )
-
-    assert type(redact.on_finding) is RedactActionConfig
-    assert redact.on_finding.template == "[redacted]"
-    for action in ("observe", "block"):
-        with pytest.raises(PrivacyGuardError):
-            PolicyConfig.from_mapping(_wire_on_finding(action, template="[redacted]"))
-
-
-@pytest.mark.parametrize(
-    "entities",
-    [
-        [""],
-        ["email", "email"],
-        ["safe\ud800sentinel"],
-        ["x" * (MAX_SCANNER_METADATA_BYTES + 1)],
-        ["😀" * (MAX_SCANNER_METADATA_BYTES // 4 + 1)],
-    ],
-)
-def test_rejects_invalid_entity_names(entities: list[str]) -> None:
     with pytest.raises(PrivacyGuardError):
-        PolicyConfig.from_mapping(_wire_on_finding("observe", entity_types=entities))
+        _registry().validate_config(values)
 
 
-def test_none_selects_all_entities_and_empty_set_selects_none() -> None:
-    all_entities = PolicyConfig.from_mapping(
-        _wire_on_finding("observe", entity_types=None)
-    )
-    no_entities = PolicyConfig.from_mapping(
-        _wire_on_finding("observe", entity_types=[])
-    )
-
-    assert all_entities.on_finding.entity_types is None
-    assert no_entities.on_finding.entity_types == frozenset()
-
-
-def test_accepts_entity_name_at_exact_utf8_metadata_limit() -> None:
-    entity = "😀" * (MAX_SCANNER_METADATA_BYTES // 4)
-
-    config = PolicyConfig.from_mapping(
-        _wire_on_finding("observe", entity_types=[entity])
+def test_stage_list_is_non_empty_and_explicit_names_are_unique() -> None:
+    empty = _config()
+    empty["entity_processing"]["stages"] = []
+    duplicate = _config(stage_name="same")
+    duplicate["entity_processing"]["stages"].append(
+        deepcopy(duplicate["entity_processing"]["stages"][0])
     )
 
-    assert config.on_finding.entity_types == frozenset({entity})
+    with pytest.raises(PrivacyGuardError):
+        _registry().validate_config(empty)
+    with pytest.raises(PrivacyGuardError):
+        _registry().validate_config(duplicate)
 
 
-def test_shared_validation_types_are_strict_scalar_safe_and_validate_defaults() -> None:
-    fixture = _ValidationFixture(
-        scalar="",
-        non_empty="value",
-        metadata="metadata",
+def test_explicit_stage_name_cannot_collide_with_a_derived_name() -> None:
+    values = _config(stage_name="regex[2]")
+    values["entity_processing"]["stages"].append(
+        deepcopy(_config()["entity_processing"]["stages"][0])
     )
 
-    assert fixture.scalar == ""
-    with pytest.raises(ValidationError):
-        _ValidationFixture.model_validate(
-            {"scalar": 1, "non_empty": "value", "metadata": "metadata"}
-        )
-    with pytest.raises(ValidationError):
-        _ValidationFixture(scalar="\ud800", non_empty="value", metadata="metadata")
-    with pytest.raises(ValidationError):
-        _InvalidDefaultFixture()
+    with pytest.raises(PrivacyGuardError):
+        _registry().validate_config(values)
 
 
-@pytest.mark.parametrize("template", ["[redacted]", "[{entity}]", "{{{entity}}}"])
-def test_accepts_static_and_label_only_templates(template: str) -> None:
-    config = PolicyConfig.from_mapping(_wire_on_finding("redact", template=template))
-
-    assert type(config.on_finding) is RedactActionConfig
-    assert config.on_finding.template == template
-
-
-@pytest.mark.parametrize(
-    "template",
-    ["{unknown}", "{entity!r}", "{entity:>10}", "{", "}", "{}", "{0}"],
-)
-def test_rejects_unsafe_or_malformed_templates(template: str) -> None:
-    with pytest.raises(PrivacyGuardError) as exception_info:
-        PolicyConfig.from_mapping(_wire_on_finding("redact", template=template))
-
-    assert exception_info.value.code is ErrorCode.CONFIG_INVALID
-
-
-def test_models_are_frozen_and_sensitive_fields_are_hidden_from_repr() -> None:
-    sentinel = "sensitive-config-value-8472"
-    config = PolicyConfig.from_mapping(
-        {
-            "body_format": sentinel,
-            **_wire_on_finding(
-                "redact",
-                template=sentinel,
-                entity_types=[sentinel],
-            ),
-        }
+def test_regex_pattern_names_are_optional_but_supplied_names_are_unique() -> None:
+    values = _config()
+    patterns = values["entity_processing"]["stages"][0]["config"]["pattern_catalog"][
+        "entities"
+    ][0]["patterns"]
+    patterns.extend(
+        [
+            {"pattern": "second", "confidence": "low"},
+            {"name": "named", "pattern": "third", "confidence": "medium"},
+        ]
     )
+    config = _registry().validate_config(values)
+
+    regex_config = config.entity_processing.stages[0].config
+    assert isinstance(regex_config, RegexEngineConfig)
+    parsed_patterns = regex_config.pattern_catalog.entities[0].patterns
+    assert [pattern.name for pattern in parsed_patterns] == [None, None, "named"]
+
+    patterns.append({"name": "named", "pattern": "duplicate", "confidence": "high"})
+    with pytest.raises(PrivacyGuardError):
+        _registry().validate_config(values)
+
+
+def test_canonical_fingerprint_covers_concrete_expanded_config() -> None:
+    registry = _registry()
+    first = registry.validate_config(_config())
+    equivalent = registry.validate_config(deepcopy(_config()))
+    changed_values = _config()
+    changed_values["entity_processing"]["stages"][0]["config"]["pattern_catalog"][
+        "entities"
+    ][0]["patterns"][0]["confidence"] = "low"
+    changed = registry.validate_config(changed_values)
+
+    assert configuration_fingerprint(first) == configuration_fingerprint(equivalent)
+    assert configuration_fingerprint(first) != configuration_fingerprint(changed)
+
+
+def test_models_are_frozen_and_hide_engine_configuration_from_repr() -> None:
+    config = _registry().validate_config(_config())
+    pattern = "sensitive-pattern-value"
 
     with pytest.raises(ValidationError):
-        setattr(config, "body_format", "json")
-    with pytest.raises(ValidationError):
-        setattr(config.on_finding, "minimum_confidence", Confidence.HIGH)
-    assert sentinel not in repr(config)
-    assert sentinel not in repr(config.on_finding)
-
-
-def test_validation_failure_does_not_leak_input_or_pydantic_error() -> None:
-    sentinel = "sensitive-invalid-config-value-8472"
-
-    with pytest.raises(PrivacyGuardError) as exception_info:
-        PolicyConfig.from_mapping({"body_format": sentinel + "\ud800"})
-
-    error = exception_info.value
-    assert error.code is ErrorCode.CONFIG_INVALID
-    assert sentinel not in str(error)
-    assert sentinel not in repr(error)
-    assert sentinel not in repr(error.args)
-    assert error.__cause__ is None
-
-
-def test_select_format_handler_error_does_not_leak_unknown_format() -> None:
-    sentinel = "sensitive-unknown-format-8472"
-
-    with pytest.raises(PrivacyGuardError) as exception_info:
-        select_format_handler(sentinel)
-
-    assert exception_info.value.code is ErrorCode.BODY_FORMAT_UNSUPPORTED
-    assert sentinel not in str(exception_info.value)
-    assert sentinel not in repr(exception_info.value)
+        setattr(config.on_detection, "action", PolicyAction.BLOCK)
+    assert pattern not in repr(config)

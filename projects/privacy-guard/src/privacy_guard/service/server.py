@@ -1,15 +1,10 @@
-"""gRPC server process that hosts Privacy Guard at a configured endpoint.
-
-This is pure transport lifecycle -- it has no counterpart in an in-process
-(built-in) middleware. It exists only because Privacy Guard runs out-of-process
-and the supervisor reaches it over gRPC. The default endpoint is loopback.
-"""
+"""Loopback gRPC server and configuration-discovery CLI."""
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
-from pathlib import Path
 from typing import Annotated
 
 import grpc
@@ -17,46 +12,48 @@ import typer
 
 from privacy_guard.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
 from privacy_guard.constants import MAX_CONCURRENT_RPCS, MAX_RECEIVE_MESSAGE_BYTES
+from privacy_guard.engine_registry import EngineRegistry
+from privacy_guard.engines import RegexEngine
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
-from privacy_guard.processor import RequestProcessor
-from privacy_guard.scanners import RegexScanner, Scanner, ScannerConfig
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
 
 app = typer.Typer(
     name="privacy-guard",
-    help="Run Privacy Guard with a built-in scanner.",
+    help="Run Privacy Guard or inspect its registered entity-processing engines.",
     no_args_is_help=True,
     add_completion=False,
 )
 
 
+def create_default_registry() -> EngineRegistry:
+    """Build the operator registry shipped by the base package."""
+    registry = EngineRegistry()
+    registry.register(RegexEngine)
+    registry.finalize()
+    return registry
+
+
 class MiddlewareServer:
-    """High-level server that wires a scanner into the Privacy Guard service."""
+    """High-level server owning registry, middleware, gRPC, and shutdown."""
 
     def __init__(
         self,
         *,
-        scanner: Scanner[ScannerConfig],
+        registry: EngineRegistry | None = None,
         log_request_content: bool = False,
     ) -> None:
         self._servicer = PrivacyGuardMiddleware(
-            RequestProcessor(
-                [scanner],
-                log_request_content=log_request_content,
-            )
+            registry or create_default_registry(),
+            log_request_content=log_request_content,
         )
 
     def serve(self, listen: str = "127.0.0.1:50051") -> None:
-        """Serve until termination using a managed synchronous entry point."""
+        """Serve until termination through a managed synchronous entry point."""
         asyncio.run(serve(self._servicer, listen))
 
 
 def create_server(servicer: PrivacyGuardMiddleware) -> grpc.aio.Server:
-    """Build an unstarted gRPC server with the servicer mounted (no port bound).
-
-    The receive limit reserves bounded space around the advertised body maximum
-    for the protobuf envelope; the servicer enforces the body limit itself.
-    """
+    """Build an unstarted bounded gRPC server."""
     server = grpc.aio.server(
         maximum_concurrent_rpcs=MAX_CONCURRENT_RPCS,
         options=(("grpc.max_receive_message_length", MAX_RECEIVE_MESSAGE_BYTES),),
@@ -69,7 +66,7 @@ async def serve(
     servicer: PrivacyGuardMiddleware,
     listen: str = "127.0.0.1:50051",
 ) -> None:
-    """Bind ``listen``, start the server, and serve until terminated."""
+    """Bind, start, and serve until termination."""
     server = create_server(servicer)
     try:
         try:
@@ -90,23 +87,16 @@ def main(
     context: typer.Context,
     debug: Annotated[
         bool,
-        typer.Option(
-            "--debug",
-            help="Log content-safe request processing and phase timings.",
-        ),
+        typer.Option(help="Enable content-safe processing diagnostics."),
     ] = False,
     debug_log_content: Annotated[
         bool,
         typer.Option(
-            "--debug-log-content",
-            help=(
-                "DANGEROUS: log complete request bodies before and after "
-                "Privacy Guard processing."
-            ),
+            help="DANGEROUS: log complete input and processed text.",
         ),
     ] = False,
 ) -> None:
-    """Select one of Privacy Guard's built-in scanners."""
+    """Configure Privacy Guard command logging."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -118,49 +108,44 @@ def main(
     if debug_log_content:
         _LOGGER.warning(
             "privacy_guard_request_content_logging_enabled "
-            "complete_request_bodies_may_contain_secrets"
+            "complete_request_text_may_contain_secrets"
         )
 
 
-@app.command("regex")
-def run_regex(
+@app.command("serve")
+def run_server(
     context: typer.Context,
-    config: Annotated[
-        Path,
-        typer.Option(help="Path to the RegexScanner configuration."),
-    ],
     listen: Annotated[
         str,
         typer.Option(help="Address on which the middleware server listens."),
     ] = "127.0.0.1:50051",
-    profile: Annotated[
-        str | None,
-        typer.Option(help="Profile required for a multi-profile configuration."),
-    ] = None,
-    scanner_name: Annotated[
-        str,
-        typer.Option(help="Scanner identity attached to findings."),
-    ] = "regex",
 ) -> None:
-    """Run Privacy Guard with the built-in RegexScanner."""
-    try:
-        scanner = RegexScanner.from_yaml(
-            config,
-            profile,
-            scanner_name=scanner_name,
+    """Run the service; entity behavior comes from prepared policy config."""
+    _LOGGER.info("privacy_guard_server_starting listen=%s", listen)
+    MiddlewareServer(log_request_content=context.obj is True).serve(listen)
+
+
+@app.command("schema")
+def show_schema() -> None:
+    """Print the exact finalized policy JSON Schema."""
+    typer.echo(
+        json.dumps(
+            create_default_registry().configuration_json_schema(),
+            indent=2,
+            ensure_ascii=False,
+            sort_keys=True,
         )
-        _LOGGER.info(
-            "privacy_guard_server_starting scanner=%s listen=%s",
-            scanner.scanner_name,
-            listen,
+    )
+
+
+@app.command("engines")
+def show_engines() -> None:
+    """List installed engines and their maximum processing strategy."""
+    for description in create_default_registry().describe_engines():
+        typer.echo(
+            f"{description.engine}\t{description.supported_strategy.value}"
+            f"\t{description.description}"
         )
-        MiddlewareServer(
-            scanner=scanner,
-            log_request_content=context.obj is True,
-        ).serve(listen)
-    except PrivacyGuardError as error:
-        typer.echo(str(error), err=True)
-        raise typer.Exit(code=1) from None
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -168,3 +153,12 @@ _LOGGER = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     app()
+
+
+__all__ = [
+    "MiddlewareServer",
+    "app",
+    "create_default_registry",
+    "create_server",
+    "serve",
+]

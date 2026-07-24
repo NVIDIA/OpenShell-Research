@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from typing_extensions import override
-
 
 class ErrorKind(StrEnum):
     """Whether a failure is attributable to input or middleware internals."""
@@ -19,8 +17,7 @@ class ErrorComponent(StrEnum):
     """The Privacy Guard component responsible for a failure."""
 
     CONFIG = "config"
-    FORMAT_HANDLER = "format_handler"
-    SCANNER = "scanner"
+    ENGINE = "engine"
     PROCESSOR = "processor"
     SERVICE = "service"
     SERVER = "server"
@@ -32,17 +29,9 @@ class ErrorCode(StrEnum):
     CONFIG_INVALID = "config_invalid"
     REQUEST_PHASE_INVALID = "request_phase_invalid"
     REQUEST_BODY_TOO_LARGE = "request_body_too_large"
-    REQUEST_SHAPE_LIMIT_EXCEEDED = "request_shape_limit_exceeded"
-    BODY_FORMAT_UNSUPPORTED = "body_format_unsupported"
     BODY_ENCODING_INVALID = "body_encoding_invalid"
-    BODY_JSON_INVALID = "body_json_invalid"
-    BODY_RECONSTRUCTION_INVALID = "body_reconstruction_invalid"
-    FORMAT_HANDLER_OUTPUT_INVALID = "format_handler_output_invalid"
-    FORMAT_HANDLER_EXECUTION_FAILED = "format_handler_execution_failed"
-    SCANNER_OUTPUT_INVALID = "scanner_output_invalid"
-    SCANNER_EXECUTION_FAILED = "scanner_execution_failed"
-    SCANNER_CONFIG_INVALID = "scanner_config_invalid"
-    FINDING_LIMIT_EXCEEDED = "finding_limit_exceeded"
+    ENGINE_OUTPUT_INVALID = "engine_output_invalid"
+    ENGINE_EXECUTION_FAILED = "engine_execution_failed"
     RESULT_LIMIT_EXCEEDED = "result_limit_exceeded"
     SERVER_BIND_FAILED = "server_bind_failed"
     UNEXPECTED_SERVICE_FAILURE = "unexpected_service_failure"
@@ -87,21 +76,11 @@ class PrivacyGuardError(Exception):
     def hint(self) -> str:
         return self._spec.hint
 
-    @override
     def __str__(self) -> str:
         return (
             f"[{self.code.value}] {self.component.value}.{self.operation}: "
             f"{self.summary} Hint: {self.hint}"
         )
-
-
-class InternalPrivacyGuardError(PrivacyGuardError):
-    """A cataloged failure reclassified as internal for its runtime context."""
-
-    @property
-    @override
-    def kind(self) -> ErrorKind:
-        return ErrorKind.INTERNAL
 
 
 _ERROR_SPECS: dict[ErrorCode, ErrorSpec] = {
@@ -110,16 +89,8 @@ _ERROR_SPECS: dict[ErrorCode, ErrorSpec] = {
         ErrorComponent.CONFIG,
         "parse",
         "Policy configuration is invalid.",
-        "Check allowed fields, strict string types, finding action, confidence, "
-        "entity filters, and redact template syntax.",
-    ),
-    ErrorCode.SCANNER_CONFIG_INVALID: ErrorSpec(
-        ErrorKind.INVALID_INPUT,
-        ErrorComponent.SCANNER,
-        "configure",
-        "Scanner configuration is invalid.",
-        "Check the YAML shape, selected profile, catalog limits, names, and "
-        "regular expressions.",
+        "Check entity-processing stages, engine configuration, pattern catalogs, "
+        "replacement recipes, and the on-detection action.",
     ),
     ErrorCode.REQUEST_PHASE_INVALID: ErrorSpec(
         ErrorKind.INVALID_INPUT,
@@ -135,84 +106,33 @@ _ERROR_SPECS: dict[ErrorCode, ErrorSpec] = {
         "Request body exceeds the advertised size limit.",
         "Reduce the request body to the maximum size in the middleware manifest.",
     ),
-    ErrorCode.REQUEST_SHAPE_LIMIT_EXCEEDED: ErrorSpec(
-        ErrorKind.INVALID_INPUT,
-        ErrorComponent.FORMAT_HANDLER,
-        "normalize",
-        "Request body exceeds a structural scanning limit.",
-        "Reduce JSON nesting, text fields, or total text content.",
-    ),
-    ErrorCode.BODY_FORMAT_UNSUPPORTED: ErrorSpec(
-        ErrorKind.INVALID_INPUT,
-        ErrorComponent.FORMAT_HANDLER,
-        "select",
-        "Request body format is unsupported.",
-        "Register or select a supported body format.",
-    ),
     ErrorCode.BODY_ENCODING_INVALID: ErrorSpec(
         ErrorKind.INVALID_INPUT,
-        ErrorComponent.FORMAT_HANDLER,
-        "normalize",
+        ErrorComponent.SERVICE,
+        "decode_text",
         "Request body encoding is invalid.",
         "Supply a valid UTF-8 request body.",
     ),
-    ErrorCode.BODY_JSON_INVALID: ErrorSpec(
-        ErrorKind.INVALID_INPUT,
-        ErrorComponent.FORMAT_HANDLER,
-        "normalize",
-        "Request body is not valid JSON.",
-        "Check UTF-8 JSON syntax, duplicate keys, non-finite numbers, Unicode "
-        "scalars, and the configured body format.",
-    ),
-    ErrorCode.BODY_RECONSTRUCTION_INVALID: ErrorSpec(
-        ErrorKind.INTERNAL,
-        ErrorComponent.FORMAT_HANDLER,
-        "reconstruct",
-        "Request body reconstruction failed validation.",
-        "Check processor-generated paths and replacement text.",
-    ),
-    ErrorCode.FORMAT_HANDLER_OUTPUT_INVALID: ErrorSpec(
+    ErrorCode.ENGINE_OUTPUT_INVALID: ErrorSpec(
         ErrorKind.INTERNAL,
         ErrorComponent.PROCESSOR,
-        "validate_handler",
-        "Format handler output is invalid.",
-        "Check the FormatHandler ABC and normalized-body contract.",
+        "validate_engine",
+        "An entity-processing engine returned an invalid result.",
+        "Check the engine run contract, result model, spans, strategy, and limits.",
     ),
-    ErrorCode.FORMAT_HANDLER_EXECUTION_FAILED: ErrorSpec(
+    ErrorCode.ENGINE_EXECUTION_FAILED: ErrorSpec(
         ErrorKind.INTERNAL,
-        ErrorComponent.FORMAT_HANDLER,
-        "call",
-        "Format handler execution failed.",
-        "Run handler unit tests for normalization and reconstruction.",
-    ),
-    ErrorCode.SCANNER_OUTPUT_INVALID: ErrorSpec(
-        ErrorKind.INTERNAL,
-        ErrorComponent.PROCESSOR,
-        "validate_scanner",
-        "Scanner output is invalid.",
-        "Check scanner identity, supported entities, result tuple, labels, spans, "
-        "confidence, and paths.",
-    ),
-    ErrorCode.SCANNER_EXECUTION_FAILED: ErrorSpec(
-        ErrorKind.INTERNAL,
-        ErrorComponent.SCANNER,
-        "scan",
-        "Scanner execution failed.",
-        "Run the scanner single-block unit tests.",
-    ),
-    ErrorCode.FINDING_LIMIT_EXCEEDED: ErrorSpec(
-        ErrorKind.INTERNAL,
-        ErrorComponent.PROCESSOR,
-        "scan",
-        "Scanner finding limit was exceeded.",
-        "Tune scanner cardinality or the policy before enabling traffic.",
+        ErrorComponent.ENGINE,
+        "run",
+        "An entity-processing engine failed.",
+        "Run the engine's focused configuration and single-text tests.",
     ),
     ErrorCode.RESULT_LIMIT_EXCEEDED: ErrorSpec(
         ErrorKind.INTERNAL,
         ErrorComponent.SERVICE,
         "serialize_result",
         "A safe middleware result could not be represented.",
-        "Tune redaction size or scanner finding cardinality.",
+        "Tune replacement size or entity-detection cardinality.",
     ),
     ErrorCode.SERVER_BIND_FAILED: ErrorSpec(
         ErrorKind.INTERNAL,

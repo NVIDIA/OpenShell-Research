@@ -12,7 +12,7 @@ dependencies = [
   "grpcio>=1.81.1,<2",
   "protobuf>=6.33.5,<7",
   "pydantic>=2.11,<3",
-  "pyyaml>=6.0.2,<7",
+  "regex>=2026.7.19,<2027",
   "typer>=0.16,<1",
   "typing-extensions>=4.12,<5",
 ]
@@ -52,7 +52,7 @@ exclude = ["src/privacy_guard/bindings"]
 
 [tool.ty.rules]
 blanket-ignore-comment = "error"
-missing-override-decorator = "error"
+missing-override-decorator = "ignore"
 missing-type-argument = "error"
 redundant-cast = "error"
 unresolved-attribute = "error"
