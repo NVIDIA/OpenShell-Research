@@ -1,146 +1,175 @@
 ---
 title: Request lifecycle
-description: How Privacy Guard normalizes, scans, filters, and transforms one request.
+description: How Privacy Guard prepares policy, runs ordered engines, and applies one request action.
 agent_markdown: true
 ---
 
 # Request lifecycle
 
-`RequestProcessor` owns the complete protobuf-free request flow. It composes
-format handlers and scanners, applies policy, and returns a `ProcessingResult`.
+`RequestProcessor` owns the complete protobuf-free flow for one text value. It
+runs configured entity-processing stages in order, aggregates detections, and
+applies the policy action.
 
-## Inputs
+The gRPC service owns the surrounding bytes/text and configuration transport
+boundaries.
 
-The processor receives an `InterceptedRequest` containing:
+## Policy configuration
 
-- the exact request body bytes
-- a parsed `PolicyConfig`
-- the request ID
-- the original content type, retained as context but not used for format
-  selection
+The policy supplies:
 
-Policy selects the format through `body_format`; the processor does not infer it
-from request content or metadata.
+```yaml
+entity_processing:
+  stages:
+    - name: optional-diagnostic-name
+      config:
+        engine: regex
+        pattern_catalog:
+          entities:
+            - name: email
+              patterns:
+                - pattern: '...'
+                  confidence: high
+        replacement:
+          strategy: template
+          template: "[{entity}]"
+on_detection:
+  action: detect
+```
 
-After validating the configured format and entity filter, the processor allows
-an empty body without normalization or scanning.
+`entity_processing` is an object so concrete pipeline-wide settings can be
+added later without changing the stage-list shape. V0 defines only `stages`.
+The list must be non-empty.
 
-## Processing stages
+Each `EntityProcessingStage` contains:
 
-### 1. Select the format handler
+- optional `name`, used only as bounded diagnostic provenance
+- required `config`, which is the exact concrete configuration model owned by
+  the selected engine
 
-The processor looks up `PolicyConfig.body_format` in its registered format
-handlers. The handler's own `format_name` must match its registry key.
+`config.engine` is a Pydantic discriminator. After every implementation is
+registered, `EngineRegistry.finalize()` constructs a real discriminated union
+of their concrete config models. Engine-specific fields and nested replacement
+variants therefore validate, serialize, and appear in JSON Schema without a
+generic mapping or translation layer.
 
-It also verifies that every entity named by policy appears in at least one
-active scanner's `ScannerConfig.entity_types`. An unknown format or entity is
-invalid configuration.
+When a stage name is omitted, Privacy Guard derives a deterministic one-based
+label such as `regex[1]`. All resulting diagnostic names must be unique.
 
-### 2. Normalize the body
+## Configuration resolution and preparation
 
-The selected handler parses the original bytes and returns a `RequestBody`.
-The processor then verifies:
+For each evaluation under the current OpenShell protocol, the service:
 
-- `RequestBody.original_bytes` exactly matches the input
-- every `TextBlock.path` is unique
-- the number of text blocks is within the request limit
-- the total text length is within the scan limit
+1. converts the protobuf `Struct` to a mapping
+2. validates it through the finalized registry-backed Pydantic model
+3. validates each concrete config against its registered implementation and
+   injected resources
+4. validates the action/replacement compatibility
+5. computes a SHA-256 fingerprint of canonical expanded configuration
+6. resolves a cached `RequestProcessor`, or constructs the engines and
+   processor and adds it to the bounded cache
 
-The processor does not parse text-block paths. Paths belong to the format
-handler.
+`ValidateConfig` performs the validation steps without populating this cache.
+Preparation is repeatable; cache state is an optimization and never required
+for correctness.
 
-### 3. Scan and filter findings
+There is no separate execution-plan abstraction. The validated stage order
+already contains the necessary policy structure, and the prepared processor
+privately retains the corresponding ordered engine instances.
 
-The processor creates one request-wide `ScanBudget`. It passes every text block
-to every configured scanner in registration order. It validates each result,
-then selects findings by:
+## Text input
 
-- `entity_types`
-- `minimum_confidence`
+The service validates the pre-credentials phase and the request body byte
+limit before processing. It still validates configuration for an empty body,
+then immediately allows that body without invoking an engine.
 
-Policy never changes scanner behavior. `entity_types: null` selects all entity
-types. An empty list selects none.
-`minimum_confidence: null` accepts every confidence level.
+A non-empty body must decode as strict UTF-8. The decoded `str` is the only
+request input passed to `RequestProcessor`; headers, content type, request ID,
+target, and protobuf messages do not cross that boundary.
 
-`Scanner.scan` validates the returned tuple and finding models.
-`RequestProcessor` validates scanner identity, declared entities, offsets, and
-selected finding totals. See
-[Validation ownership](safety-and-limits.md#validation-ownership).
+The processor validates both character and encoded-byte bounds before running
+the pipeline.
 
-### 4. Apply the action
+## Ordered stage execution
 
-| Action | No selected findings | Selected findings |
+The processor derives one invocation strategy for the whole pipeline:
+
+| Policy action | Engine strategy |
+| --- | --- |
+| `detect` | `DETECT` |
+| `block` | `DETECT` |
+| `replace` | `REPLACE` |
+
+`PolicyAction` is never passed to an engine.
+
+The processor then:
+
+1. creates one monotonic `Timeout`
+2. calls each stage exactly once in policy order
+3. passes the current text, invocation strategy, and shared timeout to
+   `engine.run()`
+4. validates intermediate character, byte, and detection limits
+5. passes the returned text to the next stage
+6. checks the same timeout after the final result
+
+In detect and block mode, the public engine contract requires returned text to
+equal that stage's input. In replace mode, each later stage sees the preceding
+stage's processed text.
+
+Detection offsets always refer to the input revision seen by the producing
+stage. Privacy Guard does not reinterpret earlier offsets after a later stage
+changes the text.
+
+If a stage times out, exceeds an execution limit, or fails, its partial text and
+detections are discarded. No later stage runs.
+
+## Detection aggregation
+
+After all stages succeed, the processor aggregates detections by:
+
+```text
+source stage + entity + confidence representation
+```
+
+It does not deduplicate across stages. Two stages may have inspected different
+text revisions, and confidence values from different tools are not assumed to
+be calibrated.
+
+The aggregate `EntityDetectionSummary` intentionally omits matched text,
+surrounding text, offsets, patterns, and raw engine metadata.
+
+## Applying the policy action
+
+The processor owns the final disposition:
+
+| Action | No detections | One or more detections |
 | --- | --- | --- |
-| `observe` | Allow unchanged | Allow unchanged and report findings |
-| `block` | Allow unchanged | Deny and report findings |
-| `redact` | Allow unchanged | Replace selected spans, or deny if safe replacement is impossible |
+| `detect` | Allow original body | Allow original body and report detection summaries |
+| `block` | Allow original body | Deny with `privacy_guard_blocked` and report detection summaries |
+| `replace` | Allow final processed text | Allow final processed text and report detection summaries |
 
-The processor scans all text blocks for every action. The action controls how
-selected findings affect the result.
+For `replace`, configuration validation requires every stage to advertise
+replacement support and to include its valid engine-specific replacement
+recipe. A recipe may remain configured but dormant when the action is changed
+to detect or block.
 
-### 5. Reconstruct the body
-
-For redaction, the processor creates replacement text for each affected,
-replaceable block. It passes a path-to-text mapping back to the same format
-handler that normalized the body.
-
-A selected block action, non-replaceable redaction, or limit result returns
-before reconstruction. Every other non-empty request is reconstructed once.
-Observe and block-without-findings pass an empty replacement map.
-
-With an empty replacement map, a handler returns the original bytes exactly.
-After a rewrite, untouched values must remain semantically equivalent, but
-byte formatting may change.
-
-The processor returns a replacement body only when reconstructed bytes differ
-from the original.
-
-## Redaction behavior
-
-Findings may overlap. Every action retains all selected findings for reporting.
-Redaction resolves overlaps only when choosing spans to replace; losing overlaps
-remain in the result.
-
-Redaction chooses non-overlapping replacement spans in this order:
-
-1. higher confidence
-2. longer span
-3. earlier start offset
-4. earlier end offset
-5. scanner name
-6. entity name
-7. pattern name
-
-The stable ordering makes redaction independent of incidental scanner return
-order.
-
-The redaction template accepts static text and `{entity}`. Formatting options,
-conversions, and other fields are invalid.
-
-Before allocating replacement text, the processor projects its UTF-8 size
-against the body limit. It checks the serialized body again after
-reconstruction.
-
-## Non-replaceable text
-
-A format handler may expose text that can be observed but not safely rewritten.
-It marks that `TextBlock` with `replaceable=False`.
-
-The JSON handler uses this for object keys. Observe reports findings in keys,
-and block denies normally. Redact denies the request when a selected finding is
-in a key because changing a key could create a collision.
+Replacement behavior belongs to each engine. For example, `RegexEngine`
+selects deterministic non-overlapping matches and renders its constrained
+template. A custom engine backed by another tool owns that tool's native
+replacement operation. `RequestProcessor` does not reproduce either algorithm.
 
 ## Output
 
-The processor returns a `ProcessingResult`:
+`RequestProcessor.process()` returns a `RequestProcessingResult`:
 
-- `ALLOW` with no replacement for an unchanged request
-- `ALLOW` with replacement bytes for a successful redaction
-- `DENY` with `privacy_guard_blocked` for a policy block
-- `DENY` with `privacy_guard_limit_exceeded` when safe bounded output cannot be
-  produced
+- detect and block-without-detections return `ALLOW` without replacement text
+- block-with-detections returns `DENY`, detection summaries, and
+  `privacy_guard_blocked`
+- replace returns `ALLOW`, the final text, and detection summaries
+- timeout or execution-limit exhaustion returns `DENY` with
+  `privacy_guard_limit_exceeded` and no partial summaries or replacement
 
-Findings remain path-aware in the domain result. The service later aggregates
-them for the protobuf response.
+The service leaves the original request bytes untouched for detect and block.
+For replace it UTF-8 encodes the final text and sets `has_body=true`, including
+when the final text happens to equal the input.
 
 [Back to the architecture overview](index.md)

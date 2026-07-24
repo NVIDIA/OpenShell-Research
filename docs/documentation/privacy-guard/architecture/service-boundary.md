@@ -1,6 +1,6 @@
 ---
 title: Service boundary
-description: gRPC adaptation, worker scheduling, result aggregation, and server lifecycle.
+description: gRPC adaptation, configuration caching, worker scheduling, and server lifecycle.
 agent_markdown: true
 ---
 
@@ -8,81 +8,112 @@ agent_markdown: true
 
 Outside the generated `bindings/` package, `service/` is the only layer that
 imports gRPC or generated protobuf bindings. It translates between OpenShell's
-transport contract and Privacy Guard's domain types.
+transport contract and Privacy Guard's one-text domain contract.
+
+The `.proto` file and generated bindings checked into this project are copied
+from OpenShell. Protocol changes must land upstream and be adopted from a new
+canonical copy; Privacy Guard must not create a private fork.
 
 ## gRPC methods
 
-Privacy Guard implements three `SupervisorMiddleware` methods:
+Privacy Guard implements the three methods currently defined by
+`SupervisorMiddleware`:
 
 | RPC | Behavior |
 | --- | --- |
-| `Describe` | Advertises the service name, version, pre-credentials HTTP binding, and body limit |
-| `ValidateConfig` | Parses policy and asks the processor to validate referenced formats and entities |
-| `EvaluateHttpRequest` | Validates transport input, runs the processor, and returns a decision |
+| `Describe` | Advertises service identity, one pre-credentials HTTP binding, and the 4 MiB body limit |
+| `ValidateConfig` | Purely validates expanded policy configuration and registered resources |
+| `EvaluateHttpRequest` | Validates transport input, resolves a processor, processes text, and returns a decision |
 
 `Describe` advertises only
-`SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS`. The service rejects evaluations
-for any other phase.
+`SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS`. Evaluations at any other phase
+are invalid input.
+
+The current manifest message has no field for the finalized policy schema or
+engine discovery metadata. Those are available through the local
+`privacy-guard schema` and `privacy-guard engines` commands.
+
+## Configuration lifecycle
+
+The current protocol carries a complete `google.protobuf.Struct` on both
+validation and every request evaluation.
+
+`ValidateConfig`:
+
+1. converts the `Struct` to a mapping
+2. validates the registry-built discriminated policy model
+3. validates each exact engine config against registered resources
+4. validates replacement support for a replace action
+5. returns `valid=true`, or a content-safe reason
+
+It does not construct engines, populate the processor cache, contact model
+providers, download resources, or write artifacts.
+
+During evaluation, the service validates the same expanded config, computes its
+canonical SHA-256 fingerprint, and resolves a configured processor from a
+bounded 128-entry LRU cache. A cache miss constructs engines directly from the
+exact stage configs and operator-injected resources, then constructs the
+`RequestProcessor`.
+
+The cache is protected for concurrent access and is not correctness-relevant.
+Eviction or process restart simply causes reconstruction from a later
+evaluation's expanded config.
 
 ## Incoming requests
 
-For each evaluation, the servicer:
+For each evaluation, the service:
 
-1. validates the phase and body size
-2. converts the protobuf `Struct` into a strict `PolicyConfig`
-3. extracts the request ID, content type, and body
-4. constructs an `InterceptedRequest`
-5. passes that domain record to `RequestProcessor`
+1. validates the pre-credentials phase
+2. validates the transport body byte limit
+3. validates and resolves the expanded policy config
+4. allows an empty body without invoking an engine
+5. decodes a non-empty body as strict UTF-8
+6. schedules `RequestProcessor.process(text)` in the bounded worker pool
 
-Transport-only fields that processing does not need remain at the service
-boundary.
-
-`content_type` is retained as request context, but the processor selects the
-format from policy. It does not infer format from this header.
+Request context, target, headers, middleware name, and protobuf values remain at
+the service boundary. The request ID is used only for content-safe operational
+logging.
 
 ## Outgoing results
 
-The processor returns `ProcessingResult`. The servicer converts it to
+The processor returns `RequestProcessingResult`. The service maps it to
 `HttpRequestResult`:
 
 | Domain result | Protobuf result |
 | --- | --- |
-| Allow without replacement | `DECISION_ALLOW`, `has_body=false` |
-| Allow with replacement | `DECISION_ALLOW`, `has_body=true`, replacement bytes |
-| Deny | `DECISION_DENY`, no body, stable reason code |
+| Detect allow | `DECISION_ALLOW`, `has_body=false` |
+| Block allow with no detections | `DECISION_ALLOW`, `has_body=false` |
+| Replace allow | `DECISION_ALLOW`, `has_body=true`, final UTF-8 body |
+| Policy block | `DECISION_DENY`, `privacy_guard_blocked`, no body |
+| Limit deny | `DECISION_DENY`, `privacy_guard_limit_exceeded`, no body or partial findings |
 
-The service checks replacement size again before serialization.
+The service checks the encoded replacement size again before serialization.
 
-### Finding aggregation
+### Findings
 
-Domain findings include text-block paths and exact offsets. The protobuf result
-contains count-based audit findings.
+The processor has already aggregated occurrences by source stage, entity, and
+confidence. For each `EntityDetectionSummary`, the service emits:
 
-The service groups findings by:
+- `type`: `detected_entity`
+- `label`: `entity (source-stage)`
+- `confidence`: the categorical value, a bounded numeric representation, or
+  empty when absent
+- `count`: aggregate occurrence count
 
-- scanner name
-- entity
-- optional `pattern_name` metadata
-- confidence
-
-It emits:
-
-- `type`: scanner name
-- `label`: entity or `entity/pattern-name`
-- `confidence`
-- `count`
-
-Paths, offsets, and matched request content never cross the protobuf boundary.
+The current OpenShell `Finding` message has no dedicated source field.
+Stage provenance is therefore secondary text in the bounded label while the
+entity remains primary. Matched content, offsets, patterns, and raw engine
+metadata never cross the protobuf boundary.
 
 ## Concurrency model
 
-The gRPC server allows up to 16 concurrent RPCs. Synchronous processing runs in
-a dedicated pool with four workers.
+The gRPC server accepts at most 16 concurrent RPCs. Synchronous processing uses
+a dedicated executor and semaphore with four active slots:
 
 ```text
 gRPC event loop
       |
-      | acquire scan slot
+      | acquire processing slot
       v
 4-slot semaphore
       |
@@ -91,61 +122,68 @@ gRPC event loop
       |
       v
 RequestProcessor.process
+      |
+      v
+ordered engine pipeline
 ```
 
-This prevents scanner work from blocking the async event loop and bounds active
-synchronous scans.
+This keeps synchronous engine work off the async event loop and bounds the
+number of active processor runs.
 
-Scanner and format-handler instances are shared by those workers. They must be
-safe for concurrent use.
+Cached processors, engine instances, and injected resources may be used by
+multiple worker threads. They must retain no mutable per-request state and must
+be safe for concurrent access.
 
 ## Cancellation
 
-Cancelling an async RPC cannot stop Python code already running in a worker
-thread. The service shields the worker future and keeps its semaphore slot until
-the worker actually exits.
+Cancelling an async RPC cannot stop Python code already running in its worker
+thread. The service shields the worker bridge and releases the semaphore slot
+only after that worker actually finishes.
 
-This rule prevents cancellation from creating more than four active scans.
+Cancellation therefore cannot create more than four active processor runs.
+An engine should pass the remaining shared timeout to any delegated API that
+supports bounded execution. A non-preemptible call continues to occupy its slot
+until it exits.
 
-During shutdown, the service stops gRPC and waits for the scan executor.
+During shutdown, the server stops gRPC and waits for active executor work.
 
 ## Error mapping
 
 `PrivacyGuardError` classifies each cataloged failure as invalid input or
-internal failure.
+internal failure:
 
 | Error kind | gRPC status |
 | --- | --- |
 | `invalid_input` | `INVALID_ARGUMENT` |
 | `internal` | `INTERNAL` |
 
-This mapping applies to `EvaluateHttpRequest`. `ValidateConfig` reports failures
-in `ValidateConfigResponse` with `valid=false` and a safe reason.
+This mapping applies to evaluation. `ValidateConfig` instead returns
+`valid=false` with a content-safe reason.
 
-Unexpected exceptions become the content-safe
-`unexpected_service_failure` error. The service does not return arbitrary
-exception text.
+Unexpected failures become `unexpected_service_failure`. The service does not
+return caught collaborator messages or exception chains.
 
-A gRPC error is different from a policy deny. OpenShell applies its configured
-middleware failure mode when the RPC fails. A policy deny is a successful RPC
-whose result explicitly stops the request.
+A gRPC failure is distinct from a successful policy deny. OpenShell applies the
+middleware registration's failure behavior when an RPC fails. A policy deny is
+a successful RPC result that explicitly stops the request.
 
-## Server lifecycle
+## Server lifecycle and discovery
 
-`MiddlewareServer` is the high-level API for custom scanners. It constructs:
+`MiddlewareServer` is the high-level API. It owns:
 
 ```text
-Scanner
-  -> RequestProcessor
+EngineRegistry
   -> PrivacyGuardMiddleware
   -> gRPC server
 ```
 
-The CLI uses the same API for built-in scanners.
+The default registry includes `RegexEngine`. Operators register custom engines
+and resource-backed tool integrations before registry finalization, then pass
+that registry to `MiddlewareServer`.
 
 The server:
 
-1. creates an unstarted async gRPC server
+1. creates an unstarted async gRPC server with receive and concurrency limits
 2. binds the configured address
 3. starts and waits for termination
 4. stops gRPC
@@ -153,21 +191,49 @@ The server:
 
 A bind failure becomes the stable `server_bind_failed` error.
 
+The CLI exposes:
+
+```bash
+privacy-guard engines
+privacy-guard schema
+privacy-guard serve --listen 127.0.0.1:50051
+```
+
+Entity behavior comes from policy configuration, not server startup flags.
+
+## Upstream protocol work
+
+The intended large-catalog and discovery experience requires coordinated
+OpenShell changes for:
+
+- a preparation operation that accepts expanded configuration larger than the
+  current 64 KiB evaluation limit
+- canonical configuration fingerprints on evaluations
+- typed cache-miss recovery
+- finalized policy schema and engine discovery in the manifest
+- a dedicated finding source field
+
+These are protocol evolution items, not local implementation hooks. Until they
+land upstream, Privacy Guard continues to validate the per-evaluation config,
+repopulate its local cache when needed, expose discovery through the CLI, and
+render stage provenance inside the finding label.
+
 ## Testing the boundary
 
 Service tests should cover:
 
 - protobuf/domain translation
-- manifest contents
-- policy validation RPCs
-- phase and body-size validation
-- allow, replacement, and deny serialization
-- finding aggregation and encoded limits
+- manifest fields supported by the current protocol
+- pure policy validation
+- phase, body-size, and UTF-8 validation
+- cache hit and reconstruction behavior
+- detect, replacement, block, and limit serialization
+- finding encoding and limits
 - gRPC status mapping
 - worker-slot behavior under cancellation
 - startup, bind failure, and shutdown
 
-Keep scanner detection and processor policy cases out of service tests unless
-the case requires transport translation.
+Engine algorithms and ordered policy semantics belong in engine and processor
+tests unless transport translation is essential to the case.
 
 [Back to the architecture overview](index.md)

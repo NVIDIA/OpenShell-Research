@@ -26,8 +26,8 @@ nav = [
       {"Architecture" = [
         "documentation/privacy-guard/architecture/index.md",
         {"Request lifecycle" = "documentation/privacy-guard/architecture/request-lifecycle.md"},
-        {"Scanners" = "documentation/privacy-guard/architecture/scanners.md"},
-        {"Format handlers" = "documentation/privacy-guard/architecture/format-handlers.md"},
+        {"Entity-processing engines" = "documentation/privacy-guard/architecture/entity-processing-engines.md"},
+        {"Configuration and text boundary" = "documentation/privacy-guard/architecture/configuration.md"},
         {"Service boundary" = "documentation/privacy-guard/architecture/service-boundary.md"},
         {"Safety and limits" = "documentation/privacy-guard/architecture/safety-and-limits.md"}
       ]}
