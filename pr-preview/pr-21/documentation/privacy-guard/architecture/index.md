@@ -6,12 +6,17 @@ agent_markdown: true
 
 # Privacy Guard architecture
 
-Privacy Guard is OpenShell middleware that scans provider-bound HTTP request
-bodies and applies policy to detected sensitive data. OpenShell calls it before
-adding provider credentials.
+Privacy Guard is OpenShell middleware that detects and optionally replaces
+sensitive entities in provider-bound HTTP request text before OpenShell adds
+provider credentials.
 
-Privacy Guard can allow the request unchanged, allow it with a replacement body,
-or deny it. It never sends the provider request itself.
+This architecture is a clean break from the earlier implementation. A processor
+run receives one UTF-8 text value and invokes an ordered pipeline of
+entity-processing engines. Structured-body parsing and compatibility with the
+previous extension and policy APIs are intentionally out of scope.
+
+Privacy Guard can allow the original body, allow a replacement body, or deny
+the request. It never sends the provider request itself.
 
 ## Where Privacy Guard runs
 
@@ -26,7 +31,7 @@ OpenShell supervisor
       v
 Privacy Guard
       |
-      | allow, replace body, or deny
+      | allow original body, allow replacement body, or deny
       v
 OpenShell supervisor
       |
@@ -35,25 +40,39 @@ OpenShell supervisor
 Provider
 ```
 
-Privacy Guard implements the `SupervisorMiddleware` gRPC service. Its manifest
-registers one binding: HTTP requests in the pre-credentials phase.
+Privacy Guard implements the OpenShell-owned `SupervisorMiddleware` gRPC
+service and advertises one HTTP-request binding in the pre-credentials phase.
+The checked-in protocol and generated bindings are canonical copies from
+OpenShell and must not be edited locally.
 
 ## Component boundaries
 
 Source paths on these pages are relative to
 `projects/privacy-guard/src/privacy_guard/`.
 
-- `service/` owns gRPC, protobuf conversion, worker scheduling, and finding
-  aggregation. It does not scan or apply policy. Outside generated `bindings/`,
-  no other package imports gRPC or generated bindings.
-- `processor.py` coordinates format handlers and scanners, applies policy, and
-  redacts bodies. It does not import gRPC or protobuf.
-- `request_body/` parses and reconstructs bodies. It does not scan or apply
-  policy.
-- `scanners/` detects values within one text block. It does not depend on
-  request formats, policy, gRPC, or protobuf.
-- `config.py` defines policy configuration, not scanner configuration.
-- `payloads/` defines transport-independent request and result records.
+- `service/` owns gRPC, protobuf conversion, UTF-8 decoding and encoding,
+  bounded worker scheduling, processor caching, and finding serialization.
+  Outside generated `bindings/`, no other package imports gRPC or generated
+  bindings.
+- `request_processor.py` runs configured stages over one text value, shares one
+  timeout across them, aggregates detections, and applies the user-facing
+  policy action. It does not import gRPC or implement an engine's algorithms.
+- `engines/` defines the custom-engine contract and the built-in Regex
+  implementation. Each engine owns its detection and replacement algorithms.
+- `engine_registry.py` registers engine implementations and operator-owned
+  resources, builds the exact Pydantic discriminated union, validates
+  configurations, and constructs configured engines.
+- `config.py` defines ordered stages, the required policy action, canonical
+  configuration serialization, and fingerprints.
+- top-level `base.py` defines the package-wide strict immutable domain-model
+  base.
+- `string_validators.py` defines shared string validators and field types.
+
+The OpenShell policy is the single source of privacy behavior: stage order,
+each stage's exact engine configuration, entity definitions, replacement
+recipes, and the final `detect`, `block`, or `replace` action. Deployment
+configuration registers implementations and injects operational resources such
+as model profiles, endpoints, clients, and credentials.
 
 ## Request flow
 
@@ -62,69 +81,87 @@ HttpRequestEvaluation protobuf
         |
         v
 PrivacyGuardMiddleware
-  validates transport input
-  parses policy
-  creates InterceptedRequest
+  validates phase and body size
+  validates expanded policy configuration
+  resolves or builds a cached RequestProcessor
+  decodes a non-empty body as strict UTF-8
+        |
+        v
+RequestProcessor.process(text)
+  derives DETECT or REPLACE engine strategy
+  creates one shared Timeout
+        |
+        v
+stage 1 engine.run(current text)
+        |
+        v
+stage 2 engine.run(stage 1 text)
+        |
+       ...
         |
         v
 RequestProcessor
-  selects FormatHandler
+  aggregates stage-qualified detections
+  applies detect, block, or replace
         |
         v
-FormatHandler.normalize
-  returns RequestBody + TextBlock values
+RequestProcessingResult
         |
         v
-Scanner.scan
-  returns block-relative Finding values
+PrivacyGuardMiddleware
+  serializes bounded findings
+  encodes replacement text only for replace
         |
         v
-RequestProcessor
-  validates and filters findings
-  observes, blocks, or redacts
-        |
-        +-- policy deny or pre-reconstruction limit --> ProcessingResult
-        |
-        +-- continue
-                |
-                v
-        FormatHandler.reconstruct
-                |
-                v
-        output-size check
-                |
-                v
-        ProcessingResult
+HttpRequestResult protobuf
 ```
 
-Both paths return a `ProcessingResult` to `PrivacyGuardMiddleware`, which
-aggregates findings and creates the `HttpRequestResult` protobuf.
+The processor passes only `EntityProcessingStrategy.DETECT` or
+`EntityProcessingStrategy.REPLACE` to engines. Blocking is a request
+disposition and never crosses the engine boundary.
 
 The processor is synchronous. The service runs it in a dedicated thread pool
-so scanner work does not block the gRPC event loop.
+so engine work does not block the gRPC event loop.
 
 ## Core data types
 
 | Type | Meaning |
 | --- | --- |
-| `PolicyConfig` | Body format and action to apply to selected findings |
-| `InterceptedRequest` | Protobuf-free request body, request ID, content type, and parsed policy |
-| `RequestBody` | Handler-owned parsed state, original bytes, and text blocks |
-| `TextBlock` | One string to scan, with an opaque path and replacement flag |
-| `Finding` | One scanner result with block-relative offsets |
-| `RequestBodyFinding` | A finding paired with its text-block path |
-| `ProcessingResult` | Allow or deny decision, optional replacement body, findings, and reason code |
+| `PrivacyGuardConfig` | Ordered entity-processing stages and the required action on detection |
+| `EntityProcessingStage` | One configured engine invocation with an optional diagnostic name |
+| `EngineConfig` | Nominal strict base for an engine's exact policy configuration |
+| `EntityProcessingStrategy` | Per-run engine selection: detect or replace |
+| `EntityDetection` | One occurrence with stage-input offsets and optional confidence |
+| `TextProcessingResult` | One engine's authoritative output text and detections |
+| `Timeout` | One monotonic deadline shared across all stages |
+| `EntityDetectionSummary` | Bounded stage/entity/confidence aggregate for audit output |
+| `RequestProcessingResult` | Allow or deny decision, detection summaries, and replacement text when requested |
 
-Domain model fields are strict and frozen. `RequestBody.parsed_value` is
-handler-owned and may contain mutable objects; reconstruction must not mutate
-it. Fields containing request content are excluded from normal representations.
+Pydantic domain models are strict, frozen, reject unknown fields, hide rejected
+input from validation errors, and suppress sensitive fields from normal
+representations.
+
+## Deliberate omissions
+
+- Cross-request entity memory is not part of v0.
+- Engines do not receive transport metadata or the user-facing policy action.
+- There is no parallel execution-plan model; preparation constructs a
+  `RequestProcessor` directly.
+- There is no generic replacement field or replacement-strategy enum. Each
+  engine owns any replacement settings appropriate to its underlying
+  algorithm.
+- Runtime policy models do not accept catalog paths. Transparent file expansion
+  requires an upstream OpenShell policy-authoring feature.
 
 ## Read next
 
-- [Request lifecycle](request-lifecycle.md) explains normalization, scanning,
-  policy filtering, and redaction.
-- [Scanners](scanners.md) defines the scanner extension contract.
-- [Format handlers](format-handlers.md) defines body parsing and reconstruction.
-- [Service boundary](service-boundary.md) covers gRPC adaptation and concurrency.
-- [Safety and limits](safety-and-limits.md) records failure behavior and resource
-  bounds.
+- [Request lifecycle](request-lifecycle.md) explains configuration resolution,
+  ordered execution, actions, and output behavior.
+- [Entity-processing engines](entity-processing-engines.md) defines the
+  extension contract and built-in engines.
+- [Configuration and text boundary](configuration.md) covers the one-text
+  contract, configuration ownership, and current catalog limits.
+- [Service boundary](service-boundary.md) covers gRPC adaptation, caching, and
+  concurrency.
+- [Safety and limits](safety-and-limits.md) records failure behavior and
+  resource bounds.

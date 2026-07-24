@@ -626,14 +626,14 @@
   
   
     <li class="md-nav__item">
-      <a href="./scanners/" class="md-nav__link">
+      <a href="./entity-processing-engines/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-  Scanners
+  Entity-processing engines
 
     
   </span>
@@ -653,14 +653,14 @@
   
   
     <li class="md-nav__item">
-      <a href="./format-handlers/" class="md-nav__link">
+      <a href="./configuration/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-  Format handlers
+  Configuration and text boundary
 
     
   </span>
@@ -828,6 +828,17 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         Core data types
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deliberate-omissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Deliberate omissions
       </span>
     </span>
   </a>
@@ -1023,11 +1034,15 @@
 
 
 <h1 id="privacy-guard-architecture">Privacy Guard architecture<a class="headerlink" href="#privacy-guard-architecture" title="Permanent link">&para;</a></h1>
-<p>Privacy Guard is OpenShell middleware that scans provider-bound HTTP request
-bodies and applies policy to detected sensitive data. OpenShell calls it before
-adding provider credentials.</p>
-<p>Privacy Guard can allow the request unchanged, allow it with a replacement body,
-or deny it. It never sends the provider request itself.</p>
+<p>Privacy Guard is OpenShell middleware that detects and optionally replaces
+sensitive entities in provider-bound HTTP request text before OpenShell adds
+provider credentials.</p>
+<p>This architecture is a clean break from the earlier implementation. A processor
+run receives one UTF-8 text value and invokes an ordered pipeline of
+entity-processing engines. Structured-body parsing and compatibility with the
+previous extension and policy APIs are intentionally out of scope.</p>
+<p>Privacy Guard can allow the original body, allow a replacement body, or deny
+the request. It never sends the provider request itself.</p>
 <h2 id="where-privacy-guard-runs">Where Privacy Guard runs<a class="headerlink" href="#where-privacy-guard-runs" title="Permanent link">&para;</a></h2>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Sandbox process
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>      |
@@ -1039,7 +1054,7 @@ or deny it. It never sends the provider request itself.</p>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>      v
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>Privacy Guard
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>      |
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>      | allow, replace body, or deny
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>      | allow original body, allow replacement body, or deny
 </span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>      v
 </span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>OpenShell supervisor
 </span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>      |
@@ -1047,67 +1062,81 @@ or deny it. It never sends the provider request itself.</p>
 </span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>      v
 </span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>Provider
 </span></code></pre></div>
-<p>Privacy Guard implements the <code>SupervisorMiddleware</code> gRPC service. Its manifest
-registers one binding: HTTP requests in the pre-credentials phase.</p>
+<p>Privacy Guard implements the OpenShell-owned <code>SupervisorMiddleware</code> gRPC
+service and advertises one HTTP-request binding in the pre-credentials phase.
+The checked-in protocol and generated bindings are canonical copies from
+OpenShell and must not be edited locally.</p>
 <h2 id="component-boundaries">Component boundaries<a class="headerlink" href="#component-boundaries" title="Permanent link">&para;</a></h2>
 <p>Source paths on these pages are relative to
 <code>projects/privacy-guard/src/privacy_guard/</code>.</p>
 <ul>
-<li><code>service/</code> owns gRPC, protobuf conversion, worker scheduling, and finding
-  aggregation. It does not scan or apply policy. Outside generated <code>bindings/</code>,
-  no other package imports gRPC or generated bindings.</li>
-<li><code>processor.py</code> coordinates format handlers and scanners, applies policy, and
-  redacts bodies. It does not import gRPC or protobuf.</li>
-<li><code>request_body/</code> parses and reconstructs bodies. It does not scan or apply
-  policy.</li>
-<li><code>scanners/</code> detects values within one text block. It does not depend on
-  request formats, policy, gRPC, or protobuf.</li>
-<li><code>config.py</code> defines policy configuration, not scanner configuration.</li>
-<li><code>payloads/</code> defines transport-independent request and result records.</li>
+<li><code>service/</code> owns gRPC, protobuf conversion, UTF-8 decoding and encoding,
+  bounded worker scheduling, processor caching, and finding serialization.
+  Outside generated <code>bindings/</code>, no other package imports gRPC or generated
+  bindings.</li>
+<li><code>request_processor.py</code> runs configured stages over one text value, shares one
+  timeout across them, aggregates detections, and applies the user-facing
+  policy action. It does not import gRPC or implement an engine's algorithms.</li>
+<li><code>engines/</code> defines the custom-engine contract and the built-in Regex
+  implementation. Each engine owns its detection and replacement algorithms.</li>
+<li><code>engine_registry.py</code> registers engine implementations and operator-owned
+  resources, builds the exact Pydantic discriminated union, validates
+  configurations, and constructs configured engines.</li>
+<li><code>config.py</code> defines ordered stages, the required policy action, canonical
+  configuration serialization, and fingerprints.</li>
+<li>top-level <code>base.py</code> defines the package-wide strict immutable domain-model
+  base.</li>
+<li><code>string_validators.py</code> defines shared string validators and field types.</li>
 </ul>
+<p>The OpenShell policy is the single source of privacy behavior: stage order,
+each stage's exact engine configuration, entity definitions, replacement
+recipes, and the final <code>detect</code>, <code>block</code>, or <code>replace</code> action. Deployment
+configuration registers implementations and injects operational resources such
+as model profiles, endpoints, clients, and credentials.</p>
 <h2 id="request-flow">Request flow<a class="headerlink" href="#request-flow" title="Permanent link">&para;</a></h2>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>HttpRequestEvaluation protobuf
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>        |
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>        v
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>PrivacyGuardMiddleware
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  validates transport input
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  parses policy
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  creates InterceptedRequest
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        |
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        v
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>RequestProcessor
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  selects FormatHandler
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>        |
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>        v
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>FormatHandler.normalize
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>  returns RequestBody + TextBlock values
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>        |
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>        v
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>Scanner.scan
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>  returns block-relative Finding values
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  validates phase and body size
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  validates expanded policy configuration
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  resolves or builds a cached RequestProcessor
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  decodes a non-empty body as strict UTF-8
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        |
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        v
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>RequestProcessor.process(text)
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>  derives DETECT or REPLACE engine strategy
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>  creates one shared Timeout
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>        |
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>        v
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>stage 1 engine.run(current text)
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>        |
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>        v
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>stage 2 engine.run(stage 1 text)
 </span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>        |
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>        v
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>RequestProcessor
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>  validates and filters findings
-</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>  observes, blocks, or redacts
-</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>        |
-</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>        +-- policy deny or pre-reconstruction limit --&gt; ProcessingResult
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>       ...
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>        |
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>        v
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>RequestProcessor
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>  aggregates stage-qualified detections
+</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>  applies detect, block, or replace
 </span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>        |
-</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>        +-- continue
-</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>                |
-</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>                v
-</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>        FormatHandler.reconstruct
-</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>                |
-</span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>                v
-</span><span id="__span-1-34"><a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>        output-size check
-</span><span id="__span-1-35"><a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>                |
-</span><span id="__span-1-36"><a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a>                v
-</span><span id="__span-1-37"><a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a>        ProcessingResult
+</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>        v
+</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>RequestProcessingResult
+</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>        |
+</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>        v
+</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>PrivacyGuardMiddleware
+</span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>  serializes bounded findings
+</span><span id="__span-1-34"><a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>  encodes replacement text only for replace
+</span><span id="__span-1-35"><a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>        |
+</span><span id="__span-1-36"><a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a>        v
+</span><span id="__span-1-37"><a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a>HttpRequestResult protobuf
 </span></code></pre></div>
-<p>Both paths return a <code>ProcessingResult</code> to <code>PrivacyGuardMiddleware</code>, which
-aggregates findings and creates the <code>HttpRequestResult</code> protobuf.</p>
+<p>The processor passes only <code>EntityProcessingStrategy.DETECT</code> or
+<code>EntityProcessingStrategy.REPLACE</code> to engines. Blocking is a request
+disposition and never crosses the engine boundary.</p>
 <p>The processor is synchronous. The service runs it in a dedicated thread pool
-so scanner work does not block the gRPC event loop.</p>
+so engine work does not block the gRPC event loop.</p>
 <h2 id="core-data-types">Core data types<a class="headerlink" href="#core-data-types" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1118,47 +1147,70 @@ so scanner work does not block the gRPC event loop.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>PolicyConfig</code></td>
-<td>Body format and action to apply to selected findings</td>
+<td><code>PrivacyGuardConfig</code></td>
+<td>Ordered entity-processing stages and the required action on detection</td>
 </tr>
 <tr>
-<td><code>InterceptedRequest</code></td>
-<td>Protobuf-free request body, request ID, content type, and parsed policy</td>
+<td><code>EntityProcessingStage</code></td>
+<td>One configured engine invocation with an optional diagnostic name</td>
 </tr>
 <tr>
-<td><code>RequestBody</code></td>
-<td>Handler-owned parsed state, original bytes, and text blocks</td>
+<td><code>EngineConfig</code></td>
+<td>Nominal strict base for an engine's exact policy configuration</td>
 </tr>
 <tr>
-<td><code>TextBlock</code></td>
-<td>One string to scan, with an opaque path and replacement flag</td>
+<td><code>EntityProcessingStrategy</code></td>
+<td>Per-run engine selection: detect or replace</td>
 </tr>
 <tr>
-<td><code>Finding</code></td>
-<td>One scanner result with block-relative offsets</td>
+<td><code>EntityDetection</code></td>
+<td>One occurrence with stage-input offsets and optional confidence</td>
 </tr>
 <tr>
-<td><code>RequestBodyFinding</code></td>
-<td>A finding paired with its text-block path</td>
+<td><code>TextProcessingResult</code></td>
+<td>One engine's authoritative output text and detections</td>
 </tr>
 <tr>
-<td><code>ProcessingResult</code></td>
-<td>Allow or deny decision, optional replacement body, findings, and reason code</td>
+<td><code>Timeout</code></td>
+<td>One monotonic deadline shared across all stages</td>
+</tr>
+<tr>
+<td><code>EntityDetectionSummary</code></td>
+<td>Bounded stage/entity/confidence aggregate for audit output</td>
+</tr>
+<tr>
+<td><code>RequestProcessingResult</code></td>
+<td>Allow or deny decision, detection summaries, and replacement text when requested</td>
 </tr>
 </tbody>
 </table>
-<p>Domain model fields are strict and frozen. <code>RequestBody.parsed_value</code> is
-handler-owned and may contain mutable objects; reconstruction must not mutate
-it. Fields containing request content are excluded from normal representations.</p>
+<p>Pydantic domain models are strict, frozen, reject unknown fields, hide rejected
+input from validation errors, and suppress sensitive fields from normal
+representations.</p>
+<h2 id="deliberate-omissions">Deliberate omissions<a class="headerlink" href="#deliberate-omissions" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Cross-request entity memory is not part of v0.</li>
+<li>Engines do not receive transport metadata or the user-facing policy action.</li>
+<li>There is no parallel execution-plan model; preparation constructs a
+  <code>RequestProcessor</code> directly.</li>
+<li>There is no generic replacement field or replacement-strategy enum. Each
+  engine owns any replacement settings appropriate to its underlying
+  algorithm.</li>
+<li>Runtime policy models do not accept catalog paths. Transparent file expansion
+  requires an upstream OpenShell policy-authoring feature.</li>
+</ul>
 <h2 id="read-next">Read next<a class="headerlink" href="#read-next" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="request-lifecycle/">Request lifecycle</a> explains normalization, scanning,
-  policy filtering, and redaction.</li>
-<li><a href="scanners/">Scanners</a> defines the scanner extension contract.</li>
-<li><a href="format-handlers/">Format handlers</a> defines body parsing and reconstruction.</li>
-<li><a href="service-boundary/">Service boundary</a> covers gRPC adaptation and concurrency.</li>
-<li><a href="safety-and-limits/">Safety and limits</a> records failure behavior and resource
-  bounds.</li>
+<li><a href="request-lifecycle/">Request lifecycle</a> explains configuration resolution,
+  ordered execution, actions, and output behavior.</li>
+<li><a href="entity-processing-engines/">Entity-processing engines</a> defines the
+  extension contract and built-in engines.</li>
+<li><a href="configuration/">Configuration and text boundary</a> covers the one-text
+  contract, configuration ownership, and current catalog limits.</li>
+<li><a href="service-boundary/">Service boundary</a> covers gRPC adaptation, caching, and
+  concurrency.</li>
+<li><a href="safety-and-limits/">Safety and limits</a> records failure behavior and
+  resource bounds.</li>
 </ul>
 
 

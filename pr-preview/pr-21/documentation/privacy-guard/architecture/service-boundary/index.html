@@ -6,14 +6,14 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="gRPC adaptation, worker scheduling, result aggregation, and server lifecycle.">
+        <meta name="description" content="gRPC adaptation, configuration caching, worker scheduling, and server lifecycle.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
       
       
       
-        <link rel="prev" href="../format-handlers/">
+        <link rel="prev" href="../configuration/">
       
       
         <link rel="next" href="../safety-and-limits/">
@@ -626,14 +626,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../scanners/" class="md-nav__link">
+      <a href="../entity-processing-engines/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-  Scanners
+  Entity-processing engines
 
     
   </span>
@@ -653,14 +653,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../format-handlers/" class="md-nav__link">
+      <a href="../configuration/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-  Format handlers
+  Configuration and text boundary
 
     
   </span>
@@ -750,6 +750,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#configuration-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration lifecycle
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#incoming-requests" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -773,10 +784,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#finding-aggregation" class="md-nav__link">
+  <a href="#findings" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Finding aggregation
+        Findings
       </span>
     </span>
   </a>
@@ -822,10 +833,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#server-lifecycle" class="md-nav__link">
+  <a href="#server-lifecycle-and-discovery" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Server lifecycle
+        Server lifecycle and discovery
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upstream-protocol-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Upstream protocol work
       </span>
     </span>
   </a>
@@ -954,6 +976,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#configuration-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration lifecycle
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#incoming-requests" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -977,10 +1010,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#finding-aggregation" class="md-nav__link">
+  <a href="#findings" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Finding aggregation
+        Findings
       </span>
     </span>
   </a>
@@ -1026,10 +1059,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#server-lifecycle" class="md-nav__link">
+  <a href="#server-lifecycle-and-discovery" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Server lifecycle
+        Server lifecycle and discovery
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upstream-protocol-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Upstream protocol work
       </span>
     </span>
   </a>
@@ -1227,9 +1271,13 @@
 <h1 id="service-boundary">Service boundary<a class="headerlink" href="#service-boundary" title="Permanent link">&para;</a></h1>
 <p>Outside the generated <code>bindings/</code> package, <code>service/</code> is the only layer that
 imports gRPC or generated protobuf bindings. It translates between OpenShell's
-transport contract and Privacy Guard's domain types.</p>
+transport contract and Privacy Guard's one-text domain contract.</p>
+<p>The <code>.proto</code> file and generated bindings checked into this project are copied
+from OpenShell. Protocol changes must land upstream and be adopted from a new
+canonical copy; Privacy Guard must not create a private fork.</p>
 <h2 id="grpc-methods">gRPC methods<a class="headerlink" href="#grpc-methods" title="Permanent link">&para;</a></h2>
-<p>Privacy Guard implements three <code>SupervisorMiddleware</code> methods:</p>
+<p>Privacy Guard implements the three methods currently defined by
+<code>SupervisorMiddleware</code>:</p>
 <table>
 <thead>
 <tr>
@@ -1240,36 +1288,60 @@ transport contract and Privacy Guard's domain types.</p>
 <tbody>
 <tr>
 <td><code>Describe</code></td>
-<td>Advertises the service name, version, pre-credentials HTTP binding, and body limit</td>
+<td>Advertises service identity, one pre-credentials HTTP binding, and the 4 MiB body limit</td>
 </tr>
 <tr>
 <td><code>ValidateConfig</code></td>
-<td>Parses policy and asks the processor to validate referenced formats and entities</td>
+<td>Purely validates expanded policy configuration and registered resources</td>
 </tr>
 <tr>
 <td><code>EvaluateHttpRequest</code></td>
-<td>Validates transport input, runs the processor, and returns a decision</td>
+<td>Validates transport input, resolves a processor, processes text, and returns a decision</td>
 </tr>
 </tbody>
 </table>
 <p><code>Describe</code> advertises only
-<code>SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS</code>. The service rejects evaluations
-for any other phase.</p>
-<h2 id="incoming-requests">Incoming requests<a class="headerlink" href="#incoming-requests" title="Permanent link">&para;</a></h2>
-<p>For each evaluation, the servicer:</p>
+<code>SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS</code>. Evaluations at any other phase
+are invalid input.</p>
+<p>The current manifest message has no field for the finalized policy schema or
+engine discovery metadata. Those are available through the local
+<code>privacy-guard schema</code> and <code>privacy-guard engines</code> commands.</p>
+<h2 id="configuration-lifecycle">Configuration lifecycle<a class="headerlink" href="#configuration-lifecycle" title="Permanent link">&para;</a></h2>
+<p>The current protocol carries a complete <code>google.protobuf.Struct</code> on both
+validation and every request evaluation.</p>
+<p><code>ValidateConfig</code>:</p>
 <ol>
-<li>validates the phase and body size</li>
-<li>converts the protobuf <code>Struct</code> into a strict <code>PolicyConfig</code></li>
-<li>extracts the request ID, content type, and body</li>
-<li>constructs an <code>InterceptedRequest</code></li>
-<li>passes that domain record to <code>RequestProcessor</code></li>
+<li>converts the <code>Struct</code> to a mapping</li>
+<li>validates the registry-built discriminated policy model</li>
+<li>validates each exact engine config against registered resources</li>
+<li>validates replacement support for a replace action</li>
+<li>returns <code>valid=true</code>, or a content-safe reason</li>
 </ol>
-<p>Transport-only fields that processing does not need remain at the service
-boundary.</p>
-<p><code>content_type</code> is retained as request context, but the processor selects the
-format from policy. It does not infer format from this header.</p>
+<p>It does not construct engines, populate the processor cache, contact model
+providers, download resources, or write artifacts.</p>
+<p>During evaluation, the service validates the same expanded config, computes its
+canonical SHA-256 fingerprint, and resolves a configured processor from a
+bounded 128-entry LRU cache. A cache miss constructs engines directly from the
+exact stage configs and operator-injected resources, then constructs the
+<code>RequestProcessor</code>.</p>
+<p>The cache is protected for concurrent access and is not correctness-relevant.
+Eviction or process restart simply causes reconstruction from a later
+evaluation's expanded config.</p>
+<h2 id="incoming-requests">Incoming requests<a class="headerlink" href="#incoming-requests" title="Permanent link">&para;</a></h2>
+<p>For each evaluation, the service:</p>
+<ol>
+<li>validates the pre-credentials phase</li>
+<li>validates the transport body byte limit</li>
+<li>validates and resolves the expanded policy config</li>
+<li>allows an empty body without invoking an engine</li>
+<li>decodes a non-empty body as strict UTF-8</li>
+<li>schedules <code>RequestProcessor.process(text)</code> in the bounded worker pool</li>
+</ol>
+<p>Request context, target, headers, middleware name, and protobuf values remain at
+the service boundary. The request ID is used only for content-safe operational
+logging.</p>
 <h2 id="outgoing-results">Outgoing results<a class="headerlink" href="#outgoing-results" title="Permanent link">&para;</a></h2>
-<p>The processor returns <code>ProcessingResult</code>. The servicer converts it to
+<p>The processor returns <code>RequestProcessingResult</code>. The service maps it to
 <code>HttpRequestResult</code>:</p>
 <table>
 <thead>
@@ -1280,44 +1352,48 @@ format from policy. It does not infer format from this header.</p>
 </thead>
 <tbody>
 <tr>
-<td>Allow without replacement</td>
+<td>Detect allow</td>
 <td><code>DECISION_ALLOW</code>, <code>has_body=false</code></td>
 </tr>
 <tr>
-<td>Allow with replacement</td>
-<td><code>DECISION_ALLOW</code>, <code>has_body=true</code>, replacement bytes</td>
+<td>Block allow with no detections</td>
+<td><code>DECISION_ALLOW</code>, <code>has_body=false</code></td>
 </tr>
 <tr>
-<td>Deny</td>
-<td><code>DECISION_DENY</code>, no body, stable reason code</td>
+<td>Replace allow</td>
+<td><code>DECISION_ALLOW</code>, <code>has_body=true</code>, final UTF-8 body</td>
+</tr>
+<tr>
+<td>Policy block</td>
+<td><code>DECISION_DENY</code>, <code>privacy_guard_blocked</code>, no body</td>
+</tr>
+<tr>
+<td>Limit deny</td>
+<td><code>DECISION_DENY</code>, <code>privacy_guard_limit_exceeded</code>, no body or partial findings</td>
 </tr>
 </tbody>
 </table>
-<p>The service checks replacement size again before serialization.</p>
-<h3 id="finding-aggregation">Finding aggregation<a class="headerlink" href="#finding-aggregation" title="Permanent link">&para;</a></h3>
-<p>Domain findings include text-block paths and exact offsets. The protobuf result
-contains count-based audit findings.</p>
-<p>The service groups findings by:</p>
+<p>The service checks the encoded replacement size again before serialization.</p>
+<h3 id="findings">Findings<a class="headerlink" href="#findings" title="Permanent link">&para;</a></h3>
+<p>The processor has already aggregated occurrences by source stage, entity, and
+confidence. For each <code>EntityDetectionSummary</code>, the service emits:</p>
 <ul>
-<li>scanner name</li>
-<li>entity</li>
-<li>optional <code>pattern_name</code> metadata</li>
-<li>confidence</li>
+<li><code>type</code>: <code>detected_entity</code></li>
+<li><code>label</code>: <code>entity (source-stage)</code></li>
+<li><code>confidence</code>: the categorical value, a bounded numeric representation, or
+  empty when absent</li>
+<li><code>count</code>: aggregate occurrence count</li>
 </ul>
-<p>It emits:</p>
-<ul>
-<li><code>type</code>: scanner name</li>
-<li><code>label</code>: entity or <code>entity/pattern-name</code></li>
-<li><code>confidence</code></li>
-<li><code>count</code></li>
-</ul>
-<p>Paths, offsets, and matched request content never cross the protobuf boundary.</p>
+<p>The current OpenShell <code>Finding</code> message has no dedicated source field.
+Stage provenance is therefore secondary text in the bounded label while the
+entity remains primary. Matched content, offsets, patterns, and raw engine
+metadata never cross the protobuf boundary.</p>
 <h2 id="concurrency-model">Concurrency model<a class="headerlink" href="#concurrency-model" title="Permanent link">&para;</a></h2>
-<p>The gRPC server allows up to 16 concurrent RPCs. Synchronous processing runs in
-a dedicated pool with four workers.</p>
+<p>The gRPC server accepts at most 16 concurrent RPCs. Synchronous processing uses
+a dedicated executor and semaphore with four active slots:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>gRPC event loop
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>      |
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>      | acquire scan slot
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>      | acquire processing slot
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>      v
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>4-slot semaphore
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>      |
@@ -1326,20 +1402,27 @@ a dedicated pool with four workers.</p>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>      |
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>      v
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>RequestProcessor.process
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>      |
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>      v
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>ordered engine pipeline
 </span></code></pre></div>
-<p>This prevents scanner work from blocking the async event loop and bounds active
-synchronous scans.</p>
-<p>Scanner and format-handler instances are shared by those workers. They must be
-safe for concurrent use.</p>
+<p>This keeps synchronous engine work off the async event loop and bounds the
+number of active processor runs.</p>
+<p>Cached processors, engine instances, and injected resources may be used by
+multiple worker threads. They must retain no mutable per-request state and must
+be safe for concurrent access.</p>
 <h2 id="cancellation">Cancellation<a class="headerlink" href="#cancellation" title="Permanent link">&para;</a></h2>
-<p>Cancelling an async RPC cannot stop Python code already running in a worker
-thread. The service shields the worker future and keeps its semaphore slot until
-the worker actually exits.</p>
-<p>This rule prevents cancellation from creating more than four active scans.</p>
-<p>During shutdown, the service stops gRPC and waits for the scan executor.</p>
+<p>Cancelling an async RPC cannot stop Python code already running in its worker
+thread. The service shields the worker bridge and releases the semaphore slot
+only after that worker actually finishes.</p>
+<p>Cancellation therefore cannot create more than four active processor runs.
+An engine should pass the remaining shared timeout to any delegated API that
+supports bounded execution. A non-preemptible call continues to occupy its slot
+until it exits.</p>
+<p>During shutdown, the server stops gRPC and waits for active executor work.</p>
 <h2 id="error-mapping">Error mapping<a class="headerlink" href="#error-mapping" title="Permanent link">&para;</a></h2>
 <p><code>PrivacyGuardError</code> classifies each cataloged failure as invalid input or
-internal failure.</p>
+internal failure:</p>
 <table>
 <thead>
 <tr>
@@ -1358,46 +1441,85 @@ internal failure.</p>
 </tr>
 </tbody>
 </table>
-<p>This mapping applies to <code>EvaluateHttpRequest</code>. <code>ValidateConfig</code> reports failures
-in <code>ValidateConfigResponse</code> with <code>valid=false</code> and a safe reason.</p>
-<p>Unexpected exceptions become the content-safe
-<code>unexpected_service_failure</code> error. The service does not return arbitrary
-exception text.</p>
-<p>A gRPC error is different from a policy deny. OpenShell applies its configured
-middleware failure mode when the RPC fails. A policy deny is a successful RPC
-whose result explicitly stops the request.</p>
-<h2 id="server-lifecycle">Server lifecycle<a class="headerlink" href="#server-lifecycle" title="Permanent link">&para;</a></h2>
-<p><code>MiddlewareServer</code> is the high-level API for custom scanners. It constructs:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Scanner
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  -&gt; RequestProcessor
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  -&gt; PrivacyGuardMiddleware
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  -&gt; gRPC server
+<p>This mapping applies to evaluation. <code>ValidateConfig</code> instead returns
+<code>valid=false</code> with a content-safe reason.</p>
+<p>Unexpected failures become <code>unexpected_service_failure</code>. The service does not
+return caught collaborator messages or exception chains.</p>
+<p>A gRPC failure is distinct from a successful policy deny. OpenShell applies the
+middleware registration's failure behavior when an RPC fails. A policy deny is
+a successful RPC result that explicitly stops the request.</p>
+<h2 id="server-lifecycle-and-discovery">Server lifecycle and discovery<a class="headerlink" href="#server-lifecycle-and-discovery" title="Permanent link">&para;</a></h2>
+<p><code>MiddlewareServer</code> is the high-level API. It owns:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>EngineRegistry
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  -&gt; PrivacyGuardMiddleware
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  -&gt; gRPC server
 </span></code></pre></div>
-<p>The CLI uses the same API for built-in scanners.</p>
+<p>The built-in registry includes <code>RegexEngine</code>. Operators register custom engines
+and resource-backed tool integrations before registry finalization, then pass
+that registry to <code>MiddlewareServer</code>.</p>
+<p>The registry is an explicit application-scoped dependency, not a global
+singleton. <code>MiddlewareServer</code> and <code>PrivacyGuardMiddleware</code> reject unfinalized
+registries. A deployment creates and finalizes one registry during startup;
+cached processors then construct configured stage engines from that registry.
+Different middleware applications in the same process may intentionally use
+different engine inventories or runtime resources.</p>
+<p>The CLI accepts an operator registry factory in <code>module:factory</code> form. The
+factory is invoked once, must return a finalized <code>EngineRegistry</code>, and supplies
+the same engine inventory to discovery, schema generation, or serving:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>privacy-guard<span class="w"> </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span>engines
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>privacy-guard<span class="w"> </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span>schema
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>privacy-guard<span class="w"> </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span>serve
+</span></code></pre></div>
+<p>The factory is trusted operator code imported into the Privacy Guard process.
+It is not a policy-controlled plugin hook.</p>
 <p>The server:</p>
 <ol>
-<li>creates an unstarted async gRPC server</li>
+<li>creates an unstarted async gRPC server with receive and concurrency limits</li>
 <li>binds the configured address</li>
 <li>starts and waits for termination</li>
 <li>stops gRPC</li>
 <li>closes the middleware executor</li>
 </ol>
 <p>A bind failure becomes the stable <code>server_bind_failed</code> error.</p>
+<p>The CLI exposes:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>privacy-guard<span class="w"> </span>engines
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>privacy-guard<span class="w"> </span>schema
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>privacy-guard<span class="w"> </span>serve<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:50051
+</span></code></pre></div>
+<p>Entity behavior comes from policy configuration, not server startup flags.
+Engine implementations and operational resources come from the selected
+application registry.</p>
+<h2 id="upstream-protocol-work">Upstream protocol work<a class="headerlink" href="#upstream-protocol-work" title="Permanent link">&para;</a></h2>
+<p>The intended large-catalog and discovery experience requires coordinated
+OpenShell changes for:</p>
+<ul>
+<li>a preparation operation that accepts expanded configuration larger than the
+  current 64 KiB evaluation limit</li>
+<li>canonical configuration fingerprints on evaluations</li>
+<li>typed cache-miss recovery</li>
+<li>finalized policy schema and engine discovery in the manifest</li>
+<li>a dedicated finding source field</li>
+</ul>
+<p>These are protocol evolution items, not local implementation hooks. Until they
+land upstream, Privacy Guard continues to validate the per-evaluation config,
+repopulate its local cache when needed, expose discovery through the CLI, and
+render stage provenance inside the finding label.</p>
 <h2 id="testing-the-boundary">Testing the boundary<a class="headerlink" href="#testing-the-boundary" title="Permanent link">&para;</a></h2>
 <p>Service tests should cover:</p>
 <ul>
 <li>protobuf/domain translation</li>
-<li>manifest contents</li>
-<li>policy validation RPCs</li>
-<li>phase and body-size validation</li>
-<li>allow, replacement, and deny serialization</li>
-<li>finding aggregation and encoded limits</li>
+<li>manifest fields supported by the current protocol</li>
+<li>pure policy validation</li>
+<li>phase, body-size, and UTF-8 validation</li>
+<li>cache hit and reconstruction behavior</li>
+<li>detect, replacement, block, and limit serialization</li>
+<li>finding encoding and limits</li>
 <li>gRPC status mapping</li>
 <li>worker-slot behavior under cancellation</li>
 <li>startup, bind failure, and shutdown</li>
 </ul>
-<p>Keep scanner detection and processor policy cases out of service tests unless
-the case requires transport translation.</p>
+<p>Engine algorithms and ordered policy semantics belong in engine and processor
+tests unless transport translation is essential to the case.</p>
 <p><a href="../">Back to the architecture overview</a></p>
 
 

@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="How Privacy Guard normalizes, scans, filters, and transforms one request.">
+        <meta name="description" content="How Privacy Guard prepares policy, runs ordered engines, and applies one request action.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
@@ -16,7 +16,7 @@
         <link rel="prev" href="../">
       
       
-        <link rel="next" href="../scanners/">
+        <link rel="next" href="../entity-processing-engines/">
       
       
         
@@ -658,10 +658,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#inputs" class="md-nav__link">
+  <a href="#policy-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Inputs
+        Policy configuration
       </span>
     </span>
   </a>
@@ -669,82 +669,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#processing-stages" class="md-nav__link">
+  <a href="#configuration-resolution-and-preparation" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Processing stages
-      </span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Processing stages">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-select-the-format-handler" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        1. Select the format handler
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-normalize-the-body" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        2. Normalize the body
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-scan-and-filter-findings" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        3. Scan and filter findings
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-apply-the-action" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        4. Apply the action
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-reconstruct-the-body" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        5. Reconstruct the body
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#redaction-behavior" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Redaction behavior
+        Configuration resolution and preparation
       </span>
     </span>
   </a>
@@ -752,10 +680,43 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#non-replaceable-text" class="md-nav__link">
+  <a href="#text-input" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Non-replaceable text
+        Text input
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ordered-stage-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Ordered stage execution
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#detection-aggregation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Detection aggregation
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#applying-the-policy-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Applying the policy action
       </span>
     </span>
   </a>
@@ -789,14 +750,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../scanners/" class="md-nav__link">
+      <a href="../entity-processing-engines/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-  Scanners
+  Entity-processing engines
 
     
   </span>
@@ -816,14 +777,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../format-handlers/" class="md-nav__link">
+      <a href="../configuration/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-  Format handlers
+  Configuration and text boundary
 
     
   </span>
@@ -954,10 +915,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#inputs" class="md-nav__link">
+  <a href="#policy-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Inputs
+        Policy configuration
       </span>
     </span>
   </a>
@@ -965,82 +926,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#processing-stages" class="md-nav__link">
+  <a href="#configuration-resolution-and-preparation" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Processing stages
-      </span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Processing stages">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#1-select-the-format-handler" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        1. Select the format handler
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#2-normalize-the-body" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        2. Normalize the body
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-scan-and-filter-findings" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        3. Scan and filter findings
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-apply-the-action" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        4. Apply the action
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-reconstruct-the-body" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        5. Reconstruct the body
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#redaction-behavior" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Redaction behavior
+        Configuration resolution and preparation
       </span>
     </span>
   </a>
@@ -1048,10 +937,43 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#non-replaceable-text" class="md-nav__link">
+  <a href="#text-input" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Non-replaceable text
+        Text input
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ordered-stage-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Ordered stage execution
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#detection-aggregation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Detection aggregation
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#applying-the-policy-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Applying the policy action
       </span>
     </span>
   </a>
@@ -1247,133 +1169,174 @@
 
 
 <h1 id="request-lifecycle">Request lifecycle<a class="headerlink" href="#request-lifecycle" title="Permanent link">&para;</a></h1>
-<p><code>RequestProcessor</code> owns the complete protobuf-free request flow. It composes
-format handlers and scanners, applies policy, and returns a <code>ProcessingResult</code>.</p>
-<h2 id="inputs">Inputs<a class="headerlink" href="#inputs" title="Permanent link">&para;</a></h2>
-<p>The processor receives an <code>InterceptedRequest</code> containing:</p>
+<p><code>RequestProcessor</code> owns the complete protobuf-free flow for one text value. It
+runs configured entity-processing stages in order, aggregates detections, and
+applies the policy action.</p>
+<p>The gRPC service owns the surrounding bytes/text and configuration transport
+boundaries.</p>
+<h2 id="policy-configuration">Policy configuration<a class="headerlink" href="#policy-configuration" title="Permanent link">&para;</a></h2>
+<p>The policy supplies:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">entity_processing</span><span class="p">:</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">stages</span><span class="p">:</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">optional-diagnostic-name</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">        </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">        </span><span class="nt">pattern_catalog</span><span class="p">:</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">          </span><span class="nt">entities</span><span class="p">:</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">              </span><span class="nt">patterns</span><span class="p">:</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">                </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;...&#39;</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">                  </span><span class="nt">confidence</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">high</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">        </span><span class="nt">replacement</span><span class="p">:</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">          </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">template</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">          </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;[{entity}]&quot;</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="nt">on_detection</span><span class="p">:</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">detect</span>
+</span></code></pre></div>
+<p><code>entity_processing</code> is an object so concrete pipeline-wide settings can be
+added later without changing the stage-list shape. V0 defines only <code>stages</code>.
+The list must be non-empty.</p>
+<p>Each <code>EntityProcessingStage</code> contains:</p>
 <ul>
-<li>the exact request body bytes</li>
-<li>a parsed <code>PolicyConfig</code></li>
-<li>the request ID</li>
-<li>the original content type, retained as context but not used for format
-  selection</li>
+<li>optional <code>name</code>, used only as bounded diagnostic provenance</li>
+<li>required <code>config</code>, which is the exact concrete configuration model owned by
+  the selected engine</li>
 </ul>
-<p>Policy selects the format through <code>body_format</code>; the processor does not infer it
-from request content or metadata.</p>
-<p>After validating the configured format and entity filter, the processor allows
-an empty body without normalization or scanning.</p>
-<h2 id="processing-stages">Processing stages<a class="headerlink" href="#processing-stages" title="Permanent link">&para;</a></h2>
-<h3 id="1-select-the-format-handler">1. Select the format handler<a class="headerlink" href="#1-select-the-format-handler" title="Permanent link">&para;</a></h3>
-<p>The processor looks up <code>PolicyConfig.body_format</code> in its registered format
-handlers. The handler's own <code>format_name</code> must match its registry key.</p>
-<p>It also verifies that every entity named by policy appears in at least one
-active scanner's <code>ScannerConfig.entity_types</code>. An unknown format or entity is
-invalid configuration.</p>
-<h3 id="2-normalize-the-body">2. Normalize the body<a class="headerlink" href="#2-normalize-the-body" title="Permanent link">&para;</a></h3>
-<p>The selected handler parses the original bytes and returns a <code>RequestBody</code>.
-The processor then verifies:</p>
-<ul>
-<li><code>RequestBody.original_bytes</code> exactly matches the input</li>
-<li>every <code>TextBlock.path</code> is unique</li>
-<li>the number of text blocks is within the request limit</li>
-<li>the total text length is within the scan limit</li>
-</ul>
-<p>The processor does not parse text-block paths. Paths belong to the format
-handler.</p>
-<h3 id="3-scan-and-filter-findings">3. Scan and filter findings<a class="headerlink" href="#3-scan-and-filter-findings" title="Permanent link">&para;</a></h3>
-<p>The processor creates one request-wide <code>ScanBudget</code>. It passes every text block
-to every configured scanner in registration order. It validates each result,
-then selects findings by:</p>
-<ul>
-<li><code>entity_types</code></li>
-<li><code>minimum_confidence</code></li>
-</ul>
-<p>Policy never changes scanner behavior. <code>entity_types: null</code> selects all entity
-types. An empty list selects none.
-<code>minimum_confidence: null</code> accepts every confidence level.</p>
-<p><code>Scanner.scan</code> validates the returned tuple and finding models.
-<code>RequestProcessor</code> validates scanner identity, declared entities, offsets, and
-selected finding totals. See
-<a href="../safety-and-limits/#validation-ownership">Validation ownership</a>.</p>
-<h3 id="4-apply-the-action">4. Apply the action<a class="headerlink" href="#4-apply-the-action" title="Permanent link">&para;</a></h3>
+<p><code>config.engine</code> is a Pydantic discriminator. After every implementation is
+registered, <code>EngineRegistry.finalize()</code> constructs a real discriminated union
+of their concrete config models. Engine-specific fields and nested replacement
+variants therefore validate, serialize, and appear in JSON Schema without a
+generic mapping or translation layer.</p>
+<p>When a stage name is omitted, Privacy Guard derives a deterministic one-based
+label such as <code>regex[1]</code>. All resulting diagnostic names must be unique.</p>
+<h2 id="configuration-resolution-and-preparation">Configuration resolution and preparation<a class="headerlink" href="#configuration-resolution-and-preparation" title="Permanent link">&para;</a></h2>
+<p>For each evaluation under the current OpenShell protocol, the service:</p>
+<ol>
+<li>converts the protobuf <code>Struct</code> to a mapping</li>
+<li>validates it through the finalized registry-backed Pydantic model</li>
+<li>validates each concrete config against its registered implementation and
+   injected resources</li>
+<li>validates the action/replacement compatibility</li>
+<li>computes a SHA-256 fingerprint of canonical expanded configuration</li>
+<li>resolves a cached <code>RequestProcessor</code>, or constructs the engines and
+   processor and adds it to the bounded cache</li>
+</ol>
+<p><code>ValidateConfig</code> performs the validation steps without populating this cache.
+Preparation is repeatable; cache state is an optimization and never required
+for correctness.</p>
+<p>There is no separate execution-plan abstraction. The validated stage order
+already contains the necessary policy structure, and the prepared processor
+privately retains the corresponding ordered engine instances.</p>
+<h2 id="text-input">Text input<a class="headerlink" href="#text-input" title="Permanent link">&para;</a></h2>
+<p>The service validates the pre-credentials phase and the request body byte
+limit before processing. It still validates configuration for an empty body,
+then immediately allows that body without invoking an engine.</p>
+<p>A non-empty body must decode as strict UTF-8. The decoded <code>str</code> is the only
+request input passed to <code>RequestProcessor</code>; headers, content type, request ID,
+target, and protobuf messages do not cross that boundary.</p>
+<p>The processor validates both character and encoded-byte bounds before running
+the pipeline.</p>
+<h2 id="ordered-stage-execution">Ordered stage execution<a class="headerlink" href="#ordered-stage-execution" title="Permanent link">&para;</a></h2>
+<p>The processor derives one invocation strategy for the whole pipeline:</p>
 <table>
 <thead>
 <tr>
-<th>Action</th>
-<th>No selected findings</th>
-<th>Selected findings</th>
+<th>Policy action</th>
+<th>Engine strategy</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>observe</code></td>
-<td>Allow unchanged</td>
-<td>Allow unchanged and report findings</td>
+<td><code>detect</code></td>
+<td><code>DETECT</code></td>
 </tr>
 <tr>
 <td><code>block</code></td>
-<td>Allow unchanged</td>
-<td>Deny and report findings</td>
+<td><code>DETECT</code></td>
 </tr>
 <tr>
-<td><code>redact</code></td>
-<td>Allow unchanged</td>
-<td>Replace selected spans, or deny if safe replacement is impossible</td>
+<td><code>replace</code></td>
+<td><code>REPLACE</code></td>
 </tr>
 </tbody>
 </table>
-<p>The processor scans all text blocks for every action. The action controls how
-selected findings affect the result.</p>
-<h3 id="5-reconstruct-the-body">5. Reconstruct the body<a class="headerlink" href="#5-reconstruct-the-body" title="Permanent link">&para;</a></h3>
-<p>For redaction, the processor creates replacement text for each affected,
-replaceable block. It passes a path-to-text mapping back to the same format
-handler that normalized the body.</p>
-<p>A selected block action, non-replaceable redaction, or limit result returns
-before reconstruction. Every other non-empty request is reconstructed once.
-Observe and block-without-findings pass an empty replacement map.</p>
-<p>With an empty replacement map, a handler returns the original bytes exactly.
-After a rewrite, untouched values must remain semantically equivalent, but
-byte formatting may change.</p>
-<p>The processor returns a replacement body only when reconstructed bytes differ
-from the original.</p>
-<h2 id="redaction-behavior">Redaction behavior<a class="headerlink" href="#redaction-behavior" title="Permanent link">&para;</a></h2>
-<p>Findings may overlap. Every action retains all selected findings for reporting.
-Redaction resolves overlaps only when choosing spans to replace; losing overlaps
-remain in the result.</p>
-<p>Redaction chooses non-overlapping replacement spans in this order:</p>
+<p><code>PolicyAction</code> is never passed to an engine.</p>
+<p>The processor then:</p>
 <ol>
-<li>higher confidence</li>
-<li>longer span</li>
-<li>earlier start offset</li>
-<li>earlier end offset</li>
-<li>scanner name</li>
-<li>entity name</li>
-<li>pattern name</li>
+<li>creates one monotonic <code>Timeout</code></li>
+<li>calls each stage exactly once in policy order</li>
+<li>passes the current text, invocation strategy, and shared timeout to
+   <code>engine.run()</code></li>
+<li>validates intermediate character, byte, and detection limits</li>
+<li>passes the returned text to the next stage</li>
+<li>checks the same timeout after the final result</li>
 </ol>
-<p>The stable ordering makes redaction independent of incidental scanner return
-order.</p>
-<p>The redaction template accepts static text and <code>{entity}</code>. Formatting options,
-conversions, and other fields are invalid.</p>
-<p>Before allocating replacement text, the processor projects its UTF-8 size
-against the body limit. It checks the serialized body again after
-reconstruction.</p>
-<h2 id="non-replaceable-text">Non-replaceable text<a class="headerlink" href="#non-replaceable-text" title="Permanent link">&para;</a></h2>
-<p>A format handler may expose text that can be observed but not safely rewritten.
-It marks that <code>TextBlock</code> with <code>replaceable=False</code>.</p>
-<p>The JSON handler uses this for object keys. Observe reports findings in keys,
-and block denies normally. Redact denies the request when a selected finding is
-in a key because changing a key could create a collision.</p>
+<p>In detect and block mode, the public engine contract requires returned text to
+equal that stage's input. In replace mode, each later stage sees the preceding
+stage's processed text.</p>
+<p>Detection offsets always refer to the input revision seen by the producing
+stage. Privacy Guard does not reinterpret earlier offsets after a later stage
+changes the text.</p>
+<p>If a stage times out, exceeds an execution limit, or fails, its partial text and
+detections are discarded. No later stage runs.</p>
+<h2 id="detection-aggregation">Detection aggregation<a class="headerlink" href="#detection-aggregation" title="Permanent link">&para;</a></h2>
+<p>After all stages succeed, the processor aggregates detections by:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>source stage + entity + confidence representation
+</span></code></pre></div>
+<p>It does not deduplicate across stages. Two stages may have inspected different
+text revisions, and confidence values from different tools are not assumed to
+be calibrated.</p>
+<p>The aggregate <code>EntityDetectionSummary</code> intentionally omits matched text,
+surrounding text, offsets, patterns, and raw engine metadata.</p>
+<h2 id="applying-the-policy-action">Applying the policy action<a class="headerlink" href="#applying-the-policy-action" title="Permanent link">&para;</a></h2>
+<p>The processor owns the final disposition:</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>No detections</th>
+<th>One or more detections</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>detect</code></td>
+<td>Allow original body</td>
+<td>Allow original body and report detection summaries</td>
+</tr>
+<tr>
+<td><code>block</code></td>
+<td>Allow original body</td>
+<td>Deny with <code>privacy_guard_blocked</code> and report detection summaries</td>
+</tr>
+<tr>
+<td><code>replace</code></td>
+<td>Allow final processed text</td>
+<td>Allow final processed text and report detection summaries</td>
+</tr>
+</tbody>
+</table>
+<p>For <code>replace</code>, configuration validation requires every stage to advertise
+replacement support and to include its valid engine-specific replacement
+recipe. A recipe may remain configured but dormant when the action is changed
+to detect or block.</p>
+<p>Replacement behavior belongs to each engine. For example, <code>RegexEngine</code>
+selects deterministic non-overlapping matches and renders its constrained
+template. A custom engine backed by another tool owns that tool's native
+replacement operation. <code>RequestProcessor</code> does not reproduce either algorithm.</p>
 <h2 id="output">Output<a class="headerlink" href="#output" title="Permanent link">&para;</a></h2>
-<p>The processor returns a <code>ProcessingResult</code>:</p>
+<p><code>RequestProcessor.process()</code> returns a <code>RequestProcessingResult</code>:</p>
 <ul>
-<li><code>ALLOW</code> with no replacement for an unchanged request</li>
-<li><code>ALLOW</code> with replacement bytes for a successful redaction</li>
-<li><code>DENY</code> with <code>privacy_guard_blocked</code> for a policy block</li>
-<li><code>DENY</code> with <code>privacy_guard_limit_exceeded</code> when safe bounded output cannot be
-  produced</li>
+<li>detect and block-without-detections return <code>ALLOW</code> without replacement text</li>
+<li>block-with-detections returns <code>DENY</code>, detection summaries, and
+  <code>privacy_guard_blocked</code></li>
+<li>replace returns <code>ALLOW</code>, the final text, and detection summaries</li>
+<li>timeout or execution-limit exhaustion returns <code>DENY</code> with
+  <code>privacy_guard_limit_exceeded</code> and no partial summaries or replacement</li>
 </ul>
-<p>Findings remain path-aware in the domain result. The service later aggregates
-them for the protobuf response.</p>
+<p>The service leaves the original request bytes untouched for detect and block.
+For replace it UTF-8 encodes the final text and sets <code>has_body=true</code>, including
+when the final text happens to equal the input.</p>
 <p><a href="../">Back to the architecture overview</a></p>
 
 

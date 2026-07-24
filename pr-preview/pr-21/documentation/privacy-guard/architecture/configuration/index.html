@@ -6,14 +6,14 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Request-body normalization, opaque paths, and reconstruction contracts.">
+        <meta name="description" content="Runtime configuration ownership and the single-text processing contract.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
       
       
       
-        <link rel="prev" href="../scanners/">
+        <link rel="prev" href="../entity-processing-engines/">
       
       
         <link rel="next" href="../service-boundary/">
@@ -27,7 +27,7 @@
     
     
       
-        <title>Format handlers - OpenShell Research</title>
+        <title>Configuration and text boundary - OpenShell Research</title>
       
     
     
@@ -68,7 +68,7 @@
     
   
   
-    <link rel="alternate" type="text/markdown" href="../format-handlers.md" title="Markdown source">
+    <link rel="alternate" type="text/markdown" href="../configuration.md" title="Markdown source">
   
 
   </head>
@@ -90,7 +90,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#format-handlers" class="md-skip">
+        <a href="#configuration-and-text-boundary" class="md-skip">
           Skip to content
         </a>
       
@@ -125,7 +125,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Format handlers
+              Configuration and text boundary
             
           </span>
         </div>
@@ -626,14 +626,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../scanners/" class="md-nav__link">
+      <a href="../entity-processing-engines/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-  Scanners
+  Entity-processing engines
 
     
   </span>
@@ -669,7 +669,7 @@
   <span class="md-ellipsis">
     
   
-  Format handlers
+  Configuration and text boundary
 
     
   </span>
@@ -686,7 +686,7 @@
   <span class="md-ellipsis">
     
   
-  Format handlers
+  Configuration and text boundary
 
     
   </span>
@@ -712,10 +712,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#format-handler-interface" class="md-nav__link">
+  <a href="#bytes-and-text" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Format handler interface
+        Bytes and text
       </span>
     </span>
   </a>
@@ -723,10 +723,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#normalized-body" class="md-nav__link">
+  <a href="#policy-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Normalized body
+        Policy configuration
       </span>
     </span>
   </a>
@@ -734,10 +734,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#unchanged-and-rewritten-bodies" class="md-nav__link">
+  <a href="#regex-catalogs" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Unchanged and rewritten bodies
+        Regex catalogs
       </span>
     </span>
   </a>
@@ -745,49 +745,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#json-handler" class="md-nav__link">
+  <a href="#current-transport-constraint" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        JSON handler
-      </span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="JSON handler">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#paths" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Paths
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reconstruction" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Reconstruction
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#minimal-plain-text-handler" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Minimal plain-text handler
+        Current transport constraint
       </span>
     </span>
   </a>
@@ -795,21 +756,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#concurrency" class="md-nav__link">
+  <a href="#configuration-identity" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Concurrency
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#testing-a-handler" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Testing a handler
+        Configuration identity
       </span>
     </span>
   </a>
@@ -943,10 +893,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#format-handler-interface" class="md-nav__link">
+  <a href="#bytes-and-text" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Format handler interface
+        Bytes and text
       </span>
     </span>
   </a>
@@ -954,10 +904,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#normalized-body" class="md-nav__link">
+  <a href="#policy-configuration" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Normalized body
+        Policy configuration
       </span>
     </span>
   </a>
@@ -965,10 +915,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#unchanged-and-rewritten-bodies" class="md-nav__link">
+  <a href="#regex-catalogs" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Unchanged and rewritten bodies
+        Regex catalogs
       </span>
     </span>
   </a>
@@ -976,49 +926,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#json-handler" class="md-nav__link">
+  <a href="#current-transport-constraint" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        JSON handler
-      </span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="JSON handler">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#paths" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Paths
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#reconstruction" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Reconstruction
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#minimal-plain-text-handler" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Minimal plain-text handler
+        Current transport constraint
       </span>
     </span>
   </a>
@@ -1026,21 +937,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#concurrency" class="md-nav__link">
+  <a href="#configuration-identity" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Concurrency
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#testing-a-handler" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Testing a handler
+        Configuration identity
       </span>
     </span>
   </a>
@@ -1219,200 +1119,102 @@
 
 
   
-  <a href="../format-handlers.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
+  <a href="../configuration.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.56 18H3.44C2.65 18 2 17.37 2 16.59V7.41C2 6.63 2.65 6 3.44 6h17.12c.79 0 1.44.63 1.44 1.41v9.18c0 .78-.65 1.41-1.44 1.41M3.44 6.94c-.26 0-.48.21-.48.47v9.19c0 .25.22.46.48.46h17.12c.26 0 .48-.21.48-.46V7.41c0-.26-.22-.47-.48-.47zm1.45 8.25V8.81h1.92l1.92 2.35 1.92-2.35h1.93v6.38h-1.93v-3.66l-1.92 2.35-1.92-2.35v3.66zm12.01 0-2.9-3.1h1.94V8.81h1.92v3.28h1.93z"/></svg>
   </a>
 
 
-<h1 id="format-handlers">Format handlers<a class="headerlink" href="#format-handlers" title="Permanent link">&para;</a></h1>
-<p>A format handler translates raw body bytes into text blocks and reconstructs the
-body after redaction. It owns all format-specific parsing and path syntax.</p>
-<p>The processor uses the same interface for every format and never parses a path.</p>
-<h2 id="format-handler-interface">Format handler interface<a class="headerlink" href="#format-handler-interface" title="Permanent link">&para;</a></h2>
-<p>A format handler implements two protected methods:</p>
-<table>
-<thead>
-<tr>
-<th>Method</th>
-<th>Responsibility</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>_normalize(raw_body, policy_config)</code></td>
-<td>Parse bytes and return a <code>RequestBody</code></td>
-</tr>
-<tr>
-<td><code>_reconstruct(request_body, replacements_by_path)</code></td>
-<td>Apply replacements and return bytes</td>
-</tr>
-</tbody>
-</table>
-<p>Applications call the public <code>normalize</code> and <code>reconstruct</code> methods. These
-wrappers validate extension output.</p>
-<p>The handler constructor declares a stable <code>format_name</code>. The processor registry
-key must match it.</p>
-<h2 id="normalized-body">Normalized body<a class="headerlink" href="#normalized-body" title="Permanent link">&para;</a></h2>
-<p><code>RequestBody</code> contains:</p>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>text_blocks</code></td>
-<td><code>TextBlock</code> values selected for scanning</td>
-</tr>
-<tr>
-<td><code>parsed_value</code></td>
-<td>Opaque handler-owned reconstruction state</td>
-</tr>
-<tr>
-<td><code>original_bytes</code></td>
-<td>Exact input bytes</td>
-</tr>
-</tbody>
-</table>
-<p><code>TextBlock</code> contains:</p>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>path</code></td>
-<td>Opaque handler-defined address</td>
-</tr>
-<tr>
-<td><code>text</code></td>
-<td>String passed to scanners</td>
-</tr>
-<tr>
-<td><code>replaceable</code></td>
-<td>Whether redaction may rewrite this block</td>
-</tr>
-</tbody>
-</table>
-<p>The processor requires unique paths. It may compare paths and use them as
-mapping keys, but it must not parse them.</p>
-<p>The handler must not mutate <code>parsed_value</code> during reconstruction. It may copy
-the value before applying replacements.</p>
-<h2 id="unchanged-and-rewritten-bodies">Unchanged and rewritten bodies<a class="headerlink" href="#unchanged-and-rewritten-bodies" title="Permanent link">&para;</a></h2>
-<p>When <code>replacements_by_path</code> is empty, return <code>original_bytes</code> exactly.</p>
-<p>When replacements exist:</p>
+<h1 id="configuration-and-text-boundary">Configuration and text boundary<a class="headerlink" href="#configuration-and-text-boundary" title="Permanent link">&para;</a></h1>
+<p>Privacy Guard processes the complete request body as one text string. Its
+runtime configuration is self-contained structured data supplied by OpenShell
+for each evaluation.</p>
+<h2 id="bytes-and-text">Bytes and text<a class="headerlink" href="#bytes-and-text" title="Permanent link">&para;</a></h2>
+<p>The service owns the transport boundary:</p>
 <ul>
-<li>replace only the addressed text blocks</li>
-<li>reject invalid paths or replacement types</li>
-<li>preserve untouched values semantically</li>
-<li>return bytes</li>
+<li>it validates the advertised 4 MiB request-body limit</li>
+<li>it allows an empty body without invoking an engine</li>
+<li>it decodes each non-empty body as strict UTF-8</li>
+<li>it passes exactly one <code>str</code> to <code>RequestProcessor</code></li>
+<li>detect and block return no body mutation</li>
+<li>replace UTF-8 encodes the final processed text</li>
 </ul>
-<p>A rewritten body does not need to preserve whitespace, object formatting, or
-other serialization details.</p>
-<h2 id="json-handler">JSON handler<a class="headerlink" href="#json-handler" title="Permanent link">&para;</a></h2>
-<p><code>JsonHandler</code> is the only built-in format handler. It accepts strict UTF-8 JSON
-and rejects:</p>
+<p>Because detect and block return no mutation, OpenShell retains the exact
+original bytes. Replace returns the final text even when it happens to equal
+the input.</p>
+<p>Headers and media types do not change this behavior. Privacy Guard does not
+parse JSON, select nested values, create document regions, or reconstruct
+structured payloads.</p>
+<h2 id="policy-configuration">Policy configuration<a class="headerlink" href="#policy-configuration" title="Permanent link">&para;</a></h2>
+<p>The OpenShell policy owns:</p>
 <ul>
-<li>invalid UTF-8</li>
-<li>duplicate object keys</li>
-<li>non-finite numbers</li>
-<li>invalid Unicode scalar values</li>
-<li>excessive nesting or text shape</li>
+<li>ordered entity-processing stages</li>
+<li>each stage's exact engine configuration</li>
+<li>entity definitions and detection settings</li>
+<li>engine-specific replacement recipes</li>
+<li>the final detect, block, or replace action</li>
 </ul>
-<p>It scans:</p>
-<ul>
-<li>every JSON string value</li>
-<li>every object key</li>
-</ul>
-<p>It does not scan numbers, booleans, or null.</p>
-<h3 id="paths">Paths<a class="headerlink" href="#paths" title="Permanent link">&para;</a></h3>
-<p>String values use JSON Pointer paths:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>{&quot;items&quot;: [{&quot;email&quot;: &quot;a@example.com&quot;}]}
+<p>For example:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">entity_processing</span><span class="p">:</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">stages</span><span class="p">:</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">identifiers</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">      </span><span class="nt">config</span><span class="p">:</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">        </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">        </span><span class="nt">pattern_catalog</span><span class="p">:</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">          </span><span class="nt">entities</span><span class="p">:</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer-id</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">              </span><span class="nt">patterns</span><span class="p">:</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">                </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefixed-eight-digit-id</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">                  </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;\bCUST-[0-9]{8}\b&#39;</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">                  </span><span class="nt">confidence</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">high</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">        </span><span class="nt">replacement</span><span class="p">:</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">          </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">template</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">          </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;[{entity}]&quot;</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="nt">on_detection</span><span class="p">:</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">  </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace</span>
 </span></code></pre></div>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>/items/0/email
+<p><code>config.engine</code> is the Pydantic discriminator. <code>EngineRegistry.finalize()</code>
+builds the complete policy model from the exact config type registered for each
+engine. Engine-specific fields therefore validate and serialize without a
+generic mapping layer.</p>
+<p>Deployment startup owns operational resources rather than privacy behavior:
+installed engine implementations, approved model profiles, clients, endpoints,
+credentials, and data-egress constraints.</p>
+<h2 id="regex-catalogs">Regex catalogs<a class="headerlink" href="#regex-catalogs" title="Permanent link">&para;</a></h2>
+<p><code>RegexEngineConfig.pattern_catalog</code> is always a structured
+<code>RegexPatternCatalog</code>. Privacy Guard maintains its schema and safety limits but
+does not ship an authoritative pattern set.</p>
+<p>The repository may publish reference catalog YAML for users to copy and adapt.
+Those files are examples, not presets, runtime defaults, or a second
+configuration source.</p>
+<p>The current OpenShell policy flow does not expand:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">pattern_catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./patterns.yaml</span>
 </span></code></pre></div>
-<p>The root string uses the empty path. Pointer tokens escape <code>~</code> as <code>~0</code> and <code>/</code>
-as <code>~1</code>.</p>
-<p>Object keys use an internal <code>#key:</code> prefix:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>#key:/items/0/email
-</span></code></pre></div>
-<p>Key paths are not reconstruction paths. Their text blocks set
-<code>replaceable=False</code>.</p>
-<h3 id="reconstruction">Reconstruction<a class="headerlink" href="#reconstruction" title="Permanent link">&para;</a></h3>
-<p><code>JsonHandler</code> copies its parsed tree, resolves each JSON Pointer, verifies the
-target is a string, applies the replacement, and serializes compact UTF-8 JSON.</p>
-<p>Object keys are never rewritten. If redact policy selects a finding in a key,
-the processor denies the request.</p>
-<h2 id="minimal-plain-text-handler">Minimal plain-text handler<a class="headerlink" href="#minimal-plain-text-handler" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Mapping</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">PolicyConfig</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.errors</span><span class="w"> </span><span class="kn">import</span> <span class="n">ErrorCode</span><span class="p">,</span> <span class="n">PrivacyGuardError</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.request_body</span><span class="w"> </span><span class="kn">import</span> <span class="n">FormatHandler</span><span class="p">,</span> <span class="n">RequestBody</span><span class="p">,</span> <span class="n">TextBlock</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="k">class</span><span class="w"> </span><span class="nc">PlainTextHandler</span><span class="p">(</span><span class="n">FormatHandler</span><span class="p">):</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">format_name</span><span class="o">=</span><span class="s2">&quot;text&quot;</span><span class="p">)</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_normalize</span><span class="p">(</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>        <span class="bp">self</span><span class="p">,</span>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>        <span class="n">raw_body</span><span class="p">:</span> <span class="nb">bytes</span><span class="p">,</span>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>        <span class="n">policy_config</span><span class="p">:</span> <span class="n">PolicyConfig</span><span class="p">,</span>
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RequestBody</span><span class="p">:</span>
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>        <span class="k">try</span><span class="p">:</span>
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>            <span class="n">text</span> <span class="o">=</span> <span class="n">raw_body</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>        <span class="k">except</span> <span class="ne">UnicodeDecodeError</span><span class="p">:</span>
-</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>            <span class="k">raise</span> <span class="n">PrivacyGuardError</span><span class="p">(</span><span class="n">ErrorCode</span><span class="o">.</span><span class="n">BODY_ENCODING_INVALID</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
-</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>        <span class="k">return</span> <span class="n">RequestBody</span><span class="p">(</span>
-</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>            <span class="n">text_blocks</span><span class="o">=</span><span class="p">(</span><span class="n">TextBlock</span><span class="p">(</span><span class="n">path</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="n">text</span><span class="p">),),</span>
-</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>            <span class="n">parsed_value</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>            <span class="n">original_bytes</span><span class="o">=</span><span class="n">raw_body</span><span class="p">,</span>
-</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>        <span class="p">)</span>
-</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>
-</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_reconstruct</span><span class="p">(</span>
-</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>        <span class="bp">self</span><span class="p">,</span>
-</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>        <span class="n">request_body</span><span class="p">:</span> <span class="n">RequestBody</span><span class="p">,</span>
-</span><span id="__span-3-30"><a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a>        <span class="n">replacements_by_path</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
-</span><span id="__span-3-31"><a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
-</span><span id="__span-3-32"><a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">replacements_by_path</span><span class="p">:</span>
-</span><span id="__span-3-33"><a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a>            <span class="k">return</span> <span class="n">request_body</span><span class="o">.</span><span class="n">original_bytes</span>
-</span><span id="__span-3-34"><a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a>        <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">replacements_by_path</span><span class="p">)</span> <span class="o">!=</span> <span class="p">{</span><span class="s2">&quot;&quot;</span><span class="p">}:</span>
-</span><span id="__span-3-35"><a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a>            <span class="k">raise</span> <span class="n">PrivacyGuardError</span><span class="p">(</span><span class="n">ErrorCode</span><span class="o">.</span><span class="n">BODY_RECONSTRUCTION_INVALID</span><span class="p">)</span>
-</span><span id="__span-3-36"><a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a>        <span class="k">return</span> <span class="n">replacements_by_path</span><span class="p">[</span><span class="s2">&quot;&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
-</span></code></pre></div>
-<p>Register it when constructing the processor:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">processor</span> <span class="o">=</span> <span class="n">RequestProcessor</span><span class="p">(</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">scanners</span><span class="o">=</span><span class="p">[</span><span class="n">scanner</span><span class="p">],</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">format_handlers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;text&quot;</span><span class="p">:</span> <span class="n">PlainTextHandler</span><span class="p">()},</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="p">)</span>
-</span></code></pre></div>
-<h2 id="concurrency">Concurrency<a class="headerlink" href="#concurrency" title="Permanent link">&para;</a></h2>
-<p>One handler instance serves concurrent requests. Keep all parsed request state
-inside the returned <code>RequestBody</code>.</p>
-<p>Do not store request bytes, parsed bodies, text blocks, paths, or replacements
-on the handler instance.</p>
-<h2 id="testing-a-handler">Testing a handler<a class="headerlink" href="#testing-a-handler" title="Permanent link">&para;</a></h2>
-<p>Test:</p>
-<ul>
-<li>valid and invalid input encoding</li>
-<li>parser edge cases specific to the format</li>
-<li>stable and unique text-block paths</li>
-<li>text selection and <code>replaceable</code> flags</li>
-<li>exact no-op byte preservation</li>
-<li>replacement of every supported path shape</li>
-<li>invalid and stale replacement paths</li>
-<li>reconstruction does not mutate parsed state</li>
-<li>shape limits</li>
-<li>concurrent calls</li>
-</ul>
-<p>Processor tests should cover cross-handler rules such as path uniqueness,
-original-byte equality, and aggregate text limits.</p>
+<p>Privacy Guard cannot resolve that path because the middleware process does not
+own the policy bundle. Accepting middleware-local paths would also make policy
+behavior depend on deployment filesystem state.</p>
+<p>Transparent catalog-file support belongs in OpenShell's policy installation
+flow. OpenShell would resolve the path relative to the policy bundle, validate
+the referenced value, retain the expanded configuration, and send only the
+self-contained mapping to Privacy Guard. Until that upstream feature exists,
+catalogs must be inline in the configuration sent to the middleware.</p>
+<h2 id="current-transport-constraint">Current transport constraint<a class="headerlink" href="#current-transport-constraint" title="Permanent link">&para;</a></h2>
+<p>The copied OpenShell protocol carries policy configuration in a
+per-evaluation <code>google.protobuf.Struct</code> limited to 64 KiB. This bounds the
+catalog size that can reach Privacy Guard today.</p>
+<p>The service validates the complete configuration, computes its canonical
+fingerprint, and uses a bounded internal <code>RequestProcessor</code> cache. Caching
+avoids repeated engine initialization but does not increase the transport
+limit.</p>
+<p>Supporting larger catalogs requires an upstream OpenShell contract for
+preparing expanded configuration and referring to it during evaluation.
+Privacy Guard must not create a private protocol fork.</p>
+<h2 id="configuration-identity">Configuration identity<a class="headerlink" href="#configuration-identity" title="Permanent link">&para;</a></h2>
+<p>Canonical serialization includes every concrete engine field and nested
+replacement variant. Mapping keys are sorted, compact JSON encoding is used,
+and the SHA-256 fingerprint is computed over the resulting UTF-8 bytes.</p>
+<p>Equivalent structured configurations therefore share a processor cache entry.
+Cache state is only an optimization; eviction or restart reconstructs the
+processor from configuration supplied by a later evaluation.</p>
 <p><a href="../">Back to the architecture overview</a></p>
 
 

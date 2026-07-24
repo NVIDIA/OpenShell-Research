@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Validation ownership, bounded processing, failure behavior, and logging rules.">
+        <meta name="description" content="Validation ownership, bounded entity processing, failure behavior, and logging rules.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
@@ -624,14 +624,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../scanners/" class="md-nav__link">
+      <a href="../entity-processing-engines/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-  Scanners
+  Entity-processing engines
 
     
   </span>
@@ -651,14 +651,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../format-handlers/" class="md-nav__link">
+      <a href="../configuration/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-  Format handlers
+  Configuration and text boundary
 
     
   </span>
@@ -775,10 +775,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#request-limits" class="md-nav__link">
+  <a href="#text-processing-and-transport-limits" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Request limits
+        Text, processing, and transport limits
       </span>
     </span>
   </a>
@@ -786,10 +786,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#name-finding-and-response-limits" class="md-nav__link">
+  <a href="#diagnostic-and-result-limits" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Name, finding, and response limits
+        Diagnostic and result limits
       </span>
     </span>
   </a>
@@ -797,10 +797,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#regex-configuration-limits" class="md-nav__link">
+  <a href="#regex-and-catalog-limits" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Regex configuration limits
+        Regex and catalog limits
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#regex-execution-safety" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Regex execution safety
       </span>
     </span>
   </a>
@@ -845,6 +856,17 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         Extension requirements
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-and-retention" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        State and retention
       </span>
     </span>
   </a>
@@ -946,10 +968,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#request-limits" class="md-nav__link">
+  <a href="#text-processing-and-transport-limits" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Request limits
+        Text, processing, and transport limits
       </span>
     </span>
   </a>
@@ -957,10 +979,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#name-finding-and-response-limits" class="md-nav__link">
+  <a href="#diagnostic-and-result-limits" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Name, finding, and response limits
+        Diagnostic and result limits
       </span>
     </span>
   </a>
@@ -968,10 +990,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#regex-configuration-limits" class="md-nav__link">
+  <a href="#regex-and-catalog-limits" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Regex configuration limits
+        Regex and catalog limits
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#regex-execution-safety" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Regex execution safety
       </span>
     </span>
   </a>
@@ -1016,6 +1049,17 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         Extension requirements
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-and-retention" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        State and retention
       </span>
     </span>
   </a>
@@ -1211,9 +1255,9 @@
 
 
 <h1 id="safety-and-limits">Safety and limits<a class="headerlink" href="#safety-and-limits" title="Permanent link">&para;</a></h1>
-<p>Privacy Guard bounds input shape, scanning work, findings, replacement size, and
-transport output. Limits are part of the architecture, not optional tuning
-defaults.</p>
+<p>Privacy Guard bounds request text, engine output, detections, regex execution,
+transport output, and concurrency. Limits are part of the architecture, not
+optional tuning defaults.</p>
 <p>Package-wide values live in <code>constants.py</code>.</p>
 <h2 id="validation-ownership">Validation ownership<a class="headerlink" href="#validation-ownership" title="Permanent link">&para;</a></h2>
 <p>Each layer validates facts it can establish:</p>
@@ -1226,35 +1270,35 @@ defaults.</p>
 </thead>
 <tbody>
 <tr>
-<td>Policy and domain models</td>
-<td>Strict field types, shape, and local field rules</td>
+<td>Policy and engine config models</td>
+<td>Strict types, exact fields, discriminators, local field rules, catalog bounds, and regex validity</td>
 </tr>
 <tr>
-<td>Scanner public wrapper</td>
-<td>Scanner return container and finding models</td>
+<td><code>EngineRegistry</code></td>
+<td>Registration contracts, exact config and resource types, pure resource-backed config checks, and action/replacement compatibility</td>
 </tr>
 <tr>
-<td>Format-handler public wrappers</td>
-<td>Normalized body and reconstructed byte types</td>
+<td><code>EntityProcessingEngine.run()</code></td>
+<td>Text and invocation types, supported strategy, timeout, result model, spans, detection-only immutability, mutation attribution, and stage output bounds</td>
 </tr>
 <tr>
-<td>JSON handler</td>
-<td>Early JSON nesting, text-block, and character limits</td>
+<td>Concrete engine</td>
+<td>Algorithm-specific execution, replacement completeness, backend timeout propagation, and native failure normalization</td>
 </tr>
 <tr>
-<td>Processor</td>
-<td>Registry consistency, original bytes, paths, finding identity, offsets, and authoritative request-wide limits</td>
+<td><code>RequestProcessor</code></td>
+<td>Request text bounds, shared timeout, intermediate output, request-wide detection count, aggregation, and policy disposition</td>
 </tr>
 <tr>
 <td>Service</td>
-<td>Phase, transport body size, protobuf conversion, response size, and finding aggregation</td>
+<td>Phase, transport body size, strict UTF-8, protobuf conversion, replacement encoding, finding representation, and response limits</td>
 </tr>
 </tbody>
 </table>
-<p>Keep validation at these owners. Early checks may bound allocation, while the
-next trust boundary repeats authoritative checks for extension output. Do not
-move request-wide checks into a scanner or scanner semantics into the service.</p>
-<h2 id="request-limits">Request limits<a class="headerlink" href="#request-limits" title="Permanent link">&para;</a></h2>
+<p>Keep request-wide policy decisions in the processor and algorithm-specific
+behavior in the concrete engine. The service adapts transport but does not
+reimplement either.</p>
+<h2 id="text-processing-and-transport-limits">Text, processing, and transport limits<a class="headerlink" href="#text-processing-and-transport-limits" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -1272,13 +1316,25 @@ move request-wide checks into a scanner or scanner semantics into the service.</
 <td>Service</td>
 </tr>
 <tr>
-<td>Projected or reconstructed replacement body</td>
+<td>Input or intermediate text characters</td>
+<td><code>MAX_SCANNED_CHARACTERS</code></td>
+<td style="text-align: right;">4,194,304</td>
+<td>Processor</td>
+</tr>
+<tr>
+<td>Input or intermediate UTF-8 bytes</td>
 <td><code>MAX_BODY_BYTES</code></td>
 <td style="text-align: right;">4 MiB</td>
 <td>Processor</td>
 </tr>
 <tr>
-<td>Serialized replacement body</td>
+<td>Engine output UTF-8 bytes</td>
+<td><code>MAX_BODY_BYTES</code></td>
+<td style="text-align: right;">4 MiB</td>
+<td>Engine wrapper</td>
+</tr>
+<tr>
+<td>Encoded replacement body</td>
 <td><code>MAX_BODY_BYTES</code></td>
 <td style="text-align: right;">4 MiB</td>
 <td>Service</td>
@@ -1290,56 +1346,32 @@ move request-wide checks into a scanner or scanner semantics into the service.</
 <td>gRPC server</td>
 </tr>
 <tr>
-<td>JSON nesting</td>
-<td><code>MAX_JSON_NESTING</code></td>
-<td style="text-align: right;">64 levels</td>
-<td>JSON handler</td>
-</tr>
-<tr>
-<td>Text blocks per request</td>
-<td><code>MAX_TEXT_BLOCKS</code></td>
-<td style="text-align: right;">4,096</td>
-<td>JSON handler + processor</td>
-</tr>
-<tr>
-<td>Characters scanned per request</td>
-<td><code>MAX_SCANNED_CHARACTERS</code></td>
-<td style="text-align: right;">4,194,304</td>
-<td>JSON handler + processor</td>
-</tr>
-<tr>
-<td>Findings returned by one scanner call</td>
-<td><code>MAX_FINDINGS_PER_BLOCK</code></td>
+<td>Detections returned by one stage</td>
+<td><code>MAX_DETECTIONS_PER_STAGE</code></td>
 <td style="text-align: right;">256</td>
-<td>Scanner wrapper</td>
+<td>Engine wrapper</td>
 </tr>
 <tr>
-<td>Selected findings per text block</td>
-<td><code>MAX_FINDINGS_PER_BLOCK</code></td>
-<td style="text-align: right;">256</td>
-<td>Processor</td>
-</tr>
-<tr>
-<td>Selected findings per request</td>
-<td><code>MAX_FINDINGS_PER_REQUEST</code></td>
+<td>Detections across one request</td>
+<td><code>MAX_DETECTIONS_PER_REQUEST</code></td>
 <td style="text-align: right;">4,096</td>
 <td>Processor</td>
 </tr>
 <tr>
-<td>Default request scan budget</td>
-<td><code>DEFAULT_SCAN_TIMEOUT_SECONDS</code></td>
+<td>Default shared timeout</td>
+<td><code>DEFAULT_TIMEOUT_SECONDS</code></td>
 <td style="text-align: right;">1 second</td>
 <td>Processor</td>
 </tr>
 <tr>
-<td>Maximum configured scan budget</td>
-<td><code>MAX_SCAN_TIMEOUT_SECONDS</code></td>
+<td>Maximum configured timeout</td>
+<td><code>MAX_TIMEOUT_SECONDS</code></td>
 <td style="text-align: right;">30 seconds</td>
-<td>Processor</td>
+<td>Processor and <code>Timeout</code></td>
 </tr>
 <tr>
-<td>Active scanner workers</td>
-<td><code>MAX_CONCURRENT_SCANS</code></td>
+<td>Active processor workers</td>
+<td><code>MAX_CONCURRENT_PROCESSING</code></td>
 <td style="text-align: right;">4</td>
 <td>Service</td>
 </tr>
@@ -1351,15 +1383,14 @@ move request-wide checks into a scanner or scanner semantics into the service.</
 </tr>
 </tbody>
 </table>
-<p>The gRPC receive limit includes 1 MiB beyond the body limit for the protobuf
-envelope. The service still enforces the advertised 4 MiB body limit.</p>
-<p>The JSON handler checks text-block and character limits while parsing. The
-processor enforces them authoritatively for every handler.</p>
-<p>The scan budget is shared across all scanners and text blocks in a request. It
-is cooperative: a scanner that calls <code>remaining_seconds()</code> after the deadline
-causes a limit deny. The processor cannot detect or interrupt an opaque scanner
-operation that does not check the budget.</p>
-<h2 id="name-finding-and-response-limits">Name, finding, and response limits<a class="headerlink" href="#name-finding-and-response-limits" title="Permanent link">&para;</a></h2>
+<p>The gRPC receive allowance is 1 MiB larger than the request body limit for the
+protobuf envelope. The service still enforces the advertised 4 MiB body bound.</p>
+<p>One monotonic <code>Timeout</code> is shared by all stages and final result validation.
+<code>RegexEngine</code> passes the remaining duration into every backend search.
+Third-party calls that accept a timeout should receive the same remaining
+duration; calls that cannot be interrupted continue to occupy a service worker
+until they exit.</p>
+<h2 id="diagnostic-and-result-limits">Diagnostic and result limits<a class="headerlink" href="#diagnostic-and-result-limits" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -1370,12 +1401,12 @@ operation that does not check the budget.</p>
 </thead>
 <tbody>
 <tr>
-<td>Entity, scanner, and metadata strings</td>
-<td><code>MAX_SCANNER_METADATA_BYTES</code></td>
+<td>Bounded diagnostic string</td>
+<td><code>MAX_DIAGNOSTIC_TEXT_BYTES</code></td>
 <td style="text-align: right;">1,024 UTF-8 bytes</td>
 </tr>
 <tr>
-<td>Metadata entries per finding</td>
+<td>Metadata entries per detection</td>
 <td><code>MAX_FINDING_METADATA_ENTRIES</code></td>
 <td style="text-align: right;">32</td>
 </tr>
@@ -1391,11 +1422,14 @@ operation that does not check the budget.</p>
 </tr>
 </tbody>
 </table>
-<p>The string limit covers policy entity filters, finding entities, finding scanner
-names, and finding metadata keys and values.</p>
-<p>The service aggregates findings before applying protobuf limits. If a safe
-result cannot be represented, it returns a limit deny with no partial findings.</p>
-<h2 id="regex-configuration-limits">Regex configuration limits<a class="headerlink" href="#regex-configuration-limits" title="Permanent link">&para;</a></h2>
+<p>The diagnostic-string bound applies to stage names, entity names, metadata
+keys and values, model-profile names, and other audit-safe identifiers built
+from the shared domain field type. Regex entity and supplied pattern names have a
+stricter ASCII grammar and limit described below.</p>
+<p>The processor aggregates occurrences before the service applies protobuf
+limits. If a safe result cannot be represented, the service returns a limit
+deny with no partial findings.</p>
+<h2 id="regex-and-catalog-limits">Regex and catalog limits<a class="headerlink" href="#regex-and-catalog-limits" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -1406,146 +1440,153 @@ result cannot be represented, it returns a limit deny with no partial findings.<
 </thead>
 <tbody>
 <tr>
-<td>YAML file size</td>
-<td><code>MAX_SCANNER_CONFIG_BYTES</code></td>
-<td style="text-align: right;">16 MiB</td>
-</tr>
-<tr>
-<td>YAML nesting</td>
-<td><code>MAX_SCANNER_CONFIG_NESTING</code></td>
-<td style="text-align: right;">16</td>
-</tr>
-<tr>
-<td>YAML nodes</td>
-<td><code>MAX_SCANNER_CONFIG_NODES</code></td>
-<td style="text-align: right;">250,000</td>
-</tr>
-<tr>
-<td>YAML scalar</td>
-<td><code>MAX_SCANNER_CONFIG_SCALAR_BYTES</code></td>
-<td style="text-align: right;">16 KiB</td>
-</tr>
-<tr>
-<td>Name length</td>
+<td>Regex entity or supplied pattern name</td>
 <td><code>MAX_REGEX_NAME_BYTES</code></td>
 <td style="text-align: right;">128 ASCII bytes</td>
 </tr>
 <tr>
-<td>Profiles</td>
-<td><code>MAX_REGEX_PROFILES</code></td>
-<td style="text-align: right;">32</td>
-</tr>
-<tr>
-<td>Entities per profile</td>
-<td><code>MAX_REGEX_ENTITIES_PER_PROFILE</code></td>
+<td>Entities per catalog</td>
+<td><code>MAX_REGEX_ENTITIES_PER_CATALOG</code></td>
 <td style="text-align: right;">2,000</td>
 </tr>
 <tr>
-<td>Patterns per profile</td>
-<td><code>MAX_REGEX_PATTERNS_PER_PROFILE</code></td>
+<td>Patterns per catalog</td>
+<td><code>MAX_REGEX_PATTERNS_PER_CATALOG</code></td>
 <td style="text-align: right;">10,000</td>
 </tr>
 <tr>
-<td>Entities across the file</td>
-<td><code>MAX_REGEX_ENTITIES_TOTAL</code></td>
-<td style="text-align: right;">10,000</td>
-</tr>
-<tr>
-<td>Patterns across the file</td>
-<td><code>MAX_REGEX_PATTERNS_TOTAL</code></td>
-<td style="text-align: right;">50,000</td>
-</tr>
-<tr>
-<td>Regex pattern</td>
+<td>Pattern string</td>
 <td><code>MAX_REGEX_PATTERN_BYTES</code></td>
 <td style="text-align: right;">16 KiB</td>
 </tr>
 <tr>
-<td>Matches per pattern and text block</td>
+<td>Matches per pattern</td>
 <td><code>MAX_MATCHES_PER_PATTERN</code></td>
 <td style="text-align: right;">256</td>
 </tr>
 </tbody>
 </table>
-<p>These catalog limits are separate from request finding limits. A large catalog
-may still produce only a few findings for a request.</p>
+<p>Entity and pattern names use
+<code>[A-Za-z_][A-Za-z0-9_-]*</code>. Pattern names are optional; their deterministic
+derived diagnostic identities are not serialized back into configuration.</p>
+<p>The per-evaluation config <code>Struct</code> is limited to 64 KiB. A catalog may satisfy
+Privacy Guard's engine limits yet remain too large for the current upstream
+protocol. Internal caching does not raise that transport ceiling.</p>
+<h2 id="regex-execution-safety">Regex execution safety<a class="headerlink" href="#regex-execution-safety" title="Permanent link">&para;</a></h2>
+<p><code>RegexEngine</code> validates and compiles the complete catalog before accepting
+configuration. It:</p>
+<ul>
+<li>rejects invalid and empty pattern strings</li>
+<li>rejects patterns that match empty input</li>
+<li>rejects user-defined named groups and inline flags</li>
+<li>verifies its private trailing marker on every match</li>
+<li>treats a context-dependent zero-width match as an atomic configuration
+  failure</li>
+<li>evaluates patterns independently to retain overlaps</li>
+<li>uses the timeout-capable third-party <code>regex</code> backend</li>
+<li>caps matches per pattern and detections per stage</li>
+<li>projects exact UTF-8 replacement size before rendering</li>
+</ul>
+<p>No timeout, limit, or pattern failure returns partial stage detections or
+mutated text.</p>
 <h2 id="when-a-limit-is-exceeded">When a limit is exceeded<a class="headerlink" href="#when-a-limit-is-exceeded" title="Permanent link">&para;</a></h2>
-<p>Privacy Guard returns a successful deny result with
-<code>privacy_guard_limit_exceeded</code> when:</p>
+<p>The processor returns a successful deny with
+<code>privacy_guard_limit_exceeded</code> and no partial findings or replacement when:</p>
 <ul>
-<li>a scanner observes an expired scan budget</li>
-<li>findings exceed block or request limits</li>
-<li>projected redaction exceeds the body limit</li>
-<li>a reconstructed body exceeds the body limit</li>
-<li>aggregated findings exceed protobuf limits</li>
-<li>a deny reason code cannot be represented safely</li>
+<li>the shared timeout expires</li>
+<li>an engine exceeds its detection or output limit</li>
+<li>intermediate text exceeds the character or byte limit</li>
+<li>aggregate request detections exceed the limit</li>
 </ul>
-<p>The limit result contains no replacement body and no partial findings.</p>
-<p>During evaluation, malformed input and internal failures instead abort the RPC
-with a cataloged gRPC error. OpenShell then applies the middleware
-registration's failure mode.</p>
+<p>The service returns the same bounded deny when:</p>
+<ul>
+<li>findings exceed the protobuf group or encoded-size limit</li>
+<li>replacement text cannot be encoded within the body limit</li>
+<li>a deny reason code is not safely representable</li>
+</ul>
+<p>Malformed input and engine contract or execution failures instead abort the RPC
+with a cataloged error. OpenShell then applies the middleware registration's
+failure behavior.</p>
+<p>The distinction is deliberate:</p>
+<ul>
+<li>an exhausted declared processing bound is a closed, successful deny</li>
+<li>invalid user input is an <code>INVALID_ARGUMENT</code> RPC failure</li>
+<li>an engine or middleware defect is an <code>INTERNAL</code> RPC failure</li>
+</ul>
 <h2 id="error-catalog">Error catalog<a class="headerlink" href="#error-catalog" title="Permanent link">&para;</a></h2>
-<p>Production failures use <code>PrivacyGuardError</code> and a stable <code>ErrorCode</code>. Each error
-spec defines:</p>
+<p>Production failures use <code>PrivacyGuardError</code> and a stable <code>ErrorCode</code>. Each
+error spec defines:</p>
 <ul>
-<li>whether the failure is invalid input or internal</li>
-<li>the responsible component</li>
-<li>the failed operation</li>
-<li>a content-safe summary</li>
-<li>a remediation hint</li>
+<li>invalid-input or internal classification</li>
+<li>responsible component</li>
+<li>failed operation</li>
+<li>content-safe summary</li>
+<li>remediation hint</li>
 </ul>
-<p>Caught extension exceptions are translated at their boundary. Their messages
-and exception chains are not exposed.</p>
-<p>Use a new catalog entry for a new externally observable failure. Do not return
-raw parser, scanner, Pydantic, or protobuf exceptions.</p>
+<p>Caught extension and third-party exceptions are translated at their trust
+boundary. Raw exception messages and chains are not exposed. Configuration
+errors do not include rejected pattern strings, paths, credentials, provider
+endpoints, or request text.</p>
+<p>Use a new catalog entry for a genuinely new externally observable failure. Do
+not return raw Pydantic, regex-backend, engine, or protobuf exceptions.</p>
 <h2 id="logging">Logging<a class="headerlink" href="#logging" title="Permanent link">&para;</a></h2>
 <p>Default operational logs include:</p>
 <ul>
 <li>request ID</li>
-<li>duration</li>
-<li>action</li>
-<li>finding count</li>
+<li>evaluation duration</li>
+<li>allow or deny action</li>
+<li>aggregate finding count</li>
 <li>stable error code</li>
-<li>phase timing and aggregate sizes at debug level</li>
+<li>stage source and invocation strategy at debug level</li>
 </ul>
 <p>They do not include:</p>
 <ul>
-<li>request or replacement bodies</li>
-<li>text blocks</li>
-<li>matches</li>
-<li>paths</li>
-<li>headers or credentials</li>
-<li>scanner configuration</li>
+<li>request or replacement text</li>
+<li>matched or surrounding text</li>
+<li>offsets</li>
+<li>patterns or catalog contents</li>
+<li>headers, targets, or credentials</li>
+<li>model endpoints</li>
 <li>arbitrary exception text</li>
 </ul>
-<p>Sensitive model fields use <code>repr=False</code> to reduce accidental exposure. This is
-not a substitute for safe exception handling.</p>
-<p><code>--debug</code> enables content-safe phase diagnostics. <code>--debug-log-content</code>
-deliberately logs complete bodies and emits a warning; use it only in a
-controlled development environment.</p>
+<p>Sensitive domain fields use <code>repr=False</code> to reduce accidental exposure. This
+does not replace safe exception handling.</p>
+<p><code>--debug</code> enables content-safe processing diagnostics.
+<code>--debug-log-content</code> deliberately logs complete input and processed text and
+emits a warning; use it only in a controlled development environment.</p>
 <h2 id="extension-requirements">Extension requirements<a class="headerlink" href="#extension-requirements" title="Permanent link">&para;</a></h2>
-<p>Scanner and format-handler extensions should:</p>
+<p>Custom engines should:</p>
 <ul>
-<li>return the types declared by the extension hook</li>
-<li>keep request data in local variables or returned request models</li>
-<li>translate expected parse and configuration failures to <code>PrivacyGuardError</code></li>
-<li>leave extension-output validation to the public wrapper</li>
-<li>check applicable limits before allocating output proportional to input or
-  findings</li>
+<li>use the base constructor and public <code>run()</code> wrapper</li>
+<li>return the exact <code>TextProcessingResult</code> contract</li>
+<li>keep request data local to <code>_run()</code></li>
+<li>keep initialized state immutable and make resources concurrency-safe</li>
+<li>pass the shared remaining timeout to delegated APIs</li>
+<li>fail the stage on native partial failure</li>
+<li>check applicable bounds before allocating output proportional to input or
+  detections</li>
+<li>translate expected collaborator failures to the content-safe engine
+  exception hierarchy</li>
 <li>avoid logging input or caught exception text</li>
 </ul>
-<p>Do not add retries, fallbacks, or extra validation without a concrete failure
-mode and a clear owning layer.</p>
+<p>Do not add retries, fallback providers, persistent request artifacts, or extra
+validation without a concrete failure mode and a clear owning layer.</p>
+<h2 id="state-and-retention">State and retention<a class="headerlink" href="#state-and-retention" title="Permanent link">&para;</a></h2>
+<p>Cross-request entity memory is not implemented. Privacy Guard retains validated
+configuration and immutable engine state in its processor cache, but never
+retains request text, detections, or replacement mappings there.</p>
 <h2 id="changing-a-limit">Changing a limit<a class="headerlink" href="#changing-a-limit" title="Permanent link">&para;</a></h2>
-<p>A limit change may affect the middleware manifest, processor behavior, protobuf
-serialization, tests, examples, and deployment configuration.</p>
+<p>A limit change may affect policy schema, processor behavior, engine contracts,
+protobuf serialization, tests, examples, and the OpenShell middleware
+registration.</p>
 <p>Before changing a limit:</p>
 <ol>
 <li>identify every layer that enforces or advertises it</li>
 <li>update exact-boundary tests</li>
-<li>check failure behavior above the boundary</li>
-<li>run <code>make check</code></li>
-<li>benchmark changes that affect request processing</li>
+<li>check the failure result immediately above the boundary</li>
+<li>run the complete project validation</li>
+<li>benchmark changes that affect regex compilation or request processing</li>
+<li>coordinate upstream when the copied OpenShell protocol is involved</li>
 </ol>
 <p><a href="../">Back to the architecture overview</a></p>
 
