@@ -147,11 +147,12 @@ class RegexReplacement(StrictDomainModel):
         return value
 
 
-class RegexEngineConfig(EngineConfig[RegexReplacement]):
+class RegexEngineConfig(EngineConfig):
     """Exact policy configuration owned by ``RegexEngine``."""
 
     engine: Literal["regex"] = "regex"
     pattern_catalog: RegexPatternCatalog = Field(repr=False)
+    replacement: RegexReplacement | None = None
 
     @model_validator(mode="after")
     def _patterns_are_valid(self) -> Self:
@@ -170,7 +171,7 @@ class RegexEngineConfig(EngineConfig[RegexReplacement]):
         return self
 
 
-class RegexEngine(EntityProcessingEngine[RegexEngineConfig, None]):
+class RegexEngine(EntityProcessingEngine[RegexEngineConfig]):
     """Detect overlapping regex matches and optionally replace deterministic winners."""
 
     supported_strategies = frozenset(
@@ -179,6 +180,20 @@ class RegexEngine(EntityProcessingEngine[RegexEngineConfig, None]):
             EntityProcessingStrategy.REPLACE,
         }
     )
+
+    @classmethod
+    def _validate_run_config(
+        cls,
+        config: RegexEngineConfig,
+        resources: None,
+        *,
+        strategy: EntityProcessingStrategy,
+    ) -> None:
+        del cls, resources
+        if strategy is EntityProcessingStrategy.REPLACE and config.replacement is None:
+            raise EngineConfigurationError(
+                "regex replacement configuration is required"
+            )
 
     def _initialize(self) -> None:
         try:

@@ -11,7 +11,6 @@ from typing import (
     ClassVar,
     Generic,
     TypeAlias,
-    TypeVar,
     get_args,
     get_origin,
 )
@@ -23,6 +22,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from typing_extensions import TypeVar
 
 from privacy_guard.base import StrictDomainModel
 from privacy_guard.constants import (
@@ -118,17 +118,8 @@ class TextProcessingResult(StrictDomainModel):
         return value
 
 
-_ReplacementConfigT = TypeVar(
-    "_ReplacementConfigT",
-    bound=StrictDomainModel,
-    covariant=True,
-)
-
-
-class EngineConfig(StrictDomainModel, Generic[_ReplacementConfigT]):
-    """Common typed location for an engine-specific replacement recipe."""
-
-    replacement: _ReplacementConfigT | None = None
+class EngineConfig(StrictDomainModel):
+    """Nominal base for an engine's exact policy configuration."""
 
 
 class EntityProcessingError(Exception):
@@ -151,8 +142,24 @@ class EngineLimitExceeded(EntityProcessingError):
     """An engine exceeded a bounded configuration or output limit."""
 
 
-_ConfigT = TypeVar("_ConfigT", bound=EngineConfig[StrictDomainModel])
-_ResourcesT = TypeVar("_ResourcesT")
+class EngineResources:
+    """Optional operator-owned runtime dependencies shared by engine instances.
+
+    Resource objects contain initialized operational dependencies such as model
+    clients, SDK adapters, endpoints, or credential providers. They must not
+    contain policy behavior or mutable per-request state, and everything they
+    expose to an engine must be safe for concurrent use.
+    """
+
+    __slots__ = ()
+
+
+_ConfigT = TypeVar("_ConfigT", bound=EngineConfig)
+_ResourcesT = TypeVar(
+    "_ResourcesT",
+    bound=EngineResources | None,
+    default=None,
+)
 
 
 class EntityProcessingEngine(ABC, Generic[_ConfigT, _ResourcesT]):
@@ -160,7 +167,11 @@ class EntityProcessingEngine(ABC, Generic[_ConfigT, _ResourcesT]):
 
     supported_strategies: ClassVar[frozenset[EntityProcessingStrategy]]
 
-    def __init__(self, config: _ConfigT, resources: _ResourcesT) -> None:
+    def __init__(
+        self,
+        config: _ConfigT,
+        resources: _ResourcesT,
+    ) -> None:
         """Validate typed configuration/resources and initialize reusable state."""
         self.validate_config(config, resources)
         self.__config = config
@@ -188,16 +199,26 @@ class EntityProcessingEngine(ABC, Generic[_ConfigT, _ResourcesT]):
         cls._validate_config(config, resources)
 
     @classmethod
-    def _validate_config(
+    def validate_run_config(
         cls,
         config: _ConfigT,
         resources: _ResourcesT,
+        *,
+        strategy: EntityProcessingStrategy,
     ) -> None:
-        """Optionally validate resource-backed config without side effects."""
+        """Validate that one config can execute the requested strategy."""
+        if not isinstance(strategy, EntityProcessingStrategy):
+            raise EngineConfigurationError("engine processing strategy is invalid")
+        cls.validate_config(config, resources)
+        if strategy not in cls.supported_strategies:
+            raise EngineConfigurationError(
+                "engine does not support the requested strategy"
+            )
+        cls._validate_run_config(config, resources, strategy=strategy)
 
     @classmethod
-    def get_config_type(cls) -> type[EngineConfig[StrictDomainModel]]:
-        """Return the concrete ``EngineConfig`` generic argument."""
+    def get_config_type(cls) -> type[EngineConfig]:
+        """Return the concrete ``EngineConfig`` type argument."""
         config_type, _ = _declared_engine_types(cls)
         return config_type
 
@@ -206,21 +227,6 @@ class EntityProcessingEngine(ABC, Generic[_ConfigT, _ResourcesT]):
         """Return the concrete runtime-resources generic argument."""
         _, resources_type = _declared_engine_types(cls)
         return resources_type
-
-    @classmethod
-    def _validate_class_contract(cls) -> None:
-        supported_strategies = getattr(cls, "supported_strategies", None)
-        if (
-            not isinstance(supported_strategies, frozenset)
-            or not supported_strategies
-            or any(
-                not isinstance(strategy, EntityProcessingStrategy)
-                for strategy in supported_strategies
-            )
-        ):
-            raise EngineConfigurationError("engine supported strategies are invalid")
-        cls.get_config_type()
-        cls.get_resources_type()
 
     @property
     def config(self) -> _ConfigT:
@@ -231,9 +237,6 @@ class EntityProcessingEngine(ABC, Generic[_ConfigT, _ResourcesT]):
     def resources(self) -> _ResourcesT:
         """Return the validated, injected runtime resources."""
         return self.__resources
-
-    def _initialize(self) -> None:
-        """Optionally initialize reusable state from config and resources."""
 
     def run(
         self,
@@ -262,6 +265,42 @@ class EntityProcessingEngine(ABC, Generic[_ConfigT, _ResourcesT]):
         timeout.raise_if_expired()
         return _validate_result(validated_text, result, strategy=strategy)
 
+    @classmethod
+    def _validate_config(
+        cls,
+        config: _ConfigT,
+        resources: _ResourcesT,
+    ) -> None:
+        """Optionally validate resource-backed config without side effects."""
+
+    @classmethod
+    def _validate_run_config(
+        cls,
+        config: _ConfigT,
+        resources: _ResourcesT,
+        *,
+        strategy: EntityProcessingStrategy,
+    ) -> None:
+        """Optionally validate requirements specific to one run strategy."""
+
+    @classmethod
+    def _validate_class_contract(cls) -> None:
+        supported_strategies = getattr(cls, "supported_strategies", None)
+        if (
+            not isinstance(supported_strategies, frozenset)
+            or not supported_strategies
+            or any(
+                not isinstance(strategy, EntityProcessingStrategy)
+                for strategy in supported_strategies
+            )
+        ):
+            raise EngineConfigurationError("engine supported strategies are invalid")
+        cls.get_config_type()
+        cls.get_resources_type()
+
+    def _initialize(self) -> None:
+        """Optionally initialize reusable state from config and resources."""
+
     @abstractmethod
     def _run(
         self,
@@ -276,7 +315,7 @@ class EntityProcessingEngine(ABC, Generic[_ConfigT, _ResourcesT]):
 
 def _declared_engine_types(
     engine_type: type[object],
-) -> tuple[type[EngineConfig[StrictDomainModel]], object]:
+) -> tuple[type[EngineConfig], object]:
     for candidate in engine_type.__mro__:
         for base in getattr(candidate, "__orig_bases__", ()):
             if get_origin(base) is not EntityProcessingEngine:
@@ -332,6 +371,7 @@ __all__ = [
     "EngineContractError",
     "EngineExecutionError",
     "EngineLimitExceeded",
+    "EngineResources",
     "EntityDetection",
     "EntityName",
     "EntityProcessingEngine",

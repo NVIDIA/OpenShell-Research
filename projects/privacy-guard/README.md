@@ -95,68 +95,57 @@ Custom engines are a first-class extension point. Authors declare one typed
 config, optional typed resources, `supported_strategies`, and `_run`. They do not
 write `__init__`; `_initialize` is optional, and `@override` is not required.
 
+Resource-backed engines define an `EngineResources` subclass containing their
+operator-owned runtime dependencies. Resource bundles may contain initialized
+tool clients, SDK adapters, models, endpoints, or credential providers, but
+must contain no policy behavior or per-request state and must be safe for
+concurrent use. Resource-free engines omit the second
+`EntityProcessingEngine` generic argument entirely.
+
 The first NeMo Anonymizer integration will be implemented as a custom engine,
 not as a built-in or placeholder abstraction in Privacy Guard.
 
-```python
-from dataclasses import dataclass
-from typing import Literal
-
-from privacy_guard.engines import (
-    EngineConfig,
-    EntityProcessingEngine,
-    EntityProcessingStrategy,
-    TextProcessingResult,
-)
-from privacy_guard.base import StrictDomainModel
-from privacy_guard.timeout import Timeout
-
-
-class AcmeReplacement(StrictDomainModel):
-    strategy: Literal["token"] = "token"
-
-
-class AcmeConfig(EngineConfig[AcmeReplacement]):
-    engine: Literal["acme-pii"] = "acme-pii"
-
-
-@dataclass(frozen=True)
-class AcmeResources:
-    client: object
-
-
-class AcmeEngine(EntityProcessingEngine[AcmeConfig, AcmeResources]):
-    supported_strategies = frozenset(
-        {
-            EntityProcessingStrategy.DETECT,
-            EntityProcessingStrategy.REPLACE,
-        }
-    )
-
-    def _run(
-        self,
-        text: str,
-        *,
-        strategy: EntityProcessingStrategy,
-        timeout: Timeout,
-    ) -> TextProcessingResult:
-        timeout.raise_if_expired()
-        return TextProcessingResult(text=text, detections=())
-```
-
-Register engines before finalizing the policy schema:
+Application startup registers engines and operator-owned resources, then
+returns one finalized registry:
 
 ```python
 from privacy_guard.engine_registry import EngineRegistry
 
-registry = EngineRegistry()
-registry.register(AcmeEngine, resources=AcmeResources(client=client))
-registry.finalize()
+
+def create_registry() -> EngineRegistry:
+    registry = EngineRegistry()
+    registry.register(AcmeEngine, resources=AcmeResources(client=client))
+    return registry.finalize()
 ```
 
-The finalized registry builds a Pydantic discriminated union containing the
-exact config type of every registered engine. `stage.config` therefore
-round-trips without dropping engine-specific or replacement-variant fields.
+Pass that factory to every CLI operation so discovery, schema generation, and
+the running server use the same engine inventory:
+
+```bash
+uv run privacy-guard --registry-factory my_engines:create_registry engines
+uv run privacy-guard --registry-factory my_engines:create_registry schema
+uv run privacy-guard --registry-factory my_engines:create_registry serve
+```
+
+The [custom engine end-to-end example](examples/custom-engine/README.md)
+contains a complete tool adapter, typed policy and replacement configuration,
+runtime resource registration, registry factory, OpenShell policy, and
+walkthrough.
+
+The registry is application-scoped, not a process-global singleton. A
+`MiddlewareServer` requires an explicit finalized registry. The finalized
+registry builds a Pydantic discriminated union containing the exact config type
+of every registered engine, so `stage.config` round-trips without dropping
+engine-specific or replacement-variant fields.
+
+The base installation has an explicit built-in registry containing
+`RegexEngine`:
+
+```python
+from privacy_guard.service.server import create_builtin_registry
+
+registry = create_builtin_registry()
+```
 
 ## CLI
 
@@ -169,6 +158,8 @@ uv run privacy-guard serve --listen 127.0.0.1:50051
 Entity behavior is supplied by OpenShell policy config, not server startup
 flags. Deployment startup owns only installed engine implementations and
 operator resources such as model profiles, endpoints, clients, and credentials.
+Use `--registry-factory module:factory` for a custom engine installation.
+Registry factories execute operator Python code; load only trusted modules.
 
 ## Safety and limits
 

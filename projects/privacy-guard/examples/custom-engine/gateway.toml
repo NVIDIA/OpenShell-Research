@@ -1,0 +1,11 @@
+# OpenShell gateway configuration for the custom-engine example.
+# Pass this file directly to openshell-gateway after replacing the host IP.
+
+[openshell]
+version = 1
+
+[[openshell.supervisor.middleware]]
+name = "privacy-guard-custom-engine"
+grpc_endpoint = "http://REPLACE_WITH_HOST_IP:50051"
+max_body_bytes = 4194304
+timeout = "5s"

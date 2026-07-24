@@ -165,8 +165,10 @@ def test_dormant_replacement_recipe_is_valid_for_detection_only_actions(
             replacement={"strategy": "template", "template": "[redacted]"},
         )
     )
+    engine_config = config.entity_processing.stages[0].config
 
-    assert config.entity_processing.stages[0].config.replacement is not None
+    assert isinstance(engine_config, RegexEngineConfig)
+    assert engine_config.replacement is not None
 
 
 @pytest.mark.parametrize(

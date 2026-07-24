@@ -74,6 +74,11 @@ Define a concrete `EngineConfig` and implement `_run`. Custom engines do not
 define `__init__`; use optional `_initialize` for derived immutable state.
 `@override` is not required.
 
+Resource-free engines omit the second generic argument. Resource-backed engines
+declare an `EngineResources` subclass as that argument; the bundle contains
+only operator-owned, concurrency-safe runtime dependencies and no policy
+behavior or per-request state.
+
 ```python
 from typing import Literal
 
@@ -83,20 +88,15 @@ from privacy_guard.engines import (
     EntityProcessingStrategy,
     TextProcessingResult,
 )
-from privacy_guard.base import StrictDomainModel
 from privacy_guard.timeout import Timeout
 
 
-class KeywordReplacement(StrictDomainModel):
-    strategy: Literal["token"] = "token"
-
-
-class KeywordConfig(EngineConfig[KeywordReplacement]):
+class KeywordConfig(EngineConfig):
     engine: Literal["keyword"] = "keyword"
     keyword: str
 
 
-class KeywordEngine(EntityProcessingEngine[KeywordConfig, None]):
+class KeywordEngine(EntityProcessingEngine[KeywordConfig]):
     supported_strategies = frozenset({EntityProcessingStrategy.DETECT})
 
     def _run(
@@ -112,6 +112,9 @@ class KeywordEngine(EntityProcessingEngine[KeywordConfig, None]):
 
 The public `run` method validates extension output. Register every engine before
 finalizing the registry so policy serialization retains its exact config type.
+Custom deployments expose a `module:factory` callable that returns the
+application-scoped finalized registry and pass it to the CLI with
+`--registry-factory`.
 
 ## Change limits
 

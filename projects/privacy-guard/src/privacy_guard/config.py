@@ -55,7 +55,7 @@ class OnDetection(StrictDomainModel):
 
 _EngineConfigT = TypeVar(
     "_EngineConfigT",
-    bound=EngineConfig[StrictDomainModel],
+    bound=EngineConfig,
 )
 
 
@@ -116,14 +116,12 @@ class PrivacyGuardConfig(
     on_detection: OnDetection = Field(repr=False)
 
 
-FinalizedPrivacyGuardConfig: TypeAlias = PrivacyGuardConfig[
-    EngineConfig[StrictDomainModel]
-]
+FinalizedPrivacyGuardConfig: TypeAlias = PrivacyGuardConfig[EngineConfig]
 FinalizedPrivacyGuardConfigType = type[FinalizedPrivacyGuardConfig]
 
 
 def build_privacy_guard_config_type(
-    config_types: Sequence[type[EngineConfig[StrictDomainModel]]],
+    config_types: Sequence[type[EngineConfig]],
 ) -> FinalizedPrivacyGuardConfigType:
     """Build the exact registry-dependent discriminated policy model."""
     if not config_types:
@@ -144,7 +142,7 @@ def build_privacy_guard_config_type(
 
 
 def build_privacy_guard_config_adapter(
-    config_types: Sequence[type[EngineConfig[StrictDomainModel]]],
+    config_types: Sequence[type[EngineConfig]],
 ) -> TypeAdapter[FinalizedPrivacyGuardConfig]:
     """Build the registry-dependent adapter used for validation and schemas."""
     config_type = build_privacy_guard_config_type(config_types)
@@ -165,7 +163,7 @@ def parse_privacy_guard_config(
 
 
 def canonical_config_json(
-    config: PrivacyGuardConfig[EngineConfig[StrictDomainModel]],
+    config: PrivacyGuardConfig[EngineConfig],
 ) -> bytes:
     """Serialize every concrete engine field deterministically for hashing."""
     return json.dumps(
@@ -178,7 +176,7 @@ def canonical_config_json(
 
 
 def configuration_fingerprint(
-    config: PrivacyGuardConfig[EngineConfig[StrictDomainModel]],
+    config: PrivacyGuardConfig[EngineConfig],
 ) -> str:
     """Return the canonical SHA-256 fingerprint of an expanded policy config."""
     return sha256(canonical_config_json(config)).hexdigest()

@@ -10,7 +10,7 @@ from google.protobuf.message import Message
 
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
-from privacy_guard.service.server import create_default_registry
+from privacy_guard.service.server import create_builtin_registry
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
 
 
@@ -70,7 +70,7 @@ def test_copied_proto_remains_the_current_openshell_contract() -> None:
 
 
 def test_validate_config_is_pure_and_reports_invalid_config() -> None:
-    middleware = PrivacyGuardMiddleware(create_default_registry())
+    middleware = PrivacyGuardMiddleware(create_builtin_registry())
 
     valid = middleware._validate_config(
         pb2.ValidateConfigRequest(config=_proto_config(_values()))
@@ -86,7 +86,7 @@ def test_validate_config_is_pure_and_reports_invalid_config() -> None:
 
 def test_evaluation_decodes_one_utf8_text_and_encodes_replacement() -> None:
     async def evaluate() -> pb2.HttpRequestResult:
-        middleware = PrivacyGuardMiddleware(create_default_registry())
+        middleware = PrivacyGuardMiddleware(create_builtin_registry())
         try:
             return await middleware._evaluate_http_request(_request(b"email a@b.com"))
         finally:
@@ -104,7 +104,7 @@ def test_evaluation_decodes_one_utf8_text_and_encodes_replacement() -> None:
 
 def test_invalid_utf8_fails_before_invoking_an_engine() -> None:
     async def evaluate() -> None:
-        middleware = PrivacyGuardMiddleware(create_default_registry())
+        middleware = PrivacyGuardMiddleware(create_builtin_registry())
         try:
             with pytest.raises(PrivacyGuardError) as captured:
                 await middleware._evaluate_http_request(_request(b"\xff"))
@@ -117,7 +117,7 @@ def test_invalid_utf8_fails_before_invoking_an_engine() -> None:
 
 def test_detect_returns_no_body_mutation() -> None:
     async def evaluate() -> pb2.HttpRequestResult:
-        middleware = PrivacyGuardMiddleware(create_default_registry())
+        middleware = PrivacyGuardMiddleware(create_builtin_registry())
         try:
             return await middleware._evaluate_http_request(
                 _request(b"a@b.com", action="detect")

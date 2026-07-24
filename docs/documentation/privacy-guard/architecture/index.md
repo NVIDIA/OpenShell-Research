@@ -129,7 +129,7 @@ so engine work does not block the gRPC event loop.
 | --- | --- |
 | `PrivacyGuardConfig` | Ordered entity-processing stages and the required action on detection |
 | `EntityProcessingStage` | One configured engine invocation with an optional diagnostic name |
-| `EngineConfig` | Generic base for an engine's exact policy configuration and optional replacement recipe |
+| `EngineConfig` | Nominal strict base for an engine's exact policy configuration |
 | `EntityProcessingStrategy` | Per-run engine selection: detect or replace |
 | `EntityDetection` | One occurrence with stage-input offsets and optional confidence |
 | `TextProcessingResult` | One engine's authoritative output text and detections |
@@ -147,8 +147,9 @@ representations.
 - Engines do not receive transport metadata or the user-facing policy action.
 - There is no parallel execution-plan model; preparation constructs a
   `RequestProcessor` directly.
-- There is no generic replacement-strategy enum. Each engine owns the
-  discriminated replacement recipes appropriate to its underlying algorithm.
+- There is no generic replacement field or replacement-strategy enum. Each
+  engine owns any replacement settings appropriate to its underlying
+  algorithm.
 - Runtime policy models do not accept catalog paths. Transparent file expansion
   requires an upstream OpenShell policy-authoring feature.
 

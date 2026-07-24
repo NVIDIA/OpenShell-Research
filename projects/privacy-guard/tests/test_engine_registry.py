@@ -13,6 +13,8 @@ from privacy_guard.base import StrictDomainModel
 from privacy_guard.engine_registry import EngineRegistry, EngineRegistryError
 from privacy_guard.engines import (
     EngineConfig,
+    EngineConfigurationError,
+    EngineResources,
     EntityProcessingEngine,
     EntityProcessingStrategy,
     RegexEngine,
@@ -26,9 +28,10 @@ class AcmeReplacement(StrictDomainModel):
     strategy: Literal["token"] = "token"
 
 
-class AcmeConfig(EngineConfig[AcmeReplacement]):
+class AcmeConfig(EngineConfig):
     engine: Literal["acme-pii"] = "acme-pii"
     entities: tuple[str, ...]
+    replacement: AcmeReplacement | None = None
 
     @field_validator("entities", mode="before")
     @classmethod
@@ -39,7 +42,7 @@ class AcmeConfig(EngineConfig[AcmeReplacement]):
 
 
 @dataclass(frozen=True)
-class AcmeResources:
+class AcmeResources(EngineResources):
     prefix: str
 
 
@@ -50,6 +53,18 @@ class AcmeEngine(EntityProcessingEngine[AcmeConfig, AcmeResources]):
             EntityProcessingStrategy.REPLACE,
         }
     )
+
+    @classmethod
+    def _validate_run_config(
+        cls,
+        config: AcmeConfig,
+        resources: AcmeResources,
+        *,
+        strategy: EntityProcessingStrategy,
+    ) -> None:
+        del cls, resources
+        if strategy is EntityProcessingStrategy.REPLACE and config.replacement is None:
+            raise EngineConfigurationError("acme replacement configuration is required")
 
     def _run(
         self,
@@ -62,11 +77,11 @@ class AcmeEngine(EntityProcessingEngine[AcmeConfig, AcmeResources]):
         return TextProcessingResult(text=text, detections=())
 
 
-class DetectConfig(EngineConfig[AcmeReplacement]):
+class DetectConfig(EngineConfig):
     engine: Literal["detect-only"] = "detect-only"
 
 
-class DetectEngine(EntityProcessingEngine[DetectConfig, None]):
+class DetectEngine(EntityProcessingEngine[DetectConfig]):
     supported_strategies = frozenset({EntityProcessingStrategy.DETECT})
 
     def _run(
@@ -127,11 +142,33 @@ def test_detection_only_engine_is_rejected_for_replace_action() -> None:
         registry.validate_config(values)
 
 
-class ReplaceOnlyConfig(EngineConfig[AcmeReplacement]):
+def test_engine_owns_strategy_specific_configuration_requirements() -> None:
+    registry = EngineRegistry()
+    registry.register(AcmeEngine, resources=AcmeResources(prefix="token"))
+    registry.finalize()
+    values = {
+        "entity_processing": {
+            "stages": [
+                {
+                    "config": {
+                        "engine": "acme-pii",
+                        "entities": ["account"],
+                    }
+                }
+            ]
+        },
+        "on_detection": {"action": "replace"},
+    }
+
+    with pytest.raises(PrivacyGuardError):
+        registry.validate_config(values)
+
+
+class ReplaceOnlyConfig(EngineConfig):
     engine: Literal["replace-only"] = "replace-only"
 
 
-class ReplaceOnlyEngine(EntityProcessingEngine[ReplaceOnlyConfig, None]):
+class ReplaceOnlyEngine(EntityProcessingEngine[ReplaceOnlyConfig]):
     supported_strategies = frozenset({EntityProcessingStrategy.REPLACE})
 
     def _run(
@@ -155,7 +192,6 @@ def test_replacement_only_engine_is_rejected_for_detect_action() -> None:
                 {
                     "config": {
                         "engine": "replace-only",
-                        "replacement": {"strategy": "token"},
                     }
                 }
             ]
@@ -167,15 +203,18 @@ def test_replacement_only_engine_is_rejected_for_detect_action() -> None:
         registry.validate_config(values)
 
     values["on_detection"] = {"action": "replace"}
-    registry.validate_config(values)
+    config = registry.validate_config(values)
+
+    config_type = type(config.entity_processing.stages[0].config)
+    assert "replacement" not in config_type.model_fields
 
 
 def test_registry_is_frozen_after_finalize_and_finalize_is_idempotent() -> None:
     registry = EngineRegistry()
     registry.register(RegexEngine)
-    first_type = registry.finalize()
 
-    assert registry.finalize() is first_type
+    assert registry.finalize() is registry
+    assert registry.finalize() is registry
     with pytest.raises(EngineRegistryError):
         registry.register(DetectEngine)
 
@@ -188,12 +227,14 @@ def test_registry_rejects_duplicate_discriminators_and_resource_mismatch() -> No
         registry.register(AcmeEngine, resources=AcmeResources(prefix="other"))
     with pytest.raises(EngineRegistryError):
         EngineRegistry().register(AcmeEngine)
+    with pytest.raises(EngineRegistryError, match="must extend EngineResources"):
+        EngineRegistry().register(AcmeEngine, resources=object())
     with pytest.raises(EngineRegistryError):
         EngineRegistry().register(DetectEngine, resources=object())
 
 
 def test_describe_does_not_construct_an_engine() -> None:
-    class CountingEngine(EntityProcessingEngine[DetectConfig, None]):
+    class CountingEngine(EntityProcessingEngine[DetectConfig]):
         supported_strategies = frozenset({EntityProcessingStrategy.DETECT})
         initialized = 0
 

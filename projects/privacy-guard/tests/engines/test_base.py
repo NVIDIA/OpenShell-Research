@@ -12,6 +12,7 @@ from privacy_guard.engines import (
     ConfidenceLevel,
     EngineConfig,
     EngineContractError,
+    EngineResources,
     EntityDetection,
     EntityProcessingEngine,
     EntityProcessingStrategy,
@@ -24,12 +25,13 @@ class _Replacement(StrictDomainModel):
     strategy: Literal["token"] = "token"
 
 
-class _Config(EngineConfig[_Replacement]):
+class _Config(EngineConfig):
     engine: Literal["test"] = "test"
+    replacement: _Replacement | None = None
 
 
 @dataclass(frozen=True)
-class _Resources:
+class _Resources(EngineResources):
     prefix: str
 
 
@@ -120,7 +122,7 @@ def test_detection_confidence_and_metadata_are_strict_bounded_values() -> None:
         )
 
 
-class _DetectOnlyEngine(EntityProcessingEngine[_Config, None]):
+class _DetectOnlyEngine(EntityProcessingEngine[_Config]):
     supported_strategies = frozenset({EntityProcessingStrategy.DETECT})
 
     def _run(
@@ -136,6 +138,8 @@ class _DetectOnlyEngine(EntityProcessingEngine[_Config, None]):
 def test_detect_only_engine_rejects_replacement_before_running() -> None:
     engine = _DetectOnlyEngine(_Config(), None)
 
+    assert _DetectOnlyEngine.get_resources_type() is None
+    assert engine.resources is None
     with pytest.raises(EngineContractError):
         engine.run(
             "text",
@@ -144,7 +148,7 @@ def test_detect_only_engine_rejects_replacement_before_running() -> None:
         )
 
 
-class _ReplaceOnlyEngine(EntityProcessingEngine[_Config, None]):
+class _ReplaceOnlyEngine(EntityProcessingEngine[_Config]):
     supported_strategies = frozenset({EntityProcessingStrategy.REPLACE})
 
     def _run(
@@ -169,7 +173,7 @@ def test_replace_only_engine_rejects_detection_before_running() -> None:
         )
 
 
-class _MutatingDetectEngine(EntityProcessingEngine[_Config, None]):
+class _MutatingDetectEngine(EntityProcessingEngine[_Config]):
     supported_strategies = frozenset(
         {
             EntityProcessingStrategy.DETECT,
@@ -201,7 +205,7 @@ def test_detection_strategy_rejects_mutated_text() -> None:
         )
 
 
-class _InvalidSpanEngine(EntityProcessingEngine[_Config, None]):
+class _InvalidSpanEngine(EntityProcessingEngine[_Config]):
     supported_strategies = frozenset({EntityProcessingStrategy.DETECT})
 
     def _run(

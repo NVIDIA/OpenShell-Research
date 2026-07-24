@@ -177,9 +177,29 @@ EngineRegistry
   -> gRPC server
 ```
 
-The default registry includes `RegexEngine`. Operators register custom engines
+The built-in registry includes `RegexEngine`. Operators register custom engines
 and resource-backed tool integrations before registry finalization, then pass
 that registry to `MiddlewareServer`.
+
+The registry is an explicit application-scoped dependency, not a global
+singleton. `MiddlewareServer` and `PrivacyGuardMiddleware` reject unfinalized
+registries. A deployment creates and finalizes one registry during startup;
+cached processors then construct configured stage engines from that registry.
+Different middleware applications in the same process may intentionally use
+different engine inventories or runtime resources.
+
+The CLI accepts an operator registry factory in `module:factory` form. The
+factory is invoked once, must return a finalized `EngineRegistry`, and supplies
+the same engine inventory to discovery, schema generation, or serving:
+
+```bash
+privacy-guard --registry-factory my_engines:create_registry engines
+privacy-guard --registry-factory my_engines:create_registry schema
+privacy-guard --registry-factory my_engines:create_registry serve
+```
+
+The factory is trusted operator code imported into the Privacy Guard process.
+It is not a policy-controlled plugin hook.
 
 The server:
 
@@ -200,6 +220,8 @@ privacy-guard serve --listen 127.0.0.1:50051
 ```
 
 Entity behavior comes from policy configuration, not server startup flags.
+Engine implementations and operational resources come from the selected
+application registry.
 
 ## Upstream protocol work
 

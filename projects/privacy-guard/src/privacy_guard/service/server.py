@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import json
 import logging
+from dataclasses import dataclass
 from typing import Annotated
 
 import grpc
@@ -25,12 +27,11 @@ app = typer.Typer(
 )
 
 
-def create_default_registry() -> EngineRegistry:
-    """Build the operator registry shipped by the base package."""
+def create_builtin_registry() -> EngineRegistry:
+    """Build the finalized registry shipped by the base package."""
     registry = EngineRegistry()
     registry.register(RegexEngine)
-    registry.finalize()
-    return registry
+    return registry.finalize()
 
 
 class MiddlewareServer:
@@ -38,12 +39,12 @@ class MiddlewareServer:
 
     def __init__(
         self,
+        registry: EngineRegistry,
         *,
-        registry: EngineRegistry | None = None,
         log_request_content: bool = False,
     ) -> None:
         self._servicer = PrivacyGuardMiddleware(
-            registry or create_default_registry(),
+            registry,
             log_request_content=log_request_content,
         )
 
@@ -85,6 +86,15 @@ async def serve(
 @app.callback()
 def main(
     context: typer.Context,
+    registry_factory: Annotated[
+        str | None,
+        typer.Option(
+            help=(
+                "Python module and callable that return a finalized engine registry, "
+                "formatted as module:factory."
+            ),
+        ),
+    ] = None,
     debug: Annotated[
         bool,
         typer.Option(help="Enable content-safe processing diagnostics."),
@@ -104,7 +114,10 @@ def main(
     logging.getLogger("privacy_guard").setLevel(
         logging.DEBUG if debug or debug_log_content else logging.INFO
     )
-    context.obj = debug_log_content
+    context.obj = _CommandOptions(
+        registry=_load_registry(registry_factory),
+        log_request_content=debug_log_content,
+    )
     if debug_log_content:
         _LOGGER.warning(
             "privacy_guard_request_content_logging_enabled "
@@ -121,16 +134,20 @@ def run_server(
     ] = "127.0.0.1:50051",
 ) -> None:
     """Run the service; entity behavior comes from prepared policy config."""
+    options = _command_options(context)
     _LOGGER.info("privacy_guard_server_starting listen=%s", listen)
-    MiddlewareServer(log_request_content=context.obj is True).serve(listen)
+    MiddlewareServer(
+        options.registry,
+        log_request_content=options.log_request_content,
+    ).serve(listen)
 
 
 @app.command("schema")
-def show_schema() -> None:
+def show_schema(context: typer.Context) -> None:
     """Print the exact finalized policy JSON Schema."""
     typer.echo(
         json.dumps(
-            create_default_registry().configuration_json_schema(),
+            _command_options(context).registry.configuration_json_schema(),
             indent=2,
             ensure_ascii=False,
             sort_keys=True,
@@ -139,9 +156,9 @@ def show_schema() -> None:
 
 
 @app.command("engines")
-def show_engines() -> None:
+def show_engines(context: typer.Context) -> None:
     """List installed engines and every supported processing strategy."""
-    for description in create_default_registry().describe_engines():
+    for description in _command_options(context).registry.describe_engines():
         strategies = ",".join(
             strategy.value
             for strategy in EntityProcessingStrategy
@@ -153,6 +170,61 @@ def show_engines() -> None:
 _LOGGER = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class _CommandOptions:
+    registry: EngineRegistry
+    log_request_content: bool
+
+
+def _load_registry(factory_reference: str | None) -> EngineRegistry:
+    if factory_reference is None:
+        return create_builtin_registry()
+    module_name, separator, factory_name = factory_reference.partition(":")
+    if not separator or not module_name or not factory_name:
+        raise typer.BadParameter(
+            "registry factory must use module:factory",
+            param_hint="--registry-factory",
+        )
+    try:
+        module = importlib.import_module(module_name)
+        factory = getattr(module, factory_name)
+    except Exception:
+        raise typer.BadParameter(
+            "registry factory could not be loaded",
+            param_hint="--registry-factory",
+        ) from None
+    if not callable(factory):
+        raise typer.BadParameter(
+            "registry factory is not callable",
+            param_hint="--registry-factory",
+        )
+    try:
+        registry = factory()
+    except Exception:
+        raise typer.BadParameter(
+            "registry factory failed",
+            param_hint="--registry-factory",
+        ) from None
+    if not isinstance(registry, EngineRegistry):
+        raise typer.BadParameter(
+            "registry factory returned an invalid object",
+            param_hint="--registry-factory",
+        )
+    if not registry.is_finalized:
+        raise typer.BadParameter(
+            "registry factory returned an unfinalized registry",
+            param_hint="--registry-factory",
+        )
+    return registry
+
+
+def _command_options(context: typer.Context) -> _CommandOptions:
+    options = context.obj
+    if not isinstance(options, _CommandOptions):
+        raise RuntimeError("Privacy Guard command context is unavailable")
+    return options
+
+
 if __name__ == "__main__":
     app()
 
@@ -160,7 +232,7 @@ if __name__ == "__main__":
 __all__ = [
     "MiddlewareServer",
     "app",
-    "create_default_registry",
+    "create_builtin_registry",
     "create_server",
     "serve",
 ]

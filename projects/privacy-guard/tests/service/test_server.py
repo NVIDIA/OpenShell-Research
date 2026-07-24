@@ -6,19 +6,21 @@ import asyncio
 import json
 import logging
 import re
+from types import SimpleNamespace
 
 import grpc
 import pytest
 from typer.testing import CliRunner, Result
 
 from privacy_guard.constants import MAX_CONCURRENT_RPCS, MAX_RECEIVE_MESSAGE_BYTES
+from privacy_guard.engine_registry import EngineRegistry, EngineRegistryError
 from privacy_guard.engines import EntityProcessingStrategy
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
 from privacy_guard.service import server as server_module
 from privacy_guard.service.server import (
     MiddlewareServer,
     app,
-    create_default_registry,
+    create_builtin_registry,
     create_server,
     serve,
 )
@@ -70,11 +72,11 @@ def _plain_output(result: Result) -> str:
 
 
 def _middleware() -> PrivacyGuardMiddleware:
-    return PrivacyGuardMiddleware(create_default_registry())
+    return PrivacyGuardMiddleware(create_builtin_registry())
 
 
-def test_default_registry_contains_the_builtin_regex_engine() -> None:
-    registry = create_default_registry()
+def test_builtin_registry_contains_the_builtin_regex_engine() -> None:
+    registry = create_builtin_registry()
 
     assert registry.is_finalized is True
     assert registry.engine_names == ("regex",)
@@ -91,7 +93,7 @@ def test_default_registry_contains_the_builtin_regex_engine() -> None:
 def test_middleware_server_uses_an_injected_registry_and_default_address(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    registry = create_default_registry()
+    registry = create_builtin_registry()
     served: list[tuple[PrivacyGuardMiddleware, str]] = []
 
     async def record_serve(servicer: PrivacyGuardMiddleware, listen: str) -> None:
@@ -106,6 +108,11 @@ def test_middleware_server_uses_an_injected_registry_and_default_address(
     assert served[0][1] == "127.0.0.1:50051"
     assert served[0][0]._registry is registry
     assert served[0][0]._processors._log_request_content is True
+
+
+def test_middleware_server_requires_an_explicit_finalized_registry() -> None:
+    with pytest.raises(EngineRegistryError, match="finalized"):
+        MiddlewareServer(EngineRegistry())
 
 
 def test_create_server_sets_transport_limits_and_registers_servicer(
@@ -161,6 +168,7 @@ def test_cli_help_exposes_only_pipeline_server_and_discovery_commands() -> None:
     assert "engines" in output
     assert "--debug" in output
     assert "--debug-log-content" in output
+    assert "--registry-factory" in output
     assert "--config" not in output
     assert "--profile" not in output
     assert "--scanner-name" not in output
@@ -183,6 +191,78 @@ def test_cli_schema_prints_the_finalized_discriminated_policy_schema() -> None:
     assert '"propertyName": "engine"' in serialized
     assert '"regex"' in serialized
     assert '"on_detection"' in serialized
+
+
+def test_cli_loads_one_finalized_operator_registry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = create_builtin_registry()
+    factory_calls = 0
+
+    def create_registry() -> EngineRegistry:
+        nonlocal factory_calls
+        factory_calls += 1
+        return registry
+
+    monkeypatch.setattr(
+        server_module.importlib,
+        "import_module",
+        lambda module_name: (
+            SimpleNamespace(create_registry=create_registry)
+            if module_name == "operator_engines"
+            else None
+        ),
+    )
+
+    result = CliRunner().invoke(
+        app,
+        ["--registry-factory", "operator_engines:create_registry", "engines"],
+    )
+
+    assert result.exit_code == 0
+    assert factory_calls == 1
+    assert result.output.startswith("regex\tdetect,replace\t")
+
+
+@pytest.mark.parametrize(
+    ("factory_reference", "reason"),
+    [
+        ("missing-separator", "module:factory"),
+        ("operator_engines:missing", "could not be loaded"),
+        ("operator_engines:not_callable", "not callable"),
+        ("operator_engines:failed", "factory failed"),
+        ("operator_engines:wrong_type", "invalid"),
+        ("operator_engines:unfinished", "unfinalized"),
+    ],
+)
+def test_cli_rejects_invalid_registry_factories(
+    monkeypatch: pytest.MonkeyPatch,
+    factory_reference: str,
+    reason: str,
+) -> None:
+    def fail() -> EngineRegistry:
+        raise RuntimeError("sensitive factory failure")
+
+    module = SimpleNamespace(
+        not_callable=object(),
+        failed=fail,
+        wrong_type=lambda: object(),
+        unfinished=lambda: EngineRegistry(),
+    )
+    monkeypatch.setattr(
+        server_module.importlib,
+        "import_module",
+        lambda _: module,
+    )
+
+    result = CliRunner().invoke(
+        app,
+        ["--registry-factory", factory_reference, "engines"],
+    )
+
+    assert result.exit_code == 2
+    assert reason in _plain_output(result)
+    assert "sensitive factory failure" not in _plain_output(result)
 
 
 def test_cli_serve_forwards_operational_options_only(

@@ -18,7 +18,8 @@ with different configurations.
 
 An engine:
 
-1. declares concrete configuration and resource types through generics
+1. declares a concrete configuration type and, when needed, a resource type
+   through generics
 2. declares its non-empty set of `supported_strategies`
 3. receives validated configuration and operator-owned resources through the
    base constructor
@@ -37,24 +38,60 @@ Every concrete config subclasses `EngineConfig` and declares exactly one
 literal `engine` discriminator:
 
 ```python
-class AcmeEngineConfig(EngineConfig[AcmeReplacement]):
+class AcmeEngineConfig(EngineConfig):
     engine: Literal["acme-pii"] = "acme-pii"
+    replacement: AcmeReplacement | None = None
 ```
 
 The object under `EntityProcessingStage.config` is this exact concrete model.
 It is validated and serialized as a member of the registry-built Pydantic
 discriminated union, then passed unchanged to the engine constructor.
 
-`EngineConfig` provides the optional location for an engine-specific
-replacement recipe. Engines with multiple replacement algorithms define their
-own nested discriminated union, using fields such as
-`replacement.strategy`. There is no closed Privacy Guard enum of all possible
-replacement algorithms.
+`EngineConfig` is a nominal, strict base model. It does not prescribe a
+`replacement` field or any other algorithm-specific setting. An engine that
+needs a replacement recipe declares that field on its concrete config. Engines
+with multiple replacement algorithms may define a nested discriminated union,
+using fields such as `replacement.strategy`. An engine whose underlying tool
+has intrinsic replacement behavior may support `REPLACE` without declaring a
+replacement field at all.
 
-Configuration contains privacy behavior. Runtime resources contain operational
-details such as model clients, credentials, endpoints, and approved profiles.
+Configuration contains privacy behavior. An optional `EngineResources` object
+contains operator-owned runtime dependencies such as initialized model clients,
+SDK adapters, endpoints, credential providers, or approved model profiles.
 Resources are registered by the operator and never serialized into policy.
-Engines without resources declare `None` as their resource type.
+
+`EngineResources` is a nominal contract. A concrete resource bundle subclasses
+it, is typed as the engine's second generic argument, and must:
+
+- contain operational dependencies rather than policy behavior
+- retain no request text or mutable per-request state
+- expose only dependencies that are safe for concurrent engine calls
+- avoid relying on construction or mutation during request processing
+
+For example:
+
+```python
+from dataclasses import dataclass
+
+from privacy_guard.engines import EngineResources
+
+
+@dataclass(frozen=True)
+class AcmeResources(EngineResources):
+    client: AcmeClient
+
+
+class AcmeEngine(EntityProcessingEngine[AcmeEngineConfig, AcmeResources]):
+    ...
+```
+
+Resources are optional. A resource-free engine omits the second generic
+argument and receives `None` from the base class:
+
+```python
+class KeywordEngine(EntityProcessingEngine[KeywordEngineConfig]):
+    ...
+```
 
 ## Invocation strategy
 
@@ -81,6 +118,12 @@ An engine that exposes both operations includes both enum values. Supporting
 `REPLACE` does not imply that the engine exposes `DETECT`, even when replacement
 requires internal detection. Blocking does not appear here: the processor runs
 engines with `DETECT` and applies the block disposition afterward.
+
+The registry calls `validate_run_config()` with the strategy derived from the
+policy action. The base implementation verifies strategy support. An engine
+may add technique-specific requirements through `_validate_run_config()`, such
+as requiring a template only when `REPLACE` is requested. The engine receives
+the strategy, never the user-facing `PolicyAction`.
 
 ## Result contract
 
@@ -137,18 +180,35 @@ class KeywordReplacement(StrictDomainModel):
     token: str = "[keyword]"
 
 
-class KeywordEngineConfig(EngineConfig[KeywordReplacement]):
+class KeywordEngineConfig(EngineConfig):
     engine: Literal["keyword"] = "keyword"
     keyword: str = Field(min_length=1)
+    replacement: KeywordReplacement | None = None
 
 
-class KeywordEngine(EntityProcessingEngine[KeywordEngineConfig, None]):
+class KeywordEngine(EntityProcessingEngine[KeywordEngineConfig]):
     supported_strategies = frozenset(
         {
             EntityProcessingStrategy.DETECT,
             EntityProcessingStrategy.REPLACE,
         }
     )
+
+    @classmethod
+    def _validate_run_config(
+        cls,
+        config: KeywordEngineConfig,
+        resources: None,
+        *,
+        strategy: EntityProcessingStrategy,
+    ) -> None:
+        if (
+            strategy is EntityProcessingStrategy.REPLACE
+            and config.replacement is None
+        ):
+            raise EngineConfigurationError(
+                "keyword replacement configuration is required"
+            )
 
     def _run(
         self,
@@ -180,15 +240,23 @@ class KeywordEngine(EntityProcessingEngine[KeywordEngineConfig, None]):
         return TextProcessingResult(text=output, detections=(detection,))
 ```
 
-Register the implementation and its resources before finalizing the registry:
+Register the implementation and, when required, its resources before finalizing
+the registry:
 
 ```python
+registry = EngineRegistry()
 registry.register(KeywordEngine)
-registry.finalize()
+registry = registry.finalize()
 ```
 
 Finalization freezes registration and constructs the exact policy config type,
 JSON Schema, and engine discovery metadata.
+
+The complete example at
+`projects/privacy-guard/examples/custom-engine/README.md` adapts an
+operator-provided analysis tool, injects it as a typed resource, and runs its
+finalized registry through discovery, schema generation, serving, and an
+OpenShell policy.
 
 ## Timeout and concurrency
 
