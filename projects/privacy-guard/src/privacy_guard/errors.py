@@ -83,6 +83,30 @@ class PrivacyGuardError(Exception):
         )
 
 
+class EntityProcessingError(Exception):
+    """Base for content-safe entity-processing failures."""
+
+
+class EngineConfigurationError(EntityProcessingError):
+    """An engine class or configured instance is invalid."""
+
+
+class EngineContractError(EntityProcessingError):
+    """An engine invocation or returned result violated the public contract."""
+
+
+class EngineExecutionError(EntityProcessingError):
+    """An engine's configured runtime failed to complete one text input."""
+
+
+class EngineLimitExceeded(EntityProcessingError):
+    """An engine exceeded a bounded configuration or output limit."""
+
+
+class EngineRegistryError(Exception):
+    """A content-safe engine registration or registry lifecycle failure."""
+
+
 _ERROR_SPECS: dict[ErrorCode, ErrorSpec] = {
     ErrorCode.CONFIG_INVALID: ErrorSpec(
         ErrorKind.INVALID_INPUT,

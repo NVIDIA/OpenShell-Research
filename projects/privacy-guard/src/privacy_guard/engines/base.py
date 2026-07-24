@@ -30,6 +30,13 @@ from privacy_guard.constants import (
     MAX_DETECTIONS_PER_STAGE,
     MAX_FINDING_METADATA_ENTRIES,
 )
+from privacy_guard.errors import (
+    EngineConfigurationError,
+    EngineContractError,
+    EngineExecutionError,
+    EngineLimitExceeded,
+    EntityProcessingError,
+)
 from privacy_guard.string_validators import (
     ScalarString,
     validate_bounded_metadata_string,
@@ -120,26 +127,6 @@ class TextProcessingResult(StrictDomainModel):
 
 class EngineConfig(StrictDomainModel):
     """Nominal base for an engine's exact policy configuration."""
-
-
-class EntityProcessingError(Exception):
-    """Base for content-safe entity-processing failures."""
-
-
-class EngineConfigurationError(EntityProcessingError):
-    """An engine class or configured instance is invalid."""
-
-
-class EngineContractError(EntityProcessingError):
-    """An engine invocation or returned result violated the public contract."""
-
-
-class EngineExecutionError(EntityProcessingError):
-    """An engine's configured runtime failed to complete one text input."""
-
-
-class EngineLimitExceeded(EntityProcessingError):
-    """An engine exceeded a bounded configuration or output limit."""
 
 
 class EngineResources:

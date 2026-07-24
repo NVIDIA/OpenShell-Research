@@ -7,15 +7,10 @@ from privacy_guard.engines.base import (
     ConfidenceLevel,
     DetectionConfidence,
     EngineConfig,
-    EngineConfigurationError,
-    EngineContractError,
-    EngineExecutionError,
-    EngineLimitExceeded,
     EngineResources,
     EntityDetection,
     EntityName,
     EntityProcessingEngine,
-    EntityProcessingError,
     EntityProcessingStrategy,
     TextProcessingResult,
     UnitInterval,
@@ -27,6 +22,13 @@ from privacy_guard.engines.regex import (
     RegexPattern,
     RegexPatternCatalog,
     RegexReplacement,
+)
+from privacy_guard.errors import (
+    EngineConfigurationError,
+    EngineContractError,
+    EngineExecutionError,
+    EngineLimitExceeded,
+    EntityProcessingError,
 )
 
 __all__ = [

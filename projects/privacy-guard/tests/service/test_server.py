@@ -13,9 +13,9 @@ import pytest
 from typer.testing import CliRunner, Result
 
 from privacy_guard.constants import MAX_CONCURRENT_RPCS, MAX_RECEIVE_MESSAGE_BYTES
-from privacy_guard.engine_registry import EngineRegistry, EngineRegistryError
+from privacy_guard.engine_registry import EngineRegistry
 from privacy_guard.engines import EntityProcessingStrategy
-from privacy_guard.errors import ErrorCode, PrivacyGuardError
+from privacy_guard.errors import EngineRegistryError, ErrorCode, PrivacyGuardError
 from privacy_guard.service import server as server_module
 from privacy_guard.service.server import (
     MiddlewareServer,

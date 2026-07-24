@@ -20,16 +20,16 @@ from privacy_guard.config import (
 )
 from privacy_guard.engines import (
     EngineConfig,
-    EngineConfigurationError,
     EngineResources,
     EntityProcessingEngine,
     EntityProcessingStrategy,
 )
-from privacy_guard.errors import ErrorCode, PrivacyGuardError
-
-
-class EngineRegistryError(Exception):
-    """A content-safe engine registration or registry lifecycle failure."""
+from privacy_guard.errors import (
+    EngineConfigurationError,
+    EngineRegistryError,
+    ErrorCode,
+    PrivacyGuardError,
+)
 
 
 @dataclass(frozen=True)
@@ -277,5 +277,4 @@ _ENGINE_NAME = re.compile(r"[a-z][a-z0-9-]{0,127}\Z")
 __all__ = [
     "EngineDescription",
     "EngineRegistry",
-    "EngineRegistryError",
 ]

@@ -25,13 +25,15 @@ from privacy_guard.constants import (
 from privacy_guard.engines.base import (
     ConfidenceLevel,
     EngineConfig,
-    EngineConfigurationError,
-    EngineContractError,
-    EngineLimitExceeded,
     EntityDetection,
     EntityProcessingEngine,
     EntityProcessingStrategy,
     TextProcessingResult,
+)
+from privacy_guard.errors import (
+    EngineConfigurationError,
+    EngineContractError,
+    EngineLimitExceeded,
 )
 from privacy_guard.string_validators import ScalarString, validate_scalar_string
 from privacy_guard.timeout import Timeout, TimeoutExpired

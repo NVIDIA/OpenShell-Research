@@ -31,9 +31,14 @@ from privacy_guard.constants import (
     SERVICE_NAME,
     SERVICE_VERSION,
 )
-from privacy_guard.engine_registry import EngineRegistry, EngineRegistryError
+from privacy_guard.engine_registry import EngineRegistry
 from privacy_guard.engines import ConfidenceLevel
-from privacy_guard.errors import ErrorCode, ErrorKind, PrivacyGuardError
+from privacy_guard.errors import (
+    EngineRegistryError,
+    ErrorCode,
+    ErrorKind,
+    PrivacyGuardError,
+)
 from privacy_guard.request_processor import (
     EntityDetectionSummary,
     RequestDecision,
