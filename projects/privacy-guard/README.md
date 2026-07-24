@@ -1,331 +1,209 @@
 # Privacy Guard
 
-An OpenShell supervisor middleware. The supervisor calls it over gRPC (the
-`SupervisorMiddleware` service in `bindings/`) to inspect provider-bound HTTP
-requests *before* credentials are attached. Privacy Guard parses the request
-body, scans its text for sensitive values, and returns an allow/deny decision
-plus an optionally rewritten body that the supervisor forwards instead of the
-original.
+Privacy Guard is an OpenShell supervisor middleware that detects and optionally
+replaces sensitive entities in provider-bound request text before credentials
+are attached.
 
-> Status: **hardened research project with a configurable regex scanner.** Strict
-> policy and scanner configuration, request-level processing, bounded scanning,
-> the generic JSON handler, safe gRPC adaptation, and a loopback server are
-> implemented.
+This release is a clean-break redesign. It does not preserve the former
+`Scanner`, `FormatHandler`, JSON traversal, `observe`, `redact`, startup catalog,
+or scanner-profile APIs. A processor run accepts one UTF-8 text body and runs
+the policy's entity-processing stages in order.
 
-The self-contained
-[built-in regex scanner walkthrough](examples/regex-scanner/README.md) provides
-a scanner configuration, gateway registration, sandbox policy, and manual
-Claude Code and custom-endpoint Pi workflows for a typical deployment. The
-separate [email scanner example](examples/email-scanner/README.md) demonstrates
-how to implement a custom scanner.
+## Policy experience
 
-## Request flow
+The OpenShell policy owns entity behavior: ordered stages, each engine's exact
+configuration, and the final `detect`, `block`, or `replace` action.
 
-`RequestProcessor` orchestrates one complete request:
-
-```
-proto HttpRequestEvaluation
-  -> payloads.InterceptedRequest         proto-free capture of the request
-  -> request_body.FormatHandler.normalize()
-                                       -> request_body.RequestBody (TextBlocks)
-  -> scanners.Scanner.scan(text_block)   -> scanners.Finding[]
-  -> policy via config.PolicyConfig      -> per-block replacements
-  -> request_body.FormatHandler.reconstruct()
-                                       -> rewritten body (bytes)
-  -> payloads.ProcessingResult           decision + replacement + findings
-  -> proto HttpRequestResult
+```yaml
+entity_processing:
+  stages:
+    - name: identifiers
+      config:
+        engine: regex
+        pattern_catalog:
+          entities:
+            - name: email
+              patterns:
+                - pattern: '(?<![\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])'
+                  confidence: high
+        replacement:
+          strategy: template
+          template: "[{entity}]"
+on_detection:
+  action: replace
 ```
 
-The servicer is the only seam that touches both the proto messages and the
-domain types: it translates proto -> domain on the way in and domain -> proto on
-the way out. Everything below the service layer is free of `bindings/` and
-gRPC. OpenShell applies an allowed mutation and forwards the provider request;
-Privacy Guard does not make the provider call itself.
+`entity_processing.stages` is ordered. In replace mode, each stage receives the
+preceding stage's processed text. Detect and block run the same engines with the
+detection-only strategy, so replacement recipes may remain configured but
+dormant.
 
-Scanners continue to operate on exactly one text block. Scanner calls run on a
-dedicated four-thread executor rather than the gRPC event loop; scanners must be
-thread-safe and must not retain request content. Format handlers decide
-which text blocks are relevant and own their addressing scheme. The processor
-scans every emitted text block but treats each block path as opaque, so adding a
-new request format does not require provider-specific processor logic.
+Privacy Guard accepts a structured catalog, not a filesystem path. The
+[regex engine example](examples/regex-engine/README.md) includes a reference
+catalog to copy and adapt. Transparent catalog-file expansion belongs in
+OpenShell's policy installation flow and is not yet supported by the current
+protocol.
 
-## Scanner and JSON policy
+## Architecture
 
-Findings carry scanner-owned `low`, `medium`, or `high` confidence. Each action
-selects the findings it applies to by `entity_types` and `minimum_confidence`:
-
-```json
-{
-  "body_format": "json",
-  "on_finding": {
-    "action": "redact",
-    "entity_types": ["email"],
-    "minimum_confidence": "high",
-    "template": "[{entity}]"
-  }
-}
+```text
+OpenShell HttpRequestEvaluation
+  -> strict UTF-8 decode
+  -> finalized Pydantic policy union (config.engine discriminator)
+  -> canonical config fingerprint and bounded processor cache
+  -> RequestProcessor.process(one text string)
+       -> stage 1 engine.run(current text)
+       -> stage 2 engine.run(stage 1 text)
+       -> ...
+  -> policy action: detect, block, or replace
+  -> safe aggregated entity findings
+  -> OpenShell HttpRequestResult
 ```
 
-`PolicyConfig.on_finding` is a Pydantic discriminated union keyed by `action`.
-Observe, block, and redact each carry their own finding criteria; only the
-redact variant has a `template`. `entity_types: null` selects every emitted
-entity type, while an empty list selects none. `minimum_confidence: null`
-accepts every confidence level.
+The policy action never crosses the engine boundary. Engines receive only
+`EntityProcessingStrategy.DETECT` or `EntityProcessingStrategy.REPLACE`.
+Blocking is a request-level disposition owned by `RequestProcessor`.
 
-Scanner configuration is independent of policy. A concrete `ScannerConfig`
-subtype controls what and how its scanner detects; scanners can run without a
-`PolicyConfig`. Action criteria filter the resulting `Finding` values for one
-policy evaluation and never reconfigure the scanner.
+The copied `proto/supervisor_middleware.proto` and generated bindings are owned
+by OpenShell. Update them only through the repository's middleware-kit workflow;
+never hand-edit them. Today's protocol carries a `google.protobuf.Struct`
+configuration on each evaluation, so Privacy Guard validates and caches it
+internally. Large-catalog preparation RPCs, evaluation fingerprints, manifest
+schema fields, and a dedicated finding-source field require a coordinated
+change in the canonical OpenShell protocol rather than a private proto fork.
 
-Every scanner config declares its complete `entity_types` catalog. When an
-action selects entity types, every configured name must occur in the union of
-the active scanner catalogs. Unknown names fail config validation instead of
-silently producing no findings.
+## Built-in engines
 
-Every JSON string value and every object key is scanned; JSON numbers, booleans,
-and nulls are not. Keys are observable in `observe`, cause normal denial in
-`block`, and cause a stable deny in `redact` because collision-safe key mutation
-is not supported. Value findings may overlap for observe/block. Redaction picks
-winners deterministically by confidence, span length, offsets, scanner identity,
-and entity. A scanner sequence is passed to `RequestProcessor`; scanner names
-must be unique and remain visible in aggregated findings.
+### RegexEngine
 
-The `privacy-guard` command runs built-in scanners. Every built-in requires
-`--config` and owns that file's schema and interpretation.
-`RegexScanner` is available through the `regex` subcommand; its config path
-selects a YAML catalog. Single-profile files contain a non-empty entity list.
-Multi-profile files contain only a non-empty `profiles` mapping and require the
-regex-specific `--profile` option. Use `privacy-guard --help` for the built-in
-scanner list or `privacy-guard regex --help` for regex options. See
-[the built-in regex scanner walkthrough](examples/regex-scanner/README.md) for a
-complete manual deployment.
+`RegexEngine` compiles configured patterns once and supports overlapping
+detection and deterministic template replacement. It preserves numeric
+backreferences by wrapping each configured pattern in a non-capturing group
+followed by a private named marker. Pattern names are optional diagnostic
+identities; `pattern` is the only field containing the regex string.
+
+The third-party `regex` backend provides enforceable per-search timeouts.
+Explicit `ignore_case`, `multiline`, `dot_all`, and `ascii` flags are supported;
+inline flags and user-defined named groups are rejected to protect the wrapper
+contract.
+
+Privacy Guard owns the catalog schema but maintains no authoritative patterns.
+
+## Custom engines
+
+Custom engines are a first-class extension point. Authors declare one typed
+config, optional typed resources, `supported_strategy`, and `_run`. They do not
+write `__init__`; `_initialize` is optional, and `@override` is not required.
+
+The first NeMo Anonymizer integration will be implemented as a custom engine,
+not as a built-in or placeholder abstraction in Privacy Guard.
+
+```python
+from dataclasses import dataclass
+from typing import Literal
+
+from privacy_guard.engines import (
+    EngineConfig,
+    EntityProcessingEngine,
+    EntityProcessingStrategy,
+    TextProcessingResult,
+)
+from privacy_guard.base import StrictDomainModel
+from privacy_guard.timeout import Timeout
+
+
+class AcmeReplacement(StrictDomainModel):
+    strategy: Literal["token"] = "token"
+
+
+class AcmeConfig(EngineConfig[AcmeReplacement]):
+    engine: Literal["acme-pii"] = "acme-pii"
+
+
+@dataclass(frozen=True)
+class AcmeResources:
+    client: object
+
+
+class AcmeEngine(EntityProcessingEngine[AcmeConfig, AcmeResources]):
+    supported_strategy = EntityProcessingStrategy.REPLACE
+
+    def _run(
+        self,
+        text: str,
+        *,
+        strategy: EntityProcessingStrategy,
+        timeout: Timeout,
+    ) -> TextProcessingResult:
+        timeout.raise_if_expired()
+        return TextProcessingResult(text=text, detections=())
+```
+
+Register engines before finalizing the policy schema:
+
+```python
+from privacy_guard.engine_registry import EngineRegistry
+
+registry = EngineRegistry()
+registry.register(AcmeEngine, resources=AcmeResources(client=client))
+registry.finalize()
+```
+
+The finalized registry builds a Pydantic discriminated union containing the
+exact config type of every registered engine. `stage.config` therefore
+round-trips without dropping engine-specific or replacement-variant fields.
+
+## CLI
 
 ```bash
-uv run privacy-guard \
-  regex \
-  --config examples/regex-scanner/regex-scanner.yaml \
-  --listen 127.0.0.1:50051
+uv run privacy-guard engines
+uv run privacy-guard schema
+uv run privacy-guard serve --listen 127.0.0.1:50051
 ```
 
-Each entity has a unique name and a non-empty `patterns` list. Patterns declare
-`name`, `regex`, `confidence`, and optional `ignore_case`, `multiline`,
-`dot_all`, and `ascii` booleans. Every match carries its configured pattern name
-in general finding metadata and is reported as `entity/pattern-name` by the
-service. Policy filtering remains at entity level.
+Entity behavior is supplied by OpenShell policy config, not server startup
+flags. Deployment startup owns only installed engine implementations and
+operator resources such as model profiles, endpoints, clients, and credentials.
 
-A scanner is a nominal extension: declare its strict configuration type and
-implement `_scan`. Use `_initialize` for any custom initialization logic rather
-than defining `__init__`; the base constructor runs the hook at the end of
-initialization, after validating and retaining the configuration. The public
-`scan` wrapper validates the returned tuple and each `Finding`.
+## Safety and limits
 
-```python
-from privacy_guard.scanners import Finding, ScanBudget, Scanner, ScannerConfig
-
-
-class ExampleScanner(Scanner[ScannerConfig]):
-    def _scan(self, text_block: str, budget: ScanBudget) -> tuple[Finding, ...]:
-        return ()
-```
-
-Applications construct the processor with a sequence, for example
-`RequestProcessor([ExampleScanner(ScannerConfig(name="example", entity_types=frozenset()))])`.
-The base
-constructor infers and validates the scanner's declared config type. A scanner
-returns block-relative
-`Finding` values; the processor composes each one into a `RequestBodyFinding`
-with the owning `TextBlock.path`.
-
-Applications serving a custom scanner can use the high-level server API, which
-owns processor, middleware, gRPC, and shutdown wiring:
-
-```python
-from privacy_guard.service import MiddlewareServer
-
-scanner = ExampleScanner(ScannerConfig(name="example", entity_types=frozenset()))
-server = MiddlewareServer(scanner=scanner)
-server.serve()  # Defaults to 127.0.0.1:50051
-```
-
-## Resource and failure behavior
-
-The service enforces the protocol's 4 MiB input and replacement-body maximum,
-32 finding groups, and exact 4 KiB encoded limit for each aggregate finding.
-The operator may configure a lower effective maximum; this project cannot observe
-that value, so deployments must keep the registration aligned with the 4 MiB
-manifest or add the lower limit to service configuration.
-
-JSON parsing is additionally bounded to 64 nesting levels, 4,096 text blocks,
-and 4 MiB of scanned characters. Scanning is capped at 256 findings per block,
-4,096 per request, four active scanner workers, and 16 concurrent gRPC calls.
-One default one-second monotonic scan budget is shared across every block and
-scanner in a request. `RegexScanner` checks it before and after each expression
-evaluation and while consuming overlapping matches. Because the standard-library
-regex engine cannot interrupt an active evaluation, one backtracking-heavy
-expression may outlast the deadline. Test catalogs against representative
-worst-case inputs before deployment and avoid expressions with pathological
-backtracking behavior.
-Shape excess is invalid input. Finding or outbound representation excess returns
-a stable `privacy_guard_limit_exceeded` deny with no body or partial findings,
-avoiding a failure-mode-dependent fail open.
-Redacted text is projected against the body budget before it is rendered, which
-bounds template and finding amplification. The authoritative serialized-body
-limit is checked immediately after format reconstruction and again at the gRPC
-boundary.
-
-Operational logs contain request ID, duration, action, finding count, and safe
-error code only—never bodies, text blocks, or matches. A cancelled RPC does not
-release its scanner slot until its synchronous worker really exits.
-
-## Module map
-
-| Module | Responsibility |
-| --- | --- |
-| `config` | Strict Pydantic `PolicyConfig` parsing at the untrusted config boundary |
-| `constants` | Package-wide limits, service metadata, and stable protocol values |
-| `errors` | Closed, content-safe error catalog shared by all components |
-| `payloads` | Frozen `InterceptedRequest` and `ProcessingResult` domain records |
-| `request_body` | Nominal `FormatHandler` ABC + `JsonHandler`; strict `RequestBody`, `TextBlock` models |
-| `scanners` | `Scanner` ABC + strict `ScannerConfig`, `Finding`, and `RequestBodyFinding` models |
-| `processor` | Proto-free request orchestration and policy application |
-| `service` | High-level `MiddlewareServer`, gRPC lifecycle, and servicer adapter |
-| `bindings` | generated protobuf stubs — do not edit by hand |
+- Input and replacement bodies are limited to 4 MiB.
+- One monotonic `Timeout` is shared across every stage and result validation.
+- Regex searches receive the remaining timeout and fail atomically.
+- Intermediate text and detection cardinality are bounded.
+- Detect and block never return a body mutation; replace returns final text.
+- Findings expose entity, bounded confidence, count, and stage provenance, but
+  never matched text, surrounding text, offsets, patterns, or raw tool metadata.
+- Engine instances and injected resources must be safe for concurrent requests.
+- Cross-request entity memory is intentionally out of scope.
 
 ## Updating the OpenShell protocol
 
 Privacy Guard uses
 [`openshell-middleware-kit`](../openshell-middleware-kit/README.md) to keep its
-checked-in OpenShell protocol and generated Python bindings aligned with a
-released OpenShell version. Install the repository's local copy as the `omkit`
-tool:
+copied protocol and generated Python bindings aligned with an OpenShell release.
+Install the repository's local `omkit`, then update:
 
 ```bash
 uv tool install --force ../openshell-middleware-kit
-```
-
-From this directory, update to the latest OpenShell release with:
-
-```bash
-omkit update
-```
-
-For a reproducible update to a specific release, pin the version:
-
-```bash
 omkit update --openshell-version v0.0.90
 ```
 
-The updater works on a validated temporary copy and replaces only
-`proto/supervisor_middleware.proto`, `src/privacy_guard/bindings/`, `uv.lock`,
-and `.openshell-middleware-manifest.json`. The manifest records the selected
-OpenShell release, protocol source and checksum, and
-`openshell-middleware-kit` version. Review all generated changes, then run
-`make check`; never edit generated bindings by hand.
+The updater replaces only the copied protocol, generated bindings, lockfile, and
+`.openshell-middleware-manifest.json` from a validated temporary copy. Review
+those generated changes and run `make check`.
 
-## Notes for implementers
+## Development validation
 
-- **Scanner metadata.** Applications pass an explicit `ScannerConfig` subtype to
-  the scanner constructor; `Scanner` infers and validates the declared generic
-  config type. The read-only `config` property preserves that concrete type, and
-  `supported_entity_types` returns its required `entity_types` catalog.
-- **Finding types.** A scanner returns strict block-relative `scanners.Finding`
-  values. The processor creates `RequestBodyFinding` values with the owning text-block
-  path, and the servicer aggregates those into the protocol's count-based `Finding`.
-  A finding may include an immutable, bounded string metadata mapping for
-  scanner-specific attribution. Regex findings use its `pattern_name` key.
-- **Scanner initialization.** Override `_initialize` only when validated config
-  must be compiled or transformed into reusable immutable scanner state. The
-  default hook does nothing.
-- **Scan budgets.** The protected scanner hook receives a request-scoped
-  `ScanBudget`. Standalone `scan` calls create a safe default when no budget is
-  supplied. Potentially unbounded scanners must cooperate with the deadline.
-- **Text-block paths.** `Finding` has no path state. A `Scanner` sees only one text
-  block; the processor attaches `TextBlock.path` by creating `RequestBodyFinding`.
-- **Format selection.** `PolicyConfig.body_format` (default `json`) picks a handler
-  from the `format_handlers` mapping supplied to `RequestProcessor`. JSON is the
-  only built-in format; applications can supply mappings containing other formats.
-  Do not infer a provider from the request body or headers.
-- **Format handlers.** A custom handler subclasses `FormatHandler`, calls
-  `super().__init__(format_name="...")`, and implements the protected
-  `_normalize` and `_reconstruct` hooks with `@override`. Return normally
-  constructed strict `RequestBody` and `TextBlock` models; handler instances are
-  reused concurrently and must retain no request content or mutable request state.
-
-  ```python
-  from collections.abc import Mapping
-
-  from typing_extensions import override
-
-  from privacy_guard.request_body import FormatHandler, RequestBody
-  from privacy_guard.config import PolicyConfig
-
-
-  class CustomHandler(FormatHandler):
-      def __init__(self) -> None:
-          super().__init__(format_name="custom")
-
-      @override
-      def _normalize(self, raw_body: bytes, policy_config: PolicyConfig) -> RequestBody:
-          return RequestBody(
-              text_blocks=(), parsed_value=None, original_bytes=raw_body
-          )
-
-      @override
-      def _reconstruct(
-          self,
-          request_body: RequestBody,
-          replacements_by_path: Mapping[str, str],
-      ) -> bytes:
-          return request_body.original_bytes
-  ```
-- **Log safety.** Raw bodies, parsed values, and text-block content use `repr=False` to
-  keep content out of routine domain representations; this does not sanitize
-  arbitrary tracebacks. Cataloged errors and gRPC status details are
-  content-safe, and caught collaborator exception chains must never be logged.
-
-## Development checks
-
-The project Makefile provides development shortcuts:
+The project Makefile exposes the normal workflow:
 
 ```bash
 make help
-make test PYTEST_ARGS="tests/test_processor.py -k redact"
+make test PYTEST_ARGS="tests/test_request_processor.py"
 make fix
 make check
+make check-py311
 ```
 
-`make check` delegates to the authoritative complete local check:
-
-```bash
-scripts/check.sh
-```
-
-The top-level
-`.github/workflows/privacy-guard.yml` workflow runs the same check in isolated
-uv environments on the minimum and latest supported Python versions.
-
-To exercise the package with the minimum supported interpreter, run
-`scripts/check.sh --python 3.11`. This committed script is the authoritative
-project check used locally and in CI. It runs the full tests, formatting, lint,
-curated `ty` rules, import smoke, and package build.
-The AST policy test rejects cast operations and explicit dynamic typing in
-handwritten `src`, `tests`, and `examples`; only generated protobuf/gRPC bindings
-are excluded.
-
-The optional diagnostic benchmark uses three samples per median and covers a
-focused set of body sizes, finding loads, scanner shapes, and reconstruction
-modes:
-
-```bash
-uv run --frozen python scripts/benchmark_privacy_guard.py
-```
-
-Use it manually when changing performance-sensitive processing code; it is not
-part of `scripts/check.sh` and does not enforce regression thresholds. For
-the broader scenario set and seven samples per median, pass `--suite full`.
-Pass `--profile profile.out` to either suite to record a `cProfile` artifact.
-The harness reports median wall time and median peak traced allocation for the
-synchronous normalize, synthetic scan, output validation, policy, and
-reconstruction path. It does not measure a real PII scanner, gRPC adaptation,
-executor queuing, concurrent throughput, or process RSS. Methodology and one
-platform-specific development snapshot are in [BENCHMARKS.md](BENCHMARKS.md).
+`make check` delegates to `scripts/check.sh`, the authoritative local and CI
+gate. It runs tests, formatting, lint, `ty`, import smoke, and package builds.
