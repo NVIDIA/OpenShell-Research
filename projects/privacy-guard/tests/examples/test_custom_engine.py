@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
+
+import yaml
 
 EXAMPLE_DIRECTORY = Path(__file__).parents[2] / "examples" / "custom-engine"
 
@@ -13,32 +17,17 @@ EXAMPLE_DIRECTORY = Path(__file__).parents[2] / "examples" / "custom-engine"
 def test_custom_engine_runs_through_the_middleware_boundary() -> None:
     probe = r"""
 import asyncio
+from pathlib import Path
 
 from google.protobuf import json_format
+import yaml
 
-from custom_engine import create_registry
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
+from privacy_guard_app import create_registry
 
-values = {
-    "entity_processing": {
-        "stages": [
-            {
-                "name": "project-names",
-                "config": {
-                    "engine": "keyword-tool",
-                    "entity": "confidential-project",
-                    "keyword": "Project Cobalt",
-                    "replacement": {
-                        "strategy": "token",
-                        "token": "[confidential-project]",
-                    },
-                },
-            }
-        ]
-    },
-    "on_detection": {"action": "replace"},
-}
+values = yaml.safe_load(Path("privacy-guard-config.yaml").read_text())
+assert isinstance(values, dict)
 config = pb2.HttpRequestEvaluation().config
 json_format.ParseDict(values, config)
 
@@ -76,12 +65,16 @@ asyncio.run(evaluate())
 
 
 def test_custom_registry_drives_cli_discovery_and_schema() -> None:
+    environment = os.environ.copy()
+    python_path = str(EXAMPLE_DIRECTORY)
+    existing_python_path = environment.get("PYTHONPATH")
+    if existing_python_path:
+        python_path = os.pathsep.join((python_path, existing_python_path))
+    environment["PYTHONPATH"] = python_path
     command = [
-        sys.executable,
-        "-m",
-        "privacy_guard.service.server",
+        str(Path(sys.executable).with_name("privacy-guard")),
         "--registry-factory",
-        "custom_engine:create_registry",
+        "privacy_guard_app:create_registry",
     ]
 
     engines = subprocess.run(
@@ -90,6 +83,7 @@ def test_custom_registry_drives_cli_discovery_and_schema() -> None:
         check=True,
         capture_output=True,
         text=True,
+        env=environment,
     )
     schema = subprocess.run(
         [*command, "schema"],
@@ -97,6 +91,7 @@ def test_custom_registry_drives_cli_discovery_and_schema() -> None:
         check=True,
         capture_output=True,
         text=True,
+        env=environment,
     )
 
     assert engines.stdout.startswith("keyword-tool\tdetect,replace\t")
@@ -113,16 +108,34 @@ def test_custom_registry_drives_cli_discovery_and_schema() -> None:
 
 
 def test_openshell_walkthrough_uses_the_custom_registry_and_current_policy() -> None:
-    policy = (EXAMPLE_DIRECTORY / "policy.yaml").read_text()
-    config = (EXAMPLE_DIRECTORY / "privacy-guard-config.yaml").read_text()
-    gateway = (EXAMPLE_DIRECTORY / "gateway.toml").read_text()
+    policy = yaml.safe_load((EXAMPLE_DIRECTORY / "policy.yaml").read_text())
+    config = yaml.safe_load(
+        (EXAMPLE_DIRECTORY / "privacy-guard-config.yaml").read_text()
+    )
+    gateway = tomllib.loads((EXAMPLE_DIRECTORY / "gateway.toml").read_text())
     readme = (EXAMPLE_DIRECTORY / "README.md").read_text()
 
-    assert "middleware: privacy-guard-custom-engine" in policy
-    assert 'name = "privacy-guard-custom-engine"' in gateway
-    assert "engine: keyword-tool" in policy
-    assert "engine: keyword-tool" in config
-    assert "action: replace" in policy
-    assert "--registry-factory custom_engine:create_registry" in readme
+    assert isinstance(policy, dict)
+    assert isinstance(config, dict)
+    middleware_config = policy["network_middlewares"]["privacy_guard_replace"]
+    assert middleware_config["middleware"] == "privacy-guard-custom-engine"
+    assert middleware_config["config"] == config
+    middleware = gateway["openshell"]["supervisor"]["middleware"]
+    assert middleware == [
+        {
+            "name": "privacy-guard-custom-engine",
+            "grpc_endpoint": "http://REPLACE_WITH_HOST_IP:50051",
+            "max_body_bytes": 4_194_304,
+            "timeout": "5s",
+        }
+    ]
+    stage_config = config["entity_processing"]["stages"][0]["config"]
+    assert stage_config["engine"] == "keyword-tool"
+    assert config["on_detection"]["action"] == "replace"
+    assert "--registry-factory privacy_guard_app:create_registry" in readme
     assert "cd projects/privacy-guard/examples/custom-engine" in readme
+    assert 'export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"' in readme
+    assert "openshell gateway select openshell" in readme
+    assert "openshell gateway add" not in readme
+    assert "OpenShell `v0.0.90`" in readme
     assert "transformed:true" in readme

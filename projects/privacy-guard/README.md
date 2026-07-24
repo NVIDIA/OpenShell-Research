@@ -119,7 +119,8 @@ def create_registry() -> EngineRegistry:
 ```
 
 Pass that factory to every CLI operation so discovery, schema generation, and
-the running server use the same engine inventory:
+the running server use the same engine inventory. The module must be installed
+or otherwise present on Python's import path:
 
 ```bash
 uv run privacy-guard --registry-factory my_engines:create_registry engines
@@ -130,7 +131,8 @@ uv run privacy-guard --registry-factory my_engines:create_registry serve
 The [custom engine end-to-end example](examples/custom-engine/README.md)
 contains a complete tool adapter, typed policy and replacement configuration,
 runtime resource registration, registry factory, OpenShell policy, and
-walkthrough.
+walkthrough. It also shows the explicit `PYTHONPATH` setup needed when the
+factory is a standalone local module rather than an installed package.
 
 The registry is application-scoped, not a process-global singleton. A
 `MiddlewareServer` requires an explicit finalized registry. The finalized

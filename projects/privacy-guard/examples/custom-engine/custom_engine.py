@@ -8,7 +8,6 @@ from typing import Literal
 from pydantic import Field
 
 from privacy_guard.base import StrictDomainModel
-from privacy_guard.engine_registry import EngineRegistry
 from privacy_guard.engines import (
     ConfidenceLevel,
     EngineConfig,
@@ -126,16 +125,6 @@ class KeywordEngine(
             )
         output = _replace_matches(text, matches, replacement.token)
         return TextProcessingResult(text=output, detections=detections)
-
-
-def create_registry() -> EngineRegistry:
-    """Create the finalized application registry consumed by Privacy Guard."""
-    registry = EngineRegistry()
-    registry.register(
-        KeywordEngine,
-        resources=KeywordEngineResources(analysis_tool=KeywordAnalysisTool()),
-    )
-    return registry.finalize()
 
 
 def _replace_matches(
