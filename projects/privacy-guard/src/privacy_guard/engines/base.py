@@ -158,7 +158,7 @@ _ResourcesT = TypeVar("_ResourcesT")
 class EntityProcessingEngine(ABC, Generic[_ConfigT, _ResourcesT]):
     """Nominal, typed extension point for processing one text string."""
 
-    supported_strategy: ClassVar[EntityProcessingStrategy]
+    supported_strategies: ClassVar[frozenset[EntityProcessingStrategy]]
 
     def __init__(self, config: _ConfigT, resources: _ResourcesT) -> None:
         """Validate typed configuration/resources and initialize reusable state."""
@@ -209,10 +209,16 @@ class EntityProcessingEngine(ABC, Generic[_ConfigT, _ResourcesT]):
 
     @classmethod
     def _validate_class_contract(cls) -> None:
-        if not isinstance(
-            getattr(cls, "supported_strategy", None), EntityProcessingStrategy
+        supported_strategies = getattr(cls, "supported_strategies", None)
+        if (
+            not isinstance(supported_strategies, frozenset)
+            or not supported_strategies
+            or any(
+                not isinstance(strategy, EntityProcessingStrategy)
+                for strategy in supported_strategies
+            )
         ):
-            raise EngineConfigurationError("engine supported strategy is invalid")
+            raise EngineConfigurationError("engine supported strategies are invalid")
         cls.get_config_type()
         cls.get_resources_type()
 
@@ -245,11 +251,8 @@ class EntityProcessingEngine(ABC, Generic[_ConfigT, _ResourcesT]):
             raise EngineContractError("engine processing strategy is invalid")
         if not isinstance(timeout, Timeout):
             raise EngineContractError("engine timeout is invalid")
-        if (
-            strategy is EntityProcessingStrategy.REPLACE
-            and self.supported_strategy is EntityProcessingStrategy.DETECT
-        ):
-            raise EngineContractError("engine does not support replacement")
+        if strategy not in self.supported_strategies:
+            raise EngineContractError("engine does not support the requested strategy")
         timeout.raise_if_expired()
         result: object = self._run(
             validated_text,

@@ -92,7 +92,7 @@ Privacy Guard owns the catalog schema but maintains no authoritative patterns.
 ## Custom engines
 
 Custom engines are a first-class extension point. Authors declare one typed
-config, optional typed resources, `supported_strategy`, and `_run`. They do not
+config, optional typed resources, `supported_strategies`, and `_run`. They do not
 write `__init__`; `_initialize` is optional, and `@override` is not required.
 
 The first NeMo Anonymizer integration will be implemented as a custom engine,
@@ -126,7 +126,12 @@ class AcmeResources:
 
 
 class AcmeEngine(EntityProcessingEngine[AcmeConfig, AcmeResources]):
-    supported_strategy = EntityProcessingStrategy.REPLACE
+    supported_strategies = frozenset(
+        {
+            EntityProcessingStrategy.DETECT,
+            EntityProcessingStrategy.REPLACE,
+        }
+    )
 
     def _run(
         self,

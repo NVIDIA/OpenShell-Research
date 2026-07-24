@@ -173,7 +173,12 @@ class RegexEngineConfig(EngineConfig[RegexReplacement]):
 class RegexEngine(EntityProcessingEngine[RegexEngineConfig, None]):
     """Detect overlapping regex matches and optionally replace deterministic winners."""
 
-    supported_strategy = EntityProcessingStrategy.REPLACE
+    supported_strategies = frozenset(
+        {
+            EntityProcessingStrategy.DETECT,
+            EntityProcessingStrategy.REPLACE,
+        }
+    )
 
     def _initialize(self) -> None:
         try:

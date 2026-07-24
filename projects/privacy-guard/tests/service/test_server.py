@@ -80,7 +80,12 @@ def test_default_registry_contains_the_builtin_regex_engine() -> None:
     assert registry.engine_names == ("regex",)
     description = registry.describe_engines()[0]
     assert description.engine == "regex"
-    assert description.supported_strategy is EntityProcessingStrategy.REPLACE
+    assert description.supported_strategies == frozenset(
+        {
+            EntityProcessingStrategy.DETECT,
+            EntityProcessingStrategy.REPLACE,
+        }
+    )
 
 
 def test_middleware_server_uses_an_injected_registry_and_default_address(
@@ -165,7 +170,7 @@ def test_cli_engines_describes_the_installed_engine() -> None:
     result = CliRunner().invoke(app, ["engines"])
 
     assert result.exit_code == 0
-    assert result.output.startswith("regex\treplace\t")
+    assert result.output.startswith("regex\tdetect,replace\t")
     assert "Detect overlapping regex matches" in result.output
 
 

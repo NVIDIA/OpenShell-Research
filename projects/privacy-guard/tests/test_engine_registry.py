@@ -18,6 +18,7 @@ from privacy_guard.engines import (
     RegexEngine,
     TextProcessingResult,
 )
+from privacy_guard.errors import PrivacyGuardError
 from privacy_guard.timeout import Timeout
 
 
@@ -43,7 +44,12 @@ class AcmeResources:
 
 
 class AcmeEngine(EntityProcessingEngine[AcmeConfig, AcmeResources]):
-    supported_strategy = EntityProcessingStrategy.REPLACE
+    supported_strategies = frozenset(
+        {
+            EntityProcessingStrategy.DETECT,
+            EntityProcessingStrategy.REPLACE,
+        }
+    )
 
     def _run(
         self,
@@ -61,7 +67,7 @@ class DetectConfig(EngineConfig[AcmeReplacement]):
 
 
 class DetectEngine(EntityProcessingEngine[DetectConfig, None]):
-    supported_strategy = EntityProcessingStrategy.DETECT
+    supported_strategies = frozenset({EntityProcessingStrategy.DETECT})
 
     def _run(
         self,
@@ -117,8 +123,51 @@ def test_detection_only_engine_is_rejected_for_replace_action() -> None:
         "on_detection": {"action": "replace"},
     }
 
-    with pytest.raises(Exception):
+    with pytest.raises(PrivacyGuardError):
         registry.validate_config(values)
+
+
+class ReplaceOnlyConfig(EngineConfig[AcmeReplacement]):
+    engine: Literal["replace-only"] = "replace-only"
+
+
+class ReplaceOnlyEngine(EntityProcessingEngine[ReplaceOnlyConfig, None]):
+    supported_strategies = frozenset({EntityProcessingStrategy.REPLACE})
+
+    def _run(
+        self,
+        text: str,
+        *,
+        strategy: EntityProcessingStrategy,
+        timeout: Timeout,
+    ) -> TextProcessingResult:
+        del strategy, timeout
+        return TextProcessingResult(text=text, detections=())
+
+
+def test_replacement_only_engine_is_rejected_for_detect_action() -> None:
+    registry = EngineRegistry()
+    registry.register(ReplaceOnlyEngine)
+    registry.finalize()
+    values = {
+        "entity_processing": {
+            "stages": [
+                {
+                    "config": {
+                        "engine": "replace-only",
+                        "replacement": {"strategy": "token"},
+                    }
+                }
+            ]
+        },
+        "on_detection": {"action": "detect"},
+    }
+
+    with pytest.raises(PrivacyGuardError):
+        registry.validate_config(values)
+
+    values["on_detection"] = {"action": "replace"}
+    registry.validate_config(values)
 
 
 def test_registry_is_frozen_after_finalize_and_finalize_is_idempotent() -> None:
@@ -145,7 +194,7 @@ def test_registry_rejects_duplicate_discriminators_and_resource_mismatch() -> No
 
 def test_describe_does_not_construct_an_engine() -> None:
     class CountingEngine(EntityProcessingEngine[DetectConfig, None]):
-        supported_strategy = EntityProcessingStrategy.DETECT
+        supported_strategies = frozenset({EntityProcessingStrategy.DETECT})
         initialized = 0
 
         def _initialize(self) -> None:
@@ -169,7 +218,9 @@ def test_describe_does_not_construct_an_engine() -> None:
 
     assert CountingEngine.initialized == 0
     assert descriptions[0].engine == "detect-only"
-    assert descriptions[0].supported_strategy is EntityProcessingStrategy.DETECT
+    assert descriptions[0].supported_strategies == frozenset(
+        {EntityProcessingStrategy.DETECT}
+    )
     properties_value = descriptions[0].configuration_schema["properties"]
     assert isinstance(properties_value, Mapping)
     properties = {

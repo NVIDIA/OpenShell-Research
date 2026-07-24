@@ -13,7 +13,7 @@ import typer
 from privacy_guard.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
 from privacy_guard.constants import MAX_CONCURRENT_RPCS, MAX_RECEIVE_MESSAGE_BYTES
 from privacy_guard.engine_registry import EngineRegistry
-from privacy_guard.engines import RegexEngine
+from privacy_guard.engines import EntityProcessingStrategy, RegexEngine
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
 
@@ -140,12 +140,14 @@ def show_schema() -> None:
 
 @app.command("engines")
 def show_engines() -> None:
-    """List installed engines and their maximum processing strategy."""
+    """List installed engines and every supported processing strategy."""
     for description in create_default_registry().describe_engines():
-        typer.echo(
-            f"{description.engine}\t{description.supported_strategy.value}"
-            f"\t{description.description}"
+        strategies = ",".join(
+            strategy.value
+            for strategy in EntityProcessingStrategy
+            if strategy in description.supported_strategies
         )
+        typer.echo(f"{description.engine}\t{strategies}\t{description.description}")
 
 
 _LOGGER = logging.getLogger(__name__)

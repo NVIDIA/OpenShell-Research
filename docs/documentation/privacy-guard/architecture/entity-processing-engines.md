@@ -19,7 +19,7 @@ with different configurations.
 An engine:
 
 1. declares concrete configuration and resource types through generics
-2. declares its maximum `supported_strategy`
+2. declares its non-empty set of `supported_strategies`
 3. receives validated configuration and operator-owned resources through the
    base constructor
 4. optionally derives immutable reusable state in `_initialize()`
@@ -64,22 +64,23 @@ class EntityProcessingStrategy(StrEnum):
     REPLACE = "replace"
 ```
 
-Every engine supports detection. A detection-only engine declares:
+An engine declares exactly the invocation strategies it supports. A
+detection-only engine declares:
 
 ```python
-supported_strategy = EntityProcessingStrategy.DETECT
+supported_strategies = frozenset({EntityProcessingStrategy.DETECT})
 ```
 
-A replacement-capable engine declares:
+A replacement-only engine declares:
 
 ```python
-supported_strategy = EntityProcessingStrategy.REPLACE
+supported_strategies = frozenset({EntityProcessingStrategy.REPLACE})
 ```
 
-`REPLACE` includes detection support, so `supported_strategy` is a singular
-maximum rather than a capability collection. Blocking does not appear here:
-the processor runs engines with `DETECT` and applies the block disposition
-afterward.
+An engine that exposes both operations includes both enum values. Supporting
+`REPLACE` does not imply that the engine exposes `DETECT`, even when replacement
+requires internal detection. Blocking does not appear here: the processor runs
+engines with `DETECT` and applies the block disposition afterward.
 
 ## Result contract
 
@@ -142,7 +143,12 @@ class KeywordEngineConfig(EngineConfig[KeywordReplacement]):
 
 
 class KeywordEngine(EntityProcessingEngine[KeywordEngineConfig, None]):
-    supported_strategy = EntityProcessingStrategy.REPLACE
+    supported_strategies = frozenset(
+        {
+            EntityProcessingStrategy.DETECT,
+            EntityProcessingStrategy.REPLACE,
+        }
+    )
 
     def _run(
         self,

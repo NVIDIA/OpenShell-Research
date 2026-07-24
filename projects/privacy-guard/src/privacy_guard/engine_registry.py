@@ -38,7 +38,7 @@ class EngineDescription:
 
     engine: str
     description: str
-    supported_strategy: EntityProcessingStrategy
+    supported_strategies: frozenset[EntityProcessingStrategy]
     configuration_schema: dict[str, object]
 
 
@@ -106,9 +106,16 @@ class EngineRegistry:
         ):
             raise EngineRegistryError("engine config type is already registered")
 
-        supported_strategy = getattr(engine_type, "supported_strategy", None)
-        if not isinstance(supported_strategy, EntityProcessingStrategy):
-            raise EngineRegistryError("engine supported strategy is invalid")
+        supported_strategies = getattr(engine_type, "supported_strategies", None)
+        if (
+            not isinstance(supported_strategies, frozenset)
+            or not supported_strategies
+            or any(
+                not isinstance(strategy, EntityProcessingStrategy)
+                for strategy in supported_strategies
+            )
+        ):
+            raise EngineRegistryError("engine supported strategies are invalid")
         if resources_runtime_type is NoneType:
             if resources is not None:
                 raise EngineRegistryError("resource-free engine received resources")
@@ -122,7 +129,7 @@ class EngineRegistry:
             config_type=config_type,
             resources_type=resources_type,
             resources=resources,
-            supported_strategy=supported_strategy,
+            supported_strategies=supported_strategies,
         )
 
     def finalize(self) -> FinalizedPrivacyGuardConfigType:
@@ -147,6 +154,11 @@ class EngineRegistry:
     def validate_config(self, values: object) -> FinalizedPrivacyGuardConfig:
         """Purely parse and validate an expanded Privacy Guard configuration."""
         config = parse_privacy_guard_config(self.config_adapter, values)
+        required_strategy = (
+            EntityProcessingStrategy.REPLACE
+            if config.on_detection.action is PolicyAction.REPLACE
+            else EntityProcessingStrategy.DETECT
+        )
         for stage in config.entity_processing.stages:
             registration = self._resolve_registration(stage.config)
             engine_type = registration.engine_type
@@ -160,13 +172,13 @@ class EngineRegistry:
                 )
             except EngineConfigurationError:
                 raise PrivacyGuardError(ErrorCode.CONFIG_INVALID) from None
-            if config.on_detection.action is PolicyAction.REPLACE:
-                if (
-                    registration.supported_strategy
-                    is not EntityProcessingStrategy.REPLACE
-                    or stage.config.replacement is None
-                ):
-                    raise PrivacyGuardError(ErrorCode.CONFIG_INVALID)
+            if required_strategy not in registration.supported_strategies:
+                raise PrivacyGuardError(ErrorCode.CONFIG_INVALID)
+            if (
+                required_strategy is EntityProcessingStrategy.REPLACE
+                and stage.config.replacement is None
+            ):
+                raise PrivacyGuardError(ErrorCode.CONFIG_INVALID)
         return config
 
     def create_engine(
@@ -189,7 +201,7 @@ class EngineRegistry:
             EngineDescription(
                 engine=engine,
                 description=_engine_description(registration.engine_type),
-                supported_strategy=registration.supported_strategy,
+                supported_strategies=registration.supported_strategies,
                 configuration_schema=registration.config_type.model_json_schema(),
             )
             for engine, registration in self._registrations.items()
@@ -217,7 +229,7 @@ class _Registration:
     config_type: type[EngineConfig[StrictDomainModel]]
     resources_type: object
     resources: object
-    supported_strategy: EntityProcessingStrategy
+    supported_strategies: frozenset[EntityProcessingStrategy]
 
 
 def _engine_discriminator(

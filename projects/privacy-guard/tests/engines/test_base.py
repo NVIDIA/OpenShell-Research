@@ -34,7 +34,12 @@ class _Resources:
 
 
 class _CustomEngine(EntityProcessingEngine[_Config, _Resources]):
-    supported_strategy = EntityProcessingStrategy.REPLACE
+    supported_strategies = frozenset(
+        {
+            EntityProcessingStrategy.DETECT,
+            EntityProcessingStrategy.REPLACE,
+        }
+    )
 
     def _run(
         self,
@@ -116,7 +121,7 @@ def test_detection_confidence_and_metadata_are_strict_bounded_values() -> None:
 
 
 class _DetectOnlyEngine(EntityProcessingEngine[_Config, None]):
-    supported_strategy = EntityProcessingStrategy.DETECT
+    supported_strategies = frozenset({EntityProcessingStrategy.DETECT})
 
     def _run(
         self,
@@ -139,8 +144,38 @@ def test_detect_only_engine_rejects_replacement_before_running() -> None:
         )
 
 
+class _ReplaceOnlyEngine(EntityProcessingEngine[_Config, None]):
+    supported_strategies = frozenset({EntityProcessingStrategy.REPLACE})
+
+    def _run(
+        self,
+        text: str,
+        *,
+        strategy: EntityProcessingStrategy,
+        timeout: Timeout,
+    ) -> TextProcessingResult:
+        del strategy, timeout
+        return TextProcessingResult(text=text, detections=())
+
+
+def test_replace_only_engine_rejects_detection_before_running() -> None:
+    engine = _ReplaceOnlyEngine(_Config(replacement=_Replacement()), None)
+
+    with pytest.raises(EngineContractError):
+        engine.run(
+            "text",
+            strategy=EntityProcessingStrategy.DETECT,
+            timeout=Timeout.from_seconds(1),
+        )
+
+
 class _MutatingDetectEngine(EntityProcessingEngine[_Config, None]):
-    supported_strategy = EntityProcessingStrategy.REPLACE
+    supported_strategies = frozenset(
+        {
+            EntityProcessingStrategy.DETECT,
+            EntityProcessingStrategy.REPLACE,
+        }
+    )
 
     def _run(
         self,
@@ -167,7 +202,7 @@ def test_detection_strategy_rejects_mutated_text() -> None:
 
 
 class _InvalidSpanEngine(EntityProcessingEngine[_Config, None]):
-    supported_strategy = EntityProcessingStrategy.DETECT
+    supported_strategies = frozenset({EntityProcessingStrategy.DETECT})
 
     def _run(
         self,

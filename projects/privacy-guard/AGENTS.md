@@ -97,7 +97,7 @@ class KeywordConfig(EngineConfig[KeywordReplacement]):
 
 
 class KeywordEngine(EntityProcessingEngine[KeywordConfig, None]):
-    supported_strategy = EntityProcessingStrategy.DETECT
+    supported_strategies = frozenset({EntityProcessingStrategy.DETECT})
 
     def _run(
         self,
