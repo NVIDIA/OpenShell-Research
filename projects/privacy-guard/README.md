@@ -194,32 +194,33 @@ release its scanner slot until its synchronous worker really exits.
 ## Updating the OpenShell protocol
 
 Privacy Guard uses
-[`middleware-kit`](../middleware-kit/README.md) to keep its checked-in
-OpenShell protocol and generated Python bindings aligned with a released
-OpenShell version. Install the repository's local copy as the `mkit` tool:
+[`openshell-middleware-kit`](../openshell-middleware-kit/README.md) to keep its
+checked-in OpenShell protocol and generated Python bindings aligned with a
+released OpenShell version. Install the repository's local copy as the `omkit`
+tool:
 
 ```bash
-uv tool install --force ../middleware-kit
+uv tool install --force ../openshell-middleware-kit
 ```
 
 From this directory, update to the latest OpenShell release with:
 
 ```bash
-mkit update
+omkit update
 ```
 
 For a reproducible update to a specific release, pin the version:
 
 ```bash
-mkit update --openshell-version v0.0.90
+omkit update --openshell-version v0.0.90
 ```
 
 The updater works on a validated temporary copy and replaces only
 `proto/supervisor_middleware.proto`, `src/privacy_guard/bindings/`, `uv.lock`,
-and `middleware-dev-manifest.json`. The manifest records the selected OpenShell
-release, protocol source and checksum, and `middleware-kit` version. Review all
-generated changes, then run `make check`; never edit generated bindings by
-hand.
+and `.openshell-middleware-manifest.json`. The manifest records the selected
+OpenShell release, protocol source and checksum, and
+`openshell-middleware-kit` version. Review all generated changes, then run
+`make check`; never edit generated bindings by hand.
 
 ## Notes for implementers
 
