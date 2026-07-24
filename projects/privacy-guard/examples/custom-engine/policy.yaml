@@ -1,0 +1,56 @@
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_only: [/usr, /lib, /proc, /dev/urandom, /app, /etc, /var/log]
+  read_write: [/sandbox, /tmp, /dev/null]
+landlock:
+  compatibility: best_effort
+process:
+  run_as_user: sandbox
+  run_as_group: sandbox
+
+network_policies:
+  claude_code:
+    name: Claude Code subscription access
+    endpoints:
+      - host: api.anthropic.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - host: platform.claude.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        access: full
+      - host: claude.ai
+        port: 443
+      - { host: statsig.anthropic.com, port: 443 }
+      - { host: sentry.io, port: 443 }
+    binaries:
+      - { path: /usr/local/bin/claude }
+      - { path: /usr/bin/node }
+
+network_middlewares:
+  privacy_guard_replace:
+    name: Replace confidential project names
+    middleware: privacy-guard-custom-engine
+    order: 0
+    config:
+      entity_processing:
+        stages:
+          - name: project-names
+            config:
+              engine: keyword-tool
+              entity: confidential-project
+              keyword: Project Cobalt
+              replacement:
+                strategy: token
+                token: "[confidential-project]"
+      on_detection:
+        action: replace
+    on_error: fail_closed
+    endpoints:
+      include:
+        - api.anthropic.com

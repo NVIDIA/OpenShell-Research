@@ -1,0 +1,13 @@
+{
+  "openshell_version": "v0.0.90",
+  "proto_source": "https://raw.githubusercontent.com/NVIDIA/OpenShell/v0.0.90/proto/supervisor_middleware.proto",
+  "proto_sha256": "e9d5a992ff5b50a33e9625176aaf6df8496d6774aa2ef3afe5cae7bc83c01105",
+  "languages": [
+    "python"
+  ],
+  "python_package": "privacy_guard",
+  "generator": {
+    "name": "openshell-middleware-kit",
+    "version": "0.1.0"
+  }
+}

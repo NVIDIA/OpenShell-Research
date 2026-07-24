@@ -1,0 +1,12 @@
+entity_processing:
+  stages:
+    - name: project-names
+      config:
+        engine: keyword-tool
+        entity: confidential-project
+        keyword: Project Cobalt
+        replacement:
+          strategy: token
+          token: "[confidential-project]"
+on_detection:
+  action: replace

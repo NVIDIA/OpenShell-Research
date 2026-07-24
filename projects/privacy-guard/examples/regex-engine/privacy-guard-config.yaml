@@ -1,0 +1,11 @@
+entity_processing:
+  stages:
+    - name: identifiers
+      config:
+        engine: regex
+        pattern_catalog: patterns.yaml
+        replacement:
+          strategy: template
+          template: "[{entity}]"
+on_detection:
+  action: replace

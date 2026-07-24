@@ -21,7 +21,17 @@ nav = [
     ]}
   ]},
   {"Documentation" = [
-    "documentation/index.md"
+    "documentation/index.md",
+    {"Privacy Guard" = [
+      {"Architecture" = [
+        "documentation/privacy-guard/architecture/index.md",
+        {"Request lifecycle" = "documentation/privacy-guard/architecture/request-lifecycle.md"},
+        {"Entity-processing engines" = "documentation/privacy-guard/architecture/entity-processing-engines.md"},
+        {"Configuration and text boundary" = "documentation/privacy-guard/architecture/configuration.md"},
+        {"Service boundary" = "documentation/privacy-guard/architecture/service-boundary.md"},
+        {"Safety and limits" = "documentation/privacy-guard/architecture/safety-and-limits.md"}
+      ]}
+    ]}
   ]}
 ]
 

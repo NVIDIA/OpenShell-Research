@@ -20,6 +20,8 @@ read `docs/development/index.md`.
 ## Repository rules
 
 - Make the smallest change that satisfies the task and preserve unrelated work.
+- Prefer explicit, clear names and language over concise but ambiguous
+  alternatives. Value concision when it does not reduce clarity.
 - Use `uv` for Python dependency management, environments, locking, builds, and
   command execution unless a project explicitly documents an exception. Treat
   `pyproject.toml` and the committed `uv.lock` as the dependency sources of truth.
