@@ -191,10 +191,11 @@ Custom engines should:
 - return the exact `TextProcessingResult` contract
 - keep request data local to `_run()`
 - keep initialized state immutable and make resources concurrency-safe
-- pass the shared remaining timeout to delegated APIs
+- pass the shared remaining timeout to delegated APIs when they support it
 - fail the stage on native partial failure
-- check applicable bounds before allocating output proportional to input or
-  detections
+- use `TextProcessingResult.from_detections()` to bound lazy detection streams
+- add manual bounds only when a low-level collaborator allocates proportional
+  output before Privacy Guard can consume it
 - translate expected collaborator failures to the content-safe engine
   exception hierarchy
 - avoid logging input or caught exception text

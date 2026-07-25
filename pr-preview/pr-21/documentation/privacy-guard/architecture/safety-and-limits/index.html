@@ -1561,10 +1561,11 @@ emits a warning; use it only in a controlled development environment.</p>
 <li>return the exact <code>TextProcessingResult</code> contract</li>
 <li>keep request data local to <code>_run()</code></li>
 <li>keep initialized state immutable and make resources concurrency-safe</li>
-<li>pass the shared remaining timeout to delegated APIs</li>
+<li>pass the shared remaining timeout to delegated APIs when they support it</li>
 <li>fail the stage on native partial failure</li>
-<li>check applicable bounds before allocating output proportional to input or
-  detections</li>
+<li>use <code>TextProcessingResult.from_detections()</code> to bound lazy detection streams</li>
+<li>add manual bounds only when a low-level collaborator allocates proportional
+  output before Privacy Guard can consume it</li>
 <li>translate expected collaborator failures to the content-safe engine
   exception hierarchy</li>
 <li>avoid logging input or caught exception text</li>
