@@ -5,7 +5,6 @@ from __future__ import annotations
 from privacy_guard.engines.base import (
     BoundedMetadata,
     ConfidenceLevel,
-    DetectionConfidence,
     EngineConfig,
     EngineResources,
     EntityDetection,
@@ -13,7 +12,6 @@ from privacy_guard.engines.base import (
     EntityProcessingEngine,
     EntityProcessingStrategy,
     TextProcessingResult,
-    UnitInterval,
 )
 from privacy_guard.engines.regex import (
     RegexEngine,
@@ -34,7 +32,6 @@ from privacy_guard.errors import (
 __all__ = [
     "BoundedMetadata",
     "ConfidenceLevel",
-    "DetectionConfidence",
     "EngineConfig",
     "EngineConfigurationError",
     "EngineContractError",
@@ -53,5 +50,4 @@ __all__ = [
     "RegexPatternCatalog",
     "RegexReplacement",
     "TextProcessingResult",
-    "UnitInterval",
 ]

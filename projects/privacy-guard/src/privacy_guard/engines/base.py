@@ -61,17 +61,6 @@ class ConfidenceLevel(StrEnum):
     HIGH = "high"
 
 
-def _parse_unit_interval(value: object) -> float:
-    if isinstance(value, bool) or not isinstance(value, int | float):
-        raise ValueError("confidence must be a number from zero through one")
-    result = float(value)
-    if not 0.0 <= result <= 1.0:
-        raise ValueError("confidence must be a number from zero through one")
-    return result
-
-
-UnitInterval = Annotated[float, BeforeValidator(_parse_unit_interval)]
-DetectionConfidence: TypeAlias = ConfidenceLevel | UnitInterval
 EntityName = Annotated[str, BeforeValidator(validate_bounded_metadata_string)]
 MetadataString = Annotated[str, BeforeValidator(validate_bounded_metadata_string)]
 BoundedMetadata: TypeAlias = Mapping[MetadataString, MetadataString]
@@ -83,7 +72,7 @@ class EntityDetection(StrictDomainModel):
     entity: EntityName
     start: int = Field(ge=0)
     end: int
-    confidence: DetectionConfidence | None = None
+    confidence: ConfidenceLevel | None = None
     metadata: BoundedMetadata = Field(default_factory=dict, repr=False)
 
     @field_validator("confidence", mode="before")
@@ -368,7 +357,6 @@ def _validate_result(
 __all__ = [
     "BoundedMetadata",
     "ConfidenceLevel",
-    "DetectionConfidence",
     "EngineConfig",
     "EngineConfigurationError",
     "EngineContractError",
@@ -381,5 +369,4 @@ __all__ = [
     "EntityProcessingError",
     "EntityProcessingStrategy",
     "TextProcessingResult",
-    "UnitInterval",
 ]

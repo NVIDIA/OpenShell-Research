@@ -18,7 +18,7 @@ from typing_extensions import override
 
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
 from privacy_guard.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
-from privacy_guard.config import FinalizedPrivacyGuardConfig, configuration_fingerprint
+from privacy_guard.config import PrivacyGuardConfig, configuration_fingerprint
 from privacy_guard.constants import (
     BLOCK_REASON,
     BLOCK_REASON_CODE,
@@ -33,7 +33,7 @@ from privacy_guard.constants import (
     SERVICE_VERSION,
 )
 from privacy_guard.engine_registry import EngineRegistry
-from privacy_guard.engines import ConfidenceLevel
+from privacy_guard.engines import EngineConfig
 from privacy_guard.errors import (
     EngineRegistryError,
     ErrorCode,
@@ -261,7 +261,7 @@ class _RequestProcessorCache:
 
     def _build_processor(
         self,
-        config: FinalizedPrivacyGuardConfig,
+        config: PrivacyGuardConfig[EngineConfig],
     ) -> RequestProcessor:
         stages = tuple(
             (
@@ -365,12 +365,7 @@ def _result_to_proto(result: RequestProcessingResult) -> pb2.HttpRequestResult:
 
 def _detection_to_proto(detection: EntityDetectionSummary) -> pb2.Finding:
     confidence = detection.confidence
-    if isinstance(confidence, ConfidenceLevel):
-        confidence_text = confidence.value
-    elif confidence is None:
-        confidence_text = ""
-    else:
-        confidence_text = format(confidence, ".12g")
+    confidence_text = confidence.value if confidence is not None else ""
     result = pb2.Finding(
         type="detected_entity",
         label=f"{detection.entity} ({detection.source_stage})",

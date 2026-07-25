@@ -12,9 +12,8 @@ from pydantic import TypeAdapter
 from pydantic_core import PydanticUndefined
 
 from privacy_guard.config import (
-    FinalizedPrivacyGuardConfig,
-    FinalizedPrivacyGuardConfigType,
     PolicyAction,
+    PrivacyGuardConfig,
     build_privacy_guard_config_type,
     parse_privacy_guard_config,
 )
@@ -37,7 +36,7 @@ from privacy_guard.errors import (
 class EngineDescription:
     """Safe discovery metadata for one registered engine."""
 
-    engine: str
+    engine_name: str
     description: str
     supported_strategies: frozenset[EntityProcessingStrategy]
     configuration_schema: dict[str, object]
@@ -48,8 +47,10 @@ class EngineRegistry:
 
     def __init__(self, *, include_builtin_engines: bool = False) -> None:
         self._registrations: dict[str, _Registration] = {}
-        self._config_type: FinalizedPrivacyGuardConfigType | None = None
-        self._config_adapter: TypeAdapter[FinalizedPrivacyGuardConfig] | None = None
+        self._config_type: type[PrivacyGuardConfig[EngineConfig]] | None = None
+        self._config_adapter: TypeAdapter[PrivacyGuardConfig[EngineConfig]] | None = (
+            None
+        )
         if include_builtin_engines:
             self.register(RegexEngine)
 
@@ -62,13 +63,13 @@ class EngineRegistry:
         return tuple(self._registrations)
 
     @property
-    def config_type(self) -> FinalizedPrivacyGuardConfigType:
+    def config_type(self) -> type[PrivacyGuardConfig[EngineConfig]]:
         if self._config_type is None:
             raise EngineRegistryError("engine registry is not finalized")
         return self._config_type
 
     @property
-    def config_adapter(self) -> TypeAdapter[FinalizedPrivacyGuardConfig]:
+    def config_adapter(self) -> TypeAdapter[PrivacyGuardConfig[EngineConfig]]:
         if self._config_adapter is None:
             raise EngineRegistryError("engine registry is not finalized")
         return self._config_adapter
@@ -170,7 +171,7 @@ class EngineRegistry:
         self._config_adapter = TypeAdapter(config_type)
         return self
 
-    def validate_config(self, values: object) -> FinalizedPrivacyGuardConfig:
+    def validate_config(self, values: object) -> PrivacyGuardConfig[EngineConfig]:
         """Purely parse and validate an expanded Privacy Guard configuration."""
         config = parse_privacy_guard_config(self.config_adapter, values)
         required_strategy = (
@@ -212,7 +213,7 @@ class EngineRegistry:
         """Return safe engine metadata without constructing runtime engines."""
         return tuple(
             EngineDescription(
-                engine=engine,
+                engine_name=engine,
                 description=_engine_description(registration.engine_type),
                 supported_strategies=registration.supported_strategies,
                 configuration_schema=registration.config_type.model_json_schema(),

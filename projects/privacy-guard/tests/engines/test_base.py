@@ -56,7 +56,7 @@ class _CustomEngine(EntityProcessingEngine[_Config, _Resources]):
             entity="token",
             start=0,
             end=len(text),
-            confidence=0.75,
+            confidence=ConfidenceLevel.HIGH,
             metadata={"provider": "custom"},
         )
         output = (
@@ -105,22 +105,16 @@ def test_detection_confidence_and_metadata_are_strict_bounded_values() -> None:
             "metadata": {"pattern": "email.patterns[0]"},
         }
     )
-    numeric = EntityDetection(
-        entity="email",
-        start=0,
-        end=1,
-        confidence=0.25,
-    )
-
     assert categorical.confidence is ConfidenceLevel.HIGH
-    assert numeric.confidence == 0.25
     assert type(categorical.metadata).__name__ == "mappingproxy"
     with pytest.raises(ValidationError):
-        EntityDetection(
-            entity="email",
-            start=0,
-            end=1,
-            confidence=1.01,
+        EntityDetection.model_validate(
+            {
+                "entity": "email",
+                "start": 0,
+                "end": 1,
+                "confidence": 0.25,
+            }
         )
 
 

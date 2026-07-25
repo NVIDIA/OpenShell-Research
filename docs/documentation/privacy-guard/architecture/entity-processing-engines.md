@@ -141,7 +141,7 @@ Each `EntityDetection` contains:
 | `entity` | Bounded entity label |
 | `start` | Inclusive Unicode code-point offset in the stage input |
 | `end` | Exclusive Unicode code-point offset in the stage input |
-| `confidence` | Optional `low`, `medium`, `high`, or strict value from 0 through 1 |
+| `confidence` | Optional `low`, `medium`, or `high` certainty |
 | `metadata` | Optional bounded engine-specific attribution retained inside the processing boundary |
 
 A detection span is non-empty and must fall within the stage input. The public
@@ -154,9 +154,8 @@ successful return is the engine's authoritative completed result. Text may not
 change without at least one detection. Engines must raise on native partial
 failure instead of returning partial output.
 
-Confidence remains in the representation supplied by the engine. Privacy Guard
-does not invent numeric values for categorical confidence or compare confidence
-across engines.
+Privacy Guard preserves categorical confidence as supplied by the engine and
+does not compare confidence across engines.
 
 ## Custom engine example
 
@@ -302,7 +301,7 @@ Test engines without gRPC:
 - detection-only immutability
 - replacement behavior and native partial failure
 - Unicode offsets and invalid spans
-- categorical and numeric confidence
+- categorical confidence
 - output and detection limits
 - timeout propagation and expiration
 - deterministic ordering where relevant

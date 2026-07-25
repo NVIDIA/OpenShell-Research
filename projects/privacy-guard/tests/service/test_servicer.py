@@ -10,7 +10,9 @@ from google.protobuf import json_format
 from google.protobuf.message import Message
 
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
+from privacy_guard.config import PrivacyGuardConfig
 from privacy_guard.engine_registry import create_builtin_registry
+from privacy_guard.engines import EngineConfig
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
 from privacy_guard.request_processor import RequestProcessor
 from privacy_guard.service import servicer as servicer_module
@@ -147,7 +149,7 @@ def test_evaluation_revalidates_configuration_before_reusing_cached_processor(
     def record_validation(
         registry: servicer_module.EngineRegistry,
         values: object,
-    ) -> servicer_module.FinalizedPrivacyGuardConfig:
+    ) -> PrivacyGuardConfig[EngineConfig]:
         nonlocal validation_count
         validation_count += 1
         return original_validate(registry, values)

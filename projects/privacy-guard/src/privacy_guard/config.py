@@ -13,7 +13,7 @@ from enum import StrEnum
 from functools import reduce
 from hashlib import sha256
 from operator import or_
-from typing import Annotated, Generic, Self, TypeAlias, TypeVar
+from typing import Annotated, Generic, Self, TypeVar
 
 from pydantic import (
     Field,
@@ -80,7 +80,7 @@ class EntityProcessingStage(
         return f"{engine}[{stage_number}]"
 
 
-class EntityProcessing(
+class EntityProcessingStages(
     StrictDomainModel,
     Generic[_EngineConfigT],
 ):
@@ -112,17 +112,13 @@ class PrivacyGuardConfig(
 ):
     """Complete validated Privacy Guard behavior for one OpenShell policy."""
 
-    entity_processing: EntityProcessing[_EngineConfigT] = Field(repr=False)
+    entity_processing: EntityProcessingStages[_EngineConfigT] = Field(repr=False)
     on_detection: OnDetection = Field(repr=False)
-
-
-FinalizedPrivacyGuardConfig: TypeAlias = PrivacyGuardConfig[EngineConfig]
-FinalizedPrivacyGuardConfigType = type[FinalizedPrivacyGuardConfig]
 
 
 def build_privacy_guard_config_type(
     config_types: Sequence[type[EngineConfig]],
-) -> FinalizedPrivacyGuardConfigType:
+) -> type[PrivacyGuardConfig[EngineConfig]]:
     """Build the exact registry-dependent discriminated policy model."""
     if not config_types:
         raise ValueError("at least one engine config type must be registered")
@@ -143,16 +139,16 @@ def build_privacy_guard_config_type(
 
 def build_privacy_guard_config_adapter(
     config_types: Sequence[type[EngineConfig]],
-) -> TypeAdapter[FinalizedPrivacyGuardConfig]:
+) -> TypeAdapter[PrivacyGuardConfig[EngineConfig]]:
     """Build the registry-dependent adapter used for validation and schemas."""
     config_type = build_privacy_guard_config_type(config_types)
     return TypeAdapter(config_type)
 
 
 def parse_privacy_guard_config(
-    adapter: TypeAdapter[FinalizedPrivacyGuardConfig],
+    adapter: TypeAdapter[PrivacyGuardConfig[EngineConfig]],
     values: object,
-) -> FinalizedPrivacyGuardConfig:
+) -> PrivacyGuardConfig[EngineConfig]:
     """Parse an expanded mapping without exposing rejected values in errors."""
     if not isinstance(values, Mapping):
         raise PrivacyGuardError(ErrorCode.CONFIG_INVALID)
@@ -183,10 +179,8 @@ def configuration_fingerprint(
 
 
 __all__ = [
-    "EntityProcessing",
     "EntityProcessingStage",
-    "FinalizedPrivacyGuardConfig",
-    "FinalizedPrivacyGuardConfigType",
+    "EntityProcessingStages",
     "OnDetection",
     "PolicyAction",
     "PrivacyGuardConfig",

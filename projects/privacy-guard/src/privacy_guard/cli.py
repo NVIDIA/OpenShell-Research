@@ -102,7 +102,9 @@ def engines(context: typer.Context) -> None:
             for strategy in EntityProcessingStrategy
             if strategy in description.supported_strategies
         )
-        typer.echo(f"{description.engine}\t{strategies}\t{description.description}")
+        typer.echo(
+            f"{description.engine_name}\t{strategies}\t{description.description}"
+        )
 
 
 _LOGGER = logging.getLogger(__name__)

@@ -12,7 +12,7 @@ from typing import Protocol
 from pydantic import Field
 
 from privacy_guard.base import StrictDomainModel
-from privacy_guard.config import FinalizedPrivacyGuardConfig, PolicyAction
+from privacy_guard.config import PolicyAction, PrivacyGuardConfig
 from privacy_guard.constants import (
     BLOCK_REASON_CODE,
     DEFAULT_TIMEOUT_SECONDS,
@@ -23,7 +23,8 @@ from privacy_guard.constants import (
     MAX_TIMEOUT_SECONDS,
 )
 from privacy_guard.engines import (
-    DetectionConfidence,
+    ConfidenceLevel,
+    EngineConfig,
     EntityProcessingStrategy,
     TextProcessingResult,
 )
@@ -50,7 +51,7 @@ class EntityDetectionSummary(StrictDomainModel):
 
     entity: str
     source_stage: str
-    confidence: DetectionConfidence | None = None
+    confidence: ConfidenceLevel | None = None
     count: int = Field(ge=1)
 
 
@@ -68,7 +69,7 @@ class RequestProcessor:
 
     def __init__(
         self,
-        config: FinalizedPrivacyGuardConfig,
+        config: PrivacyGuardConfig[EngineConfig],
         stages: Sequence[tuple[str, _RunnableEngine]],
         *,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
@@ -96,7 +97,7 @@ class RequestProcessor:
         self._log_request_content = log_request_content
 
     @property
-    def config(self) -> FinalizedPrivacyGuardConfig:
+    def config(self) -> PrivacyGuardConfig[EngineConfig]:
         """Return the exact validated configuration retained by this processor."""
         return self._config
 
@@ -184,7 +185,7 @@ def _aggregate_detections(
     stage_results: Sequence[tuple[str, TextProcessingResult]],
 ) -> tuple[EntityDetectionSummary, ...]:
     groups: OrderedDict[
-        tuple[str, str, DetectionConfidence | None],
+        tuple[str, str, ConfidenceLevel | None],
         int,
     ] = OrderedDict()
     for source, result in stage_results:

@@ -118,7 +118,7 @@ def test_builtin_registry_contains_the_builtin_regex_engine() -> None:
     assert registry.is_finalized is True
     assert registry.engine_names == ("regex",)
     description = registry.describe_engines()[0]
-    assert description.engine == "regex"
+    assert description.engine_name == "regex"
     assert description.supported_strategies == frozenset(
         {
             EntityProcessingStrategy.DETECT,
@@ -280,7 +280,7 @@ def test_describe_does_not_construct_an_engine() -> None:
     descriptions = registry.describe_engines()
 
     assert CountingEngine.initialized == 0
-    assert descriptions[0].engine == "detect-only"
+    assert descriptions[0].engine_name == "detect-only"
     assert descriptions[0].supported_strategies == frozenset(
         {EntityProcessingStrategy.DETECT}
     )
