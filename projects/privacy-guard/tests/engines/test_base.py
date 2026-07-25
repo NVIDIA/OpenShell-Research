@@ -9,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from privacy_guard.base import StrictDomainModel
+from privacy_guard.constants import MAX_DETECTIONS_PER_STAGE
 from privacy_guard.engines import (
     ConfidenceLevel,
     EngineConfig,
@@ -135,6 +136,37 @@ def test_processing_result_bounds_a_lazy_detection_stream() -> None:
         )
 
     assert produced == 257
+
+
+class _OversizedResultEngine(EntityProcessingEngine[_Config]):
+    supported_strategies = frozenset({EntityProcessingStrategy.DETECT})
+
+    def _run(
+        self,
+        text: str,
+        *,
+        strategy: EntityProcessingStrategy,
+        timeout: Timeout,
+    ) -> TextProcessingResult:
+        del strategy, timeout
+        return TextProcessingResult(
+            text=text,
+            detections=tuple(
+                EntityDetection(entity="token", start=0, end=1)
+                for _ in range(MAX_DETECTIONS_PER_STAGE + 1)
+            ),
+        )
+
+
+def test_engine_boundary_bounds_results_built_without_lazy_helper() -> None:
+    engine = _OversizedResultEngine(_Config(), None)
+
+    with pytest.raises(EngineLimitExceededError):
+        engine.run(
+            "text",
+            strategy=EntityProcessingStrategy.DETECT,
+            timeout=Timeout.from_seconds(1),
+        )
 
 
 class _DetectOnlyEngine(EntityProcessingEngine[_Config]):

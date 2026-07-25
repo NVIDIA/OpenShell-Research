@@ -100,8 +100,9 @@ Custom engines are a first-class extension point. Authors declare one typed
 config, optional typed resources, `supported_strategies`, and `_run`. They do not
 write `__init__`; `_initialize` is optional, and `@override` is not required.
 The public wrapper validates strategy support, input, timeout, spans, output
-size, mutation behavior, and result cardinality. Lazy detection streams use
-`TextProcessingResult.from_detections()` for bounded materialization.
+size, mutation behavior, and result cardinality for every returned result.
+`TextProcessingResult.from_detections()` is an optional safe materializer for
+lazy detection streams, not the enforcement boundary.
 
 Resource-backed engines define an `EngineResources` subclass containing their
 operator-owned runtime dependencies. Resource bundles may contain initialized

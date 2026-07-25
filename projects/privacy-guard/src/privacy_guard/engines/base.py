@@ -119,7 +119,7 @@ class TextProcessingResult(StrictDomainModel):
         text: str,
         detections: Iterable[EntityDetection],
     ) -> Self:
-        """Build a result while bounding a lazily produced detection stream."""
+        """Safely materialize a lazy stream; ``run()`` still validates the result."""
         bounded: list[EntityDetection] = []
         for detection in detections:
             if len(bounded) >= MAX_DETECTIONS_PER_STAGE:

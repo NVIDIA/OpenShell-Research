@@ -145,9 +145,11 @@ Each `EntityDetection` contains:
 | `metadata` | Optional bounded engine-specific attribution retained inside the processing boundary |
 
 A detection span is non-empty and must fall within the stage input. The public
-wrapper also enforces stage detection and output-size limits. Engines that
-produce detections lazily should use `TextProcessingResult.from_detections()`;
-it stops consuming the iterable as soon as the stage limit is exceeded.
+wrapper independently enforces stage detection and output-size limits for every
+returned result. Engines that produce detections lazily should use
+`TextProcessingResult.from_detections()`; this optional convenience stops
+consuming the iterable as soon as the stage limit is exceeded, but it is not
+the enforcement boundary.
 
 For `DETECT`, output text must exactly equal input text. For `REPLACE`, a
 successful return is the engine's authoritative completed result. Text may not
