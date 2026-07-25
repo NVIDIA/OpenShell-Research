@@ -1378,9 +1378,11 @@ the strategy, never the user-facing <code>PolicyAction</code>.</p>
 </tbody>
 </table>
 <p>A detection span is non-empty and must fall within the stage input. The public
-wrapper also enforces stage detection and output-size limits. Engines that
-produce detections lazily should use <code>TextProcessingResult.from_detections()</code>;
-it stops consuming the iterable as soon as the stage limit is exceeded.</p>
+wrapper independently enforces stage detection and output-size limits for every
+returned result. Engines that produce detections lazily should use
+<code>TextProcessingResult.from_detections()</code>; this optional convenience stops
+consuming the iterable as soon as the stage limit is exceeded, but it is not
+the enforcement boundary.</p>
 <p>For <code>DETECT</code>, output text must exactly equal input text. For <code>REPLACE</code>, a
 successful return is the engine's authoritative completed result. Text may not
 change without at least one detection. Engines must raise on native partial
