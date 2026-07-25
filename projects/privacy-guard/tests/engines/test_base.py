@@ -13,14 +13,15 @@ from privacy_guard.engines import (
     ConfidenceLevel,
     EngineConfig,
     EngineContractError,
-    EngineLimitExceeded,
+    EngineLimitExceededError,
     EngineResources,
     EntityDetection,
     EntityProcessingEngine,
     EntityProcessingStrategy,
     TextProcessingResult,
 )
-from privacy_guard.timeout import Timeout, TimeoutExpired
+from privacy_guard.errors import TimeoutExpiredError
+from privacy_guard.timeout import Timeout
 
 
 class _Replacement(StrictDomainModel):
@@ -127,7 +128,7 @@ def test_processing_result_bounds_a_lazy_detection_stream() -> None:
             produced += 1
             yield EntityDetection(entity="token", start=index, end=index + 1)
 
-    with pytest.raises(EngineLimitExceeded):
+    with pytest.raises(EngineLimitExceededError):
         TextProcessingResult.from_detections(
             text="x" * 1_000,
             detections=detections(),
@@ -257,5 +258,5 @@ def test_timeout_duration_is_strict_positive_and_bounded(
 def test_expired_timeout_raises_typed_signal() -> None:
     timeout = Timeout(deadline=monotonic() - 1)
 
-    with pytest.raises(TimeoutExpired):
+    with pytest.raises(TimeoutExpiredError):
         timeout.raise_if_expired()

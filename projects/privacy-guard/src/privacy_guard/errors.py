@@ -98,8 +98,12 @@ class EngineExecutionError(EntityProcessingError):
     """An engine's configured runtime failed to complete one text input."""
 
 
-class EngineLimitExceeded(EntityProcessingError):
+class EngineLimitExceededError(EntityProcessingError):
     """An engine exceeded a bounded configuration or output limit."""
+
+
+class TimeoutExpiredError(EntityProcessingError):
+    """The shared entity-processing timeout expired."""
 
 
 class EngineRegistryError(Exception):

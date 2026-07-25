@@ -44,10 +44,11 @@ from privacy_guard.engines.base import (
 from privacy_guard.errors import (
     EngineConfigurationError,
     EngineContractError,
-    EngineLimitExceeded,
+    EngineLimitExceededError,
+    TimeoutExpiredError,
 )
 from privacy_guard.string_validators import ScalarString, validate_scalar_string
-from privacy_guard.timeout import Timeout, TimeoutExpired
+from privacy_guard.timeout import Timeout
 
 
 class RegexPattern(StrictDomainModel):
@@ -262,12 +263,12 @@ class RegexEngine(EntityProcessingEngine[RegexEngineConfig]):
                     )
                     detections_with_identity.append((detection, rule.pattern_identity))
                     if len(detections_with_identity) > MAX_DETECTIONS_PER_STAGE:
-                        raise EngineLimitExceeded(
+                        raise EngineLimitExceededError(
                             "regex detection count exceeds the limit"
                         )
                     next_position = start + 1
         except TimeoutError:
-            raise TimeoutExpired from None
+            raise TimeoutExpiredError from None
 
         detections_with_identity.sort(
             key=lambda item: (
@@ -641,11 +642,11 @@ def _render_bounded_replacement(
         projected_size += len(text[cursor : detection.start].encode("utf-8"))
         projected_size += _rendered_template_size(template, detection.entity)
         if projected_size > MAX_BODY_BYTES:
-            raise EngineLimitExceeded("regex replacement exceeds the size limit")
+            raise EngineLimitExceededError("regex replacement exceeds the size limit")
         cursor = detection.end
     projected_size += len(text[cursor:].encode("utf-8"))
     if projected_size > MAX_BODY_BYTES:
-        raise EngineLimitExceeded("regex replacement exceeds the size limit")
+        raise EngineLimitExceededError("regex replacement exceeds the size limit")
 
     parts: list[str] = []
     cursor = 0

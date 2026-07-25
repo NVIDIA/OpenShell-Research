@@ -29,13 +29,14 @@ from privacy_guard.engines import (
 )
 from privacy_guard.errors import (
     EngineContractError,
-    EngineLimitExceeded,
+    EngineLimitExceededError,
     EntityProcessingError,
     ErrorCode,
     PrivacyGuardError,
+    TimeoutExpiredError,
 )
 from privacy_guard.string_validators import validate_scalar_string
-from privacy_guard.timeout import Timeout, TimeoutExpired
+from privacy_guard.timeout import Timeout
 
 
 class RequestDecision(StrEnum):
@@ -128,17 +129,21 @@ class RequestProcessor:
                     timeout=timeout,
                 )
                 if len(result.text.encode("utf-8")) > MAX_BODY_BYTES:
-                    raise EngineLimitExceeded("intermediate text exceeds the limit")
+                    raise EngineLimitExceededError(
+                        "intermediate text exceeds the limit"
+                    )
                 if (
                     sum(len(item.detections) for _, item in stage_results)
                     + len(result.detections)
                     > MAX_DETECTIONS_PER_REQUEST
                 ):
-                    raise EngineLimitExceeded("request detections exceed the limit")
+                    raise EngineLimitExceededError(
+                        "request detections exceed the limit"
+                    )
                 stage_results.append((source, result))
                 current_text = result.text
             timeout.raise_if_expired()
-        except (EngineLimitExceeded, TimeoutExpired):
+        except (EngineLimitExceededError, TimeoutExpiredError):
             return RequestProcessingResult(
                 decision=RequestDecision.DENY,
                 reason_code=LIMIT_REASON_CODE,

@@ -10,10 +10,7 @@ from pydantic import Field
 
 from privacy_guard.base import StrictDomainModel
 from privacy_guard.constants import MAX_TIMEOUT_SECONDS
-
-
-class TimeoutExpired(Exception):
-    """Signal that the shared entity-processing timeout has expired."""
+from privacy_guard.errors import TimeoutExpiredError
 
 
 class Timeout(StrictDomainModel):
@@ -35,15 +32,15 @@ class Timeout(StrictDomainModel):
         return cls(deadline=monotonic() + seconds)
 
     def remaining_seconds(self) -> float:
-        """Return the positive duration remaining or raise ``TimeoutExpired``."""
+        """Return the positive duration remaining or raise ``TimeoutExpiredError``."""
         remaining = self.deadline - monotonic()
         if remaining <= 0:
-            raise TimeoutExpired
+            raise TimeoutExpiredError
         return remaining
 
     def raise_if_expired(self) -> None:
-        """Raise ``TimeoutExpired`` when no time remains."""
+        """Raise ``TimeoutExpiredError`` when no time remains."""
         self.remaining_seconds()
 
 
-__all__ = ["Timeout", "TimeoutExpired"]
+__all__ = ["Timeout"]

@@ -8,12 +8,13 @@ from pydantic import ValidationError
 import privacy_guard.engines.regex as regex_module
 from privacy_guard.engines import (
     EngineConfigurationError,
-    EngineLimitExceeded,
+    EngineLimitExceededError,
     EntityProcessingStrategy,
     RegexEngine,
     RegexEngineConfig,
 )
-from privacy_guard.timeout import Timeout, TimeoutExpired
+from privacy_guard.errors import TimeoutExpiredError
+from privacy_guard.timeout import Timeout
 
 
 def _config(
@@ -223,7 +224,7 @@ def test_replacement_size_is_projected_before_rendering(
         replacement={"strategy": "template", "template": "[{entity}]"},
     )
 
-    with pytest.raises(EngineLimitExceeded):
+    with pytest.raises(EngineLimitExceededError):
         _run(config, "x", EntityProcessingStrategy.REPLACE)
 
 
@@ -231,7 +232,7 @@ def test_pattern_search_has_an_enforceable_timeout() -> None:
     config = _config([{"pattern": "(a+)+$", "confidence": "high"}])
     engine = RegexEngine(config, None)
 
-    with pytest.raises(TimeoutExpired):
+    with pytest.raises(TimeoutExpiredError):
         engine.run(
             "a" * 100_000 + "!",
             strategy=EntityProcessingStrategy.DETECT,

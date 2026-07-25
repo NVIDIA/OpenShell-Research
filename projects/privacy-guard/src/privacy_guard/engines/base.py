@@ -34,7 +34,7 @@ from privacy_guard.constants import (
 from privacy_guard.errors import (
     EngineConfigurationError,
     EngineContractError,
-    EngineLimitExceeded,
+    EngineLimitExceededError,
 )
 from privacy_guard.string_validators import (
     ScalarString,
@@ -123,7 +123,7 @@ class TextProcessingResult(StrictDomainModel):
         bounded: list[EntityDetection] = []
         for detection in detections:
             if len(bounded) >= MAX_DETECTIONS_PER_STAGE:
-                raise EngineLimitExceeded("engine returned too many detections")
+                raise EngineLimitExceededError("engine returned too many detections")
             bounded.append(detection)
         return cls(text=text, detections=tuple(bounded))
 
@@ -339,9 +339,9 @@ def _validate_result(
     if not isinstance(result, TextProcessingResult):
         raise EngineContractError("engine output is invalid")
     if len(result.detections) > MAX_DETECTIONS_PER_STAGE:
-        raise EngineLimitExceeded("engine returned too many detections")
+        raise EngineLimitExceededError("engine returned too many detections")
     if len(result.text.encode("utf-8")) > MAX_BODY_BYTES:
-        raise EngineLimitExceeded("engine output text exceeds the size limit")
+        raise EngineLimitExceededError("engine output text exceeds the size limit")
     for detection in result.detections:
         if detection.end > len(input_text):
             raise EngineContractError("engine detection span is invalid")

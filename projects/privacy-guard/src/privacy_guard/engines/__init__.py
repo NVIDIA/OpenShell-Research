@@ -25,7 +25,7 @@ from privacy_guard.errors import (
     EngineConfigurationError,
     EngineContractError,
     EngineExecutionError,
-    EngineLimitExceeded,
+    EngineLimitExceededError,
     EntityProcessingError,
 )
 
@@ -36,7 +36,7 @@ __all__ = [
     "EngineConfigurationError",
     "EngineContractError",
     "EngineExecutionError",
-    "EngineLimitExceeded",
+    "EngineLimitExceededError",
     "EngineResources",
     "EntityDetection",
     "EntityName",
