@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping
 from enum import StrEnum
+from itertools import islice
 from types import MappingProxyType
 from typing import (
     Annotated,
@@ -120,12 +121,10 @@ class TextProcessingResult(StrictDomainModel):
         detections: Iterable[EntityDetection],
     ) -> Self:
         """Safely materialize a lazy stream; ``run()`` still validates the result."""
-        bounded: list[EntityDetection] = []
-        for detection in detections:
-            if len(bounded) >= MAX_DETECTIONS_PER_STAGE:
-                raise EngineLimitExceededError("engine returned too many detections")
-            bounded.append(detection)
-        return cls(text=text, detections=tuple(bounded))
+        bounded = tuple(islice(detections, MAX_DETECTIONS_PER_STAGE + 1))
+        if len(bounded) > MAX_DETECTIONS_PER_STAGE:
+            raise EngineLimitExceededError("engine returned too many detections")
+        return cls(text=text, detections=bounded)
 
 
 class EngineConfig(StrictDomainModel):
