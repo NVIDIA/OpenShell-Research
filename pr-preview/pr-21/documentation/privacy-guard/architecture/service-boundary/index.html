@@ -1496,7 +1496,7 @@ cached processors then construct configured stage engines from that registry.
 Different middleware applications in the same process may intentionally use
 different engine inventories or runtime resources.</p>
 <p>Synchronous applications use:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.engine_registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_builtin_registry</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.engines.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_builtin_registry</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.service</span><span class="w"> </span><span class="kn">import</span> <span class="n">PrivacyGuardServer</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">server</span> <span class="o">=</span> <span class="n">PrivacyGuardServer</span><span class="p">(</span><span class="n">create_builtin_registry</span><span class="p">())</span>
