@@ -1507,6 +1507,8 @@ pattern set.</p>
 <li>each backend search receives the shared remaining timeout</li>
 <li>pattern names are optional; unnamed patterns receive deterministic
   diagnostic identities without changing serialized configuration</li>
+<li>catalogs may be supplied inline or through a bounded relative YAML path and
+  normalize to the same structured configuration</li>
 <li>replacement resolves overlaps by categorical confidence, span length,
   offsets, entity, and pattern identity</li>
 <li>templates allow literal text and <code>{entity}</code> only</li>

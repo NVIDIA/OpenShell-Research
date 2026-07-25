@@ -293,6 +293,8 @@ Important properties:
 - each backend search receives the shared remaining timeout
 - pattern names are optional; unnamed patterns receive deterministic
   diagnostic identities without changing serialized configuration
+- catalogs may be supplied inline or through a bounded relative YAML path and
+  normalize to the same structured configuration
 - replacement resolves overlaps by categorical confidence, span length,
   offsets, entity, and pattern identity
 - templates allow literal text and `{entity}` only

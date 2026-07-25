@@ -54,6 +54,9 @@ Source paths on these pages are relative to
   bounded worker scheduling, processor caching, and finding serialization.
   Outside generated `bindings/`, no other package imports gRPC or generated
   bindings.
+- `cli.py` owns command parsing, registry-factory loading, engine discovery,
+  schema output, logging options, and the adapter that starts the programmatic
+  server.
 - `request_processor.py` runs configured stages over one text value, shares one
   timeout across them, aggregates detections, and applies the user-facing
   policy action. It does not import gRPC or implement an engine's algorithms.
@@ -82,7 +85,7 @@ HttpRequestEvaluation protobuf
         v
 PrivacyGuardMiddleware
   validates phase and body size
-  validates expanded policy configuration
+  validates and normalizes policy configuration
   resolves or builds a cached RequestProcessor
   decodes a non-empty body as strict UTF-8
         |
@@ -150,8 +153,8 @@ representations.
 - There is no generic replacement field or replacement-strategy enum. Each
   engine owns any replacement settings appropriate to its underlying
   algorithm.
-- Runtime policy models do not accept catalog paths. Transparent file expansion
-  requires an upstream OpenShell policy-authoring feature.
+- Regex catalogs may be supplied inline or as bounded relative YAML paths
+  beneath Privacy Guard's working directory.
 
 ## Read next
 

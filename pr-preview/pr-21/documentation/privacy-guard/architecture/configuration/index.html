@@ -1126,8 +1126,8 @@
 
 <h1 id="configuration-and-text-boundary">Configuration and text boundary<a class="headerlink" href="#configuration-and-text-boundary" title="Permanent link">&para;</a></h1>
 <p>Privacy Guard processes the complete request body as one text string. Its
-runtime configuration is self-contained structured data supplied by OpenShell
-for each evaluation.</p>
+runtime configuration is supplied by OpenShell for each evaluation and
+normalized into strict structured models before processing.</p>
 <h2 id="bytes-and-text">Bytes and text<a class="headerlink" href="#bytes-and-text" title="Permanent link">&para;</a></h2>
 <p>The service owns the transport boundary:</p>
 <ul>
@@ -1180,34 +1180,35 @@ generic mapping layer.</p>
 installed engine implementations, approved model profiles, clients, endpoints,
 credentials, and data-egress constraints.</p>
 <h2 id="regex-catalogs">Regex catalogs<a class="headerlink" href="#regex-catalogs" title="Permanent link">&para;</a></h2>
-<p><code>RegexEngineConfig.pattern_catalog</code> is always a structured
-<code>RegexPatternCatalog</code>. Privacy Guard maintains its schema and safety limits but
-does not ship an authoritative pattern set.</p>
-<p>The repository may publish reference catalog YAML for users to copy and adapt.
-Those files are examples, not presets, runtime defaults, or a second
-configuration source.</p>
-<p>The current OpenShell policy flow does not expand:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">pattern_catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./patterns.yaml</span>
+<p><code>RegexEngineConfig.pattern_catalog</code> accepts either a structured
+<code>RegexPatternCatalog</code> or a relative <code>.yaml</code> or <code>.yml</code> path:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">pattern_catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">patterns.yaml</span>
 </span></code></pre></div>
-<p>Privacy Guard cannot resolve that path because the middleware process does not
-own the policy bundle. Accepting middleware-local paths would also make policy
-behavior depend on deployment filesystem state.</p>
-<p>Transparent catalog-file support belongs in OpenShell's policy installation
-flow. OpenShell would resolve the path relative to the policy bundle, validate
-the referenced value, retain the expanded configuration, and send only the
-self-contained mapping to Privacy Guard. Until that upstream feature exists,
-catalogs must be inline in the configuration sent to the middleware.</p>
+<p>Paths resolve beneath Privacy Guard's working directory. Absolute paths,
+traversal, and symlinks are rejected. Catalog files must be bounded UTF-8 YAML
+without aliases, duplicate keys, or unsafe tags.</p>
+<p>File-backed and inline inputs normalize to the same <code>RegexPatternCatalog</code>.
+Serialization and canonical fingerprints contain the validated structured
+catalog rather than its source path. File metadata keys a bounded parser cache;
+the normalized immutable catalog keys a bounded compiled-rule cache. A content
+change produces a newly validated configuration, compiled rule set, and
+processor fingerprint.</p>
+<p>Privacy Guard maintains the catalog schema and safety limits but does not ship
+an authoritative pattern set. Repository catalogs are examples to copy and
+adapt, not presets or runtime defaults.</p>
 <h2 id="current-transport-constraint">Current transport constraint<a class="headerlink" href="#current-transport-constraint" title="Permanent link">&para;</a></h2>
 <p>The copied OpenShell protocol carries policy configuration in a
-per-evaluation <code>google.protobuf.Struct</code> limited to 64 KiB. This bounds the
-catalog size that can reach Privacy Guard today.</p>
+per-evaluation <code>google.protobuf.Struct</code> limited to 64 KiB. An inline catalog is
+bounded by that transport. A file-backed configuration carries only its bounded
+relative path through the protocol and loads the deployment-mounted catalog in
+the middleware process.</p>
 <p>The service validates the complete configuration, computes its canonical
 fingerprint, and uses a bounded internal <code>RequestProcessor</code> cache. Caching
 avoids repeated engine initialization but does not increase the transport
 limit.</p>
-<p>Supporting larger catalogs requires an upstream OpenShell contract for
-preparing expanded configuration and referring to it during evaluation.
-Privacy Guard must not create a private protocol fork.</p>
+<p>A future self-contained transport for larger expanded catalogs requires an
+upstream OpenShell contract for preparing configuration and referring to it
+during evaluation. Privacy Guard must not create a private protocol fork.</p>
 <h2 id="configuration-identity">Configuration identity<a class="headerlink" href="#configuration-identity" title="Permanent link">&para;</a></h2>
 <p>Canonical serialization includes every concrete engine field and nested
 replacement variant. Mapping keys are sorted, compact JSON encoding is used,

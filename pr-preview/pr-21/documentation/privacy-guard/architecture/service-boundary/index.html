@@ -833,10 +833,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#server-lifecycle-and-discovery" class="md-nav__link">
+  <a href="#programmatic-server-lifecycle" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Server lifecycle and discovery
+        Programmatic server lifecycle
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#command-line-application" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Command-line application
       </span>
     </span>
   </a>
@@ -1059,10 +1070,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#server-lifecycle-and-discovery" class="md-nav__link">
+  <a href="#programmatic-server-lifecycle" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Server lifecycle and discovery
+        Programmatic server lifecycle
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#command-line-application" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Command-line application
       </span>
     </span>
   </a>
@@ -1292,7 +1314,7 @@ canonical copy; Privacy Guard must not create a private fork.</p>
 </tr>
 <tr>
 <td><code>ValidateConfig</code></td>
-<td>Purely validates expanded policy configuration and registered resources</td>
+<td>Validates supplied policy configuration and registered resources</td>
 </tr>
 <tr>
 <td><code>EvaluateHttpRequest</code></td>
@@ -1318,12 +1340,17 @@ validation and every request evaluation.</p>
 <li>returns <code>valid=true</code>, or a content-safe reason</li>
 </ol>
 <p>It does not construct engines, populate the processor cache, contact model
-providers, download resources, or write artifacts.</p>
-<p>During evaluation, the service validates the same expanded config, computes its
-canonical SHA-256 fingerprint, and resolves a configured processor from a
-bounded 128-entry LRU cache. A cache miss constructs engines directly from the
-exact stage configs and operator-injected resources, then constructs the
-<code>RequestProcessor</code>.</p>
+providers, download resources, or write artifacts. Validation runs in the
+bounded worker pool so catalog parsing and engine-specific checks do not block
+the async gRPC event loop.</p>
+<p>During evaluation, the service validates and normalizes the same config,
+computes its canonical SHA-256 fingerprint, and resolves a configured processor
+from a bounded 128-entry LRU cache. A cache miss constructs engines directly
+from the exact stage configs and operator-injected resources, then constructs
+the <code>RequestProcessor</code>. Validation, cache resolution, engine construction,
+strict UTF-8 decoding, and processing all run in the bounded worker pool.
+Validation still occurs for every evaluation, while equivalent normalized regex
+catalogs reuse their bounded compiled-rule entry instead of recompiling.</p>
 <p>The cache is protected for concurrent access and is not correctness-relevant.
 Eviction or process restart simply causes reconstruction from a later
 evaluation's expanded config.</p>
@@ -1332,10 +1359,11 @@ evaluation's expanded config.</p>
 <ol>
 <li>validates the pre-credentials phase</li>
 <li>validates the transport body byte limit</li>
-<li>validates and resolves the expanded policy config</li>
+<li>acquires one bounded worker slot</li>
+<li>validates, normalizes, and resolves the supplied policy config in that worker</li>
 <li>allows an empty body without invoking an engine</li>
 <li>decodes a non-empty body as strict UTF-8</li>
-<li>schedules <code>RequestProcessor.process(text)</code> in the bounded worker pool</li>
+<li>calls <code>RequestProcessor.process(text)</code> in the same worker</li>
 </ol>
 <p>Request context, target, headers, middleware name, and protobuf values remain at
 the service boundary. The request ID is used only for content-safe operational
@@ -1401,13 +1429,17 @@ a dedicated executor and semaphore with four active slots:</p>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>4-thread executor
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>      |
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>      v
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>RequestProcessor.process
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>      |
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>      v
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>ordered engine pipeline
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>configuration validation
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>and processor resolution
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>      |
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>      v
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>RequestProcessor.process
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>      |
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>      v
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>ordered engine pipeline
 </span></code></pre></div>
-<p>This keeps synchronous engine work off the async event loop and bounds the
-number of active processor runs.</p>
+<p>This keeps synchronous configuration and engine work off the async event loop
+and bounds the number of active operations.</p>
 <p>Cached processors, engine instances, and injected resources may be used by
 multiple worker threads. They must retain no mutable per-request state and must
 be safe for concurrent access.</p>
@@ -1415,7 +1447,8 @@ be safe for concurrent access.</p>
 <p>Cancelling an async RPC cannot stop Python code already running in its worker
 thread. The service shields the worker bridge and releases the semaphore slot
 only after that worker actually finishes.</p>
-<p>Cancellation therefore cannot create more than four active processor runs.
+<p>Cancellation therefore cannot create more than four active synchronous
+operations.
 An engine should pass the remaining shared timeout to any delegated API that
 supports bounded execution. A non-preemptible call continues to occupy its slot
 until it exits.</p>
@@ -1448,30 +1481,30 @@ return caught collaborator messages or exception chains.</p>
 <p>A gRPC failure is distinct from a successful policy deny. OpenShell applies the
 middleware registration's failure behavior when an RPC fails. A policy deny is
 a successful RPC result that explicitly stops the request.</p>
-<h2 id="server-lifecycle-and-discovery">Server lifecycle and discovery<a class="headerlink" href="#server-lifecycle-and-discovery" title="Permanent link">&para;</a></h2>
-<p><code>MiddlewareServer</code> is the high-level API. It owns:</p>
+<h2 id="programmatic-server-lifecycle">Programmatic server lifecycle<a class="headerlink" href="#programmatic-server-lifecycle" title="Permanent link">&para;</a></h2>
+<p><code>PrivacyGuardServer</code> is the high-level programmatic API. It owns:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>EngineRegistry
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  -&gt; PrivacyGuardMiddleware
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  -&gt; gRPC server
 </span></code></pre></div>
 <p>The built-in registry includes <code>RegexEngine</code>. Operators register custom engines
 and resource-backed tool integrations before registry finalization, then pass
-that registry to <code>MiddlewareServer</code>.</p>
+that registry to <code>PrivacyGuardServer</code>.</p>
 <p>The registry is an explicit application-scoped dependency, not a global
-singleton. <code>MiddlewareServer</code> and <code>PrivacyGuardMiddleware</code> reject unfinalized
+singleton. <code>PrivacyGuardServer</code> and <code>PrivacyGuardMiddleware</code> reject unfinalized
 registries. A deployment creates and finalizes one registry during startup;
 cached processors then construct configured stage engines from that registry.
 Different middleware applications in the same process may intentionally use
 different engine inventories or runtime resources.</p>
-<p>The CLI accepts an operator registry factory in <code>module:factory</code> form. The
-factory is invoked once, must return a finalized <code>EngineRegistry</code>, and supplies
-the same engine inventory to discovery, schema generation, or serving:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>privacy-guard<span class="w"> </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span>engines
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>privacy-guard<span class="w"> </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span>schema
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>privacy-guard<span class="w"> </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span>serve
+<p>Synchronous applications use:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.engine_registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_builtin_registry</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.service</span><span class="w"> </span><span class="kn">import</span> <span class="n">PrivacyGuardServer</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">server</span> <span class="o">=</span> <span class="n">PrivacyGuardServer</span><span class="p">(</span><span class="n">create_builtin_registry</span><span class="p">())</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">server</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;127.0.0.1:50051&quot;</span><span class="p">)</span>
 </span></code></pre></div>
-<p>The factory is trusted operator code imported into the Privacy Guard process.
-It is not a policy-controlled plugin hook.</p>
+<p>Async applications call <code>await server.serve(address)</code> instead. Both entry
+points use the same server instance and lifecycle.</p>
 <p>The server:</p>
 <ol>
 <li>creates an unstarted async gRPC server with receive and concurrency limits</li>
@@ -1481,10 +1514,30 @@ It is not a policy-controlled plugin hook.</p>
 <li>closes the middleware executor</li>
 </ol>
 <p>A bind failure becomes the stable <code>server_bind_failed</code> error.</p>
+<p>The server module has no command framework, module-import-string, discovery,
+schema-rendering, or command-logging responsibilities.</p>
+<h2 id="command-line-application">Command-line application<a class="headerlink" href="#command-line-application" title="Permanent link">&para;</a></h2>
+<p><code>privacy_guard.cli</code> owns the Typer application. The <code>--registry-factory</code> option
+identifies a Python function in <code>module:function</code> form. At startup, the CLI
+imports the module, calls the function once, and uses the returned finalized
+<code>EngineRegistry</code> for the selected command:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>privacy-guard<span class="w"> </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span>engines
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>privacy-guard<span class="w"> </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span>schema
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>privacy-guard<span class="w"> </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span>serve
+</span></code></pre></div>
+<p>This is a deployment setting, not part of an OpenShell policy. The person
+starting Privacy Guard chooses the function, and importing its module executes
+Python code, so it must refer to code that the deployer controls. A policy
+cannot select a factory or cause Privacy Guard to import a module.</p>
+<p>Applications that start <code>PrivacyGuardServer</code> from Python do not need this CLI
+option. They create the registry normally and pass it to the server:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">registry</span> <span class="o">=</span> <span class="n">create_registry</span><span class="p">()</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">PrivacyGuardServer</span><span class="p">(</span><span class="n">registry</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</span></code></pre></div>
 <p>The CLI exposes:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>privacy-guard<span class="w"> </span>engines
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>privacy-guard<span class="w"> </span>schema
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>privacy-guard<span class="w"> </span>serve<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:50051
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>privacy-guard<span class="w"> </span>engines
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>privacy-guard<span class="w"> </span>schema
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>privacy-guard<span class="w"> </span>serve<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:50051
 </span></code></pre></div>
 <p>Entity behavior comes from policy configuration, not server startup flags.
 Engine implementations and operational resources come from the selected
