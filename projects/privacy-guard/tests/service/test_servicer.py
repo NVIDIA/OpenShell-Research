@@ -138,6 +138,40 @@ def test_evaluation_prepares_configuration_off_the_event_loop(
     assert preparation_threads[0] != event_loop_thread
 
 
+def test_evaluation_revalidates_configuration_before_reusing_cached_processor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    validation_count = 0
+    original_validate = servicer_module.EngineRegistry.validate_config
+
+    def record_validation(
+        registry: servicer_module.EngineRegistry,
+        values: object,
+    ) -> servicer_module.FinalizedPrivacyGuardConfig:
+        nonlocal validation_count
+        validation_count += 1
+        return original_validate(registry, values)
+
+    monkeypatch.setattr(
+        servicer_module.EngineRegistry,
+        "validate_config",
+        record_validation,
+    )
+
+    async def evaluate_twice() -> None:
+        middleware = PrivacyGuardMiddleware(create_builtin_registry())
+        try:
+            request = _request(b"email a@b.com")
+            await middleware._evaluate_http_request(request)
+            await middleware._evaluate_http_request(request)
+        finally:
+            await middleware.close()
+
+    asyncio.run(evaluate_twice())
+
+    assert validation_count == 2
+
+
 def test_invalid_utf8_fails_before_invoking_an_engine() -> None:
     async def evaluate() -> None:
         middleware = PrivacyGuardMiddleware(create_builtin_registry())

@@ -5,8 +5,5 @@ entity_processing:
         engine: keyword-tool
         entity: confidential-project
         keyword: Project Cobalt
-        replacement:
-          strategy: token
-          token: "[confidential-project]"
 on_detection:
-  action: replace
+  action: detect

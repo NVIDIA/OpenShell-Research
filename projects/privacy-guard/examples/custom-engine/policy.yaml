@@ -33,8 +33,8 @@ network_policies:
       - { path: /usr/bin/node }
 
 network_middlewares:
-  privacy_guard_replace:
-    name: Replace confidential project names
+  privacy_guard_detect:
+    name: Detect confidential project names
     middleware: privacy-guard-custom-engine
     order: 0
     config:
@@ -45,11 +45,8 @@ network_middlewares:
               engine: keyword-tool
               entity: confidential-project
               keyword: Project Cobalt
-              replacement:
-                strategy: token
-                token: "[confidential-project]"
       on_detection:
-        action: replace
+        action: detect
     on_error: fail_closed
     endpoints:
       include:

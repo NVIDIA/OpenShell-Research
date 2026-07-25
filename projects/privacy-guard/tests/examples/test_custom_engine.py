@@ -24,7 +24,7 @@ import yaml
 
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
-from privacy_guard_app import create_registry
+from custom_engine import create_registry
 
 values = yaml.safe_load(Path("privacy-guard-config.yaml").read_text())
 assert isinstance(values, dict)
@@ -46,8 +46,8 @@ async def evaluate() -> None:
         await middleware.close()
 
     assert result.decision == pb2.DECISION_ALLOW
-    assert result.has_body is True
-    assert result.body == b"Discuss [confidential-project] safely."
+    assert result.has_body is False
+    assert result.body == b""
     assert len(result.findings) == 1
     assert result.findings[0].label == (
         "confidential-project (project-names)"
@@ -55,45 +55,6 @@ async def evaluate() -> None:
 
 
 asyncio.run(evaluate())
-"""
-
-    subprocess.run(
-        [sys.executable, "-c", probe],
-        cwd=EXAMPLE_DIRECTORY,
-        check=True,
-    )
-
-
-def test_custom_engine_bounds_matches_before_building_detections() -> None:
-    probe = r"""
-from custom_engine import (
-    KeywordAnalysisTool,
-    KeywordEngine,
-    KeywordEngineConfig,
-    KeywordEngineResources,
-)
-from privacy_guard.engines import EntityProcessingStrategy
-from privacy_guard.errors import EngineLimitExceeded
-from privacy_guard.timeout import Timeout
-
-engine = KeywordEngine(
-    KeywordEngineConfig(
-        entity="keyword",
-        keyword="x",
-    ),
-    KeywordEngineResources(analysis_tool=KeywordAnalysisTool()),
-)
-
-try:
-    engine.run(
-        "x" * 257,
-        strategy=EntityProcessingStrategy.DETECT,
-        timeout=Timeout.from_seconds(1),
-    )
-except EngineLimitExceeded:
-    pass
-else:
-    raise AssertionError("custom engine accepted too many detections")
 """
 
     subprocess.run(
@@ -113,7 +74,7 @@ def test_custom_registry_drives_cli_discovery_and_schema() -> None:
     command = [
         str(Path(sys.executable).with_name("privacy-guard")),
         "--registry-factory",
-        "privacy_guard_app:create_registry",
+        "custom_engine:create_registry",
     ]
 
     engines = subprocess.run(
@@ -133,13 +94,12 @@ def test_custom_registry_drives_cli_discovery_and_schema() -> None:
         env=environment,
     )
 
-    assert engines.stdout.startswith("keyword-tool\tdetect,replace\t")
+    assert engines.stdout.startswith("keyword-tool\tdetect\t")
     assert "regex" not in engines.stdout
     serialized_schema = json.loads(schema.stdout)
     assert "KeywordEngineConfig" in serialized_schema["$defs"]
     keyword_properties = serialized_schema["$defs"]["KeywordEngineConfig"]["properties"]
     assert set(keyword_properties) == {
-        "replacement",
         "engine",
         "entity",
         "keyword",
@@ -153,10 +113,13 @@ def test_openshell_walkthrough_uses_the_custom_registry_and_current_policy() -> 
     )
     gateway = tomllib.loads((EXAMPLE_DIRECTORY / "gateway.toml").read_text())
     readme = (EXAMPLE_DIRECTORY / "README.md").read_text()
+    implementation = (EXAMPLE_DIRECTORY / "custom_engine.py").read_text()
 
     assert isinstance(policy, dict)
     assert isinstance(config, dict)
-    middleware_config = policy["network_middlewares"]["privacy_guard_replace"]
+    assert not (EXAMPLE_DIRECTORY / "privacy_guard_app.py").exists()
+    assert "def create_registry() -> EngineRegistry:" in implementation
+    middleware_config = policy["network_middlewares"]["privacy_guard_detect"]
     assert middleware_config["middleware"] == "privacy-guard-custom-engine"
     assert middleware_config["config"] == config
     middleware = gateway["openshell"]["supervisor"]["middleware"]
@@ -170,11 +133,11 @@ def test_openshell_walkthrough_uses_the_custom_registry_and_current_policy() -> 
     ]
     stage_config = config["entity_processing"]["stages"][0]["config"]
     assert stage_config["engine"] == "keyword-tool"
-    assert config["on_detection"]["action"] == "replace"
-    assert "--registry-factory privacy_guard_app:create_registry" in readme
+    assert config["on_detection"]["action"] == "detect"
+    assert "--registry-factory custom_engine:create_registry" in readme
     assert "cd projects/privacy-guard/examples/custom-engine" in readme
     assert 'export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"' in readme
     assert "openshell gateway select openshell" in readme
     assert "openshell gateway add" not in readme
     assert "OpenShell `v0.0.90`" in readme
-    assert "transformed:true" in readme
+    assert "transformed:false" in readme

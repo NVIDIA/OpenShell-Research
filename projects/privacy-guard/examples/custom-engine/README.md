@@ -1,29 +1,21 @@
 # Custom engine end-to-end example
 
-This example implements `KeywordEngine`, registers an operator-owned
-`KeywordAnalysisTool`, and runs the custom engine through Privacy Guard and
-OpenShell. The final check sends a Claude Code request containing
-`Project Cobalt` and verifies that OpenShell forwards `[confidential-project]`
-instead.
+This example implements and registers `KeywordEngine` in one Python file, then
+runs it through Privacy Guard and OpenShell. The final check sends a Claude Code
+request containing `Project Cobalt` and verifies that Privacy Guard reports the
+configured confidential-project finding.
 
-The analyzer is intentionally small. Its purpose is to show the complete
-integration boundary that a production adapter for a library or service such as
-NeMo Anonymizer would use:
+The implementation is intentionally compact but complete:
 
-- `KeywordEngineConfig` and `TokenReplacement` contain policy-owned behavior.
-- `KeywordAnalysisTool` is an operator-created dependency held by the
-  `KeywordEngineResources` bundle and never appears in policy.
-- `KeywordEngine` translates tool matches into `EntityDetection` objects and
-  implements detection and replacement.
-- `privacy_guard_app.py` is deployment-owned wiring. Its `create_registry()`
-  selects the installed engine, creates its runtime resource, and returns the
-  finalized application-scoped registry.
+- `KeywordEngineConfig` defines the policy-owned entity and keyword.
+- `KeywordEngine._run()` finds every literal occurrence and returns detections.
+- `TextProcessingResult.from_detections()` bounds the lazy detection stream.
+- `create_registry()` registers the implementation for every CLI command.
 
-An engine author implements only the types in `custom_engine.py`; registration
-is not part of the engine contract. The deployment owner performs the small
-amount of explicit application assembly in `privacy_guard_app.py`. Privacy Guard
-needs that complete inventory at startup to build the exact Pydantic policy
-union and inject operator-owned resources.
+The base engine wrapper validates strategy support, input, timeout, spans,
+output size, mutation behavior, and result cardinality. Custom engines add
+their own checks only when an underlying library or service has a unique
+low-level requirement.
 
 ## Prerequisites
 
@@ -72,18 +64,18 @@ Use the same custom registry for discovery, schema generation, and serving:
 
 ```bash
 uv run privacy-guard \
-  --registry-factory privacy_guard_app:create_registry \
+  --registry-factory custom_engine:create_registry \
   engines
 
 uv run privacy-guard \
-  --registry-factory privacy_guard_app:create_registry \
+  --registry-factory custom_engine:create_registry \
   schema
 ```
 
-The first command should print one `keyword-tool` row with `detect,replace`.
+The first command should print one `keyword-tool` row with `detect`.
 The schema should contain `KeywordEngineConfig`, including its exact `entity`,
-`keyword`, and `replacement` fields. Registry factories execute operator Python
-code in the Privacy Guard process; use only trusted modules.
+and `keyword` fields. Registry factories execute operator Python code in the
+Privacy Guard process; use only trusted modules.
 
 `privacy-guard-config.yaml` shows the standalone engine configuration. OpenShell
 does not load that file separately; `policy.yaml` contains the same configuration
@@ -97,7 +89,7 @@ In terminal 1, enter this example directory, export `PYTHONPATH` again, and run:
 export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
 
 uv run privacy-guard \
-  --registry-factory privacy_guard_app:create_registry \
+  --registry-factory custom_engine:create_registry \
   serve \
   --listen 0.0.0.0:50051
 ```
@@ -205,8 +197,8 @@ After authenticating Claude Code, enter:
 Tell me something that rhymes with the confidential name Project Cobalt
 ```
 
-Privacy Guard should send `[confidential-project]` instead of `Project Cobalt`
-to the provider.
+This detection-only example leaves the request body unchanged and records the
+finding before the provider request continues.
 
 ## Verify the middleware result
 
@@ -217,9 +209,9 @@ inspect a finite recent log window:
 openshell logs privacy-guard-custom-engine -n 100 --source sandbox
 ```
 
-Look for the `api.anthropic.com/v1/messages` request with `transformed:true` and
-a `confidential-project (project-names)` finding. The raw confidential value
-must not appear in middleware findings.
+Look for the `api.anthropic.com/v1/messages` request with `transformed:false`
+and a `confidential-project (project-names)` finding. The raw confidential
+value must not appear in middleware findings.
 
 ## Cleanup
 

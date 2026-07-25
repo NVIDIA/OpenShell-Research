@@ -99,6 +99,9 @@ Privacy Guard owns the catalog schema but maintains no authoritative patterns.
 Custom engines are a first-class extension point. Authors declare one typed
 config, optional typed resources, `supported_strategies`, and `_run`. They do not
 write `__init__`; `_initialize` is optional, and `@override` is not required.
+The public wrapper validates strategy support, input, timeout, spans, output
+size, mutation behavior, and result cardinality. Lazy detection streams use
+`TextProcessingResult.from_detections()` for bounded materialization.
 
 Resource-backed engines define an `EngineResources` subclass containing their
 operator-owned runtime dependencies. Resource bundles may contain initialized
@@ -134,10 +137,10 @@ uv run privacy-guard --registry-factory my_engines:create_registry serve
 ```
 
 The [custom engine end-to-end example](examples/custom-engine/README.md)
-contains a complete tool adapter, typed policy and replacement configuration,
-runtime resource registration, registry factory, OpenShell policy, and
-walkthrough. It also shows the explicit `PYTHONPATH` setup needed when the
-factory is a standalone local module rather than an installed package.
+contains one Python file with a typed detection config, engine implementation,
+and registry factory, plus its OpenShell policy and walkthrough. It also shows
+the explicit `PYTHONPATH` setup needed when the factory is a standalone local
+module rather than an installed package.
 
 The registry is application-scoped, not a process-global singleton. A
 `PrivacyGuardServer` requires an explicit finalized registry. The finalized

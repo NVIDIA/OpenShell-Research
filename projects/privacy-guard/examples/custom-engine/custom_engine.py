@@ -1,100 +1,37 @@
-"""Example custom entity-processing engine and application registry."""
+"""Complete custom entity-processing engine example."""
 
 from __future__ import annotations
 
-from collections.abc import Iterator
-from dataclasses import dataclass
+import re
 from typing import Literal
 
 from pydantic import Field
 
-from privacy_guard.base import StrictDomainModel
-from privacy_guard.constants import MAX_DETECTIONS_PER_STAGE
+from privacy_guard.engine_registry import EngineRegistry
 from privacy_guard.engines import (
     ConfidenceLevel,
     EngineConfig,
-    EngineConfigurationError,
-    EngineResources,
     EntityDetection,
     EntityName,
     EntityProcessingEngine,
     EntityProcessingStrategy,
     TextProcessingResult,
 )
-from privacy_guard.errors import EngineLimitExceeded
 from privacy_guard.timeout import Timeout
 
 
-class TokenReplacement(StrictDomainModel):
-    """Replace every detected keyword with one configured token."""
-
-    strategy: Literal["token"] = "token"
-    token: str = Field(min_length=1, max_length=256)
-
-
 class KeywordEngineConfig(EngineConfig):
-    """Policy-owned behavior for the example keyword-analysis tool."""
+    """Policy-owned configuration for keyword detection."""
 
     engine: Literal["keyword-tool"] = "keyword-tool"
     entity: EntityName
     keyword: str = Field(min_length=1, max_length=256, repr=False)
-    replacement: TokenReplacement | None = None
 
 
-@dataclass(frozen=True)
-class KeywordMatch:
-    """One match returned by the example third-party-style tool."""
+class KeywordEngine(EntityProcessingEngine[KeywordEngineConfig]):
+    """Detect every occurrence of one configured keyword."""
 
-    start: int
-    end: int
-
-
-class KeywordAnalysisTool:
-    """Small stand-in for an operator-provided entity-analysis library or client."""
-
-    def iter_matches(self, text: str, keyword: str) -> Iterator[KeywordMatch]:
-        start = 0
-        while True:
-            start = text.find(keyword, start)
-            if start < 0:
-                return
-            end = start + len(keyword)
-            yield KeywordMatch(start=start, end=end)
-            start = end
-
-
-@dataclass(frozen=True)
-class KeywordEngineResources(EngineResources):
-    """Operator-owned dependencies injected into every configured engine."""
-
-    analysis_tool: KeywordAnalysisTool
-
-
-class KeywordEngine(
-    EntityProcessingEngine[KeywordEngineConfig, KeywordEngineResources],
-):
-    """Adapt KeywordAnalysisTool results to the Privacy Guard engine contract."""
-
-    supported_strategies = frozenset(
-        {
-            EntityProcessingStrategy.DETECT,
-            EntityProcessingStrategy.REPLACE,
-        }
-    )
-
-    @classmethod
-    def _validate_run_config(
-        cls,
-        config: KeywordEngineConfig,
-        resources: KeywordEngineResources,
-        *,
-        strategy: EntityProcessingStrategy,
-    ) -> None:
-        del cls, resources
-        if strategy is EntityProcessingStrategy.REPLACE and config.replacement is None:
-            raise EngineConfigurationError(
-                "keyword replacement configuration is required"
-            )
+    supported_strategies = frozenset({EntityProcessingStrategy.DETECT})
 
     def _run(
         self,
@@ -103,44 +40,23 @@ class KeywordEngine(
         strategy: EntityProcessingStrategy,
         timeout: Timeout,
     ) -> TextProcessingResult:
-        timeout.raise_if_expired()
-        matches: list[KeywordMatch] = []
-        for match in self.resources.analysis_tool.iter_matches(
-            text,
-            self.config.keyword,
-        ):
-            timeout.raise_if_expired()
-            if len(matches) >= MAX_DETECTIONS_PER_STAGE:
-                raise EngineLimitExceeded("keyword detection count exceeds the limit")
-            matches.append(match)
-        bounded_matches = tuple(matches)
-        detections = tuple(
-            EntityDetection(
-                entity=self.config.entity,
-                start=match.start,
-                end=match.end,
-                confidence=ConfidenceLevel.HIGH,
-            )
-            for match in bounded_matches
+        matches = re.finditer(re.escape(self.config.keyword), text)
+        return TextProcessingResult.from_detections(
+            text=text,
+            detections=(
+                EntityDetection(
+                    entity=self.config.entity,
+                    start=match.start(),
+                    end=match.end(),
+                    confidence=ConfidenceLevel.HIGH,
+                )
+                for match in matches
+            ),
         )
-        if strategy is EntityProcessingStrategy.DETECT or not bounded_matches:
-            return TextProcessingResult(text=text, detections=detections)
-
-        replacement = self.config.replacement
-        if replacement is None:
-            raise EngineConfigurationError(
-                "keyword replacement configuration is required"
-            )
-        output = _replace_matches(text, bounded_matches, replacement.token)
-        return TextProcessingResult(text=output, detections=detections)
 
 
-def _replace_matches(
-    text: str,
-    matches: tuple[KeywordMatch, ...],
-    replacement: str,
-) -> str:
-    output = text
-    for match in reversed(matches):
-        output = output[: match.start] + replacement + output[match.end :]
-    return output
+def create_registry() -> EngineRegistry:
+    """Create the application-scoped registry used by every CLI command."""
+    registry = EngineRegistry()
+    registry.register(KeywordEngine)
+    return registry.finalize()

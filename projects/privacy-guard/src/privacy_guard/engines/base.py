@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from enum import StrEnum
 from types import MappingProxyType
 from typing import (
     Annotated,
     ClassVar,
     Generic,
+    Self,
     TypeAlias,
     get_args,
     get_origin,
@@ -123,6 +124,21 @@ class TextProcessingResult(StrictDomainModel):
         if not isinstance(value, tuple):
             raise ValueError("detections must be a tuple")
         return value
+
+    @classmethod
+    def from_detections(
+        cls,
+        *,
+        text: str,
+        detections: Iterable[EntityDetection],
+    ) -> Self:
+        """Build a result while bounding a lazily produced detection stream."""
+        bounded: list[EntityDetection] = []
+        for detection in detections:
+            if len(bounded) >= MAX_DETECTIONS_PER_STAGE:
+                raise EngineLimitExceeded("engine returned too many detections")
+            bounded.append(detection)
+        return cls(text=text, detections=tuple(bounded))
 
 
 class EngineConfig(StrictDomainModel):

@@ -107,15 +107,15 @@ class KeywordEngine(EntityProcessingEngine[KeywordConfig]):
         strategy: EntityProcessingStrategy,
         timeout: Timeout,
     ) -> TextProcessingResult:
-        timeout.raise_if_expired()
         return TextProcessingResult(text=text, detections=())
 ```
 
-The public `run` method validates extension output. Register every engine before
-finalizing the registry so policy serialization retains its exact config type.
-Custom deployments expose a `module:factory` callable that returns the
-application-scoped finalized registry and pass it to the CLI with
-`--registry-factory`.
+The public `run` method validates input, strategy, timeout, and extension
+output. Custom code checks the timeout itself only for delegated calls or
+unique long-running loops. Register every engine before finalizing the registry
+so policy serialization retains its exact config type. Custom deployments
+expose a `module:factory` callable that returns the application-scoped finalized
+registry and pass it to the CLI with `--registry-factory`.
 
 ## Change limits
 

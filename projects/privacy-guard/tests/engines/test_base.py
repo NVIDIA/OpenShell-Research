@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from time import monotonic
 from typing import Literal
@@ -12,6 +13,7 @@ from privacy_guard.engines import (
     ConfidenceLevel,
     EngineConfig,
     EngineContractError,
+    EngineLimitExceeded,
     EngineResources,
     EntityDetection,
     EntityProcessingEngine,
@@ -120,6 +122,24 @@ def test_detection_confidence_and_metadata_are_strict_bounded_values() -> None:
             end=1,
             confidence=1.01,
         )
+
+
+def test_processing_result_bounds_a_lazy_detection_stream() -> None:
+    produced = 0
+
+    def detections() -> Iterator[EntityDetection]:
+        nonlocal produced
+        for index in range(1_000):
+            produced += 1
+            yield EntityDetection(entity="token", start=index, end=index + 1)
+
+    with pytest.raises(EngineLimitExceeded):
+        TextProcessingResult.from_detections(
+            text="x" * 1_000,
+            detections=detections(),
+        )
+
+    assert produced == 257
 
 
 class _DetectOnlyEngine(EntityProcessingEngine[_Config]):

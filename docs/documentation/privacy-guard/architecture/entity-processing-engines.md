@@ -132,7 +132,7 @@ the strategy, never the user-facing `PolicyAction`.
 | Field | Meaning |
 | --- | --- |
 | `text` | Authoritative text returned by this stage |
-| `detections` | Tuple of all `EntityDetection` occurrences |
+| `detections` | Bounded tuple of all `EntityDetection` occurrences |
 
 Each `EntityDetection` contains:
 
@@ -145,7 +145,9 @@ Each `EntityDetection` contains:
 | `metadata` | Optional bounded engine-specific attribution retained inside the processing boundary |
 
 A detection span is non-empty and must fall within the stage input. The public
-wrapper also enforces stage detection and output-size limits.
+wrapper also enforces stage detection and output-size limits. Engines that
+produce detections lazily should use `TextProcessingResult.from_detections()`;
+it stops consuming the iterable as soon as the stage limit is exceeded.
 
 For `DETECT`, output text must exactly equal input text. For `REPLACE`, a
 successful return is the engine's authoritative completed result. Text may not
@@ -159,56 +161,28 @@ across engines.
 ## Custom engine example
 
 ```python
+import re
 from typing import Literal
 
 from pydantic import Field
 
 from privacy_guard.engines import (
     EngineConfig,
-    EngineConfigurationError,
     EntityDetection,
     EntityProcessingEngine,
     EntityProcessingStrategy,
     TextProcessingResult,
 )
 from privacy_guard.timeout import Timeout
-from privacy_guard.base import StrictDomainModel
-
-
-class KeywordReplacement(StrictDomainModel):
-    strategy: Literal["token"] = "token"
-    token: str = "[keyword]"
 
 
 class KeywordEngineConfig(EngineConfig):
     engine: Literal["keyword"] = "keyword"
     keyword: str = Field(min_length=1)
-    replacement: KeywordReplacement | None = None
 
 
 class KeywordEngine(EntityProcessingEngine[KeywordEngineConfig]):
-    supported_strategies = frozenset(
-        {
-            EntityProcessingStrategy.DETECT,
-            EntityProcessingStrategy.REPLACE,
-        }
-    )
-
-    @classmethod
-    def _validate_run_config(
-        cls,
-        config: KeywordEngineConfig,
-        resources: None,
-        *,
-        strategy: EntityProcessingStrategy,
-    ) -> None:
-        if (
-            strategy is EntityProcessingStrategy.REPLACE
-            and config.replacement is None
-        ):
-            raise EngineConfigurationError(
-                "keyword replacement configuration is required"
-            )
+    supported_strategies = frozenset({EntityProcessingStrategy.DETECT})
 
     def _run(
         self,
@@ -217,27 +191,18 @@ class KeywordEngine(EntityProcessingEngine[KeywordEngineConfig]):
         strategy: EntityProcessingStrategy,
         timeout: Timeout,
     ) -> TextProcessingResult:
-        timeout.raise_if_expired()
-        start = text.find(self.config.keyword)
-        if start < 0:
-            return TextProcessingResult(text=text, detections=())
-
-        end = start + len(self.config.keyword)
-        detection = EntityDetection(
-            entity="keyword",
-            start=start,
-            end=end,
-        )
-        if strategy is EntityProcessingStrategy.DETECT:
-            output = text
-        else:
-            replacement = self.config.replacement
-            if replacement is None:
-                raise EngineConfigurationError(
-                    "keyword replacement configuration is required"
+        matches = re.finditer(re.escape(self.config.keyword), text)
+        return TextProcessingResult.from_detections(
+            text=text,
+            detections=(
+                EntityDetection(
+                    entity="keyword",
+                    start=match.start(),
+                    end=match.end(),
                 )
-            output = text[:start] + replacement.token + text[end:]
-        return TextProcessingResult(text=output, detections=(detection,))
+                for match in matches
+            ),
+        )
 ```
 
 Register the implementation and, when required, its resources before finalizing
@@ -253,23 +218,26 @@ Finalization freezes registration and constructs the exact policy config type,
 JSON Schema, and engine discovery metadata.
 
 The complete example at
-`projects/privacy-guard/examples/custom-engine/README.md` adapts an
-operator-provided analysis tool, injects it as a typed resource, and runs its
-finalized registry through discovery, schema generation, serving, and an
-OpenShell policy.
+`projects/privacy-guard/examples/custom-engine/README.md` keeps the engine,
+configuration, and registry factory in one Python file and runs that registry
+through discovery, schema generation, serving, and an OpenShell policy.
 
 ## Timeout and concurrency
 
 One `Timeout` is created for the processor run and passed through every stage.
-An engine must not create a fresh per-stage duration. It should call:
+The public engine wrapper checks it immediately before and after `_run()`, so
+ordinary in-memory implementations do not repeat those checks. An engine must
+not create a fresh per-stage duration.
+
+When a delegated API accepts a timeout, pass the remaining duration:
 
 ```python
-timeout.raise_if_expired()
 remaining = timeout.remaining_seconds()
 ```
 
-When a delegated API accepts a timeout, pass the remaining duration. Operations
-that cannot be interrupted must be documented and bounded independently.
+Unique long-running loops may also call `timeout.raise_if_expired()`.
+Operations that cannot be interrupted must be documented and bounded
+independently.
 
 Engine configuration, derived state, and injected resources are shared across
 concurrent requests. Keep request text, detections, and counters local to
