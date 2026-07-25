@@ -1434,10 +1434,13 @@ across engines.</p>
 </span></code></pre></div>
 <p>Register the implementation and, when required, its resources before finalizing
 the registry:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">registry</span> <span class="o">=</span> <span class="n">EngineRegistry</span><span class="p">()</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">registry</span> <span class="o">=</span> <span class="n">EngineRegistry</span><span class="p">(</span><span class="n">include_builtin_engines</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">KeywordEngine</span><span class="p">)</span>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">registry</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
 </span></code></pre></div>
+<p>The opt-in constructor argument registers the engines shipped by Privacy Guard
+before application-specific engines. Omit it when the registry should contain
+only explicitly registered implementations.</p>
 <p>Finalization freezes registration and constructs the exact policy config type,
 JSON Schema, and engine discovery metadata.</p>
 <p>The complete example at
