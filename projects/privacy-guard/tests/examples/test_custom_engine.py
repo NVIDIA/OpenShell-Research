@@ -64,6 +64,45 @@ asyncio.run(evaluate())
     )
 
 
+def test_custom_engine_bounds_matches_before_building_detections() -> None:
+    probe = r"""
+from custom_engine import (
+    KeywordAnalysisTool,
+    KeywordEngine,
+    KeywordEngineConfig,
+    KeywordEngineResources,
+)
+from privacy_guard.engines import EntityProcessingStrategy
+from privacy_guard.errors import EngineLimitExceeded
+from privacy_guard.timeout import Timeout
+
+engine = KeywordEngine(
+    KeywordEngineConfig(
+        entity="keyword",
+        keyword="x",
+    ),
+    KeywordEngineResources(analysis_tool=KeywordAnalysisTool()),
+)
+
+try:
+    engine.run(
+        "x" * 257,
+        strategy=EntityProcessingStrategy.DETECT,
+        timeout=Timeout.from_seconds(1),
+    )
+except EngineLimitExceeded:
+    pass
+else:
+    raise AssertionError("custom engine accepted too many detections")
+"""
+
+    subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=EXAMPLE_DIRECTORY,
+        check=True,
+    )
+
+
 def test_custom_registry_drives_cli_discovery_and_schema() -> None:
     environment = os.environ.copy()
     python_path = str(EXAMPLE_DIRECTORY)

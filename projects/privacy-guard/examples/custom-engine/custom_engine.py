@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Literal
 
 from pydantic import Field
 
 from privacy_guard.base import StrictDomainModel
+from privacy_guard.constants import MAX_DETECTIONS_PER_STAGE
 from privacy_guard.engines import (
     ConfidenceLevel,
     EngineConfig,
@@ -19,6 +21,7 @@ from privacy_guard.engines import (
     EntityProcessingStrategy,
     TextProcessingResult,
 )
+from privacy_guard.errors import EngineLimitExceeded
 from privacy_guard.timeout import Timeout
 
 
@@ -49,15 +52,14 @@ class KeywordMatch:
 class KeywordAnalysisTool:
     """Small stand-in for an operator-provided entity-analysis library or client."""
 
-    def find_matches(self, text: str, keyword: str) -> tuple[KeywordMatch, ...]:
-        matches: list[KeywordMatch] = []
+    def iter_matches(self, text: str, keyword: str) -> Iterator[KeywordMatch]:
         start = 0
         while True:
             start = text.find(keyword, start)
             if start < 0:
-                return tuple(matches)
+                return
             end = start + len(keyword)
-            matches.append(KeywordMatch(start=start, end=end))
+            yield KeywordMatch(start=start, end=end)
             start = end
 
 
@@ -102,10 +104,16 @@ class KeywordEngine(
         timeout: Timeout,
     ) -> TextProcessingResult:
         timeout.raise_if_expired()
-        matches = self.resources.analysis_tool.find_matches(
+        matches: list[KeywordMatch] = []
+        for match in self.resources.analysis_tool.iter_matches(
             text,
             self.config.keyword,
-        )
+        ):
+            timeout.raise_if_expired()
+            if len(matches) >= MAX_DETECTIONS_PER_STAGE:
+                raise EngineLimitExceeded("keyword detection count exceeds the limit")
+            matches.append(match)
+        bounded_matches = tuple(matches)
         detections = tuple(
             EntityDetection(
                 entity=self.config.entity,
@@ -113,9 +121,9 @@ class KeywordEngine(
                 end=match.end,
                 confidence=ConfidenceLevel.HIGH,
             )
-            for match in matches
+            for match in bounded_matches
         )
-        if strategy is EntityProcessingStrategy.DETECT or not matches:
+        if strategy is EntityProcessingStrategy.DETECT or not bounded_matches:
             return TextProcessingResult(text=text, detections=detections)
 
         replacement = self.config.replacement
@@ -123,7 +131,7 @@ class KeywordEngine(
             raise EngineConfigurationError(
                 "keyword replacement configuration is required"
             )
-        output = _replace_matches(text, matches, replacement.token)
+        output = _replace_matches(text, bounded_matches, replacement.token)
         return TextProcessingResult(text=output, detections=detections)
 
 
