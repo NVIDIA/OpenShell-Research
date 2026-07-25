@@ -1316,12 +1316,6 @@ reimplement either.</p>
 <td>Service</td>
 </tr>
 <tr>
-<td>Input or intermediate text characters</td>
-<td><code>MAX_SCANNED_CHARACTERS</code></td>
-<td style="text-align: right;">4,194,304</td>
-<td>Processor</td>
-</tr>
-<tr>
 <td>Input or intermediate UTF-8 bytes</td>
 <td><code>MAX_BODY_BYTES</code></td>
 <td style="text-align: right;">4 MiB</td>
@@ -1459,11 +1453,6 @@ deny with no partial findings.</p>
 <td><code>MAX_REGEX_PATTERN_BYTES</code></td>
 <td style="text-align: right;">16 KiB</td>
 </tr>
-<tr>
-<td>Matches per pattern</td>
-<td><code>MAX_MATCHES_PER_PATTERN</code></td>
-<td style="text-align: right;">256</td>
-</tr>
 </tbody>
 </table>
 <p>Entity and pattern names use
@@ -1484,7 +1473,7 @@ configuration. It:</p>
   failure</li>
 <li>evaluates patterns independently to retain overlaps</li>
 <li>uses the timeout-capable third-party <code>regex</code> backend</li>
-<li>caps matches per pattern and detections per stage</li>
+<li>caps detections per stage</li>
 <li>projects exact UTF-8 replacement size before rendering</li>
 </ul>
 <p>No timeout, limit, or pattern failure returns partial stage detections or
@@ -1495,7 +1484,7 @@ mutated text.</p>
 <ul>
 <li>the shared timeout expires</li>
 <li>an engine exceeds its detection or output limit</li>
-<li>intermediate text exceeds the character or byte limit</li>
+<li>intermediate text exceeds the UTF-8 byte limit</li>
 <li>aggregate request detections exceed the limit</li>
 </ul>
 <p>The service returns the same bounded deny when:</p>

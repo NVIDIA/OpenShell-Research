@@ -1193,9 +1193,8 @@ boundaries.</p>
 </span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="nt">on_detection</span><span class="p">:</span>
 </span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">detect</span>
 </span></code></pre></div>
-<p><code>entity_processing</code> is an object so concrete pipeline-wide settings can be
-added later without changing the stage-list shape. V0 defines only <code>stages</code>.
-The list must be non-empty.</p>
+<p><code>entity_processing</code> groups the ordered stages and owns their non-empty-list and
+unique-diagnostic-name validation. V0 defines only <code>stages</code>.</p>
 <p>Each <code>EntityProcessingStage</code> contains:</p>
 <ul>
 <li>optional <code>name</code>, used only as bounded diagnostic provenance</li>
@@ -1234,8 +1233,8 @@ then immediately allows that body without invoking an engine.</p>
 <p>A non-empty body must decode as strict UTF-8. The decoded <code>str</code> is the only
 request input passed to <code>RequestProcessor</code>; headers, content type, request ID,
 target, and protobuf messages do not cross that boundary.</p>
-<p>The processor validates both character and encoded-byte bounds before running
-the pipeline.</p>
+<p>The processor validates the encoded UTF-8 byte bound before running the
+pipeline.</p>
 <h2 id="ordered-stage-execution">Ordered stage execution<a class="headerlink" href="#ordered-stage-execution" title="Permanent link">&para;</a></h2>
 <p>The processor derives one invocation strategy for the whole pipeline:</p>
 <table>
@@ -1267,7 +1266,7 @@ the pipeline.</p>
 <li>calls each stage exactly once in policy order</li>
 <li>passes the current text, invocation strategy, and shared timeout to
    <code>engine.run()</code></li>
-<li>validates intermediate character, byte, and detection limits</li>
+<li>validates intermediate UTF-8 byte and detection limits</li>
 <li>passes the returned text to the next stage</li>
 <li>checks the same timeout after the final result</li>
 </ol>

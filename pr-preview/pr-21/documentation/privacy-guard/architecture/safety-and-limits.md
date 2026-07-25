@@ -34,7 +34,6 @@ reimplement either.
 | Limit | Constant | Value | Owner |
 | --- | --- | ---: | --- |
 | Incoming request body | `MAX_BODY_BYTES` | 4 MiB | Service |
-| Input or intermediate text characters | `MAX_SCANNED_CHARACTERS` | 4,194,304 | Processor |
 | Input or intermediate UTF-8 bytes | `MAX_BODY_BYTES` | 4 MiB | Processor |
 | Engine output UTF-8 bytes | `MAX_BODY_BYTES` | 4 MiB | Engine wrapper |
 | Encoded replacement body | `MAX_BODY_BYTES` | 4 MiB | Service |
@@ -81,7 +80,6 @@ deny with no partial findings.
 | Entities per catalog | `MAX_REGEX_ENTITIES_PER_CATALOG` | 2,000 |
 | Patterns per catalog | `MAX_REGEX_PATTERNS_PER_CATALOG` | 10,000 |
 | Pattern string | `MAX_REGEX_PATTERN_BYTES` | 16 KiB |
-| Matches per pattern | `MAX_MATCHES_PER_PATTERN` | 256 |
 
 Entity and pattern names use
 `[A-Za-z_][A-Za-z0-9_-]*`. Pattern names are optional; their deterministic
@@ -104,7 +102,7 @@ configuration. It:
   failure
 - evaluates patterns independently to retain overlaps
 - uses the timeout-capable third-party `regex` backend
-- caps matches per pattern and detections per stage
+- caps detections per stage
 - projects exact UTF-8 replacement size before rendering
 
 No timeout, limit, or pattern failure returns partial stage detections or
@@ -117,7 +115,7 @@ The processor returns a successful deny with
 
 - the shared timeout expires
 - an engine exceeds its detection or output limit
-- intermediate text exceeds the character or byte limit
+- intermediate text exceeds the UTF-8 byte limit
 - aggregate request detections exceed the limit
 
 The service returns the same bounded deny when:
