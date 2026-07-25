@@ -7,7 +7,6 @@ from typing import Literal
 
 from pydantic import Field
 
-from privacy_guard.engine_registry import EngineRegistry
 from privacy_guard.engines import (
     ConfidenceLevel,
     EngineConfig,
@@ -17,6 +16,7 @@ from privacy_guard.engines import (
     EntityProcessingStrategy,
     TextProcessingResult,
 )
+from privacy_guard.engines.registry import EngineRegistry
 from privacy_guard.timeout import Timeout
 
 

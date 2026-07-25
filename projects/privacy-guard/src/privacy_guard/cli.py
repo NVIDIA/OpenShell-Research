@@ -10,8 +10,8 @@ from typing import Annotated
 
 import typer
 
-from privacy_guard.engine_registry import EngineRegistry, create_builtin_registry
 from privacy_guard.engines import EntityProcessingStrategy
+from privacy_guard.engines.registry import EngineRegistry, create_builtin_registry
 from privacy_guard.service.server import DEFAULT_LISTEN_ADDRESS, PrivacyGuardServer
 
 app = typer.Typer(

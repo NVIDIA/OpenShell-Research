@@ -9,7 +9,6 @@ import pytest
 from pydantic import field_validator
 
 from privacy_guard.base import StrictDomainModel
-from privacy_guard.engine_registry import EngineRegistry, create_builtin_registry
 from privacy_guard.engines import (
     EngineConfig,
     EngineConfigurationError,
@@ -19,6 +18,7 @@ from privacy_guard.engines import (
     RegexEngine,
     TextProcessingResult,
 )
+from privacy_guard.engines.registry import EngineRegistry, create_builtin_registry
 from privacy_guard.errors import EngineRegistryError, PrivacyGuardError
 from privacy_guard.timeout import Timeout
 

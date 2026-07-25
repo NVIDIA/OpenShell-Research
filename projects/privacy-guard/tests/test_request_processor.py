@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from privacy_guard.config import PolicyAction
-from privacy_guard.engine_registry import EngineRegistry
 from privacy_guard.engines import RegexEngine
+from privacy_guard.engines.registry import EngineRegistry
 from privacy_guard.request_processor import RequestDecision, RequestProcessor
 
 

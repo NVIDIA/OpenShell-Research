@@ -30,9 +30,8 @@ Run focused tests while working and `make check` before handoff.
 
 ## Project map
 
-- `src/privacy_guard/engines/`: engine contract and built-in implementations
+- `src/privacy_guard/engines/`: engine contract, registry, and built-in implementations
 - `src/privacy_guard/config.py`: policy action and ordered stage configuration
-- `src/privacy_guard/engine_registry.py`: registration and finalized config union
 - `src/privacy_guard/request_processor.py`: stage execution and policy disposition
 - `src/privacy_guard/cli.py`: command parsing, discovery, schema output, and server adapter
 - `src/privacy_guard/base.py`: package-wide strict immutable domain-model base

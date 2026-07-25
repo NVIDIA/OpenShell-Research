@@ -201,7 +201,7 @@ different engine inventories or runtime resources.
 Synchronous applications use:
 
 ```python
-from privacy_guard.engine_registry import create_builtin_registry
+from privacy_guard.engines.registry import create_builtin_registry
 from privacy_guard.service import PrivacyGuardServer
 
 server = PrivacyGuardServer(create_builtin_registry())

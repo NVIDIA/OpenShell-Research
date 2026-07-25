@@ -32,8 +32,8 @@ from privacy_guard.constants import (
     SERVICE_NAME,
     SERVICE_VERSION,
 )
-from privacy_guard.engine_registry import EngineRegistry
 from privacy_guard.engines import EngineConfig
+from privacy_guard.engines.registry import EngineRegistry
 from privacy_guard.errors import (
     EngineRegistryError,
     ErrorCode,

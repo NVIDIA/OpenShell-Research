@@ -117,7 +117,7 @@ Application startup registers engines and operator-owned resources, then
 returns one finalized registry:
 
 ```python
-from privacy_guard.engine_registry import EngineRegistry
+from privacy_guard.engines.registry import EngineRegistry
 
 
 def create_registry() -> EngineRegistry:
@@ -156,7 +156,7 @@ The base installation has an explicit built-in registry containing
 `RegexEngine`:
 
 ```python
-from privacy_guard.engine_registry import create_builtin_registry
+from privacy_guard.engines.registry import create_builtin_registry
 
 registry = create_builtin_registry()
 ```
@@ -166,7 +166,7 @@ registry = create_builtin_registry()
 The server is a library API independent of the command-line application:
 
 ```python
-from privacy_guard.engine_registry import create_builtin_registry
+from privacy_guard.engines.registry import create_builtin_registry
 from privacy_guard.service import PrivacyGuardServer
 
 server = PrivacyGuardServer(create_builtin_registry())

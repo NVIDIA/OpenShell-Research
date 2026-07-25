@@ -10,7 +10,7 @@ import grpc
 import pytest
 
 from privacy_guard.constants import MAX_CONCURRENT_RPCS, MAX_RECEIVE_MESSAGE_BYTES
-from privacy_guard.engine_registry import EngineRegistry, create_builtin_registry
+from privacy_guard.engines.registry import EngineRegistry, create_builtin_registry
 from privacy_guard.errors import EngineRegistryError, ErrorCode, PrivacyGuardError
 from privacy_guard.service import server as server_module
 from privacy_guard.service.server import PrivacyGuardServer

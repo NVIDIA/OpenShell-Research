@@ -11,8 +11,8 @@ from google.protobuf.message import Message
 
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
 from privacy_guard.config import PrivacyGuardConfig
-from privacy_guard.engine_registry import create_builtin_registry
 from privacy_guard.engines import EngineConfig
+from privacy_guard.engines.registry import create_builtin_registry
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
 from privacy_guard.request_processor import RequestProcessor
 from privacy_guard.service import servicer as servicer_module

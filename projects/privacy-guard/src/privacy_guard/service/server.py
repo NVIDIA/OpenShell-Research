@@ -9,7 +9,7 @@ import grpc
 
 from privacy_guard.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
 from privacy_guard.constants import MAX_CONCURRENT_RPCS, MAX_RECEIVE_MESSAGE_BYTES
-from privacy_guard.engine_registry import EngineRegistry
+from privacy_guard.engines.registry import EngineRegistry
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
 

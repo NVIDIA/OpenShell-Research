@@ -13,7 +13,7 @@ from typer.testing import CliRunner, Result
 
 from privacy_guard import cli as cli_module
 from privacy_guard.cli import app
-from privacy_guard.engine_registry import EngineRegistry, create_builtin_registry
+from privacy_guard.engines.registry import EngineRegistry, create_builtin_registry
 from privacy_guard.service.server import PrivacyGuardServer
 
 

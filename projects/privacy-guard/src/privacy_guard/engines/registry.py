@@ -18,11 +18,13 @@ from privacy_guard.config import (
     PolicyAction,
     PrivacyGuardConfig,
 )
-from privacy_guard.engines import (
+from privacy_guard.engines.base import (
     EngineConfig,
     EngineResources,
     EntityProcessingEngine,
     EntityProcessingStrategy,
+)
+from privacy_guard.engines.regex import (
     RegexEngine,
 )
 from privacy_guard.errors import (

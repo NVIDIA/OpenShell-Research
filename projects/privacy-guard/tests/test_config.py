@@ -16,12 +16,12 @@ from privacy_guard.config import (
     PolicyAction,
     configuration_fingerprint,
 )
-from privacy_guard.engine_registry import EngineRegistry
 from privacy_guard.engines import (
     RegexEngine,
     RegexEngineConfig,
     RegexPatternCatalog,
 )
+from privacy_guard.engines.registry import EngineRegistry
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
 
 

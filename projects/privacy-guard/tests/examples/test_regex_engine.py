@@ -14,8 +14,8 @@ import yaml
 from google.protobuf import json_format
 
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
-from privacy_guard.engine_registry import create_builtin_registry
 from privacy_guard.engines import RegexPatternCatalog
+from privacy_guard.engines.registry import create_builtin_registry
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
 
 EXAMPLE_DIRECTORY = Path(__file__).parents[2] / "examples" / "regex-engine"
