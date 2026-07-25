@@ -102,8 +102,7 @@ confidence. For each `EntityDetectionSummary`, the service emits:
 
 - `type`: `detected_entity`
 - `label`: `entity (source-stage)`
-- `confidence`: the categorical value, a bounded numeric representation, or
-  empty when absent
+- `confidence`: the categorical value or empty when absent
 - `count`: aggregate occurrence count
 
 The current OpenShell `Finding` message has no dedicated source field.

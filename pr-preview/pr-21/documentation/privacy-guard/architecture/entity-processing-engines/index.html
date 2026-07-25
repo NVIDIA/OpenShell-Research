@@ -1369,7 +1369,7 @@ the strategy, never the user-facing <code>PolicyAction</code>.</p>
 </tr>
 <tr>
 <td><code>confidence</code></td>
-<td>Optional <code>low</code>, <code>medium</code>, <code>high</code>, or strict value from 0 through 1</td>
+<td>Optional <code>low</code>, <code>medium</code>, or <code>high</code> certainty</td>
 </tr>
 <tr>
 <td><code>metadata</code></td>
@@ -1385,9 +1385,8 @@ it stops consuming the iterable as soon as the stage limit is exceeded.</p>
 successful return is the engine's authoritative completed result. Text may not
 change without at least one detection. Engines must raise on native partial
 failure instead of returning partial output.</p>
-<p>Confidence remains in the representation supplied by the engine. Privacy Guard
-does not invent numeric values for categorical confidence or compare confidence
-across engines.</p>
+<p>Privacy Guard preserves categorical confidence as supplied by the engine and
+does not compare confidence across engines.</p>
 <h2 id="custom-engine-example">Custom engine example<a class="headerlink" href="#custom-engine-example" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Literal</span>
@@ -1506,7 +1505,7 @@ retention, deletion, consistency, and policy ownership.</p>
 <li>detection-only immutability</li>
 <li>replacement behavior and native partial failure</li>
 <li>Unicode offsets and invalid spans</li>
-<li>categorical and numeric confidence</li>
+<li>categorical confidence</li>
 <li>output and detection limits</li>
 <li>timeout propagation and expiration</li>
 <li>deterministic ordering where relevant</li>
