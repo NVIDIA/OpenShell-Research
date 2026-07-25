@@ -56,7 +56,7 @@ class KeywordEngine(EntityProcessingEngine[KeywordEngineConfig]):
 
 
 def create_registry() -> EngineRegistry:
-    """Create the application-scoped registry used by every CLI command."""
-    registry = EngineRegistry()
+    """Create a registry containing the built-in and custom engines."""
+    registry = EngineRegistry(include_builtin_engines=True)
     registry.register(KeywordEngine)
     return registry.finalize()

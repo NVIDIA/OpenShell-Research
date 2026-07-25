@@ -46,10 +46,12 @@ class EngineDescription:
 class EngineRegistry:
     """Register engine implementations and finalize their exact policy union."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, include_builtin_engines: bool = False) -> None:
         self._registrations: dict[str, _Registration] = {}
         self._config_type: FinalizedPrivacyGuardConfigType | None = None
         self._config_adapter: TypeAdapter[FinalizedPrivacyGuardConfig] | None = None
+        if include_builtin_engines:
+            self.register(RegexEngine)
 
     @property
     def is_finalized(self) -> bool:
@@ -236,9 +238,7 @@ class EngineRegistry:
 
 def create_builtin_registry() -> EngineRegistry:
     """Build the finalized registry shipped by the base package."""
-    registry = EngineRegistry()
-    registry.register(RegexEngine)
-    return registry.finalize()
+    return EngineRegistry(include_builtin_engines=True).finalize()
 
 
 @dataclass(frozen=True)

@@ -127,10 +127,17 @@ def test_builtin_registry_contains_the_builtin_regex_engine() -> None:
     )
 
 
+def test_registry_can_include_builtin_engines_before_custom_registration() -> None:
+    registry = EngineRegistry(include_builtin_engines=True)
+    registry.register(AcmeEngine, resources=AcmeResources(prefix="token"))
+    registry.finalize()
+
+    assert registry.engine_names == ("regex", "acme-pii")
+
+
 def test_custom_engine_config_joins_the_exact_discriminated_union() -> None:
     resources = AcmeResources(prefix="token")
-    registry = EngineRegistry()
-    registry.register(RegexEngine)
+    registry = EngineRegistry(include_builtin_engines=True)
     registry.register(AcmeEngine, resources=resources)
     registry.finalize()
 

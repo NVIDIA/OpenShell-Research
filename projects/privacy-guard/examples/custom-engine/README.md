@@ -10,7 +10,8 @@ The implementation is intentionally compact but complete:
 - `KeywordEngineConfig` defines the policy-owned entity and keyword.
 - `KeywordEngine._run()` finds every literal occurrence and returns detections.
 - `TextProcessingResult.from_detections()` bounds the lazy detection stream.
-- `create_registry()` registers the implementation for every CLI command.
+- `create_registry()` includes the built-in engines and registers the custom
+  implementation for every CLI command.
 
 The base engine wrapper validates strategy support, input, timeout, spans,
 output size, mutation behavior, and result cardinality. Custom engines add
@@ -72,10 +73,11 @@ uv run privacy-guard \
   schema
 ```
 
-The first command should print one `keyword-tool` row with `detect`.
-The schema should contain `KeywordEngineConfig`, including its exact `entity`,
-and `keyword` fields. Registry factories execute operator Python code in the
-Privacy Guard process; use only trusted modules.
+The first command should print the built-in `regex` row with `detect,replace`
+and the custom `keyword-tool` row with `detect`. The schema should contain both
+`RegexEngineConfig` and `KeywordEngineConfig`; the latter includes its exact
+`entity` and `keyword` fields. Registry factories execute operator Python code
+in the Privacy Guard process; use only trusted modules.
 
 `privacy-guard-config.yaml` shows the standalone engine configuration. OpenShell
 does not load that file separately; `policy.yaml` contains the same configuration

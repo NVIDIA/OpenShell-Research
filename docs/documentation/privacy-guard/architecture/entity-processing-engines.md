@@ -209,10 +209,14 @@ Register the implementation and, when required, its resources before finalizing
 the registry:
 
 ```python
-registry = EngineRegistry()
+registry = EngineRegistry(include_builtin_engines=True)
 registry.register(KeywordEngine)
 registry = registry.finalize()
 ```
+
+The opt-in constructor argument registers the engines shipped by Privacy Guard
+before application-specific engines. Omit it when the registry should contain
+only explicitly registered implementations.
 
 Finalization freezes registration and constructs the exact policy config type,
 JSON Schema, and engine discovery metadata.

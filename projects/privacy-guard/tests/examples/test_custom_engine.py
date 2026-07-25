@@ -94,9 +94,10 @@ def test_custom_registry_drives_cli_discovery_and_schema() -> None:
         env=environment,
     )
 
-    assert engines.stdout.startswith("keyword-tool\tdetect\t")
-    assert "regex" not in engines.stdout
+    assert engines.stdout.startswith("regex\tdetect,replace\t")
+    assert "keyword-tool\tdetect\t" in engines.stdout
     serialized_schema = json.loads(schema.stdout)
+    assert "RegexEngineConfig" in serialized_schema["$defs"]
     assert "KeywordEngineConfig" in serialized_schema["$defs"]
     keyword_properties = serialized_schema["$defs"]["KeywordEngineConfig"]["properties"]
     assert set(keyword_properties) == {
@@ -118,6 +119,7 @@ def test_openshell_walkthrough_uses_the_custom_registry_and_current_policy() -> 
     assert isinstance(policy, dict)
     assert isinstance(config, dict)
     assert not (EXAMPLE_DIRECTORY / "privacy_guard_app.py").exists()
+    assert "EngineRegistry(include_builtin_engines=True)" in implementation
     assert "def create_registry() -> EngineRegistry:" in implementation
     middleware_config = policy["network_middlewares"]["privacy_guard_detect"]
     assert middleware_config["middleware"] == "privacy-guard-custom-engine"

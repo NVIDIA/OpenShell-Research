@@ -121,10 +121,14 @@ from privacy_guard.engine_registry import EngineRegistry
 
 
 def create_registry() -> EngineRegistry:
-    registry = EngineRegistry()
+    registry = EngineRegistry(include_builtin_engines=True)
     registry.register(AcmeEngine, resources=AcmeResources(client=client))
     return registry.finalize()
 ```
+
+Set `include_builtin_engines=True` when a custom deployment should extend the
+standard engine inventory. Leave it at the default `False` for an intentionally
+isolated registry.
 
 Pass that factory to every CLI operation so discovery, schema generation, and
 the running server use the same engine inventory. The module must be installed
