@@ -6,9 +6,10 @@ import asyncio
 import logging
 import time
 from collections import OrderedDict
+from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from threading import RLock
-from typing import Never, Protocol, TypedDict
+from typing import Never, Protocol, TypedDict, TypeVar
 
 import grpc
 from google.protobuf import json_format
@@ -92,7 +93,7 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         ],
     ) -> pb2.ValidateConfigResponse:
         """Validate expanded configuration without preparing runtime state."""
-        return self._validate_config(request)
+        return await self._run_in_worker(lambda: self._validate_config(request))
 
     @override
     async def EvaluateHttpRequest(
@@ -184,27 +185,43 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
             raise PrivacyGuardError(ErrorCode.REQUEST_PHASE_INVALID)
         if len(request.body) > MAX_BODY_BYTES:
             raise PrivacyGuardError(ErrorCode.REQUEST_BODY_TOO_LARGE)
-        processor = self._processors.resolve(_mapping_from_proto(request.config))
-        if not request.body:
+        values = _mapping_from_proto(request.config)
+        result = await self._run_in_worker(
+            lambda: self._prepare_and_process(values, request.body)
+        )
+        if result is None:
             return pb2.HttpRequestResult(decision=pb2.DECISION_ALLOW)
+
+        return _result_to_proto(result)
+
+    def _prepare_and_process(
+        self,
+        values: object,
+        body: bytes,
+    ) -> RequestProcessingResult | None:
+        processor = self._processors.resolve(values)
+        if not body:
+            return None
         try:
-            text = request.body.decode("utf-8", errors="strict")
+            text = body.decode("utf-8", errors="strict")
         except UnicodeDecodeError:
             raise PrivacyGuardError(ErrorCode.BODY_ENCODING_INVALID) from None
+        return processor.process(text)
 
+    async def _run_in_worker(
+        self,
+        operation: Callable[[], _WorkerResultT],
+    ) -> _WorkerResultT:
+        """Run one bounded synchronous operation without blocking the event loop."""
         await self._processing_slots.acquire()
         try:
-            worker = self._processing_executor.submit(
-                processor.process,
-                text,
-            )
+            worker = self._processing_executor.submit(operation)
             future = asyncio.create_task(_await_worker(worker))
         except BaseException:
             self._processing_slots.release()
             raise
         future.add_done_callback(lambda _: self._processing_slots.release())
-        result = await asyncio.shield(future)
-        return _result_to_proto(result)
+        return await asyncio.shield(future)
 
 
 class _RequestProcessorCache:
@@ -263,9 +280,10 @@ class _RequestProcessorCache:
         )
 
 
-async def _await_worker(
-    worker: Future[RequestProcessingResult],
-) -> RequestProcessingResult:
+_WorkerResultT = TypeVar("_WorkerResultT")
+
+
+async def _await_worker(worker: Future[_WorkerResultT]) -> _WorkerResultT:
     """Bridge a worker without relying on broken cross-thread loop wakeups."""
     while not worker.done():
         await asyncio.sleep(0.001)

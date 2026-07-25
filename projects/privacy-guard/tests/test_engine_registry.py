@@ -10,7 +10,7 @@ import pytest
 from pydantic import field_validator
 
 from privacy_guard.base import StrictDomainModel
-from privacy_guard.engine_registry import EngineRegistry
+from privacy_guard.engine_registry import EngineRegistry, create_builtin_registry
 from privacy_guard.engines import (
     EngineConfig,
     EngineConfigurationError,
@@ -110,6 +110,21 @@ def _acme_values(*, action: str = "detect") -> dict[str, object]:
         },
         "on_detection": {"action": action},
     }
+
+
+def test_builtin_registry_contains_the_builtin_regex_engine() -> None:
+    registry = create_builtin_registry()
+
+    assert registry.is_finalized is True
+    assert registry.engine_names == ("regex",)
+    description = registry.describe_engines()[0]
+    assert description.engine == "regex"
+    assert description.supported_strategies == frozenset(
+        {
+            EntityProcessingStrategy.DETECT,
+            EntityProcessingStrategy.REPLACE,
+        }
+    )
 
 
 def test_custom_engine_config_joins_the_exact_discriminated_union() -> None:

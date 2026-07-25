@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+from threading import get_ident
 
 import pytest
 from google.protobuf import json_format
 from google.protobuf.message import Message
 
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
+from privacy_guard.engine_registry import create_builtin_registry
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
-from privacy_guard.service.server import create_builtin_registry
+from privacy_guard.request_processor import RequestProcessor
+from privacy_guard.service import servicer as servicer_module
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
 
 
@@ -100,6 +103,39 @@ def test_evaluation_decodes_one_utf8_text_and_encodes_replacement() -> None:
     assert len(result.findings) == 1
     assert result.findings[0].type == "detected_entity"
     assert result.findings[0].label == "email (regex[1])"
+
+
+def test_evaluation_prepares_configuration_off_the_event_loop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    event_loop_thread = get_ident()
+    preparation_threads: list[int] = []
+    original_resolve = servicer_module._RequestProcessorCache.resolve
+
+    def record_resolve(
+        cache: servicer_module._RequestProcessorCache,
+        values: object,
+    ) -> RequestProcessor:
+        preparation_threads.append(get_ident())
+        return original_resolve(cache, values)
+
+    monkeypatch.setattr(
+        servicer_module._RequestProcessorCache,
+        "resolve",
+        record_resolve,
+    )
+
+    async def evaluate() -> None:
+        middleware = PrivacyGuardMiddleware(create_builtin_registry())
+        try:
+            await middleware._evaluate_http_request(_request(b"email a@b.com"))
+        finally:
+            await middleware.close()
+
+    asyncio.run(evaluate())
+
+    assert len(preparation_threads) == 1
+    assert preparation_threads[0] != event_loop_thread
 
 
 def test_invalid_utf8_fails_before_invoking_an_engine() -> None:

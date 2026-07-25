@@ -83,7 +83,9 @@ change in the canonical OpenShell protocol rather than a private proto fork.
 detection and deterministic template replacement. It preserves numeric
 backreferences by wrapping each configured pattern in a non-capturing group
 followed by a private named marker. Pattern names are optional diagnostic
-identities; `pattern` is the only field containing the regex string.
+identities; `pattern` is the only field containing the regex string. Equivalent
+normalized catalogs reuse a bounded compiled-rule cache across validation and
+engine construction.
 
 The third-party `regex` backend provides enforceable per-search timeouts.
 Explicit `ignore_case`, `multiline`, `dot_all`, and `ascii` flags are supported;
@@ -138,7 +140,7 @@ walkthrough. It also shows the explicit `PYTHONPATH` setup needed when the
 factory is a standalone local module rather than an installed package.
 
 The registry is application-scoped, not a process-global singleton. A
-`MiddlewareServer` requires an explicit finalized registry. The finalized
+`PrivacyGuardServer` requires an explicit finalized registry. The finalized
 registry builds a Pydantic discriminated union containing the exact config type
 of every registered engine, so `stage.config` round-trips without dropping
 engine-specific or replacement-variant fields.
@@ -147,10 +149,34 @@ The base installation has an explicit built-in registry containing
 `RegexEngine`:
 
 ```python
-from privacy_guard.service.server import create_builtin_registry
+from privacy_guard.engine_registry import create_builtin_registry
 
 registry = create_builtin_registry()
 ```
+
+## Programmatic server
+
+The server is a library API independent of the command-line application:
+
+```python
+from privacy_guard.engine_registry import create_builtin_registry
+from privacy_guard.service import PrivacyGuardServer
+
+server = PrivacyGuardServer(create_builtin_registry())
+server.run("127.0.0.1:50051")
+```
+
+`run()` is the blocking synchronous entry point. Async applications can use the
+same server directly:
+
+```python
+await server.serve("127.0.0.1:50051")
+```
+
+Custom applications pass their own finalized registry to
+`PrivacyGuardServer`. The server owns the middleware adapter, bounded gRPC
+transport, worker executor, and shutdown lifecycle; it does not load Python
+modules, select engines, generate schemas, or parse command-line options.
 
 ## CLI
 
@@ -165,6 +191,8 @@ flags. Deployment startup owns only installed engine implementations and
 operator resources such as model profiles, endpoints, clients, and credentials.
 Use `--registry-factory module:factory` for a custom engine installation.
 Registry factories execute operator Python code; load only trusted modules.
+The `privacy_guard.cli` module owns the executable application and adapts its
+`serve` command to the programmatic server API.
 
 ## Safety and limits
 

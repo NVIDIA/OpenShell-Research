@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
-privacy-guard = "privacy_guard.service.server:app"
+privacy-guard = "privacy_guard.cli:app"
 
 [project.urls]
 Repository = "https://github.com/NVIDIA/OpenShell-Research"

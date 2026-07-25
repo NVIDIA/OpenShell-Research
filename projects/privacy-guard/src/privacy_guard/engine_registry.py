@@ -23,6 +23,7 @@ from privacy_guard.engines import (
     EngineResources,
     EntityProcessingEngine,
     EntityProcessingStrategy,
+    RegexEngine,
 )
 from privacy_guard.errors import (
     EngineConfigurationError,
@@ -233,6 +234,13 @@ class EngineRegistry:
         return registration
 
 
+def create_builtin_registry() -> EngineRegistry:
+    """Build the finalized registry shipped by the base package."""
+    registry = EngineRegistry()
+    registry.register(RegexEngine)
+    return registry.finalize()
+
+
 @dataclass(frozen=True)
 class _Registration:
     engine_type: type[object]
@@ -277,4 +285,5 @@ _ENGINE_NAME = re.compile(r"[a-z][a-z0-9-]{0,127}\Z")
 __all__ = [
     "EngineDescription",
     "EngineRegistry",
+    "create_builtin_registry",
 ]

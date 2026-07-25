@@ -1,35 +1,23 @@
-"""Registry-based server lifecycle and discovery CLI tests."""
+"""Programmatic Privacy Guard server lifecycle tests."""
 
 from __future__ import annotations
 
 import asyncio
-import json
-import logging
-import re
-from types import SimpleNamespace
+import subprocess
+import sys
 
 import grpc
 import pytest
-from typer.testing import CliRunner, Result
 
 from privacy_guard.constants import MAX_CONCURRENT_RPCS, MAX_RECEIVE_MESSAGE_BYTES
-from privacy_guard.engine_registry import EngineRegistry
-from privacy_guard.engines import EntityProcessingStrategy
+from privacy_guard.engine_registry import EngineRegistry, create_builtin_registry
 from privacy_guard.errors import EngineRegistryError, ErrorCode, PrivacyGuardError
 from privacy_guard.service import server as server_module
-from privacy_guard.service.server import (
-    MiddlewareServer,
-    app,
-    create_builtin_registry,
-    create_server,
-    serve,
-)
+from privacy_guard.service.server import PrivacyGuardServer
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
 
-_ANSI_STYLE_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
 
-
-class LifecycleServerFake:
+class _LifecycleServerFake:
     """Minimal async-server fake for lifecycle-only tests."""
 
     def __init__(
@@ -38,14 +26,21 @@ class LifecycleServerFake:
         bound_port: int = 50051,
         bind_error: RuntimeError | None = None,
         start_error: RuntimeError | None = None,
+        wait_error: BaseException | None = None,
+        block_stop: bool = False,
     ) -> None:
         self.bound_port = bound_port
         self.bind_error = bind_error
         self.start_error = start_error
+        self.wait_error = wait_error
         self.addresses: list[str] = []
         self.started = False
         self.waited = False
         self.stop_graces: list[float | None] = []
+        self.stop_started = asyncio.Event()
+        self.stop_release = asyncio.Event()
+        if not block_stop:
+            self.stop_release.set()
 
     def add_insecure_port(self, address: str) -> int:
         self.addresses.append(address)
@@ -60,62 +55,81 @@ class LifecycleServerFake:
 
     async def wait_for_termination(self, timeout: float | None = None) -> bool:
         del timeout
+        if self.wait_error is not None:
+            raise self.wait_error
         self.waited = True
         return True
 
     async def stop(self, grace: float | None) -> None:
         self.stop_graces.append(grace)
+        self.stop_started.set()
+        await self.stop_release.wait()
 
 
-def _plain_output(result: Result) -> str:
-    return _ANSI_STYLE_PATTERN.sub("", result.output)
-
-
-def _middleware() -> PrivacyGuardMiddleware:
-    return PrivacyGuardMiddleware(create_builtin_registry())
-
-
-def test_builtin_registry_contains_the_builtin_regex_engine() -> None:
-    registry = create_builtin_registry()
-
-    assert registry.is_finalized is True
-    assert registry.engine_names == ("regex",)
-    description = registry.describe_engines()[0]
-    assert description.engine == "regex"
-    assert description.supported_strategies == frozenset(
-        {
-            EntityProcessingStrategy.DETECT,
-            EntityProcessingStrategy.REPLACE,
-        }
-    )
-
-
-def test_middleware_server_uses_an_injected_registry_and_default_address(
+def test_programmatic_server_runs_with_injected_registry_and_default_address(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     registry = create_builtin_registry()
-    served: list[tuple[PrivacyGuardMiddleware, str]] = []
+    served: list[tuple[PrivacyGuardServer, str]] = []
 
-    async def record_serve(servicer: PrivacyGuardMiddleware, listen: str) -> None:
-        served.append((servicer, listen))
-        await servicer.close()
+    async def record_serve(self: PrivacyGuardServer, listen: str) -> None:
+        served.append((self, listen))
+        await self._middleware.close()
 
-    monkeypatch.setattr(server_module, "serve", record_serve)
+    monkeypatch.setattr(PrivacyGuardServer, "serve", record_serve)
 
-    MiddlewareServer(registry=registry, log_request_content=True).serve()
+    server = PrivacyGuardServer(registry=registry, log_request_content=True)
+    server.run()
 
-    assert len(served) == 1
-    assert served[0][1] == "127.0.0.1:50051"
-    assert served[0][0]._registry is registry
-    assert served[0][0]._processors._log_request_content is True
+    assert served == [(server, "127.0.0.1:50051")]
+    assert server._middleware._registry is registry
+    assert server._middleware._processors._log_request_content is True
 
 
-def test_middleware_server_requires_an_explicit_finalized_registry() -> None:
+def test_programmatic_server_requires_an_explicit_finalized_registry() -> None:
     with pytest.raises(EngineRegistryError, match="finalized"):
-        MiddlewareServer(EngineRegistry())
+        PrivacyGuardServer(EngineRegistry())
 
 
-def test_create_server_sets_transport_limits_and_registers_servicer(
+def test_synchronous_server_exits_cleanly_after_keyboard_interrupt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    server = PrivacyGuardServer(create_builtin_registry())
+
+    async def interrupt(self: PrivacyGuardServer, listen: str) -> None:
+        del self, listen
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(PrivacyGuardServer, "serve", interrupt)
+
+    server.run()
+    asyncio.run(server._middleware.close())
+
+
+def test_programmatic_server_import_does_not_load_the_cli_framework() -> None:
+    probe = (
+        "import sys; "
+        "from privacy_guard.service import PrivacyGuardServer; "
+        "assert PrivacyGuardServer.__name__ == 'PrivacyGuardServer'; "
+        "assert 'privacy_guard.cli' not in sys.modules; "
+        "assert 'typer' not in sys.modules"
+    )
+
+    subprocess.run([sys.executable, "-c", probe], check=True)
+
+
+def test_engine_import_does_not_load_the_server_transport() -> None:
+    probe = (
+        "import sys; "
+        "import privacy_guard.engines; "
+        "assert 'privacy_guard.service' not in sys.modules; "
+        "assert 'grpc' not in sys.modules"
+    )
+
+    subprocess.run([sys.executable, "-c", probe], check=True)
+
+
+def test_server_sets_transport_limits_and_registers_middleware(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fake_server = object()
@@ -131,10 +145,10 @@ def test_create_server_sets_transport_limits_and_registers_servicer(
         return fake_server
 
     def record_registration(
-        servicer: PrivacyGuardMiddleware,
+        middleware: PrivacyGuardMiddleware,
         server: object,
     ) -> None:
-        registrations.append((servicer, server))
+        registrations.append((middleware, server))
 
     middleware = _middleware()
     monkeypatch.setattr(grpc.aio, "server", fake_server_factory)
@@ -144,7 +158,7 @@ def test_create_server_sets_transport_limits_and_registers_servicer(
         record_registration,
     )
     try:
-        result = create_server(middleware)
+        result = server_module._create_grpc_server(middleware)
     finally:
         asyncio.run(middleware.close())
 
@@ -158,142 +172,13 @@ def test_create_server_sets_transport_limits_and_registers_servicer(
     assert registrations == [(middleware, fake_server)]
 
 
-def test_cli_help_exposes_only_pipeline_server_and_discovery_commands() -> None:
-    result = CliRunner().invoke(app, ["--help"])
-
-    assert result.exit_code == 0
-    output = _plain_output(result)
-    assert "serve" in output
-    assert "schema" in output
-    assert "engines" in output
-    assert "--debug" in output
-    assert "--debug-log-content" in output
-    assert "--registry-factory" in output
-    assert "--config" not in output
-    assert "--profile" not in output
-    assert "--scanner-name" not in output
-
-
-def test_cli_engines_describes_the_installed_engine() -> None:
-    result = CliRunner().invoke(app, ["engines"])
-
-    assert result.exit_code == 0
-    assert result.output.startswith("regex\tdetect,replace\t")
-    assert "Detect overlapping regex matches" in result.output
-
-
-def test_cli_schema_prints_the_finalized_discriminated_policy_schema() -> None:
-    result = CliRunner().invoke(app, ["schema"])
-
-    assert result.exit_code == 0
-    schema = json.loads(result.output)
-    serialized = json.dumps(schema, sort_keys=True)
-    assert '"propertyName": "engine"' in serialized
-    assert '"regex"' in serialized
-    assert '"on_detection"' in serialized
-
-
-def test_cli_loads_one_finalized_operator_registry(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    registry = create_builtin_registry()
-    factory_calls = 0
-
-    def create_registry() -> EngineRegistry:
-        nonlocal factory_calls
-        factory_calls += 1
-        return registry
-
-    monkeypatch.setattr(
-        server_module.importlib,
-        "import_module",
-        lambda module_name: (
-            SimpleNamespace(create_registry=create_registry)
-            if module_name == "operator_engines"
-            else None
-        ),
-    )
-
-    result = CliRunner().invoke(
-        app,
-        ["--registry-factory", "operator_engines:create_registry", "engines"],
-    )
-
-    assert result.exit_code == 0
-    assert factory_calls == 1
-    assert result.output.startswith("regex\tdetect,replace\t")
-
-
-@pytest.mark.parametrize(
-    ("factory_reference", "reason"),
-    [
-        ("missing-separator", "module:factory"),
-        ("operator_engines:missing", "could not be loaded"),
-        ("operator_engines:not_callable", "not callable"),
-        ("operator_engines:failed", "factory failed"),
-        ("operator_engines:wrong_type", "invalid"),
-        ("operator_engines:unfinished", "unfinalized"),
-    ],
-)
-def test_cli_rejects_invalid_registry_factories(
-    monkeypatch: pytest.MonkeyPatch,
-    factory_reference: str,
-    reason: str,
-) -> None:
-    def fail() -> EngineRegistry:
-        raise RuntimeError("sensitive factory failure")
-
-    module = SimpleNamespace(
-        not_callable=object(),
-        failed=fail,
-        wrong_type=lambda: object(),
-        unfinished=lambda: EngineRegistry(),
-    )
-    monkeypatch.setattr(
-        server_module.importlib,
-        "import_module",
-        lambda _: module,
-    )
-
-    result = CliRunner().invoke(
-        app,
-        ["--registry-factory", factory_reference, "engines"],
-    )
-
-    assert result.exit_code == 2
-    assert reason in _plain_output(result)
-    assert "sensitive factory failure" not in _plain_output(result)
-
-
-def test_cli_serve_forwards_operational_options_only(
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    calls: list[tuple[str, bool]] = []
-
-    def record_serve(self: MiddlewareServer, listen: str) -> None:
-        calls.append((listen, self._servicer._processors._log_request_content))
-
-    monkeypatch.setattr(MiddlewareServer, "serve", record_serve)
-
-    with caplog.at_level(logging.WARNING, logger="privacy_guard.service.server"):
-        result = CliRunner().invoke(
-            app,
-            ["--debug-log-content", "serve", "--listen", "127.0.0.1:50052"],
-        )
-
-    assert result.exit_code == 0
-    assert calls == [("127.0.0.1:50052", True)]
-    assert "privacy_guard_request_content_logging_enabled" in caplog.text
-
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("fake_server", "sensitive_address"),
     [
-        (LifecycleServerFake(bound_port=0), "invalid-sensitive-listen-8472"),
+        (_LifecycleServerFake(bound_port=0), "invalid-sensitive-listen-8472"),
         (
-            LifecycleServerFake(
+            _LifecycleServerFake(
                 bind_error=RuntimeError("invalid-sensitive-listen-9472")
             ),
             "invalid-sensitive-listen-9472",
@@ -302,20 +187,20 @@ def test_cli_serve_forwards_operational_options_only(
 )
 async def test_serve_sanitizes_bind_failures_and_closes_resources(
     monkeypatch: pytest.MonkeyPatch,
-    fake_server: LifecycleServerFake,
+    fake_server: _LifecycleServerFake,
     sensitive_address: str,
 ) -> None:
     closed: list[PrivacyGuardMiddleware] = []
 
-    async def record_close(servicer: PrivacyGuardMiddleware) -> None:
-        closed.append(servicer)
+    async def record_close(middleware: PrivacyGuardMiddleware) -> None:
+        closed.append(middleware)
 
-    middleware = _middleware()
-    monkeypatch.setattr(server_module, "create_server", lambda _: fake_server)
+    server = PrivacyGuardServer(create_builtin_registry())
+    monkeypatch.setattr(server_module, "_create_grpc_server", lambda _: fake_server)
     monkeypatch.setattr(PrivacyGuardMiddleware, "close", record_close)
 
     with pytest.raises(PrivacyGuardError) as captured:
-        await serve(middleware, sensitive_address)
+        await server.serve(sensitive_address)
 
     assert captured.value.code is ErrorCode.SERVER_BIND_FAILED
     assert captured.value.__cause__ is None
@@ -323,49 +208,104 @@ async def test_serve_sanitizes_bind_failures_and_closes_resources(
     assert fake_server.started is False
     assert fake_server.waited is False
     assert fake_server.stop_graces == [0]
-    assert closed == [middleware]
+    assert closed == [server._middleware]
 
 
 @pytest.mark.asyncio
 async def test_serve_starts_waits_and_closes_on_normal_termination(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake_server = LifecycleServerFake()
+    fake_server = _LifecycleServerFake()
     closed: list[PrivacyGuardMiddleware] = []
 
-    async def record_close(servicer: PrivacyGuardMiddleware) -> None:
-        closed.append(servicer)
+    async def record_close(middleware: PrivacyGuardMiddleware) -> None:
+        closed.append(middleware)
 
-    middleware = _middleware()
-    monkeypatch.setattr(server_module, "create_server", lambda _: fake_server)
+    server = PrivacyGuardServer(create_builtin_registry())
+    monkeypatch.setattr(server_module, "_create_grpc_server", lambda _: fake_server)
     monkeypatch.setattr(PrivacyGuardMiddleware, "close", record_close)
 
-    await serve(middleware, "127.0.0.1:50053")
+    await server.serve("127.0.0.1:50053")
 
     assert fake_server.addresses == ["127.0.0.1:50053"]
     assert fake_server.started is True
     assert fake_server.waited is True
     assert fake_server.stop_graces == [0]
-    assert closed == [middleware]
+    assert closed == [server._middleware]
+
+
+@pytest.mark.asyncio
+async def test_serve_propagates_cancellation_after_closing_resources(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_server = _LifecycleServerFake(wait_error=asyncio.CancelledError())
+    closed: list[PrivacyGuardMiddleware] = []
+
+    async def record_close(middleware: PrivacyGuardMiddleware) -> None:
+        closed.append(middleware)
+
+    server = PrivacyGuardServer(create_builtin_registry())
+    monkeypatch.setattr(server_module, "_create_grpc_server", lambda _: fake_server)
+    monkeypatch.setattr(PrivacyGuardMiddleware, "close", record_close)
+
+    with pytest.raises(asyncio.CancelledError):
+        await server.serve("127.0.0.1:50054")
+
+    assert fake_server.started is True
+    assert fake_server.stop_graces == [0]
+    assert closed == [server._middleware]
+
+
+@pytest.mark.asyncio
+async def test_serve_preserves_cancellation_during_server_shutdown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_server = _LifecycleServerFake(block_stop=True)
+    closed: list[PrivacyGuardMiddleware] = []
+
+    async def record_close(middleware: PrivacyGuardMiddleware) -> None:
+        closed.append(middleware)
+
+    server = PrivacyGuardServer(create_builtin_registry())
+    monkeypatch.setattr(server_module, "_create_grpc_server", lambda _: fake_server)
+    monkeypatch.setattr(PrivacyGuardMiddleware, "close", record_close)
+
+    serving = asyncio.create_task(server.serve("127.0.0.1:50055"))
+    await fake_server.stop_started.wait()
+    serving.cancel()
+    await asyncio.sleep(0)
+
+    assert serving.done() is False
+
+    fake_server.stop_release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await serving
+
+    assert fake_server.stop_graces == [0]
+    assert closed == [server._middleware]
 
 
 @pytest.mark.asyncio
 async def test_serve_closes_resources_when_startup_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake_server = LifecycleServerFake(start_error=RuntimeError("startup failed"))
+    fake_server = _LifecycleServerFake(start_error=RuntimeError("startup failed"))
     closed: list[PrivacyGuardMiddleware] = []
 
-    async def record_close(servicer: PrivacyGuardMiddleware) -> None:
-        closed.append(servicer)
+    async def record_close(middleware: PrivacyGuardMiddleware) -> None:
+        closed.append(middleware)
 
-    middleware = _middleware()
-    monkeypatch.setattr(server_module, "create_server", lambda _: fake_server)
+    server = PrivacyGuardServer(create_builtin_registry())
+    monkeypatch.setattr(server_module, "_create_grpc_server", lambda _: fake_server)
     monkeypatch.setattr(PrivacyGuardMiddleware, "close", record_close)
 
     with pytest.raises(RuntimeError, match="startup failed"):
-        await serve(middleware, "127.0.0.1:50054")
+        await server.serve("127.0.0.1:50056")
 
     assert fake_server.waited is False
     assert fake_server.stop_graces == [0]
-    assert closed == [middleware]
+    assert closed == [server._middleware]
+
+
+def _middleware() -> PrivacyGuardMiddleware:
+    return PrivacyGuardMiddleware(create_builtin_registry())

@@ -22,7 +22,7 @@ Privacy Guard implements the three methods currently defined by
 | RPC | Behavior |
 | --- | --- |
 | `Describe` | Advertises service identity, one pre-credentials HTTP binding, and the 4 MiB body limit |
-| `ValidateConfig` | Purely validates expanded policy configuration and registered resources |
+| `ValidateConfig` | Validates supplied policy configuration and registered resources |
 | `EvaluateHttpRequest` | Validates transport input, resolves a processor, processes text, and returns a decision |
 
 `Describe` advertises only
@@ -47,13 +47,18 @@ validation and every request evaluation.
 5. returns `valid=true`, or a content-safe reason
 
 It does not construct engines, populate the processor cache, contact model
-providers, download resources, or write artifacts.
+providers, download resources, or write artifacts. Validation runs in the
+bounded worker pool so catalog parsing and engine-specific checks do not block
+the async gRPC event loop.
 
-During evaluation, the service validates the same expanded config, computes its
-canonical SHA-256 fingerprint, and resolves a configured processor from a
-bounded 128-entry LRU cache. A cache miss constructs engines directly from the
-exact stage configs and operator-injected resources, then constructs the
-`RequestProcessor`.
+During evaluation, the service validates and normalizes the same config,
+computes its canonical SHA-256 fingerprint, and resolves a configured processor
+from a bounded 128-entry LRU cache. A cache miss constructs engines directly
+from the exact stage configs and operator-injected resources, then constructs
+the `RequestProcessor`. Validation, cache resolution, engine construction,
+strict UTF-8 decoding, and processing all run in the bounded worker pool.
+Validation still occurs for every evaluation, while equivalent normalized regex
+catalogs reuse their bounded compiled-rule entry instead of recompiling.
 
 The cache is protected for concurrent access and is not correctness-relevant.
 Eviction or process restart simply causes reconstruction from a later
@@ -65,10 +70,11 @@ For each evaluation, the service:
 
 1. validates the pre-credentials phase
 2. validates the transport body byte limit
-3. validates and resolves the expanded policy config
-4. allows an empty body without invoking an engine
-5. decodes a non-empty body as strict UTF-8
-6. schedules `RequestProcessor.process(text)` in the bounded worker pool
+3. acquires one bounded worker slot
+4. validates, normalizes, and resolves the supplied policy config in that worker
+5. allows an empty body without invoking an engine
+6. decodes a non-empty body as strict UTF-8
+7. calls `RequestProcessor.process(text)` in the same worker
 
 Request context, target, headers, middleware name, and protobuf values remain at
 the service boundary. The request ID is used only for content-safe operational
@@ -121,14 +127,18 @@ gRPC event loop
 4-thread executor
       |
       v
+configuration validation
+and processor resolution
+      |
+      v
 RequestProcessor.process
       |
       v
 ordered engine pipeline
 ```
 
-This keeps synchronous engine work off the async event loop and bounds the
-number of active processor runs.
+This keeps synchronous configuration and engine work off the async event loop
+and bounds the number of active operations.
 
 Cached processors, engine instances, and injected resources may be used by
 multiple worker threads. They must retain no mutable per-request state and must
@@ -140,7 +150,8 @@ Cancelling an async RPC cannot stop Python code already running in its worker
 thread. The service shields the worker bridge and releases the semaphore slot
 only after that worker actually finishes.
 
-Cancellation therefore cannot create more than four active processor runs.
+Cancellation therefore cannot create more than four active synchronous
+operations.
 An engine should pass the remaining shared timeout to any delegated API that
 supports bounded execution. A non-preemptible call continues to occupy its slot
 until it exits.
@@ -167,9 +178,9 @@ A gRPC failure is distinct from a successful policy deny. OpenShell applies the
 middleware registration's failure behavior when an RPC fails. A policy deny is
 a successful RPC result that explicitly stops the request.
 
-## Server lifecycle and discovery
+## Programmatic server lifecycle
 
-`MiddlewareServer` is the high-level API. It owns:
+`PrivacyGuardServer` is the high-level programmatic API. It owns:
 
 ```text
 EngineRegistry
@@ -179,27 +190,27 @@ EngineRegistry
 
 The built-in registry includes `RegexEngine`. Operators register custom engines
 and resource-backed tool integrations before registry finalization, then pass
-that registry to `MiddlewareServer`.
+that registry to `PrivacyGuardServer`.
 
 The registry is an explicit application-scoped dependency, not a global
-singleton. `MiddlewareServer` and `PrivacyGuardMiddleware` reject unfinalized
+singleton. `PrivacyGuardServer` and `PrivacyGuardMiddleware` reject unfinalized
 registries. A deployment creates and finalizes one registry during startup;
 cached processors then construct configured stage engines from that registry.
 Different middleware applications in the same process may intentionally use
 different engine inventories or runtime resources.
 
-The CLI accepts an operator registry factory in `module:factory` form. The
-factory is invoked once, must return a finalized `EngineRegistry`, and supplies
-the same engine inventory to discovery, schema generation, or serving:
+Synchronous applications use:
 
-```bash
-privacy-guard --registry-factory my_engines:create_registry engines
-privacy-guard --registry-factory my_engines:create_registry schema
-privacy-guard --registry-factory my_engines:create_registry serve
+```python
+from privacy_guard.engine_registry import create_builtin_registry
+from privacy_guard.service import PrivacyGuardServer
+
+server = PrivacyGuardServer(create_builtin_registry())
+server.run("127.0.0.1:50051")
 ```
 
-The factory is trusted operator code imported into the Privacy Guard process.
-It is not a policy-controlled plugin hook.
+Async applications call `await server.serve(address)` instead. Both entry
+points use the same server instance and lifecycle.
 
 The server:
 
@@ -210,6 +221,35 @@ The server:
 5. closes the middleware executor
 
 A bind failure becomes the stable `server_bind_failed` error.
+
+The server module has no command framework, module-import-string, discovery,
+schema-rendering, or command-logging responsibilities.
+
+## Command-line application
+
+`privacy_guard.cli` owns the Typer application. The `--registry-factory` option
+identifies a Python function in `module:function` form. At startup, the CLI
+imports the module, calls the function once, and uses the returned finalized
+`EngineRegistry` for the selected command:
+
+```bash
+privacy-guard --registry-factory my_engines:create_registry engines
+privacy-guard --registry-factory my_engines:create_registry schema
+privacy-guard --registry-factory my_engines:create_registry serve
+```
+
+This is a deployment setting, not part of an OpenShell policy. The person
+starting Privacy Guard chooses the function, and importing its module executes
+Python code, so it must refer to code that the deployer controls. A policy
+cannot select a factory or cause Privacy Guard to import a module.
+
+Applications that start `PrivacyGuardServer` from Python do not need this CLI
+option. They create the registry normally and pass it to the server:
+
+```python
+registry = create_registry()
+PrivacyGuardServer(registry).run()
+```
 
 The CLI exposes:
 
