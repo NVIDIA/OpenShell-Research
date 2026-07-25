@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from collections.abc import Callable
 from copy import deepcopy
 from pathlib import Path
@@ -197,6 +200,45 @@ def test_catalog_file_change_produces_a_new_fingerprint(
     assert configuration_fingerprint(first) != configuration_fingerprint(second)
 
 
+def test_equivalent_catalogs_reuse_compiled_regex_rules(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    regex_module._compile_pattern_catalog.cache_clear()
+    original_compile_rule = regex_module._compile_rule
+    compile_calls = 0
+
+    def record_compile_rule(
+        entity: regex_module.RegexEntity,
+        pattern: regex_module.RegexPattern,
+        catalog_index: int,
+        entity_pattern_index: int,
+    ) -> regex_module._CompiledRule:
+        nonlocal compile_calls
+        compile_calls += 1
+        return original_compile_rule(
+            entity,
+            pattern,
+            catalog_index,
+            entity_pattern_index,
+        )
+
+    monkeypatch.setattr(regex_module, "_compile_rule", record_compile_rule)
+    registry = _registry()
+    first = registry.validate_config(_config())
+    registry.create_engine(first.entity_processing.stages[0].config)
+    second = registry.validate_config(deepcopy(_config()))
+    registry.create_engine(second.entity_processing.stages[0].config)
+    changed_values = deepcopy(_config())
+    changed_values["entity_processing"]["stages"][0]["config"]["pattern_catalog"][
+        "entities"
+    ][0]["patterns"][0]["pattern"] = "changed"
+    changed = registry.validate_config(changed_values)
+    registry.create_engine(changed.entity_processing.stages[0].config)
+
+    assert compile_calls == 2
+    regex_module._compile_pattern_catalog.cache_clear()
+
+
 @pytest.mark.parametrize(
     "catalog_path",
     [
@@ -251,6 +293,70 @@ def test_catalog_file_rejects_symlinks(
         _registry().validate_config(values)
 
     assert exception_info.value.code is ErrorCode.CONFIG_INVALID
+
+
+def test_catalog_file_rejects_a_symlink_swap_during_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    catalog_root = tmp_path / "catalog-root"
+    catalog_root.mkdir()
+    catalog_path = catalog_root / "patterns.yaml"
+    values = _config()
+    catalog = values["entity_processing"]["stages"][0]["config"]["pattern_catalog"]
+    catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+    outside_path = tmp_path / "outside.yaml"
+    outside_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
+    values["entity_processing"]["stages"][0]["config"]["pattern_catalog"] = (
+        "patterns.yaml"
+    )
+    monkeypatch.chdir(catalog_root)
+
+    original_open = os.open
+    swapped = False
+
+    def swap_before_final_open(
+        path: str | bytes | Path,
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        nonlocal swapped
+        if path == "patterns.yaml" and dir_fd is not None and not swapped:
+            swapped = True
+            catalog_path.unlink()
+            catalog_path.symlink_to(outside_path)
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(regex_module.os, "open", swap_before_final_open)
+
+    with pytest.raises(PrivacyGuardError) as exception_info:
+        _registry().validate_config(values)
+
+    assert swapped is True
+    assert exception_info.value.code is ErrorCode.CONFIG_INVALID
+
+
+def test_catalog_file_rejects_a_fifo_without_blocking(tmp_path: Path) -> None:
+    os.mkfifo(tmp_path / "patterns.yaml")
+    probe = """
+from privacy_guard.engines.regex import _load_pattern_catalog_file
+
+try:
+    _load_pattern_catalog_file("patterns.yaml")
+except ValueError:
+    pass
+else:
+    raise AssertionError("FIFO catalog was accepted")
+"""
+
+    subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=tmp_path,
+        check=True,
+        timeout=5,
+    )
 
 
 @pytest.mark.parametrize(

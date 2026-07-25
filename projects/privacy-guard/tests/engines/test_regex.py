@@ -242,6 +242,7 @@ def test_pattern_search_has_an_enforceable_timeout() -> None:
 def test_patterns_compile_during_validation_and_preparation_not_run(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    regex_module._compile_pattern_catalog.cache_clear()
     compile_count = 0
     original_compile = regex_module.regex.compile
 

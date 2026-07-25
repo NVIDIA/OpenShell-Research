@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import os
+from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from stat import S_ISREG
 from string import Formatter
+from threading import RLock
 from typing import Literal, Protocol, Self
 
 import regex
@@ -189,15 +192,7 @@ class RegexEngineConfig(EngineConfig):
     @model_validator(mode="after")
     def _patterns_are_valid(self) -> Self:
         try:
-            for global_index, (entity, pattern_index, pattern) in enumerate(
-                _iter_catalog_patterns(self.pattern_catalog)
-            ):
-                _compile_rule(
-                    entity,
-                    pattern,
-                    catalog_index=global_index,
-                    entity_pattern_index=pattern_index,
-                )
+            _compile_pattern_catalog(self.pattern_catalog)
         except (RecursionError, ValueError, regex.error):
             raise ValueError("regex pattern catalog is invalid") from None
         return self
@@ -229,17 +224,7 @@ class RegexEngine(EntityProcessingEngine[RegexEngineConfig]):
 
     def _initialize(self) -> None:
         try:
-            self._rules = tuple(
-                _compile_rule(
-                    entity,
-                    pattern,
-                    catalog_index=global_index,
-                    entity_pattern_index=pattern_index,
-                )
-                for global_index, (entity, pattern_index, pattern) in enumerate(
-                    _iter_catalog_patterns(self.config.pattern_catalog)
-                )
-            )
+            self._rules = _compile_pattern_catalog(self.config.pattern_catalog)
         except (RecursionError, ValueError, regex.error):
             raise EngineConfigurationError(
                 "regex engine configuration is invalid"
@@ -401,6 +386,7 @@ _StrictCatalogLoader.add_constructor(
 
 
 def _load_pattern_catalog_file(value: str) -> RegexPatternCatalog:
+    descriptor: int | None = None
     try:
         path_text = validate_scalar_string(value)
         if (
@@ -416,23 +402,16 @@ def _load_pattern_catalog_file(value: str) -> RegexPatternCatalog:
         ):
             raise ValueError
 
-        catalog_root = Path.cwd().resolve(strict=True)
-        catalog_path = (catalog_root / relative_path).resolve(strict=True)
-        catalog_path.relative_to(catalog_root)
-        current_path = catalog_root
-        for part in relative_path.parts:
-            current_path /= part
-            if current_path.is_symlink():
-                raise ValueError
-
-        metadata = catalog_path.stat()
+        descriptor = _open_pattern_catalog_file(relative_path)
+        metadata = os.fstat(descriptor)
         if (
             not S_ISREG(metadata.st_mode)
             or metadata.st_size > MAX_REGEX_CATALOG_FILE_BYTES
         ):
             raise ValueError
         return _read_pattern_catalog_file(
-            str(catalog_path),
+            descriptor,
+            path_text,
             metadata.st_dev,
             metadata.st_ino,
             metadata.st_size,
@@ -447,10 +426,27 @@ def _load_pattern_catalog_file(value: str) -> RegexPatternCatalog:
         yaml.YAMLError,
     ):
         raise ValueError("regex pattern catalog file is invalid") from None
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
 
 
-@lru_cache(maxsize=64)
+def _open_pattern_catalog_file(relative_path: Path) -> int:
+    directory_flags = os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW
+    file_flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK | os.O_NOFOLLOW
+    directory = os.open(".", directory_flags)
+    try:
+        for part in relative_path.parts[:-1]:
+            child = os.open(part, directory_flags, dir_fd=directory)
+            os.close(directory)
+            directory = child
+        return os.open(relative_path.parts[-1], file_flags, dir_fd=directory)
+    finally:
+        os.close(directory)
+
+
 def _read_pattern_catalog_file(
+    descriptor: int,
     path: str,
     device: int,
     inode: int,
@@ -458,15 +454,56 @@ def _read_pattern_catalog_file(
     modified_at_ns: int,
     changed_at_ns: int,
 ) -> RegexPatternCatalog:
-    del device, inode, modified_at_ns, changed_at_ns
-    contents = Path(path).read_bytes()
+    cache_key = (
+        path,
+        device,
+        inode,
+        size,
+        modified_at_ns,
+        changed_at_ns,
+    )
+    with _PATTERN_CATALOG_CACHE_LOCK:
+        cached = _PATTERN_CATALOG_CACHE.get(cache_key)
+        if cached is not None:
+            _PATTERN_CATALOG_CACHE.move_to_end(cache_key)
+            return cached
+
+    contents = _read_bounded_file(descriptor)
     if len(contents) != size or len(contents) > MAX_REGEX_CATALOG_FILE_BYTES:
+        raise ValueError
+    final_metadata = os.fstat(descriptor)
+    if (
+        final_metadata.st_dev,
+        final_metadata.st_ino,
+        final_metadata.st_size,
+        final_metadata.st_mtime_ns,
+        final_metadata.st_ctime_ns,
+    ) != (device, inode, size, modified_at_ns, changed_at_ns):
         raise ValueError
     values = yaml.load(
         contents.decode("utf-8", errors="strict"),
         Loader=_StrictCatalogLoader,
     )
-    return RegexPatternCatalog.model_validate(values)
+    catalog = RegexPatternCatalog.model_validate(values)
+    with _PATTERN_CATALOG_CACHE_LOCK:
+        _PATTERN_CATALOG_CACHE[cache_key] = catalog
+        _PATTERN_CATALOG_CACHE.move_to_end(cache_key)
+        while len(_PATTERN_CATALOG_CACHE) > _MAX_CACHED_PATTERN_CATALOGS:
+            _PATTERN_CATALOG_CACHE.popitem(last=False)
+    return catalog
+
+
+def _read_bounded_file(descriptor: int) -> bytes:
+    contents = bytearray()
+    while len(contents) <= MAX_REGEX_CATALOG_FILE_BYTES:
+        chunk = os.read(
+            descriptor,
+            min(64 * 1024, MAX_REGEX_CATALOG_FILE_BYTES + 1 - len(contents)),
+        )
+        if not chunk:
+            break
+        contents.extend(chunk)
+    return bytes(contents)
 
 
 def _validate_name(value: str) -> str:
@@ -477,6 +514,23 @@ def _validate_name(value: str) -> str:
     ):
         raise ValueError("name is invalid")
     return value
+
+
+@lru_cache(maxsize=128)
+def _compile_pattern_catalog(
+    catalog: RegexPatternCatalog,
+) -> tuple[_CompiledRule, ...]:
+    return tuple(
+        _compile_rule(
+            entity,
+            pattern,
+            catalog_index=global_index,
+            entity_pattern_index=pattern_index,
+        )
+        for global_index, (entity, pattern_index, pattern) in enumerate(
+            _iter_catalog_patterns(catalog)
+        )
+    )
 
 
 def _compile_rule(
@@ -622,6 +676,12 @@ def _rendered_template_size(template: str, entity: str) -> int:
 _NAME_PATTERN = regex.compile(r"[A-Za-z_][A-Za-z0-9_-]*\Z")
 _INLINE_FLAG_PATTERN = regex.compile(r"[A-Za-z0-9-]+(?=[:)])")
 _PATTERN_METADATA_KEY = "pattern"
+_MAX_CACHED_PATTERN_CATALOGS = 64
+_PATTERN_CATALOG_CACHE: OrderedDict[
+    tuple[str, int, int, int, int, int],
+    RegexPatternCatalog,
+] = OrderedDict()
+_PATTERN_CATALOG_CACHE_LOCK = RLock()
 
 
 __all__ = [
