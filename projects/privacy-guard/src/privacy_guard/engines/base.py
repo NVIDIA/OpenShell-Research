@@ -34,9 +34,7 @@ from privacy_guard.constants import (
 from privacy_guard.errors import (
     EngineConfigurationError,
     EngineContractError,
-    EngineExecutionError,
     EngineLimitExceeded,
-    EntityProcessingError,
 )
 from privacy_guard.string_validators import (
     ScalarString,
@@ -358,15 +356,10 @@ __all__ = [
     "BoundedMetadata",
     "ConfidenceLevel",
     "EngineConfig",
-    "EngineConfigurationError",
-    "EngineContractError",
-    "EngineExecutionError",
-    "EngineLimitExceeded",
     "EngineResources",
     "EntityDetection",
     "EntityName",
     "EntityProcessingEngine",
-    "EntityProcessingError",
     "EntityProcessingStrategy",
     "TextProcessingResult",
 ]

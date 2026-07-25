@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
@@ -116,8 +115,9 @@ def test_builtin_registry_contains_the_builtin_regex_engine() -> None:
     registry = create_builtin_registry()
 
     assert registry.is_finalized is True
-    assert registry.engine_names == ("regex",)
-    description = registry.describe_engines()[0]
+    descriptions = registry.describe_engines()
+    assert tuple(item.engine_name for item in descriptions) == ("regex",)
+    description = descriptions[0]
     assert description.engine_name == "regex"
     assert description.supported_strategies == frozenset(
         {
@@ -132,7 +132,10 @@ def test_registry_can_include_builtin_engines_before_custom_registration() -> No
     registry.register(AcmeEngine, resources=AcmeResources(prefix="token"))
     registry.finalize()
 
-    assert registry.engine_names == ("regex", "acme-pii")
+    assert tuple(item.engine_name for item in registry.describe_engines()) == (
+        "regex",
+        "acme-pii",
+    )
 
 
 def test_custom_engine_config_joins_the_exact_discriminated_union() -> None:
@@ -148,7 +151,10 @@ def test_custom_engine_config_joins_the_exact_discriminated_union() -> None:
     assert type(engine) is AcmeEngine
     assert engine.config is config.entity_processing.stages[0].config
     assert engine.resources is resources
-    assert registry.engine_names == ("regex", "acme-pii")
+    assert tuple(item.engine_name for item in registry.describe_engines()) == (
+        "regex",
+        "acme-pii",
+    )
 
 
 def test_detection_only_engine_is_rejected_for_replace_action() -> None:
@@ -284,15 +290,6 @@ def test_describe_does_not_construct_an_engine() -> None:
     assert descriptions[0].supported_strategies == frozenset(
         {EntityProcessingStrategy.DETECT}
     )
-    properties_value = descriptions[0].configuration_schema["properties"]
-    assert isinstance(properties_value, Mapping)
-    properties = {
-        key: value for key, value in properties_value.items() if isinstance(key, str)
-    }
-    engine_value = properties["engine"]
-    assert isinstance(engine_value, Mapping)
-    engine = {key: value for key, value in engine_value.items() if isinstance(key, str)}
-    assert engine["const"] == "detect-only"
 
 
 def test_registry_requires_at_least_one_engine() -> None:

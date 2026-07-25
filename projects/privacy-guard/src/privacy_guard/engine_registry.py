@@ -4,18 +4,19 @@ from __future__ import annotations
 
 import inspect
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from functools import reduce
+from operator import or_
 from types import NoneType
-from typing import Literal, Self, get_args, get_origin
+from typing import Annotated, Literal, Self, get_args, get_origin
 
-from pydantic import TypeAdapter
+from pydantic import Field, TypeAdapter, ValidationError
 from pydantic_core import PydanticUndefined
 
 from privacy_guard.config import (
     PolicyAction,
     PrivacyGuardConfig,
-    build_privacy_guard_config_type,
-    parse_privacy_guard_config,
 )
 from privacy_guard.engines import (
     EngineConfig,
@@ -39,7 +40,6 @@ class EngineDescription:
     engine_name: str
     description: str
     supported_strategies: frozenset[EntityProcessingStrategy]
-    configuration_schema: dict[str, object]
 
 
 class EngineRegistry:
@@ -47,7 +47,6 @@ class EngineRegistry:
 
     def __init__(self, *, include_builtin_engines: bool = False) -> None:
         self._registrations: dict[str, _Registration] = {}
-        self._config_type: type[PrivacyGuardConfig[EngineConfig]] | None = None
         self._config_adapter: TypeAdapter[PrivacyGuardConfig[EngineConfig]] | None = (
             None
         )
@@ -57,22 +56,6 @@ class EngineRegistry:
     @property
     def is_finalized(self) -> bool:
         return self._config_adapter is not None
-
-    @property
-    def engine_names(self) -> tuple[str, ...]:
-        return tuple(self._registrations)
-
-    @property
-    def config_type(self) -> type[PrivacyGuardConfig[EngineConfig]]:
-        if self._config_type is None:
-            raise EngineRegistryError("engine registry is not finalized")
-        return self._config_type
-
-    @property
-    def config_adapter(self) -> TypeAdapter[PrivacyGuardConfig[EngineConfig]]:
-        if self._config_adapter is None:
-            raise EngineRegistryError("engine registry is not finalized")
-        return self._config_adapter
 
     def register(
         self,
@@ -121,16 +104,7 @@ class EngineRegistry:
         ):
             raise EngineRegistryError("engine config type is already registered")
 
-        supported_strategies = getattr(engine_type, "supported_strategies", None)
-        if (
-            not isinstance(supported_strategies, frozenset)
-            or not supported_strategies
-            or any(
-                not isinstance(strategy, EntityProcessingStrategy)
-                for strategy in supported_strategies
-            )
-        ):
-            raise EngineRegistryError("engine supported strategies are invalid")
+        _supported_strategies(engine_type)
         if resources_runtime_type is NoneType:
             if resources is not None:
                 raise EngineRegistryError("resource-free engine received resources")
@@ -147,9 +121,7 @@ class EngineRegistry:
         self._registrations[engine_name] = _Registration(
             engine_type=engine_type,
             config_type=config_type,
-            resources_type=resources_type,
             resources=resources,
-            supported_strategies=supported_strategies,
         )
 
     def finalize(self) -> Self:
@@ -157,7 +129,7 @@ class EngineRegistry:
         if self.is_finalized:
             return self
         try:
-            config_type = build_privacy_guard_config_type(
+            config_type = _build_privacy_guard_config_type(
                 tuple(
                     registration.config_type
                     for registration in self._registrations.values()
@@ -167,13 +139,17 @@ class EngineRegistry:
             raise EngineRegistryError(
                 "cannot finalize an empty engine registry"
             ) from None
-        self._config_type = config_type
         self._config_adapter = TypeAdapter(config_type)
         return self
 
     def validate_config(self, values: object) -> PrivacyGuardConfig[EngineConfig]:
         """Purely parse and validate an expanded Privacy Guard configuration."""
-        config = parse_privacy_guard_config(self.config_adapter, values)
+        if not isinstance(values, Mapping):
+            raise PrivacyGuardError(ErrorCode.CONFIG_INVALID)
+        try:
+            config = self._require_config_adapter().validate_python(dict(values))
+        except (TypeError, ValueError, ValidationError):
+            raise PrivacyGuardError(ErrorCode.CONFIG_INVALID) from None
         required_strategy = (
             EntityProcessingStrategy.REPLACE
             if config.on_detection.action is PolicyAction.REPLACE
@@ -207,7 +183,7 @@ class EngineRegistry:
 
     def configuration_json_schema(self) -> dict[str, object]:
         """Return the finalized complete policy JSON Schema."""
-        return self.config_adapter.json_schema()
+        return self._require_config_adapter().json_schema()
 
     def describe_engines(self) -> tuple[EngineDescription, ...]:
         """Return safe engine metadata without constructing runtime engines."""
@@ -215,8 +191,7 @@ class EngineRegistry:
             EngineDescription(
                 engine_name=engine,
                 description=_engine_description(registration.engine_type),
-                supported_strategies=registration.supported_strategies,
-                configuration_schema=registration.config_type.model_json_schema(),
+                supported_strategies=_supported_strategies(registration.engine_type),
             )
             for engine, registration in self._registrations.items()
         )
@@ -236,6 +211,13 @@ class EngineRegistry:
             raise EngineRegistryError("engine config is not registered") from None
         return registration
 
+    def _require_config_adapter(
+        self,
+    ) -> TypeAdapter[PrivacyGuardConfig[EngineConfig]]:
+        if self._config_adapter is None:
+            raise EngineRegistryError("engine registry is not finalized")
+        return self._config_adapter
+
 
 def create_builtin_registry() -> EngineRegistry:
     """Build the finalized registry shipped by the base package."""
@@ -246,9 +228,43 @@ def create_builtin_registry() -> EngineRegistry:
 class _Registration:
     engine_type: type[object]
     config_type: type[EngineConfig]
-    resources_type: object
     resources: EngineResources | None
-    supported_strategies: frozenset[EntityProcessingStrategy]
+
+
+def _build_privacy_guard_config_type(
+    config_types: Sequence[type[EngineConfig]],
+) -> type[PrivacyGuardConfig[EngineConfig]]:
+    if not config_types:
+        raise ValueError("at least one engine config type must be registered")
+    registered_union = reduce(or_, config_types)
+    registered_config = Annotated[
+        registered_union,  # ty: ignore[invalid-type-form]
+        Field(discriminator="engine"),
+    ]
+    config_type = PrivacyGuardConfig.__class_getitem__(
+        registered_config  # ty: ignore[invalid-argument-type]
+    )
+    if not isinstance(config_type, type) or not issubclass(
+        config_type, PrivacyGuardConfig
+    ):
+        raise TypeError("Pydantic did not construct a policy config type")
+    return config_type  # ty: ignore[invalid-return-type]
+
+
+def _supported_strategies(
+    engine_type: type[object],
+) -> frozenset[EntityProcessingStrategy]:
+    supported_strategies = getattr(engine_type, "supported_strategies", None)
+    if (
+        not isinstance(supported_strategies, frozenset)
+        or not supported_strategies
+        or any(
+            not isinstance(strategy, EntityProcessingStrategy)
+            for strategy in supported_strategies
+        )
+    ):
+        raise EngineRegistryError("engine supported strategies are invalid")
+    return supported_strategies
 
 
 def _engine_discriminator(

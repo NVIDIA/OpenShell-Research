@@ -19,7 +19,6 @@ from privacy_guard.constants import (
     LIMIT_REASON_CODE,
     MAX_BODY_BYTES,
     MAX_DETECTIONS_PER_REQUEST,
-    MAX_SCANNED_CHARACTERS,
     MAX_TIMEOUT_SECONDS,
 )
 from privacy_guard.engines import (
@@ -96,21 +95,13 @@ class RequestProcessor:
         self._timeout_seconds = float(timeout_seconds)
         self._log_request_content = log_request_content
 
-    @property
-    def config(self) -> PrivacyGuardConfig[EngineConfig]:
-        """Return the exact validated configuration retained by this processor."""
-        return self._config
-
     def process(self, text: str) -> RequestProcessingResult:
         """Process one complete request text and apply the user-facing action."""
         try:
             input_text = validate_scalar_string(text)
         except ValueError:
             raise PrivacyGuardError(ErrorCode.BODY_ENCODING_INVALID) from None
-        if (
-            len(input_text) > MAX_SCANNED_CHARACTERS
-            or len(input_text.encode("utf-8")) > MAX_BODY_BYTES
-        ):
+        if len(input_text.encode("utf-8")) > MAX_BODY_BYTES:
             raise PrivacyGuardError(ErrorCode.REQUEST_BODY_TOO_LARGE)
         if self._log_request_content:
             _LOGGER.debug("privacy_guard_text_input text=%r", input_text)
@@ -136,10 +127,7 @@ class RequestProcessor:
                     strategy=strategy,
                     timeout=timeout,
                 )
-                if (
-                    len(result.text) > MAX_SCANNED_CHARACTERS
-                    or len(result.text.encode("utf-8")) > MAX_BODY_BYTES
-                ):
+                if len(result.text.encode("utf-8")) > MAX_BODY_BYTES:
                     raise EngineLimitExceeded("intermediate text exceeds the limit")
                 if (
                     sum(len(item.detections) for _, item in stage_results)

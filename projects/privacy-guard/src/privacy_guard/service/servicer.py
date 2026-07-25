@@ -81,7 +81,17 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         context: grpc.aio.ServicerContext[object, pb2.MiddlewareManifest],
     ) -> pb2.MiddlewareManifest:
         """Advertise the binding and its finalized policy schema."""
-        return self._describe()
+        return pb2.MiddlewareManifest(
+            name=SERVICE_NAME,
+            service_version=SERVICE_VERSION,
+            bindings=[
+                pb2.MiddlewareBinding(
+                    operation=pb2.SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_REQUEST,
+                    phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS,
+                    max_body_bytes=MAX_BODY_BYTES,
+                )
+            ],
+        )
 
     @override
     async def ValidateConfig(
@@ -106,19 +116,6 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
     ) -> pb2.HttpRequestResult:
         """Resolve the prepared config, decode one text, and process it."""
         return await self._evaluate_rpc(request, context)
-
-    def _describe(self) -> pb2.MiddlewareManifest:
-        return pb2.MiddlewareManifest(
-            name=SERVICE_NAME,
-            service_version=SERVICE_VERSION,
-            bindings=[
-                pb2.MiddlewareBinding(
-                    operation=pb2.SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_REQUEST,
-                    phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS,
-                    max_body_bytes=MAX_BODY_BYTES,
-                )
-            ],
-        )
 
     def _validate_config(
         self,
@@ -189,19 +186,16 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         result = await self._run_in_worker(
             lambda: self._prepare_and_process(values, request.body)
         )
-        if result is None:
-            return pb2.HttpRequestResult(decision=pb2.DECISION_ALLOW)
-
         return _result_to_proto(result)
 
     def _prepare_and_process(
         self,
         values: object,
         body: bytes,
-    ) -> RequestProcessingResult | None:
+    ) -> RequestProcessingResult:
         processor = self._processors.resolve(values)
         if not body:
-            return None
+            return RequestProcessingResult(decision=RequestDecision.ALLOW)
         try:
             text = body.decode("utf-8", errors="strict")
         except UnicodeDecodeError:
@@ -240,24 +234,20 @@ class _RequestProcessorCache:
 
     def resolve(self, values: object) -> RequestProcessor:
         """Return the cached or newly prepared processor for expanded config."""
-        _, processor = self._prepare(values)
-        return processor
-
-    def _prepare(self, values: object) -> tuple[str, RequestProcessor]:
         config = self._registry.validate_config(values)
         fingerprint = configuration_fingerprint(config)
         with self._lock:
             cached = self._processors.get(fingerprint)
             if cached is not None:
                 self._processors.move_to_end(fingerprint)
-                return fingerprint, cached
+                return cached
         processor = self._build_processor(config)
         with self._lock:
             self._processors[fingerprint] = processor
             self._processors.move_to_end(fingerprint)
             while len(self._processors) > _MAX_CACHED_PROCESSORS:
                 self._processors.popitem(last=False)
-        return fingerprint, processor
+        return processor
 
     def _build_processor(
         self,
@@ -327,14 +317,12 @@ def _mapping_from_proto(config: Message) -> dict[str, object]:
 
 
 def _result_to_proto(result: RequestProcessingResult) -> pb2.HttpRequestResult:
-    try:
-        findings = [
-            _detection_to_proto(detection) for detection in result.detection_summaries
-        ]
-    except PrivacyGuardError as error:
-        if error.code is ErrorCode.RESULT_LIMIT_EXCEEDED:
+    findings: list[pb2.Finding] = []
+    for detection in result.detection_summaries:
+        finding = _detection_to_proto(detection)
+        if finding.ByteSize() > MAX_PROTO_FINDING_BYTES:
             return _limit_deny()
-        raise
+        findings.append(finding)
     if len(findings) > MAX_PROTO_FINDING_GROUPS:
         return _limit_deny()
     if result.decision is RequestDecision.ALLOW:
@@ -372,8 +360,6 @@ def _detection_to_proto(detection: EntityDetectionSummary) -> pb2.Finding:
         confidence=confidence_text,
         count=detection.count,
     )
-    if result.ByteSize() > MAX_PROTO_FINDING_BYTES:
-        raise PrivacyGuardError(ErrorCode.RESULT_LIMIT_EXCEEDED)
     return result
 
 

@@ -8,24 +8,18 @@ union containing the exact config model registered by every engine.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
 from enum import StrEnum
-from functools import reduce
 from hashlib import sha256
-from operator import or_
-from typing import Annotated, Generic, Self, TypeVar
+from typing import Generic, Self, TypeVar
 
 from pydantic import (
     Field,
-    TypeAdapter,
-    ValidationError,
     field_validator,
     model_validator,
 )
 
 from privacy_guard.base import StrictDomainModel
 from privacy_guard.engines import EngineConfig
-from privacy_guard.errors import ErrorCode, PrivacyGuardError
 from privacy_guard.string_validators import (
     BoundedMetadataString,
     validate_scalar_string,
@@ -116,66 +110,18 @@ class PrivacyGuardConfig(
     on_detection: OnDetection = Field(repr=False)
 
 
-def build_privacy_guard_config_type(
-    config_types: Sequence[type[EngineConfig]],
-) -> type[PrivacyGuardConfig[EngineConfig]]:
-    """Build the exact registry-dependent discriminated policy model."""
-    if not config_types:
-        raise ValueError("at least one engine config type must be registered")
-    registered_union = reduce(or_, config_types)
-    registered_config = Annotated[
-        registered_union,  # ty: ignore[invalid-type-form]
-        Field(discriminator="engine"),
-    ]
-    config_type = PrivacyGuardConfig.__class_getitem__(
-        registered_config  # ty: ignore[invalid-argument-type]
-    )
-    if not isinstance(config_type, type) or not issubclass(
-        config_type, PrivacyGuardConfig
-    ):
-        raise TypeError("Pydantic did not construct a policy config type")
-    return config_type  # ty: ignore[invalid-return-type]
-
-
-def build_privacy_guard_config_adapter(
-    config_types: Sequence[type[EngineConfig]],
-) -> TypeAdapter[PrivacyGuardConfig[EngineConfig]]:
-    """Build the registry-dependent adapter used for validation and schemas."""
-    config_type = build_privacy_guard_config_type(config_types)
-    return TypeAdapter(config_type)
-
-
-def parse_privacy_guard_config(
-    adapter: TypeAdapter[PrivacyGuardConfig[EngineConfig]],
-    values: object,
-) -> PrivacyGuardConfig[EngineConfig]:
-    """Parse an expanded mapping without exposing rejected values in errors."""
-    if not isinstance(values, Mapping):
-        raise PrivacyGuardError(ErrorCode.CONFIG_INVALID)
-    try:
-        return adapter.validate_python(dict(values))
-    except (TypeError, ValueError, ValidationError):
-        raise PrivacyGuardError(ErrorCode.CONFIG_INVALID) from None
-
-
-def canonical_config_json(
+def configuration_fingerprint(
     config: PrivacyGuardConfig[EngineConfig],
-) -> bytes:
-    """Serialize every concrete engine field deterministically for hashing."""
-    return json.dumps(
+) -> str:
+    """Return the canonical SHA-256 fingerprint of an expanded policy config."""
+    serialized = json.dumps(
         config.model_dump(mode="json"),
         allow_nan=False,
         ensure_ascii=False,
         separators=(",", ":"),
         sort_keys=True,
     ).encode("utf-8")
-
-
-def configuration_fingerprint(
-    config: PrivacyGuardConfig[EngineConfig],
-) -> str:
-    """Return the canonical SHA-256 fingerprint of an expanded policy config."""
-    return sha256(canonical_config_json(config)).hexdigest()
+    return sha256(serialized).hexdigest()
 
 
 __all__ = [
@@ -184,9 +130,5 @@ __all__ = [
     "OnDetection",
     "PolicyAction",
     "PrivacyGuardConfig",
-    "build_privacy_guard_config_adapter",
-    "build_privacy_guard_config_type",
-    "canonical_config_json",
     "configuration_fingerprint",
-    "parse_privacy_guard_config",
 ]

@@ -23,11 +23,9 @@ from yaml.resolver import BaseResolver
 
 from privacy_guard.base import StrictDomainModel
 from privacy_guard.constants import (
-    CONFIDENCE_RANK,
     MAX_BODY_BYTES,
     MAX_DETECTIONS_PER_STAGE,
     MAX_DIAGNOSTIC_TEXT_BYTES,
-    MAX_MATCHES_PER_PATTERN,
     MAX_REGEX_CATALOG_FILE_BYTES,
     MAX_REGEX_CATALOG_PATH_BYTES,
     MAX_REGEX_ENTITIES_PER_CATALOG,
@@ -240,7 +238,6 @@ class RegexEngine(EntityProcessingEngine[RegexEngineConfig]):
         detections_with_identity: list[tuple[EntityDetection, str]] = []
         try:
             for rule in self._rules:
-                match_count = 0
                 next_position = 0
                 while next_position <= len(text):
                     match = rule.compiled.search(
@@ -256,9 +253,6 @@ class RegexEngine(EntityProcessingEngine[RegexEngineConfig]):
                         raise EngineConfigurationError(
                             "regex engine configuration is invalid"
                         )
-                    match_count += 1
-                    if match_count > MAX_MATCHES_PER_PATTERN:
-                        raise EngineLimitExceeded("regex match count exceeds the limit")
                     detection = EntityDetection(
                         entity=rule.entity,
                         start=start,
@@ -633,7 +627,7 @@ def _resolve_overlaps(
 def _categorical_confidence_rank(confidence: object) -> int:
     if not isinstance(confidence, ConfidenceLevel):
         raise EngineContractError("regex detection confidence is invalid")
-    return CONFIDENCE_RANK[confidence.value]
+    return _CONFIDENCE_RANK[confidence]
 
 
 def _render_bounded_replacement(
@@ -675,6 +669,11 @@ def _rendered_template_size(template: str, entity: str) -> int:
 
 _NAME_PATTERN = regex.compile(r"[A-Za-z_][A-Za-z0-9_-]*\Z")
 _INLINE_FLAG_PATTERN = regex.compile(r"[A-Za-z0-9-]+(?=[:)])")
+_CONFIDENCE_RANK = {
+    ConfidenceLevel.LOW: 0,
+    ConfidenceLevel.MEDIUM: 1,
+    ConfidenceLevel.HIGH: 2,
+}
 _PATTERN_METADATA_KEY = "pattern"
 _MAX_CACHED_PATTERN_CATALOGS = 64
 _PATTERN_CATALOG_CACHE: OrderedDict[

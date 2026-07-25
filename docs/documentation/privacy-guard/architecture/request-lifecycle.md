@@ -36,9 +36,8 @@ on_detection:
   action: detect
 ```
 
-`entity_processing` is an object so concrete pipeline-wide settings can be
-added later without changing the stage-list shape. V0 defines only `stages`.
-The list must be non-empty.
+`entity_processing` groups the ordered stages and owns their non-empty-list and
+unique-diagnostic-name validation. V0 defines only `stages`.
 
 Each `EntityProcessingStage` contains:
 
@@ -86,8 +85,8 @@ A non-empty body must decode as strict UTF-8. The decoded `str` is the only
 request input passed to `RequestProcessor`; headers, content type, request ID,
 target, and protobuf messages do not cross that boundary.
 
-The processor validates both character and encoded-byte bounds before running
-the pipeline.
+The processor validates the encoded UTF-8 byte bound before running the
+pipeline.
 
 ## Ordered stage execution
 
@@ -107,7 +106,7 @@ The processor then:
 2. calls each stage exactly once in policy order
 3. passes the current text, invocation strategy, and shared timeout to
    `engine.run()`
-4. validates intermediate character, byte, and detection limits
+4. validates intermediate UTF-8 byte and detection limits
 5. passes the returned text to the next stage
 6. checks the same timeout after the final result
 
