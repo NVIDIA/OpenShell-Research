@@ -19,8 +19,13 @@ def test_timeout_duration_is_strict_positive_and_bounded(
 def test_expired_timeout_raises_typed_signal() -> None:
     timeout = Timeout(deadline=monotonic() - 1)
 
-    with pytest.raises(TimeoutExpiredError):
+    with pytest.raises(TimeoutExpiredError) as captured:
         timeout.raise_if_expired()
+
+    assert str(captured.value) == (
+        "Privacy Guard processing timed out. Reduce the request size or simplify "
+        "the configured stages and patterns, then retry."
+    )
 
 
 def test_timeout_context_translates_delegated_timeout_error() -> None:

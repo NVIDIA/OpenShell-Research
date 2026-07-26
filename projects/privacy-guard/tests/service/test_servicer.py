@@ -11,10 +11,15 @@ from google.protobuf.message import Message
 
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
 from privacy_guard.config import PrivacyGuardConfig
+from privacy_guard.constants import LIMIT_REASON, LIMIT_REASON_CODE
 from privacy_guard.engines import EngineConfig
 from privacy_guard.engines.registry import create_builtin_registry
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
-from privacy_guard.request_processor import RequestProcessor
+from privacy_guard.request_processor import (
+    RequestDecision,
+    RequestProcessingResult,
+    RequestProcessor,
+)
 from privacy_guard.service import servicer as servicer_module
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
 
@@ -87,6 +92,19 @@ def test_validate_config_is_pure_and_reports_invalid_config() -> None:
     assert valid.valid is True
     assert invalid.valid is False
     assert "config_invalid" in invalid.reason
+
+
+def test_limit_deny_explains_recovery_options() -> None:
+    result = servicer_module._result_to_proto(
+        RequestProcessingResult(
+            decision=RequestDecision.DENY,
+            reason_code=LIMIT_REASON_CODE,
+        )
+    )
+
+    assert result.reason == LIMIT_REASON
+    assert "Reduce the request or replacement size" in result.reason
+    assert "simplify the configured stages and patterns" in result.reason
 
 
 def test_evaluation_decodes_one_utf8_text_and_encodes_replacement() -> None:

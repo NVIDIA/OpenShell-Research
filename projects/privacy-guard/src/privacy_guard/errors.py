@@ -105,6 +105,12 @@ class EngineLimitExceededError(EntityProcessingError):
 class TimeoutExpiredError(EntityProcessingError):
     """The shared entity-processing timeout expired."""
 
+    def __init__(self) -> None:
+        super().__init__(
+            "Privacy Guard processing timed out. Reduce the request size or simplify "
+            "the configured stages and patterns, then retry."
+        )
+
 
 class EngineRegistryError(Exception):
     """A content-safe engine registration or registry lifecycle failure."""

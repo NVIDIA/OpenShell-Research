@@ -14,7 +14,10 @@ SERVICE_NAME = "privacy-guard"
 SERVICE_VERSION = version("privacy-guard")
 BLOCK_REASON = "Privacy Guard blocked the request"
 BLOCK_REASON_CODE = "privacy_guard_blocked"
-LIMIT_REASON = "Privacy Guard denied a result that exceeded a safety limit"
+LIMIT_REASON = (
+    "Privacy Guard exceeded a processing safety limit. Reduce the request or "
+    "replacement size, or simplify the configured stages and patterns, then retry."
+)
 LIMIT_REASON_CODE = "privacy_guard_limit_exceeded"
 # Text input limits.
 MAX_BODY_BYTES = 4 * 1024 * 1024

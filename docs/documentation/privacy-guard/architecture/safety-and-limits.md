@@ -124,6 +124,11 @@ The service returns the same bounded deny when:
 - replacement text cannot be encoded within the body limit
 - a deny reason code is not safely representable
 
+The deny reason directs users to reduce the request or replacement size, or
+simplify the configured stages and patterns before retrying. These options
+reduce both bounded output pressure and timeout risk without weakening the
+fail-closed behavior.
+
 Malformed input and engine contract or execution failures instead abort the RPC
 with a cataloged error. OpenShell then applies the middleware registration's
 failure behavior.
