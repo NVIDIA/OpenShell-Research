@@ -6,7 +6,7 @@ import logging
 from collections import OrderedDict
 from collections.abc import Sequence
 from enum import StrEnum
-from typing import Protocol
+from typing import Literal, Protocol
 
 from pydantic import Field
 
@@ -60,6 +60,11 @@ class RequestProcessingResult(StrictDomainModel):
     replacement_text: str | None = Field(default=None, repr=False)
     detection_summaries: tuple[EntityDetectionSummary, ...] = ()
     reason_code: str | None = None
+    diagnostic_limit_kind: Literal["timeout", "resource"] | None = Field(
+        default=None,
+        exclude=True,
+        repr=False,
+    )
 
 
 class RequestProcessor:
@@ -138,12 +143,14 @@ class RequestProcessor:
             return RequestProcessingResult(
                 decision=RequestDecision.DENY,
                 reason_code=LIMIT_REASON_CODE,
+                diagnostic_limit_kind="timeout",
             )
         except EngineLimitExceededError:
             _LOGGER.info("privacy_guard_processing_limit kind=resource")
             return RequestProcessingResult(
                 decision=RequestDecision.DENY,
                 reason_code=LIMIT_REASON_CODE,
+                diagnostic_limit_kind="resource",
             )
         except EngineContractError:
             raise PrivacyGuardError(ErrorCode.ENGINE_OUTPUT_INVALID) from None

@@ -161,6 +161,13 @@ def _load_registry(factory_reference: str | None) -> EngineRegistry:
             "module:factory reference or export that callable.",
             param_hint="--registry-factory",
         ) from None
+    except Exception:
+        raise typer.BadParameter(
+            "Registry factory could not be resolved. Import the module and access "
+            "the factory directly with content-safe diagnostics, then fix its "
+            "dynamic attribute lookup.",
+            param_hint="--registry-factory",
+        ) from None
     if not callable(factory):
         raise typer.BadParameter(
             "Registry factory is not callable. Export a callable that returns a "

@@ -144,8 +144,9 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         failure: PrivacyGuardError | None = None
         action = "error"
         finding_count = 0
+        limit_kind: str | None = None
         try:
-            response = await self._evaluate_http_request(request)
+            response, limit_kind = await self._evaluate_http_request(request)
             action = "allow" if response.decision == pb2.DECISION_ALLOW else "deny"
             finding_count = sum(finding.count for finding in response.findings)
             return response
@@ -159,15 +160,17 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                 started=started,
                 action=action,
                 finding_count=finding_count,
+                limit_kind=limit_kind,
                 failure=failure,
             )
             _LOGGER.info(
                 "privacy_guard_evaluation request_id=%s duration_ms=%.3f "
-                "action=%s finding_count=%d error_code=%s",
+                "action=%s finding_count=%d limit_kind=%s error_code=%s",
                 log_extra["request_id"],
                 log_extra["duration_ms"],
                 log_extra["action"],
                 log_extra["finding_count"],
+                log_extra["limit_kind"] or "none",
                 log_extra["error_code"] or "none",
                 extra=log_extra,
             )
@@ -181,7 +184,7 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
     async def _evaluate_http_request(
         self,
         request: pb2.HttpRequestEvaluation,
-    ) -> pb2.HttpRequestResult:
+    ) -> tuple[pb2.HttpRequestResult, str | None]:
         if request.phase != pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS:
             raise PrivacyGuardError(ErrorCode.REQUEST_PHASE_INVALID)
         if len(request.body) > MAX_BODY_BYTES:
@@ -296,6 +299,7 @@ class _EvaluationLogExtra(TypedDict):
     duration_ms: float
     action: str
     finding_count: int
+    limit_kind: str | None
     error_code: str | None
 
 
@@ -305,6 +309,7 @@ def _evaluation_log_extra(
     started: float,
     action: str,
     finding_count: int,
+    limit_kind: str | None,
     failure: PrivacyGuardError | None,
 ) -> _EvaluationLogExtra:
     return {
@@ -312,6 +317,7 @@ def _evaluation_log_extra(
         "duration_ms": round((time.monotonic() - started) * 1000, 3),
         "action": action,
         "finding_count": finding_count,
+        "limit_kind": limit_kind,
         "error_code": failure.code.value if failure is not None else None,
     }
 
@@ -323,7 +329,9 @@ def _mapping_from_proto(config: Message) -> dict[str, object]:
         raise PrivacyGuardError(ErrorCode.CONFIG_INVALID) from None
 
 
-def _result_to_proto(result: RequestProcessingResult) -> pb2.HttpRequestResult:
+def _result_to_proto(
+    result: RequestProcessingResult,
+) -> tuple[pb2.HttpRequestResult, str | None]:
     findings: list[pb2.Finding] = []
     for detection in result.detection_summaries:
         finding = _detection_to_proto(detection)
@@ -339,21 +347,29 @@ def _result_to_proto(result: RequestProcessingResult) -> pb2.HttpRequestResult:
         )
         if len(replacement_body) > MAX_BODY_BYTES:
             return _limit_deny()
-        return pb2.HttpRequestResult(
-            decision=pb2.DECISION_ALLOW,
-            body=replacement_body,
-            has_body=replacement is not None,
-            findings=findings,
+        return (
+            pb2.HttpRequestResult(
+                decision=pb2.DECISION_ALLOW,
+                body=replacement_body,
+                has_body=replacement is not None,
+                findings=findings,
+            ),
+            None,
         )
     if result.decision is RequestDecision.DENY:
         reason_code = result.reason_code or BLOCK_REASON_CODE
         if REASON_CODE_PATTERN.fullmatch(reason_code) is None:
             return _limit_deny()
-        return pb2.HttpRequestResult(
-            decision=pb2.DECISION_DENY,
-            reason=LIMIT_REASON if reason_code == LIMIT_REASON_CODE else BLOCK_REASON,
-            reason_code=reason_code,
-            findings=findings,
+        return (
+            pb2.HttpRequestResult(
+                decision=pb2.DECISION_DENY,
+                reason=LIMIT_REASON
+                if reason_code == LIMIT_REASON_CODE
+                else BLOCK_REASON,
+                reason_code=reason_code,
+                findings=findings,
+            ),
+            result.diagnostic_limit_kind,
         )
     raise PrivacyGuardError(ErrorCode.UNEXPECTED_SERVICE_FAILURE)
 
@@ -370,11 +386,14 @@ def _detection_to_proto(detection: EntityDetectionSummary) -> pb2.Finding:
     return result
 
 
-def _limit_deny() -> pb2.HttpRequestResult:
-    return pb2.HttpRequestResult(
-        decision=pb2.DECISION_DENY,
-        reason=LIMIT_REASON,
-        reason_code=LIMIT_REASON_CODE,
+def _limit_deny() -> tuple[pb2.HttpRequestResult, str]:
+    return (
+        pb2.HttpRequestResult(
+            decision=pb2.DECISION_DENY,
+            reason=LIMIT_REASON,
+            reason_code=LIMIT_REASON_CODE,
+        ),
+        "resource",
     )
 
 

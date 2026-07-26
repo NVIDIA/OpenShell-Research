@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from threading import get_ident
+from typing import Never
 
+import grpc
 import pytest
 from google.protobuf import json_format
 from google.protobuf.message import Message
@@ -70,6 +73,11 @@ def _request(body: bytes, *, action: str = "replace") -> pb2.HttpRequestEvaluati
     )
 
 
+class _UnusedAbortContext:
+    async def abort(self, code: grpc.StatusCode, details: str) -> Never:
+        raise AssertionError(f"unexpected abort: {code.name}: {details}")
+
+
 def test_copied_proto_remains_the_current_openshell_contract() -> None:
     evaluation = pb2.HttpRequestEvaluation()
     finding = pb2.Finding()
@@ -95,13 +103,15 @@ def test_validate_config_is_pure_and_reports_invalid_config() -> None:
 
 
 def test_limit_deny_explains_recovery_options() -> None:
-    result = servicer_module._result_to_proto(
+    result, limit_kind = servicer_module._result_to_proto(
         RequestProcessingResult(
             decision=RequestDecision.DENY,
             reason_code=LIMIT_REASON_CODE,
+            diagnostic_limit_kind="timeout",
         )
     )
 
+    assert limit_kind == "timeout"
     assert result.reason == LIMIT_REASON
     assert "Reduce the request or replacement size" in result.reason
     assert "simplify the configured stages and patterns" in result.reason
@@ -131,7 +141,10 @@ def test_evaluation_decodes_one_utf8_text_and_encodes_replacement() -> None:
     async def evaluate() -> pb2.HttpRequestResult:
         middleware = PrivacyGuardMiddleware(create_builtin_registry())
         try:
-            return await middleware._evaluate_http_request(_request(b"email a@b.com"))
+            result, _ = await middleware._evaluate_http_request(
+                _request(b"email a@b.com")
+            )
+            return result
         finally:
             await middleware.close()
 
@@ -229,9 +242,10 @@ def test_detect_returns_no_body_mutation() -> None:
     async def evaluate() -> pb2.HttpRequestResult:
         middleware = PrivacyGuardMiddleware(create_builtin_registry())
         try:
-            return await middleware._evaluate_http_request(
+            result, _ = await middleware._evaluate_http_request(
                 _request(b"a@b.com", action="detect")
             )
+            return result
         finally:
             await middleware.close()
 
@@ -240,3 +254,39 @@ def test_detect_returns_no_body_mutation() -> None:
     assert result.decision == pb2.DECISION_ALLOW
     assert result.has_body is False
     assert result.body == b""
+
+
+def test_service_resource_limit_log_is_content_safe_and_request_correlated(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def evaluate() -> pb2.HttpRequestResult:
+        middleware = PrivacyGuardMiddleware(create_builtin_registry())
+
+        async def return_resource_limit(
+            _: pb2.HttpRequestEvaluation,
+        ) -> tuple[pb2.HttpRequestResult, str]:
+            return servicer_module._limit_deny()
+
+        monkeypatch.setattr(
+            middleware,
+            "_evaluate_http_request",
+            return_resource_limit,
+        )
+        request = _request(b"sensitive request content")
+        request.context.request_id = "request-123"
+        try:
+            return await middleware._evaluate_rpc(
+                request,
+                _UnusedAbortContext(),
+            )
+        finally:
+            await middleware.close()
+
+    with caplog.at_level(logging.INFO, logger="privacy_guard.service.servicer"):
+        result = asyncio.run(evaluate())
+
+    assert result.reason_code == LIMIT_REASON_CODE
+    assert "request_id=request-123" in caplog.text
+    assert "limit_kind=resource" in caplog.text
+    assert "sensitive request content" not in caplog.text

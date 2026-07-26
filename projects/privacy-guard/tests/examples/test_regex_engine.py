@@ -35,7 +35,7 @@ def test_regex_example_runs_through_the_middleware_boundary(
     async def evaluate() -> None:
         middleware = PrivacyGuardMiddleware(create_builtin_registry())
         try:
-            result = await middleware._evaluate_http_request(
+            result, _ = await middleware._evaluate_http_request(
                 pb2.HttpRequestEvaluation(
                     phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS,
                     config=config,

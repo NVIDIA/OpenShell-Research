@@ -10,6 +10,7 @@ import pytest
 from privacy_guard.config import PolicyAction
 from privacy_guard.engines import RegexEngine
 from privacy_guard.engines.registry import EngineRegistry
+from privacy_guard.errors import EngineLimitExceededError
 from privacy_guard.request_processor import RequestDecision, RequestProcessor
 from privacy_guard.timeout import Timeout
 
@@ -130,5 +131,26 @@ def test_timeout_deny_logs_a_content_safe_diagnostic_kind(
 
     assert result.decision is RequestDecision.DENY
     assert result.reason_code == "privacy_guard_limit_exceeded"
+    assert result.diagnostic_limit_kind == "timeout"
     assert "privacy_guard_processing_limit kind=timeout" in caplog.text
     assert "Alice" not in caplog.text
+
+
+def test_resource_limit_deny_logs_a_content_safe_diagnostic_kind(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    def exceed_limit(*_: object, **__: object) -> object:
+        raise EngineLimitExceededError("sensitive resource detail")
+
+    monkeypatch.setattr(RegexEngine, "_run", exceed_limit)
+
+    with caplog.at_level(logging.INFO, logger="privacy_guard.request_processor"):
+        result = _processor(PolicyAction.DETECT).process("Hello Alice")
+
+    assert result.decision is RequestDecision.DENY
+    assert result.reason_code == "privacy_guard_limit_exceeded"
+    assert result.diagnostic_limit_kind == "resource"
+    assert "privacy_guard_processing_limit kind=resource" in caplog.text
+    assert "Alice" not in caplog.text
+    assert "sensitive resource detail" not in caplog.text

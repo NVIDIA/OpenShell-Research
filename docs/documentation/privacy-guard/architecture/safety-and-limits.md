@@ -130,9 +130,9 @@ The service returns the same bounded deny when:
 - a deny reason code is not safely representable
 
 The deny reason directs users to reduce the request or replacement size and
-simplify the configured stages and patterns. Privacy Guard also emits a
-content-safe limit kind in its logs. When the log reports a timeout, users can
-increase `--timeout-seconds` or
+simplify the configured stages and patterns. The request-ID-bearing service
+evaluation log also emits a content-safe `timeout` or `resource` limit kind.
+When the log reports a timeout, users can increase `--timeout-seconds` or
 `PrivacyGuardServer(timeout_seconds=...)` up to 30 seconds and give OpenShell's
 middleware timeout additional headroom for worker queueing and configuration or
 engine preparation. These options reduce bounded output pressure or provide

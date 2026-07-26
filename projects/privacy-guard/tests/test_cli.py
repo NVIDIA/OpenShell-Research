@@ -169,6 +169,32 @@ def test_cli_explains_registry_module_import_failures_without_leaking_details(
     assert "sensitive import failure" not in _plain_output(result)
 
 
+def test_cli_translates_dynamic_registry_factory_lookup_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class DynamicModule:
+        def __getattr__(self, _: str) -> object:
+            raise RuntimeError("sensitive dynamic lookup failure")
+
+    monkeypatch.setattr(
+        cli_module.importlib,
+        "import_module",
+        lambda _: DynamicModule(),
+    )
+
+    result = CliRunner().invoke(
+        app,
+        ["--registry-factory", "operator_engines:create_registry", "engines"],
+        terminal_width=240,
+    )
+
+    assert result.exit_code == 2
+    output = _normalized_output(result)
+    assert "Registry factory could not be resolved" in output
+    assert "fix its dynamic attribute lookup" in output
+    assert "sensitive dynamic lookup failure" not in _plain_output(result)
+
+
 def test_cli_serve_adapts_operational_options_to_the_programmatic_server(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
