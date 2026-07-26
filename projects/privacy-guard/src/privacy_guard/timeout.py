@@ -45,8 +45,8 @@ class Timeout(StrictDomainModel):
         self.remaining_seconds()
 
     @contextmanager
-    def translate_errors(self) -> Iterator[None]:
-        """Translate a delegated ``TimeoutError`` and enforce this deadline."""
+    def enforce(self) -> Iterator[None]:
+        """Enforce this deadline around one delegated operation."""
         self.raise_if_expired()
         try:
             yield

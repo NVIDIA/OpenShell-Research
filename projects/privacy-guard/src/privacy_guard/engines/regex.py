@@ -239,7 +239,7 @@ class RegexEngine(EntityProcessingEngine[RegexEngineConfig]):
         for rule in self._rules:
             next_position = 0
             while next_position <= len(text):
-                with timeout.translate_errors():
+                with timeout.enforce():
                     match = rule.compiled.search(
                         text,
                         next_position,

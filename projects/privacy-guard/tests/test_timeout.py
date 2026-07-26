@@ -26,12 +26,12 @@ def test_expired_timeout_raises_typed_signal() -> None:
 def test_timeout_context_translates_delegated_timeout_error() -> None:
     timeout = Timeout.from_seconds(1)
 
-    with pytest.raises(TimeoutExpiredError), timeout.translate_errors():
+    with pytest.raises(TimeoutExpiredError), timeout.enforce():
         raise TimeoutError
 
 
 def test_timeout_context_preserves_unrelated_errors() -> None:
     timeout = Timeout.from_seconds(1)
 
-    with pytest.raises(RuntimeError), timeout.translate_errors():
+    with pytest.raises(RuntimeError), timeout.enforce():
         raise RuntimeError
