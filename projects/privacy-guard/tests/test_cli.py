@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
-import logging
 import re
+from collections.abc import Iterator
 from importlib.metadata import entry_points
 from types import SimpleNamespace
 
@@ -15,7 +15,14 @@ from privacy_guard import cli as cli_module
 from privacy_guard.cli import app
 from privacy_guard.engines.registry import EngineRegistry, create_builtin_registry
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
+from privacy_guard.logging import reset_logging
 from privacy_guard.service.server import PrivacyGuardServer
+
+
+@pytest.fixture(autouse=True)
+def _reset_cli_logging() -> Iterator[None]:
+    yield
+    reset_logging()
 
 
 def test_cli_help_exposes_server_and_discovery_commands() -> None:
@@ -172,7 +179,6 @@ def test_cli_explains_registry_module_import_failures_without_leaking_details(
 
 def test_cli_serve_adapts_operational_options_to_the_programmatic_server(
     monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
     calls: list[tuple[str, float, bool]] = []
 
@@ -187,22 +193,21 @@ def test_cli_serve_adapts_operational_options_to_the_programmatic_server(
 
     monkeypatch.setattr(PrivacyGuardServer, "serve_sync", record_serve_sync)
 
-    with caplog.at_level(logging.WARNING, logger="privacy_guard.cli"):
-        result = CliRunner().invoke(
-            app,
-            [
-                "--debug-log-content",
-                "serve",
-                "--listen",
-                "127.0.0.1:50052",
-                "--timeout-seconds",
-                "4.5",
-            ],
-        )
+    result = CliRunner().invoke(
+        app,
+        [
+            "--debug-log-content",
+            "serve",
+            "--listen",
+            "127.0.0.1:50052",
+            "--timeout-seconds",
+            "4.5",
+        ],
+    )
 
     assert result.exit_code == 0
     assert calls == [("127.0.0.1:50052", 4.5, True)]
-    assert "privacy_guard_request_content_logging_enabled" in caplog.text
+    assert "privacy_guard_request_content_logging_enabled" in _plain_output(result)
 
 
 def test_cli_serve_prints_cataloged_startup_errors_without_a_traceback(

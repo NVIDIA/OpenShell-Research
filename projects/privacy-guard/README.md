@@ -189,6 +189,25 @@ Custom applications pass their own finalized registry to
 transport, worker executor, and shutdown lifecycle; it does not load Python
 modules, select engines, generate schemas, or parse command-line options.
 
+Privacy Guard emits records through Python's standard `privacy_guard` logger
+and does not configure logging when imported. Applications may use their own
+standard-library logging setup or opt into Privacy Guard's concise console
+format:
+
+```python
+import logging
+
+from privacy_guard.logging import configure_logging
+
+configure_logging(level=logging.DEBUG)
+```
+
+Repeated calls replace only the handler installed by `configure_logging()`;
+application-owned handlers are preserved. The CLI uses this same configuration
+path. Its default level is `INFO`, and `--debug` enables content-safe `DEBUG`
+diagnostics. `--debug-log-content` additionally logs complete request and
+processed text and should be enabled only in a controlled environment.
+
 ## CLI
 
 ```bash
