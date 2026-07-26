@@ -240,6 +240,14 @@ When a delegated API accepts a timeout, pass the remaining duration:
 remaining = timeout.remaining_seconds()
 ```
 
+When that API raises Python's `TimeoutError` on expiration, use the shared
+context manager to translate it into Privacy Guard's domain error:
+
+```python
+with timeout.translate_errors():
+    result = client.process(text, timeout=timeout.remaining_seconds())
+```
+
 Unique long-running loops may also call `timeout.raise_if_expired()`.
 Operations that cannot be interrupted must be documented and bounded
 independently.

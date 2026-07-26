@@ -1456,6 +1456,11 @@ not create a fresh per-stage duration.</p>
 <p>When a delegated API accepts a timeout, pass the remaining duration:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">remaining</span> <span class="o">=</span> <span class="n">timeout</span><span class="o">.</span><span class="n">remaining_seconds</span><span class="p">()</span>
 </span></code></pre></div>
+<p>When that API raises Python's <code>TimeoutError</code> on expiration, use the shared
+context manager to translate it into Privacy Guard's domain error:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">with</span> <span class="n">timeout</span><span class="o">.</span><span class="n">translate_errors</span><span class="p">():</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="o">.</span><span class="n">remaining_seconds</span><span class="p">())</span>
+</span></code></pre></div>
 <p>Unique long-running loops may also call <code>timeout.raise_if_expired()</code>.
 Operations that cannot be interrupted must be documented and bounded
 independently.</p>
