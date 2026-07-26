@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import time
 from collections import OrderedDict
 from collections.abc import Callable
@@ -40,6 +39,7 @@ from privacy_guard.errors import (
     ErrorKind,
     PrivacyGuardError,
 )
+from privacy_guard.logging import get_logger
 from privacy_guard.request_processor import (
     EntityDetectionSummary,
     RequestDecision,
@@ -375,7 +375,7 @@ def _limit_deny() -> pb2.HttpRequestResult:
     )
 
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = get_logger(__name__)
 _MAX_CACHED_PROCESSORS = 128
 
 

@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import ast
 import logging
 from collections.abc import Iterator
 from io import StringIO
+from pathlib import Path
 
 import pytest
 
-from privacy_guard.logging import configure_logging, reset_logging
+from privacy_guard.logging import configure_logging, get_logger, reset_logging
 
 
 @pytest.fixture(autouse=True)
@@ -28,6 +30,12 @@ def test_configure_logging_emits_consistent_package_logs() -> None:
     output = stream.getvalue()
     assert "[INFO] server_started" in output
     assert "hidden_detail" not in output
+
+
+def test_get_logger_returns_named_package_logger() -> None:
+    logger = get_logger("privacy_guard.custom_engine")
+
+    assert logger is logging.getLogger("privacy_guard.custom_engine")
 
 
 def test_configure_logging_accepts_native_log_levels() -> None:
@@ -65,3 +73,26 @@ def test_reset_logging_restores_application_logging() -> None:
         assert package_logger.propagate is True
     finally:
         package_logger.removeHandler(application_handler)
+
+
+def test_source_modules_use_the_shared_logging_module() -> None:
+    direct_imports: list[str] = []
+    for path in _SOURCE_ROOT.rglob("*.py"):
+        if path == _LOGGING_MODULE or "bindings" in path.parts:
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        if any(
+            (
+                isinstance(node, ast.Import)
+                and any(imported.name == "logging" for imported in node.names)
+            )
+            or (isinstance(node, ast.ImportFrom) and node.module == "logging")
+            for node in ast.walk(tree)
+        ):
+            direct_imports.append(str(path.relative_to(_SOURCE_ROOT)))
+
+    assert direct_imports == []
+
+
+_SOURCE_ROOT = Path(__file__).parents[1] / "src" / "privacy_guard"
+_LOGGING_MODULE = _SOURCE_ROOT / "logging.py"

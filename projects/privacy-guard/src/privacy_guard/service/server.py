@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 
 import grpc
 
@@ -15,6 +14,7 @@ from privacy_guard.constants import (
 )
 from privacy_guard.engines.registry import EngineRegistry
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
+from privacy_guard.logging import get_logger
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
 
 DEFAULT_LISTEN_ADDRESS = "127.0.0.1:50051"
@@ -63,7 +63,7 @@ class PrivacyGuardServer:
                 await self._middleware.close()
 
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = get_logger(__name__)
 
 
 def _create_grpc_server(

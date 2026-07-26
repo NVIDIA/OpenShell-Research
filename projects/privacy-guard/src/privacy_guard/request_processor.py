@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from collections import OrderedDict
 from collections.abc import Sequence
 from enum import StrEnum
@@ -33,6 +32,7 @@ from privacy_guard.errors import (
     PrivacyGuardError,
     TimeoutExpiredError,
 )
+from privacy_guard.logging import get_logger
 from privacy_guard.string_validators import validate_scalar_string
 from privacy_guard.timeout import Timeout, validate_timeout_seconds
 
@@ -205,7 +205,7 @@ class _RunnableEngine(Protocol):
     ) -> TextProcessingResult: ...
 
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = get_logger(__name__)
 
 
 __all__ = [

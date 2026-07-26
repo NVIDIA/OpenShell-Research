@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib
 import json
-import logging
 from dataclasses import dataclass
 from typing import Annotated
 
@@ -14,7 +13,7 @@ from privacy_guard.constants import DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS
 from privacy_guard.engines import EntityProcessingStrategy
 from privacy_guard.engines.registry import EngineRegistry, create_builtin_registry
 from privacy_guard.errors import PrivacyGuardError
-from privacy_guard.logging import configure_logging
+from privacy_guard.logging import configure_logging, get_logger
 from privacy_guard.service.server import DEFAULT_LISTEN_ADDRESS, PrivacyGuardServer
 from privacy_guard.timeout import validate_timeout_seconds
 
@@ -50,7 +49,7 @@ def configure_cli(
     ] = False,
 ) -> None:
     """Configure the command application and its engine inventory."""
-    configure_logging(logging.DEBUG if debug or debug_log_content else logging.INFO)
+    configure_logging("DEBUG" if debug or debug_log_content else "INFO")
     context.obj = _CommandOptions(
         registry=_load_registry(registry_factory),
         log_request_content=debug_log_content,
@@ -126,7 +125,7 @@ def engines(context: typer.Context) -> None:
         )
 
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = get_logger(__name__)
 
 
 @dataclass(frozen=True)
