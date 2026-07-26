@@ -244,7 +244,7 @@ When that API raises Python's `TimeoutError` on expiration, use the shared
 context manager to translate it into Privacy Guard's domain error:
 
 ```python
-with timeout.translate_errors():
+with timeout.enforce():
     result = client.process(text, timeout=timeout.remaining_seconds())
 ```
 
