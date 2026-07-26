@@ -5,7 +5,16 @@ from __future__ import annotations
 import copy
 import logging
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import TextIO
+
+
+class ColorMode(StrEnum):
+    """When Privacy Guard should add ANSI colors to console logs."""
+
+    AUTO = "auto"
+    ALWAYS = "always"
+    NEVER = "never"
 
 
 @dataclass(frozen=True)
@@ -14,7 +23,7 @@ class LoggingConfig:
 
     level: int | str = logging.INFO
     stream: TextIO | None = None
-    use_colors: bool | None = None
+    color_mode: ColorMode = ColorMode.AUTO
 
 
 DEFAULT_LOGGING_CONFIG = LoggingConfig()
@@ -43,7 +52,9 @@ def configure_logging(
 
     handler = _PrivacyGuardStreamHandler(config.stream)
     use_colors = (
-        handler.stream.isatty() if config.use_colors is None else config.use_colors
+        handler.stream.isatty()
+        if config.color_mode is ColorMode.AUTO
+        else config.color_mode is ColorMode.ALWAYS
     )
     handler.setFormatter(_PrivacyGuardFormatter(use_colors=use_colors))
     package_logger.addHandler(handler)
@@ -111,6 +122,7 @@ _LEVEL_COLORS = {
 
 
 __all__ = [
+    "ColorMode",
     "DEFAULT_LOGGING_CONFIG",
     "LoggingConfig",
     "configure_logging",

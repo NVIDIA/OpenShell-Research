@@ -13,6 +13,7 @@ import pytest
 
 from privacy_guard.logging import (
     DEFAULT_LOGGING_CONFIG,
+    ColorMode,
     LoggingConfig,
     configure_logging,
     get_logger,
@@ -48,7 +49,7 @@ def test_default_logging_config_uses_info_and_terminal_aware_colors() -> None:
     assert DEFAULT_LOGGING_CONFIG == LoggingConfig(
         level=logging.INFO,
         stream=None,
-        use_colors=None,
+        color_mode=ColorMode.AUTO,
     )
 
 
@@ -66,7 +67,7 @@ def test_configure_logging_colors_interactive_output() -> None:
 
 def test_configure_logging_can_disable_terminal_colors() -> None:
     stream = _TerminalStream()
-    configure_logging(LoggingConfig(stream=stream, use_colors=False))
+    configure_logging(LoggingConfig(stream=stream, color_mode=ColorMode.NEVER))
 
     logging.getLogger("privacy_guard.service").error("startup_failed")
 
@@ -75,7 +76,7 @@ def test_configure_logging_can_disable_terminal_colors() -> None:
 
 def test_configure_logging_can_force_colors_for_redirected_output() -> None:
     stream = StringIO()
-    configure_logging(LoggingConfig(stream=stream, use_colors=True))
+    configure_logging(LoggingConfig(stream=stream, color_mode=ColorMode.ALWAYS))
 
     logging.getLogger("privacy_guard.service").info("server_started")
 
