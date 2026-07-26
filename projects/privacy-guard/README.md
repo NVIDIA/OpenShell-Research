@@ -195,18 +195,20 @@ standard-library logging setup or opt into Privacy Guard's concise console
 format:
 
 ```python
-import logging
+from privacy_guard.logging import LoggingConfig, configure_logging
 
-from privacy_guard.logging import configure_logging
-
-configure_logging(level=logging.DEBUG)
+configure_logging(LoggingConfig(level="DEBUG"))
 ```
 
 Repeated calls replace only the handler installed by `configure_logging()`;
 application-owned handlers are preserved. The CLI uses this same configuration
-path. Its default level is `INFO`, and `--debug` enables content-safe `DEBUG`
-diagnostics. `--debug-log-content` additionally logs complete request and
-processed text and should be enabled only in a controlled environment.
+path. The default format includes the date, time, padded level, logger name,
+and message. It adds level-aware ANSI colors when writing to an interactive
+terminal and stays plain when redirected; set `use_colors=True` or
+`use_colors=False` for an explicit choice. Its default level is `INFO`, and
+`--debug` enables content-safe `DEBUG` diagnostics. `--debug-log-content`
+additionally logs complete request and processed text and should be enabled
+only in a controlled environment.
 
 ## CLI
 
