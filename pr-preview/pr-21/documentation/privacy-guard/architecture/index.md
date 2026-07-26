@@ -56,7 +56,9 @@ Source paths on these pages are relative to
   bindings.
 - `cli.py` owns command parsing, registry-factory loading, engine discovery,
   configuration-schema output, logging options, and the adapter that starts
-  the programmatic server.
+  the programmatic server. Top-level `logging.py` provides the shared,
+  standard-library logging configuration used by the CLI and available to
+  programmatic deployments.
 - `request_processor.py` runs configured stages over one text value, shares one
   timeout across them, aggregates detections, and applies the user-facing
   policy action. It does not import gRPC or implement an engine's algorithms.

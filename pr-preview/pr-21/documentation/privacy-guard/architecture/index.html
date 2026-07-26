@@ -1076,7 +1076,9 @@ OpenShell and must not be edited locally.</p>
   bindings.</li>
 <li><code>cli.py</code> owns command parsing, registry-factory loading, engine discovery,
   configuration-schema output, logging options, and the adapter that starts
-  the programmatic server.</li>
+  the programmatic server. Top-level <code>logging.py</code> provides the shared,
+  standard-library logging configuration used by the CLI and available to
+  programmatic deployments.</li>
 <li><code>request_processor.py</code> runs configured stages over one text value, shares one
   timeout across them, aggregates detections, and applies the user-facing
   policy action. It does not import gRPC or implement an engine's algorithms.</li>
