@@ -45,7 +45,6 @@ from privacy_guard.errors import (
     EngineConfigurationError,
     EngineContractError,
     EngineLimitExceededError,
-    TimeoutExpiredError,
 )
 from privacy_guard.string_validators import ScalarString, validate_scalar_string
 from privacy_guard.timeout import Timeout
@@ -237,38 +236,35 @@ class RegexEngine(EntityProcessingEngine[RegexEngineConfig]):
         timeout: Timeout,
     ) -> TextProcessingResult:
         detections_with_identity: list[tuple[EntityDetection, str]] = []
-        try:
-            for rule in self._rules:
-                next_position = 0
-                while next_position <= len(text):
+        for rule in self._rules:
+            next_position = 0
+            while next_position <= len(text):
+                with timeout.translate_errors():
                     match = rule.compiled.search(
                         text,
                         next_position,
                         timeout=timeout.remaining_seconds(),
                     )
-                    timeout.raise_if_expired()
-                    if match is None:
-                        break
-                    start, end = match.span()
-                    if start == end or match.span(rule.marker) != (end, end):
-                        raise EngineConfigurationError(
-                            "regex engine configuration is invalid"
-                        )
-                    detection = EntityDetection(
-                        entity=rule.entity,
-                        start=start,
-                        end=end,
-                        confidence=rule.confidence,
-                        metadata={_PATTERN_METADATA_KEY: rule.pattern_identity},
+                if match is None:
+                    break
+                start, end = match.span()
+                if start == end or match.span(rule.marker) != (end, end):
+                    raise EngineConfigurationError(
+                        "regex engine configuration is invalid"
                     )
-                    detections_with_identity.append((detection, rule.pattern_identity))
-                    if len(detections_with_identity) > MAX_DETECTIONS_PER_STAGE:
-                        raise EngineLimitExceededError(
-                            "regex detection count exceeds the limit"
-                        )
-                    next_position = start + 1
-        except TimeoutError:
-            raise TimeoutExpiredError from None
+                detection = EntityDetection(
+                    entity=rule.entity,
+                    start=start,
+                    end=end,
+                    confidence=rule.confidence,
+                    metadata={_PATTERN_METADATA_KEY: rule.pattern_identity},
+                )
+                detections_with_identity.append((detection, rule.pattern_identity))
+                if len(detections_with_identity) > MAX_DETECTIONS_PER_STAGE:
+                    raise EngineLimitExceededError(
+                        "regex detection count exceeds the limit"
+                    )
+                next_position = start + 1
 
         detections_with_identity.sort(
             key=lambda item: (

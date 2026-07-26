@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterator
+from contextlib import contextmanager
 from time import monotonic
 from typing import Self
 
@@ -41,6 +43,16 @@ class Timeout(StrictDomainModel):
     def raise_if_expired(self) -> None:
         """Raise ``TimeoutExpiredError`` when no time remains."""
         self.remaining_seconds()
+
+    @contextmanager
+    def translate_errors(self) -> Iterator[None]:
+        """Translate a delegated ``TimeoutError`` and enforce this deadline."""
+        self.raise_if_expired()
+        try:
+            yield
+        except TimeoutError:
+            raise TimeoutExpiredError from None
+        self.raise_if_expired()
 
 
 __all__ = ["Timeout"]
