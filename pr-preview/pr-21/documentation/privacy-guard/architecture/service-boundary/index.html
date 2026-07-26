@@ -1327,7 +1327,7 @@ canonical copy; Privacy Guard must not create a private fork.</p>
 are invalid input.</p>
 <p>The current manifest message has no field for the finalized policy schema or
 engine discovery metadata. Those are available through the local
-<code>privacy-guard schema</code> and <code>privacy-guard engines</code> commands.</p>
+<code>privacy-guard configuration-schema</code> and <code>privacy-guard engines</code> commands.</p>
 <h2 id="configuration-lifecycle">Configuration lifecycle<a class="headerlink" href="#configuration-lifecycle" title="Permanent link">&para;</a></h2>
 <p>The current protocol carries a complete <code>google.protobuf.Struct</code> on both
 validation and every request evaluation.</p>
@@ -1511,10 +1511,11 @@ different engine inventories or runtime resources.</p>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">create_builtin_registry</span><span class="p">(),</span>
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">timeout_seconds</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">)</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">server</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;127.0.0.1:50051&quot;</span><span class="p">)</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">server</span><span class="o">.</span><span class="n">serve_sync</span><span class="p">(</span><span class="s2">&quot;127.0.0.1:50051&quot;</span><span class="p">)</span>
 </span></code></pre></div>
-<p>Async applications call <code>await server.serve(address)</code> instead. Both entry
-points use the same server instance and lifecycle.</p>
+<p>Async applications call <code>await server.serve_async(address)</code> instead. The
+explicit suffixes make the blocking behavior visible at each call site. Both
+entry points use the same server instance and lifecycle.</p>
 <p>The server:</p>
 <ol>
 <li>creates an unstarted async gRPC server with receive and concurrency limits</li>
@@ -1523,7 +1524,9 @@ points use the same server instance and lifecycle.</p>
 <li>stops gRPC</li>
 <li>closes the middleware executor</li>
 </ol>
-<p>A bind failure becomes the stable <code>server_bind_failed</code> error.</p>
+<p>A bind or asynchronous gRPC startup <code>RuntimeError</code> becomes the stable
+<code>server_bind_failed</code> error. Its catalog operation is the broader <code>server.start</code>
+phase so the rendered failure does not mislabel a post-bind startup error.</p>
 <p>The server module has no command framework, module-import-string, discovery,
 schema-rendering, or command-logging responsibilities.</p>
 <h2 id="command-line-application">Command-line application<a class="headerlink" href="#command-line-application" title="Permanent link">&para;</a></h2>
@@ -1532,7 +1535,7 @@ identifies a Python function in <code>module:function</code> form. At startup, t
 imports the module, calls the function once, and uses the returned finalized
 <code>EngineRegistry</code> for the selected command:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>privacy-guard<span class="w"> </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span>engines
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>privacy-guard<span class="w"> </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span>schema
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>privacy-guard<span class="w"> </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span>configuration-schema
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>privacy-guard<span class="w"> </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span>serve
 </span></code></pre></div>
 <p>This is a deployment setting, not part of an OpenShell policy. The person
@@ -1542,11 +1545,11 @@ cannot select a factory or cause Privacy Guard to import a module.</p>
 <p>Applications that start <code>PrivacyGuardServer</code> from Python do not need this CLI
 option. They create the registry normally and pass it to the server:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">registry</span> <span class="o">=</span> <span class="n">create_registry</span><span class="p">()</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">PrivacyGuardServer</span><span class="p">(</span><span class="n">registry</span><span class="p">,</span> <span class="n">timeout_seconds</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">PrivacyGuardServer</span><span class="p">(</span><span class="n">registry</span><span class="p">,</span> <span class="n">timeout_seconds</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span><span class="o">.</span><span class="n">serve_sync</span><span class="p">()</span>
 </span></code></pre></div>
 <p>The CLI exposes:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>privacy-guard<span class="w"> </span>engines
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>privacy-guard<span class="w"> </span>schema
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>privacy-guard<span class="w"> </span>configuration-schema
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>privacy-guard<span class="w"> </span>serve<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:50051<span class="w"> </span>--timeout-seconds<span class="w"> </span><span class="m">5</span>
 </span></code></pre></div>
 <p>Entity behavior comes from policy configuration, not server startup flags.

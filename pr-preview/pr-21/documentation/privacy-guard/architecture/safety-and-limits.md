@@ -129,14 +129,16 @@ The service returns the same bounded deny when:
 - replacement text cannot be encoded within the body limit
 - a deny reason code is not safely representable
 
-The deny reason directs users to reduce the request or replacement size and
-simplify the configured stages and patterns. The request-ID-bearing service
-evaluation log also emits a content-safe `timeout` or `resource` limit kind.
-When the log reports a timeout, users can increase `--timeout-seconds` or
-`PrivacyGuardServer(timeout_seconds=...)` up to 30 seconds and give OpenShell's
-middleware timeout additional headroom for worker queueing and configuration or
-engine preparation. These options reduce bounded output pressure or provide
-appropriate time without weakening the fail-closed behavior.
+The processor emits a content-safe `timeout` or `resource` limit kind, and the
+service adapter emits `resource` for representation limits. Neither log includes
+request content or collaborator error text. The deny reason directs users to
+check that log, then reduce the request or replacement size, simplify the
+configured stages and patterns, or increase `--timeout-seconds` or
+`PrivacyGuardServer(timeout_seconds=...)` up to 30 seconds. When increasing the
+processing timeout, users must give OpenShell's middleware timeout additional
+headroom for worker queueing and configuration or engine preparation. These
+options reduce bounded output pressure or provide appropriate time without
+weakening the fail-closed behavior.
 
 Malformed input and engine contract or execution failures instead abort the RPC
 with a cataloged error. OpenShell then applies the middleware registration's
@@ -160,10 +162,12 @@ error spec defines:
 - remediation hint
 
 Successful policy and safety-limit denials use stable reason codes plus
-content-safe recovery guidance. CLI validation failures name the rejected
-option and state the accepted form or next action. Internal engine and
-third-party failures remain concise because the owning boundary translates
-them before they reach users.
+content-safe recovery guidance; they do not add domain fields solely for
+diagnostic logging. CLI validation failures name the rejected option and state
+the accepted form or next action. Cataloged server-startup failures print one
+content-safe message and exit nonzero rather than exposing a traceback.
+Internal engine and third-party failures remain concise because the owning
+boundary translates them before they reach users.
 
 Caught extension and third-party exceptions are translated at their trust
 boundary. Raw exception messages and chains are not exposed. Configuration

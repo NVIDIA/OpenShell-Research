@@ -31,7 +31,7 @@ are invalid input.
 
 The current manifest message has no field for the finalized policy schema or
 engine discovery metadata. Those are available through the local
-`privacy-guard schema` and `privacy-guard engines` commands.
+`privacy-guard configuration-schema` and `privacy-guard engines` commands.
 
 ## Configuration lifecycle
 
@@ -217,11 +217,12 @@ server = PrivacyGuardServer(
     create_builtin_registry(),
     timeout_seconds=5,
 )
-server.run("127.0.0.1:50051")
+server.serve_sync("127.0.0.1:50051")
 ```
 
-Async applications call `await server.serve(address)` instead. Both entry
-points use the same server instance and lifecycle.
+Async applications call `await server.serve_async(address)` instead. The
+explicit suffixes make the blocking behavior visible at each call site. Both
+entry points use the same server instance and lifecycle.
 
 The server:
 
@@ -231,7 +232,9 @@ The server:
 4. stops gRPC
 5. closes the middleware executor
 
-A bind failure becomes the stable `server_bind_failed` error.
+A bind or asynchronous gRPC startup `RuntimeError` becomes the stable
+`server_bind_failed` error. Its catalog operation is the broader `server.start`
+phase so the rendered failure does not mislabel a post-bind startup error.
 
 The server module has no command framework, module-import-string, discovery,
 schema-rendering, or command-logging responsibilities.
@@ -245,7 +248,7 @@ imports the module, calls the function once, and uses the returned finalized
 
 ```bash
 privacy-guard --registry-factory my_engines:create_registry engines
-privacy-guard --registry-factory my_engines:create_registry schema
+privacy-guard --registry-factory my_engines:create_registry configuration-schema
 privacy-guard --registry-factory my_engines:create_registry serve
 ```
 
@@ -259,14 +262,14 @@ option. They create the registry normally and pass it to the server:
 
 ```python
 registry = create_registry()
-PrivacyGuardServer(registry, timeout_seconds=5).run()
+PrivacyGuardServer(registry, timeout_seconds=5).serve_sync()
 ```
 
 The CLI exposes:
 
 ```bash
 privacy-guard engines
-privacy-guard schema
+privacy-guard configuration-schema
 privacy-guard serve --listen 127.0.0.1:50051 --timeout-seconds 5
 ```
 

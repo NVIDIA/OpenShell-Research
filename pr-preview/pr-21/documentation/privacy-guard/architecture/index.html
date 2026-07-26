@@ -1075,8 +1075,8 @@ OpenShell and must not be edited locally.</p>
   Outside generated <code>bindings/</code>, no other package imports gRPC or generated
   bindings.</li>
 <li><code>cli.py</code> owns command parsing, registry-factory loading, engine discovery,
-  schema output, logging options, and the adapter that starts the programmatic
-  server.</li>
+  configuration-schema output, logging options, and the adapter that starts
+  the programmatic server.</li>
 <li><code>request_processor.py</code> runs configured stages over one text value, shares one
   timeout across them, aggregates detections, and applies the user-facing
   policy action. It does not import gRPC or implement an engine's algorithms.</li>
