@@ -19,9 +19,10 @@ SERVICE_VERSION = version("privacy-guard")
 BLOCK_REASON = "Privacy Guard blocked the request"
 BLOCK_REASON_CODE = "privacy_guard_blocked"
 LIMIT_REASON = (
-    "Privacy Guard exceeded a processing safety limit. Reduce the request or "
-    "replacement size, simplify the configured stages and patterns, or increase "
-    "the processing timeout with --timeout-seconds or "
+    "Privacy Guard exceeded a processing safety limit. Check Privacy Guard logs "
+    "for the limit kind. Reduce the request or replacement size, simplify the "
+    "configured stages and patterns, or increase the processing timeout with "
+    "--timeout-seconds or "
     "PrivacyGuardServer(timeout_seconds=...) to at most "
     f"{MAX_TIMEOUT_SECONDS:g} seconds. If increasing it, give OpenShell's "
     "middleware timeout additional headroom for queueing and configuration "

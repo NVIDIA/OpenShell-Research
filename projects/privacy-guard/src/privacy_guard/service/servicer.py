@@ -367,6 +367,7 @@ def _detection_to_proto(detection: EntityDetectionSummary) -> pb2.Finding:
 
 
 def _limit_deny() -> pb2.HttpRequestResult:
+    _LOGGER.info("privacy_guard_processing_limit kind=resource")
     return pb2.HttpRequestResult(
         decision=pb2.DECISION_DENY,
         reason=LIMIT_REASON,

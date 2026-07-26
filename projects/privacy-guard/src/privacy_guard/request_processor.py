@@ -134,11 +134,13 @@ class RequestProcessor:
                 current_text = result.text
             timeout.raise_if_expired()
         except TimeoutExpiredError:
+            _LOGGER.info("privacy_guard_processing_limit kind=timeout")
             return RequestProcessingResult(
                 decision=RequestDecision.DENY,
                 reason_code=LIMIT_REASON_CODE,
             )
         except EngineLimitExceededError:
+            _LOGGER.info("privacy_guard_processing_limit kind=resource")
             return RequestProcessingResult(
                 decision=RequestDecision.DENY,
                 reason_code=LIMIT_REASON_CODE,

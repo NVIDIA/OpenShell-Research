@@ -168,7 +168,7 @@ _ERROR_SPECS: dict[ErrorCode, _ErrorSpec] = {
     ErrorCode.SERVER_BIND_FAILED: _ErrorSpec(
         ErrorKind.INTERNAL,
         ErrorComponent.SERVER,
-        "bind",
+        "start",
         "Server could not start on its listen address.",
         "Choose an available listen address and port, then retry.",
     ),

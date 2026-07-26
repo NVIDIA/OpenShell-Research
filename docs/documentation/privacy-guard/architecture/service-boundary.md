@@ -232,7 +232,9 @@ The server:
 4. stops gRPC
 5. closes the middleware executor
 
-A bind failure becomes the stable `server_bind_failed` error.
+A bind or asynchronous gRPC startup `RuntimeError` becomes the stable
+`server_bind_failed` error. Its catalog operation is the broader `server.start`
+phase so the rendered failure does not mislabel a post-bind startup error.
 
 The server module has no command framework, module-import-string, discovery,
 schema-rendering, or command-logging responsibilities.

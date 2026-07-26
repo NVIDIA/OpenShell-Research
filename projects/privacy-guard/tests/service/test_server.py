@@ -323,6 +323,7 @@ async def test_serve_async_sanitizes_startup_failures_and_closes_resources(
 
     assert captured.value.code is ErrorCode.SERVER_BIND_FAILED
     assert captured.value.__cause__ is None
+    assert "server.start" in str(captured.value)
     assert "startup failed" not in str(captured.value)
     assert fake_server.waited is False
     assert fake_server.stop_graces == [0]

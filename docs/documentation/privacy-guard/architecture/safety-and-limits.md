@@ -129,8 +129,11 @@ The service returns the same bounded deny when:
 - replacement text cannot be encoded within the body limit
 - a deny reason code is not safely representable
 
-The deny reason directs users to reduce the request or replacement size,
-simplify the configured stages and patterns, or increase `--timeout-seconds` or
+The processor emits a content-safe `timeout` or `resource` limit kind, and the
+service adapter emits `resource` for representation limits. Neither log includes
+request content or collaborator error text. The deny reason directs users to
+check that log, then reduce the request or replacement size, simplify the
+configured stages and patterns, or increase `--timeout-seconds` or
 `PrivacyGuardServer(timeout_seconds=...)` up to 30 seconds. When increasing the
 processing timeout, users must give OpenShell's middleware timeout additional
 headroom for worker queueing and configuration or engine preparation. These

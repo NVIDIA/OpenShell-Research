@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from threading import get_ident
 
 import pytest
@@ -11,11 +12,16 @@ from google.protobuf.message import Message
 
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
 from privacy_guard.config import PrivacyGuardConfig
-from privacy_guard.constants import LIMIT_REASON, LIMIT_REASON_CODE
+from privacy_guard.constants import (
+    LIMIT_REASON,
+    LIMIT_REASON_CODE,
+    MAX_PROTO_FINDING_BYTES,
+)
 from privacy_guard.engines import EngineConfig
 from privacy_guard.engines.registry import create_builtin_registry
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
 from privacy_guard.request_processor import (
+    EntityDetectionSummary,
     RequestDecision,
     RequestProcessingResult,
     RequestProcessor,
@@ -103,6 +109,7 @@ def test_limit_deny_explains_recovery_options() -> None:
     )
 
     assert result.reason == LIMIT_REASON
+    assert "Check Privacy Guard logs for the limit kind" in result.reason
     assert "Reduce the request or replacement size" in result.reason
     assert "simplify the configured stages and patterns" in result.reason
     assert "--timeout-seconds or PrivacyGuardServer(timeout_seconds=...)" in (
@@ -111,6 +118,29 @@ def test_limit_deny_explains_recovery_options() -> None:
     assert "additional headroom for queueing and configuration preparation" in (
         result.reason
     )
+
+
+def test_service_limit_deny_logs_a_content_safe_resource_kind(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    sentinel = "sensitive-finding-value"
+    with caplog.at_level(logging.INFO, logger="privacy_guard.service.servicer"):
+        result = servicer_module._result_to_proto(
+            RequestProcessingResult(
+                decision=RequestDecision.ALLOW,
+                detection_summaries=(
+                    EntityDetectionSummary(
+                        entity=sentinel + ("x" * MAX_PROTO_FINDING_BYTES),
+                        source_stage="stage",
+                        count=1,
+                    ),
+                ),
+            )
+        )
+
+    assert result.reason_code == LIMIT_REASON_CODE
+    assert "privacy_guard_processing_limit kind=resource" in caplog.text
+    assert sentinel not in caplog.text
 
 
 def test_middleware_applies_configured_timeout_to_cached_processors() -> None:
