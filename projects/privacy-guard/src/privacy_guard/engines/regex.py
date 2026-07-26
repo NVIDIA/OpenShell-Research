@@ -198,7 +198,7 @@ class RegexEngineConfig(EngineConfig):
 
 
 class RegexEngine(EntityProcessingEngine[RegexEngineConfig]):
-    """Detect overlapping regex matches and optionally replace deterministic winners."""
+    """Detect every regex match, including matches that share input characters."""
 
     supported_strategies = frozenset(
         {

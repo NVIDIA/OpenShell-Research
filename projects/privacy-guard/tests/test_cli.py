@@ -48,7 +48,10 @@ def test_cli_engines_describes_the_installed_engine() -> None:
 
     assert result.exit_code == 0
     assert result.output.startswith("regex\tdetect,replace\t")
-    assert "Detect overlapping regex matches" in result.output
+    description = (
+        "Detect every regex match, including matches that share input characters"
+    )
+    assert description in result.output
 
 
 def test_cli_schema_prints_the_finalized_discriminated_policy_schema() -> None:
