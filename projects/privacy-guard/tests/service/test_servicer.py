@@ -105,6 +105,21 @@ def test_limit_deny_explains_recovery_options() -> None:
     assert result.reason == LIMIT_REASON
     assert "Reduce the request or replacement size" in result.reason
     assert "simplify the configured stages and patterns" in result.reason
+    assert "increase --timeout-seconds up to 30" in result.reason
+    assert "OpenShell middleware timeout is longer" in result.reason
+
+
+def test_middleware_applies_configured_timeout_to_cached_processors() -> None:
+    middleware = PrivacyGuardMiddleware(
+        create_builtin_registry(),
+        timeout_seconds=4.5,
+    )
+    try:
+        processor = middleware._processors.resolve(_values())
+    finally:
+        asyncio.run(middleware.close())
+
+    assert processor._timeout_seconds == 4.5
 
 
 def test_evaluation_decodes_one_utf8_text_and_encodes_replacement() -> None:

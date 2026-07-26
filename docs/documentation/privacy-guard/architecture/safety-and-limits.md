@@ -40,8 +40,8 @@ reimplement either.
 | gRPC receive message | `MAX_RECEIVE_MESSAGE_BYTES` | 5 MiB | gRPC server |
 | Detections returned by one stage | `MAX_DETECTIONS_PER_STAGE` | 256 | Engine wrapper |
 | Detections across one request | `MAX_DETECTIONS_PER_REQUEST` | 4,096 | Processor |
-| Default shared timeout | `DEFAULT_TIMEOUT_SECONDS` | 1 second | Processor |
-| Maximum configured timeout | `MAX_TIMEOUT_SECONDS` | 30 seconds | Processor and `Timeout` |
+| Default shared timeout | `DEFAULT_TIMEOUT_SECONDS` | 1 second | Server and processor |
+| Maximum configured timeout | `MAX_TIMEOUT_SECONDS` | 30 seconds | Server, processor, and `Timeout` |
 | Active processor workers | `MAX_CONCURRENT_PROCESSING` | 4 | Service |
 | Concurrent gRPC calls | `MAX_CONCURRENT_RPCS` | 16 | gRPC server |
 
@@ -53,6 +53,10 @@ One monotonic `Timeout` is shared by all stages and final result validation.
 Third-party calls that accept a timeout should receive the same remaining
 duration; calls that cannot be interrupted continue to occupy a service worker
 until they exit.
+
+Operators configure the internal bound with `--timeout-seconds` or the
+programmatic `PrivacyGuardServer(timeout_seconds=...)` argument. OpenShell's
+outer middleware timeout must be longer than this internal bound.
 
 ## Diagnostic and result limits
 
@@ -124,10 +128,11 @@ The service returns the same bounded deny when:
 - replacement text cannot be encoded within the body limit
 - a deny reason code is not safely representable
 
-The deny reason directs users to reduce the request or replacement size, or
-simplify the configured stages and patterns before retrying. These options
-reduce both bounded output pressure and timeout risk without weakening the
-fail-closed behavior.
+The deny reason directs users to reduce the request or replacement size,
+simplify the configured stages and patterns, or, when processing timed out,
+increase `--timeout-seconds` up to 30 and ensure OpenShell's middleware timeout
+is longer before retrying. These options reduce bounded output pressure or
+provide appropriate time without weakening the fail-closed behavior.
 
 Malformed input and engine contract or execution failures instead abort the RPC
 with a cataloged error. OpenShell then applies the middleware registration's
@@ -149,6 +154,12 @@ error spec defines:
 - failed operation
 - content-safe summary
 - remediation hint
+
+Successful policy and safety-limit denials use stable reason codes plus
+content-safe recovery guidance. CLI validation failures name the rejected
+option and state the accepted form or next action. Internal engine and
+third-party failures remain concise because the owning boundary translates
+them before they reach users.
 
 Caught extension and third-party exceptions are translated at their trust
 boundary. Raw exception messages and chains are not exposed. Configuration

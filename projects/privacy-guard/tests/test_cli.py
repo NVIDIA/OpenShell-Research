@@ -43,6 +43,16 @@ def test_console_script_targets_the_cli_module() -> None:
     assert console_script.value == "privacy_guard.cli:app"
 
 
+def test_cli_serve_help_explains_the_processing_timeout() -> None:
+    result = CliRunner().invoke(app, ["serve", "--help"])
+
+    assert result.exit_code == 0
+    output = _normalized_output(result)
+    assert "--timeout-seconds" in output
+    assert "shared by all processing stages" in output
+    assert "at most 30" in output
+
+
 def test_cli_engines_describes_the_installed_engine() -> None:
     result = CliRunner().invoke(app, ["engines"])
 
@@ -99,12 +109,12 @@ def test_cli_loads_one_finalized_operator_registry(
 @pytest.mark.parametrize(
     ("factory_reference", "reason"),
     [
-        ("missing-separator", "module:factory"),
-        ("operator_engines:missing", "could not be loaded"),
-        ("operator_engines:not_callable", "not callable"),
-        ("operator_engines:failed", "factory failed"),
-        ("operator_engines:wrong_type", "invalid"),
-        ("operator_engines:unfinished", "unfinalized"),
+        ("missing-separator", "my_engines:create_registry"),
+        ("operator_engines:missing", "Verify the module is installed"),
+        ("operator_engines:not_callable", "Export a callable"),
+        ("operator_engines:failed", "Run the factory directly"),
+        ("operator_engines:wrong_type", "Return an EngineRegistry"),
+        ("operator_engines:unfinished", "Call finalize()"),
     ],
 )
 def test_cli_rejects_invalid_registry_factories(
@@ -130,10 +140,11 @@ def test_cli_rejects_invalid_registry_factories(
     result = CliRunner().invoke(
         app,
         ["--registry-factory", factory_reference, "engines"],
+        terminal_width=240,
     )
 
     assert result.exit_code == 2
-    assert reason in _plain_output(result)
+    assert reason in _normalized_output(result)
     assert "sensitive factory failure" not in _plain_output(result)
 
 
@@ -141,22 +152,53 @@ def test_cli_serve_adapts_operational_options_to_the_programmatic_server(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    calls: list[tuple[str, bool]] = []
+    calls: list[tuple[str, float, bool]] = []
 
     def record_run(self: PrivacyGuardServer, listen: str) -> None:
-        calls.append((listen, self._middleware._processors._log_request_content))
+        calls.append(
+            (
+                listen,
+                self._middleware._processors._timeout_seconds,
+                self._middleware._processors._log_request_content,
+            )
+        )
 
     monkeypatch.setattr(PrivacyGuardServer, "run", record_run)
 
     with caplog.at_level(logging.WARNING, logger="privacy_guard.cli"):
         result = CliRunner().invoke(
             app,
-            ["--debug-log-content", "serve", "--listen", "127.0.0.1:50052"],
+            [
+                "--debug-log-content",
+                "serve",
+                "--listen",
+                "127.0.0.1:50052",
+                "--timeout-seconds",
+                "4.5",
+            ],
         )
 
     assert result.exit_code == 0
-    assert calls == [("127.0.0.1:50052", True)]
+    assert calls == [("127.0.0.1:50052", 4.5, True)]
     assert "privacy_guard_request_content_logging_enabled" in caplog.text
+
+
+@pytest.mark.parametrize("timeout_seconds", ["0", "31", "nan"])
+def test_cli_rejects_invalid_processing_timeout(timeout_seconds: str) -> None:
+    result = CliRunner().invoke(
+        app,
+        ["serve", "--timeout-seconds", timeout_seconds],
+        terminal_width=240,
+    )
+
+    assert result.exit_code == 2
+    output = _normalized_output(result)
+    assert "--timeout-seconds" in output
+    assert "greater than 0 and at most 30" in output
+
+
+def _normalized_output(result: Result) -> str:
+    return " ".join(_plain_output(result).replace("│", " ").split())
 
 
 def _plain_output(result: Result) -> str:

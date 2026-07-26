@@ -9,6 +9,10 @@ from __future__ import annotations
 import re
 from importlib.metadata import version
 
+# Configurable processing timeout.
+DEFAULT_TIMEOUT_SECONDS = 1.0
+MAX_TIMEOUT_SECONDS = 30.0
+
 # Middleware identity and stable response values.
 SERVICE_NAME = "privacy-guard"
 SERVICE_VERSION = version("privacy-guard")
@@ -16,7 +20,9 @@ BLOCK_REASON = "Privacy Guard blocked the request"
 BLOCK_REASON_CODE = "privacy_guard_blocked"
 LIMIT_REASON = (
     "Privacy Guard exceeded a processing safety limit. Reduce the request or "
-    "replacement size, or simplify the configured stages and patterns, then retry."
+    "replacement size, simplify the configured stages and patterns, or, for a "
+    f"timeout, increase --timeout-seconds up to {MAX_TIMEOUT_SECONDS:g} and ensure "
+    "the OpenShell middleware timeout is longer, then retry."
 )
 LIMIT_REASON_CODE = "privacy_guard_limit_exceeded"
 # Text input limits.
@@ -37,8 +43,6 @@ MAX_REGEX_PATTERNS_PER_CATALOG = 10_000
 MAX_REGEX_PATTERN_BYTES = 16 * 1024
 MAX_REGEX_CATALOG_FILE_BYTES = 16 * 1024 * 1024
 MAX_REGEX_CATALOG_PATH_BYTES = 1024
-DEFAULT_TIMEOUT_SECONDS = 1.0
-MAX_TIMEOUT_SECONDS = 30.0
 
 # Service concurrency and transport limits.
 MAX_CONCURRENT_PROCESSING = 4

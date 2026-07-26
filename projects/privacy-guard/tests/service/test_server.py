@@ -78,17 +78,36 @@ def test_programmatic_server_runs_with_injected_registry_and_default_address(
 
     monkeypatch.setattr(PrivacyGuardServer, "serve", record_serve)
 
-    server = PrivacyGuardServer(registry=registry, log_request_content=True)
+    server = PrivacyGuardServer(
+        registry=registry,
+        timeout_seconds=4.5,
+        log_request_content=True,
+    )
     server.run()
 
     assert served == [(server, "127.0.0.1:50051")]
     assert server._middleware._registry is registry
+    assert server._middleware._processors._timeout_seconds == 4.5
     assert server._middleware._processors._log_request_content is True
 
 
 def test_programmatic_server_requires_an_explicit_finalized_registry() -> None:
     with pytest.raises(EngineRegistryError, match="finalized"):
         PrivacyGuardServer(EngineRegistry())
+
+
+@pytest.mark.parametrize("timeout_seconds", [True, 0, 31, float("inf")])
+def test_programmatic_server_rejects_invalid_processing_timeout(
+    timeout_seconds: bool | int | float,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match="finite number greater than 0 and at most 30",
+    ):
+        PrivacyGuardServer(
+            create_builtin_registry(),
+            timeout_seconds=timeout_seconds,
+        )
 
 
 def test_synchronous_server_exits_cleanly_after_keyboard_interrupt(

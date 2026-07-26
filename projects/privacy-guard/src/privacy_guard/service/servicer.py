@@ -22,6 +22,7 @@ from privacy_guard.config import PrivacyGuardConfig, configuration_fingerprint
 from privacy_guard.constants import (
     BLOCK_REASON,
     BLOCK_REASON_CODE,
+    DEFAULT_TIMEOUT_SECONDS,
     LIMIT_REASON,
     LIMIT_REASON_CODE,
     MAX_BODY_BYTES,
@@ -46,6 +47,7 @@ from privacy_guard.request_processor import (
     RequestProcessingResult,
     RequestProcessor,
 )
+from privacy_guard.timeout import validate_timeout_seconds
 
 
 class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
@@ -55,6 +57,7 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         self,
         registry: EngineRegistry,
         *,
+        timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         log_request_content: bool = False,
     ) -> None:
         if not registry.is_finalized:
@@ -62,6 +65,7 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         self._registry = registry
         self._processors = _RequestProcessorCache(
             registry,
+            timeout_seconds=validate_timeout_seconds(timeout_seconds),
             log_request_content=log_request_content,
         )
         self._processing_slots = asyncio.Semaphore(MAX_CONCURRENT_PROCESSING)
@@ -225,9 +229,11 @@ class _RequestProcessorCache:
         self,
         registry: EngineRegistry,
         *,
+        timeout_seconds: float,
         log_request_content: bool,
     ) -> None:
         self._registry = registry
+        self._timeout_seconds = timeout_seconds
         self._log_request_content = log_request_content
         self._processors: OrderedDict[str, RequestProcessor] = OrderedDict()
         self._lock = RLock()
@@ -266,6 +272,7 @@ class _RequestProcessorCache:
         return RequestProcessor(
             config,
             stages,
+            timeout_seconds=self._timeout_seconds,
             log_request_content=self._log_request_content,
         )
 

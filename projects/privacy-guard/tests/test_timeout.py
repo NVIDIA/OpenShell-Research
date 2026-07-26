@@ -12,7 +12,10 @@ from privacy_guard.timeout import Timeout
 def test_timeout_duration_is_strict_positive_and_bounded(
     seconds: bool | int | float,
 ) -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(
+        ValueError,
+        match="finite number greater than 0 and at most 30",
+    ):
         Timeout.from_seconds(seconds)
 
 
@@ -24,7 +27,8 @@ def test_expired_timeout_raises_typed_signal() -> None:
 
     assert str(captured.value) == (
         "Privacy Guard processing timed out. Reduce the request size or simplify "
-        "the configured stages and patterns, then retry."
+        "the configured stages and patterns, or increase the processing timeout "
+        "to at most 30 seconds, then retry."
     )
 
 

@@ -8,7 +8,11 @@ import logging
 import grpc
 
 from privacy_guard.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
-from privacy_guard.constants import MAX_CONCURRENT_RPCS, MAX_RECEIVE_MESSAGE_BYTES
+from privacy_guard.constants import (
+    DEFAULT_TIMEOUT_SECONDS,
+    MAX_CONCURRENT_RPCS,
+    MAX_RECEIVE_MESSAGE_BYTES,
+)
 from privacy_guard.engines.registry import EngineRegistry
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
@@ -23,10 +27,12 @@ class PrivacyGuardServer:
         self,
         registry: EngineRegistry,
         *,
+        timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         log_request_content: bool = False,
     ) -> None:
         self._middleware = PrivacyGuardMiddleware(
             registry,
+            timeout_seconds=timeout_seconds,
             log_request_content=log_request_content,
         )
 

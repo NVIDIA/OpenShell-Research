@@ -64,6 +64,13 @@ The cache is protected for concurrent access and is not correctness-relevant.
 Eviction or process restart simply causes reconstruction from a later
 evaluation's expanded config.
 
+Each cached processor receives the server's operational processing timeout.
+The default is 1 second shared across every configured stage. Operators may set
+up to 30 seconds with `privacy-guard serve --timeout-seconds`; programmatic
+applications pass the same `timeout_seconds` argument to `PrivacyGuardServer`.
+OpenShell's outer middleware `timeout` must be longer than Privacy Guard's
+processing timeout so the supervisor does not end the RPC first.
+
 ## Incoming requests
 
 For each evaluation, the service:
@@ -204,7 +211,10 @@ Synchronous applications use:
 from privacy_guard.engines.registry import create_builtin_registry
 from privacy_guard.service import PrivacyGuardServer
 
-server = PrivacyGuardServer(create_builtin_registry())
+server = PrivacyGuardServer(
+    create_builtin_registry(),
+    timeout_seconds=5,
+)
 server.run("127.0.0.1:50051")
 ```
 
@@ -247,7 +257,7 @@ option. They create the registry normally and pass it to the server:
 
 ```python
 registry = create_registry()
-PrivacyGuardServer(registry).run()
+PrivacyGuardServer(registry, timeout_seconds=5).run()
 ```
 
 The CLI exposes:
@@ -255,12 +265,13 @@ The CLI exposes:
 ```bash
 privacy-guard engines
 privacy-guard schema
-privacy-guard serve --listen 127.0.0.1:50051
+privacy-guard serve --listen 127.0.0.1:50051 --timeout-seconds 5
 ```
 
 Entity behavior comes from policy configuration, not server startup flags.
 Engine implementations and operational resources come from the selected
-application registry.
+application registry. The processing timeout is an operational server bound,
+not policy-controlled behavior.
 
 ## Upstream protocol work
 

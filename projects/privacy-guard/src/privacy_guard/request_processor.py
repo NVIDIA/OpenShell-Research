@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import math
 from collections import OrderedDict
 from collections.abc import Sequence
 from enum import StrEnum
@@ -19,7 +18,6 @@ from privacy_guard.constants import (
     LIMIT_REASON_CODE,
     MAX_BODY_BYTES,
     MAX_DETECTIONS_PER_REQUEST,
-    MAX_TIMEOUT_SECONDS,
 )
 from privacy_guard.engines import (
     ConfidenceLevel,
@@ -36,7 +34,7 @@ from privacy_guard.errors import (
     TimeoutExpiredError,
 )
 from privacy_guard.string_validators import validate_scalar_string
-from privacy_guard.timeout import Timeout
+from privacy_guard.timeout import Timeout, validate_timeout_seconds
 
 
 class RequestDecision(StrEnum):
@@ -75,14 +73,6 @@ class RequestProcessor:
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         log_request_content: bool = False,
     ) -> None:
-        if (
-            isinstance(timeout_seconds, bool)
-            or not isinstance(timeout_seconds, int | float)
-            or not math.isfinite(timeout_seconds)
-            or timeout_seconds <= 0
-            or timeout_seconds > MAX_TIMEOUT_SECONDS
-        ):
-            raise ValueError("timeout must be finite, positive, and bounded")
         configured_stages = tuple(stages)
         if len(configured_stages) != len(config.entity_processing.stages):
             raise ValueError("configured stages do not match the policy")
@@ -93,7 +83,7 @@ class RequestProcessor:
             raise ValueError("stage sources must be non-empty and unique")
         self._config = config
         self._stages = configured_stages
-        self._timeout_seconds = float(timeout_seconds)
+        self._timeout_seconds = validate_timeout_seconds(timeout_seconds)
         self._log_request_content = log_request_content
 
     def process(self, text: str) -> RequestProcessingResult:

@@ -15,6 +15,22 @@ from privacy_guard.constants import MAX_TIMEOUT_SECONDS
 from privacy_guard.errors import TimeoutExpiredError
 
 
+def validate_timeout_seconds(seconds: object) -> float:
+    """Return a finite supported processing timeout in seconds."""
+    if (
+        isinstance(seconds, bool)
+        or not isinstance(seconds, int | float)
+        or not math.isfinite(seconds)
+        or seconds <= 0
+        or seconds > MAX_TIMEOUT_SECONDS
+    ):
+        raise ValueError(
+            "timeout seconds must be a finite number greater than 0 and at most "
+            f"{MAX_TIMEOUT_SECONDS:g}"
+        )
+    return float(seconds)
+
+
 class Timeout(StrictDomainModel):
     """An immutable monotonic deadline shared across processing stages."""
 
@@ -23,15 +39,7 @@ class Timeout(StrictDomainModel):
     @classmethod
     def from_seconds(cls, seconds: float) -> Self:
         """Create a timeout from a finite, positive bounded duration."""
-        if (
-            isinstance(seconds, bool)
-            or not isinstance(seconds, int | float)
-            or not math.isfinite(seconds)
-            or seconds <= 0
-            or seconds > MAX_TIMEOUT_SECONDS
-        ):
-            raise ValueError("timeout must be finite, positive, and within the limit")
-        return cls(deadline=monotonic() + seconds)
+        return cls(deadline=monotonic() + validate_timeout_seconds(seconds))
 
     def remaining_seconds(self) -> float:
         """Return the positive duration remaining or raise ``TimeoutExpiredError``."""
@@ -55,4 +63,4 @@ class Timeout(StrictDomainModel):
         self.raise_if_expired()
 
 
-__all__ = ["Timeout"]
+__all__ = ["Timeout", "validate_timeout_seconds"]

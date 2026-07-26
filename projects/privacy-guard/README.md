@@ -170,7 +170,10 @@ The server is a library API independent of the command-line application:
 from privacy_guard.engines.registry import create_builtin_registry
 from privacy_guard.service import PrivacyGuardServer
 
-server = PrivacyGuardServer(create_builtin_registry())
+server = PrivacyGuardServer(
+    create_builtin_registry(),
+    timeout_seconds=5,
+)
 server.run("127.0.0.1:50051")
 ```
 
@@ -191,13 +194,19 @@ modules, select engines, generate schemas, or parse command-line options.
 ```bash
 uv run privacy-guard engines
 uv run privacy-guard schema
-uv run privacy-guard serve --listen 127.0.0.1:50051
+uv run privacy-guard serve \
+  --listen 127.0.0.1:50051 \
+  --timeout-seconds 5
 ```
 
 Entity behavior is supplied by OpenShell policy config, not server startup
 flags. Deployment startup owns only installed engine implementations and
 operator resources such as model profiles, endpoints, clients, and credentials.
-Use `--registry-factory module:factory` for a custom engine installation.
+The processing timeout is an operational bound shared by every stage; it
+defaults to 1 second and may be increased to at most 30 seconds. When increasing
+it, configure OpenShell's middleware `timeout` to a longer duration so the
+supervisor does not end the RPC first. Use `--registry-factory module:factory`
+for a custom engine installation.
 Registry factories execute operator Python code; load only trusted modules.
 The `privacy_guard.cli` module owns the executable application and adapts its
 `serve` command to the programmatic server API.

@@ -10,9 +10,11 @@ from typing import Annotated
 
 import typer
 
+from privacy_guard.constants import DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS
 from privacy_guard.engines import EntityProcessingStrategy
 from privacy_guard.engines.registry import EngineRegistry, create_builtin_registry
 from privacy_guard.service.server import DEFAULT_LISTEN_ADDRESS, PrivacyGuardServer
+from privacy_guard.timeout import validate_timeout_seconds
 
 app = typer.Typer(
     name="privacy-guard",
@@ -71,11 +73,28 @@ def serve(
         str,
         typer.Option(help="Address on which the middleware server listens."),
     ] = DEFAULT_LISTEN_ADDRESS,
+    timeout_seconds: Annotated[
+        float,
+        typer.Option(
+            help=(
+                "Maximum seconds shared by all processing stages in one request; "
+                f"must be greater than 0 and at most {MAX_TIMEOUT_SECONDS:g}."
+            ),
+        ),
+    ] = DEFAULT_TIMEOUT_SECONDS,
 ) -> None:
     """Run the middleware server with the selected engine inventory."""
     options = _command_options(context)
+    try:
+        validated_timeout_seconds = validate_timeout_seconds(timeout_seconds)
+    except ValueError as error:
+        raise typer.BadParameter(
+            str(error),
+            param_hint="--timeout-seconds",
+        ) from None
     PrivacyGuardServer(
         options.registry,
+        timeout_seconds=validated_timeout_seconds,
         log_request_content=options.log_request_content,
     ).run(listen)
 
@@ -122,7 +141,7 @@ def _load_registry(factory_reference: str | None) -> EngineRegistry:
     module_name, separator, factory_name = factory_reference.partition(":")
     if not separator or not module_name or not factory_name:
         raise typer.BadParameter(
-            "registry factory must use module:factory",
+            "Use module:factory, for example my_engines:create_registry.",
             param_hint="--registry-factory",
         )
     try:
@@ -130,29 +149,33 @@ def _load_registry(factory_reference: str | None) -> EngineRegistry:
         factory = getattr(module, factory_name)
     except Exception:
         raise typer.BadParameter(
-            "registry factory could not be loaded",
+            "Registry factory could not be loaded. Verify the module is installed "
+            "and the module:factory reference is correct.",
             param_hint="--registry-factory",
         ) from None
     if not callable(factory):
         raise typer.BadParameter(
-            "registry factory is not callable",
+            "Registry factory is not callable. Export a callable that returns a "
+            "finalized EngineRegistry.",
             param_hint="--registry-factory",
         )
     try:
         registry = factory()
     except Exception:
         raise typer.BadParameter(
-            "registry factory failed",
+            "Registry factory failed. Run the factory directly with content-safe "
+            "diagnostics and fix its startup error.",
             param_hint="--registry-factory",
         ) from None
     if not isinstance(registry, EngineRegistry):
         raise typer.BadParameter(
-            "registry factory returned an invalid object",
+            "Registry factory returned an invalid object. Return an EngineRegistry.",
             param_hint="--registry-factory",
         )
     if not registry.is_finalized:
         raise typer.BadParameter(
-            "registry factory returned an unfinalized registry",
+            "Registry factory returned an unfinalized registry. Call finalize() "
+            "before returning it.",
             param_hint="--registry-factory",
         )
     return registry
