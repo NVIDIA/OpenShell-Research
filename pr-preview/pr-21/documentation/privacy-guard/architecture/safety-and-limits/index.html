@@ -1355,13 +1355,13 @@ reimplement either.</p>
 <td>Default shared timeout</td>
 <td><code>DEFAULT_TIMEOUT_SECONDS</code></td>
 <td style="text-align: right;">1 second</td>
-<td>Processor</td>
+<td>Server and processor</td>
 </tr>
 <tr>
 <td>Maximum configured timeout</td>
 <td><code>MAX_TIMEOUT_SECONDS</code></td>
 <td style="text-align: right;">30 seconds</td>
-<td>Processor and <code>Timeout</code></td>
+<td>Server, processor, and <code>Timeout</code></td>
 </tr>
 <tr>
 <td>Active processor workers</td>
@@ -1384,6 +1384,10 @@ protobuf envelope. The service still enforces the advertised 4 MiB body bound.</
 Third-party calls that accept a timeout should receive the same remaining
 duration; calls that cannot be interrupted continue to occupy a service worker
 until they exit.</p>
+<p>Operators configure the internal bound with <code>--timeout-seconds</code> or the
+programmatic <code>PrivacyGuardServer(timeout_seconds=...)</code> argument. OpenShell's
+outer middleware timeout must include additional headroom for worker queueing
+and configuration or engine preparation beyond this internal bound.</p>
 <h2 id="diagnostic-and-result-limits">Diagnostic and result limits<a class="headerlink" href="#diagnostic-and-result-limits" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1493,10 +1497,14 @@ mutated text.</p>
 <li>replacement text cannot be encoded within the body limit</li>
 <li>a deny reason code is not safely representable</li>
 </ul>
-<p>The deny reason directs users to reduce the request or replacement size, or
-simplify the configured stages and patterns before retrying. These options
-reduce both bounded output pressure and timeout risk without weakening the
-fail-closed behavior.</p>
+<p>The deny reason directs users to reduce the request or replacement size and
+simplify the configured stages and patterns. The request-ID-bearing service
+evaluation log also emits a content-safe <code>timeout</code> or <code>resource</code> limit kind.
+When the log reports a timeout, users can increase <code>--timeout-seconds</code> or
+<code>PrivacyGuardServer(timeout_seconds=...)</code> up to 30 seconds and give OpenShell's
+middleware timeout additional headroom for worker queueing and configuration or
+engine preparation. These options reduce bounded output pressure or provide
+appropriate time without weakening the fail-closed behavior.</p>
 <p>Malformed input and engine contract or execution failures instead abort the RPC
 with a cataloged error. OpenShell then applies the middleware registration's
 failure behavior.</p>
@@ -1516,6 +1524,11 @@ error spec defines:</p>
 <li>content-safe summary</li>
 <li>remediation hint</li>
 </ul>
+<p>Successful policy and safety-limit denials use stable reason codes plus
+content-safe recovery guidance. CLI validation failures name the rejected
+option and state the accepted form or next action. Internal engine and
+third-party failures remain concise because the owning boundary translates
+them before they reach users.</p>
 <p>Caught extension and third-party exceptions are translated at their trust
 boundary. Raw exception messages and chains are not exposed. Configuration
 errors do not include rejected pattern strings, paths, credentials, provider

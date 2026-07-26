@@ -1354,6 +1354,14 @@ catalogs reuse their bounded compiled-rule entry instead of recompiling.</p>
 <p>The cache is protected for concurrent access and is not correctness-relevant.
 Eviction or process restart simply causes reconstruction from a later
 evaluation's expanded config.</p>
+<p>Each cached processor receives the server's operational processing timeout.
+The default is 1 second shared across every configured stage. Operators may set
+up to 30 seconds with <code>privacy-guard serve --timeout-seconds</code>; programmatic
+applications pass the same <code>timeout_seconds</code> argument to <code>PrivacyGuardServer</code>.
+OpenShell's outer middleware <code>timeout</code> must include the processing timeout plus
+additional headroom for worker queueing, repeated configuration validation,
+cache resolution, and engine construction so the supervisor does not end the
+RPC first.</p>
 <h2 id="incoming-requests">Incoming requests<a class="headerlink" href="#incoming-requests" title="Permanent link">&para;</a></h2>
 <p>For each evaluation, the service:</p>
 <ol>
@@ -1499,8 +1507,11 @@ different engine inventories or runtime resources.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.engines.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_builtin_registry</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.service</span><span class="w"> </span><span class="kn">import</span> <span class="n">PrivacyGuardServer</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">server</span> <span class="o">=</span> <span class="n">PrivacyGuardServer</span><span class="p">(</span><span class="n">create_builtin_registry</span><span class="p">())</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">server</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;127.0.0.1:50051&quot;</span><span class="p">)</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">server</span> <span class="o">=</span> <span class="n">PrivacyGuardServer</span><span class="p">(</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">create_builtin_registry</span><span class="p">(),</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">timeout_seconds</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">)</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">server</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;127.0.0.1:50051&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Async applications call <code>await server.serve(address)</code> instead. Both entry
 points use the same server instance and lifecycle.</p>
@@ -1531,16 +1542,17 @@ cannot select a factory or cause Privacy Guard to import a module.</p>
 <p>Applications that start <code>PrivacyGuardServer</code> from Python do not need this CLI
 option. They create the registry normally and pass it to the server:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">registry</span> <span class="o">=</span> <span class="n">create_registry</span><span class="p">()</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">PrivacyGuardServer</span><span class="p">(</span><span class="n">registry</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">PrivacyGuardServer</span><span class="p">(</span><span class="n">registry</span><span class="p">,</span> <span class="n">timeout_seconds</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
 </span></code></pre></div>
 <p>The CLI exposes:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>privacy-guard<span class="w"> </span>engines
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>privacy-guard<span class="w"> </span>schema
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>privacy-guard<span class="w"> </span>serve<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:50051
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>privacy-guard<span class="w"> </span>serve<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:50051<span class="w"> </span>--timeout-seconds<span class="w"> </span><span class="m">5</span>
 </span></code></pre></div>
 <p>Entity behavior comes from policy configuration, not server startup flags.
 Engine implementations and operational resources come from the selected
-application registry.</p>
+application registry. The processing timeout is an operational server bound,
+not policy-controlled behavior.</p>
 <h2 id="upstream-protocol-work">Upstream protocol work<a class="headerlink" href="#upstream-protocol-work" title="Permanent link">&para;</a></h2>
 <p>The intended large-catalog and discovery experience requires coordinated
 OpenShell changes for:</p>
