@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import logging
+from time import monotonic
+
+import pytest
+
 from privacy_guard.config import PolicyAction
 from privacy_guard.engines import RegexEngine
 from privacy_guard.engines.registry import EngineRegistry
 from privacy_guard.request_processor import RequestDecision, RequestProcessor
+from privacy_guard.timeout import Timeout
 
 
 def _values(action: PolicyAction) -> dict[str, object]:
@@ -107,3 +113,22 @@ def test_block_is_a_processor_disposition_not_an_engine_strategy() -> None:
     assert result.replacement_text is None
     assert result.reason_code == "privacy_guard_blocked"
     assert tuple(item.entity for item in result.detection_summaries) == ("person",)
+
+
+def test_timeout_deny_logs_a_content_safe_diagnostic_kind(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr(
+        Timeout,
+        "from_seconds",
+        classmethod(lambda cls, seconds: cls(deadline=monotonic() - 1)),
+    )
+
+    with caplog.at_level(logging.INFO, logger="privacy_guard.request_processor"):
+        result = _processor(PolicyAction.DETECT).process("Hello Alice")
+
+    assert result.decision is RequestDecision.DENY
+    assert result.reason_code == "privacy_guard_limit_exceeded"
+    assert "privacy_guard_processing_limit kind=timeout" in caplog.text
+    assert "Alice" not in caplog.text

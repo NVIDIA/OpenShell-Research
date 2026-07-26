@@ -204,9 +204,10 @@ flags. Deployment startup owns only installed engine implementations and
 operator resources such as model profiles, endpoints, clients, and credentials.
 The processing timeout is an operational bound shared by every stage; it
 defaults to 1 second and may be increased to at most 30 seconds. When increasing
-it, configure OpenShell's middleware `timeout` to a longer duration so the
-supervisor does not end the RPC first. Use `--registry-factory module:factory`
-for a custom engine installation.
+it, configure OpenShell's middleware `timeout` with additional headroom for
+worker queueing and configuration or engine preparation so the supervisor does
+not end the RPC first. Use `--registry-factory module:factory` for a custom
+engine installation.
 Registry factories execute operator Python code; load only trusted modules.
 The `privacy_guard.cli` module owns the executable application and adapts its
 `serve` command to the programmatic server API.

@@ -20,9 +20,11 @@ BLOCK_REASON = "Privacy Guard blocked the request"
 BLOCK_REASON_CODE = "privacy_guard_blocked"
 LIMIT_REASON = (
     "Privacy Guard exceeded a processing safety limit. Reduce the request or "
-    "replacement size, simplify the configured stages and patterns, or, for a "
-    f"timeout, increase --timeout-seconds up to {MAX_TIMEOUT_SECONDS:g} and ensure "
-    "the OpenShell middleware timeout is longer, then retry."
+    "replacement size or simplify the configured stages and patterns, then retry. "
+    "If Privacy Guard logs report a timeout, increase the processing timeout with "
+    "--timeout-seconds or PrivacyGuardServer(timeout_seconds=...) to at most "
+    f"{MAX_TIMEOUT_SECONDS:g} seconds, and give OpenShell's middleware timeout "
+    "additional headroom for queueing and configuration preparation."
 )
 LIMIT_REASON_CODE = "privacy_guard_limit_exceeded"
 # Text input limits.

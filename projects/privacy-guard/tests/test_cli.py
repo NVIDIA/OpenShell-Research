@@ -110,7 +110,7 @@ def test_cli_loads_one_finalized_operator_registry(
     ("factory_reference", "reason"),
     [
         ("missing-separator", "my_engines:create_registry"),
-        ("operator_engines:missing", "Verify the module is installed"),
+        ("operator_engines:missing", "does not export the named factory"),
         ("operator_engines:not_callable", "Export a callable"),
         ("operator_engines:failed", "Run the factory directly"),
         ("operator_engines:wrong_type", "Return an EngineRegistry"),
@@ -146,6 +146,27 @@ def test_cli_rejects_invalid_registry_factories(
     assert result.exit_code == 2
     assert reason in _normalized_output(result)
     assert "sensitive factory failure" not in _plain_output(result)
+
+
+def test_cli_explains_registry_module_import_failures_without_leaking_details(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_import(_: str) -> object:
+        raise RuntimeError("sensitive import failure")
+
+    monkeypatch.setattr(cli_module.importlib, "import_module", fail_import)
+
+    result = CliRunner().invoke(
+        app,
+        ["--registry-factory", "operator_engines:create_registry", "engines"],
+        terminal_width=240,
+    )
+
+    assert result.exit_code == 2
+    output = _normalized_output(result)
+    assert "Registry module could not be imported" in output
+    assert "import the module directly with content-safe diagnostics" in output
+    assert "sensitive import failure" not in _plain_output(result)
 
 
 def test_cli_serve_adapts_operational_options_to_the_programmatic_server(

@@ -105,8 +105,13 @@ def test_limit_deny_explains_recovery_options() -> None:
     assert result.reason == LIMIT_REASON
     assert "Reduce the request or replacement size" in result.reason
     assert "simplify the configured stages and patterns" in result.reason
-    assert "increase --timeout-seconds up to 30" in result.reason
-    assert "OpenShell middleware timeout is longer" in result.reason
+    assert "If Privacy Guard logs report a timeout" in result.reason
+    assert "--timeout-seconds or PrivacyGuardServer(timeout_seconds=...)" in (
+        result.reason
+    )
+    assert "additional headroom for queueing and configuration preparation" in (
+        result.reason
+    )
 
 
 def test_middleware_applies_configured_timeout_to_cached_processors() -> None:

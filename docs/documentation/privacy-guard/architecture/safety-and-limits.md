@@ -56,7 +56,8 @@ until they exit.
 
 Operators configure the internal bound with `--timeout-seconds` or the
 programmatic `PrivacyGuardServer(timeout_seconds=...)` argument. OpenShell's
-outer middleware timeout must be longer than this internal bound.
+outer middleware timeout must include additional headroom for worker queueing
+and configuration or engine preparation beyond this internal bound.
 
 ## Diagnostic and result limits
 
@@ -128,11 +129,14 @@ The service returns the same bounded deny when:
 - replacement text cannot be encoded within the body limit
 - a deny reason code is not safely representable
 
-The deny reason directs users to reduce the request or replacement size,
-simplify the configured stages and patterns, or, when processing timed out,
-increase `--timeout-seconds` up to 30 and ensure OpenShell's middleware timeout
-is longer before retrying. These options reduce bounded output pressure or
-provide appropriate time without weakening the fail-closed behavior.
+The deny reason directs users to reduce the request or replacement size and
+simplify the configured stages and patterns. Privacy Guard also emits a
+content-safe limit kind in its logs. When the log reports a timeout, users can
+increase `--timeout-seconds` or
+`PrivacyGuardServer(timeout_seconds=...)` up to 30 seconds and give OpenShell's
+middleware timeout additional headroom for worker queueing and configuration or
+engine preparation. These options reduce bounded output pressure or provide
+appropriate time without weakening the fail-closed behavior.
 
 Malformed input and engine contract or execution failures instead abort the RPC
 with a cataloged error. OpenShell then applies the middleware registration's

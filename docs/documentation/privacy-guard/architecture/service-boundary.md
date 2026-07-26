@@ -68,8 +68,10 @@ Each cached processor receives the server's operational processing timeout.
 The default is 1 second shared across every configured stage. Operators may set
 up to 30 seconds with `privacy-guard serve --timeout-seconds`; programmatic
 applications pass the same `timeout_seconds` argument to `PrivacyGuardServer`.
-OpenShell's outer middleware `timeout` must be longer than Privacy Guard's
-processing timeout so the supervisor does not end the RPC first.
+OpenShell's outer middleware `timeout` must include the processing timeout plus
+additional headroom for worker queueing, repeated configuration validation,
+cache resolution, and engine construction so the supervisor does not end the
+RPC first.
 
 ## Incoming requests
 

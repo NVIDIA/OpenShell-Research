@@ -146,11 +146,19 @@ def _load_registry(factory_reference: str | None) -> EngineRegistry:
         )
     try:
         module = importlib.import_module(module_name)
-        factory = getattr(module, factory_name)
     except Exception:
         raise typer.BadParameter(
-            "Registry factory could not be loaded. Verify the module is installed "
-            "and the module:factory reference is correct.",
+            "Registry module could not be imported. Verify the module:factory "
+            "reference, then import the module directly with content-safe "
+            "diagnostics to find missing dependencies or startup failures.",
+            param_hint="--registry-factory",
+        ) from None
+    try:
+        factory = getattr(module, factory_name)
+    except AttributeError:
+        raise typer.BadParameter(
+            "Registry module does not export the named factory. Correct the "
+            "module:factory reference or export that callable.",
             param_hint="--registry-factory",
         ) from None
     if not callable(factory):
