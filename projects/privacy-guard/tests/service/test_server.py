@@ -76,14 +76,14 @@ def test_programmatic_server_runs_with_injected_registry_and_default_address(
         served.append((self, listen))
         await self._middleware.close()
 
-    monkeypatch.setattr(PrivacyGuardServer, "serve", record_serve)
+    monkeypatch.setattr(PrivacyGuardServer, "serve_async", record_serve)
 
     server = PrivacyGuardServer(
         registry=registry,
         timeout_seconds=4.5,
         log_request_content=True,
     )
-    server.run()
+    server.serve_sync()
 
     assert served == [(server, "127.0.0.1:50051")]
     assert server._middleware._registry is registry
@@ -119,9 +119,9 @@ def test_synchronous_server_exits_cleanly_after_keyboard_interrupt(
         del self, listen
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(PrivacyGuardServer, "serve", interrupt)
+    monkeypatch.setattr(PrivacyGuardServer, "serve_async", interrupt)
 
-    server.run()
+    server.serve_sync()
     asyncio.run(server._middleware.close())
 
 
@@ -204,7 +204,7 @@ def test_server_sets_transport_limits_and_registers_middleware(
         ),
     ],
 )
-async def test_serve_sanitizes_bind_failures_and_closes_resources(
+async def test_serve_async_sanitizes_bind_failures_and_closes_resources(
     monkeypatch: pytest.MonkeyPatch,
     fake_server: _LifecycleServerFake,
     sensitive_address: str,
@@ -219,7 +219,7 @@ async def test_serve_sanitizes_bind_failures_and_closes_resources(
     monkeypatch.setattr(PrivacyGuardMiddleware, "close", record_close)
 
     with pytest.raises(PrivacyGuardError) as captured:
-        await server.serve(sensitive_address)
+        await server.serve_async(sensitive_address)
 
     assert captured.value.code is ErrorCode.SERVER_BIND_FAILED
     assert captured.value.__cause__ is None
@@ -231,7 +231,7 @@ async def test_serve_sanitizes_bind_failures_and_closes_resources(
 
 
 @pytest.mark.asyncio
-async def test_serve_starts_waits_and_closes_on_normal_termination(
+async def test_serve_async_starts_waits_and_closes_on_normal_termination(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fake_server = _LifecycleServerFake()
@@ -244,7 +244,7 @@ async def test_serve_starts_waits_and_closes_on_normal_termination(
     monkeypatch.setattr(server_module, "_create_grpc_server", lambda _: fake_server)
     monkeypatch.setattr(PrivacyGuardMiddleware, "close", record_close)
 
-    await server.serve("127.0.0.1:50053")
+    await server.serve_async("127.0.0.1:50053")
 
     assert fake_server.addresses == ["127.0.0.1:50053"]
     assert fake_server.started is True
@@ -254,7 +254,7 @@ async def test_serve_starts_waits_and_closes_on_normal_termination(
 
 
 @pytest.mark.asyncio
-async def test_serve_propagates_cancellation_after_closing_resources(
+async def test_serve_async_propagates_cancellation_after_closing_resources(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fake_server = _LifecycleServerFake(wait_error=asyncio.CancelledError())
@@ -268,7 +268,7 @@ async def test_serve_propagates_cancellation_after_closing_resources(
     monkeypatch.setattr(PrivacyGuardMiddleware, "close", record_close)
 
     with pytest.raises(asyncio.CancelledError):
-        await server.serve("127.0.0.1:50054")
+        await server.serve_async("127.0.0.1:50054")
 
     assert fake_server.started is True
     assert fake_server.stop_graces == [0]
@@ -276,7 +276,7 @@ async def test_serve_propagates_cancellation_after_closing_resources(
 
 
 @pytest.mark.asyncio
-async def test_serve_preserves_cancellation_during_server_shutdown(
+async def test_serve_async_preserves_cancellation_during_server_shutdown(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fake_server = _LifecycleServerFake(block_stop=True)
@@ -289,7 +289,7 @@ async def test_serve_preserves_cancellation_during_server_shutdown(
     monkeypatch.setattr(server_module, "_create_grpc_server", lambda _: fake_server)
     monkeypatch.setattr(PrivacyGuardMiddleware, "close", record_close)
 
-    serving = asyncio.create_task(server.serve("127.0.0.1:50055"))
+    serving = asyncio.create_task(server.serve_async("127.0.0.1:50055"))
     await fake_server.stop_started.wait()
     serving.cancel()
     await asyncio.sleep(0)
@@ -305,7 +305,7 @@ async def test_serve_preserves_cancellation_during_server_shutdown(
 
 
 @pytest.mark.asyncio
-async def test_serve_closes_resources_when_startup_fails(
+async def test_serve_async_sanitizes_startup_failures_and_closes_resources(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fake_server = _LifecycleServerFake(start_error=RuntimeError("startup failed"))
@@ -318,9 +318,12 @@ async def test_serve_closes_resources_when_startup_fails(
     monkeypatch.setattr(server_module, "_create_grpc_server", lambda _: fake_server)
     monkeypatch.setattr(PrivacyGuardMiddleware, "close", record_close)
 
-    with pytest.raises(RuntimeError, match="startup failed"):
-        await server.serve("127.0.0.1:50056")
+    with pytest.raises(PrivacyGuardError) as captured:
+        await server.serve_async("127.0.0.1:50056")
 
+    assert captured.value.code is ErrorCode.SERVER_BIND_FAILED
+    assert captured.value.__cause__ is None
+    assert "startup failed" not in str(captured.value)
     assert fake_server.waited is False
     assert fake_server.stop_graces == [0]
     assert closed == [server._middleware]

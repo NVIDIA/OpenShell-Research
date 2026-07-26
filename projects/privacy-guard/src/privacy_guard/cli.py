@@ -13,6 +13,7 @@ import typer
 from privacy_guard.constants import DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS
 from privacy_guard.engines import EntityProcessingStrategy
 from privacy_guard.engines.registry import EngineRegistry, create_builtin_registry
+from privacy_guard.errors import PrivacyGuardError
 from privacy_guard.service.server import DEFAULT_LISTEN_ADDRESS, PrivacyGuardServer
 from privacy_guard.timeout import validate_timeout_seconds
 
@@ -92,15 +93,19 @@ def serve(
             str(error),
             param_hint="--timeout-seconds",
         ) from None
-    PrivacyGuardServer(
-        options.registry,
-        timeout_seconds=validated_timeout_seconds,
-        log_request_content=options.log_request_content,
-    ).run(listen)
+    try:
+        PrivacyGuardServer(
+            options.registry,
+            timeout_seconds=validated_timeout_seconds,
+            log_request_content=options.log_request_content,
+        ).serve_sync(listen)
+    except PrivacyGuardError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(code=1) from None
 
 
-@app.command("schema")
-def schema(context: typer.Context) -> None:
+@app.command("configuration-schema")
+def configuration_schema(context: typer.Context) -> None:
     """Print the exact finalized policy JSON Schema."""
     typer.echo(
         json.dumps(
@@ -155,17 +160,11 @@ def _load_registry(factory_reference: str | None) -> EngineRegistry:
         ) from None
     try:
         factory = getattr(module, factory_name)
-    except AttributeError:
-        raise typer.BadParameter(
-            "Registry module does not export the named factory. Correct the "
-            "module:factory reference or export that callable.",
-            param_hint="--registry-factory",
-        ) from None
     except Exception:
         raise typer.BadParameter(
-            "Registry factory could not be resolved. Import the module and access "
-            "the factory directly with content-safe diagnostics, then fix its "
-            "dynamic attribute lookup.",
+            "Registry factory could not be resolved. Verify the module:factory "
+            "reference and exported callable, then access it directly with "
+            "content-safe diagnostics.",
             param_hint="--registry-factory",
         ) from None
     if not callable(factory):

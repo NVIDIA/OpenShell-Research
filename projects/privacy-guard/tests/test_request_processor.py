@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from time import monotonic
 
 import pytest
@@ -116,9 +115,8 @@ def test_block_is_a_processor_disposition_not_an_engine_strategy() -> None:
     assert tuple(item.entity for item in result.detection_summaries) == ("person",)
 
 
-def test_timeout_deny_logs_a_content_safe_diagnostic_kind(
+def test_timeout_returns_the_bounded_limit_deny(
     monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
     monkeypatch.setattr(
         Timeout,
@@ -126,31 +124,21 @@ def test_timeout_deny_logs_a_content_safe_diagnostic_kind(
         classmethod(lambda cls, seconds: cls(deadline=monotonic() - 1)),
     )
 
-    with caplog.at_level(logging.INFO, logger="privacy_guard.request_processor"):
-        result = _processor(PolicyAction.DETECT).process("Hello Alice")
+    result = _processor(PolicyAction.DETECT).process("Hello Alice")
 
     assert result.decision is RequestDecision.DENY
     assert result.reason_code == "privacy_guard_limit_exceeded"
-    assert result.diagnostic_limit_kind == "timeout"
-    assert "privacy_guard_processing_limit kind=timeout" in caplog.text
-    assert "Alice" not in caplog.text
 
 
-def test_resource_limit_deny_logs_a_content_safe_diagnostic_kind(
+def test_engine_resource_limit_returns_the_bounded_limit_deny(
     monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
     def exceed_limit(*_: object, **__: object) -> object:
         raise EngineLimitExceededError("sensitive resource detail")
 
     monkeypatch.setattr(RegexEngine, "_run", exceed_limit)
 
-    with caplog.at_level(logging.INFO, logger="privacy_guard.request_processor"):
-        result = _processor(PolicyAction.DETECT).process("Hello Alice")
+    result = _processor(PolicyAction.DETECT).process("Hello Alice")
 
     assert result.decision is RequestDecision.DENY
     assert result.reason_code == "privacy_guard_limit_exceeded"
-    assert result.diagnostic_limit_kind == "resource"
-    assert "privacy_guard_processing_limit kind=resource" in caplog.text
-    assert "Alice" not in caplog.text
-    assert "sensitive resource detail" not in caplog.text

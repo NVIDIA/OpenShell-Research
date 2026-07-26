@@ -70,7 +70,7 @@ uv run privacy-guard \
 
 uv run privacy-guard \
   --registry-factory custom_engine:create_registry \
-  schema
+  configuration-schema
 ```
 
 The first command should print the built-in `regex` row with `detect,replace`

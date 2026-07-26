@@ -14,6 +14,7 @@ from typer.testing import CliRunner, Result
 from privacy_guard import cli as cli_module
 from privacy_guard.cli import app
 from privacy_guard.engines.registry import EngineRegistry, create_builtin_registry
+from privacy_guard.errors import ErrorCode, PrivacyGuardError
 from privacy_guard.service.server import PrivacyGuardServer
 
 
@@ -23,7 +24,7 @@ def test_cli_help_exposes_server_and_discovery_commands() -> None:
     assert result.exit_code == 0
     output = _plain_output(result)
     assert "serve" in output
-    assert "schema" in output
+    assert "configuration-schema" in output
     assert "engines" in output
     assert "--debug" in output
     assert "--debug-log-content" in output
@@ -64,8 +65,8 @@ def test_cli_engines_describes_the_installed_engine() -> None:
     assert description in result.output
 
 
-def test_cli_schema_prints_the_finalized_discriminated_policy_schema() -> None:
-    result = CliRunner().invoke(app, ["schema"])
+def test_cli_configuration_schema_prints_finalized_policy_schema() -> None:
+    result = CliRunner().invoke(app, ["configuration-schema"])
 
     assert result.exit_code == 0
     schema = json.loads(result.output)
@@ -110,7 +111,7 @@ def test_cli_loads_one_finalized_operator_registry(
     ("factory_reference", "reason"),
     [
         ("missing-separator", "my_engines:create_registry"),
-        ("operator_engines:missing", "does not export the named factory"),
+        ("operator_engines:missing", "Verify the module:factory reference"),
         ("operator_engines:not_callable", "Export a callable"),
         ("operator_engines:failed", "Run the factory directly"),
         ("operator_engines:wrong_type", "Return an EngineRegistry"),
@@ -169,39 +170,13 @@ def test_cli_explains_registry_module_import_failures_without_leaking_details(
     assert "sensitive import failure" not in _plain_output(result)
 
 
-def test_cli_translates_dynamic_registry_factory_lookup_failures(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class DynamicModule:
-        def __getattr__(self, _: str) -> object:
-            raise RuntimeError("sensitive dynamic lookup failure")
-
-    monkeypatch.setattr(
-        cli_module.importlib,
-        "import_module",
-        lambda _: DynamicModule(),
-    )
-
-    result = CliRunner().invoke(
-        app,
-        ["--registry-factory", "operator_engines:create_registry", "engines"],
-        terminal_width=240,
-    )
-
-    assert result.exit_code == 2
-    output = _normalized_output(result)
-    assert "Registry factory could not be resolved" in output
-    assert "fix its dynamic attribute lookup" in output
-    assert "sensitive dynamic lookup failure" not in _plain_output(result)
-
-
 def test_cli_serve_adapts_operational_options_to_the_programmatic_server(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     calls: list[tuple[str, float, bool]] = []
 
-    def record_run(self: PrivacyGuardServer, listen: str) -> None:
+    def record_serve_sync(self: PrivacyGuardServer, listen: str) -> None:
         calls.append(
             (
                 listen,
@@ -210,7 +185,7 @@ def test_cli_serve_adapts_operational_options_to_the_programmatic_server(
             )
         )
 
-    monkeypatch.setattr(PrivacyGuardServer, "run", record_run)
+    monkeypatch.setattr(PrivacyGuardServer, "serve_sync", record_serve_sync)
 
     with caplog.at_level(logging.WARNING, logger="privacy_guard.cli"):
         result = CliRunner().invoke(
@@ -228,6 +203,27 @@ def test_cli_serve_adapts_operational_options_to_the_programmatic_server(
     assert result.exit_code == 0
     assert calls == [("127.0.0.1:50052", 4.5, True)]
     assert "privacy_guard_request_content_logging_enabled" in caplog.text
+
+
+def test_cli_serve_prints_cataloged_startup_errors_without_a_traceback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_safely(_: PrivacyGuardServer, listen: str) -> None:
+        del listen
+        raise PrivacyGuardError(ErrorCode.SERVER_BIND_FAILED)
+
+    monkeypatch.setattr(PrivacyGuardServer, "serve_sync", fail_safely)
+
+    result = CliRunner().invoke(
+        app,
+        ["serve", "--listen", "sensitive-listen-address"],
+    )
+
+    assert result.exit_code == 1
+    assert "[server_bind_failed]" in result.output
+    assert "Choose an available listen address and port, then retry" in result.output
+    assert "sensitive-listen-address" not in result.output
+    assert "Traceback" not in result.output
 
 
 @pytest.mark.parametrize("timeout_seconds", ["0", "31", "nan"])

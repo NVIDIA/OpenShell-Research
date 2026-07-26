@@ -137,7 +137,7 @@ or otherwise present on Python's import path:
 
 ```bash
 uv run privacy-guard --registry-factory my_engines:create_registry engines
-uv run privacy-guard --registry-factory my_engines:create_registry schema
+uv run privacy-guard --registry-factory my_engines:create_registry configuration-schema
 uv run privacy-guard --registry-factory my_engines:create_registry serve
 ```
 
@@ -174,14 +174,14 @@ server = PrivacyGuardServer(
     create_builtin_registry(),
     timeout_seconds=5,
 )
-server.run("127.0.0.1:50051")
+server.serve_sync("127.0.0.1:50051")
 ```
 
-`run()` is the blocking synchronous entry point. Async applications can use the
-same server directly:
+`serve_sync()` is the blocking entry point. Async applications use the
+explicitly named asynchronous counterpart:
 
 ```python
-await server.serve("127.0.0.1:50051")
+await server.serve_async("127.0.0.1:50051")
 ```
 
 Custom applications pass their own finalized registry to
@@ -193,7 +193,7 @@ modules, select engines, generate schemas, or parse command-line options.
 
 ```bash
 uv run privacy-guard engines
-uv run privacy-guard schema
+uv run privacy-guard configuration-schema
 uv run privacy-guard serve \
   --listen 127.0.0.1:50051 \
   --timeout-seconds 5

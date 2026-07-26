@@ -46,7 +46,7 @@ uv sync --locked
 
 ```bash
 uv run privacy-guard engines
-uv run privacy-guard schema
+uv run privacy-guard configuration-schema
 ```
 
 The first command should print one `regex` row with `detect,replace`. The schema

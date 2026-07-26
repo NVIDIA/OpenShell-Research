@@ -35,7 +35,7 @@ json_format.ParseDict(values, config)
 async def evaluate() -> None:
     middleware = PrivacyGuardMiddleware(create_registry())
     try:
-        result, _ = await middleware._evaluate_http_request(
+        result = await middleware._evaluate_http_request(
             pb2.HttpRequestEvaluation(
                 phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS,
                 config=config,
@@ -86,7 +86,7 @@ def test_custom_registry_drives_cli_discovery_and_schema() -> None:
         env=environment,
     )
     schema = subprocess.run(
-        [*command, "schema"],
+        [*command, "configuration-schema"],
         cwd=EXAMPLE_DIRECTORY,
         check=True,
         capture_output=True,

@@ -33,7 +33,7 @@ Run focused tests while working and `make check` before handoff.
 - `src/privacy_guard/engines/`: engine contract, registry, and built-in implementations
 - `src/privacy_guard/config.py`: policy action and ordered stage configuration
 - `src/privacy_guard/request_processor.py`: stage execution and policy disposition
-- `src/privacy_guard/cli.py`: command parsing, discovery, schema output, and server adapter
+- `src/privacy_guard/cli.py`: command parsing, discovery, configuration-schema output, and server adapter
 - `src/privacy_guard/base.py`: package-wide strict immutable domain-model base
 - `src/privacy_guard/string_validators.py`: shared string validators and field types
 - `src/privacy_guard/service/`: gRPC lifecycle and protobuf adapter

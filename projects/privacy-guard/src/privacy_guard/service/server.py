@@ -36,25 +36,25 @@ class PrivacyGuardServer:
             log_request_content=log_request_content,
         )
 
-    def run(self, listen: str = DEFAULT_LISTEN_ADDRESS) -> None:
-        """Run synchronously until termination."""
+    def serve_sync(self, listen: str = DEFAULT_LISTEN_ADDRESS) -> None:
+        """Serve synchronously until termination."""
         try:
-            asyncio.run(self.serve(listen))
+            asyncio.run(self.serve_async(listen))
         except KeyboardInterrupt:
             return
 
-    async def serve(self, listen: str = DEFAULT_LISTEN_ADDRESS) -> None:
+    async def serve_async(self, listen: str = DEFAULT_LISTEN_ADDRESS) -> None:
         """Serve asynchronously until termination, then close owned resources."""
         server = _create_grpc_server(self._middleware)
         _LOGGER.info("privacy_guard_server_starting listen=%s", listen)
         try:
             try:
                 bound_port = server.add_insecure_port(listen)
+                if bound_port == 0:
+                    raise PrivacyGuardError(ErrorCode.SERVER_BIND_FAILED)
+                await server.start()
             except RuntimeError:
                 raise PrivacyGuardError(ErrorCode.SERVER_BIND_FAILED) from None
-            if bound_port == 0:
-                raise PrivacyGuardError(ErrorCode.SERVER_BIND_FAILED)
-            await server.start()
             await server.wait_for_termination()
         finally:
             try:
