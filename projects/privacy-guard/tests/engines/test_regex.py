@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 
 import pytest
 from pydantic import ValidationError
@@ -12,6 +14,7 @@ from privacy_guard.engines import (
     EntityProcessingStrategy,
     RegexEngine,
     RegexEngineConfig,
+    RegexPatternCatalog,
 )
 from privacy_guard.errors import (
     ErrorCode,
@@ -62,6 +65,24 @@ def _run(
         )
         for detection in result.detections
     ]
+
+
+def _catalog(pattern: str) -> RegexPatternCatalog:
+    return RegexPatternCatalog.model_validate(
+        {
+            "entities": [
+                {
+                    "name": "token",
+                    "patterns": [
+                        {
+                            "pattern": pattern,
+                            "confidence": "high",
+                        }
+                    ],
+                }
+            ]
+        }
+    )
 
 
 def test_detects_overlaps_and_orders_matches_deterministically() -> None:
@@ -290,7 +311,7 @@ def test_pattern_search_has_an_enforceable_timeout() -> None:
 def test_patterns_compile_during_validation_and_preparation_not_run(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    regex_module._compile_pattern_catalog.cache_clear()
+    regex_module._clear_compiled_pattern_cache()
     compile_count = 0
     original_compile = regex_module.regex.compile
 
@@ -312,6 +333,130 @@ def test_patterns_compile_during_validation_and_preparation_not_run(
 
     assert prepared_count > 0
     assert compile_count == prepared_count
+
+
+def test_compiled_catalog_cache_evicts_least_recently_used_entry(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    regex_module._clear_compiled_pattern_cache()
+    catalogs = tuple(_catalog(f"sensitive-pattern-{suffix}") for suffix in "abc")
+
+    try:
+        first_rules = regex_module._compile_pattern_catalog(catalogs[0])
+        entry_weight = regex_module._COMPILED_PATTERN_CACHE[catalogs[0]][1]
+        monkeypatch.setattr(
+            regex_module,
+            "MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES",
+            entry_weight * 2,
+        )
+        with caplog.at_level(logging.DEBUG, logger="privacy_guard.engines.regex"):
+            regex_module._compile_pattern_catalog(catalogs[1])
+            assert regex_module._compile_pattern_catalog(catalogs[0]) is first_rules
+            regex_module._compile_pattern_catalog(catalogs[2])
+
+        assert tuple(regex_module._COMPILED_PATTERN_CACHE) == (
+            catalogs[0],
+            catalogs[2],
+        )
+        assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES == sum(
+            entry[1] for entry in regex_module._COMPILED_PATTERN_CACHE.values()
+        )
+        assert (
+            "privacy_guard_cache_eviction cache=regex_compiled entries=1" in caplog.text
+        )
+        assert "sensitive-pattern" not in caplog.text
+    finally:
+        regex_module._clear_compiled_pattern_cache()
+
+
+def test_compiled_catalog_cache_skips_oversized_valid_entry(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    regex_module._clear_compiled_pattern_cache()
+    monkeypatch.setattr(regex_module, "MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES", 1)
+    catalog = _catalog("sensitive-oversized-pattern")
+
+    try:
+        with caplog.at_level(logging.DEBUG, logger="privacy_guard.engines.regex"):
+            first = regex_module._compile_pattern_catalog(catalog)
+            second = regex_module._compile_pattern_catalog(catalog)
+
+        assert first is not second
+        assert regex_module._COMPILED_PATTERN_CACHE == {}
+        assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES == 0
+        assert caplog.text.count("privacy_guard_cache_skip cache=regex_compiled") == 2
+        assert "sensitive-oversized-pattern" not in caplog.text
+    finally:
+        regex_module._clear_compiled_pattern_cache()
+
+
+def test_compiled_catalog_failure_preserves_existing_weight(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    regex_module._clear_compiled_pattern_cache()
+    retained_catalog = _catalog("retained")
+    regex_module._compile_pattern_catalog(retained_catalog)
+    retained_weight = regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES
+    retained_entries = tuple(regex_module._COMPILED_PATTERN_CACHE)
+
+    def fail_compile(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        raise ValueError("expected test failure")
+
+    monkeypatch.setattr(regex_module, "_compile_rule", fail_compile)
+    try:
+        with pytest.raises(ValueError, match="expected test failure"):
+            regex_module._compile_pattern_catalog(_catalog("failing"))
+
+        assert tuple(regex_module._COMPILED_PATTERN_CACHE) == retained_entries
+        assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES == retained_weight
+    finally:
+        regex_module._clear_compiled_pattern_cache()
+
+
+def test_compiled_catalog_same_key_race_accounts_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    regex_module._clear_compiled_pattern_cache()
+    worker_count = 4
+    workers_ready = Barrier(worker_count)
+    catalog = _catalog("same-key")
+    original_compile_rule = regex_module._compile_rule
+
+    def synchronized_compile(
+        entity: regex_module.RegexEntity,
+        pattern: regex_module.RegexPattern,
+        catalog_index: int,
+        entity_pattern_index: int,
+    ) -> regex_module._CompiledRule:
+        workers_ready.wait(timeout=5)
+        return original_compile_rule(
+            entity,
+            pattern,
+            catalog_index,
+            entity_pattern_index,
+        )
+
+    monkeypatch.setattr(regex_module, "_compile_rule", synchronized_compile)
+    try:
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            results = tuple(
+                executor.map(
+                    lambda _: regex_module._compile_pattern_catalog(catalog),
+                    range(worker_count),
+                )
+            )
+
+        assert all(result is results[0] for result in results)
+        assert len(regex_module._COMPILED_PATTERN_CACHE) == 1
+        assert (
+            regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES
+            == (next(iter(regex_module._COMPILED_PATTERN_CACHE.values()))[1])
+        )
+    finally:
+        regex_module._clear_compiled_pattern_cache()
 
 
 def test_regex_engine_is_safe_for_concurrent_runs() -> None:

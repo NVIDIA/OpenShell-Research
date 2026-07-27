@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import sys
@@ -216,10 +217,123 @@ def test_catalog_file_change_produces_a_new_fingerprint(
     assert configuration_fingerprint(first) != configuration_fingerprint(second)
 
 
+def test_parsed_catalog_cache_evicts_least_recently_used_file_by_weight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    regex_module._clear_parsed_pattern_catalog_cache()
+    monkeypatch.chdir(tmp_path)
+    paths = tuple(Path(f"sensitive-{suffix}.yaml") for suffix in "abc")
+    sizes: list[int] = []
+    for suffix, path in zip("abc", paths, strict=True):
+        catalog = _config()["entity_processing"]["stages"][0]["config"][
+            "pattern_catalog"
+        ]
+        catalog["entities"][0]["patterns"][0]["pattern"] = f"pattern-{suffix}"
+        contents = yaml.safe_dump(catalog)
+        path.write_text(contents, encoding="utf-8")
+        sizes.append(len(contents.encode("utf-8")))
+    assert len(set(sizes)) == 1
+    monkeypatch.setattr(
+        regex_module,
+        "MAX_REGEX_PARSED_CATALOG_CACHE_BYTES",
+        sizes[0] * 2,
+    )
+
+    try:
+        with caplog.at_level(logging.DEBUG, logger="privacy_guard.engines.regex"):
+            first = regex_module._load_pattern_catalog_file(str(paths[0]))
+            regex_module._load_pattern_catalog_file(str(paths[1]))
+            assert regex_module._load_pattern_catalog_file(str(paths[0])) is first
+            regex_module._load_pattern_catalog_file(str(paths[2]))
+
+        assert tuple(
+            cache_key[0] for cache_key in regex_module._PATTERN_CATALOG_CACHE
+        ) == (str(paths[0]), str(paths[2]))
+        assert regex_module._PATTERN_CATALOG_CACHE_WEIGHT_BYTES == sizes[0] * 2
+        assert regex_module._PATTERN_CATALOG_CACHE_WEIGHT_BYTES == sum(
+            entry[1] for entry in regex_module._PATTERN_CATALOG_CACHE.values()
+        )
+        assert (
+            "privacy_guard_cache_eviction cache=regex_parsed_catalog entries=1"
+            in caplog.text
+        )
+        assert "sensitive-" not in caplog.text
+    finally:
+        regex_module._clear_parsed_pattern_catalog_cache()
+
+
+def test_parsed_catalog_cache_skips_oversized_valid_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    regex_module._clear_parsed_pattern_catalog_cache()
+    monkeypatch.chdir(tmp_path)
+    catalog = _config()["entity_processing"]["stages"][0]["config"]["pattern_catalog"]
+    catalog["entities"][0]["patterns"][0]["pattern"] = "sensitive-pattern"
+    contents = yaml.safe_dump(catalog)
+    path = Path("sensitive-oversized.yaml")
+    path.write_text(contents, encoding="utf-8")
+    size = len(contents.encode("utf-8"))
+    monkeypatch.setattr(
+        regex_module,
+        "MAX_REGEX_PARSED_CATALOG_CACHE_BYTES",
+        size - 1,
+    )
+
+    try:
+        with caplog.at_level(logging.DEBUG, logger="privacy_guard.engines.regex"):
+            first = regex_module._load_pattern_catalog_file(str(path))
+            second = regex_module._load_pattern_catalog_file(str(path))
+
+        assert first is not second
+        assert regex_module._PATTERN_CATALOG_CACHE == {}
+        assert regex_module._PATTERN_CATALOG_CACHE_WEIGHT_BYTES == 0
+        assert (
+            caplog.text.count("privacy_guard_cache_skip cache=regex_parsed_catalog")
+            == 2
+        )
+        assert "sensitive-oversized" not in caplog.text
+        assert "sensitive-pattern" not in caplog.text
+    finally:
+        regex_module._clear_parsed_pattern_catalog_cache()
+
+
+def test_parsed_catalog_failure_preserves_existing_weight(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    regex_module._clear_parsed_pattern_catalog_cache()
+    monkeypatch.chdir(tmp_path)
+    valid_catalog = _config()["entity_processing"]["stages"][0]["config"][
+        "pattern_catalog"
+    ]
+    Path("valid.yaml").write_text(
+        yaml.safe_dump(valid_catalog),
+        encoding="utf-8",
+    )
+    Path("invalid.yaml").write_text("entities: []\n", encoding="utf-8")
+
+    try:
+        regex_module._load_pattern_catalog_file("valid.yaml")
+        retained_keys = tuple(regex_module._PATTERN_CATALOG_CACHE)
+        retained_weight = regex_module._PATTERN_CATALOG_CACHE_WEIGHT_BYTES
+
+        with pytest.raises(ValueError, match="catalog file is invalid"):
+            regex_module._load_pattern_catalog_file("invalid.yaml")
+
+        assert tuple(regex_module._PATTERN_CATALOG_CACHE) == retained_keys
+        assert regex_module._PATTERN_CATALOG_CACHE_WEIGHT_BYTES == retained_weight
+    finally:
+        regex_module._clear_parsed_pattern_catalog_cache()
+
+
 def test_equivalent_catalogs_reuse_compiled_regex_rules(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    regex_module._compile_pattern_catalog.cache_clear()
+    regex_module._clear_compiled_pattern_cache()
     original_compile_rule = regex_module._compile_rule
     compile_calls = 0
 
@@ -252,7 +366,7 @@ def test_equivalent_catalogs_reuse_compiled_regex_rules(
     registry.create_engine(changed.entity_processing.stages[0].config)
 
     assert compile_calls == 2
-    regex_module._compile_pattern_catalog.cache_clear()
+    regex_module._clear_compiled_pattern_cache()
 
 
 @pytest.mark.parametrize(

@@ -17,7 +17,10 @@ from google.protobuf.message import Message
 
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
 from privacy_guard.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
-from privacy_guard.config import PrivacyGuardConfig, configuration_fingerprint
+from privacy_guard.config import (
+    PrivacyGuardConfig,
+    _configuration_fingerprint_and_size,
+)
 from privacy_guard.constants import (
     BLOCK_REASON,
     BLOCK_REASON_CODE,
@@ -26,6 +29,7 @@ from privacy_guard.constants import (
     LIMIT_REASON_CODE,
     MAX_BODY_BYTES,
     MAX_CONCURRENT_PROCESSING,
+    MAX_PROCESSOR_CACHE_CONFIG_BYTES,
     MAX_PROTO_CONFIG_BYTES,
     MAX_PROTO_CONTEXT_BYTES,
     MAX_PROTO_FINDING_BYTES,
@@ -241,19 +245,23 @@ class _RequestProcessorCache:
         self._registry = registry
         self._timeout_seconds = timeout_seconds
         self._log_request_content = log_request_content
-        self._processors: OrderedDict[str, RequestProcessor] = OrderedDict()
+        self._processors: OrderedDict[
+            str,
+            tuple[RequestProcessor, int],
+        ] = OrderedDict()
+        self._weight_bytes = 0
         self._in_flight: dict[str, Future[RequestProcessor]] = {}
         self._lock = RLock()
 
     def resolve(self, values: object) -> RequestProcessor:
         """Return the cached or newly prepared processor for expanded config."""
         config = self._registry.validate_config(values)
-        fingerprint = configuration_fingerprint(config)
+        fingerprint, weight_bytes = _configuration_fingerprint_and_size(config)
         with self._lock:
             cached = self._processors.get(fingerprint)
             if cached is not None:
                 self._processors.move_to_end(fingerprint)
-                return cached
+                return cached[0]
             owner_future = self._in_flight.get(fingerprint)
             owns_build = owner_future is None
             if owner_future is None:
@@ -264,19 +272,46 @@ class _RequestProcessorCache:
         try:
             processor = self._build_processor(config)
         except Exception as error:
+            owner_future.set_exception(error)
             with self._lock:
                 if self._in_flight.get(fingerprint) is owner_future:
                     del self._in_flight[fingerprint]
-            owner_future.set_exception(error)
             raise
+        evicted_entries = 0
+        evicted_weight_bytes = 0
         with self._lock:
-            self._processors[fingerprint] = processor
-            self._processors.move_to_end(fingerprint)
-            while len(self._processors) > _MAX_CACHED_PROCESSORS:
-                self._processors.popitem(last=False)
+            if weight_bytes <= MAX_PROCESSOR_CACHE_CONFIG_BYTES:
+                replaced = self._processors.pop(fingerprint, None)
+                if replaced is not None:
+                    self._weight_bytes -= replaced[1]
+                self._processors[fingerprint] = (processor, weight_bytes)
+                self._weight_bytes += weight_bytes
+                while (
+                    len(self._processors) > _MAX_CACHED_PROCESSORS
+                    or self._weight_bytes > MAX_PROCESSOR_CACHE_CONFIG_BYTES
+                ):
+                    _, (_, evicted_weight) = self._processors.popitem(last=False)
+                    self._weight_bytes -= evicted_weight
+                    evicted_entries += 1
+                    evicted_weight_bytes += evicted_weight
+        owner_future.set_result(processor)
+        with self._lock:
             if self._in_flight.get(fingerprint) is owner_future:
                 del self._in_flight[fingerprint]
-        owner_future.set_result(processor)
+        if weight_bytes > MAX_PROCESSOR_CACHE_CONFIG_BYTES:
+            _LOGGER.debug(
+                "privacy_guard_cache_skip cache=processor "
+                "weight_bytes=%d budget_bytes=%d",
+                weight_bytes,
+                MAX_PROCESSOR_CACHE_CONFIG_BYTES,
+            )
+        if evicted_entries:
+            _LOGGER.debug(
+                "privacy_guard_cache_eviction cache=processor "
+                "entries=%d weight_bytes=%d",
+                evicted_entries,
+                evicted_weight_bytes,
+            )
         return processor
 
     def _build_processor(

@@ -245,6 +245,21 @@ Cross-request entity memory is not implemented. Privacy Guard retains validated
 configuration and immutable engine state in its processor cache, but never
 retains request text, detections, or replacement mappings there.
 
+Prepared state is bounded by weight and least-recently-used entry count:
+
+| Cache | Weight budget | Entry cap | Entry weight |
+| --- | ---: | ---: | --- |
+| Parsed Regex file catalogs | 8 MiB | 64 | source file bytes |
+| Compiled Regex catalogs | 32 MiB | 128 | canonical catalog bytes plus 4 KiB per rule |
+| Request processors | 1 MiB | 128 | canonical expanded configuration bytes |
+
+The compiled-rule allowance accounts for retained backend state that is much
+larger than short pattern text. Processor weighting remains engine-neutral, so
+custom engines do not need a cache-size hook. One entry that exceeds its cache
+budget remains valid and usable for the current evaluation but is not retained.
+Debug skip and eviction records contain only cache names and weights, plus
+eviction counts.
+
 ## Changing a limit
 
 A limit change may affect policy schema, processor behavior, engine contracts,

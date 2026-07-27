@@ -15,7 +15,10 @@ from google.protobuf import json_format
 from google.protobuf.message import Message
 
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
-from privacy_guard.config import PrivacyGuardConfig
+from privacy_guard.config import (
+    PrivacyGuardConfig,
+    _configuration_fingerprint_and_size,
+)
 from privacy_guard.constants import (
     LIMIT_REASON,
     LIMIT_REASON_CODE,
@@ -517,6 +520,10 @@ def test_same_fingerprint_misses_build_one_shared_processor(
 
     assert build_count == 1
     assert all(processor is processors[0] for processor in processors)
+    _, expected_weight = _configuration_fingerprint_and_size(
+        create_builtin_registry().validate_config(_values())
+    )
+    assert cache._weight_bytes == expected_weight
     assert cache._in_flight == {}
 
 
@@ -553,6 +560,13 @@ def test_different_fingerprints_build_concurrently(
 
     assert processors[0] is not processors[1]
     assert len(cache._processors) == 2
+    expected_weight = sum(
+        _configuration_fingerprint_and_size(
+            create_builtin_registry().validate_config(values)
+        )[1]
+        for values in (_values(action="detect"), _values(action="block"))
+    )
+    assert cache._weight_bytes == expected_weight
     assert cache._in_flight == {}
 
 
@@ -611,6 +625,7 @@ def test_failed_processor_build_wakes_waiters_and_allows_retry(
     assert build_count == 1
     assert all(error is failure for error in failures)
     assert cache._processors == {}
+    assert cache._weight_bytes == 0
     assert cache._in_flight == {}
 
     processor = cache.resolve(_values())
@@ -618,6 +633,160 @@ def test_failed_processor_build_wakes_waiters_and_allows_retry(
     assert isinstance(processor, RequestProcessor)
     assert build_count == 2
     assert len(cache._processors) == 1
+    assert cache._weight_bytes > 0
+    assert cache._in_flight == {}
+
+
+def test_processor_cache_evicts_least_recently_used_config_by_weight(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    registry = create_builtin_registry()
+    values = tuple(
+        _values(action="detect", stage_name=f"sensitive-stage-{suffix}")
+        for suffix in ("a", "b", "c")
+    )
+    identities = tuple(
+        _configuration_fingerprint_and_size(registry.validate_config(item))
+        for item in values
+    )
+    assert len({weight for _, weight in identities}) == 1
+    entry_weight = identities[0][1]
+    monkeypatch.setattr(
+        servicer_module,
+        "MAX_PROCESSOR_CACHE_CONFIG_BYTES",
+        entry_weight * 2,
+    )
+    cache = servicer_module._RequestProcessorCache(
+        registry,
+        timeout_seconds=1,
+        log_request_content=False,
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="privacy_guard.service.servicer"):
+        first = cache.resolve(values[0])
+        cache.resolve(values[1])
+        assert cache.resolve(values[0]) is first
+        cache.resolve(values[2])
+
+    assert tuple(cache._processors) == (identities[0][0], identities[2][0])
+    assert cache._weight_bytes == entry_weight * 2
+    assert "privacy_guard_cache_eviction cache=processor entries=1" in caplog.text
+    assert "sensitive-stage" not in caplog.text
+
+
+def test_processor_cache_builds_but_does_not_retain_oversized_config(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    registry = create_builtin_registry()
+    values = _values(action="detect", stage_name="sensitive-oversized-stage")
+    _, weight_bytes = _configuration_fingerprint_and_size(
+        registry.validate_config(values)
+    )
+    monkeypatch.setattr(
+        servicer_module,
+        "MAX_PROCESSOR_CACHE_CONFIG_BYTES",
+        weight_bytes - 1,
+    )
+    build_count = 0
+    original_build = servicer_module._RequestProcessorCache._build_processor
+
+    def record_build(
+        cache: servicer_module._RequestProcessorCache,
+        config: PrivacyGuardConfig[EngineConfig],
+    ) -> RequestProcessor:
+        nonlocal build_count
+        build_count += 1
+        return original_build(cache, config)
+
+    monkeypatch.setattr(
+        servicer_module._RequestProcessorCache,
+        "_build_processor",
+        record_build,
+    )
+    cache = servicer_module._RequestProcessorCache(
+        registry,
+        timeout_seconds=1,
+        log_request_content=False,
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="privacy_guard.service.servicer"):
+        first = cache.resolve(values)
+        second = cache.resolve(values)
+
+    assert first is not second
+    assert build_count == 2
+    assert cache._processors == {}
+    assert cache._weight_bytes == 0
+    assert caplog.text.count("privacy_guard_cache_skip cache=processor") == 2
+    assert "sensitive-oversized-stage" not in caplog.text
+
+
+def test_oversized_same_fingerprint_misses_remain_single_flight(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    publication_started = Event()
+    waiter_ready = Event()
+    release_publication = Event()
+
+    class _PublicationPausingFuture(Future[RequestProcessor]):
+        def result(self, timeout: float | None = None) -> RequestProcessor:
+            waiter_ready.set()
+            return super().result(timeout)
+
+        def set_result(self, result: RequestProcessor) -> None:
+            publication_started.set()
+            assert release_publication.wait(timeout=5)
+            super().set_result(result)
+
+    registry = create_builtin_registry()
+    values = _values(action="detect", stage_name="oversized-single-flight")
+    _, weight_bytes = _configuration_fingerprint_and_size(
+        registry.validate_config(values)
+    )
+    monkeypatch.setattr(
+        servicer_module,
+        "MAX_PROCESSOR_CACHE_CONFIG_BYTES",
+        weight_bytes - 1,
+    )
+    monkeypatch.setattr(servicer_module, "Future", _PublicationPausingFuture)
+    build_count = 0
+    original_build = servicer_module._RequestProcessorCache._build_processor
+
+    def record_build(
+        cache: servicer_module._RequestProcessorCache,
+        config: PrivacyGuardConfig[EngineConfig],
+    ) -> RequestProcessor:
+        nonlocal build_count
+        build_count += 1
+        return original_build(cache, config)
+
+    monkeypatch.setattr(
+        servicer_module._RequestProcessorCache,
+        "_build_processor",
+        record_build,
+    )
+    cache = servicer_module._RequestProcessorCache(
+        registry,
+        timeout_seconds=1,
+        log_request_content=False,
+    )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        owner = executor.submit(cache.resolve, values)
+        assert publication_started.wait(timeout=5)
+        waiter = executor.submit(cache.resolve, values)
+        try:
+            assert waiter_ready.wait(timeout=5)
+        finally:
+            release_publication.set()
+        processors = (owner.result(timeout=5), waiter.result(timeout=5))
+
+    assert processors[0] is processors[1]
+    assert build_count == 1
+    assert cache._processors == {}
+    assert cache._weight_bytes == 0
     assert cache._in_flight == {}
 
 
@@ -632,7 +801,7 @@ def test_oversized_stage_list_fails_before_fingerprinting_or_construction(
 
     monkeypatch.setattr(
         servicer_module,
-        "configuration_fingerprint",
+        "_configuration_fingerprint_and_size",
         unexpected_call,
     )
     monkeypatch.setattr(

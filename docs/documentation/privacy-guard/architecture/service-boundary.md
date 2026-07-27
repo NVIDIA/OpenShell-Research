@@ -53,16 +53,38 @@ the async gRPC event loop.
 
 During evaluation, the service validates and normalizes the same config,
 computes its canonical SHA-256 fingerprint, and resolves a configured processor
-from a bounded 128-entry LRU cache. A cache miss constructs engines directly
-from the exact stage configs and operator-injected resources, then constructs
-the `RequestProcessor`. Validation, cache resolution, engine construction,
-strict UTF-8 decoding, and processing all run in the bounded worker pool.
-Validation still occurs for every evaluation, while equivalent normalized regex
-catalogs reuse their bounded compiled-rule entry instead of recompiling.
+from an LRU cache bounded by both 128 entries and 1 MiB of canonical expanded
+configuration. A cache miss constructs engines directly from the exact stage
+configs and operator-injected resources, then constructs the
+`RequestProcessor`. Validation, cache resolution, engine construction, strict
+UTF-8 decoding, and processing all run in the bounded worker pool. Validation
+still occurs for every evaluation, while equivalent normalized regex catalogs
+reuse their bounded compiled-rule entry instead of recompiling.
+
+Regex keeps two additional owner-local LRU caches. Parsed file catalogs retain
+at most 64 entries and 8 MiB of source files. Compiled catalogs retain at most
+128 entries and 32 MiB of weighted state, where each entry weighs its canonical
+catalog bytes plus 4 KiB per compiled rule. The rule allowance conservatively
+represents backend and Python state that the catalog encoding alone does not
+capture.
+
+An otherwise valid entry larger than one cache's byte budget is built and
+returned without being retained. Eviction or a skipped entry never makes a
+policy invalid. Content-safe debug events report the cache name and weight, plus
+the number of entries for an eviction, without logging configuration, paths,
+patterns, or fingerprints.
 
 The cache is protected for concurrent access and is not correctness-relevant.
 Eviction or process restart simply causes reconstruction from a later
 evaluation's expanded config.
+
+The entry cap remains useful for small policies. The 1 MiB processor budget
+holds roughly sixteen near-ceiling inline configurations and up to 128 smaller
+configurations. A representative 250-rule configuration weighs about 33 KiB in
+that cache and about 1 MiB in the compiled cache, so the default budgets retain
+roughly thirty such configurations while bounding their compiled state.
+Operators with consistently larger catalogs should expect more frequent
+preparation rather than unbounded retention.
 
 Each cached processor receives the server's operational processing timeout.
 The default is 1 second shared across every configured stage. Operators may set
