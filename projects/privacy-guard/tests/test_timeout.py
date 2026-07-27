@@ -27,7 +27,7 @@ def test_expired_timeout_raises_typed_signal() -> None:
 
     assert str(captured.value) == (
         "Privacy Guard processing timed out. Reduce the request size or simplify "
-        "the configured stages and patterns, or increase the processing timeout "
+        "the configured stages and rules, or increase the processing timeout "
         "to at most 30 seconds, then retry."
     )
 

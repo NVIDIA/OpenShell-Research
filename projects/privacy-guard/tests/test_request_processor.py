@@ -37,7 +37,7 @@ def _values(
                     "entities": [
                         {
                             "name": "person",
-                            "patterns": [
+                            "rules": [
                                 {
                                     "pattern": "Alice",
                                     "confidence": "high",
@@ -62,7 +62,7 @@ def _values(
                         "entities": [
                             {
                                 "name": "marker",
-                                "patterns": [
+                                "rules": [
                                     {
                                         "pattern": "person",
                                         "confidence": "medium",

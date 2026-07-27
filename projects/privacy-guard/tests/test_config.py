@@ -44,7 +44,7 @@ def _config(
             "entities": [
                 {
                     "name": "email",
-                    "patterns": [
+                    "rules": [
                         {
                             "pattern": r"\buser@example\.com\b",
                             "confidence": "high",
@@ -86,7 +86,7 @@ def test_known_discriminator_constructs_the_exact_engine_config() -> None:
 
     assert type(stage.config) is RegexEngineConfig
     assert type(stage.config.pattern_catalog) is RegexPatternCatalog
-    assert stage.config.pattern_catalog.entities[0].patterns[0].name is None
+    assert stage.config.pattern_catalog.entities[0].rules[0].name is None
     assert stage.diagnostic_name(1) == "regex[1]"
 
 
@@ -206,7 +206,7 @@ def test_catalog_file_change_produces_a_different_validated_config(
     registry = _registry()
     first = registry.validate_config(values)
 
-    catalog["entities"][0]["patterns"][0]["confidence"] = "low"
+    catalog["entities"][0]["rules"][0]["confidence"] = "low"
     catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
     second = registry.validate_config(values)
 
@@ -226,7 +226,7 @@ def test_parsed_catalog_cache_evicts_least_recently_used_file_by_weight(
         catalog = _config()["entity_processing"]["stages"][0]["config"][
             "pattern_catalog"
         ]
-        catalog["entities"][0]["patterns"][0]["pattern"] = f"pattern-{suffix}"
+        catalog["entities"][0]["rules"][0]["pattern"] = f"pattern-{suffix}"
         contents = yaml.safe_dump(catalog)
         path.write_text(contents, encoding="utf-8")
         sizes.append(len(contents.encode("utf-8")))
@@ -268,7 +268,7 @@ def test_parsed_catalog_cache_skips_oversized_valid_file(
     regex_module._clear_parsed_pattern_catalog_cache()
     monkeypatch.chdir(tmp_path)
     catalog = _config()["entity_processing"]["stages"][0]["config"]["pattern_catalog"]
-    catalog["entities"][0]["patterns"][0]["pattern"] = "sensitive-pattern"
+    catalog["entities"][0]["rules"][0]["pattern"] = "sensitive-pattern"
     contents = yaml.safe_dump(catalog)
     path = Path("sensitive-oversized.yaml")
     path.write_text(contents, encoding="utf-8")
@@ -335,17 +335,17 @@ def test_equivalent_catalogs_reuse_compiled_regex_rules(
 
     def record_compile_rule(
         entity: regex_module.RegexEntity,
-        pattern: regex_module.RegexPattern,
+        rule: regex_module.RegexRule,
         catalog_index: int,
-        entity_pattern_index: int,
+        entity_rule_index: int,
     ) -> regex_module._CompiledRule:
         nonlocal compile_calls
         compile_calls += 1
         return original_compile_rule(
             entity,
-            pattern,
+            rule,
             catalog_index,
-            entity_pattern_index,
+            entity_rule_index,
         )
 
     monkeypatch.setattr(regex_module, "_compile_rule", record_compile_rule)
@@ -357,7 +357,7 @@ def test_equivalent_catalogs_reuse_compiled_regex_rules(
     changed_values = deepcopy(_config())
     changed_values["entity_processing"]["stages"][0]["config"]["pattern_catalog"][
         "entities"
-    ][0]["patterns"][0]["pattern"] = "changed"
+    ][0]["rules"][0]["pattern"] = "changed"
     changed = registry.validate_config(changed_values)
     registry.create_engine(changed.entity_processing.stages[0].config)
 
@@ -488,12 +488,12 @@ else:
 @pytest.mark.parametrize(
     "contents",
     [
-        "entities:\n  - name: first\n    name: duplicate\n    patterns: []\n",
+        "entities:\n  - name: first\n    name: duplicate\n    rules: []\n",
         (
             "entities:\n"
             "  - &shared\n"
             "    name: first\n"
-            "    patterns:\n"
+            "    rules:\n"
             "      - pattern: x\n"
             "        confidence: high\n"
             "  - *shared\n"
@@ -626,12 +626,12 @@ def test_explicit_stage_name_cannot_collide_with_a_derived_name() -> None:
         _registry().validate_config(values)
 
 
-def test_regex_pattern_names_are_optional_but_supplied_names_are_unique() -> None:
+def test_regex_rule_names_are_optional_but_supplied_names_are_unique() -> None:
     values = _config()
-    patterns = values["entity_processing"]["stages"][0]["config"]["pattern_catalog"][
+    rules = values["entity_processing"]["stages"][0]["config"]["pattern_catalog"][
         "entities"
-    ][0]["patterns"]
-    patterns.extend(
+    ][0]["rules"]
+    rules.extend(
         [
             {"pattern": "second", "confidence": "low"},
             {"name": "named", "pattern": "third", "confidence": "medium"},
@@ -641,10 +641,10 @@ def test_regex_pattern_names_are_optional_but_supplied_names_are_unique() -> Non
 
     regex_config = config.entity_processing.stages[0].config
     assert isinstance(regex_config, RegexEngineConfig)
-    parsed_patterns = regex_config.pattern_catalog.entities[0].patterns
-    assert [pattern.name for pattern in parsed_patterns] == [None, None, "named"]
+    parsed_rules = regex_config.pattern_catalog.entities[0].rules
+    assert [rule.name for rule in parsed_rules] == [None, None, "named"]
 
-    patterns.append({"name": "named", "pattern": "duplicate", "confidence": "high"})
+    rules.append({"name": "named", "pattern": "duplicate", "confidence": "high"})
     with pytest.raises(PrivacyGuardError):
         _registry().validate_config(values)
 
@@ -656,7 +656,7 @@ def test_validated_config_equality_covers_concrete_expanded_config() -> None:
     changed_values = _config()
     changed_values["entity_processing"]["stages"][0]["config"]["pattern_catalog"][
         "entities"
-    ][0]["patterns"][0]["confidence"] = "low"
+    ][0]["rules"][0]["confidence"] = "low"
     changed = registry.validate_config(changed_values)
 
     assert first == equivalent

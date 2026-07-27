@@ -17,9 +17,9 @@ from privacy_guard.engines.regex import (
     RegexEngine,
     RegexEngineConfig,
     RegexEntity,
-    RegexPattern,
     RegexPatternCatalog,
     RegexReplacement,
+    RegexRule,
 )
 from privacy_guard.errors import (
     EngineConfigurationError,
@@ -46,8 +46,8 @@ __all__ = [
     "RegexEngine",
     "RegexEngineConfig",
     "RegexEntity",
-    "RegexPattern",
     "RegexPatternCatalog",
     "RegexReplacement",
+    "RegexRule",
     "TextProcessingResult",
 ]

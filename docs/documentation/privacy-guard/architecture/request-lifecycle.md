@@ -26,7 +26,7 @@ entity_processing:
         pattern_catalog:
           entities:
             - name: email
-              patterns:
+              rules:
                 - pattern: '...'
                   confidence: high
         replacement:

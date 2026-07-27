@@ -50,7 +50,7 @@ entity_processing:
         pattern_catalog:
           entities:
             - name: customer-id
-              patterns:
+              rules:
                 - name: prefixed-eight-digit-id
                   pattern: '\bCUST-[0-9]{8}\b'
                   confidence: high

@@ -23,7 +23,7 @@ entity_processing:
         pattern_catalog:
           entities:
             - name: email
-              patterns:
+              rules:
                 - pattern: '(?<![\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])'
                   confidence: high
         replacement:
@@ -88,11 +88,11 @@ protocol rather than a private proto fork.
 
 ### RegexEngine
 
-`RegexEngine` compiles configured patterns once and supports overlapping
+`RegexEngine` compiles configured rules once and supports overlapping
 detection and deterministic template replacement. It preserves numeric
-backreferences by wrapping each configured pattern in a non-capturing group
-followed by a private named marker. Pattern names are optional diagnostic
-identities; `pattern` is the only field containing the regex string. Equivalent
+backreferences by wrapping each rule's pattern in a non-capturing group followed
+by a private named marker. Rule names are optional diagnostic identities;
+`pattern` is the only field containing the regex string. Equivalent
 normalized catalogs reuse a bounded compiled-rule cache across validation and
 engine construction.
 

@@ -77,6 +77,7 @@ def test_builtin_registry_drives_documented_cli_discovery_and_schema() -> None:
     serialized_schema = json.loads(schema.stdout)
     assert "RegexEngineConfig" in serialized_schema["$defs"]
     assert "RegexPatternCatalog" in serialized_schema["$defs"]
+    assert "RegexRule" in serialized_schema["$defs"]
     assert "RegexReplacement" in serialized_schema["$defs"]
 
 

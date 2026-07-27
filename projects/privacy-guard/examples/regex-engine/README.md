@@ -50,7 +50,7 @@ uv run privacy-guard configuration-schema
 ```
 
 The first command should print one `regex` row with `detect,replace`. The schema
-should contain `RegexEngineConfig`, `RegexPatternCatalog`, and
+should contain `RegexEngineConfig`, `RegexPatternCatalog`, `RegexRule`, and
 `RegexReplacement`.
 
 `privacy-guard-config.yaml` is the standalone Privacy Guard configuration.

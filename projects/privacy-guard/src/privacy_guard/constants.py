@@ -21,7 +21,7 @@ BLOCK_REASON_CODE = "privacy_guard_blocked"
 LIMIT_REASON = (
     "Privacy Guard exceeded a processing safety limit. Check Privacy Guard logs "
     "for the limit kind. Reduce the request or replacement size, simplify the "
-    "configured stages and patterns, or increase the processing timeout with "
+    "configured stages and rules, or increase the processing timeout with "
     "--timeout-seconds or "
     "PrivacyGuardServer(timeout_seconds=...) to at most "
     f"{MAX_TIMEOUT_SECONDS:g} seconds. If increasing it, give OpenShell's "
@@ -44,7 +44,7 @@ MAX_PROTO_FINDING_BYTES = 4 * 1024
 MAX_ENTITY_PROCESSING_STAGES = 10
 MAX_REGEX_NAME_BYTES = 128
 MAX_REGEX_ENTITIES_PER_CATALOG = 2_000
-MAX_REGEX_PATTERNS_PER_CATALOG = 10_000
+MAX_REGEX_RULES_PER_CATALOG = 10_000
 MAX_REGEX_PATTERN_BYTES = 16 * 1024
 MAX_REGEX_CATALOG_FILE_BYTES = 16 * 1024 * 1024
 MAX_REGEX_CATALOG_PATH_BYTES = 1024

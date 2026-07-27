@@ -33,7 +33,7 @@ from privacy_guard.constants import (
     MAX_REGEX_NAME_BYTES,
     MAX_REGEX_PARSED_CATALOG_CACHE_BYTES,
     MAX_REGEX_PATTERN_BYTES,
-    MAX_REGEX_PATTERNS_PER_CATALOG,
+    MAX_REGEX_RULES_PER_CATALOG,
     REGEX_COMPILED_RULE_WEIGHT_BYTES,
 )
 from privacy_guard.engines.base import (
@@ -54,8 +54,8 @@ from privacy_guard.string_validators import ScalarString, validate_scalar_string
 from privacy_guard.timeout import Timeout
 
 
-class RegexPattern(StrictDomainModel):
-    """One optional diagnostic identity, pattern string, and explicit flags."""
+class RegexRule(StrictDomainModel):
+    """One regex pattern with its diagnostic identity, confidence, and flags."""
 
     name: str | None = None
     pattern: ScalarString = Field(repr=False)
@@ -88,30 +88,28 @@ class RegexPattern(StrictDomainModel):
 
 
 class RegexEntity(StrictDomainModel):
-    """One entity name and its ordered, non-empty regex patterns."""
+    """One entity name and its ordered, non-empty regex rules."""
 
     name: str
-    patterns: tuple[RegexPattern, ...] = Field(repr=False)
+    rules: tuple[RegexRule, ...] = Field(repr=False)
 
     @field_validator("name")
     @classmethod
     def _name_is_safe(cls, value: str) -> str:
         return _validate_name(value)
 
-    @field_validator("patterns", mode="before")
+    @field_validator("rules", mode="before")
     @classmethod
-    def _patterns_are_non_empty(cls, value: object) -> object:
+    def _rules_are_non_empty(cls, value: object) -> object:
         if not isinstance(value, list | tuple) or not value:
-            raise ValueError("patterns must be a non-empty list")
+            raise ValueError("rules must be a non-empty list")
         return tuple(value)
 
     @model_validator(mode="after")
-    def _supplied_pattern_names_are_unique(self) -> Self:
-        supplied_names = [
-            pattern.name for pattern in self.patterns if pattern.name is not None
-        ]
+    def _supplied_rule_names_are_unique(self) -> Self:
+        supplied_names = [rule.name for rule in self.rules if rule.name is not None]
         if len(supplied_names) != len(set(supplied_names)):
-            raise ValueError("supplied pattern names must be unique within an entity")
+            raise ValueError("supplied rule names must be unique within an entity")
         return self
 
 
@@ -135,10 +133,10 @@ class RegexPatternCatalog(StrictDomainModel):
         if len(self.entities) > MAX_REGEX_ENTITIES_PER_CATALOG:
             raise ValueError("entity catalog exceeds the size limit")
         if (
-            sum(len(entity.patterns) for entity in self.entities)
-            > MAX_REGEX_PATTERNS_PER_CATALOG
+            sum(len(entity.rules) for entity in self.entities)
+            > MAX_REGEX_RULES_PER_CATALOG
         ):
-            raise ValueError("pattern catalog exceeds the size limit")
+            raise ValueError("rule catalog exceeds the size limit")
         return self
 
 
@@ -192,7 +190,7 @@ class RegexEngineConfig(EngineConfig):
         return value
 
     @model_validator(mode="after")
-    def _patterns_are_valid(self) -> Self:
+    def _rules_are_valid(self) -> Self:
         try:
             _compile_pattern_catalog(self.pattern_catalog)
         except (RecursionError, ValueError, regex.error):
@@ -265,9 +263,9 @@ class RegexEngine(EntityProcessingEngine[RegexEngineConfig]):
                     start=start,
                     end=end,
                     confidence=rule.confidence,
-                    metadata={_PATTERN_METADATA_KEY: rule.pattern_identity},
+                    metadata={_RULE_METADATA_KEY: rule.rule_identity},
                 )
-                detections_with_identity.append((detection, rule.pattern_identity))
+                detections_with_identity.append((detection, rule.rule_identity))
                 if len(detections_with_identity) > MAX_DETECTIONS_PER_STAGE:
                     raise EngineLimitExceededError(
                         "regex detection count exceeds the limit"
@@ -302,7 +300,7 @@ class RegexEngine(EntityProcessingEngine[RegexEngineConfig]):
 @dataclass(frozen=True)
 class _CompiledRule:
     entity: str
-    pattern_identity: str
+    rule_identity: str
     confidence: ConfidenceLevel
     marker: str
     compiled: _CompiledPattern
@@ -556,12 +554,12 @@ def _compile_pattern_catalog(
     rules = tuple(
         _compile_rule(
             entity,
-            pattern,
+            rule,
             catalog_index=global_index,
-            entity_pattern_index=pattern_index,
+            entity_rule_index=rule_index,
         )
-        for global_index, (entity, pattern_index, pattern) in enumerate(
-            _iter_catalog_patterns(catalog)
+        for global_index, (entity, rule_index, rule) in enumerate(
+            _iter_catalog_rules(catalog)
         )
     )
     weight_bytes = _compiled_pattern_weight(catalog, len(rules))
@@ -636,47 +634,47 @@ def _clear_parsed_pattern_catalog_cache() -> None:
 
 def _compile_rule(
     entity: RegexEntity,
-    pattern: RegexPattern,
+    rule: RegexRule,
     catalog_index: int,
-    entity_pattern_index: int,
+    entity_rule_index: int,
 ) -> _CompiledRule:
     flags = 0
-    if pattern.ignore_case:
+    if rule.ignore_case:
         flags |= regex.IGNORECASE
-    if pattern.multiline:
+    if rule.multiline:
         flags |= regex.MULTILINE
-    if pattern.dot_all:
+    if rule.dot_all:
         flags |= regex.DOTALL
-    if pattern.ascii:
+    if rule.ascii:
         flags |= regex.ASCII
-    if _contains_inline_flags(pattern.pattern):
+    if _contains_inline_flags(rule.pattern):
         raise ValueError("inline flags are unsupported")
-    unmarked = regex.compile(pattern.pattern, flags)
+    unmarked = regex.compile(rule.pattern, flags)
     if unmarked.groupindex:
         raise ValueError("named groups are reserved")
     if unmarked.search("") is not None:
         raise ValueError("pattern must not match empty input")
-    marker = f"_pg_pattern_{catalog_index:06d}"
-    compiled = regex.compile(f"(?:{pattern.pattern})(?P<{marker}>)", flags)
+    marker = f"_pg_rule_{catalog_index:06d}"
+    compiled = regex.compile(f"(?:{rule.pattern})(?P<{marker}>)", flags)
     if marker not in compiled.groupindex:
         raise ValueError("internal marker is missing")
-    pattern_identity = pattern.name or f"{entity.name}.patterns[{entity_pattern_index}]"
+    rule_identity = rule.name or f"{entity.name}.rules[{entity_rule_index}]"
     return _CompiledRule(
         entity=entity.name,
-        pattern_identity=pattern_identity,
-        confidence=pattern.confidence,
+        rule_identity=rule_identity,
+        confidence=rule.confidence,
         marker=marker,
         compiled=compiled,
     )
 
 
-def _iter_catalog_patterns(
+def _iter_catalog_rules(
     catalog: RegexPatternCatalog,
-) -> tuple[tuple[RegexEntity, int, RegexPattern], ...]:
+) -> tuple[tuple[RegexEntity, int, RegexRule], ...]:
     return tuple(
-        (entity, pattern_index, pattern)
+        (entity, rule_index, rule)
         for entity in catalog.entities
-        for pattern_index, pattern in enumerate(entity.patterns)
+        for rule_index, rule in enumerate(entity.rules)
     )
 
 
@@ -781,7 +779,7 @@ _CONFIDENCE_RANK = {
     ConfidenceLevel.MEDIUM: 1,
     ConfidenceLevel.HIGH: 2,
 }
-_PATTERN_METADATA_KEY = "pattern"
+_RULE_METADATA_KEY = "rule"
 _MAX_CACHED_PATTERN_CATALOGS = 64
 _PATTERN_CATALOG_CACHE: OrderedDict[
     tuple[str, int, int, int, int, int],
@@ -803,7 +801,7 @@ __all__ = [
     "RegexEngine",
     "RegexEngineConfig",
     "RegexEntity",
-    "RegexPattern",
     "RegexPatternCatalog",
     "RegexReplacement",
+    "RegexRule",
 ]

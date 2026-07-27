@@ -102,7 +102,7 @@ def test_detection_confidence_and_metadata_are_strict_bounded_values() -> None:
             "start": 0,
             "end": 1,
             "confidence": "high",
-            "metadata": {"pattern": "email.patterns[0]"},
+            "metadata": {"rule": "email.rules[0]"},
         }
     )
     assert categorical.confidence is ConfidenceLevel.HIGH

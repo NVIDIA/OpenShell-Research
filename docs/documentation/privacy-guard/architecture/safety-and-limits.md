@@ -76,7 +76,7 @@ request IDs use the same content and size rules for logging; an invalid request
 ID is represented by a constant placeholder and does not change the evaluation
 result. The human-readable log message quotes request IDs and escapes ASCII
 spaces so their text cannot introduce another key/value token; structured log
-records retain the exact validated ID. Regex entity and supplied pattern names
+records retain the exact validated ID. Regex entity and supplied rule names
 have a stricter ASCII grammar and limit described below.
 
 The processor aggregates occurrences before the service applies protobuf
@@ -87,13 +87,13 @@ deny with no partial findings.
 
 | Limit | Constant | Value |
 | --- | --- | ---: |
-| Regex entity or supplied pattern name | `MAX_REGEX_NAME_BYTES` | 128 ASCII bytes |
+| Regex entity or supplied rule name | `MAX_REGEX_NAME_BYTES` | 128 ASCII bytes |
 | Entities per catalog | `MAX_REGEX_ENTITIES_PER_CATALOG` | 2,000 |
-| Patterns per catalog | `MAX_REGEX_PATTERNS_PER_CATALOG` | 10,000 |
+| Rules per catalog | `MAX_REGEX_RULES_PER_CATALOG` | 10,000 |
 | Pattern string | `MAX_REGEX_PATTERN_BYTES` | 16 KiB |
 
-Entity and pattern names use
-`[A-Za-z_][A-Za-z0-9_-]*`. Pattern names are optional; their deterministic
+Entity and rule names use
+`[A-Za-z_][A-Za-z0-9_-]*`. Rule names are optional; their deterministic
 derived diagnostic identities are not serialized back into configuration.
 
 The per-evaluation config `Struct` is limited to 64 KiB. A catalog may satisfy
@@ -139,7 +139,7 @@ The processor emits a content-safe `timeout` or `resource` limit kind, and the
 service adapter emits `resource` for representation limits. Neither log includes
 request content or collaborator error text. The deny reason directs users to
 check that log, then reduce the request or replacement size, simplify the
-configured stages and patterns, or increase `--timeout-seconds` or
+configured stages and rules, or increase `--timeout-seconds` or
 `PrivacyGuardServer(timeout_seconds=...)` up to 30 seconds. When increasing the
 processing timeout, users must give OpenShell's middleware timeout additional
 headroom for worker queueing and configuration or engine preparation. These

@@ -45,7 +45,7 @@ def _config(
                                 "entities": [
                                     {
                                         "name": "email",
-                                        "patterns": [
+                                        "rules": [
                                             {
                                                 "pattern": pattern,
                                                 "confidence": "high",

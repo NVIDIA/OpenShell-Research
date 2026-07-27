@@ -269,24 +269,25 @@ concurrent requests. Keep request text, detections, and counters local to
 
 `RegexEngine` owns both regular-expression detection and deterministic template
 replacement. Its `RegexPatternCatalog` contains structured entities and ordered
-patterns; Privacy Guard maintains the schema and limits but no authoritative
-pattern set.
+rules. Each rule combines one regex pattern with its optional diagnostic name,
+confidence, and flags. Privacy Guard maintains the schema and limits but no
+authoritative pattern set.
 
 Important properties:
 
-- patterns compile once during configuration validation and initialization
+- rules compile once during configuration validation and initialization
 - a non-capturing wrapper plus a private trailing named marker preserves
   numeric backreferences and proves the configured match completed
 - user-defined named groups and inline flags are rejected
 - `ignore_case`, `multiline`, `dot_all`, and `ascii` are explicit fields
-- detection retains overlapping matches within and across patterns
+- detection retains overlapping matches within and across rules
 - each backend search receives the shared remaining timeout
-- pattern names are optional; unnamed patterns receive deterministic
+- rule names are optional; unnamed rules receive deterministic
   diagnostic identities without changing serialized configuration
 - catalogs may be supplied inline or through a bounded relative YAML path and
   normalize to the same structured configuration
 - replacement resolves overlaps by categorical confidence, span length,
-  offsets, entity, and pattern identity
+  offsets, entity, and rule identity
 - templates allow literal text and `{entity}` only
 - replacement size is projected before output allocation
 

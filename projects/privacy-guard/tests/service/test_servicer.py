@@ -46,12 +46,12 @@ from privacy_guard.service.servicer import PrivacyGuardMiddleware
 def _values(
     action: str = "replace",
     *,
-    patterns: list[dict[str, object]] | None = None,
+    rules: list[dict[str, object]] | None = None,
     stage_count: int = 1,
     stage_name: str | None = None,
 ) -> dict[str, object]:
-    if patterns is None:
-        patterns = [
+    if rules is None:
+        rules = [
             {
                 "pattern": r"[a-z]+@[a-z]+\.[a-z]+",
                 "confidence": "high",
@@ -64,7 +64,7 @@ def _values(
                 "entities": [
                     {
                         "name": "email",
-                        "patterns": patterns,
+                        "rules": rules,
                     }
                 ]
             },
@@ -286,7 +286,7 @@ def test_limit_deny_explains_recovery_options() -> None:
     assert result.reason == LIMIT_REASON
     assert "Check Privacy Guard logs for the limit kind" in result.reason
     assert "Reduce the request or replacement size" in result.reason
-    assert "simplify the configured stages and patterns" in result.reason
+    assert "simplify the configured stages and rules" in result.reason
     assert "--timeout-seconds or PrivacyGuardServer(timeout_seconds=...)" in (
         result.reason
     )
@@ -717,11 +717,11 @@ def test_compiled_cache_eviction_does_not_invalidate_active_processor(
     )
     processor_values = _values(
         "detect",
-        patterns=[{"pattern": "aaa", "confidence": "high"}],
+        rules=[{"pattern": "aaa", "confidence": "high"}],
     )
     validation_values = _values(
         "detect",
-        patterns=[{"pattern": "bbb", "confidence": "high"}],
+        rules=[{"pattern": "bbb", "confidence": "high"}],
     )
 
     try:

@@ -21,7 +21,7 @@ from privacy_guard.timeout import Timeout
 
 
 def _config(
-    patterns: list[dict[str, object]],
+    rules: list[dict[str, object]],
     *,
     replacement: dict[str, object] | None = None,
 ) -> RegexEngineConfig:
@@ -31,7 +31,7 @@ def _config(
             "entities": [
                 {
                     "name": "token",
-                    "patterns": patterns,
+                    "rules": rules,
                 }
             ]
         },
@@ -56,7 +56,7 @@ def _run(
             detection.entity,
             detection.start,
             detection.end,
-            detection.metadata["pattern"],
+            detection.metadata["rule"],
         )
         for detection in result.detections
     ]
@@ -68,7 +68,7 @@ def _catalog(pattern: str) -> RegexPatternCatalog:
             "entities": [
                 {
                     "name": "token",
-                    "patterns": [
+                    "rules": [
                         {
                             "pattern": pattern,
                             "confidence": "high",
@@ -112,7 +112,7 @@ def test_optional_names_derive_identity_without_affecting_internal_marker() -> N
     assert [item[3] for item in detections] == [
         "same-name",
         "same_name",
-        "token.patterns[2]",
+        "token.rules[2]",
     ]
 
 
@@ -215,7 +215,7 @@ def test_patterns_with_consuming_lookarounds_or_boundaries_remain_valid(
     assert [(item[1], item[2]) for item in detections] == [expected_span]
 
 
-def test_duplicate_supplied_names_are_rejected_but_unnamed_patterns_are_not() -> None:
+def test_duplicate_supplied_names_are_rejected_but_unnamed_rules_are_not() -> None:
     with pytest.raises(ValidationError):
         _config(
             [
@@ -230,7 +230,7 @@ def test_duplicate_supplied_names_are_rejected_but_unnamed_patterns_are_not() ->
             {"pattern": "y", "confidence": "high"},
         ]
     )
-    assert len(config.pattern_catalog.entities[0].patterns) == 2
+    assert len(config.pattern_catalog.entities[0].rules) == 2
 
 
 def test_replacement_selects_ranked_non_overlapping_winners() -> None:
@@ -423,16 +423,16 @@ def test_compiled_catalog_same_key_race_accounts_once(
 
     def synchronized_compile(
         entity: regex_module.RegexEntity,
-        pattern: regex_module.RegexPattern,
+        rule: regex_module.RegexRule,
         catalog_index: int,
-        entity_pattern_index: int,
+        entity_rule_index: int,
     ) -> regex_module._CompiledRule:
         workers_ready.wait(timeout=5)
         return original_compile_rule(
             entity,
-            pattern,
+            rule,
             catalog_index,
-            entity_pattern_index,
+            entity_rule_index,
         )
 
     monkeypatch.setattr(regex_module, "_compile_rule", synchronized_compile)

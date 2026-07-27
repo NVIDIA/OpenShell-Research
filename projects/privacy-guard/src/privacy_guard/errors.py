@@ -111,7 +111,7 @@ class TimeoutExpiredError(EntityProcessingError):
     def __init__(self) -> None:
         super().__init__(
             "Privacy Guard processing timed out. Reduce the request size or simplify "
-            "the configured stages and patterns, or increase the processing timeout "
+            "the configured stages and rules, or increase the processing timeout "
             f"to at most {MAX_TIMEOUT_SECONDS:g} seconds, then retry."
         )
 
