@@ -3,78 +3,97 @@
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from time import monotonic
 
 import pytest
 
 from privacy_guard.config import PolicyAction
+from privacy_guard.constants import MAX_BODY_BYTES
 from privacy_guard.engines import RegexEngine
 from privacy_guard.engines.registry import EngineRegistry
-from privacy_guard.errors import EngineLimitExceededError
+from privacy_guard.errors import (
+    EngineLimitExceededError,
+    ErrorCode,
+    PrivacyGuardError,
+)
 from privacy_guard.request_processor import RequestDecision, RequestProcessor
+from privacy_guard.string_validators import validate_scalar_string
 from privacy_guard.timeout import Timeout
 
 
-def _values(action: PolicyAction) -> dict[str, object]:
+def _values(
+    action: PolicyAction,
+    *,
+    include_second_stage: bool = True,
+) -> dict[str, object]:
+    stages: list[dict[str, object]] = [
+        {
+            "name": "people",
+            "config": {
+                "engine": "regex",
+                "pattern_catalog": {
+                    "entities": [
+                        {
+                            "name": "person",
+                            "patterns": [
+                                {
+                                    "pattern": "Alice",
+                                    "confidence": "high",
+                                }
+                            ],
+                        }
+                    ]
+                },
+                "replacement": {
+                    "strategy": "template",
+                    "template": "[{entity}]",
+                },
+            },
+        }
+    ]
+    if include_second_stage:
+        stages.append(
+            {
+                "config": {
+                    "engine": "regex",
+                    "pattern_catalog": {
+                        "entities": [
+                            {
+                                "name": "marker",
+                                "patterns": [
+                                    {
+                                        "pattern": "person",
+                                        "confidence": "medium",
+                                    }
+                                ],
+                            }
+                        ]
+                    },
+                    "replacement": {
+                        "strategy": "template",
+                        "template": "<{entity}>",
+                    },
+                },
+            }
+        )
     return {
-        "entity_processing": {
-            "stages": [
-                {
-                    "name": "people",
-                    "config": {
-                        "engine": "regex",
-                        "pattern_catalog": {
-                            "entities": [
-                                {
-                                    "name": "person",
-                                    "patterns": [
-                                        {
-                                            "pattern": "Alice",
-                                            "confidence": "high",
-                                        }
-                                    ],
-                                }
-                            ]
-                        },
-                        "replacement": {
-                            "strategy": "template",
-                            "template": "[{entity}]",
-                        },
-                    },
-                },
-                {
-                    "config": {
-                        "engine": "regex",
-                        "pattern_catalog": {
-                            "entities": [
-                                {
-                                    "name": "marker",
-                                    "patterns": [
-                                        {
-                                            "pattern": "person",
-                                            "confidence": "medium",
-                                        }
-                                    ],
-                                }
-                            ]
-                        },
-                        "replacement": {
-                            "strategy": "template",
-                            "template": "<{entity}>",
-                        },
-                    },
-                },
-            ]
-        },
+        "entity_processing": {"stages": stages},
         "on_detection": {"action": action.value},
     }
 
 
-def _processor(action: PolicyAction) -> RequestProcessor:
+def _processor(
+    action: PolicyAction,
+    *,
+    include_second_stage: bool = True,
+) -> RequestProcessor:
     registry = EngineRegistry()
     registry.register(RegexEngine)
     registry.finalize()
-    config = registry.validate_config(_values(action))
+    config = registry.validate_config(
+        _values(action, include_second_stage=include_second_stage)
+    )
     stages = tuple(
         (
             stage.diagnostic_name(index),
@@ -114,6 +133,38 @@ def test_block_is_a_processor_disposition_not_an_engine_strategy() -> None:
     assert result.replacement_text is None
     assert result.reason_code == "privacy_guard_blocked"
     assert tuple(item.entity for item in result.detection_summaries) == ("person",)
+
+
+def test_scalar_validation_rejects_lone_surrogates() -> None:
+    with pytest.raises(ValueError, match="Unicode scalar"):
+        validate_scalar_string("\ud800")
+
+
+def test_processor_accepts_exact_body_limit_and_rejects_one_byte_more() -> None:
+    processor = _processor(PolicyAction.DETECT, include_second_stage=False)
+
+    exact = processor.process("x" * MAX_BODY_BYTES)
+
+    assert exact.decision is RequestDecision.ALLOW
+    with pytest.raises(PrivacyGuardError) as captured:
+        processor.process("x" * (MAX_BODY_BYTES + 1))
+    assert captured.value.code is ErrorCode.REQUEST_BODY_TOO_LARGE
+
+
+def test_exact_limit_requests_complete_concurrently() -> None:
+    processor = _processor(PolicyAction.DETECT, include_second_stage=False)
+    text = "x" * MAX_BODY_BYTES
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        results = tuple(executor.map(processor.process, (text,) * 4))
+
+    assert all(result.decision is RequestDecision.ALLOW for result in results)
+
+
+def test_exact_limit_request_completes_with_multiple_stages() -> None:
+    result = _processor(PolicyAction.DETECT).process("x" * MAX_BODY_BYTES)
+
+    assert result.decision is RequestDecision.ALLOW
 
 
 def test_timeout_returns_the_bounded_limit_deny(

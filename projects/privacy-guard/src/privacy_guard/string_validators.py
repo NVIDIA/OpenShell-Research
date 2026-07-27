@@ -11,7 +11,9 @@ def validate_scalar_string(value: object) -> str:
     """Validate and return a string containing only Unicode scalar values."""
     if not isinstance(value, str):
         raise ValueError("value must be a string")
-    if any("\ud800" <= character <= "\udfff" for character in value):
+    try:
+        value.encode("utf-8", errors="strict")
+    except UnicodeEncodeError:
         raise ValueError("string must contain valid Unicode scalar values")
     return value
 
