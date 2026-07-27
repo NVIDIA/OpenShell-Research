@@ -7,6 +7,7 @@ from threading import Barrier
 import pytest
 from pydantic import ValidationError
 
+import privacy_guard.engines._replacement as replacement_module
 import privacy_guard.engines.regex as regex_module
 from privacy_guard.engines import (
     EngineConfigurationError,
@@ -282,7 +283,7 @@ def test_template_language_allows_only_literal_text_and_entity(
 def test_replacement_size_is_projected_before_rendering(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(regex_module, "MAX_BODY_BYTES", 4)
+    monkeypatch.setattr(replacement_module, "MAX_BODY_BYTES", 4)
     config = _config(
         [{"pattern": "x", "confidence": "high"}],
         replacement={"strategy": "template", "template": "[{entity}]"},

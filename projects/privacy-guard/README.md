@@ -103,6 +103,48 @@ contract.
 
 Privacy Guard owns the catalog schema but maintains no authoritative patterns.
 
+### NEREngine
+
+`NEREngine` is a resource-backed general named-entity recognizer. Policy
+declares an ordered non-empty label list, a required score threshold, nested or
+flat overlap behavior, and an optional constrained replacement template.
+Deployment supplies one provider-neutral model facade through `NERResources`.
+The package includes facades for the explicit GLiNER-compatible
+`POST /v1/extract` contract and for an already-loaded local model; neither
+model identity nor endpoint appears in policy.
+
+The built-in registry remains Regex-only unless NER resources are supplied:
+
+```python
+from privacy_guard.engines import (
+    NERExtractEndpointModel,
+    NERResources,
+)
+from privacy_guard.engines.registry import create_builtin_registry
+
+registry = create_builtin_registry(
+    ner_resources=NERResources(
+        model=NERExtractEndpointModel(
+            endpoint="http://model-host:8002/v1/extract",
+            model="operator-selected-model",
+        )
+    )
+)
+```
+
+NER model scores remain internal and are not mapped to Privacy Guard's
+categorical confidence because model scores are not universally calibrated.
+Case-only returned-label differences are canonicalized to the configured
+label. Exact duplicate spans retain the highest score. Replacement keeps every
+finding while choosing non-overlapping winners by score, span length, start,
+and configured label order.
+
+See the
+[NER engine end-to-end example](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/privacy-guard/examples/ner-engine/README.md)
+for endpoint and local registry factories. The self-hosted Anonymizer GLiNER
+chat-completions contract is a future dedicated facade rather than an
+auto-detected variant of the extract endpoint.
+
 ## Custom engines
 
 Custom engines are a first-class extension point. Authors declare one typed
@@ -120,8 +162,8 @@ must contain no policy behavior or per-request state and must be safe for
 concurrent use. Resource-free engines omit the second
 `EntityProcessingEngine` generic argument entirely.
 
-The first NeMo Anonymizer integration will be implemented as a custom engine,
-not as a built-in or placeholder abstraction in Privacy Guard.
+A future full NeMo Anonymizer integration remains a separate custom engine,
+not an expansion of the general built-in NER facade.
 
 Application startup registers engines and operator-owned resources, then
 returns one finalized registry:

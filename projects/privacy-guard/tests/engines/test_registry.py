@@ -15,6 +15,8 @@ from privacy_guard.engines import (
     EngineResources,
     EntityProcessingEngine,
     EntityProcessingStrategy,
+    NERModelEntity,
+    NERResources,
     RegexEngine,
     TextProcessingResult,
 )
@@ -61,7 +63,6 @@ class AcmeEngine(EntityProcessingEngine[AcmeConfig, AcmeResources]):
         *,
         strategy: EntityProcessingStrategy,
     ) -> None:
-        del cls, resources
         if strategy is EntityProcessingStrategy.REPLACE and config.replacement is None:
             raise EngineConfigurationError("acme replacement configuration is required")
 
@@ -125,6 +126,40 @@ def test_builtin_registry_contains_the_builtin_regex_engine() -> None:
             EntityProcessingStrategy.REPLACE,
         }
     )
+
+
+class _EmptyNERModel:
+    def predict_entities(
+        self,
+        text: str,
+        *,
+        labels: tuple[str, ...],
+        threshold: float,
+        flat_ner: bool,
+        timeout: Timeout,
+    ) -> tuple[NERModelEntity, ...]:
+        del text, labels, threshold, flat_ner, timeout
+        return ()
+
+
+def test_builtin_registry_adds_ner_only_with_explicit_resources() -> None:
+    resources = NERResources(model=_EmptyNERModel())
+
+    registry = create_builtin_registry(ner_resources=resources)
+
+    assert tuple(item.engine_name for item in registry.describe_engines()) == (
+        "regex",
+        "ner",
+    )
+    schema = registry.configuration_json_schema()
+    definitions = schema["$defs"]
+    assert isinstance(definitions, dict)
+    assert "NEREngineConfig" in definitions
+
+
+def test_ner_resources_require_builtins_to_be_enabled() -> None:
+    with pytest.raises(EngineRegistryError):
+        EngineRegistry(ner_resources=NERResources(model=_EmptyNERModel()))
 
 
 def test_registry_can_include_builtin_engines_before_custom_registration() -> None:

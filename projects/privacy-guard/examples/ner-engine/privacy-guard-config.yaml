@@ -1,0 +1,16 @@
+entity_processing:
+  stages:
+    - name: general-entities
+      config:
+        engine: ner
+        labels:
+          - person
+          - email
+          - phone_number
+        threshold: 0.5
+        overlap_mode: nested
+        replacement:
+          strategy: template
+          template: "[{entity}]"
+on_detection:
+  action: detect

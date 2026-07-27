@@ -9,7 +9,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from stat import S_ISREG
-from string import Formatter
 from threading import RLock
 from typing import Literal, Protocol, Self
 
@@ -23,9 +22,7 @@ from yaml.resolver import BaseResolver
 
 from privacy_guard.base import StrictDomainModel
 from privacy_guard.constants import (
-    MAX_BODY_BYTES,
     MAX_DETECTIONS_PER_STAGE,
-    MAX_DIAGNOSTIC_TEXT_BYTES,
     MAX_REGEX_CATALOG_FILE_BYTES,
     MAX_REGEX_CATALOG_PATH_BYTES,
     MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES,
@@ -34,6 +31,10 @@ from privacy_guard.constants import (
     MAX_REGEX_PATTERN_BYTES,
     MAX_REGEX_RULES_PER_CATALOG,
     REGEX_COMPILED_RULE_WEIGHT_BYTES,
+)
+from privacy_guard.engines._replacement import (
+    render_bounded_replacement,
+    validate_replacement_template,
 )
 from privacy_guard.engines.base import (
     ConfidenceLevel,
@@ -148,17 +149,7 @@ class RegexReplacement(StrictDomainModel):
     @field_validator("template")
     @classmethod
     def _template_is_safe_and_bounded(cls, value: str) -> str:
-        if len(value.encode("utf-8")) > MAX_DIAGNOSTIC_TEXT_BYTES:
-            raise ValueError("replacement template exceeds the size limit")
-        try:
-            for _, field_name, format_spec, conversion in Formatter().parse(value):
-                if field_name is not None and field_name != "entity":
-                    raise ValueError
-                if format_spec or conversion is not None:
-                    raise ValueError
-        except ValueError:
-            raise ValueError("replacement template syntax is invalid") from None
-        return value
+        return validate_replacement_template(value)
 
 
 class RegexEngineConfig(EngineConfig):
@@ -183,7 +174,6 @@ class RegexEngineConfig(EngineConfig):
         cls,
         value: object,
     ) -> object:
-        del cls
         if isinstance(value, str):
             return _load_pattern_catalog_file(value)
         return value
@@ -215,7 +205,6 @@ class RegexEngine(EntityProcessingEngine[RegexEngineConfig]):
         *,
         strategy: EntityProcessingStrategy,
     ) -> None:
-        del cls, resources
         if strategy is EntityProcessingStrategy.REPLACE and config.replacement is None:
             raise EngineConfigurationError(
                 "regex replacement configuration is required"
@@ -288,10 +277,11 @@ class RegexEngine(EntityProcessingEngine[RegexEngineConfig]):
                     "regex replacement configuration is required"
                 )
             winners = _resolve_overlaps(detections_with_identity)
-            output_text = _render_bounded_replacement(
+            output_text = render_bounded_replacement(
                 text,
                 winners,
                 replacement.template,
+                limit_message="regex replacement exceeds the size limit",
             )
         return TextProcessingResult(text=output_text, detections=detections)
 
@@ -657,43 +647,6 @@ def _categorical_confidence_rank(confidence: object) -> int:
     if not isinstance(confidence, ConfidenceLevel):
         raise EngineContractError("regex detection confidence is invalid")
     return _CONFIDENCE_RANK[confidence]
-
-
-def _render_bounded_replacement(
-    text: str,
-    detections: tuple[EntityDetection, ...],
-    template: str,
-) -> str:
-    projected_size = 0
-    cursor = 0
-    for detection in detections:
-        projected_size += len(text[cursor : detection.start].encode("utf-8"))
-        projected_size += _rendered_template_size(template, detection.entity)
-        if projected_size > MAX_BODY_BYTES:
-            raise EngineLimitExceededError("regex replacement exceeds the size limit")
-        cursor = detection.end
-    projected_size += len(text[cursor:].encode("utf-8"))
-    if projected_size > MAX_BODY_BYTES:
-        raise EngineLimitExceededError("regex replacement exceeds the size limit")
-
-    parts: list[str] = []
-    cursor = 0
-    for detection in detections:
-        parts.append(text[cursor : detection.start])
-        parts.append(template.format(entity=detection.entity))
-        cursor = detection.end
-    parts.append(text[cursor:])
-    return "".join(parts)
-
-
-def _rendered_template_size(template: str, entity: str) -> int:
-    size = 0
-    entity_size = len(entity.encode("utf-8"))
-    for literal, field_name, _, _ in Formatter().parse(template):
-        size += len(literal.encode("utf-8"))
-        if field_name is not None:
-            size += entity_size
-    return size
 
 
 _NAME_PATTERN = regex.compile(r"[A-Za-z_][A-Za-z0-9_-]*\Z")

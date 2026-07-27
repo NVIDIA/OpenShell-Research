@@ -13,6 +13,20 @@ from privacy_guard.engines.base import (
     EntityProcessingStrategy,
     TextProcessingResult,
 )
+from privacy_guard.engines.ner import (
+    NEREngine,
+    NEREngineConfig,
+    NEROverlapMode,
+    NERReplacement,
+    NERResources,
+)
+from privacy_guard.engines.ner_model import (
+    LocalNERModel,
+    LocalNERPredictor,
+    NERExtractEndpointModel,
+    NERModel,
+    NERModelEntity,
+)
 from privacy_guard.engines.regex import (
     RegexEngine,
     RegexEngineConfig,
@@ -43,6 +57,16 @@ __all__ = [
     "EntityProcessingEngine",
     "EntityProcessingError",
     "EntityProcessingStrategy",
+    "LocalNERModel",
+    "LocalNERPredictor",
+    "NEREngine",
+    "NEREngineConfig",
+    "NERExtractEndpointModel",
+    "NERModel",
+    "NERModelEntity",
+    "NEROverlapMode",
+    "NERReplacement",
+    "NERResources",
     "RegexEngine",
     "RegexEngineConfig",
     "RegexEntity",

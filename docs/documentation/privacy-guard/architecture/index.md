@@ -64,8 +64,8 @@ Source paths on these pages are relative to
   policy action. It does not import gRPC or implement an engine's algorithms.
 - `engines/` defines the custom-engine contract, registers engine
   implementations and operator-owned resources, builds the exact Pydantic
-  discriminated union, and contains the built-in Regex implementation. Each
-  engine owns its detection and replacement algorithms.
+  discriminated union, and contains the built-in Regex and resource-backed NER
+  implementations. Each engine owns its detection and replacement algorithms.
 - `config.py` defines ordered stages and the required policy action.
 - top-level `base.py` defines the package-wide strict immutable domain-model
   base.

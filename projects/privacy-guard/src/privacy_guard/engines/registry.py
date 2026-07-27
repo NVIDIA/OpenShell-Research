@@ -24,6 +24,7 @@ from privacy_guard.engines.base import (
     EntityProcessingEngine,
     EntityProcessingStrategy,
 )
+from privacy_guard.engines.ner import NEREngine, NERResources
 from privacy_guard.engines.regex import (
     RegexEngine,
 )
@@ -47,13 +48,24 @@ class EngineDescription:
 class EngineRegistry:
     """Register engine implementations and finalize their exact policy union."""
 
-    def __init__(self, *, include_builtin_engines: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        include_builtin_engines: bool = False,
+        ner_resources: NERResources | None = None,
+    ) -> None:
         self._registrations: dict[str, _Registration] = {}
         self._config_adapter: TypeAdapter[PrivacyGuardConfig[EngineConfig]] | None = (
             None
         )
         if include_builtin_engines:
             self.register(RegexEngine)
+            if ner_resources is not None:
+                self.register(NEREngine, resources=ner_resources)
+        elif ner_resources is not None:
+            raise EngineRegistryError(
+                "NER resources require built-in engines to be enabled"
+            )
 
     @property
     def is_finalized(self) -> bool:
@@ -231,9 +243,15 @@ class EngineRegistry:
         return self._config_adapter
 
 
-def create_builtin_registry() -> EngineRegistry:
+def create_builtin_registry(
+    *,
+    ner_resources: NERResources | None = None,
+) -> EngineRegistry:
     """Build the finalized registry shipped by the base package."""
-    return EngineRegistry(include_builtin_engines=True).finalize()
+    return EngineRegistry(
+        include_builtin_engines=True,
+        ner_resources=ner_resources,
+    ).finalize()
 
 
 @dataclass(frozen=True)

@@ -216,9 +216,10 @@ EngineRegistry
   -> gRPC server
 ```
 
-The built-in registry includes `RegexEngine`. Operators register custom engines
-and resource-backed tool integrations before registry finalization, then pass
-that registry to `PrivacyGuardServer`.
+The built-in registry always includes `RegexEngine` and includes `NEREngine`
+only when the operator supplies explicit NER resources. Operators register
+custom engines and other resource-backed tool integrations before registry
+finalization, then pass that registry to `PrivacyGuardServer`.
 
 The registry is an explicit application-scoped dependency, not a global
 singleton. `PrivacyGuardServer` and `PrivacyGuardMiddleware` reject unfinalized

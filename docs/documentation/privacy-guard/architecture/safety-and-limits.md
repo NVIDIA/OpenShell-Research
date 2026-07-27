@@ -44,6 +44,7 @@ reimplement either.
 | Maximum configured timeout | `MAX_TIMEOUT_SECONDS` | 30 seconds | Server, processor, and `Timeout` |
 | Active processor workers | `MAX_CONCURRENT_PROCESSING` | 4 | Service |
 | Concurrent gRPC calls | `MAX_CONCURRENT_RPCS` | 16 | gRPC server |
+| NER endpoint response | `MAX_NER_ENDPOINT_RESPONSE_BYTES` | 1 MiB | NER endpoint facade |
 
 The gRPC receive allowance is 1 MiB larger than the request body limit for the
 protobuf envelope. The service still enforces the advertised 4 MiB body bound.
@@ -99,6 +100,32 @@ derived diagnostic identities are not serialized back into configuration.
 The per-evaluation config `Struct` is limited to 64 KiB. A catalog may satisfy
 Privacy Guard's engine limits yet remain too large for the current upstream
 protocol. Internal caching does not raise that transport ceiling.
+
+## NER configuration and execution limits
+
+| Limit | Constant | Value |
+| --- | --- | ---: |
+| Labels per NER stage | `MAX_NER_LABELS` | 128 |
+| UTF-8 bytes per label | `MAX_NER_LABEL_BYTES` | 256 |
+| Total UTF-8 label bytes | `MAX_NER_LABELS_BYTES` | 16 KiB |
+| Endpoint response bytes | `MAX_NER_ENDPOINT_RESPONSE_BYTES` | 1 MiB |
+
+NER labels must be non-empty printable Unicode without leading or trailing
+whitespace and must be unique after Unicode case folding. Model identity,
+endpoint, and execution chunking are deployment resources rather than policy
+fields.
+
+The endpoint facade bounds response bytes before JSON decoding and performs one
+request without retry or fallback. The local facade processes every supported
+input in overlapping code-point windows and rebases returned offsets. Its
+overlap must be smaller than its chunk length. Operators should choose overlap
+using the longest entity spans expected in the deployment corpus.
+
+Both facades return only normalized label, start, end, and score values. The
+engine rejects unknown labels, invalid or out-of-bounds spans, non-finite or
+out-of-range scores, and excessive result cardinality. Request text, returned
+matched text, raw response bodies, endpoint URLs, credentials, and collaborator
+exception messages are not logged or included in errors.
 
 ## Regex execution safety
 

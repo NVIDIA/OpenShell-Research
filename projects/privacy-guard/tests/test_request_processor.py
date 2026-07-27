@@ -10,7 +10,11 @@ import pytest
 
 from privacy_guard.config import PolicyAction
 from privacy_guard.constants import MAX_BODY_BYTES
-from privacy_guard.engines import RegexEngine
+from privacy_guard.engines import (
+    NERModelEntity,
+    NERResources,
+    RegexEngine,
+)
 from privacy_guard.engines.registry import EngineRegistry
 from privacy_guard.errors import (
     EngineConfigurationError,
@@ -21,6 +25,30 @@ from privacy_guard.errors import (
 from privacy_guard.request_processor import RequestDecision, RequestProcessor
 from privacy_guard.string_validators import validate_scalar_string
 from privacy_guard.timeout import Timeout
+
+
+class _MarkerNERModel:
+    def predict_entities(
+        self,
+        text: str,
+        *,
+        labels: tuple[str, ...],
+        threshold: float,
+        flat_ner: bool,
+        timeout: Timeout,
+    ) -> tuple[NERModelEntity, ...]:
+        del labels, threshold, flat_ner, timeout
+        start = text.find("[person]")
+        if start < 0:
+            return ()
+        return (
+            NERModelEntity(
+                label="marker",
+                start=start,
+                end=start + len("[person]"),
+                score=0.9,
+            ),
+        )
 
 
 def _values(
@@ -116,6 +144,74 @@ def test_replace_runs_stages_sequentially_over_the_current_text() -> None:
     ) == (
         ("person", "people", 1),
         ("marker", "regex[2]", 1),
+    )
+
+
+def test_replace_runs_mixed_regex_and_ner_stages_sequentially() -> None:
+    registry = EngineRegistry(
+        include_builtin_engines=True,
+        ner_resources=NERResources(model=_MarkerNERModel()),
+    ).finalize()
+    values: dict[str, object] = {
+        "entity_processing": {
+            "stages": [
+                {
+                    "name": "people",
+                    "config": {
+                        "engine": "regex",
+                        "pattern_catalog": {
+                            "entities": [
+                                {
+                                    "name": "person",
+                                    "rules": [
+                                        {
+                                            "pattern": "Alice",
+                                            "confidence": "high",
+                                        }
+                                    ],
+                                }
+                            ]
+                        },
+                        "replacement": {
+                            "strategy": "template",
+                            "template": "[{entity}]",
+                        },
+                    },
+                },
+                {
+                    "name": "model-marker",
+                    "config": {
+                        "engine": "ner",
+                        "labels": ["marker"],
+                        "threshold": 0.5,
+                        "overlap_mode": "nested",
+                        "replacement": {
+                            "strategy": "template",
+                            "template": "<{entity}>",
+                        },
+                    },
+                },
+            ]
+        },
+        "on_detection": {"action": "replace"},
+    }
+    config = registry.validate_config(values)
+    prepared = tuple(
+        (
+            stage.diagnostic_name(index),
+            registry.create_engine(stage.config),
+        )
+        for index, stage in enumerate(config.entity_processing.stages, start=1)
+    )
+
+    result = RequestProcessor(config, prepared).process("Hello Alice")
+
+    assert result.replacement_text == "Hello <marker>"
+    assert tuple(
+        (item.entity, item.source_stage) for item in result.detection_summaries
+    ) == (
+        ("person", "people"),
+        ("marker", "model-marker"),
     )
 
 

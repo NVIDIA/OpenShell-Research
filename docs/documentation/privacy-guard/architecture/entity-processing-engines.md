@@ -294,15 +294,64 @@ Important properties:
 The third-party `regex` backend is used because it can interrupt an individual
 search when the timeout expires.
 
+## NEREngine
+
+`NEREngine` is a resource-backed built-in for general named-entity recognition.
+Its policy configuration owns:
+
+- an ordered non-empty list of printable labels
+- a required finite threshold from zero through one
+- `nested` or `flat` overlap behavior
+- an optional template replacement allowing only literal text and `{entity}`
+
+The deployment registers one immutable `NERResources` bundle containing a
+provider-neutral `NERModel`. The facade has one synchronous
+`predict_entities` operation. Endpoint URLs, model identifiers, chunk
+configuration, device placement, and loaded model objects never enter policy.
+The default built-in registry remains Regex-only; it registers NER only when
+the operator explicitly supplies `ner_resources`.
+
+The package provides two focused facades:
+
+- `NERExtractEndpointModel` sends the exact `POST /v1/extract` JSON contract,
+  bounds response bytes before decoding, performs no retries, and translates
+  expected transport or schema failures without exposing content, endpoint
+  details, or raw collaborator errors.
+- `LocalNERModel` receives an already-loaded object without importing GLiNER,
+  serializes access, processes long text in overlapping code-point windows,
+  rebases offsets, and removes exact chunk-overlap duplicates.
+
+The local facade's lock acquisition is bounded by the shared timeout. Once a
+loaded model call starts, Python's worker-thread architecture cannot preempt
+it; expiration is observed after that call returns.
+
+The engine accepts only returned labels declared by policy, canonicalizes
+case-only differences, rejects invalid spans and scores, retains the
+highest-scoring exact duplicate, and sorts results deterministically. Raw
+scores remain private to duplicate and replacement selection and do not become
+finding confidence or metadata.
+
+Nested detection may return overlapping findings. Replacement keeps every
+finding but selects non-overlapping winners by score, span length, earlier
+start, and configured label order. It projects UTF-8 output size before
+allocating the replacement.
+
+The extract endpoint contract is not the self-hosted Anonymizer GLiNER
+`/v1/chat/completions` contract. Supporting that deployment requires a future
+explicit facade with its own response validation and must not rely on protocol
+autodetection. A future full Anonymizer engine remains separately configured
+because it may own validation, augmentation, or rewriting beyond general NER.
+
 ## Tool-specific custom engines
 
 Tool integrations belong in custom engines until they have a complete,
 production-backed implementation. Privacy Guard does not ship placeholder
 engine types or runtime protocols that merely resemble a third-party tool.
 
-The first NeMo Anonymizer integration will be a custom engine. Its configuration
-and replacement types should preserve Anonymizer's native concepts, while the
-engine itself owns all translation to and from the actual Anonymizer SDK.
+A future full NeMo Anonymizer integration will be a custom engine. Its
+configuration and replacement types should preserve Anonymizer's native
+concepts, while the engine itself owns translation to and from the actual
+Anonymizer SDK.
 
 ## State
 
