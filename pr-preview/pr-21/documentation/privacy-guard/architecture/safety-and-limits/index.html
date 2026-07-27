@@ -1619,28 +1619,28 @@ retains request text, detections, or replacement mappings there.</p>
 <td>source file bytes</td>
 </tr>
 <tr>
-<td>Compiled Regex state retained by its LRU or cached processors</td>
+<td>Compiled Regex rules</td>
 <td style="text-align: right;">32 MiB</td>
 <td style="text-align: right;">128</td>
 <td>canonical catalog bytes plus 4 KiB per rule</td>
 </tr>
 <tr>
 <td>Request processors</td>
-<td style="text-align: right;">1 MiB</td>
-<td style="text-align: right;">128</td>
-<td>canonical expanded configuration bytes</td>
+<td style="text-align: right;">32 MiB</td>
+<td style="text-align: right;">16</td>
+<td>canonical expanded configuration plus the full Regex state estimate for every Regex stage</td>
 </tr>
 </tbody>
 </table>
 <p>The compiled-rule allowance accounts for retained backend state that is much
-larger than short pattern text. Equal catalogs share one compiled tuple and one
-weight charge across the compiled LRU and any cached Regex processors that use
-it. Processor configuration weighting remains engine-neutral, and the
-Regex-specific ownership accounting is private to the built-in engine, so
-custom engines do not need a cache-size hook. One entry that exceeds its cache
-budget remains valid and usable for the current evaluation but is not retained.
-Debug skip and eviction records contain only cache names and weights, plus
-eviction counts.</p>
+larger than short pattern text. Cache budgets are independent. The compiled-rule
+cache charges each retained catalog once. The processor cache charges every
+processor for its full estimated Regex state, even when equivalent rules are
+referenced elsewhere. This conservative accounting avoids coupling eviction or
+ownership between caches. Custom engines do not need a cache-size hook. One
+entry that exceeds its cache budget remains valid and usable for the current
+evaluation but is not retained. Debug skip and eviction records contain only
+cache names and weights, plus eviction counts.</p>
 <h2 id="changing-a-limit">Changing a limit<a class="headerlink" href="#changing-a-limit" title="Permanent link">&para;</a></h2>
 <p>A limit change may affect policy schema, processor behavior, engine contracts,
 protobuf serialization, tests, examples, and the OpenShell middleware

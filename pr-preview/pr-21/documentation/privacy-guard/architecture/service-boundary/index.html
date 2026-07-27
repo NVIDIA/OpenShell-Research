@@ -1346,37 +1346,33 @@ bounded worker pool so catalog parsing and engine-specific checks do not block
 the async gRPC event loop.</p>
 <p>During evaluation, the service validates and normalizes the same config,
 computes its canonical SHA-256 fingerprint, and resolves a configured processor
-from an LRU cache bounded by both 128 entries and 1 MiB of canonical expanded
-configuration. A cache miss constructs engines directly from the exact stage
-configs and operator-injected resources, then constructs the
-<code>RequestProcessor</code>. Validation, cache resolution, engine construction, strict
-UTF-8 decoding, and processing all run in the bounded worker pool. Validation
-still occurs for every evaluation, while equivalent normalized regex catalogs
-reuse their bounded compiled-rule entry instead of recompiling.</p>
-<p>Regex keeps two additional owner-local LRU caches. Parsed file catalogs retain
-at most 64 entries and 8 MiB of source files. Compiled Regex state retained by
-either the compiled-catalog LRU or cached processors shares one 128-catalog,
-32 MiB union budget. Each canonical catalog weighs its encoded bytes plus 4 KiB
-per compiled rule and is counted once when both owners refer to it. The rule
-allowance conservatively represents backend and Python state that the catalog
-encoding alone does not capture.</p>
-<p>An otherwise valid entry larger than one cache's byte budget is built and
-returned without being retained. A processor whose unique compiled Regex state
-does not fit the union budget is likewise returned for the current evaluation
-without processor-cache retention. Eviction or a skipped entry never makes a
-policy invalid. Content-safe debug events report the cache name and weight,
-plus the number of entries for an eviction, without logging configuration,
-paths, patterns, or fingerprints.</p>
-<p>The cache is protected for concurrent access and is not correctness-relevant.
-Eviction or process restart simply causes reconstruction from a later
-evaluation's expanded config.</p>
-<p>The entry cap remains useful for small policies. The 1 MiB processor budget
-holds roughly sixteen near-ceiling inline configurations and up to 128 smaller
-configurations. A representative 250-rule configuration weighs about 33 KiB in
-that cache and about 1 MiB in the compiled cache, so the default budgets retain
-roughly thirty such configurations while bounding their compiled state.
-Operators with consistently larger catalogs should expect more frequent
-preparation rather than unbounded retention.</p>
+from an LRU cache bounded by both 16 entries and 32 MiB of prepared-state
+weight. A cache miss constructs engines directly from the exact stage configs
+and operator-injected resources, then constructs the <code>RequestProcessor</code>.
+Validation, cache resolution, engine construction, strict UTF-8 decoding, and
+processing all run in the bounded worker pool. Validation still occurs for
+every evaluation. Equivalent normalized Regex catalogs may reuse an entry in
+the independent compiled-rule cache during validation and engine construction.</p>
+<p>Regex maintains two independent LRU caches. Parsed file catalogs retain at most
+64 entries and 8 MiB of source files. Compiled rules retain at most 128 catalogs
+and 32 MiB; each entry weighs its canonical catalog bytes plus 4 KiB per rule.
+Evicting a compiled-rule entry only removes that cache's reference. A processor
+that already uses those rules remains valid.</p>
+<p>Processor-cache admission counts canonical configuration bytes and the full
+estimated Regex state held by every configured Regex stage. Each processor
+receives that full charge even when an equivalent compiled tuple is also
+referenced by the compiled-rule cache or another processor. This conservative
+accounting intentionally favors simple, independent caches over exact
+shared-memory accounting.</p>
+<p>An otherwise valid entry larger than its cache's byte budget is built and used
+for the current operation but is not retained. Eviction or a skipped entry
+never makes a policy invalid. Content-safe debug events report only the cache
+name and weight, plus the number of evicted entries.</p>
+<p>The caches are protected for concurrent access and are not
+correctness-relevant. Eviction or process restart simply causes reconstruction
+from a later evaluation's expanded config. Operators with consistently larger
+catalogs should expect more frequent preparation rather than unbounded
+retention.</p>
 <p>Each cached processor receives the server's operational processing timeout.
 The default is 1 second shared across every configured stage. Operators may set
 up to 30 seconds with <code>privacy-guard serve --timeout-seconds</code>; programmatic

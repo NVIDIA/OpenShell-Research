@@ -252,18 +252,18 @@ Prepared state is bounded by weight and least-recently-used entry count:
 | Cache | Weight budget | Entry cap | Entry weight |
 | --- | ---: | ---: | --- |
 | Parsed Regex file catalogs | 8 MiB | 64 | source file bytes |
-| Compiled Regex state retained by its LRU or cached processors | 32 MiB | 128 | canonical catalog bytes plus 4 KiB per rule |
-| Request processors | 1 MiB | 128 | canonical expanded configuration bytes |
+| Compiled Regex rules | 32 MiB | 128 | canonical catalog bytes plus 4 KiB per rule |
+| Request processors | 32 MiB | 16 | canonical expanded configuration plus the full Regex state estimate for every Regex stage |
 
 The compiled-rule allowance accounts for retained backend state that is much
-larger than short pattern text. Equal catalogs share one compiled tuple and one
-weight charge across the compiled LRU and any cached Regex processors that use
-it. Processor configuration weighting remains engine-neutral, and the
-Regex-specific ownership accounting is private to the built-in engine, so
-custom engines do not need a cache-size hook. One entry that exceeds its cache
-budget remains valid and usable for the current evaluation but is not retained.
-Debug skip and eviction records contain only cache names and weights, plus
-eviction counts.
+larger than short pattern text. Cache budgets are independent. The compiled-rule
+cache charges each retained catalog once. The processor cache charges every
+processor for its full estimated Regex state, even when equivalent rules are
+referenced elsewhere. This conservative accounting avoids coupling eviction or
+ownership between caches. Custom engines do not need a cache-size hook. One
+entry that exceeds its cache budget remains valid and usable for the current
+evaluation but is not retained. Debug skip and eviction records contain only
+cache names and weights, plus eviction counts.
 
 ## Changing a limit
 
