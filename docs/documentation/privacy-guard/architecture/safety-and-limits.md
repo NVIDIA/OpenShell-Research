@@ -70,8 +70,12 @@ and configuration or engine preparation beyond this internal bound.
 
 The diagnostic-string bound applies to stage names, entity names, metadata
 keys and values, model-profile names, and other audit-safe identifiers built
-from the shared domain field type. Regex entity and supplied pattern names have a
-stricter ASCII grammar and limit described below.
+from the shared domain field type. These values must be non-empty printable
+Unicode without control or bidirectional formatting characters. Untrusted
+request IDs use the same content and size rules for logging; an invalid request
+ID is represented by a constant placeholder and does not change the evaluation
+result. Regex entity and supplied pattern names have a stricter ASCII grammar
+and limit described below.
 
 The processor aggregates occurrences before the service applies protobuf
 limits. If a safe result cannot be represented, the service returns a limit
@@ -211,6 +215,8 @@ Custom engines should:
 
 - use the base constructor and public `run()` wrapper
 - return the exact `TextProcessingResult` contract
+- return stable, declared entity identifiers rather than values derived from
+  request text
 - keep request data local to `_run()`
 - keep initialized state immutable and make resources concurrency-safe
 - pass the shared remaining timeout to delegated APIs when they support it
@@ -221,6 +227,14 @@ Custom engines should:
 - translate expected collaborator failures to the content-safe engine
   exception hierarchy
 - avoid logging input or caught exception text
+
+Privacy Guard keeps framework-controlled fields and identifiers that pass its
+shared validation content-safe for findings and operational logs.
+Operator-installed Python engine code is trusted deployment code: it can access
+request text and must honor the declared identifier and logging contract. The
+framework cannot make arbitrary trusted Python code non-exfiltrating, so
+operators must review and install custom engines with the same care as other
+code in the middleware process.
 
 Do not add retries, fallback providers, persistent request artifacts, or extra
 validation without a concrete failure mode and a clear owning layer.

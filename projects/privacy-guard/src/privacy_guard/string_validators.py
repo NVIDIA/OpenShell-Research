@@ -19,10 +19,12 @@ def validate_scalar_string(value: object) -> str:
 
 
 def validate_bounded_metadata_string(value: object) -> str:
-    """Validate and return a non-empty, size-bounded metadata string."""
+    """Validate and return a non-empty, printable, bounded metadata string."""
     validated = validate_scalar_string(value)
     if not validated:
         raise ValueError("string must not be empty")
+    if not validated.isprintable():
+        raise ValueError("metadata must contain only printable characters")
     if (
         len(validated) > MAX_DIAGNOSTIC_TEXT_BYTES
         or len(validated.encode("utf-8")) > MAX_DIAGNOSTIC_TEXT_BYTES

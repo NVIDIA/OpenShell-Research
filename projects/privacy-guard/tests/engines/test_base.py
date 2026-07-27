@@ -118,6 +118,52 @@ def test_detection_confidence_and_metadata_are_strict_bounded_values() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "unsafe_value",
+    [
+        "line\nbreak",
+        "ansi\x1b[31m",
+        "nul\x00byte",
+        "right-to-left\u202eoverride",
+    ],
+)
+def test_detection_rejects_non_printable_identifiers_and_metadata(
+    unsafe_value: str,
+) -> None:
+    with pytest.raises(ValidationError):
+        EntityDetection(
+            entity=unsafe_value,
+            start=0,
+            end=1,
+        )
+    with pytest.raises(ValidationError):
+        EntityDetection(
+            entity="token",
+            start=0,
+            end=1,
+            metadata={unsafe_value: "value"},
+        )
+    with pytest.raises(ValidationError):
+        EntityDetection(
+            entity="token",
+            start=0,
+            end=1,
+            metadata={"key": unsafe_value},
+        )
+
+
+def test_detection_accepts_printable_unicode_identifiers_and_metadata() -> None:
+    detection = EntityDetection(
+        entity="客户资料",
+        start=0,
+        end=1,
+        metadata={"提供者": "自定义 🛡️"},
+    )
+
+    assert detection.entity == "客户资料"
+    assert detection.metadata == {"提供者": "自定义 🛡️"}
+
+
 def test_processing_result_bounds_a_lazy_detection_stream() -> None:
     produced = 0
 

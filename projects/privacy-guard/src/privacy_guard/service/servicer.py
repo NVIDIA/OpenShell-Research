@@ -52,6 +52,7 @@ from privacy_guard.request_processor import (
     RequestProcessingResult,
     RequestProcessor,
 )
+from privacy_guard.string_validators import validate_bounded_metadata_string
 from privacy_guard.timeout import validate_timeout_seconds
 
 
@@ -144,7 +145,7 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         context: _AbortContext,
     ) -> pb2.HttpRequestResult:
         started = time.monotonic()
-        request_id = request.context.request_id
+        request_id = _request_id_for_logging(request.context.request_id)
         failure: PrivacyGuardError | None = None
         action = "error"
         finding_count = 0
@@ -321,6 +322,13 @@ def _evaluation_log_extra(
     }
 
 
+def _request_id_for_logging(request_id: object) -> str:
+    try:
+        return validate_bounded_metadata_string(request_id)
+    except ValueError:
+        return _INVALID_REQUEST_ID
+
+
 def _mapping_from_proto(config: Message) -> dict[str, object]:
     try:
         values: object = json_format.MessageToDict(config)
@@ -436,6 +444,7 @@ def _limit_deny() -> pb2.HttpRequestResult:
 
 
 _LOGGER = get_logger(__name__)
+_INVALID_REQUEST_ID = "invalid"
 _MAX_CACHED_PROCESSORS = 128
 _MAX_PROTO_SAFE_INTEGER = (1 << 53) - 1
 

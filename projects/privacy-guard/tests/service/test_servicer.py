@@ -6,7 +6,9 @@ import asyncio
 import logging
 from copy import deepcopy
 from threading import get_ident
+from typing import Never
 
+import grpc
 import pytest
 from google.protobuf import json_format
 from google.protobuf.message import Message
@@ -16,6 +18,7 @@ from privacy_guard.config import PrivacyGuardConfig
 from privacy_guard.constants import (
     LIMIT_REASON,
     LIMIT_REASON_CODE,
+    MAX_DIAGNOSTIC_TEXT_BYTES,
     MAX_PROTO_CONFIG_BYTES,
     MAX_PROTO_CONTEXT_BYTES,
     MAX_PROTO_FINDING_BYTES,
@@ -40,6 +43,7 @@ def _values(
     action: str = "replace",
     *,
     stage_count: int = 1,
+    stage_name: str | None = None,
 ) -> dict[str, object]:
     stage: dict[str, object] = {
         "config": {
@@ -63,6 +67,8 @@ def _values(
             },
         }
     }
+    if stage_name is not None:
+        stage["name"] = stage_name
     return {
         "entity_processing": {"stages": [deepcopy(stage) for _ in range(stage_count)]},
         "on_detection": {"action": action},
@@ -81,6 +87,12 @@ def _request(body: bytes, *, action: str = "replace") -> pb2.HttpRequestEvaluati
         config=_proto_config(_values(action)),
         body=body,
     )
+
+
+class _SuccessfulEvaluationContext:
+    async def abort(self, code: grpc.StatusCode, details: str) -> Never:
+        del code, details
+        raise AssertionError("successful evaluation unexpectedly aborted")
 
 
 def test_copied_proto_remains_the_current_openshell_contract() -> None:
@@ -142,6 +154,34 @@ def test_validate_config_rejects_oversized_proto_before_registry_validation(
     assert exact.valid is False
     assert oversized.valid is False
     assert validation_count == 1
+
+
+@pytest.mark.parametrize(
+    "unsafe_value",
+    [
+        "line\nbreak",
+        "ansi\x1b[31m",
+        "nul\x00byte",
+        "right-to-left\u202eoverride",
+    ],
+)
+def test_validate_config_rejects_non_printable_stage_names(
+    unsafe_value: str,
+) -> None:
+    registry = create_builtin_registry()
+
+    with pytest.raises(PrivacyGuardError) as captured:
+        registry.validate_config(_values(stage_name=unsafe_value))
+
+    assert captured.value.code is ErrorCode.CONFIG_INVALID
+
+
+def test_validate_config_accepts_printable_unicode_stage_names() -> None:
+    config = create_builtin_registry().validate_config(
+        _values(stage_name="身份检查 🛡️")
+    )
+
+    assert config.entity_processing.stages[0].name == "身份检查 🛡️"
 
 
 def test_evaluation_enforces_exact_encoded_transport_boundaries() -> None:
@@ -246,6 +286,70 @@ def test_service_limit_deny_logs_a_content_safe_resource_kind(
     assert result.reason_code == LIMIT_REASON_CODE
     assert "privacy_guard_processing_limit kind=resource" in caplog.text
     assert sentinel not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "invalid_request_id",
+    [
+        "line\nbreak",
+        "ansi\x1b[31m",
+        "nul\x00byte",
+        "right-to-left\u202eoverride",
+        "x" * (MAX_DIAGNOSTIC_TEXT_BYTES + 1),
+    ],
+)
+def test_evaluation_logs_placeholder_for_invalid_request_id(
+    caplog: pytest.LogCaptureFixture,
+    invalid_request_id: str,
+) -> None:
+    async def evaluate() -> pb2.HttpRequestResult:
+        middleware = PrivacyGuardMiddleware(create_builtin_registry())
+        request = _request(b"no match", action="detect")
+        request.context.request_id = invalid_request_id
+        try:
+            return await middleware._evaluate_rpc(
+                request,
+                _SuccessfulEvaluationContext(),
+            )
+        finally:
+            await middleware.close()
+
+    with caplog.at_level(logging.INFO, logger="privacy_guard.service.servicer"):
+        result = asyncio.run(evaluate())
+
+    records = [
+        record
+        for record in caplog.records
+        if record.name == "privacy_guard.service.servicer"
+        and record.getMessage().startswith("privacy_guard_evaluation ")
+    ]
+    assert result.decision == pb2.DECISION_ALLOW
+    assert len(records) == 1
+    assert "request_id=invalid " in records[0].getMessage()
+    assert records[0].getMessage().isprintable()
+    assert len(caplog.text.splitlines()) == 1
+
+
+def test_evaluation_logs_printable_unicode_request_id(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def evaluate() -> None:
+        middleware = PrivacyGuardMiddleware(create_builtin_registry())
+        request = _request(b"no match", action="detect")
+        request.context.request_id = "请求-42 🛡️"
+        try:
+            await middleware._evaluate_rpc(
+                request,
+                _SuccessfulEvaluationContext(),
+            )
+        finally:
+            await middleware.close()
+
+    with caplog.at_level(logging.INFO, logger="privacy_guard.service.servicer"):
+        asyncio.run(evaluate())
+
+    assert "request_id=请求-42 🛡️ " in caplog.text
+    assert len(caplog.text.splitlines()) == 1
 
 
 def test_middleware_applies_configured_timeout_to_cached_processors() -> None:
