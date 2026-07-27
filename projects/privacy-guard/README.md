@@ -44,8 +44,8 @@ Privacy Guard's working directory and normalized to the same
 `RegexPatternCatalog` model as inline input. Absolute paths, traversal, symlinks,
 unsafe YAML tags, aliases, duplicate keys, invalid UTF-8, and oversized files
 are rejected. The
-[RegexEngine end-to-end example](examples/regex-engine/README.md) passes its
-catalog as `patterns.yaml`.
+[RegexEngine end-to-end example](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/privacy-guard/examples/regex-engine/README.md)
+passes its catalog as `patterns.yaml`.
 
 ## Architecture
 
@@ -141,7 +141,8 @@ uv run privacy-guard --registry-factory my_engines:create_registry configuration
 uv run privacy-guard --registry-factory my_engines:create_registry serve
 ```
 
-The [custom engine end-to-end example](examples/custom-engine/README.md)
+The
+[custom engine end-to-end example](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/privacy-guard/examples/custom-engine/README.md)
 contains one Python file with a typed detection config, engine implementation,
 and registry factory, plus its OpenShell policy and walkthrough. It also shows
 the explicit `PYTHONPATH` setup needed when the factory is a standalone local
@@ -252,8 +253,9 @@ The `privacy_guard.cli` module owns the executable application and adapts its
 ## Updating the OpenShell protocol
 
 Privacy Guard uses
-[`openshell-middleware-kit`](../openshell-middleware-kit/README.md) to keep its
-copied protocol and generated Python bindings aligned with an OpenShell release.
+[`openshell-middleware-kit`](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-middleware-kit/README.md)
+to keep its copied protocol and generated Python bindings aligned with an
+OpenShell release.
 Install the repository's local `omkit`, then update:
 
 ```bash
