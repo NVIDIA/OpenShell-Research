@@ -455,109 +455,17 @@ def test_compiled_catalog_same_key_race_accounts_once(
         regex_module._clear_compiled_pattern_cache()
 
 
-def test_leased_catalog_remains_canonical_after_lru_reference_is_cleared() -> None:
-    regex_module._clear_compiled_pattern_cache()
-    config = _config([{"pattern": "leased", "confidence": "high"}])
-    first_engine = RegexEngine(config, None)
-    first_lease = regex_module._try_acquire_compiled_processor_lease((first_engine,))
-    assert first_lease is not None
-    retained_weight = regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES
+def test_processor_weight_counts_each_regex_stage() -> None:
+    config = _config([{"pattern": "shared", "confidence": "high"}])
+    first = RegexEngine(config, None)
+    second = RegexEngine(config, None)
 
-    try:
-        regex_module._clear_compiled_pattern_cache()
-        assert regex_module._COMPILED_PATTERN_CACHE == {}
-        assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES == retained_weight
-
-        second_config = _config([{"pattern": "leased", "confidence": "high"}])
-        second_engine = RegexEngine(second_config, None)
-        second_lease = regex_module._try_acquire_compiled_processor_lease(
-            (second_engine,)
-        )
-        assert second_lease is not None
-        try:
-            assert second_engine._rules is first_engine._rules
-            assert len(regex_module._COMPILED_PATTERN_LEASES) == 1
-            assert (
-                next(iter(regex_module._COMPILED_PATTERN_LEASES.values())).lease_count
-                == 2
-            )
-            assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES == retained_weight
-        finally:
-            second_lease.release()
-    finally:
-        first_lease.release()
-        regex_module._clear_compiled_pattern_cache()
-
-    assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES == 0
-    assert regex_module._COMPILED_PATTERN_LEASES == {}
-
-
-def test_leased_catalog_count_prevents_a_129th_retained_catalog(
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    regex_module._clear_compiled_pattern_cache()
-    monkeypatch.setattr(regex_module, "_MAX_CACHED_COMPILED_CATALOGS", 1)
-    config = _config([{"pattern": "leased", "confidence": "high"}])
-    engine = RegexEngine(config, None)
-    lease = regex_module._try_acquire_compiled_processor_lease((engine,))
-    assert lease is not None
-
-    try:
-        regex_module._clear_compiled_pattern_cache()
-        retained_weight = regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES
-        with caplog.at_level(logging.DEBUG, logger="privacy_guard.engines.regex"):
-            uncached_rules = regex_module._compile_pattern_catalog(_catalog("other"))
-
-        assert uncached_rules
-        assert regex_module._COMPILED_PATTERN_CACHE == {}
-        assert regex_module._compiled_pattern_retained_count() == 1
-        assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES == retained_weight
-        assert "privacy_guard_cache_skip cache=regex_compiled" in caplog.text
-        assert "other" not in caplog.text
-    finally:
-        lease.release()
-        regex_module._clear_compiled_pattern_cache()
-
-
-def test_multi_catalog_lease_does_not_evict_its_own_reservation(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    regex_module._clear_compiled_pattern_cache()
-    monkeypatch.setattr(regex_module, "_MAX_CACHED_COMPILED_CATALOGS", 2)
-    first_catalog = _catalog("first")
-    evictable_catalog = _catalog("evictable")
-    second_catalog = _catalog("second")
-    first_engine = RegexEngine(
-        _config([{"pattern": "first", "confidence": "high"}]),
-        None,
+    assert regex_module._compiled_processor_weight(
+        (first, second)
+    ) == 2 * regex_module._compiled_pattern_weight(
+        first.config.pattern_catalog,
+        len(first._rules),
     )
-    second_engine = RegexEngine(
-        _config([{"pattern": "second", "confidence": "high"}]),
-        None,
-    )
-    regex_module._clear_compiled_pattern_cache()
-    regex_module._compile_pattern_catalog(first_catalog)
-    regex_module._compile_pattern_catalog(evictable_catalog)
-
-    lease = regex_module._try_acquire_compiled_processor_lease(
-        (first_engine, second_engine)
-    )
-    assert lease is not None
-    try:
-        assert regex_module._compiled_pattern_retained_count() == 2
-        assert set(regex_module._COMPILED_PATTERN_LEASES) == {
-            first_catalog,
-            second_catalog,
-        }
-        assert evictable_catalog not in regex_module._COMPILED_PATTERN_CACHE
-        assert (
-            regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES
-            <= regex_module.MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES
-        )
-    finally:
-        lease.release()
-        regex_module._clear_compiled_pattern_cache()
 
 
 def test_regex_engine_is_safe_for_concurrent_runs() -> None:

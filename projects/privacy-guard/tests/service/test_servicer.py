@@ -7,7 +7,7 @@ import logging
 from concurrent.futures import Future, ThreadPoolExecutor
 from copy import deepcopy
 from threading import Barrier, Event, Lock, get_ident
-from typing import Literal, Never
+from typing import Never
 
 import grpc
 import pytest
@@ -32,9 +32,6 @@ from privacy_guard.constants import (
 )
 from privacy_guard.engines import (
     EngineConfig,
-    EntityProcessingEngine,
-    EntityProcessingStrategy,
-    TextProcessingResult,
 )
 from privacy_guard.engines import regex as regex_module
 from privacy_guard.engines.registry import EngineRegistry, create_builtin_registry
@@ -47,25 +44,6 @@ from privacy_guard.request_processor import (
 )
 from privacy_guard.service import servicer as servicer_module
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
-from privacy_guard.timeout import Timeout
-
-
-class _LeaseFreeEngineConfig(EngineConfig):
-    engine: Literal["lease-free"] = "lease-free"
-
-
-class _LeaseFreeEngine(EntityProcessingEngine[_LeaseFreeEngineConfig]):
-    supported_strategies = frozenset({EntityProcessingStrategy.DETECT})
-
-    def _run(
-        self,
-        text: str,
-        *,
-        strategy: EntityProcessingStrategy,
-        timeout: Timeout,
-    ) -> TextProcessingResult:
-        del strategy, timeout
-        return TextProcessingResult(text=text, detections=())
 
 
 def _values(
@@ -107,19 +85,29 @@ def _values(
     }
 
 
+def _expected_processor_cache_weight(
+    registry: EngineRegistry,
+    values: dict[str, object],
+) -> int:
+    config = registry.validate_config(values)
+    _, config_weight = _configuration_fingerprint_and_size(config)
+    regex_weight = sum(
+        regex_module._compiled_pattern_weight(
+            stage.config.pattern_catalog,
+            sum(
+                len(entity.patterns) for entity in stage.config.pattern_catalog.entities
+            ),
+        )
+        for stage in config.entity_processing.stages
+        if isinstance(stage.config, regex_module.RegexEngineConfig)
+    )
+    return config_weight + regex_weight
+
+
 def _proto_config(values: dict[str, object]) -> Message:
     result = pb2.ValidateConfigRequest().config
     json_format.ParseDict(values, result)
     return result
-
-
-def _lease_free_values() -> dict[str, object]:
-    return {
-        "entity_processing": {
-            "stages": [{"config": {"engine": "lease-free"}}],
-        },
-        "on_detection": {"action": "detect"},
-    }
 
 
 def _request(body: bytes, *, action: str = "replace") -> pb2.HttpRequestEvaluation:
@@ -578,8 +566,9 @@ def test_same_fingerprint_misses_build_one_shared_processor(
         "_build_processor",
         synchronized_build,
     )
+    registry = create_builtin_registry()
     cache = servicer_module._RequestProcessorCache(
-        create_builtin_registry(),
+        registry,
         timeout_seconds=1,
         log_request_content=False,
     )
@@ -593,10 +582,10 @@ def test_same_fingerprint_misses_build_one_shared_processor(
 
     assert build_count == 1
     assert all(processor is processors[0] for processor in processors)
-    _, expected_weight = _configuration_fingerprint_and_size(
-        create_builtin_registry().validate_config(_values())
+    assert cache._weight_bytes == _expected_processor_cache_weight(
+        registry,
+        _values(),
     )
-    assert cache._weight_bytes == expected_weight
     assert cache._in_flight == {}
     cache.clear()
 
@@ -619,8 +608,9 @@ def test_different_fingerprints_build_concurrently(
         "_build_processor",
         synchronized_build,
     )
+    registry = create_builtin_registry()
     cache = servicer_module._RequestProcessorCache(
-        create_builtin_registry(),
+        registry,
         timeout_seconds=1,
         log_request_content=False,
     )
@@ -634,11 +624,9 @@ def test_different_fingerprints_build_concurrently(
 
     assert processors[0] is not processors[1]
     assert len(cache._processors) == 2
+    values = (_values(action="detect"), _values(action="block"))
     expected_weight = sum(
-        _configuration_fingerprint_and_size(
-            create_builtin_registry().validate_config(values)
-        )[1]
-        for values in (_values(action="detect"), _values(action="block"))
+        _expected_processor_cache_weight(registry, item) for item in values
     )
     assert cache._weight_bytes == expected_weight
     assert cache._in_flight == {}
@@ -713,7 +701,7 @@ def test_failed_processor_build_wakes_waiters_and_allows_retry(
     cache.clear()
 
 
-def test_processor_cache_evicts_least_recently_used_config_by_weight(
+def test_processor_cache_evicts_least_recently_used_processor_by_weight(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -726,21 +714,21 @@ def test_processor_cache_evicts_least_recently_used_config_by_weight(
         _configuration_fingerprint_and_size(registry.validate_config(item))
         for item in values
     )
-    assert len({weight for _, weight in identities}) == 1
-    entry_weight = identities[0][1]
-    monkeypatch.setattr(
-        servicer_module,
-        "MAX_PROCESSOR_CACHE_CONFIG_BYTES",
-        entry_weight * 2,
-    )
     cache = servicer_module._RequestProcessorCache(
         registry,
         timeout_seconds=1,
         log_request_content=False,
     )
+    first = cache.resolve(values[0])
+    entry_weight = cache._processors[identities[0][0]].weight_bytes
+    assert entry_weight > identities[0][1]
+    monkeypatch.setattr(
+        servicer_module,
+        "MAX_PROCESSOR_CACHE_WEIGHT_BYTES",
+        entry_weight * 2,
+    )
 
     with caplog.at_level(logging.DEBUG, logger="privacy_guard.service.servicer"):
-        first = cache.resolve(values[0])
         cache.resolve(values[1])
         assert cache.resolve(values[0]) is first
         cache.resolve(values[2])
@@ -752,19 +740,47 @@ def test_processor_cache_evicts_least_recently_used_config_by_weight(
     cache.clear()
 
 
-def test_processor_cache_builds_but_does_not_retain_oversized_config(
+def test_processor_cache_evicts_least_recently_used_processor_by_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = create_builtin_registry()
+    values = tuple(
+        _values(action="detect", stage_name=f"stage-{suffix}")
+        for suffix in ("a", "b", "c")
+    )
+    fingerprints = tuple(
+        _configuration_fingerprint_and_size(registry.validate_config(item))[0]
+        for item in values
+    )
+    monkeypatch.setattr(servicer_module, "_MAX_CACHED_PROCESSORS", 2)
+    cache = servicer_module._RequestProcessorCache(
+        registry,
+        timeout_seconds=1,
+        log_request_content=False,
+    )
+
+    first = cache.resolve(values[0])
+    cache.resolve(values[1])
+    assert cache.resolve(values[0]) is first
+    cache.resolve(values[2])
+
+    assert tuple(cache._processors) == (fingerprints[0], fingerprints[2])
+    assert cache._weight_bytes == sum(
+        entry.weight_bytes for entry in cache._processors.values()
+    )
+    cache.clear()
+
+
+def test_processor_cache_builds_but_does_not_retain_oversized_processor(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     registry = create_builtin_registry()
     values = _values(action="detect", stage_name="sensitive-oversized-stage")
-    _, weight_bytes = _configuration_fingerprint_and_size(
-        registry.validate_config(values)
-    )
     monkeypatch.setattr(
         servicer_module,
-        "MAX_PROCESSOR_CACHE_CONFIG_BYTES",
-        weight_bytes - 1,
+        "MAX_PROCESSOR_CACHE_WEIGHT_BYTES",
+        1,
     )
     build_count = 0
     original_build = servicer_module._RequestProcessorCache._build_processor
@@ -820,13 +836,10 @@ def test_oversized_same_fingerprint_misses_remain_single_flight(
 
     registry = create_builtin_registry()
     values = _values(action="detect", stage_name="oversized-single-flight")
-    _, weight_bytes = _configuration_fingerprint_and_size(
-        registry.validate_config(values)
-    )
     monkeypatch.setattr(
         servicer_module,
-        "MAX_PROCESSOR_CACHE_CONFIG_BYTES",
-        weight_bytes - 1,
+        "MAX_PROCESSOR_CACHE_WEIGHT_BYTES",
+        1,
     )
     monkeypatch.setattr(servicer_module, "Future", _PublicationPausingFuture)
     build_count = 0
@@ -869,52 +882,7 @@ def test_oversized_same_fingerprint_misses_remain_single_flight(
     cache.clear()
 
 
-def test_regex_union_pressure_evicts_and_releases_old_processor(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    regex_module._clear_compiled_pattern_cache()
-    registry = create_builtin_registry()
-    cache = servicer_module._RequestProcessorCache(
-        registry,
-        timeout_seconds=1,
-        log_request_content=False,
-    )
-    first_values = _values(
-        "detect",
-        patterns=[{"pattern": "aaa", "confidence": "high"}],
-    )
-    second_values = _values(
-        "detect",
-        patterns=[{"pattern": "bbb", "confidence": "high"}],
-    )
-
-    try:
-        cache.resolve(first_values)
-        retained_weight = regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES
-        monkeypatch.setattr(
-            regex_module,
-            "MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES",
-            retained_weight,
-        )
-
-        second = cache.resolve(second_values)
-        second_fingerprint, _ = _configuration_fingerprint_and_size(
-            registry.validate_config(second_values)
-        )
-
-        assert cache._processors == {
-            second_fingerprint: cache._processors[second_fingerprint]
-        }
-        assert cache._processors[second_fingerprint][0] is second
-        assert len(regex_module._COMPILED_PATTERN_LEASES) == 1
-        assert regex_module._compiled_pattern_retained_count() == 1
-        assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES <= retained_weight
-    finally:
-        cache.clear()
-        regex_module._clear_compiled_pattern_cache()
-
-
-def test_validate_config_churn_shares_the_compiled_union_with_processors(
+def test_compiled_cache_eviction_does_not_invalidate_cached_processor(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     regex_module._clear_compiled_pattern_cache()
@@ -928,107 +896,32 @@ def test_validate_config_churn_shares_the_compiled_union_with_processors(
         "detect",
         patterns=[{"pattern": "aaa", "confidence": "high"}],
     )
-    validation_values = tuple(
-        _values(
-            "detect",
-            patterns=[{"pattern": pattern, "confidence": "high"}],
-        )
-        for pattern in ("bbb", "ccc")
+    validation_values = _values(
+        "detect",
+        patterns=[{"pattern": "bbb", "confidence": "high"}],
     )
 
     try:
         processor = cache.resolve(processor_values)
-        processor_engine = processor._stages[0][1]
-        assert isinstance(processor_engine, regex_module.RegexEngine)
-        processor_rules = processor_engine._rules
         entry_weight = regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES
         monkeypatch.setattr(
             regex_module,
             "MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES",
-            entry_weight * 2,
+            entry_weight,
         )
 
-        for values in validation_values:
-            registry.validate_config(values)
-            assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES <= entry_weight * 2
-            assert regex_module._compiled_pattern_retained_count() <= 2
+        registry.validate_config(validation_values)
 
+        result = processor.process("aaa")
+        assert len(result.detection_summaries) == 1
         assert cache.resolve(processor_values) is processor
-        assert processor_engine._rules is processor_rules
-        assert len(regex_module._COMPILED_PATTERN_LEASES) == 1
-        assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES <= entry_weight * 2
+        assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES <= entry_weight
     finally:
         cache.clear()
         regex_module._clear_compiled_pattern_cache()
 
 
-def test_different_fingerprints_same_catalog_race_rebinds_canonical_rules(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    regex_module._clear_compiled_pattern_cache()
-    registry = create_builtin_registry()
-    cache = servicer_module._RequestProcessorCache(
-        registry,
-        timeout_seconds=1,
-        log_request_content=False,
-    )
-    blocker_values = _values(
-        "detect",
-        patterns=[{"pattern": "aaa", "confidence": "high"}],
-    )
-    shared_values = tuple(
-        _values(
-            action,
-            patterns=[{"pattern": "bbb", "confidence": "high"}],
-        )
-        for action in ("detect", "block")
-    )
-
-    try:
-        cache.resolve(blocker_values)
-        retained_weight = regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES
-        monkeypatch.setattr(
-            regex_module,
-            "MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES",
-            retained_weight,
-        )
-        builds_ready = Barrier(2)
-        original_build = servicer_module._RequestProcessorCache._build_processor
-
-        def synchronized_build(
-            owner: servicer_module._RequestProcessorCache,
-            config: PrivacyGuardConfig[EngineConfig],
-        ) -> servicer_module._PreparedProcessor:
-            prepared = original_build(owner, config)
-            builds_ready.wait(timeout=5)
-            return prepared
-
-        monkeypatch.setattr(
-            servicer_module._RequestProcessorCache,
-            "_build_processor",
-            synchronized_build,
-        )
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            processors = tuple(executor.map(cache.resolve, shared_values))
-
-        first_engine = processors[0]._stages[0][1]
-        second_engine = processors[1]._stages[0][1]
-        assert isinstance(first_engine, regex_module.RegexEngine)
-        assert isinstance(second_engine, regex_module.RegexEngine)
-        first_rules = first_engine._rules
-        assert second_engine._rules is first_rules
-        assert len(regex_module._COMPILED_PATTERN_LEASES) == 1
-        assert (
-            next(iter(regex_module._COMPILED_PATTERN_LEASES.values())).lease_count == 2
-        )
-        assert regex_module._compiled_pattern_retained_count() == 1
-        assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES <= retained_weight
-    finally:
-        cache.clear()
-        regex_module._clear_compiled_pattern_cache()
-
-
-def test_intrinsically_oversized_regex_processor_preserves_cached_processor(
+def test_oversized_regex_processor_preserves_cached_processor(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     regex_module._clear_compiled_pattern_cache()
@@ -1055,10 +948,10 @@ def test_intrinsically_oversized_regex_processor_preserves_cached_processor(
         retained_fingerprint, _ = _configuration_fingerprint_and_size(
             registry.validate_config(retained_values)
         )
-        retained_weight = regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES
+        retained_weight = cache._processors[retained_fingerprint].weight_bytes
         monkeypatch.setattr(
-            regex_module,
-            "MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES",
+            servicer_module,
+            "MAX_PROCESSOR_CACHE_WEIGHT_BYTES",
             retained_weight + 1,
         )
 
@@ -1066,77 +959,24 @@ def test_intrinsically_oversized_regex_processor_preserves_cached_processor(
 
         assert oversized is not retained
         assert tuple(cache._processors) == (retained_fingerprint,)
-        assert cache._processors[retained_fingerprint][0] is retained
-        assert len(regex_module._COMPILED_PATTERN_LEASES) == 1
-        assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES == retained_weight
+        assert cache._processors[retained_fingerprint].processor is retained
+        assert cache._weight_bytes == retained_weight
     finally:
         cache.clear()
         regex_module._clear_compiled_pattern_cache()
 
 
-def test_regex_pressure_preserves_lease_free_custom_processor(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    regex_module._clear_compiled_pattern_cache()
-    registry = EngineRegistry(include_builtin_engines=True)
-    registry.register(_LeaseFreeEngine)
-    registry.finalize()
-    cache = servicer_module._RequestProcessorCache(
-        registry,
-        timeout_seconds=1,
-        log_request_content=False,
-    )
-    custom_values = _lease_free_values()
-    first_regex_values = _values(
-        "detect",
-        patterns=[{"pattern": "aaa", "confidence": "high"}],
-    )
-    second_regex_values = _values(
-        "detect",
-        patterns=[{"pattern": "bbb", "confidence": "high"}],
-    )
-
-    try:
-        custom = cache.resolve(custom_values)
-        cache.resolve(first_regex_values)
-        custom_fingerprint, _ = _configuration_fingerprint_and_size(
-            registry.validate_config(custom_values)
-        )
-        first_fingerprint, _ = _configuration_fingerprint_and_size(
-            registry.validate_config(first_regex_values)
-        )
-        retained_weight = regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES
-        monkeypatch.setattr(
-            regex_module,
-            "MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES",
-            retained_weight,
-        )
-
-        cache.resolve(second_regex_values)
-        second_fingerprint, _ = _configuration_fingerprint_and_size(
-            registry.validate_config(second_regex_values)
-        )
-
-        assert custom_fingerprint in cache._processors
-        assert cache._processors[custom_fingerprint][0] is custom
-        assert first_fingerprint not in cache._processors
-        assert second_fingerprint in cache._processors
-    finally:
-        cache.clear()
-        regex_module._clear_compiled_pattern_cache()
-
-
-def test_middleware_shutdown_releases_processor_regex_leases() -> None:
+def test_middleware_shutdown_clears_processor_cache() -> None:
     regex_module._clear_compiled_pattern_cache()
     middleware = PrivacyGuardMiddleware(create_builtin_registry())
     try:
         middleware._processors.resolve(_values("detect"))
-        assert regex_module._COMPILED_PATTERN_LEASES
+        assert middleware._processors._processors
 
         asyncio.run(middleware.close())
 
         assert middleware._processors._processors == {}
-        assert regex_module._COMPILED_PATTERN_LEASES == {}
+        assert middleware._processors._weight_bytes == 0
     finally:
         middleware._processors.clear()
         regex_module._clear_compiled_pattern_cache()
