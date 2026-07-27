@@ -710,9 +710,11 @@ def _try_acquire_compiled_processor_lease(
             cached_weight
             for cached_catalog, (_, cached_weight) in _COMPILED_PATTERN_CACHE.items()
             if cached_catalog not in _COMPILED_PATTERN_LEASES
+            and cached_catalog not in compiled
         )
         removable_count = sum(
             cached_catalog not in _COMPILED_PATTERN_LEASES
+            and cached_catalog not in compiled
             for cached_catalog in _COMPILED_PATTERN_CACHE
         )
         if (
@@ -727,12 +729,20 @@ def _try_acquire_compiled_processor_lease(
                 or _compiled_pattern_retained_count() + additional_count
                 > _MAX_CACHED_COMPILED_CATALOGS
             ):
-                evicted_catalog, (_, evicted_weight) = _COMPILED_PATTERN_CACHE.popitem(
-                    last=False
+                evicted_catalog = next(
+                    (
+                        cached_catalog
+                        for cached_catalog in _COMPILED_PATTERN_CACHE
+                        if cached_catalog not in _COMPILED_PATTERN_LEASES
+                        and cached_catalog not in compiled
+                    ),
+                    None,
                 )
-                if evicted_catalog not in _COMPILED_PATTERN_LEASES:
-                    _COMPILED_PATTERN_CACHE_WEIGHT_BYTES -= evicted_weight
-                    evicted_weight_bytes += evicted_weight
+                if evicted_catalog is None:
+                    break
+                _, evicted_weight = _COMPILED_PATTERN_CACHE.pop(evicted_catalog)
+                _COMPILED_PATTERN_CACHE_WEIGHT_BYTES -= evicted_weight
+                evicted_weight_bytes += evicted_weight
                 evicted_entries += 1
 
             for catalog, rules in compiled.items():
