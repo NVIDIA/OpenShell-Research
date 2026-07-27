@@ -32,8 +32,11 @@ if [[ ${#wheels[@]} -ne 1 ]]; then
   exit 1
 fi
 
+VIRTUAL_ENV="$artifact_check_dir/venv" \
+  uv sync --frozen --no-dev --no-install-project --active
 uv pip install \
   --offline \
+  --no-deps \
   --python "$artifact_check_dir/venv/bin/python" \
   "${wheels[0]}"
 runtime_site_packages=$(
