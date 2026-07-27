@@ -229,10 +229,27 @@ environment.
 ```bash
 uv run privacy-guard engines
 uv run privacy-guard configuration-schema
+uv run privacy-guard configure-gateway --host-ip YOUR_HOST_IPV4
 uv run privacy-guard serve \
   --listen 127.0.0.1:50051 \
   --timeout-seconds 5
 ```
+
+Replace `YOUR_HOST_IPV4` with the non-loopback IPv4 address that the OpenShell
+gateway and sandbox supervisors use to reach this host. `configure-gateway`
+adds or updates a registration named `privacy-guard` in the path set by
+OpenShell's `OPENSHELL_GATEWAY_CONFIG` override, or OpenShell's standard
+per-user gateway config location when that variable is unset:
+`$XDG_CONFIG_HOME/openshell/gateway.toml` (normally
+`~/.config/openshell/gateway.toml`). Privacy Guard does not guess which host
+interface is correct. Use `--name` when the policy references a different
+registration name, `--port` when Privacy Guard does not listen on 50051, and
+`--config` for a nonstandard gateway TOML. OpenShell middleware registration
+names must use 1–128 ASCII bytes containing only letters, digits, `.`, `_`, `-`,
+or `/`; the `openshell/` prefix is reserved. The command preserves unrelated
+settings and updates the named registration when it already exists. Start
+Privacy Guard before restarting the gateway, because OpenShell connects to
+registered middleware during startup.
 
 Entity behavior is supplied by OpenShell policy config, not server startup
 flags. Deployment startup owns only installed engine implementations and

@@ -120,18 +120,20 @@ generate the local gateway configuration:
 
 ```bash
 YOUR_HOST_IP=YOUR_HOST_IPV4
-if [ "$YOUR_HOST_IP" = "YOUR_HOST_IPV4" ] || [ "$YOUR_HOST_IP" = "127.0.0.1" ]; then
-  echo "Set YOUR_HOST_IP to a non-loopback IPv4 address"
-else
-  sed "s/REPLACE_WITH_HOST_IP/$YOUR_HOST_IP/" gateway.toml > gateway.local.toml
-  grep grpc_endpoint gateway.local.toml
-fi
+uv run privacy-guard configure-gateway \
+  --host-ip "$YOUR_HOST_IP" \
+  --name privacy-guard-custom-engine \
+  --config gateway.local.toml
 ```
 
 Replace `YOUR_HOST_IPV4` with the address you selected. Do not use
 `127.0.0.1`, a VPN address, or `host.openshell.internal`: the foreground gateway
 process and the sandbox supervisor must both be able to resolve and reach the
-configured endpoint.
+configured endpoint. This walkthrough passes `--config` to keep its generated
+file local and disposable. Without that option, the command uses OpenShell's
+`OPENSHELL_GATEWAY_CONFIG` override when set, otherwise its standard per-user
+gateway config location at `$XDG_CONFIG_HOME/openshell/gateway.toml`, normally
+`~/.config/openshell/gateway.toml`.
 
 ## Restart the local gateway with middleware enabled
 

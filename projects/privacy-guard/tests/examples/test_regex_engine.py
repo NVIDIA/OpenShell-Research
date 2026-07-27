@@ -6,7 +6,6 @@ import asyncio
 import json
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 
 import pytest
@@ -87,21 +86,11 @@ def test_regex_walkthrough_uses_current_policy_and_gateway_schema() -> None:
         (EXAMPLE_DIRECTORY / "privacy-guard-config.yaml").read_text()
     )
     catalog = yaml.safe_load((EXAMPLE_DIRECTORY / "patterns.yaml").read_text())
-    gateway = tomllib.loads((EXAMPLE_DIRECTORY / "gateway.toml").read_text())
     readme = (EXAMPLE_DIRECTORY / "README.md").read_text()
 
     assert isinstance(policy, dict)
     assert isinstance(config, dict)
     assert isinstance(catalog, dict)
-    middleware = gateway["openshell"]["supervisor"]["middleware"]
-    assert middleware == [
-        {
-            "name": "privacy-guard-regex",
-            "grpc_endpoint": "http://REPLACE_WITH_HOST_IP:50051",
-            "max_body_bytes": 4_194_304,
-            "timeout": "5s",
-        }
-    ]
     middleware_config = policy["network_middlewares"]["privacy_guard_replace"]
     assert middleware_config["middleware"] == "privacy-guard-regex"
     assert middleware_config["config"] == config
@@ -111,6 +100,12 @@ def test_regex_walkthrough_uses_current_policy_and_gateway_schema() -> None:
     assert stage_config["pattern_catalog"] == "patterns.yaml"
     RegexPatternCatalog.model_validate(catalog)
     assert "uv run privacy-guard serve --listen 0.0.0.0:50051" in readme
+    assert "uv run privacy-guard configure-gateway" in readme
+    assert '--host-ip "$YOUR_HOST_IP"' in readme
+    assert "--name privacy-guard-regex" in readme
+    assert "--config gateway.local.toml" in readme
+    assert 'sed "s/REPLACE_WITH_HOST_IP/' not in readme
+    assert not (EXAMPLE_DIRECTORY / "gateway.toml").exists()
     assert "openshell gateway select openshell" in readme
     assert "openshell gateway add" not in readme
     assert "OpenShell `v0.0.90`" in readme

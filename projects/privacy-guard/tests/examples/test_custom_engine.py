@@ -6,7 +6,6 @@ import json
 import os
 import subprocess
 import sys
-import tomllib
 from pathlib import Path
 
 import yaml
@@ -112,7 +111,6 @@ def test_openshell_walkthrough_uses_the_custom_registry_and_current_policy() -> 
     config = yaml.safe_load(
         (EXAMPLE_DIRECTORY / "privacy-guard-config.yaml").read_text()
     )
-    gateway = tomllib.loads((EXAMPLE_DIRECTORY / "gateway.toml").read_text())
     readme = (EXAMPLE_DIRECTORY / "README.md").read_text()
     implementation = (EXAMPLE_DIRECTORY / "custom_engine.py").read_text()
 
@@ -124,21 +122,18 @@ def test_openshell_walkthrough_uses_the_custom_registry_and_current_policy() -> 
     middleware_config = policy["network_middlewares"]["privacy_guard_detect"]
     assert middleware_config["middleware"] == "privacy-guard-custom-engine"
     assert middleware_config["config"] == config
-    middleware = gateway["openshell"]["supervisor"]["middleware"]
-    assert middleware == [
-        {
-            "name": "privacy-guard-custom-engine",
-            "grpc_endpoint": "http://REPLACE_WITH_HOST_IP:50051",
-            "max_body_bytes": 4_194_304,
-            "timeout": "5s",
-        }
-    ]
     stage_config = config["entity_processing"]["stages"][0]["config"]
     assert stage_config["engine"] == "keyword-tool"
     assert config["on_detection"]["action"] == "detect"
     assert "--registry-factory custom_engine:create_registry" in readme
     assert "cd projects/privacy-guard/examples/custom-engine" in readme
     assert 'export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"' in readme
+    assert "uv run privacy-guard configure-gateway" in readme
+    assert '--host-ip "$YOUR_HOST_IP"' in readme
+    assert "--name privacy-guard-custom-engine" in readme
+    assert "--config gateway.local.toml" in readme
+    assert 'sed "s/REPLACE_WITH_HOST_IP/' not in readme
+    assert not (EXAMPLE_DIRECTORY / "gateway.toml").exists()
     assert "openshell gateway select openshell" in readme
     assert "openshell gateway add" not in readme
     assert "OpenShell `v0.0.90`" in readme

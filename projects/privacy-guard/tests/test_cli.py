@@ -6,6 +6,7 @@ import json
 import re
 from collections.abc import Iterator
 from importlib.metadata import entry_points
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -32,6 +33,7 @@ def test_cli_help_exposes_server_and_discovery_commands() -> None:
     output = _plain_output(result)
     assert "serve" in output
     assert "configuration-schema" in output
+    assert "configure-gateway" in output
     assert "engines" in output
     assert "--debug" in output
     assert "--debug-log-content" in output
@@ -39,6 +41,109 @@ def test_cli_help_exposes_server_and_discovery_commands() -> None:
     assert "--config" not in output
     assert "--profile" not in output
     assert "--scanner-name" not in output
+
+
+def test_cli_configure_gateway_help_requires_an_explicit_host_ip() -> None:
+    result = CliRunner().invoke(
+        app,
+        ["configure-gateway", "--help"],
+        terminal_width=240,
+    )
+
+    assert result.exit_code == 0
+    output = _normalized_output(result)
+    assert "--host-ip" in output
+    assert "required" in output.lower()
+    assert "Non-loopback IPv4" in output
+    assert "$OPENSHELL_GATEWAY_CONFIG" in output
+    assert "$XDG_CONFIG_HOME/openshell" in output
+    assert "1-128 ASCII bytes" in output
+    assert "restart the OpenShell gateway" not in output
+
+
+def test_cli_configure_gateway_updates_the_default_xdg_config(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+
+    result = CliRunner().invoke(
+        app,
+        ["configure-gateway", "--host-ip", "192.168.1.20"],
+    )
+
+    assert result.exit_code == 0
+    config_path = tmp_path / "openshell" / "gateway.toml"
+    assert config_path.exists()
+    output = _plain_output(result)
+    assert f"Created {config_path}" in output
+    assert "Registered privacy-guard at http://192.168.1.20:50051" in output
+    assert "start Privacy Guard, then restart the OpenShell gateway" in output
+
+
+@pytest.mark.parametrize("host_ip", ["host.openshell.internal", "127.0.0.1", "0.0.0.0"])
+def test_cli_configure_gateway_rejects_unusable_host_ip(host_ip: str) -> None:
+    result = CliRunner().invoke(
+        app,
+        ["configure-gateway", "--host-ip", host_ip],
+        terminal_width=240,
+    )
+
+    assert result.exit_code == 2
+    output = _normalized_output(result)
+    assert "--host-ip" in output
+    assert "IPv4 address" in output
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "a" * 129,
+        "privacy guard",
+        "openshell/privacy-guard",
+    ],
+)
+def test_cli_configure_gateway_rejects_invalid_registration_name(
+    name: str,
+) -> None:
+    result = CliRunner().invoke(
+        app,
+        [
+            "configure-gateway",
+            "--host-ip",
+            "192.168.1.20",
+            "--name",
+            name,
+        ],
+        terminal_width=240,
+    )
+
+    assert result.exit_code == 2
+    assert "--name" in _normalized_output(result)
+
+
+def test_cli_configure_gateway_reports_invalid_existing_config(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "gateway.toml"
+    path.write_text("not valid TOML")
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "configure-gateway",
+            "--host-ip",
+            "192.168.1.20",
+            "--config",
+            str(path),
+        ],
+    )
+
+    assert result.exit_code == 1
+    output = _plain_output(result)
+    assert "Could not configure the OpenShell gateway" in output
+    assert "not valid TOML" in output
+    assert path.read_text() == "not valid TOML"
 
 
 def test_console_script_targets_the_cli_module() -> None:
