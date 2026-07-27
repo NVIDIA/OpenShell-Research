@@ -30,7 +30,9 @@ An engine:
 The public `run()` method validates input, strategy support, the timeout, and
 the complete output contract. Custom engines implement `_run()` and do not
 override `run()` or define `__init__`. `_initialize()` is optional, and
-`@override` is not required.
+`@override` is not required. The base constructor and public wrapper are final
+lifecycle methods. Registration rejects direct or inherited overrides and
+directs custom engines to `_initialize()` and `_run()` instead.
 
 ## Configuration
 
@@ -46,6 +48,13 @@ class AcmeEngineConfig(EngineConfig):
 The object under `EntityProcessingStage.config` is this exact concrete model.
 It is validated and serialized as a member of the registry-built Pydantic
 discriminated union, then passed unchanged to the engine constructor.
+
+Custom integer fields remain strict for direct Python callers. OpenShell policy
+uses protobuf `Struct`, whose numeric representation is a double, so the service
+normalizes finite integral values only within the safe range `-(2^53 - 1)`
+through `2^53 - 1`. Values outside that range and non-integral values remain
+floats and fail strict integer fields. Nested models and lists follow the same
+transport rule.
 
 `EngineConfig` is a nominal, strict base model. It does not prescribe a
 `replacement` field or any other algorithm-specific setting. An engine that

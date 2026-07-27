@@ -1256,7 +1256,9 @@ with different configurations.</p>
 <p>The public <code>run()</code> method validates input, strategy support, the timeout, and
 the complete output contract. Custom engines implement <code>_run()</code> and do not
 override <code>run()</code> or define <code>__init__</code>. <code>_initialize()</code> is optional, and
-<code>@override</code> is not required.</p>
+<code>@override</code> is not required. The base constructor and public wrapper are final
+lifecycle methods. Registration rejects direct or inherited overrides and
+directs custom engines to <code>_initialize()</code> and <code>_run()</code> instead.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
 <p>Every concrete config subclasses <code>EngineConfig</code> and declares exactly one
 literal <code>engine</code> discriminator:</p>
@@ -1267,6 +1269,12 @@ literal <code>engine</code> discriminator:</p>
 <p>The object under <code>EntityProcessingStage.config</code> is this exact concrete model.
 It is validated and serialized as a member of the registry-built Pydantic
 discriminated union, then passed unchanged to the engine constructor.</p>
+<p>Custom integer fields remain strict for direct Python callers. OpenShell policy
+uses protobuf <code>Struct</code>, whose numeric representation is a double, so the service
+normalizes finite integral values only within the safe range <code>-(2^53 - 1)</code>
+through <code>2^53 - 1</code>. Values outside that range and non-integral values remain
+floats and fail strict integer fields. Nested models and lists follow the same
+transport rule.</p>
 <p><code>EngineConfig</code> is a nominal, strict base model. It does not prescribe a
 <code>replacement</code> field or any other algorithm-specific setting. An engine that
 needs a replacement recipe declares that field on its concrete config. Engines

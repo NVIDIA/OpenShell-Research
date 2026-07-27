@@ -94,6 +94,14 @@ Privacy Guard maintains the catalog schema and safety limits but does not ship
 an authoritative pattern set. Repository catalogs are examples to copy and
 adapt, not presets or runtime defaults.
 
+`ValidateConfig` proves that each Regex pattern has valid syntax and rejects
+patterns that immediately match empty input. It cannot prove that every
+context-dependent branch consumes text. If a boundary, lookaround, or
+alternation produces a zero-width match only when triggering request text is
+observed, evaluation rejects the policy as `config_invalid` rather than treating
+the result as an internal engine failure. Lookarounds and boundaries remain
+valid when the complete match consumes text.
+
 ## Current transport constraint
 
 The copied OpenShell protocol carries policy configuration in a
@@ -102,10 +110,20 @@ bounded by that transport. A file-backed configuration carries only its bounded
 relative path through the protocol and loads the deployment-mounted catalog in
 the middleware process.
 
-The service validates the complete configuration, computes its canonical
-fingerprint, and uses a bounded internal `RequestProcessor` cache. Caching
-avoids repeated engine initialization but does not increase the transport
-limit.
+The service rejects an encoded configuration above that limit before protobuf
+conversion or policy validation. A policy may contain at most ten ordered
+entity-processing stages. The service validates the complete bounded
+configuration, computes its canonical fingerprint, and uses a bounded internal
+`RequestProcessor` cache. Caching avoids repeated engine initialization but
+does not increase either limit.
+
+`Struct` carries every number as a double. At this transport boundary only,
+Privacy Guard converts finite integral values in the safe integer range
+`-(2^53 - 1)` through `2^53 - 1` to Python integers before strict policy
+validation. Non-integral and out-of-range values remain floats, so integer
+fields reject them. Direct Python registry validation remains strict and does
+not perform this transport normalization. Custom-engine integer settings must
+therefore remain within the safe range when supplied through OpenShell policy.
 
 A future self-contained transport for larger expanded catalogs requires an
 upstream OpenShell contract for preparing configuration and referring to it

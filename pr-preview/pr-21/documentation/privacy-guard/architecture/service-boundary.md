@@ -40,11 +40,12 @@ validation and every request evaluation.
 
 `ValidateConfig`:
 
-1. converts the `Struct` to a mapping
-2. validates the registry-built discriminated policy model
-3. validates each exact engine config against registered resources
-4. validates replacement support for a replace action
-5. returns `valid=true`, or a content-safe reason
+1. rejects an encoded `Struct` larger than 64 KiB before conversion
+2. converts the `Struct` to a mapping
+3. validates the registry-built discriminated policy model
+4. validates each exact engine config against registered resources
+5. validates replacement support for a replace action
+6. returns `valid=true`, or a content-safe reason
 
 It does not construct engines, populate the processor cache, contact model
 providers, download resources, or write artifacts. Validation runs in the
@@ -53,16 +54,41 @@ the async gRPC event loop.
 
 During evaluation, the service validates and normalizes the same config,
 computes its canonical SHA-256 fingerprint, and resolves a configured processor
-from a bounded 128-entry LRU cache. A cache miss constructs engines directly
-from the exact stage configs and operator-injected resources, then constructs
-the `RequestProcessor`. Validation, cache resolution, engine construction,
-strict UTF-8 decoding, and processing all run in the bounded worker pool.
-Validation still occurs for every evaluation, while equivalent normalized regex
-catalogs reuse their bounded compiled-rule entry instead of recompiling.
+from an LRU cache bounded by both 128 entries and 1 MiB of canonical expanded
+configuration. A cache miss constructs engines directly from the exact stage
+configs and operator-injected resources, then constructs the
+`RequestProcessor`. Validation, cache resolution, engine construction, strict
+UTF-8 decoding, and processing all run in the bounded worker pool. Validation
+still occurs for every evaluation, while equivalent normalized regex catalogs
+reuse their bounded compiled-rule entry instead of recompiling.
+
+Regex keeps two additional owner-local LRU caches. Parsed file catalogs retain
+at most 64 entries and 8 MiB of source files. Compiled Regex state retained by
+either the compiled-catalog LRU or cached processors shares one 128-catalog,
+32 MiB union budget. Each canonical catalog weighs its encoded bytes plus 4 KiB
+per compiled rule and is counted once when both owners refer to it. The rule
+allowance conservatively represents backend and Python state that the catalog
+encoding alone does not capture.
+
+An otherwise valid entry larger than one cache's byte budget is built and
+returned without being retained. A processor whose unique compiled Regex state
+does not fit the union budget is likewise returned for the current evaluation
+without processor-cache retention. Eviction or a skipped entry never makes a
+policy invalid. Content-safe debug events report the cache name and weight,
+plus the number of entries for an eviction, without logging configuration,
+paths, patterns, or fingerprints.
 
 The cache is protected for concurrent access and is not correctness-relevant.
 Eviction or process restart simply causes reconstruction from a later
 evaluation's expanded config.
+
+The entry cap remains useful for small policies. The 1 MiB processor budget
+holds roughly sixteen near-ceiling inline configurations and up to 128 smaller
+configurations. A representative 250-rule configuration weighs about 33 KiB in
+that cache and about 1 MiB in the compiled cache, so the default budgets retain
+roughly thirty such configurations while bounding their compiled state.
+Operators with consistently larger catalogs should expect more frequent
+preparation rather than unbounded retention.
 
 Each cached processor receives the server's operational processing timeout.
 The default is 1 second shared across every configured stage. Operators may set
@@ -78,9 +104,11 @@ RPC first.
 For each evaluation, the service:
 
 1. validates the pre-credentials phase
-2. validates the transport body byte limit
+2. validates the encoded context (4 KiB), configuration (64 KiB), target
+   (32 KiB), headers (128 entries and 64 KiB), and body (4 MiB) limits
 3. acquires one bounded worker slot
-4. validates, normalizes, and resolves the supplied policy config in that worker
+4. converts transport-safe integral numbers, validates the maximum ten stages,
+   and resolves the supplied policy config in that worker
 5. allows an empty body without invoking an engine
 6. decodes a non-empty body as strict UTF-8
 7. calls `RequestProcessor.process(text)` in the same worker
@@ -223,6 +251,11 @@ server.serve_sync("127.0.0.1:50051")
 Async applications call `await server.serve_async(address)` instead. The
 explicit suffixes make the blocking behavior visible at each call site. Both
 entry points use the same server instance and lifecycle.
+
+The listen address uses `host:port` or bracketed IPv6 `[address]:port` form,
+with an explicit port from 1 through 65535. Privacy Guard rejects zero and
+out-of-range numeric ports before calling gRPC, then verifies that gRPC bound
+the requested port before starting the service.
 
 The server:
 

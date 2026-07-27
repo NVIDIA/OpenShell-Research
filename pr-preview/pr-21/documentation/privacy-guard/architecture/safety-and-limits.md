@@ -70,8 +70,14 @@ and configuration or engine preparation beyond this internal bound.
 
 The diagnostic-string bound applies to stage names, entity names, metadata
 keys and values, model-profile names, and other audit-safe identifiers built
-from the shared domain field type. Regex entity and supplied pattern names have a
-stricter ASCII grammar and limit described below.
+from the shared domain field type. These values must be non-empty printable
+Unicode without control or bidirectional formatting characters. Untrusted
+request IDs use the same content and size rules for logging; an invalid request
+ID is represented by a constant placeholder and does not change the evaluation
+result. The human-readable log message quotes request IDs and escapes ASCII
+spaces so their text cannot introduce another key/value token; structured log
+records retain the exact validated ID. Regex entity and supplied pattern names
+have a stricter ASCII grammar and limit described below.
 
 The processor aggregates occurrences before the service applies protobuf
 limits. If a safe result cannot be represented, the service returns a limit
@@ -211,6 +217,8 @@ Custom engines should:
 
 - use the base constructor and public `run()` wrapper
 - return the exact `TextProcessingResult` contract
+- return stable, declared entity identifiers rather than values derived from
+  request text
 - keep request data local to `_run()`
 - keep initialized state immutable and make resources concurrency-safe
 - pass the shared remaining timeout to delegated APIs when they support it
@@ -222,6 +230,14 @@ Custom engines should:
   exception hierarchy
 - avoid logging input or caught exception text
 
+Privacy Guard keeps framework-controlled fields and identifiers that pass its
+shared validation content-safe for findings and operational logs.
+Operator-installed Python engine code is trusted deployment code: it can access
+request text and must honor the declared identifier and logging contract. The
+framework cannot make arbitrary trusted Python code non-exfiltrating, so
+operators must review and install custom engines with the same care as other
+code in the middleware process.
+
 Do not add retries, fallback providers, persistent request artifacts, or extra
 validation without a concrete failure mode and a clear owning layer.
 
@@ -230,6 +246,24 @@ validation without a concrete failure mode and a clear owning layer.
 Cross-request entity memory is not implemented. Privacy Guard retains validated
 configuration and immutable engine state in its processor cache, but never
 retains request text, detections, or replacement mappings there.
+
+Prepared state is bounded by weight and least-recently-used entry count:
+
+| Cache | Weight budget | Entry cap | Entry weight |
+| --- | ---: | ---: | --- |
+| Parsed Regex file catalogs | 8 MiB | 64 | source file bytes |
+| Compiled Regex state retained by its LRU or cached processors | 32 MiB | 128 | canonical catalog bytes plus 4 KiB per rule |
+| Request processors | 1 MiB | 128 | canonical expanded configuration bytes |
+
+The compiled-rule allowance accounts for retained backend state that is much
+larger than short pattern text. Equal catalogs share one compiled tuple and one
+weight charge across the compiled LRU and any cached Regex processors that use
+it. Processor configuration weighting remains engine-neutral, and the
+Regex-specific ownership accounting is private to the built-in engine, so
+custom engines do not need a cache-size hook. One entry that exceeds its cache
+budget remains valid and usable for the current evaluation but is not retained.
+Debug skip and eviction records contain only cache names and weights, plus
+eviction counts.
 
 ## Changing a limit
 
