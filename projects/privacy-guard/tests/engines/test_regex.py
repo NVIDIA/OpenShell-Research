@@ -16,12 +16,7 @@ from privacy_guard.engines import (
     RegexEngineConfig,
     RegexPatternCatalog,
 )
-from privacy_guard.errors import (
-    ErrorCode,
-    ErrorKind,
-    PrivacyGuardError,
-    TimeoutExpiredError,
-)
+from privacy_guard.errors import TimeoutExpiredError
 from privacy_guard.timeout import Timeout
 
 
@@ -182,15 +177,16 @@ def test_contextual_zero_width_match_is_invalid_configuration_at_runtime(
     config = _config([{"pattern": pattern, "confidence": "high"}])
     engine = RegexEngine(config, None)
 
-    with pytest.raises(PrivacyGuardError) as exception_info:
+    with pytest.raises(
+        EngineConfigurationError,
+        match="regex engine configuration is invalid",
+    ) as exception_info:
         engine.run(
             text,
             strategy=EntityProcessingStrategy.DETECT,
             timeout=Timeout.from_seconds(1),
         )
 
-    assert exception_info.value.code is ErrorCode.CONFIG_INVALID
-    assert exception_info.value.kind is ErrorKind.INVALID_INPUT
     assert pattern not in str(exception_info.value)
 
 
@@ -456,6 +452,71 @@ def test_compiled_catalog_same_key_race_accounts_once(
             == (next(iter(regex_module._COMPILED_PATTERN_CACHE.values()))[1])
         )
     finally:
+        regex_module._clear_compiled_pattern_cache()
+
+
+def test_leased_catalog_remains_canonical_after_lru_reference_is_cleared() -> None:
+    regex_module._clear_compiled_pattern_cache()
+    config = _config([{"pattern": "leased", "confidence": "high"}])
+    first_engine = RegexEngine(config, None)
+    first_lease = regex_module._try_acquire_compiled_processor_lease((first_engine,))
+    assert first_lease is not None
+    retained_weight = regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES
+
+    try:
+        regex_module._clear_compiled_pattern_cache()
+        assert regex_module._COMPILED_PATTERN_CACHE == {}
+        assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES == retained_weight
+
+        second_config = _config([{"pattern": "leased", "confidence": "high"}])
+        second_engine = RegexEngine(second_config, None)
+        second_lease = regex_module._try_acquire_compiled_processor_lease(
+            (second_engine,)
+        )
+        assert second_lease is not None
+        try:
+            assert second_engine._rules is first_engine._rules
+            assert len(regex_module._COMPILED_PATTERN_LEASES) == 1
+            assert (
+                next(iter(regex_module._COMPILED_PATTERN_LEASES.values())).lease_count
+                == 2
+            )
+            assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES == retained_weight
+        finally:
+            second_lease.release()
+    finally:
+        first_lease.release()
+        regex_module._clear_compiled_pattern_cache()
+
+    assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES == 0
+    assert regex_module._COMPILED_PATTERN_LEASES == {}
+
+
+def test_leased_catalog_count_prevents_a_129th_retained_catalog(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    regex_module._clear_compiled_pattern_cache()
+    monkeypatch.setattr(regex_module, "_MAX_CACHED_COMPILED_CATALOGS", 1)
+    config = _config([{"pattern": "leased", "confidence": "high"}])
+    engine = RegexEngine(config, None)
+    lease = regex_module._try_acquire_compiled_processor_lease((engine,))
+    assert lease is not None
+
+    try:
+        regex_module._clear_compiled_pattern_cache()
+        retained_weight = regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES
+        with caplog.at_level(logging.DEBUG, logger="privacy_guard.engines.regex"):
+            uncached_rules = regex_module._compile_pattern_catalog(_catalog("other"))
+
+        assert uncached_rules
+        assert regex_module._COMPILED_PATTERN_CACHE == {}
+        assert regex_module._compiled_pattern_retained_count() == 1
+        assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES == retained_weight
+        assert "privacy_guard_cache_skip cache=regex_compiled" in caplog.text
+        assert "other" not in caplog.text
+    finally:
+        lease.release()
         regex_module._clear_compiled_pattern_cache()
 
 

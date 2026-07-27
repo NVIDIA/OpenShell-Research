@@ -25,6 +25,7 @@ from privacy_guard.engines import (
     TextProcessingResult,
 )
 from privacy_guard.errors import (
+    EngineConfigurationError,
     EngineContractError,
     EngineLimitExceededError,
     EntityProcessingError,
@@ -145,6 +146,8 @@ class RequestProcessor:
                 decision=RequestDecision.DENY,
                 reason_code=LIMIT_REASON_CODE,
             )
+        except EngineConfigurationError:
+            raise PrivacyGuardError(ErrorCode.CONFIG_INVALID) from None
         except EngineContractError:
             raise PrivacyGuardError(ErrorCode.ENGINE_OUTPUT_INVALID) from None
         except EntityProcessingError:

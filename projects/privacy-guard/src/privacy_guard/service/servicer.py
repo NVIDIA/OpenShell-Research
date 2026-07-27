@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import math
 import time
 from collections import OrderedDict
 from collections.abc import Callable, Iterable
 from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import dataclass
 from threading import RLock
 from typing import Never, Protocol, TypedDict, TypeVar
 
@@ -42,6 +44,7 @@ from privacy_guard.constants import (
     SERVICE_VERSION,
 )
 from privacy_guard.engines import EngineConfig
+from privacy_guard.engines import regex as regex_engine
 from privacy_guard.engines.registry import EngineRegistry
 from privacy_guard.errors import (
     EngineRegistryError,
@@ -87,6 +90,7 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
     async def close(self) -> None:
         """Wait for in-flight synchronous engines during shutdown."""
         self._processing_executor.shutdown(wait=True, cancel_futures=True)
+        self._processors.clear()
 
     async def Describe(
         self,
@@ -173,7 +177,7 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
             _LOGGER.info(
                 "privacy_guard_evaluation request_id=%s duration_ms=%.3f "
                 "action=%s finding_count=%d error_code=%s",
-                log_extra["request_id"],
+                _request_id_for_log_message(log_extra["request_id"]),
                 log_extra["duration_ms"],
                 log_extra["action"],
                 log_extra["finding_count"],
@@ -232,6 +236,12 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         return await asyncio.shield(future)
 
 
+@dataclass(frozen=True)
+class _PreparedProcessor:
+    processor: RequestProcessor
+    regex_engines: tuple[regex_engine.RegexEngine, ...]
+
+
 class _RequestProcessorCache:
     """Bounded, recoverable cache keyed by canonical expanded configuration."""
 
@@ -247,7 +257,11 @@ class _RequestProcessorCache:
         self._log_request_content = log_request_content
         self._processors: OrderedDict[
             str,
-            tuple[RequestProcessor, int],
+            tuple[
+                RequestProcessor,
+                int,
+                regex_engine._CompiledProcessorLease | None,
+            ],
         ] = OrderedDict()
         self._weight_bytes = 0
         self._in_flight: dict[str, Future[RequestProcessor]] = {}
@@ -270,40 +284,98 @@ class _RequestProcessorCache:
         if not owns_build:
             return owner_future.result()
         try:
-            processor = self._build_processor(config)
+            prepared = self._build_processor(config)
         except Exception as error:
             owner_future.set_exception(error)
             with self._lock:
                 if self._in_flight.get(fingerprint) is owner_future:
                     del self._in_flight[fingerprint]
             raise
+        processor = prepared.processor
+        regex_weight_bytes = regex_engine._compiled_processor_weight(
+            prepared.regex_engines
+        )
         evicted_entries = 0
         evicted_weight_bytes = 0
+        cacheable = (
+            weight_bytes <= MAX_PROCESSOR_CACHE_CONFIG_BYTES
+            and regex_weight_bytes <= regex_engine.MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES
+        )
         with self._lock:
-            if weight_bytes <= MAX_PROCESSOR_CACHE_CONFIG_BYTES:
-                replaced = self._processors.pop(fingerprint, None)
-                if replaced is not None:
-                    self._weight_bytes -= replaced[1]
-                self._processors[fingerprint] = (processor, weight_bytes)
-                self._weight_bytes += weight_bytes
+            lease: regex_engine._CompiledProcessorLease | None = None
+            if cacheable:
                 while (
-                    len(self._processors) > _MAX_CACHED_PROCESSORS
-                    or self._weight_bytes > MAX_PROCESSOR_CACHE_CONFIG_BYTES
+                    len(self._processors) >= _MAX_CACHED_PROCESSORS
+                    or self._weight_bytes + weight_bytes
+                    > MAX_PROCESSOR_CACHE_CONFIG_BYTES
                 ):
-                    _, (_, evicted_weight) = self._processors.popitem(last=False)
+                    _, (_, evicted_weight, evicted_lease) = self._processors.popitem(
+                        last=False
+                    )
                     self._weight_bytes -= evicted_weight
+                    if evicted_lease is not None:
+                        evicted_lease.release()
                     evicted_entries += 1
                     evicted_weight_bytes += evicted_weight
+                if prepared.regex_engines:
+                    lease = regex_engine._try_acquire_compiled_processor_lease(
+                        prepared.regex_engines
+                    )
+                    while lease is None:
+                        evicted_fingerprint = next(
+                            (
+                                cached_fingerprint
+                                for cached_fingerprint, (
+                                    _,
+                                    _,
+                                    cached_lease,
+                                ) in self._processors.items()
+                                if cached_lease is not None
+                            ),
+                            None,
+                        )
+                        if evicted_fingerprint is None:
+                            break
+                        _, evicted_weight, evicted_lease = self._processors.pop(
+                            evicted_fingerprint
+                        )
+                        self._weight_bytes -= evicted_weight
+                        assert evicted_lease is not None
+                        evicted_lease.release()
+                        evicted_entries += 1
+                        evicted_weight_bytes += evicted_weight
+                        lease = regex_engine._try_acquire_compiled_processor_lease(
+                            prepared.regex_engines
+                        )
+                    cacheable = lease is not None
+                if cacheable:
+                    replaced = self._processors.pop(fingerprint, None)
+                    if replaced is not None:
+                        self._weight_bytes -= replaced[1]
+                        if replaced[2] is not None:
+                            replaced[2].release()
+                    self._processors[fingerprint] = (
+                        processor,
+                        weight_bytes,
+                        lease,
+                    )
+                    self._weight_bytes += weight_bytes
         owner_future.set_result(processor)
         with self._lock:
             if self._in_flight.get(fingerprint) is owner_future:
                 del self._in_flight[fingerprint]
-        if weight_bytes > MAX_PROCESSOR_CACHE_CONFIG_BYTES:
+        if not cacheable:
+            skipped_weight_bytes = max(weight_bytes, regex_weight_bytes)
+            skipped_budget_bytes = (
+                MAX_PROCESSOR_CACHE_CONFIG_BYTES
+                if weight_bytes > MAX_PROCESSOR_CACHE_CONFIG_BYTES
+                else regex_engine.MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES
+            )
             _LOGGER.debug(
                 "privacy_guard_cache_skip cache=processor "
                 "weight_bytes=%d budget_bytes=%d",
-                weight_bytes,
-                MAX_PROCESSOR_CACHE_CONFIG_BYTES,
+                skipped_weight_bytes,
+                skipped_budget_bytes,
             )
         if evicted_entries:
             _LOGGER.debug(
@@ -317,7 +389,7 @@ class _RequestProcessorCache:
     def _build_processor(
         self,
         config: PrivacyGuardConfig[EngineConfig],
-    ) -> RequestProcessor:
+    ) -> _PreparedProcessor:
         stages = tuple(
             (
                 stage.diagnostic_name(index),
@@ -328,12 +400,28 @@ class _RequestProcessorCache:
                 start=1,
             )
         )
-        return RequestProcessor(
-            config,
-            stages,
-            timeout_seconds=self._timeout_seconds,
-            log_request_content=self._log_request_content,
+        return _PreparedProcessor(
+            processor=RequestProcessor(
+                config,
+                stages,
+                timeout_seconds=self._timeout_seconds,
+                log_request_content=self._log_request_content,
+            ),
+            regex_engines=tuple(
+                engine
+                for _, engine in stages
+                if isinstance(engine, regex_engine.RegexEngine)
+            ),
         )
+
+    def clear(self) -> None:
+        """Release every retained processor and its owner-specific Regex lease."""
+        with self._lock:
+            for _, _, lease in self._processors.values():
+                if lease is not None:
+                    lease.release()
+            self._processors.clear()
+            self._weight_bytes = 0
 
 
 _WorkerResultT = TypeVar("_WorkerResultT")
@@ -380,6 +468,10 @@ def _request_id_for_logging(request_id: object) -> str:
         return validate_bounded_metadata_string(request_id)
     except ValueError:
         return _INVALID_REQUEST_ID
+
+
+def _request_id_for_log_message(request_id: str) -> str:
+    return json.dumps(request_id, ensure_ascii=False).replace(" ", r"\u0020")
 
 
 def _mapping_from_proto(config: Message) -> dict[str, object]:

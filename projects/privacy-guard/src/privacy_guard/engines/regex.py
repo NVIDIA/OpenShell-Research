@@ -48,8 +48,6 @@ from privacy_guard.errors import (
     EngineConfigurationError,
     EngineContractError,
     EngineLimitExceededError,
-    ErrorCode,
-    PrivacyGuardError,
 )
 from privacy_guard.logging import get_logger
 from privacy_guard.string_validators import ScalarString, validate_scalar_string
@@ -255,7 +253,9 @@ class RegexEngine(EntityProcessingEngine[RegexEngineConfig]):
                     break
                 start, end = match.span()
                 if start == end:
-                    raise PrivacyGuardError(ErrorCode.CONFIG_INVALID)
+                    raise EngineConfigurationError(
+                        "regex engine configuration is invalid"
+                    )
                 if match.span(rule.marker) != (end, end):
                     raise EngineConfigurationError(
                         "regex engine configuration is invalid"
@@ -306,6 +306,30 @@ class _CompiledRule:
     confidence: ConfidenceLevel
     marker: str
     compiled: _CompiledPattern
+
+
+@dataclass
+class _LeasedCompiledRules:
+    rules: tuple[_CompiledRule, ...]
+    weight_bytes: int
+    lease_count: int
+
+
+class _CompiledProcessorLease:
+    """Private ownership token for Regex state retained by one processor."""
+
+    __slots__ = ("_catalogs", "_released")
+
+    def __init__(self, catalogs: tuple[RegexPatternCatalog, ...]) -> None:
+        self._catalogs = catalogs
+        self._released = False
+
+    def release(self) -> None:
+        """Release this processor's retained compiled-state ownership."""
+        if self._released:
+            return
+        self._released = True
+        _release_compiled_processor_lease(self._catalogs)
 
 
 class _RegexMatch(Protocol):
@@ -552,6 +576,9 @@ def _compile_pattern_catalog(
         if cached is not None:
             _COMPILED_PATTERN_CACHE.move_to_end(catalog)
             return cached[0]
+        leased = _COMPILED_PATTERN_LEASES.get(catalog)
+        if leased is not None:
+            return leased.rules
 
     rules = tuple(
         _compile_rule(
@@ -564,16 +591,7 @@ def _compile_pattern_catalog(
             _iter_catalog_patterns(catalog)
         )
     )
-    catalog_bytes = len(
-        json.dumps(
-            catalog.model_dump(mode="json"),
-            allow_nan=False,
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode("utf-8")
-    )
-    weight_bytes = catalog_bytes + len(rules) * REGEX_COMPILED_RULE_WEIGHT_BYTES
+    weight_bytes = _compiled_pattern_weight(catalog, len(rules))
     if weight_bytes > MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES:
         _LOGGER.debug(
             "privacy_guard_cache_skip cache=regex_compiled "
@@ -585,23 +603,47 @@ def _compile_pattern_catalog(
 
     evicted_entries = 0
     evicted_weight_bytes = 0
+    retained = False
     with _COMPILED_PATTERN_CACHE_LOCK:
         cached = _COMPILED_PATTERN_CACHE.get(catalog)
         if cached is not None:
             _COMPILED_PATTERN_CACHE.move_to_end(catalog)
             return cached[0]
-        _COMPILED_PATTERN_CACHE[catalog] = (rules, weight_bytes)
+        leased = _COMPILED_PATTERN_LEASES.get(catalog)
+        if leased is not None:
+            return leased.rules
+
         global _COMPILED_PATTERN_CACHE_WEIGHT_BYTES
-        _COMPILED_PATTERN_CACHE_WEIGHT_BYTES += weight_bytes
-        while (
-            len(_COMPILED_PATTERN_CACHE) > _MAX_CACHED_COMPILED_CATALOGS
-            or _COMPILED_PATTERN_CACHE_WEIGHT_BYTES
-            > MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES
+        retained_count = _compiled_pattern_retained_count()
+        removable_weight = sum(
+            cached_weight
+            for cached_catalog, (_, cached_weight) in _COMPILED_PATTERN_CACHE.items()
+            if cached_catalog not in _COMPILED_PATTERN_LEASES
+        )
+        removable_count = sum(
+            cached_catalog not in _COMPILED_PATTERN_LEASES
+            for cached_catalog in _COMPILED_PATTERN_CACHE
+        )
+        if (
+            _COMPILED_PATTERN_CACHE_WEIGHT_BYTES + weight_bytes - removable_weight
+            <= MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES
+            and retained_count + 1 - removable_count <= _MAX_CACHED_COMPILED_CATALOGS
         ):
-            _, (_, evicted_weight) = _COMPILED_PATTERN_CACHE.popitem(last=False)
-            _COMPILED_PATTERN_CACHE_WEIGHT_BYTES -= evicted_weight
-            evicted_entries += 1
-            evicted_weight_bytes += evicted_weight
+            while _COMPILED_PATTERN_CACHE and (
+                _compiled_pattern_retained_count() >= _MAX_CACHED_COMPILED_CATALOGS
+                or _COMPILED_PATTERN_CACHE_WEIGHT_BYTES + weight_bytes
+                > MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES
+            ):
+                evicted_catalog, (_, evicted_weight) = _COMPILED_PATTERN_CACHE.popitem(
+                    last=False
+                )
+                if evicted_catalog not in _COMPILED_PATTERN_LEASES:
+                    _COMPILED_PATTERN_CACHE_WEIGHT_BYTES -= evicted_weight
+                    evicted_weight_bytes += evicted_weight
+                evicted_entries += 1
+            _COMPILED_PATTERN_CACHE[catalog] = (rules, weight_bytes)
+            _COMPILED_PATTERN_CACHE_WEIGHT_BYTES += weight_bytes
+            retained = True
     if evicted_entries:
         _LOGGER.debug(
             "privacy_guard_cache_eviction cache=regex_compiled "
@@ -609,14 +651,167 @@ def _compile_pattern_catalog(
             evicted_entries,
             evicted_weight_bytes,
         )
+    if not retained:
+        _LOGGER.debug(
+            "privacy_guard_cache_skip cache=regex_compiled "
+            "weight_bytes=%d budget_bytes=%d",
+            weight_bytes,
+            MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES,
+        )
     return rules
+
+
+def _compiled_processor_weight(engines: tuple[RegexEngine, ...]) -> int:
+    catalogs = {engine.config.pattern_catalog: len(engine._rules) for engine in engines}
+    return sum(
+        _compiled_pattern_weight(catalog, rule_count)
+        for catalog, rule_count in catalogs.items()
+    )
+
+
+def _try_acquire_compiled_processor_lease(
+    engines: tuple[RegexEngine, ...],
+) -> _CompiledProcessorLease | None:
+    """Try to retain one processor's unique Regex state under the union budget."""
+    engines_by_catalog: dict[RegexPatternCatalog, list[RegexEngine]] = {}
+    for engine in engines:
+        engines_by_catalog.setdefault(engine.config.pattern_catalog, []).append(engine)
+    compiled = {
+        catalog: catalog_engines[0]._rules
+        for catalog, catalog_engines in engines_by_catalog.items()
+    }
+    if (
+        sum(
+            _compiled_pattern_weight(catalog, len(rules))
+            for catalog, rules in compiled.items()
+        )
+        > MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES
+    ):
+        return None
+
+    evicted_entries = 0
+    evicted_weight_bytes = 0
+    lease: _CompiledProcessorLease | None = None
+    with _COMPILED_PATTERN_CACHE_LOCK:
+        additional_weight = sum(
+            _compiled_pattern_weight(catalog, len(rules))
+            for catalog, rules in compiled.items()
+            if catalog not in _COMPILED_PATTERN_CACHE
+            and catalog not in _COMPILED_PATTERN_LEASES
+        )
+        additional_count = sum(
+            catalog not in _COMPILED_PATTERN_CACHE
+            and catalog not in _COMPILED_PATTERN_LEASES
+            for catalog in compiled
+        )
+        global _COMPILED_PATTERN_CACHE_WEIGHT_BYTES
+        retained_count = _compiled_pattern_retained_count()
+        removable_weight = sum(
+            cached_weight
+            for cached_catalog, (_, cached_weight) in _COMPILED_PATTERN_CACHE.items()
+            if cached_catalog not in _COMPILED_PATTERN_LEASES
+        )
+        removable_count = sum(
+            cached_catalog not in _COMPILED_PATTERN_LEASES
+            for cached_catalog in _COMPILED_PATTERN_CACHE
+        )
+        if (
+            _COMPILED_PATTERN_CACHE_WEIGHT_BYTES + additional_weight - removable_weight
+            <= MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES
+            and retained_count + additional_count - removable_count
+            <= _MAX_CACHED_COMPILED_CATALOGS
+        ):
+            while _COMPILED_PATTERN_CACHE and (
+                _COMPILED_PATTERN_CACHE_WEIGHT_BYTES + additional_weight
+                > MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES
+                or _compiled_pattern_retained_count() + additional_count
+                > _MAX_CACHED_COMPILED_CATALOGS
+            ):
+                evicted_catalog, (_, evicted_weight) = _COMPILED_PATTERN_CACHE.popitem(
+                    last=False
+                )
+                if evicted_catalog not in _COMPILED_PATTERN_LEASES:
+                    _COMPILED_PATTERN_CACHE_WEIGHT_BYTES -= evicted_weight
+                    evicted_weight_bytes += evicted_weight
+                evicted_entries += 1
+
+            for catalog, rules in compiled.items():
+                leased = _COMPILED_PATTERN_LEASES.get(catalog)
+                if leased is not None:
+                    retained_rules = leased.rules
+                    leased.lease_count += 1
+                else:
+                    cached = _COMPILED_PATTERN_CACHE.get(catalog)
+                    if cached is not None:
+                        retained_rules, weight_bytes = cached
+                    else:
+                        retained_rules = rules
+                        weight_bytes = _compiled_pattern_weight(catalog, len(rules))
+                        _COMPILED_PATTERN_CACHE_WEIGHT_BYTES += weight_bytes
+                    _COMPILED_PATTERN_LEASES[catalog] = _LeasedCompiledRules(
+                        rules=retained_rules,
+                        weight_bytes=weight_bytes,
+                        lease_count=1,
+                    )
+                for engine in engines_by_catalog[catalog]:
+                    engine._rules = retained_rules
+            lease = _CompiledProcessorLease(tuple(compiled))
+
+    if evicted_entries:
+        _LOGGER.debug(
+            "privacy_guard_cache_eviction cache=regex_compiled "
+            "entries=%d weight_bytes=%d",
+            evicted_entries,
+            evicted_weight_bytes,
+        )
+    return lease
+
+
+def _compiled_pattern_retained_count() -> int:
+    return len(_COMPILED_PATTERN_CACHE) + sum(
+        catalog not in _COMPILED_PATTERN_CACHE for catalog in _COMPILED_PATTERN_LEASES
+    )
+
+
+def _release_compiled_processor_lease(
+    catalogs: tuple[RegexPatternCatalog, ...],
+) -> None:
+    global _COMPILED_PATTERN_CACHE_WEIGHT_BYTES
+    with _COMPILED_PATTERN_CACHE_LOCK:
+        for catalog in catalogs:
+            leased = _COMPILED_PATTERN_LEASES[catalog]
+            leased.lease_count -= 1
+            if leased.lease_count:
+                continue
+            del _COMPILED_PATTERN_LEASES[catalog]
+            if catalog not in _COMPILED_PATTERN_CACHE:
+                _COMPILED_PATTERN_CACHE_WEIGHT_BYTES -= leased.weight_bytes
+
+
+def _compiled_pattern_weight(
+    catalog: RegexPatternCatalog,
+    rule_count: int,
+) -> int:
+    catalog_bytes = len(
+        json.dumps(
+            catalog.model_dump(mode="json"),
+            allow_nan=False,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    )
+    return catalog_bytes + rule_count * REGEX_COMPILED_RULE_WEIGHT_BYTES
 
 
 def _clear_compiled_pattern_cache() -> None:
     global _COMPILED_PATTERN_CACHE_WEIGHT_BYTES
     with _COMPILED_PATTERN_CACHE_LOCK:
+        retained_lease_weight = sum(
+            leased.weight_bytes for leased in _COMPILED_PATTERN_LEASES.values()
+        )
         _COMPILED_PATTERN_CACHE.clear()
-        _COMPILED_PATTERN_CACHE_WEIGHT_BYTES = 0
+        _COMPILED_PATTERN_CACHE_WEIGHT_BYTES = retained_lease_weight
 
 
 def _clear_parsed_pattern_catalog_cache() -> None:
@@ -786,7 +981,9 @@ _COMPILED_PATTERN_CACHE: OrderedDict[
     RegexPatternCatalog,
     tuple[tuple[_CompiledRule, ...], int],
 ] = OrderedDict()
+# This is the union retained by the LRU and processor leases, not their sum.
 _COMPILED_PATTERN_CACHE_WEIGHT_BYTES = 0
+_COMPILED_PATTERN_LEASES: dict[RegexPatternCatalog, _LeasedCompiledRules] = {}
 _COMPILED_PATTERN_CACHE_LOCK = RLock()
 _LOGGER = get_logger(__name__)
 

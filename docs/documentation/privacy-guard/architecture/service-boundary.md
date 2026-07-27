@@ -40,11 +40,12 @@ validation and every request evaluation.
 
 `ValidateConfig`:
 
-1. converts the `Struct` to a mapping
-2. validates the registry-built discriminated policy model
-3. validates each exact engine config against registered resources
-4. validates replacement support for a replace action
-5. returns `valid=true`, or a content-safe reason
+1. rejects an encoded `Struct` larger than 64 KiB before conversion
+2. converts the `Struct` to a mapping
+3. validates the registry-built discriminated policy model
+4. validates each exact engine config against registered resources
+5. validates replacement support for a replace action
+6. returns `valid=true`, or a content-safe reason
 
 It does not construct engines, populate the processor cache, contact model
 providers, download resources, or write artifacts. Validation runs in the
@@ -62,17 +63,20 @@ still occurs for every evaluation, while equivalent normalized regex catalogs
 reuse their bounded compiled-rule entry instead of recompiling.
 
 Regex keeps two additional owner-local LRU caches. Parsed file catalogs retain
-at most 64 entries and 8 MiB of source files. Compiled catalogs retain at most
-128 entries and 32 MiB of weighted state, where each entry weighs its canonical
-catalog bytes plus 4 KiB per compiled rule. The rule allowance conservatively
-represents backend and Python state that the catalog encoding alone does not
-capture.
+at most 64 entries and 8 MiB of source files. Compiled Regex state retained by
+either the compiled-catalog LRU or cached processors shares one 128-catalog,
+32 MiB union budget. Each canonical catalog weighs its encoded bytes plus 4 KiB
+per compiled rule and is counted once when both owners refer to it. The rule
+allowance conservatively represents backend and Python state that the catalog
+encoding alone does not capture.
 
 An otherwise valid entry larger than one cache's byte budget is built and
-returned without being retained. Eviction or a skipped entry never makes a
-policy invalid. Content-safe debug events report the cache name and weight, plus
-the number of entries for an eviction, without logging configuration, paths,
-patterns, or fingerprints.
+returned without being retained. A processor whose unique compiled Regex state
+does not fit the union budget is likewise returned for the current evaluation
+without processor-cache retention. Eviction or a skipped entry never makes a
+policy invalid. Content-safe debug events report the cache name and weight,
+plus the number of entries for an eviction, without logging configuration,
+paths, patterns, or fingerprints.
 
 The cache is protected for concurrent access and is not correctness-relevant.
 Eviction or process restart simply causes reconstruction from a later

@@ -74,8 +74,10 @@ from the shared domain field type. These values must be non-empty printable
 Unicode without control or bidirectional formatting characters. Untrusted
 request IDs use the same content and size rules for logging; an invalid request
 ID is represented by a constant placeholder and does not change the evaluation
-result. Regex entity and supplied pattern names have a stricter ASCII grammar
-and limit described below.
+result. The human-readable log message quotes request IDs and escapes ASCII
+spaces so their text cannot introduce another key/value token; structured log
+records retain the exact validated ID. Regex entity and supplied pattern names
+have a stricter ASCII grammar and limit described below.
 
 The processor aggregates occurrences before the service applies protobuf
 limits. If a safe result cannot be represented, the service returns a limit
@@ -250,11 +252,14 @@ Prepared state is bounded by weight and least-recently-used entry count:
 | Cache | Weight budget | Entry cap | Entry weight |
 | --- | ---: | ---: | --- |
 | Parsed Regex file catalogs | 8 MiB | 64 | source file bytes |
-| Compiled Regex catalogs | 32 MiB | 128 | canonical catalog bytes plus 4 KiB per rule |
+| Compiled Regex state retained by its LRU or cached processors | 32 MiB | 128 | canonical catalog bytes plus 4 KiB per rule |
 | Request processors | 1 MiB | 128 | canonical expanded configuration bytes |
 
 The compiled-rule allowance accounts for retained backend state that is much
-larger than short pattern text. Processor weighting remains engine-neutral, so
+larger than short pattern text. Equal catalogs share one compiled tuple and one
+weight charge across the compiled LRU and any cached Regex processors that use
+it. Processor configuration weighting remains engine-neutral, and the
+Regex-specific ownership accounting is private to the built-in engine, so
 custom engines do not need a cache-size hook. One entry that exceeds its cache
 budget remains valid and usable for the current evaluation but is not retained.
 Debug skip and eviction records contain only cache names and weights, plus

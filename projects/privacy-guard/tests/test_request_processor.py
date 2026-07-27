@@ -13,6 +13,7 @@ from privacy_guard.constants import MAX_BODY_BYTES
 from privacy_guard.engines import RegexEngine
 from privacy_guard.engines.registry import EngineRegistry
 from privacy_guard.errors import (
+    EngineConfigurationError,
     EngineLimitExceededError,
     ErrorCode,
     PrivacyGuardError,
@@ -203,3 +204,18 @@ def test_engine_resource_limit_returns_the_bounded_limit_deny(
     assert "privacy_guard_processing_limit kind=resource" in caplog.text
     assert "Alice" not in caplog.text
     assert "sensitive resource detail" not in caplog.text
+
+
+def test_engine_configuration_failure_maps_to_invalid_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def reject_config(*_: object, **__: object) -> object:
+        raise EngineConfigurationError("sensitive configuration detail")
+
+    monkeypatch.setattr(RegexEngine, "_run", reject_config)
+
+    with pytest.raises(PrivacyGuardError) as captured:
+        _processor(PolicyAction.DETECT).process("Hello Alice")
+
+    assert captured.value.code is ErrorCode.CONFIG_INVALID
+    assert "sensitive configuration detail" not in str(captured.value)
