@@ -13,6 +13,7 @@ from typing import (
     Generic,
     Self,
     TypeAlias,
+    final,
     get_args,
     get_origin,
 )
@@ -156,6 +157,7 @@ class EntityProcessingEngine(ABC, Generic[_ConfigT, _ResourcesT]):
 
     supported_strategies: ClassVar[frozenset[EntityProcessingStrategy]]
 
+    @final
     def __init__(
         self,
         config: _ConfigT,
@@ -227,6 +229,7 @@ class EntityProcessingEngine(ABC, Generic[_ConfigT, _ResourcesT]):
         """Return the validated, injected runtime resources."""
         return self.__resources
 
+    @final
     def run(
         self,
         text: str,

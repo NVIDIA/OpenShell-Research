@@ -261,6 +261,107 @@ def test_registry_rejects_duplicate_discriminators_and_resource_mismatch() -> No
         EngineRegistry().register(DetectEngine, resources=object())
 
 
+def _run_without_the_engine_wrapper(
+    self: DetectEngine,
+    text: str,
+    *,
+    strategy: EntityProcessingStrategy,
+    timeout: Timeout,
+) -> TextProcessingResult:
+    del self, strategy, timeout
+    return TextProcessingResult(text=text, detections=())
+
+
+def _initialize_without_the_engine_constructor(
+    self: DetectEngine,
+    config: DetectConfig,
+    resources: None,
+) -> None:
+    del self, config, resources
+
+
+@pytest.mark.parametrize(
+    ("method_name", "method", "expected_error"),
+    [
+        (
+            "run",
+            _run_without_the_engine_wrapper,
+            "engine lifecycle contract requires EntityProcessingEngine.run; "
+            "implement _run() instead",
+        ),
+        (
+            "__init__",
+            _initialize_without_the_engine_constructor,
+            "engine lifecycle contract requires EntityProcessingEngine.__init__; "
+            "use _initialize() instead",
+        ),
+    ],
+)
+def test_registry_rejects_direct_and_inherited_lifecycle_overrides(
+    method_name: str,
+    method: object,
+    expected_error: str,
+) -> None:
+    direct_override = type(
+        "LifecycleOverrideEngine",
+        (DetectEngine,),
+        {method_name: method},
+    )
+    inherited_override = type(
+        "InheritedOverrideEngine",
+        (direct_override,),
+        {},
+    )
+
+    for engine_type in (direct_override, inherited_override):
+        with pytest.raises(EngineRegistryError) as error:
+            EngineRegistry().register(engine_type)
+
+        assert str(error.value) == expected_error
+
+
+def test_base_lifecycle_methods_are_final_for_static_feedback() -> None:
+    assert getattr(EntityProcessingEngine.__init__, "__final__", False) is True
+    assert getattr(EntityProcessingEngine.run, "__final__", False) is True
+
+
+def test_registry_accepts_base_lifecycle_inherited_through_custom_base() -> None:
+    intermediate_base = type(
+        "ValidIntermediateEngineBase",
+        (DetectEngine,),
+        {},
+    )
+    inherited_lifecycle_engine = type(
+        "InheritedLifecycleEngine",
+        (intermediate_base,),
+        {},
+    )
+
+    registry = EngineRegistry()
+    registry.register(inherited_lifecycle_engine)
+
+    assert inherited_lifecycle_engine.__init__ is EntityProcessingEngine.__init__
+    assert inherited_lifecycle_engine.run is EntityProcessingEngine.run
+
+
+@pytest.mark.parametrize(
+    ("engine_type", "resources"),
+    [
+        (DetectEngine, None),
+        (AcmeEngine, AcmeResources(prefix="token")),
+    ],
+)
+def test_registry_accepts_engines_using_the_base_lifecycle(
+    engine_type: type[object],
+    resources: object,
+) -> None:
+    registry = EngineRegistry()
+
+    registry.register(engine_type, resources=resources)
+
+    assert registry.finalize().is_finalized is True
+
+
 def test_describe_does_not_construct_an_engine() -> None:
     class CountingEngine(EntityProcessingEngine[DetectConfig]):
         supported_strategies = frozenset({EntityProcessingStrategy.DETECT})

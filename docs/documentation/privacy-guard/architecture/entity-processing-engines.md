@@ -30,7 +30,9 @@ An engine:
 The public `run()` method validates input, strategy support, the timeout, and
 the complete output contract. Custom engines implement `_run()` and do not
 override `run()` or define `__init__`. `_initialize()` is optional, and
-`@override` is not required.
+`@override` is not required. The base constructor and public wrapper are final
+lifecycle methods. Registration rejects direct or inherited overrides and
+directs custom engines to `_initialize()` and `_run()` instead.
 
 ## Configuration
 

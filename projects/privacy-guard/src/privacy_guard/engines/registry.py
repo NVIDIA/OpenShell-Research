@@ -72,6 +72,16 @@ class EngineRegistry:
             engine_type, EntityProcessingEngine
         ):
             raise EngineRegistryError("registered engine type is invalid")
+        if engine_type.__init__ is not EntityProcessingEngine.__init__:
+            raise EngineRegistryError(
+                "engine lifecycle contract requires EntityProcessingEngine.__init__; "
+                "use _initialize() instead"
+            )
+        if engine_type.run is not EntityProcessingEngine.run:
+            raise EngineRegistryError(
+                "engine lifecycle contract requires EntityProcessingEngine.run; "
+                "implement _run() instead"
+            )
 
         try:
             config_type = engine_type.get_config_type()
