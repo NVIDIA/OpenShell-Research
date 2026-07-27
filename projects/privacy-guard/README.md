@@ -184,6 +184,9 @@ explicitly named asynchronous counterpart:
 await server.serve_async("127.0.0.1:50051")
 ```
 
+Listen addresses use `host:port` or bracketed IPv6 `[address]:port` form. The
+port must be an explicit integer from 1 through 65535.
+
 Custom applications pass their own finalized registry to
 `PrivacyGuardServer`. The server owns the middleware adapter, bounded gRPC
 transport, worker executor, and shutdown lifecycle; it does not load Python

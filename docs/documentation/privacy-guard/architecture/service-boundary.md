@@ -226,6 +226,11 @@ Async applications call `await server.serve_async(address)` instead. The
 explicit suffixes make the blocking behavior visible at each call site. Both
 entry points use the same server instance and lifecycle.
 
+The listen address uses `host:port` or bracketed IPv6 `[address]:port` form,
+with an explicit port from 1 through 65535. Privacy Guard rejects zero and
+out-of-range numeric ports before calling gRPC, then verifies that gRPC bound
+the requested port before starting the service.
+
 The server:
 
 1. creates an unstarted async gRPC server with receive and concurrency limits

@@ -46,12 +46,13 @@ class PrivacyGuardServer:
     async def serve_async(self, listen: str = DEFAULT_LISTEN_ADDRESS) -> None:
         """Serve asynchronously until termination, then close owned resources."""
         server = _create_grpc_server(self._middleware)
-        _LOGGER.info("privacy_guard_server_starting listen=%s", listen)
         try:
             try:
+                requested_port = _validated_listen_port(listen)
                 bound_port = server.add_insecure_port(listen)
-                if bound_port == 0:
+                if bound_port != requested_port:
                     raise PrivacyGuardError(ErrorCode.SERVER_BIND_FAILED)
+                _LOGGER.info("privacy_guard_server_bound listen=%r", listen)
                 await server.start()
             except RuntimeError:
                 raise PrivacyGuardError(ErrorCode.SERVER_BIND_FAILED) from None
@@ -85,6 +86,35 @@ async def _stop_grpc_server(server: grpc.aio.Server) -> None:
         if not shutdown.done():
             await shutdown
         raise
+
+
+def _validated_listen_port(listen: str) -> int:
+    if not isinstance(listen, str):
+        raise PrivacyGuardError(ErrorCode.SERVER_BIND_FAILED)
+    if listen.startswith("["):
+        closing_bracket = listen.rfind("]")
+        if (
+            closing_bracket < 2
+            or listen[closing_bracket + 1 : closing_bracket + 2] != ":"
+        ):
+            raise PrivacyGuardError(ErrorCode.SERVER_BIND_FAILED)
+        host = listen[1:closing_bracket]
+        port_text = listen[closing_bracket + 2 :]
+    else:
+        host, separator, port_text = listen.rpartition(":")
+        if not separator or not host or ":" in host:
+            raise PrivacyGuardError(ErrorCode.SERVER_BIND_FAILED)
+    if (
+        not host
+        or not port_text
+        or not port_text.isascii()
+        or not port_text.isdecimal()
+    ):
+        raise PrivacyGuardError(ErrorCode.SERVER_BIND_FAILED)
+    port = int(port_text)
+    if not 1 <= port <= 65_535:
+        raise PrivacyGuardError(ErrorCode.SERVER_BIND_FAILED)
+    return port
 
 
 __all__ = [

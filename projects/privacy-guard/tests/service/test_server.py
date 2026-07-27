@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import subprocess
 import sys
 
@@ -233,8 +234,9 @@ async def test_serve_async_sanitizes_bind_failures_and_closes_resources(
 @pytest.mark.asyncio
 async def test_serve_async_starts_waits_and_closes_on_normal_termination(
     monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    fake_server = _LifecycleServerFake()
+    fake_server = _LifecycleServerFake(bound_port=50053)
     closed: list[PrivacyGuardMiddleware] = []
 
     async def record_close(middleware: PrivacyGuardMiddleware) -> None:
@@ -244,20 +246,25 @@ async def test_serve_async_starts_waits_and_closes_on_normal_termination(
     monkeypatch.setattr(server_module, "_create_grpc_server", lambda _: fake_server)
     monkeypatch.setattr(PrivacyGuardMiddleware, "close", record_close)
 
-    await server.serve_async("127.0.0.1:50053")
+    with caplog.at_level(logging.INFO, logger="privacy_guard.service.server"):
+        await server.serve_async("127.0.0.1:50053")
 
     assert fake_server.addresses == ["127.0.0.1:50053"]
     assert fake_server.started is True
     assert fake_server.waited is True
     assert fake_server.stop_graces == [0]
     assert closed == [server._middleware]
+    assert "privacy_guard_server_bound listen='127.0.0.1:50053'" in caplog.text
 
 
 @pytest.mark.asyncio
 async def test_serve_async_propagates_cancellation_after_closing_resources(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake_server = _LifecycleServerFake(wait_error=asyncio.CancelledError())
+    fake_server = _LifecycleServerFake(
+        bound_port=50054,
+        wait_error=asyncio.CancelledError(),
+    )
     closed: list[PrivacyGuardMiddleware] = []
 
     async def record_close(middleware: PrivacyGuardMiddleware) -> None:
@@ -279,7 +286,7 @@ async def test_serve_async_propagates_cancellation_after_closing_resources(
 async def test_serve_async_preserves_cancellation_during_server_shutdown(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake_server = _LifecycleServerFake(block_stop=True)
+    fake_server = _LifecycleServerFake(bound_port=50055, block_stop=True)
     closed: list[PrivacyGuardMiddleware] = []
 
     async def record_close(middleware: PrivacyGuardMiddleware) -> None:
@@ -308,7 +315,10 @@ async def test_serve_async_preserves_cancellation_during_server_shutdown(
 async def test_serve_async_sanitizes_startup_failures_and_closes_resources(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    fake_server = _LifecycleServerFake(start_error=RuntimeError("startup failed"))
+    fake_server = _LifecycleServerFake(
+        bound_port=50056,
+        start_error=RuntimeError("startup failed"),
+    )
     closed: list[PrivacyGuardMiddleware] = []
 
     async def record_close(middleware: PrivacyGuardMiddleware) -> None:
@@ -326,6 +336,61 @@ async def test_serve_async_sanitizes_startup_failures_and_closes_resources(
     assert "server.start" in str(captured.value)
     assert "startup failed" not in str(captured.value)
     assert fake_server.waited is False
+    assert fake_server.stop_graces == [0]
+    assert closed == [server._middleware]
+
+
+@pytest.mark.parametrize(
+    ("listen", "port"),
+    [
+        ("127.0.0.1:1", 1),
+        ("middleware.local:65535", 65_535),
+        ("[::1]:50051", 50_051),
+    ],
+)
+def test_listen_address_accepts_supported_tcp_forms(listen: str, port: int) -> None:
+    assert server_module._validated_listen_port(listen) == port
+
+
+@pytest.mark.parametrize(
+    "listen",
+    [
+        "127.0.0.1:0",
+        "127.0.0.1:65536",
+        "127.0.0.1:99999",
+        "127.0.0.1:-1",
+        "[::1]",
+        "::1:50051",
+    ],
+)
+def test_listen_address_rejects_invalid_numeric_ports_and_forms(
+    listen: str,
+) -> None:
+    with pytest.raises(PrivacyGuardError) as captured:
+        server_module._validated_listen_port(listen)
+
+    assert captured.value.code is ErrorCode.SERVER_BIND_FAILED
+
+
+@pytest.mark.asyncio
+async def test_serve_async_rejects_mismatched_bound_port(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_server = _LifecycleServerFake(bound_port=34_463)
+    closed: list[PrivacyGuardMiddleware] = []
+
+    async def record_close(middleware: PrivacyGuardMiddleware) -> None:
+        closed.append(middleware)
+
+    server = PrivacyGuardServer(create_builtin_registry())
+    monkeypatch.setattr(server_module, "_create_grpc_server", lambda _: fake_server)
+    monkeypatch.setattr(PrivacyGuardMiddleware, "close", record_close)
+
+    with pytest.raises(PrivacyGuardError) as captured:
+        await server.serve_async("127.0.0.1:9999")
+
+    assert captured.value.code is ErrorCode.SERVER_BIND_FAILED
+    assert fake_server.started is False
     assert fake_server.stop_graces == [0]
     assert closed == [server._middleware]
 
