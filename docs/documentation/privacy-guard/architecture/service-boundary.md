@@ -78,9 +78,11 @@ RPC first.
 For each evaluation, the service:
 
 1. validates the pre-credentials phase
-2. validates the transport body byte limit
+2. validates the encoded context (4 KiB), configuration (64 KiB), target
+   (32 KiB), headers (128 entries and 64 KiB), and body (4 MiB) limits
 3. acquires one bounded worker slot
-4. validates, normalizes, and resolves the supplied policy config in that worker
+4. converts transport-safe integral numbers, validates the maximum ten stages,
+   and resolves the supplied policy config in that worker
 5. allows an empty body without invoking an engine
 6. decodes a non-empty body as strict UTF-8
 7. calls `RequestProcessor.process(text)` in the same worker

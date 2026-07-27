@@ -102,10 +102,20 @@ bounded by that transport. A file-backed configuration carries only its bounded
 relative path through the protocol and loads the deployment-mounted catalog in
 the middleware process.
 
-The service validates the complete configuration, computes its canonical
-fingerprint, and uses a bounded internal `RequestProcessor` cache. Caching
-avoids repeated engine initialization but does not increase the transport
-limit.
+The service rejects an encoded configuration above that limit before protobuf
+conversion or policy validation. A policy may contain at most ten ordered
+entity-processing stages. The service validates the complete bounded
+configuration, computes its canonical fingerprint, and uses a bounded internal
+`RequestProcessor` cache. Caching avoids repeated engine initialization but
+does not increase either limit.
+
+`Struct` carries every number as a double. At this transport boundary only,
+Privacy Guard converts finite integral values in the safe integer range
+`-(2^53 - 1)` through `2^53 - 1` to Python integers before strict policy
+validation. Non-integral and out-of-range values remain floats, so integer
+fields reject them. Direct Python registry validation remains strict and does
+not perform this transport normalization. Custom-engine integer settings must
+therefore remain within the safe range when supplied through OpenShell policy.
 
 A future self-contained transport for larger expanded catalogs requires an
 upstream OpenShell contract for preparing configuration and referring to it

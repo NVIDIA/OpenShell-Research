@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from copy import deepcopy
 from threading import get_ident
 
 import pytest
@@ -15,7 +16,12 @@ from privacy_guard.config import PrivacyGuardConfig
 from privacy_guard.constants import (
     LIMIT_REASON,
     LIMIT_REASON_CODE,
+    MAX_PROTO_CONFIG_BYTES,
+    MAX_PROTO_CONTEXT_BYTES,
     MAX_PROTO_FINDING_BYTES,
+    MAX_PROTO_HEADERS,
+    MAX_PROTO_HEADERS_BYTES,
+    MAX_PROTO_TARGET_BYTES,
 )
 from privacy_guard.engines import EngineConfig
 from privacy_guard.engines.registry import create_builtin_registry
@@ -30,34 +36,35 @@ from privacy_guard.service import servicer as servicer_module
 from privacy_guard.service.servicer import PrivacyGuardMiddleware
 
 
-def _values(action: str = "replace") -> dict[str, object]:
-    return {
-        "entity_processing": {
-            "stages": [
-                {
-                    "config": {
-                        "engine": "regex",
-                        "pattern_catalog": {
-                            "entities": [
-                                {
-                                    "name": "email",
-                                    "patterns": [
-                                        {
-                                            "pattern": r"[a-z]+@[a-z]+\.[a-z]+",
-                                            "confidence": "high",
-                                        }
-                                    ],
-                                }
-                            ]
-                        },
-                        "replacement": {
-                            "strategy": "template",
-                            "template": "[{entity}]",
-                        },
+def _values(
+    action: str = "replace",
+    *,
+    stage_count: int = 1,
+) -> dict[str, object]:
+    stage: dict[str, object] = {
+        "config": {
+            "engine": "regex",
+            "pattern_catalog": {
+                "entities": [
+                    {
+                        "name": "email",
+                        "patterns": [
+                            {
+                                "pattern": r"[a-z]+@[a-z]+\.[a-z]+",
+                                "confidence": "high",
+                            }
+                        ],
                     }
-                }
-            ]
-        },
+                ]
+            },
+            "replacement": {
+                "strategy": "template",
+                "template": "[{entity}]",
+            },
+        }
+    }
+    return {
+        "entity_processing": {"stages": [deepcopy(stage) for _ in range(stage_count)]},
         "on_detection": {"action": action},
     }
 
@@ -98,6 +105,104 @@ def test_validate_config_is_pure_and_reports_invalid_config() -> None:
     assert valid.valid is True
     assert invalid.valid is False
     assert "config_invalid" in invalid.reason
+
+
+def test_validate_config_rejects_oversized_proto_before_registry_validation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    validation_count = 0
+    original_validate = servicer_module.EngineRegistry.validate_config
+
+    def record_validation(
+        registry: servicer_module.EngineRegistry,
+        values: object,
+    ) -> PrivacyGuardConfig[EngineConfig]:
+        nonlocal validation_count
+        validation_count += 1
+        return original_validate(registry, values)
+
+    monkeypatch.setattr(
+        servicer_module.EngineRegistry,
+        "validate_config",
+        record_validation,
+    )
+    exact_config = pb2.ValidateConfigRequest()
+    json_format.ParseDict({"padding": "x" * 65_515}, exact_config.config)
+    oversized_config = pb2.ValidateConfigRequest()
+    json_format.ParseDict({"padding": "x" * 65_516}, oversized_config.config)
+    assert exact_config.config.ByteSize() == MAX_PROTO_CONFIG_BYTES
+    assert oversized_config.config.ByteSize() == MAX_PROTO_CONFIG_BYTES + 1
+    middleware = PrivacyGuardMiddleware(create_builtin_registry())
+    try:
+        exact = middleware._validate_config(exact_config)
+        oversized = middleware._validate_config(oversized_config)
+    finally:
+        asyncio.run(middleware.close())
+
+    assert exact.valid is False
+    assert oversized.valid is False
+    assert validation_count == 1
+
+
+def test_evaluation_enforces_exact_encoded_transport_boundaries() -> None:
+    request = _request(b"")
+    request.context.request_id = "x" * 4_093
+    assert request.context.ByteSize() == MAX_PROTO_CONTEXT_BYTES
+    servicer_module._validate_evaluation_envelope(request)
+    request.context.request_id += "x"
+    assert request.context.ByteSize() == MAX_PROTO_CONTEXT_BYTES + 1
+    with pytest.raises(PrivacyGuardError) as context_error:
+        servicer_module._validate_evaluation_envelope(request)
+    assert context_error.value.code is ErrorCode.REQUEST_ENVELOPE_INVALID
+
+    request = _request(b"")
+    request.target.host = "x" * 32_764
+    assert request.target.ByteSize() == MAX_PROTO_TARGET_BYTES
+    servicer_module._validate_evaluation_envelope(request)
+    request.target.host += "x"
+    assert request.target.ByteSize() == MAX_PROTO_TARGET_BYTES + 1
+    with pytest.raises(PrivacyGuardError) as target_error:
+        servicer_module._validate_evaluation_envelope(request)
+    assert target_error.value.code is ErrorCode.REQUEST_ENVELOPE_INVALID
+
+    request = _request(b"")
+    request.headers.add(name="x", value="x" * 65_525)
+    assert servicer_module._encoded_headers_size(request.headers) == (
+        MAX_PROTO_HEADERS_BYTES
+    )
+    servicer_module._validate_evaluation_envelope(request)
+    request.headers[0].value += "x"
+    assert servicer_module._encoded_headers_size(request.headers) == (
+        MAX_PROTO_HEADERS_BYTES + 1
+    )
+    with pytest.raises(PrivacyGuardError) as header_size_error:
+        servicer_module._validate_evaluation_envelope(request)
+    assert header_size_error.value.code is ErrorCode.REQUEST_ENVELOPE_INVALID
+
+    request = _request(b"")
+    for _ in range(MAX_PROTO_HEADERS):
+        request.headers.add()
+    servicer_module._validate_evaluation_envelope(request)
+    request.headers.add()
+    with pytest.raises(PrivacyGuardError) as header_count_error:
+        servicer_module._validate_evaluation_envelope(request)
+    assert header_count_error.value.code is ErrorCode.REQUEST_ENVELOPE_INVALID
+
+
+def test_evaluation_enforces_exact_encoded_config_boundary() -> None:
+    request = _request(b"")
+    request.config.Clear()
+    json_format.ParseDict({"padding": "x" * 65_515}, request.config)
+    assert request.config.ByteSize() == MAX_PROTO_CONFIG_BYTES
+    servicer_module._validate_evaluation_envelope(request)
+    request.config.Clear()
+    json_format.ParseDict({"padding": "x" * 65_516}, request.config)
+    assert request.config.ByteSize() == MAX_PROTO_CONFIG_BYTES + 1
+
+    with pytest.raises(PrivacyGuardError) as captured:
+        servicer_module._validate_evaluation_envelope(request)
+
+    assert captured.value.code is ErrorCode.CONFIG_INVALID
 
 
 def test_limit_deny_explains_recovery_options() -> None:
@@ -239,6 +344,35 @@ def test_evaluation_revalidates_configuration_before_reusing_cached_processor(
     asyncio.run(evaluate_twice())
 
     assert validation_count == 2
+
+
+def test_oversized_stage_list_fails_before_fingerprinting_or_construction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    values = _values(action="detect", stage_count=10_000)
+
+    def unexpected_call(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        raise AssertionError("oversized stage list reached preparation")
+
+    monkeypatch.setattr(
+        servicer_module,
+        "configuration_fingerprint",
+        unexpected_call,
+    )
+    monkeypatch.setattr(
+        servicer_module.EngineRegistry,
+        "create_engine",
+        unexpected_call,
+    )
+    middleware = PrivacyGuardMiddleware(create_builtin_registry())
+    try:
+        with pytest.raises(PrivacyGuardError) as captured:
+            middleware._processors.resolve(values)
+    finally:
+        asyncio.run(middleware.close())
+
+    assert captured.value.code is ErrorCode.CONFIG_INVALID
 
 
 def test_invalid_utf8_fails_before_invoking_an_engine() -> None:

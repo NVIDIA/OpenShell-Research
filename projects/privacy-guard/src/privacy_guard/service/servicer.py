@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import time
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from concurrent.futures import Future, ThreadPoolExecutor
 from threading import RLock
 from typing import Never, Protocol, TypedDict, TypeVar
@@ -25,8 +26,13 @@ from privacy_guard.constants import (
     LIMIT_REASON_CODE,
     MAX_BODY_BYTES,
     MAX_CONCURRENT_PROCESSING,
+    MAX_PROTO_CONFIG_BYTES,
+    MAX_PROTO_CONTEXT_BYTES,
     MAX_PROTO_FINDING_BYTES,
     MAX_PROTO_FINDING_GROUPS,
+    MAX_PROTO_HEADERS,
+    MAX_PROTO_HEADERS_BYTES,
+    MAX_PROTO_TARGET_BYTES,
     REASON_CODE_PATTERN,
     SERVICE_NAME,
     SERVICE_VERSION,
@@ -122,6 +128,8 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         request: pb2.ValidateConfigRequest,
     ) -> pb2.ValidateConfigResponse:
         try:
+            if request.config.ByteSize() > MAX_PROTO_CONFIG_BYTES:
+                raise PrivacyGuardError(ErrorCode.CONFIG_INVALID)
             self._registry.validate_config(_mapping_from_proto(request.config))
         except PrivacyGuardError as error:
             return pb2.ValidateConfigResponse(valid=False, reason=str(error))
@@ -182,17 +190,18 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
             raise PrivacyGuardError(ErrorCode.REQUEST_PHASE_INVALID)
         if len(request.body) > MAX_BODY_BYTES:
             raise PrivacyGuardError(ErrorCode.REQUEST_BODY_TOO_LARGE)
-        values = _mapping_from_proto(request.config)
+        _validate_evaluation_envelope(request)
         result = await self._run_in_worker(
-            lambda: self._prepare_and_process(values, request.body)
+            lambda: self._prepare_and_process(request.config, request.body)
         )
         return _result_to_proto(result)
 
     def _prepare_and_process(
         self,
-        values: object,
+        config: Message,
         body: bytes,
     ) -> RequestProcessingResult:
+        values = _mapping_from_proto(config)
         processor = self._processors.resolve(values)
         if not body:
             return RequestProcessingResult(decision=RequestDecision.ALLOW)
@@ -314,9 +323,60 @@ def _evaluation_log_extra(
 
 def _mapping_from_proto(config: Message) -> dict[str, object]:
     try:
-        return json_format.MessageToDict(config)
+        values: object = json_format.MessageToDict(config)
     except Exception:
         raise PrivacyGuardError(ErrorCode.CONFIG_INVALID) from None
+    if not isinstance(values, dict) or any(not isinstance(key, str) for key in values):
+        raise PrivacyGuardError(ErrorCode.CONFIG_INVALID)
+    return {
+        key: _normalize_proto_numbers(item)
+        for key, item in values.items()
+        if isinstance(key, str)
+    }
+
+
+def _normalize_proto_numbers(value: object) -> object:
+    if isinstance(value, float):
+        if (
+            math.isfinite(value)
+            and value.is_integer()
+            and -_MAX_PROTO_SAFE_INTEGER <= value <= _MAX_PROTO_SAFE_INTEGER
+        ):
+            return int(value)
+        return value
+    if isinstance(value, list):
+        return [_normalize_proto_numbers(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _normalize_proto_numbers(item) for key, item in value.items()}
+    return value
+
+
+def _validate_evaluation_envelope(request: pb2.HttpRequestEvaluation) -> None:
+    if request.config.ByteSize() > MAX_PROTO_CONFIG_BYTES:
+        raise PrivacyGuardError(ErrorCode.CONFIG_INVALID)
+    if (
+        request.context.ByteSize() > MAX_PROTO_CONTEXT_BYTES
+        or request.target.ByteSize() > MAX_PROTO_TARGET_BYTES
+        or len(request.headers) > MAX_PROTO_HEADERS
+        or _encoded_headers_size(request.headers) > MAX_PROTO_HEADERS_BYTES
+    ):
+        raise PrivacyGuardError(ErrorCode.REQUEST_ENVELOPE_INVALID)
+
+
+def _encoded_headers_size(headers: Iterable[Message]) -> int:
+    total = 0
+    for header in headers:
+        size = header.ByteSize()
+        total += 1 + _varint_size(size) + size
+    return total
+
+
+def _varint_size(value: int) -> int:
+    size = 1
+    while value >= 0x80:
+        value >>= 7
+        size += 1
+    return size
 
 
 def _result_to_proto(result: RequestProcessingResult) -> pb2.HttpRequestResult:
@@ -377,6 +437,7 @@ def _limit_deny() -> pb2.HttpRequestResult:
 
 _LOGGER = get_logger(__name__)
 _MAX_CACHED_PROCESSORS = 128
+_MAX_PROTO_SAFE_INTEGER = (1 << 53) - 1
 
 
 __all__ = ["PrivacyGuardMiddleware"]

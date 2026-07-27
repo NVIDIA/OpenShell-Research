@@ -19,6 +19,7 @@ from pydantic import (
 )
 
 from privacy_guard.base import StrictDomainModel
+from privacy_guard.constants import MAX_ENTITY_PROCESSING_STAGES
 from privacy_guard.engines import EngineConfig
 from privacy_guard.string_validators import (
     BoundedMetadataString,
@@ -87,6 +88,8 @@ class EntityProcessingStages(
     def _parse_stages(cls, value: object) -> object:
         if not isinstance(value, list | tuple) or not value:
             raise ValueError("stages must be a non-empty list")
+        if len(value) > MAX_ENTITY_PROCESSING_STAGES:
+            raise ValueError("policy has too many entity-processing stages")
         return tuple(value)
 
     @model_validator(mode="after")

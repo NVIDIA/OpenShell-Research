@@ -47,6 +47,13 @@ The object under `EntityProcessingStage.config` is this exact concrete model.
 It is validated and serialized as a member of the registry-built Pydantic
 discriminated union, then passed unchanged to the engine constructor.
 
+Custom integer fields remain strict for direct Python callers. OpenShell policy
+uses protobuf `Struct`, whose numeric representation is a double, so the service
+normalizes finite integral values only within the safe range `-(2^53 - 1)`
+through `2^53 - 1`. Values outside that range and non-integral values remain
+floats and fail strict integer fields. Nested models and lists follow the same
+transport rule.
+
 `EngineConfig` is a nominal, strict base model. It does not prescribe a
 `replacement` field or any other algorithm-specific setting. An engine that
 needs a replacement recipe declares that field on its concrete config. Engines

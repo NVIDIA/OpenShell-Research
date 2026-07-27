@@ -30,6 +30,7 @@ class ErrorCode(StrEnum):
 
     CONFIG_INVALID = "config_invalid"
     REQUEST_PHASE_INVALID = "request_phase_invalid"
+    REQUEST_ENVELOPE_INVALID = "request_envelope_invalid"
     REQUEST_BODY_TOO_LARGE = "request_body_too_large"
     BODY_ENCODING_INVALID = "body_encoding_invalid"
     ENGINE_OUTPUT_INVALID = "engine_output_invalid"
@@ -134,6 +135,14 @@ _ERROR_SPECS: dict[ErrorCode, _ErrorSpec] = {
         "validate_phase",
         "Request evaluation phase is invalid.",
         "Use the advertised pre-credentials phase.",
+    ),
+    ErrorCode.REQUEST_ENVELOPE_INVALID: _ErrorSpec(
+        ErrorKind.INVALID_INPUT,
+        ErrorComponent.SERVICE,
+        "validate_envelope",
+        "Request transport metadata exceeds an advertised limit.",
+        "Reduce the request context, target, or headers to the OpenShell "
+        "middleware contract limits.",
     ),
     ErrorCode.REQUEST_BODY_TOO_LARGE: _ErrorSpec(
         ErrorKind.INVALID_INPUT,

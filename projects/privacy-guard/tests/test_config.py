@@ -90,6 +90,22 @@ def test_known_discriminator_constructs_the_exact_engine_config() -> None:
     assert stage.diagnostic_name(1) == "regex[1]"
 
 
+def test_policy_accepts_ten_stages_and_rejects_eleven() -> None:
+    registry = _registry()
+    exact = _config()
+    stage = deepcopy(exact["entity_processing"]["stages"][0])
+    exact["entity_processing"]["stages"] = [deepcopy(stage) for _ in range(10)]
+    oversized = deepcopy(exact)
+    oversized["entity_processing"]["stages"].append(deepcopy(stage))
+
+    parsed = registry.validate_config(exact)
+
+    assert len(parsed.entity_processing.stages) == 10
+    with pytest.raises(PrivacyGuardError) as captured:
+        registry.validate_config(oversized)
+    assert captured.value.code is ErrorCode.CONFIG_INVALID
+
+
 def test_explicit_stage_name_is_the_diagnostic_source() -> None:
     config = _registry().validate_config(_config(stage_name="credentials"))
 
