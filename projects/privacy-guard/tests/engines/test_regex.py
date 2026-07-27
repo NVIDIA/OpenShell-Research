@@ -13,7 +13,12 @@ from privacy_guard.engines import (
     RegexEngine,
     RegexEngineConfig,
 )
-from privacy_guard.errors import TimeoutExpiredError
+from privacy_guard.errors import (
+    ErrorCode,
+    ErrorKind,
+    PrivacyGuardError,
+    TimeoutExpiredError,
+)
 from privacy_guard.timeout import Timeout
 
 
@@ -139,16 +144,58 @@ def test_invalid_patterns_are_rejected_content_safely(pattern: str) -> None:
         assert pattern not in str(exception_info.value)
 
 
-def test_contextual_zero_width_failure_is_atomic_at_runtime() -> None:
-    config = _config([{"pattern": "(?=a)", "confidence": "high"}])
+@pytest.mark.parametrize(
+    ("pattern", "text"),
+    [
+        ("x|(?=SECRET-zero-width-493)", "SECRET-zero-width-493"),
+        ("(?=secret)", "secret"),
+        ("(?<=prefix)", "prefix"),
+        (r"\b", "secret"),
+        ("x|(?:y|(?=secret))", "secret"),
+    ],
+)
+def test_contextual_zero_width_match_is_invalid_configuration_at_runtime(
+    pattern: str,
+    text: str,
+) -> None:
+    config = _config([{"pattern": pattern, "confidence": "high"}])
     engine = RegexEngine(config, None)
 
-    with pytest.raises(EngineConfigurationError):
+    with pytest.raises(PrivacyGuardError) as exception_info:
         engine.run(
-            "a",
+            text,
             strategy=EntityProcessingStrategy.DETECT,
             timeout=Timeout.from_seconds(1),
         )
+
+    assert exception_info.value.code is ErrorCode.CONFIG_INVALID
+    assert exception_info.value.kind is ErrorKind.INVALID_INPUT
+    assert pattern not in str(exception_info.value)
+
+
+@pytest.mark.parametrize(
+    ("pattern", "text", "expected_span"),
+    [
+        ("(?<=prefix)secret(?=suffix)", "prefixsecretsuffix", (6, 12)),
+        (r"\bsecret\b", "a secret value", (2, 8)),
+        (
+            r"(?<![\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"
+            r"(?![\w.-])",
+            "contact a@b.com",
+            (8, 15),
+        ),
+    ],
+)
+def test_patterns_with_consuming_lookarounds_or_boundaries_remain_valid(
+    pattern: str,
+    text: str,
+    expected_span: tuple[int, int],
+) -> None:
+    config = _config([{"pattern": pattern, "confidence": "high"}])
+
+    _, detections = _run(config, text)
+
+    assert [(item[1], item[2]) for item in detections] == [expected_span]
 
 
 def test_duplicate_supplied_names_are_rejected_but_unnamed_patterns_are_not() -> None:

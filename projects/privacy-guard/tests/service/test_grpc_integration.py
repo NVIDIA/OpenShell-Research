@@ -27,7 +27,11 @@ from privacy_guard.service.servicer import PrivacyGuardMiddleware
 from privacy_guard.timeout import Timeout
 
 
-def _config(*, action: str = "replace") -> pb2.ValidateConfigRequest:
+def _config(
+    *,
+    action: str = "replace",
+    pattern: str = r"[a-z]+@[a-z]+\.[a-z]+",
+) -> pb2.ValidateConfigRequest:
     request = pb2.ValidateConfigRequest()
     json_format.ParseDict(
         {
@@ -43,7 +47,7 @@ def _config(*, action: str = "replace") -> pb2.ValidateConfigRequest:
                                         "name": "email",
                                         "patterns": [
                                             {
-                                                "pattern": (r"[a-z]+@[a-z]+\.[a-z]+"),
+                                                "pattern": pattern,
                                                 "confidence": "high",
                                             }
                                         ],
@@ -193,6 +197,27 @@ async def test_generated_stub_enforces_ten_stage_limit() -> None:
     assert exact_result.decision == pb2.DECISION_ALLOW
     assert oversized_result.value.code() is grpc.StatusCode.INVALID_ARGUMENT
     assert "config_invalid" in (oversized_result.value.details() or "")
+
+
+@pytest.mark.asyncio
+async def test_generated_stub_maps_contextual_zero_width_to_invalid_config() -> None:
+    report_pattern = "x|(?=SECRET-zero-width-493)"
+    config = _config(action="detect", pattern=report_pattern)
+    evaluation = _evaluation(b"SECRET-zero-width-493", action="detect")
+    evaluation.config.CopyFrom(config.config)
+    middleware = PrivacyGuardMiddleware(create_builtin_registry())
+
+    async with _running_stub(middleware) as stub:
+        validation = await stub.ValidateConfig(config)
+        with pytest.raises(grpc.aio.AioRpcError) as evaluation_error:
+            await stub.EvaluateHttpRequest(evaluation)
+
+    details = evaluation_error.value.details() or ""
+    assert validation.valid is True
+    assert evaluation_error.value.code() is grpc.StatusCode.INVALID_ARGUMENT
+    assert "config_invalid" in details
+    assert "engine_execution_failed" not in details
+    assert report_pattern not in details
 
 
 class _NumericNestedConfig(StrictDomainModel):

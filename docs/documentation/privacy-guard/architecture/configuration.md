@@ -94,6 +94,14 @@ Privacy Guard maintains the catalog schema and safety limits but does not ship
 an authoritative pattern set. Repository catalogs are examples to copy and
 adapt, not presets or runtime defaults.
 
+`ValidateConfig` proves that each Regex pattern has valid syntax and rejects
+patterns that immediately match empty input. It cannot prove that every
+context-dependent branch consumes text. If a boundary, lookaround, or
+alternation produces a zero-width match only when triggering request text is
+observed, evaluation rejects the policy as `config_invalid` rather than treating
+the result as an internal engine failure. Lookarounds and boundaries remain
+valid when the complete match consumes text.
+
 ## Current transport constraint
 
 The copied OpenShell protocol carries policy configuration in a

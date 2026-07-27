@@ -45,6 +45,8 @@ from privacy_guard.errors import (
     EngineConfigurationError,
     EngineContractError,
     EngineLimitExceededError,
+    ErrorCode,
+    PrivacyGuardError,
 )
 from privacy_guard.string_validators import ScalarString, validate_scalar_string
 from privacy_guard.timeout import Timeout
@@ -248,7 +250,9 @@ class RegexEngine(EntityProcessingEngine[RegexEngineConfig]):
                 if match is None:
                     break
                 start, end = match.span()
-                if start == end or match.span(rule.marker) != (end, end):
+                if start == end:
+                    raise PrivacyGuardError(ErrorCode.CONFIG_INVALID)
+                if match.span(rule.marker) != (end, end):
                     raise EngineConfigurationError(
                         "regex engine configuration is invalid"
                     )
