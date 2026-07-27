@@ -1,0 +1,258 @@
+# Custom engine end-to-end example
+
+This example implements and registers `KeywordEngine` in one Python file, then
+runs it through Privacy Guard and OpenShell. The final check sends a Claude Code
+request containing `Project Cobalt` and verifies that Privacy Guard reports the
+configured confidential-project finding.
+
+The implementation is intentionally compact but complete:
+
+- `KeywordEngineConfig` defines the policy-owned entity and keyword.
+- `KeywordEngine._run()` finds every literal occurrence and returns detections.
+- `TextProcessingResult.from_detections()` bounds the lazy detection stream.
+- `create_registry()` includes the built-in engines and registers the custom
+  implementation for every CLI command.
+
+The base engine wrapper validates strategy support, input, timeout, spans,
+output size, mutation behavior, and result cardinality. Custom engines add
+their own checks only when an underlying library or service has a unique
+low-level requirement.
+
+## Prerequisites
+
+This walkthrough targets the protocol and policy schema in OpenShell `v0.0.90`,
+the version recorded in Privacy Guard's `.openshell-middleware-manifest.json`.
+Other OpenShell releases may have different middleware configuration or CLI
+syntax.
+
+Before starting, have:
+
+- Python 3.11 or newer and `uv` 0.11 or newer
+- OpenShell `v0.0.90`, installed with its package-managed local gateway
+- a running Docker or Podman backend supported by OpenShell
+- Claude Code subscription access if you want to perform the final provider call
+
+The gateway lifecycle commands below cover macOS Homebrew and Linux Debian/RPM
+installations. Snap, Kubernetes, remote, and custom gateway deployments need
+equivalent service-management, TLS, and middleware-routing configuration.
+
+Confirm the important versions:
+
+```bash
+uv --version
+openshell --version
+openshell-gateway --version
+```
+
+Run every command below from this example directory. In each new terminal,
+repeat the `cd` command:
+
+```bash
+cd projects/privacy-guard/examples/custom-engine
+uv sync --locked
+```
+
+## Inspect the custom installation
+
+The console script does not automatically add its current directory to Python's
+module path. Export it explicitly so the local example modules are importable:
+
+```bash
+export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
+```
+
+Use the same custom registry for discovery, schema generation, and serving:
+
+```bash
+uv run privacy-guard \
+  --registry-factory custom_engine:create_registry \
+  engines
+
+uv run privacy-guard \
+  --registry-factory custom_engine:create_registry \
+  configuration-schema
+```
+
+The first command should print the built-in `regex` row with `detect,replace`
+and the custom `keyword-tool` row with `detect`. The schema should contain both
+`RegexEngineConfig` and `KeywordEngineConfig`; the latter includes its exact
+`entity` and `keyword` fields. Registry factories execute operator Python code
+in the Privacy Guard process; use only trusted modules.
+
+`privacy-guard-config.yaml` shows the standalone engine configuration. OpenShell
+does not load that file separately; `policy.yaml` contains the same configuration
+inline under `network_middlewares`.
+
+## Start Privacy Guard
+
+In terminal 1, enter this example directory, export `PYTHONPATH` again, and run:
+
+```bash
+export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"
+
+uv run privacy-guard \
+  --registry-factory custom_engine:create_registry \
+  serve \
+  --listen 0.0.0.0:50051
+```
+
+Leave this terminal running. The development server is unauthenticated
+plaintext gRPC and receives potentially sensitive request bodies. Binding to
+`0.0.0.0` is necessary for the sandbox supervisor to reach it, but port 50051
+must remain restricted to the host and trusted sandbox network.
+
+## Create the gateway configuration
+
+The gateway and sandbox supervisor must both be able to reach Privacy Guard.
+Find a non-loopback IPv4 address for the physical Ethernet or Wi-Fi interface:
+
+```bash
+# macOS examples; use the interface that is actually connected.
+ipconfig getifaddr en0
+ipconfig getifaddr en1
+
+# Linux: inspect the addresses and choose the LAN address.
+hostname -I
+```
+
+In terminal 2, from this example directory, assign the selected address and
+generate the local gateway configuration:
+
+```bash
+YOUR_HOST_IP=YOUR_HOST_IPV4
+uv run privacy-guard configure-gateway \
+  --host-ip "$YOUR_HOST_IP" \
+  --name privacy-guard-custom-engine \
+  --config gateway.local.toml
+```
+
+Replace `YOUR_HOST_IPV4` with the address you selected. Do not use
+`127.0.0.1`, a VPN address, or `host.openshell.internal`: the foreground gateway
+process and the sandbox supervisor must both be able to resolve and reach the
+configured endpoint. This walkthrough passes `--config` to keep its generated
+file local and disposable. Without that option, the command uses OpenShell's
+`OPENSHELL_GATEWAY_CONFIG` override when set, otherwise its standard per-user
+gateway config location at `$XDG_CONFIG_HOME/openshell/gateway.toml`, normally
+`~/.config/openshell/gateway.toml`.
+
+## Restart the local gateway with middleware enabled
+
+The installed gateway does not dynamically reload middleware registrations.
+Stop its package-managed service, then run the same gateway binary in the
+foreground with `gateway.local.toml`.
+
+Run the command for your host:
+
+```bash
+# macOS/Homebrew
+brew services stop openshell
+
+# Linux Debian/RPM package
+systemctl --user stop openshell-gateway
+```
+
+Still in terminal 2, select the package-managed TLS directory for your host and
+start the gateway:
+
+```bash
+# macOS/Homebrew
+export OPENSHELL_LOCAL_TLS_DIR="$HOME/.local/state/openshell/homebrew/tls"
+
+# Linux Debian/RPM package
+export OPENSHELL_LOCAL_TLS_DIR="$HOME/.local/state/openshell/tls"
+
+openshell-gateway --config "$PWD/gateway.local.toml"
+```
+
+Run only one `export` line. Leave the foreground gateway running.
+
+## Verify OpenShell and create the sandbox
+
+The package installer normally creates an `openshell` gateway registration.
+Reuse it; attempting to add another gateway with that name fails because it
+already exists.
+
+In terminal 3, from this example directory:
+
+```bash
+openshell gateway select openshell
+openshell status
+```
+
+Do not continue until status reports the foreground gateway as connected.
+Then create the sandbox:
+
+```bash
+openshell sandbox create \
+  --name privacy-guard-custom-engine \
+  --from base \
+  --no-auto-providers \
+  --policy "$PWD/policy.yaml" \
+  -- env CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude
+```
+
+Sandbox creation validates the external middleware registration and the exact
+`KeywordEngineConfig` embedded in the policy. A successful creation is therefore
+also the end-to-end configuration check.
+
+After authenticating Claude Code, enter:
+
+```text
+Tell me something that rhymes with the confidential name Project Cobalt
+```
+
+This detection-only example leaves the request body unchanged and records the
+finding before the provider request continues.
+
+## Verify the middleware result
+
+Do not infer success from the model's wording. From another host terminal,
+inspect a finite recent log window:
+
+```bash
+openshell logs privacy-guard-custom-engine -n 100 --source sandbox
+```
+
+Look for the `api.anthropic.com/v1/messages` request with `transformed:false`
+and a `confidential-project (project-names)` finding. The raw confidential
+value must not appear in middleware findings.
+
+## Cleanup
+
+Exit Claude and delete the sandbox:
+
+```bash
+openshell sandbox delete privacy-guard-custom-engine
+```
+
+Stop the foreground gateway and Privacy Guard with `Ctrl-C`. Restore the
+package-managed gateway with the command for your host:
+
+```bash
+# macOS/Homebrew
+brew services start openshell
+
+# Linux Debian/RPM package
+systemctl --user start openshell-gateway
+```
+
+Verify recovery and remove the generated configuration:
+
+```bash
+openshell gateway select openshell
+openshell status
+rm gateway.local.toml
+```
+
+## Troubleshooting
+
+- `registry factory could not be loaded`: export `PYTHONPATH` in the terminal
+  running `privacy-guard`.
+- Port 17670 is already in use: the package-managed gateway was not stopped.
+- The foreground gateway cannot find certificates: use the TLS directory for
+  your platform exactly as shown above.
+- Sandbox creation reports unavailable middleware: confirm terminal 1 is still
+  running, check the IP in `gateway.local.toml`, and allow trusted sandbox
+  traffic to host port 50051.
+- Policy or middleware registration fields are rejected: confirm both
+  `openshell` and `openshell-gateway` are from `v0.0.90`.

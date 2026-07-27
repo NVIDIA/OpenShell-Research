@@ -109,9 +109,12 @@ Dependabot pull requests validate with read-only credentials but do not publish
 previews on the production documentation origin.
 
 The `gh-pages` branch stores the composite production site and active previews;
-GitHub Pages remains configured with **GitHub Actions** as its publishing source.
-Pushes and manual workflow runs from `main` update the production site while
-preserving active previews, then deploy the complete branch through the official
-Pages artifact workflow. The first production deployment creates `gh-pages`
-automatically. To roll back to a revision before preview support, leave the Pages
-source set to **GitHub Actions** and rerun the restored documentation workflow.
+GitHub Pages remains configured with **GitHub Actions** as its publishing
+source. Pushes to `main` validate documentation without publishing it. When the
+current documentation is ready for production, manually run the **Docs**
+workflow from `main`; that run updates the production site while preserving
+active previews, then deploys the complete branch through the official Pages
+artifact workflow. The first production deployment creates `gh-pages`
+automatically. To roll back to a revision before preview support, leave the
+Pages source set to **GitHub Actions** and rerun the restored documentation
+workflow.
