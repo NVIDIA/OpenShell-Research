@@ -36,8 +36,21 @@ uv pip install \
   --offline \
   --python "$artifact_check_dir/venv/bin/python" \
   "${wheels[0]}"
+runtime_site_packages=$(
+  "$artifact_check_dir/venv/bin/python" \
+    -c 'import sysconfig; print(sysconfig.get_path("purelib"))'
+)
+"${uv_run[@]}" pip-audit \
+  --cache-dir "$artifact_check_dir/pip-audit-cache" \
+  --progress-spinner off \
+  --path "$runtime_site_packages"
+
 cp scripts/external_engine_typing.py "$artifact_check_dir/external_engine_typing.py"
 "${uv_run[@]}" ty check \
   --project "$artifact_check_dir" \
   --python "$artifact_check_dir/venv" \
   "$artifact_check_dir/external_engine_typing.py"
+"${uv_run[@]}" pip-audit \
+  --cache-dir "$artifact_check_dir/pip-audit-cache" \
+  --progress-spinner off \
+  --local
