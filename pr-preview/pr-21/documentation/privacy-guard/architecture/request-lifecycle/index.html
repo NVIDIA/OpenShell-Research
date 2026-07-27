@@ -1216,20 +1216,24 @@ label such as <code>regex[1]</code>. All resulting diagnostic names must be uniq
 <li>validates each concrete config against its registered implementation and
    injected resources</li>
 <li>validates the action/replacement compatibility</li>
-<li>computes a SHA-256 fingerprint of canonical expanded configuration</li>
-<li>resolves a cached <code>RequestProcessor</code>, or constructs the engines and
-   processor and adds it to the bounded cache</li>
+<li>reuses the active <code>RequestProcessor</code> when its complete immutable validated
+   configuration is equal</li>
+<li>otherwise serializes preparation, constructs every configured engine and a
+   candidate processor, and atomically activates the candidate only after full
+   success</li>
 </ol>
-<p><code>ValidateConfig</code> performs the validation steps without populating this cache.
-Preparation is repeatable; cache state is an optimization and never required
-for correctness.</p>
+<p>The first evaluation establishes the active policy and pays its preparation
+cost. A failed validation or preparation leaves an existing active processor
+unchanged and fails the triggering evaluation. <code>ValidateConfig</code> performs
+validation without constructing engines or changing the active policy.</p>
 <p>There is no separate execution-plan abstraction. The validated stage order
-already contains the necessary policy structure, and the prepared processor
+already contains the necessary policy structure, and the active processor
 privately retains the corresponding ordered engine instances.</p>
 <h2 id="text-input">Text input<a class="headerlink" href="#text-input" title="Permanent link">&para;</a></h2>
 <p>The service validates the pre-credentials phase and the request body byte
-limit before processing. It still validates configuration for an empty body,
-then immediately allows that body without invoking an engine.</p>
+limit before processing. It still validates configuration and resolves the
+active processor for an empty body, then immediately allows that body without
+invoking an engine.</p>
 <p>A non-empty body must decode as strict UTF-8. The decoded <code>str</code> is the only
 request input passed to <code>RequestProcessor</code>; headers, content type, request ID,
 target, and protobuf messages do not cross that boundary.</p>

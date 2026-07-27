@@ -84,11 +84,11 @@ traversal, and symlinks are rejected. Catalog files must be bounded UTF-8 YAML
 without aliases, duplicate keys, or unsafe tags.
 
 File-backed and inline inputs normalize to the same `RegexPatternCatalog`.
-Serialization and canonical fingerprints contain the validated structured
-catalog rather than its source path. File metadata keys a bounded parser cache;
-the normalized immutable catalog keys a bounded compiled-rule cache. A content
-change produces a newly validated configuration, compiled rule set, and
-processor fingerprint.
+The complete validated configuration contains the structured catalog rather
+than its source path. File metadata keys a bounded parser cache; the normalized
+immutable catalog keys a bounded compiled-rule cache. A content change produces
+a different validated configuration and causes the next evaluation to prepare
+an active-policy replacement.
 
 Privacy Guard maintains the catalog schema and safety limits but does not ship
 an authoritative pattern set. Repository catalogs are examples to copy and
@@ -113,9 +113,10 @@ the middleware process.
 The service rejects an encoded configuration above that limit before protobuf
 conversion or policy validation. A policy may contain at most ten ordered
 entity-processing stages. The service validates the complete bounded
-configuration, computes its canonical fingerprint, and uses a bounded internal
-`RequestProcessor` cache. Caching avoids repeated engine initialization but
-does not increase either limit.
+configuration and compares it with the single active policy. Equal validated
+configurations reuse the active processor; a different valid configuration pays
+full engine and processor preparation before atomic replacement. Reuse avoids
+repeated engine initialization but does not increase either limit.
 
 `Struct` carries every number as a double. At this transport boundary only,
 Privacy Guard converts finite integral values in the safe integer range
@@ -129,14 +130,19 @@ A future self-contained transport for larger expanded catalogs requires an
 upstream OpenShell contract for preparing configuration and referring to it
 during evaluation. Privacy Guard must not create a private protocol fork.
 
-## Configuration identity
+## Policy identity
 
-Canonical serialization includes every concrete engine field and nested
-replacement variant. Mapping keys are sorted, compact JSON encoding is used,
-and the SHA-256 fingerprint is computed over the resulting UTF-8 bytes.
+Privacy Guard compares the complete immutable validated configuration,
+including every concrete engine field, nested replacement variant, and expanded
+Regex catalog. Equal configurations reuse the active processor. A different
+configuration is an update candidate and replaces the active policy only after
+complete preparation succeeds.
 
-Equivalent structured configurations therefore share a processor cache entry.
-Cache state is only an optimization; eviction or restart reconstructs the
-processor from configuration supplied by a later evaluation.
+The current protocol carries neither an explicit update operation nor a policy
+version. Privacy Guard therefore cannot distinguish an intentional user update
+from any other changed per-evaluation configuration. OpenShell must send one
+consistent policy stream to a process; interleaved old and new configurations
+can repeatedly replace one another. A future protocol can make preparation and
+activation explicit and let evaluations refer to a versioned policy.
 
 [Back to the architecture overview](index.md)

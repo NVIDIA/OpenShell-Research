@@ -1598,10 +1598,15 @@ code in the middleware process.</p>
 <p>Do not add retries, fallback providers, persistent request artifacts, or extra
 validation without a concrete failure mode and a clear owning layer.</p>
 <h2 id="state-and-retention">State and retention<a class="headerlink" href="#state-and-retention" title="Permanent link">&para;</a></h2>
-<p>Cross-request entity memory is not implemented. Privacy Guard retains validated
-configuration and immutable engine state in its processor cache, but never
-retains request text, detections, or replacement mappings there.</p>
-<p>Prepared state is bounded by weight and least-recently-used entry count:</p>
+<p>Cross-request entity memory is not implemented. Privacy Guard retains one active
+validated policy and its immutable configured engine state, but never request
+text, detections, or replacement mappings. The active processor is deliberate
+process state, not an LRU entry: it remains until successful replacement or
+shutdown.</p>
+<p>During an update, the fully prepared candidate may coexist with the active
+processor. Evaluations that already captured the prior processor may keep it
+alive until they finish. A failed candidate leaves active state unchanged.</p>
+<p>Regex's supporting caches remain independently bounded:</p>
 <table>
 <thead>
 <tr>
@@ -1624,23 +1629,16 @@ retains request text, detections, or replacement mappings there.</p>
 <td style="text-align: right;">128</td>
 <td>canonical catalog bytes plus 4 KiB per rule</td>
 </tr>
-<tr>
-<td>Request processors</td>
-<td style="text-align: right;">32 MiB</td>
-<td style="text-align: right;">16</td>
-<td>canonical expanded configuration plus the full Regex state estimate for every Regex stage</td>
-</tr>
 </tbody>
 </table>
 <p>The compiled-rule allowance accounts for retained backend state that is much
-larger than short pattern text. Cache budgets are independent. The compiled-rule
-cache charges each retained catalog once. The processor cache charges every
-processor for its full estimated Regex state, even when equivalent rules are
-referenced elsewhere. This conservative accounting avoids coupling eviction or
-ownership between caches. Custom engines do not need a cache-size hook. One
-entry that exceeds its cache budget remains valid and usable for the current
-evaluation but is not retained. Debug skip and eviction records contain only
-cache names and weights, plus eviction counts.</p>
+larger than short pattern text. Cache budgets are independent. One entry that
+exceeds a Regex cache budget remains valid and usable for the current operation
+but is not retained there. This does not invalidate an active or candidate
+processor holding those rules. The active policy is not rejected by cache
+admission; policy and schema limits bound its shape, while custom-engine
+prepared memory remains an operator responsibility. Regex cache skip and
+eviction records contain only cache names and weights, plus eviction counts.</p>
 <h2 id="changing-a-limit">Changing a limit<a class="headerlink" href="#changing-a-limit" title="Permanent link">&para;</a></h2>
 <p>A limit change may affect policy schema, processor behavior, engine contracts,
 protobuf serialization, tests, examples, and the OpenShell middleware

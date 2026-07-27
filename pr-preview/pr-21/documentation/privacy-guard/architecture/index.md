@@ -51,9 +51,9 @@ Source paths on these pages are relative to
 `projects/privacy-guard/src/privacy_guard/`.
 
 - `service/` owns gRPC, protobuf conversion, UTF-8 decoding and encoding,
-  bounded worker scheduling, processor caching, and finding serialization.
-  Outside generated `bindings/`, no other package imports gRPC or generated
-  bindings.
+  bounded worker scheduling, active-processor preparation and replacement, and
+  finding serialization. Outside generated `bindings/`, no other package
+  imports gRPC or generated bindings.
 - `cli.py` owns command parsing, registry-factory loading, engine discovery,
   configuration-schema output, logging options, and the adapter that starts
   the programmatic server. Top-level `logging.py` provides the shared,
@@ -66,8 +66,7 @@ Source paths on these pages are relative to
   implementations and operator-owned resources, builds the exact Pydantic
   discriminated union, and contains the built-in Regex implementation. Each
   engine owns its detection and replacement algorithms.
-- `config.py` defines ordered stages, the required policy action, canonical
-  configuration serialization, and fingerprints.
+- `config.py` defines ordered stages and the required policy action.
 - top-level `base.py` defines the package-wide strict immutable domain-model
   base.
 - `string_validators.py` defines shared string validators and field types.
@@ -87,7 +86,8 @@ HttpRequestEvaluation protobuf
 PrivacyGuardMiddleware
   validates phase and body size
   validates and normalizes policy configuration
-  resolves or builds a cached RequestProcessor
+  reuses the matching active RequestProcessor or prepares and activates
+  a replacement
   decodes a non-empty body as strict UTF-8
         |
         v
@@ -165,7 +165,7 @@ representations.
   extension contract and built-in engines.
 - [Configuration and text boundary](configuration.md) covers the one-text
   contract, configuration ownership, and current catalog limits.
-- [Service boundary](service-boundary.md) covers gRPC adaptation, caching, and
-  concurrency.
+- [Service boundary](service-boundary.md) covers gRPC adaptation, policy
+  activation, and concurrency.
 - [Safety and limits](safety-and-limits.md) records failure behavior and
   resource bounds.
