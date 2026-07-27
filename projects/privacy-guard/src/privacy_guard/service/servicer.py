@@ -242,6 +242,7 @@ class _RequestProcessorCache:
         self._timeout_seconds = timeout_seconds
         self._log_request_content = log_request_content
         self._processors: OrderedDict[str, RequestProcessor] = OrderedDict()
+        self._in_flight: dict[str, Future[RequestProcessor]] = {}
         self._lock = RLock()
 
     def resolve(self, values: object) -> RequestProcessor:
@@ -253,12 +254,29 @@ class _RequestProcessorCache:
             if cached is not None:
                 self._processors.move_to_end(fingerprint)
                 return cached
-        processor = self._build_processor(config)
+            owner_future = self._in_flight.get(fingerprint)
+            owns_build = owner_future is None
+            if owner_future is None:
+                owner_future = Future()
+                self._in_flight[fingerprint] = owner_future
+        if not owns_build:
+            return owner_future.result()
+        try:
+            processor = self._build_processor(config)
+        except Exception as error:
+            with self._lock:
+                if self._in_flight.get(fingerprint) is owner_future:
+                    del self._in_flight[fingerprint]
+            owner_future.set_exception(error)
+            raise
         with self._lock:
             self._processors[fingerprint] = processor
             self._processors.move_to_end(fingerprint)
             while len(self._processors) > _MAX_CACHED_PROCESSORS:
                 self._processors.popitem(last=False)
+            if self._in_flight.get(fingerprint) is owner_future:
+                del self._in_flight[fingerprint]
+        owner_future.set_result(processor)
         return processor
 
     def _build_processor(

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from concurrent.futures import Future, ThreadPoolExecutor
 from copy import deepcopy
-from threading import get_ident
+from threading import Barrier, Event, Lock, get_ident
 from typing import Never
 
 import grpc
@@ -95,6 +96,26 @@ class _SuccessfulEvaluationContext:
         raise AssertionError("successful evaluation unexpectedly aborted")
 
 
+def _waiter_observing_future_type(
+    *,
+    expected_waiters: int,
+    waiters_ready: Event,
+) -> type[Future[RequestProcessor]]:
+    waiter_count = 0
+    waiter_count_lock = Lock()
+
+    class _WaiterObservingFuture(Future[RequestProcessor]):
+        def result(self, timeout: float | None = None) -> RequestProcessor:
+            nonlocal waiter_count
+            with waiter_count_lock:
+                waiter_count += 1
+                if waiter_count == expected_waiters:
+                    waiters_ready.set()
+            return super().result(timeout)
+
+    return _WaiterObservingFuture
+
+
 def test_copied_proto_remains_the_current_openshell_contract() -> None:
     evaluation = pb2.HttpRequestEvaluation()
     finding = pb2.Finding()
@@ -177,9 +198,7 @@ def test_validate_config_rejects_non_printable_stage_names(
 
 
 def test_validate_config_accepts_printable_unicode_stage_names() -> None:
-    config = create_builtin_registry().validate_config(
-        _values(stage_name="身份检查 🛡️")
-    )
+    config = create_builtin_registry().validate_config(_values(stage_name="身份检查 🛡️"))
 
     assert config.entity_processing.stages[0].name == "身份检查 🛡️"
 
@@ -448,6 +467,158 @@ def test_evaluation_revalidates_configuration_before_reusing_cached_processor(
     asyncio.run(evaluate_twice())
 
     assert validation_count == 2
+
+
+def test_same_fingerprint_misses_build_one_shared_processor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    worker_count = 4
+    workers_ready = Barrier(worker_count)
+    waiters_ready = Event()
+    build_count = 0
+    build_count_lock = Lock()
+    original_build = servicer_module._RequestProcessorCache._build_processor
+
+    def synchronized_build(
+        cache: servicer_module._RequestProcessorCache,
+        config: PrivacyGuardConfig[EngineConfig],
+    ) -> RequestProcessor:
+        nonlocal build_count
+        with build_count_lock:
+            build_count += 1
+        assert waiters_ready.wait(timeout=5)
+        return original_build(cache, config)
+
+    monkeypatch.setattr(
+        servicer_module,
+        "Future",
+        _waiter_observing_future_type(
+            expected_waiters=worker_count - 1,
+            waiters_ready=waiters_ready,
+        ),
+    )
+    monkeypatch.setattr(
+        servicer_module._RequestProcessorCache,
+        "_build_processor",
+        synchronized_build,
+    )
+    cache = servicer_module._RequestProcessorCache(
+        create_builtin_registry(),
+        timeout_seconds=1,
+        log_request_content=False,
+    )
+
+    def resolve() -> RequestProcessor:
+        workers_ready.wait(timeout=5)
+        return cache.resolve(_values())
+
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        processors = tuple(executor.map(lambda _: resolve(), range(worker_count)))
+
+    assert build_count == 1
+    assert all(processor is processors[0] for processor in processors)
+    assert cache._in_flight == {}
+
+
+def test_different_fingerprints_build_concurrently(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    builds_ready = Barrier(2)
+    original_build = servicer_module._RequestProcessorCache._build_processor
+
+    def synchronized_build(
+        cache: servicer_module._RequestProcessorCache,
+        config: PrivacyGuardConfig[EngineConfig],
+    ) -> RequestProcessor:
+        builds_ready.wait(timeout=5)
+        return original_build(cache, config)
+
+    monkeypatch.setattr(
+        servicer_module._RequestProcessorCache,
+        "_build_processor",
+        synchronized_build,
+    )
+    cache = servicer_module._RequestProcessorCache(
+        create_builtin_registry(),
+        timeout_seconds=1,
+        log_request_content=False,
+    )
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        processors = tuple(
+            executor.map(
+                cache.resolve,
+                (_values(action="detect"), _values(action="block")),
+            )
+        )
+
+    assert processors[0] is not processors[1]
+    assert len(cache._processors) == 2
+    assert cache._in_flight == {}
+
+
+def test_failed_processor_build_wakes_waiters_and_allows_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    worker_count = 4
+    workers_ready = Barrier(worker_count)
+    waiters_ready = Event()
+    build_count = 0
+    build_count_lock = Lock()
+    failure = PrivacyGuardError(ErrorCode.UNEXPECTED_SERVICE_FAILURE)
+    original_build = servicer_module._RequestProcessorCache._build_processor
+
+    def fail_first_build(
+        cache: servicer_module._RequestProcessorCache,
+        config: PrivacyGuardConfig[EngineConfig],
+    ) -> RequestProcessor:
+        nonlocal build_count
+        with build_count_lock:
+            build_count += 1
+            current_build = build_count
+        if current_build == 1:
+            assert waiters_ready.wait(timeout=5)
+            raise failure
+        return original_build(cache, config)
+
+    monkeypatch.setattr(
+        servicer_module,
+        "Future",
+        _waiter_observing_future_type(
+            expected_waiters=worker_count - 1,
+            waiters_ready=waiters_ready,
+        ),
+    )
+    monkeypatch.setattr(
+        servicer_module._RequestProcessorCache,
+        "_build_processor",
+        fail_first_build,
+    )
+    cache = servicer_module._RequestProcessorCache(
+        create_builtin_registry(),
+        timeout_seconds=1,
+        log_request_content=False,
+    )
+
+    def capture_failure() -> PrivacyGuardError:
+        workers_ready.wait(timeout=5)
+        with pytest.raises(PrivacyGuardError) as captured:
+            cache.resolve(_values())
+        return captured.value
+
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        failures = tuple(executor.map(lambda _: capture_failure(), range(worker_count)))
+
+    assert build_count == 1
+    assert all(error is failure for error in failures)
+    assert cache._processors == {}
+    assert cache._in_flight == {}
+
+    processor = cache.resolve(_values())
+
+    assert isinstance(processor, RequestProcessor)
+    assert build_count == 2
+    assert len(cache._processors) == 1
+    assert cache._in_flight == {}
 
 
 def test_oversized_stage_list_fails_before_fingerprinting_or_construction(
