@@ -245,8 +245,10 @@ The `privacy_guard.cli` module owns the executable application and adapts its
 - Regex searches receive the remaining timeout and fail atomically.
 - Intermediate text and detection cardinality are bounded.
 - Detect and block never return a body mutation; replace returns final text.
-- Findings expose entity, bounded confidence, count, and stage provenance, but
-  never matched text, surrounding text, offsets, patterns, or raw tool metadata.
+- Findings expose entity, bounded confidence, count, and stage provenance.
+  Framework-controlled fields and compliant custom engines never expose matched
+  or surrounding text, offsets, patterns, or raw tool metadata. Custom engines
+  must return stable, declared identifiers rather than request-derived values.
 - Engine instances and injected resources must be safe for concurrent requests.
 - Cross-request entity memory is intentionally out of scope.
 

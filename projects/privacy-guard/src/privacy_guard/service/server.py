@@ -107,6 +107,7 @@ def _validated_listen_port(listen: str) -> int:
     if (
         not host
         or not port_text
+        or len(port_text) > 5
         or not port_text.isascii()
         or not port_text.isdecimal()
     ):

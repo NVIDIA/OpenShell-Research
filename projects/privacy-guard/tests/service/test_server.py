@@ -372,6 +372,13 @@ def test_listen_address_rejects_invalid_numeric_ports_and_forms(
     assert captured.value.code is ErrorCode.SERVER_BIND_FAILED
 
 
+def test_listen_address_rejects_arbitrarily_long_decimal_port() -> None:
+    with pytest.raises(PrivacyGuardError) as captured:
+        server_module._validated_listen_port(f"127.0.0.1:{'9' * 5_000}")
+
+    assert captured.value.code is ErrorCode.SERVER_BIND_FAILED
+
+
 @pytest.mark.asyncio
 async def test_serve_async_rejects_mismatched_bound_port(
     monkeypatch: pytest.MonkeyPatch,

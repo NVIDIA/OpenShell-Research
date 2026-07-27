@@ -35,5 +35,11 @@ def test_error_kinds_distinguish_invalid_input_from_internal_failures() -> None:
     )
 
 
+def test_config_error_explains_the_transport_size_limit() -> None:
+    error = PrivacyGuardError(ErrorCode.CONFIG_INVALID)
+
+    assert "encoded configuration at or below 64 KiB" in error.hint
+
+
 def test_privacy_guard_error_exposes_only_a_catalog_code_parameter() -> None:
     assert list(inspect.signature(PrivacyGuardError).parameters) == ["code"]

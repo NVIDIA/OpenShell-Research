@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from privacy_guard.constants import MAX_TIMEOUT_SECONDS
+from privacy_guard.constants import MAX_PROTO_CONFIG_BYTES, MAX_TIMEOUT_SECONDS
 
 
 class ErrorKind(StrEnum):
@@ -126,8 +126,10 @@ _ERROR_SPECS: dict[ErrorCode, _ErrorSpec] = {
         ErrorComponent.CONFIG,
         "parse",
         "Policy configuration is invalid.",
-        "Compare it with `privacy-guard configuration-schema`, then check the "
-        "stages, engine settings, pattern catalogs, replacements, and action.",
+        "Keep the encoded configuration at or below "
+        f"{MAX_PROTO_CONFIG_BYTES // 1024} KiB, compare it with "
+        "`privacy-guard configuration-schema`, then check the stages, engine "
+        "settings, pattern catalogs, replacements, and action.",
     ),
     ErrorCode.REQUEST_PHASE_INVALID: _ErrorSpec(
         ErrorKind.INVALID_INPUT,
