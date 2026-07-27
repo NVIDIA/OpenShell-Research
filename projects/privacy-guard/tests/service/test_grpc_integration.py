@@ -208,16 +208,24 @@ async def test_generated_stub_maps_contextual_zero_width_to_invalid_config() -> 
     middleware = PrivacyGuardMiddleware(create_builtin_registry())
 
     async with _running_stub(middleware) as stub:
+        before = await stub.EvaluateHttpRequest(
+            _evaluation(b"contact a@b.com", action="detect")
+        )
         validation = await stub.ValidateConfig(config)
         with pytest.raises(grpc.aio.AioRpcError) as evaluation_error:
             await stub.EvaluateHttpRequest(evaluation)
+        after = await stub.EvaluateHttpRequest(
+            _evaluation(b"contact a@b.com", action="detect")
+        )
 
     details = evaluation_error.value.details() or ""
+    assert len(before.findings) == 1
     assert validation.valid is True
     assert evaluation_error.value.code() is grpc.StatusCode.INVALID_ARGUMENT
     assert "config_invalid" in details
     assert "engine_execution_failed" not in details
     assert report_pattern not in details
+    assert len(after.findings) == 1
 
 
 class _NumericNestedConfig(StrictDomainModel):

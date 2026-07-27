@@ -1,6 +1,6 @@
 ---
 title: Service boundary
-description: gRPC adaptation, configuration caching, worker scheduling, and server lifecycle.
+description: gRPC adaptation, policy activation, worker scheduling, and server lifecycle.
 agent_markdown: true
 ---
 
@@ -23,7 +23,7 @@ Privacy Guard implements the three methods currently defined by
 | --- | --- |
 | `Describe` | Advertises service identity, one pre-credentials HTTP binding, and the 4 MiB body limit |
 | `ValidateConfig` | Validates supplied policy configuration and registered resources |
-| `EvaluateHttpRequest` | Validates transport input, resolves a processor, processes text, and returns a decision |
+| `EvaluateHttpRequest` | Validates transport input, resolves the active processor, processes text, and returns a decision |
 
 `Describe` advertises only
 `SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS`. Evaluations at any other phase
@@ -47,20 +47,24 @@ validation and every request evaluation.
 5. validates replacement support for a replace action
 6. returns `valid=true`, or a content-safe reason
 
-It does not construct engines, populate the processor cache, contact model
-providers, download resources, or write artifacts. Validation runs in the
-bounded worker pool so catalog parsing and engine-specific checks do not block
-the async gRPC event loop.
+It does not construct engines, change the active policy, contact model providers,
+download resources, or write artifacts. Validation runs in the bounded worker
+pool so catalog parsing and engine-specific checks do not block the async gRPC
+event loop.
 
-During evaluation, the service validates and normalizes the same config,
-computes its canonical SHA-256 fingerprint, and resolves a configured processor
-from an LRU cache bounded by both 16 entries and 32 MiB of prepared-state
-weight. A cache miss constructs engines directly from the exact stage configs
-and operator-injected resources, then constructs the `RequestProcessor`.
-Validation, cache resolution, engine construction, strict UTF-8 decoding, and
-processing all run in the bounded worker pool. Validation still occurs for
-every evaluation. Equivalent normalized Regex catalogs may reuse an entry in
-the independent compiled-rule cache during validation and engine construction.
+During evaluation, the service validates and normalizes the same config. It
+retains one active pair: the complete immutable validated configuration and its
+configured `RequestProcessor`. Equal config reuses the processor. When no
+processor is active or config differs, one serialized update path constructs
+engines from the exact stage configs and operator-injected resources, constructs
+a candidate processor, and atomically replaces the active pair only after
+preparation succeeds. Failure preserves the prior active pair and fails the
+triggering evaluation.
+
+Validation, resolution or preparation, strict UTF-8 decoding, and processing all
+run in the bounded worker pool. Validation still occurs for every evaluation.
+Equivalent normalized Regex catalogs may reuse an entry in the independent
+compiled-rule cache during validation and engine construction.
 
 Regex maintains two independent LRU caches. Parsed file catalogs retain at most
 64 entries and 8 MiB of source files. Compiled rules retain at most 128 catalogs
@@ -68,32 +72,21 @@ and 32 MiB; each entry weighs its canonical catalog bytes plus 4 KiB per rule.
 Evicting a compiled-rule entry only removes that cache's reference. A processor
 that already uses those rules remains valid.
 
-Processor-cache admission counts canonical configuration bytes and the full
-estimated Regex state held by every configured Regex stage. Each processor
-receives that full charge even when an equivalent compiled tuple is also
-referenced by the compiled-rule cache or another processor. This conservative
-accounting intentionally favors simple, independent caches over exact
-shared-memory accounting.
+An otherwise valid Regex cache entry larger than its byte budget is built and
+used for the current operation but is not retained in that cache. The active
+processor itself has no LRU admission budget: it is deliberate process state
+retained until replacement or shutdown. Regex cache eviction or a skipped entry
+never invalidates it. Process restart discards the active processor, and the
+first later evaluation reconstructs it from supplied configuration.
 
-An otherwise valid entry larger than its cache's byte budget is built and used
-for the current operation but is not retained. Eviction or a skipped entry
-never makes a policy invalid. Content-safe debug events report only the cache
-name and weight, plus the number of evicted entries.
-
-The caches are protected for concurrent access and are not
-correctness-relevant. Eviction or process restart simply causes reconstruction
-from a later evaluation's expanded config. Operators with consistently larger
-catalogs should expect more frequent preparation rather than unbounded
-retention.
-
-Each cached processor receives the server's operational processing timeout.
+Each active processor receives the server's operational processing timeout.
 The default is 1 second shared across every configured stage. Operators may set
 up to 30 seconds with `privacy-guard serve --timeout-seconds`; programmatic
 applications pass the same `timeout_seconds` argument to `PrivacyGuardServer`.
 OpenShell's outer middleware `timeout` must include the processing timeout plus
 additional headroom for worker queueing, repeated configuration validation,
-cache resolution, and engine construction so the supervisor does not end the
-RPC first.
+and occasional candidate preparation so the supervisor does not end the RPC
+first.
 
 ## Incoming requests
 
@@ -104,7 +97,7 @@ For each evaluation, the service:
    (32 KiB), headers (128 entries and 64 KiB), and body (4 MiB) limits
 3. acquires one bounded worker slot
 4. converts transport-safe integral numbers, validates the maximum ten stages,
-   and resolves the supplied policy config in that worker
+   and resolves or updates the active policy in that worker
 5. allows an empty body without invoking an engine
 6. decodes a non-empty body as strict UTF-8
 7. calls `RequestProcessor.process(text)` in the same worker
@@ -160,7 +153,7 @@ gRPC event loop
       |
       v
 configuration validation
-and processor resolution
+and active-policy resolution
       |
       v
 RequestProcessor.process
@@ -172,9 +165,13 @@ ordered engine pipeline
 This keeps synchronous configuration and engine work off the async event loop
 and bounds the number of active operations.
 
-Cached processors, engine instances, and injected resources may be used by
+The active processor, engine instances, and injected resources may be used by
 multiple worker threads. They must retain no mutable per-request state and must
-be safe for concurrent access.
+be safe for concurrent access. Policy preparation is serialized. A candidate is
+fully prepared before the active reference is swapped. An evaluation that
+already captured the old processor may finish with it while later evaluations
+use the replacement; this is an atomic reference cutover, not a draining
+cutover.
 
 ## Cancellation
 
@@ -227,7 +224,8 @@ that registry to `PrivacyGuardServer`.
 The registry is an explicit application-scoped dependency, not a global
 singleton. `PrivacyGuardServer` and `PrivacyGuardMiddleware` reject unfinalized
 registries. A deployment creates and finalizes one registry during startup;
-cached processors then construct configured stage engines from that registry.
+the middleware constructs configured stage engines and the active processor
+from that registry.
 Different middleware applications in the same process may intentionally use
 different engine inventories or runtime resources.
 
@@ -312,17 +310,20 @@ not policy-controlled behavior.
 The intended large-catalog and discovery experience requires coordinated
 OpenShell changes for:
 
-- a preparation operation that accepts expanded configuration larger than the
-  current 64 KiB evaluation limit
-- canonical configuration fingerprints on evaluations
-- typed cache-miss recovery
+- explicit preparation and activation that accepts expanded configuration
+  larger than the current 64 KiB evaluation limit
+- versioned policy references on evaluations
 - finalized policy schema and engine discovery in the manifest
 - a dedicated finding source field
 
 These are protocol evolution items, not local implementation hooks. Until they
 land upstream, Privacy Guard continues to validate the per-evaluation config,
-repopulate its local cache when needed, expose discovery through the CLI, and
-render stage provenance inside the finding label.
+treat a changed valid config as an active-policy update, expose discovery
+through the CLI, and render stage provenance inside the finding label.
+
+The protocol cannot distinguish an intentional update from any other changed
+configuration. Each process must receive one consistent policy stream.
+Interleaved old and new configurations can repeatedly switch the active policy.
 
 ## Testing the boundary
 
@@ -332,7 +333,8 @@ Service tests should cover:
 - manifest fields supported by the current protocol
 - pure policy validation
 - phase, body-size, and UTF-8 validation
-- cache hit and reconstruction behavior
+- first activation, equal-config reuse, serialized replacement, failed-update
+  preservation, and concurrent cutover
 - detect, replacement, block, and limit serialization
 - finding encoding and limits
 - gRPC status mapping

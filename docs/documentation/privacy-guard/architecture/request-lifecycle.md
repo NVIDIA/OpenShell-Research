@@ -63,23 +63,27 @@ For each evaluation under the current OpenShell protocol, the service:
 3. validates each concrete config against its registered implementation and
    injected resources
 4. validates the action/replacement compatibility
-5. computes a SHA-256 fingerprint of canonical expanded configuration
-6. resolves a cached `RequestProcessor`, or constructs the engines and
-   processor and adds it to the bounded cache
+5. reuses the active `RequestProcessor` when its complete immutable validated
+   configuration is equal
+6. otherwise serializes preparation, constructs every configured engine and a
+   candidate processor, and atomically activates the candidate only after full
+   success
 
-`ValidateConfig` performs the validation steps without populating this cache.
-Preparation is repeatable; cache state is an optimization and never required
-for correctness.
+The first evaluation establishes the active policy and pays its preparation
+cost. A failed validation or preparation leaves an existing active processor
+unchanged and fails the triggering evaluation. `ValidateConfig` performs
+validation without constructing engines or changing the active policy.
 
 There is no separate execution-plan abstraction. The validated stage order
-already contains the necessary policy structure, and the prepared processor
+already contains the necessary policy structure, and the active processor
 privately retains the corresponding ordered engine instances.
 
 ## Text input
 
 The service validates the pre-credentials phase and the request body byte
-limit before processing. It still validates configuration for an empty body,
-then immediately allows that body without invoking an engine.
+limit before processing. It still validates configuration and resolves the
+active processor for an empty body, then immediately allows that body without
+invoking an engine.
 
 A non-empty body must decode as strict UTF-8. The decoded `str` is the only
 request input passed to `RequestProcessor`; headers, content type, request ID,

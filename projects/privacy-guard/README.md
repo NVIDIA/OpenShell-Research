@@ -51,9 +51,10 @@ passes its catalog as `patterns.yaml`.
 
 ```text
 OpenShell HttpRequestEvaluation
-  -> strict UTF-8 decode
   -> finalized Pydantic policy union (config.engine discriminator)
-  -> canonical config fingerprint and bounded processor cache
+  -> reuse the matching active RequestProcessor, or fully prepare and
+     atomically activate a replacement
+  -> strict UTF-8 decode
   -> RequestProcessor.process(one text string)
        -> stage 1 engine.run(current text)
        -> stage 2 engine.run(stage 1 text)
@@ -70,10 +71,18 @@ Blocking is a request-level disposition owned by `RequestProcessor`.
 The copied `proto/supervisor_middleware.proto` and generated bindings are owned
 by OpenShell. Update them only through the repository's middleware-kit workflow;
 never hand-edit them. Today's protocol carries a `google.protobuf.Struct`
-configuration on each evaluation, so Privacy Guard validates and caches it
-internally. Large-catalog preparation RPCs, evaluation fingerprints, manifest
-schema fields, and a dedicated finding-source field require a coordinated
-change in the canonical OpenShell protocol rather than a private proto fork.
+configuration on each evaluation. Privacy Guard validates it every time and
+retains one active configured processor. The first evaluation prepares that
+processor. A different validated configuration is fully prepared and atomically
+replaces it only after preparation succeeds; failure leaves the active processor
+unchanged.
+
+The protocol has no explicit update or policy-version marker, so any changed
+per-evaluation configuration is treated as an update. Each Privacy Guard process
+must therefore receive one consistent policy stream. Large-catalog preparation
+RPCs, versioned policy references, manifest schema fields, and a dedicated
+finding-source field require a coordinated change in the canonical OpenShell
+protocol rather than a private proto fork.
 
 ## Built-in engines
 

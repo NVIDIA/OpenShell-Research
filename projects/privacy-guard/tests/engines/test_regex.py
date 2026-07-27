@@ -455,19 +455,6 @@ def test_compiled_catalog_same_key_race_accounts_once(
         regex_module._clear_compiled_pattern_cache()
 
 
-def test_processor_weight_counts_each_regex_stage() -> None:
-    config = _config([{"pattern": "shared", "confidence": "high"}])
-    first = RegexEngine(config, None)
-    second = RegexEngine(config, None)
-
-    assert regex_module._compiled_processor_weight(
-        (first, second)
-    ) == 2 * regex_module._compiled_pattern_weight(
-        first.config.pattern_catalog,
-        len(first._rules),
-    )
-
-
 def test_regex_engine_is_safe_for_concurrent_runs() -> None:
     engine = RegexEngine(
         _config([{"pattern": "x", "confidence": "high"}]),

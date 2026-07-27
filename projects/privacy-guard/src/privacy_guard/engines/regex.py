@@ -604,13 +604,6 @@ def _compile_pattern_catalog(
     return rules
 
 
-def _compiled_processor_weight(engines: tuple[RegexEngine, ...]) -> int:
-    return sum(
-        _compiled_pattern_weight(engine.config.pattern_catalog, len(engine._rules))
-        for engine in engines
-    )
-
-
 def _compiled_pattern_weight(
     catalog: RegexPatternCatalog,
     rule_count: int,

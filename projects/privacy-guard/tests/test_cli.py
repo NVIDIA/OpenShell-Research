@@ -186,8 +186,8 @@ def test_cli_serve_adapts_operational_options_to_the_programmatic_server(
         calls.append(
             (
                 listen,
-                self._middleware._processors._timeout_seconds,
-                self._middleware._processors._log_request_content,
+                self._middleware._policy._timeout_seconds,
+                self._middleware._policy._log_request_content,
             )
         )
 

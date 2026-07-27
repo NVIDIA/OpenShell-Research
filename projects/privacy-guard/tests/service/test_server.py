@@ -88,8 +88,8 @@ def test_programmatic_server_runs_with_injected_registry_and_default_address(
 
     assert served == [(server, "127.0.0.1:50051")]
     assert server._middleware._registry is registry
-    assert server._middleware._processors._timeout_seconds == 4.5
-    assert server._middleware._processors._log_request_content is True
+    assert server._middleware._policy._timeout_seconds == 4.5
+    assert server._middleware._policy._log_request_content is True
 
 
 def test_programmatic_server_requires_an_explicit_finalized_registry() -> None:

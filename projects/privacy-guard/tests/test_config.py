@@ -15,7 +15,6 @@ from pydantic import ValidationError
 import privacy_guard.engines.regex as regex_module
 from privacy_guard.config import (
     PolicyAction,
-    configuration_fingerprint_and_size,
 )
 from privacy_guard.engines import (
     RegexEngine,
@@ -182,9 +181,6 @@ def test_catalog_file_and_inline_catalog_produce_the_same_config(
     file_config = registry.validate_config(file_values)
 
     assert file_config == inline_config
-    assert configuration_fingerprint_and_size(
-        file_config
-    ) == configuration_fingerprint_and_size(inline_config)
     serialized_catalog = file_config.model_dump(mode="json")["entity_processing"][
         "stages"
     ][0]["config"]["pattern_catalog"]
@@ -195,7 +191,7 @@ def test_catalog_file_and_inline_catalog_produce_the_same_config(
     assert isinstance(serialized_catalog, dict)
 
 
-def test_catalog_file_change_produces_a_new_fingerprint(
+def test_catalog_file_change_produces_a_different_validated_config(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -214,9 +210,7 @@ def test_catalog_file_change_produces_a_new_fingerprint(
     catalog_path.write_text(yaml.safe_dump(catalog), encoding="utf-8")
     second = registry.validate_config(values)
 
-    assert configuration_fingerprint_and_size(
-        first
-    ) != configuration_fingerprint_and_size(second)
+    assert first != second
 
 
 def test_parsed_catalog_cache_evicts_least_recently_used_file_by_weight(
@@ -655,7 +649,7 @@ def test_regex_pattern_names_are_optional_but_supplied_names_are_unique() -> Non
         _registry().validate_config(values)
 
 
-def test_canonical_fingerprint_covers_concrete_expanded_config() -> None:
+def test_validated_config_equality_covers_concrete_expanded_config() -> None:
     registry = _registry()
     first = registry.validate_config(_config())
     equivalent = registry.validate_config(deepcopy(_config()))
@@ -665,12 +659,8 @@ def test_canonical_fingerprint_covers_concrete_expanded_config() -> None:
     ][0]["patterns"][0]["confidence"] = "low"
     changed = registry.validate_config(changed_values)
 
-    assert configuration_fingerprint_and_size(
-        first
-    ) == configuration_fingerprint_and_size(equivalent)
-    assert configuration_fingerprint_and_size(
-        first
-    ) != configuration_fingerprint_and_size(changed)
+    assert first == equivalent
+    assert first != changed
 
 
 def test_models_are_frozen_and_hide_engine_configuration_from_repr() -> None:

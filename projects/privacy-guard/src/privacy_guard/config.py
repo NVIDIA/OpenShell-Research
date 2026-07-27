@@ -7,9 +7,7 @@ union containing the exact config model registered by every engine.
 
 from __future__ import annotations
 
-import json
 from enum import StrEnum
-from hashlib import sha256
 from typing import Generic, Self, TypeVar
 
 from pydantic import (
@@ -113,25 +111,10 @@ class PrivacyGuardConfig(
     on_detection: OnDetection = Field(repr=False)
 
 
-def configuration_fingerprint_and_size(
-    config: PrivacyGuardConfig[EngineConfig],
-) -> tuple[str, int]:
-    """Return the canonical fingerprint and encoded size of an expanded config."""
-    serialized = json.dumps(
-        config.model_dump(mode="json"),
-        allow_nan=False,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode("utf-8")
-    return sha256(serialized).hexdigest(), len(serialized)
-
-
 __all__ = [
     "EntityProcessingStage",
     "EntityProcessingStages",
     "OnDetection",
     "PolicyAction",
     "PrivacyGuardConfig",
-    "configuration_fingerprint_and_size",
 ]

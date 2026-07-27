@@ -1,4 +1,4 @@
-"""gRPC boundary for cached entity-processing configurations."""
+"""gRPC boundary for active entity-processing policy evaluation."""
 
 from __future__ import annotations
 
@@ -6,11 +6,9 @@ import asyncio
 import json
 import math
 import time
-from collections import OrderedDict
 from collections.abc import Callable, Iterable
 from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import dataclass
-from threading import RLock
+from threading import Lock
 from typing import Never, Protocol, TypedDict, TypeVar
 
 import grpc
@@ -19,10 +17,7 @@ from google.protobuf.message import Message
 
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
 from privacy_guard.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
-from privacy_guard.config import (
-    PrivacyGuardConfig,
-    configuration_fingerprint_and_size,
-)
+from privacy_guard.config import PrivacyGuardConfig
 from privacy_guard.constants import (
     BLOCK_REASON,
     BLOCK_REASON_CODE,
@@ -31,7 +26,6 @@ from privacy_guard.constants import (
     LIMIT_REASON_CODE,
     MAX_BODY_BYTES,
     MAX_CONCURRENT_PROCESSING,
-    MAX_PROCESSOR_CACHE_WEIGHT_BYTES,
     MAX_PROTO_CONFIG_BYTES,
     MAX_PROTO_CONTEXT_BYTES,
     MAX_PROTO_FINDING_BYTES,
@@ -44,7 +38,6 @@ from privacy_guard.constants import (
     SERVICE_VERSION,
 )
 from privacy_guard.engines import EngineConfig
-from privacy_guard.engines import regex as regex_engine
 from privacy_guard.engines.registry import EngineRegistry
 from privacy_guard.errors import (
     EngineRegistryError,
@@ -76,7 +69,7 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         if not registry.is_finalized:
             raise EngineRegistryError("middleware requires a finalized engine registry")
         self._registry = registry
-        self._processors = _RequestProcessorCache(
+        self._policy = _ActivePolicy(
             registry,
             timeout_seconds=validate_timeout_seconds(timeout_seconds),
             log_request_content=log_request_content,
@@ -90,7 +83,7 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
     async def close(self) -> None:
         """Wait for in-flight synchronous engines during shutdown."""
         self._processing_executor.shutdown(wait=True, cancel_futures=True)
-        self._processors.clear()
+        self._policy.clear()
 
     async def Describe(
         self,
@@ -211,7 +204,7 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         body: bytes,
     ) -> RequestProcessingResult:
         values = _mapping_from_proto(config)
-        processor = self._processors.resolve(values)
+        processor = self._policy.processor_for(values)
         if not body:
             return RequestProcessingResult(decision=RequestDecision.ALLOW)
         try:
@@ -236,20 +229,8 @@ class PrivacyGuardMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         return await asyncio.shield(future)
 
 
-@dataclass(frozen=True)
-class _PreparedProcessor:
-    processor: RequestProcessor
-    regex_engines: tuple[regex_engine.RegexEngine, ...]
-
-
-@dataclass(frozen=True)
-class _CachedProcessor:
-    processor: RequestProcessor
-    weight_bytes: int
-
-
-class _RequestProcessorCache:
-    """Bounded, recoverable cache keyed by canonical expanded configuration."""
+class _ActivePolicy:
+    """Own the process's active policy and its prepared processor."""
 
     def __init__(
         self,
@@ -261,89 +242,25 @@ class _RequestProcessorCache:
         self._registry = registry
         self._timeout_seconds = timeout_seconds
         self._log_request_content = log_request_content
-        self._processors: OrderedDict[str, _CachedProcessor] = OrderedDict()
-        self._weight_bytes = 0
-        self._in_flight: dict[str, Future[RequestProcessor]] = {}
-        self._lock = RLock()
+        self._config: PrivacyGuardConfig[EngineConfig] | None = None
+        self._processor: RequestProcessor | None = None
+        self._lock = Lock()
 
-    def resolve(self, values: object) -> RequestProcessor:
-        """Return the cached or newly prepared processor for expanded config."""
+    def processor_for(self, values: object) -> RequestProcessor:
+        """Return the processor for the requested policy, activating it if needed."""
         config = self._registry.validate_config(values)
-        fingerprint, config_weight_bytes = configuration_fingerprint_and_size(config)
         with self._lock:
-            cached = self._processors.get(fingerprint)
-            if cached is not None:
-                self._processors.move_to_end(fingerprint)
-                return cached.processor
-            owner_future = self._in_flight.get(fingerprint)
-            owns_build = owner_future is None
-            if owner_future is None:
-                owner_future = Future()
-                self._in_flight[fingerprint] = owner_future
-        if not owns_build:
-            return owner_future.result()
-        try:
-            prepared = self._build_processor(config)
-        except Exception as error:
-            owner_future.set_exception(error)
-            with self._lock:
-                if self._in_flight.get(fingerprint) is owner_future:
-                    del self._in_flight[fingerprint]
-            raise
-        processor = prepared.processor
-        weight_bytes = config_weight_bytes + regex_engine._compiled_processor_weight(
-            prepared.regex_engines
-        )
-        self._retain(fingerprint, processor, weight_bytes)
-        owner_future.set_result(processor)
-        with self._lock:
-            if self._in_flight.get(fingerprint) is owner_future:
-                del self._in_flight[fingerprint]
-        return processor
-
-    def _retain(
-        self,
-        fingerprint: str,
-        processor: RequestProcessor,
-        weight_bytes: int,
-    ) -> None:
-        if weight_bytes > MAX_PROCESSOR_CACHE_WEIGHT_BYTES:
-            _LOGGER.debug(
-                "privacy_guard_cache_skip cache=processor "
-                "weight_bytes=%d budget_bytes=%d",
-                weight_bytes,
-                MAX_PROCESSOR_CACHE_WEIGHT_BYTES,
-            )
-            return
-
-        evicted_entries = 0
-        evicted_weight_bytes = 0
-        with self._lock:
-            while (
-                len(self._processors) >= _MAX_CACHED_PROCESSORS
-                or self._weight_bytes + weight_bytes > MAX_PROCESSOR_CACHE_WEIGHT_BYTES
-            ):
-                _, evicted = self._processors.popitem(last=False)
-                self._weight_bytes -= evicted.weight_bytes
-                evicted_entries += 1
-                evicted_weight_bytes += evicted.weight_bytes
-            self._processors[fingerprint] = _CachedProcessor(
-                processor=processor,
-                weight_bytes=weight_bytes,
-            )
-            self._weight_bytes += weight_bytes
-        if evicted_entries:
-            _LOGGER.debug(
-                "privacy_guard_cache_eviction cache=processor "
-                "entries=%d weight_bytes=%d",
-                evicted_entries,
-                evicted_weight_bytes,
-            )
+            if config == self._config and self._processor is not None:
+                return self._processor
+            processor = self._build_processor(config)
+            self._config = config
+            self._processor = processor
+            return processor
 
     def _build_processor(
         self,
         config: PrivacyGuardConfig[EngineConfig],
-    ) -> _PreparedProcessor:
+    ) -> RequestProcessor:
         stages = tuple(
             (
                 stage.diagnostic_name(index),
@@ -354,25 +271,18 @@ class _RequestProcessorCache:
                 start=1,
             )
         )
-        return _PreparedProcessor(
-            processor=RequestProcessor(
-                config,
-                stages,
-                timeout_seconds=self._timeout_seconds,
-                log_request_content=self._log_request_content,
-            ),
-            regex_engines=tuple(
-                engine
-                for _, engine in stages
-                if isinstance(engine, regex_engine.RegexEngine)
-            ),
+        return RequestProcessor(
+            config,
+            stages,
+            timeout_seconds=self._timeout_seconds,
+            log_request_content=self._log_request_content,
         )
 
     def clear(self) -> None:
-        """Release every retained processor."""
+        """Release the active policy."""
         with self._lock:
-            self._processors.clear()
-            self._weight_bytes = 0
+            self._config = None
+            self._processor = None
 
 
 _WorkerResultT = TypeVar("_WorkerResultT")
@@ -541,7 +451,6 @@ def _limit_deny() -> pb2.HttpRequestResult:
 
 _LOGGER = get_logger(__name__)
 _INVALID_REQUEST_ID = "invalid"
-_MAX_CACHED_PROCESSORS = 16
 _MAX_PROTO_SAFE_INTEGER = (1 << 53) - 1
 
 

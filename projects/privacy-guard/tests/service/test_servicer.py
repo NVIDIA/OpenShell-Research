@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from threading import Barrier, Event, Lock, get_ident
 from typing import Never
@@ -15,10 +15,7 @@ from google.protobuf import json_format
 from google.protobuf.message import Message
 
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
-from privacy_guard.config import (
-    PrivacyGuardConfig,
-    configuration_fingerprint_and_size,
-)
+from privacy_guard.config import PrivacyGuardConfig
 from privacy_guard.constants import (
     LIMIT_REASON,
     LIMIT_REASON_CODE,
@@ -34,7 +31,7 @@ from privacy_guard.engines import (
     EngineConfig,
 )
 from privacy_guard.engines import regex as regex_module
-from privacy_guard.engines.registry import EngineRegistry, create_builtin_registry
+from privacy_guard.engines.registry import create_builtin_registry
 from privacy_guard.errors import ErrorCode, PrivacyGuardError
 from privacy_guard.request_processor import (
     EntityDetectionSummary,
@@ -85,25 +82,6 @@ def _values(
     }
 
 
-def _expected_processor_cache_weight(
-    registry: EngineRegistry,
-    values: dict[str, object],
-) -> int:
-    config = registry.validate_config(values)
-    _, config_weight = configuration_fingerprint_and_size(config)
-    regex_weight = sum(
-        regex_module._compiled_pattern_weight(
-            stage.config.pattern_catalog,
-            sum(
-                len(entity.patterns) for entity in stage.config.pattern_catalog.entities
-            ),
-        )
-        for stage in config.entity_processing.stages
-        if isinstance(stage.config, regex_module.RegexEngineConfig)
-    )
-    return config_weight + regex_weight
-
-
 def _proto_config(values: dict[str, object]) -> Message:
     result = pb2.ValidateConfigRequest().config
     json_format.ParseDict(values, result)
@@ -124,26 +102,6 @@ class _SuccessfulEvaluationContext:
         raise AssertionError("successful evaluation unexpectedly aborted")
 
 
-def _waiter_observing_future_type(
-    *,
-    expected_waiters: int,
-    waiters_ready: Event,
-) -> type[Future[RequestProcessor]]:
-    waiter_count = 0
-    waiter_count_lock = Lock()
-
-    class _WaiterObservingFuture(Future[RequestProcessor]):
-        def result(self, timeout: float | None = None) -> RequestProcessor:
-            nonlocal waiter_count
-            with waiter_count_lock:
-                waiter_count += 1
-                if waiter_count == expected_waiters:
-                    waiters_ready.set()
-            return super().result(timeout)
-
-    return _WaiterObservingFuture
-
-
 def test_copied_proto_remains_the_current_openshell_contract() -> None:
     evaluation = pb2.HttpRequestEvaluation()
     finding = pb2.Finding()
@@ -153,19 +111,43 @@ def test_copied_proto_remains_the_current_openshell_contract() -> None:
     assert not hasattr(finding, "source")
 
 
-def test_validate_config_is_pure_and_reports_invalid_config() -> None:
+def test_validate_config_is_pure_and_reports_invalid_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     middleware = PrivacyGuardMiddleware(create_builtin_registry())
+    active = middleware._policy.processor_for(_values(action="replace"))
+    processor_build_count = 0
+    original_build = servicer_module._ActivePolicy._build_processor
 
-    valid = middleware._validate_config(
-        pb2.ValidateConfigRequest(config=_proto_config(_values()))
+    def record_processor_build(
+        policy: servicer_module._ActivePolicy,
+        config: PrivacyGuardConfig[EngineConfig],
+    ) -> RequestProcessor:
+        nonlocal processor_build_count
+        processor_build_count += 1
+        return original_build(policy, config)
+
+    monkeypatch.setattr(
+        servicer_module._ActivePolicy,
+        "_build_processor",
+        record_processor_build,
     )
-    invalid = middleware._validate_config(
-        pb2.ValidateConfigRequest(config=_proto_config({"on_detection": {}}))
-    )
+    try:
+        valid = middleware._validate_config(
+            pb2.ValidateConfigRequest(config=_proto_config(_values("detect")))
+        )
+        invalid = middleware._validate_config(
+            pb2.ValidateConfigRequest(config=_proto_config({"on_detection": {}}))
+        )
+        still_active = middleware._policy.processor_for(_values(action="replace"))
+    finally:
+        asyncio.run(middleware.close())
 
     assert valid.valid is True
     assert invalid.valid is False
     assert "config_invalid" in invalid.reason
+    assert still_active is active
+    assert processor_build_count == 0
 
 
 def test_validate_config_rejects_oversized_proto_before_registry_validation(
@@ -435,13 +417,13 @@ def test_evaluation_quotes_request_id_delimiters_in_message_log(
     assert records[0].getMessage().count(" action=") == 1
 
 
-def test_middleware_applies_configured_timeout_to_cached_processors() -> None:
+def test_middleware_applies_configured_timeout_to_active_processor() -> None:
     middleware = PrivacyGuardMiddleware(
         create_builtin_registry(),
         timeout_seconds=4.5,
     )
     try:
-        processor = middleware._processors.resolve(_values())
+        processor = middleware._policy.processor_for(_values())
     finally:
         asyncio.run(middleware.close())
 
@@ -471,19 +453,19 @@ def test_evaluation_prepares_configuration_off_the_event_loop(
 ) -> None:
     event_loop_thread = get_ident()
     preparation_threads: list[int] = []
-    original_resolve = servicer_module._RequestProcessorCache.resolve
+    original_processor_for = servicer_module._ActivePolicy.processor_for
 
-    def record_resolve(
-        cache: servicer_module._RequestProcessorCache,
+    def record_preparation(
+        policy: servicer_module._ActivePolicy,
         values: object,
     ) -> RequestProcessor:
         preparation_threads.append(get_ident())
-        return original_resolve(cache, values)
+        return original_processor_for(policy, values)
 
     monkeypatch.setattr(
-        servicer_module._RequestProcessorCache,
-        "resolve",
-        record_resolve,
+        servicer_module._ActivePolicy,
+        "processor_for",
+        record_preparation,
     )
 
     async def evaluate() -> None:
@@ -499,7 +481,7 @@ def test_evaluation_prepares_configuration_off_the_event_loop(
     assert preparation_threads[0] != event_loop_thread
 
 
-def test_evaluation_revalidates_configuration_before_reusing_cached_processor(
+def test_evaluation_revalidates_configuration_before_reusing_active_processor(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     validation_count = 0
@@ -533,361 +515,202 @@ def test_evaluation_revalidates_configuration_before_reusing_cached_processor(
     assert validation_count == 2
 
 
-def test_same_fingerprint_misses_build_one_shared_processor(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    worker_count = 4
-    workers_ready = Barrier(worker_count)
-    waiters_ready = Event()
-    build_count = 0
-    build_count_lock = Lock()
-    original_build = servicer_module._RequestProcessorCache._build_processor
-
-    def synchronized_build(
-        cache: servicer_module._RequestProcessorCache,
-        config: PrivacyGuardConfig[EngineConfig],
-    ) -> servicer_module._PreparedProcessor:
-        nonlocal build_count
-        with build_count_lock:
-            build_count += 1
-        assert waiters_ready.wait(timeout=5)
-        return original_build(cache, config)
-
-    monkeypatch.setattr(
-        servicer_module,
-        "Future",
-        _waiter_observing_future_type(
-            expected_waiters=worker_count - 1,
-            waiters_ready=waiters_ready,
-        ),
-    )
-    monkeypatch.setattr(
-        servicer_module._RequestProcessorCache,
-        "_build_processor",
-        synchronized_build,
-    )
-    registry = create_builtin_registry()
-    cache = servicer_module._RequestProcessorCache(
-        registry,
-        timeout_seconds=1,
-        log_request_content=False,
-    )
-
-    def resolve() -> RequestProcessor:
-        workers_ready.wait(timeout=5)
-        return cache.resolve(_values())
-
-    with ThreadPoolExecutor(max_workers=worker_count) as executor:
-        processors = tuple(executor.map(lambda _: resolve(), range(worker_count)))
-
-    assert build_count == 1
-    assert all(processor is processors[0] for processor in processors)
-    assert cache._weight_bytes == _expected_processor_cache_weight(
-        registry,
-        _values(),
-    )
-    assert cache._in_flight == {}
-    cache.clear()
-
-
-def test_different_fingerprints_build_concurrently(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    builds_ready = Barrier(2)
-    original_build = servicer_module._RequestProcessorCache._build_processor
-
-    def synchronized_build(
-        cache: servicer_module._RequestProcessorCache,
-        config: PrivacyGuardConfig[EngineConfig],
-    ) -> servicer_module._PreparedProcessor:
-        builds_ready.wait(timeout=5)
-        return original_build(cache, config)
-
-    monkeypatch.setattr(
-        servicer_module._RequestProcessorCache,
-        "_build_processor",
-        synchronized_build,
-    )
-    registry = create_builtin_registry()
-    cache = servicer_module._RequestProcessorCache(
-        registry,
-        timeout_seconds=1,
-        log_request_content=False,
-    )
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        processors = tuple(
-            executor.map(
-                cache.resolve,
-                (_values(action="detect"), _values(action="block")),
-            )
-        )
-
-    assert processors[0] is not processors[1]
-    assert len(cache._processors) == 2
-    values = (_values(action="detect"), _values(action="block"))
-    expected_weight = sum(
-        _expected_processor_cache_weight(registry, item) for item in values
-    )
-    assert cache._weight_bytes == expected_weight
-    assert cache._in_flight == {}
-    cache.clear()
-
-
-def test_failed_processor_build_wakes_waiters_and_allows_retry(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    worker_count = 4
-    workers_ready = Barrier(worker_count)
-    waiters_ready = Event()
-    build_count = 0
-    build_count_lock = Lock()
-    failure = PrivacyGuardError(ErrorCode.UNEXPECTED_SERVICE_FAILURE)
-    original_build = servicer_module._RequestProcessorCache._build_processor
-
-    def fail_first_build(
-        cache: servicer_module._RequestProcessorCache,
-        config: PrivacyGuardConfig[EngineConfig],
-    ) -> servicer_module._PreparedProcessor:
-        nonlocal build_count
-        with build_count_lock:
-            build_count += 1
-            current_build = build_count
-        if current_build == 1:
-            assert waiters_ready.wait(timeout=5)
-            raise failure
-        return original_build(cache, config)
-
-    monkeypatch.setattr(
-        servicer_module,
-        "Future",
-        _waiter_observing_future_type(
-            expected_waiters=worker_count - 1,
-            waiters_ready=waiters_ready,
-        ),
-    )
-    monkeypatch.setattr(
-        servicer_module._RequestProcessorCache,
-        "_build_processor",
-        fail_first_build,
-    )
-    cache = servicer_module._RequestProcessorCache(
+def test_active_policy_reuses_only_the_current_configuration() -> None:
+    policy = servicer_module._ActivePolicy(
         create_builtin_registry(),
         timeout_seconds=1,
         log_request_content=False,
     )
+    first_values = _values(action="detect")
+    second_values = _values(action="block")
 
-    def capture_failure() -> PrivacyGuardError:
+    first = policy.processor_for(first_values)
+    same = policy.processor_for(deepcopy(first_values))
+    second = policy.processor_for(second_values)
+    rebuilt_first = policy.processor_for(first_values)
+
+    assert same is first
+    assert second is not first
+    assert rebuilt_first is not first
+    assert rebuilt_first is not second
+
+
+@pytest.mark.parametrize("initial_action", [None, "detect"])
+def test_concurrent_requests_for_the_same_policy_build_once(
+    monkeypatch: pytest.MonkeyPatch,
+    initial_action: str | None,
+) -> None:
+    worker_count = 4
+    workers_ready = Barrier(worker_count)
+    build_started = Event()
+    release_build = Event()
+    build_count = 0
+    build_count_lock = Lock()
+    original_build = servicer_module._ActivePolicy._build_processor
+    policy = servicer_module._ActivePolicy(
+        create_builtin_registry(),
+        timeout_seconds=1,
+        log_request_content=False,
+    )
+    initial = (
+        policy.processor_for(_values(action=initial_action))
+        if initial_action is not None
+        else None
+    )
+    requested_values = _values(
+        action="block" if initial_action is not None else "detect"
+    )
+
+    def pause_build(
+        active_policy: servicer_module._ActivePolicy,
+        config: PrivacyGuardConfig[EngineConfig],
+    ) -> RequestProcessor:
+        nonlocal build_count
+        with build_count_lock:
+            build_count += 1
+        build_started.set()
+        assert release_build.wait(timeout=5)
+        return original_build(active_policy, config)
+
+    monkeypatch.setattr(
+        servicer_module._ActivePolicy,
+        "_build_processor",
+        pause_build,
+    )
+
+    def resolve_policy() -> RequestProcessor:
         workers_ready.wait(timeout=5)
-        with pytest.raises(PrivacyGuardError) as captured:
-            cache.resolve(_values())
-        return captured.value
+        return policy.processor_for(requested_values)
 
     with ThreadPoolExecutor(max_workers=worker_count) as executor:
-        failures = tuple(executor.map(lambda _: capture_failure(), range(worker_count)))
+        futures = tuple(executor.submit(resolve_policy) for _ in range(worker_count))
+        assert build_started.wait(timeout=5)
+        assert all(not future.done() for future in futures)
+        release_build.set()
+        processors = tuple(future.result(timeout=5) for future in futures)
 
     assert build_count == 1
-    assert all(error is failure for error in failures)
-    assert cache._processors == {}
-    assert cache._weight_bytes == 0
-    assert cache._in_flight == {}
-
-    processor = cache.resolve(_values())
-
-    assert isinstance(processor, RequestProcessor)
-    assert build_count == 2
-    assert len(cache._processors) == 1
-    assert cache._weight_bytes > 0
-    assert cache._in_flight == {}
-    cache.clear()
+    assert all(processor is processors[0] for processor in processors)
+    assert processors[0] is not initial
+    assert policy.processor_for(requested_values) is processors[0]
 
 
-def test_processor_cache_evicts_least_recently_used_processor_by_weight(
+def test_different_policy_updates_are_serialized(
     monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    registry = create_builtin_registry()
-    values = tuple(
-        _values(action="detect", stage_name=f"sensitive-stage-{suffix}")
-        for suffix in ("a", "b", "c")
-    )
-    identities = tuple(
-        configuration_fingerprint_and_size(registry.validate_config(item))
-        for item in values
-    )
-    cache = servicer_module._RequestProcessorCache(
-        registry,
+    first_build_started = Event()
+    release_first_build = Event()
+    second_build_started = Event()
+    build_actions: list[str] = []
+    active_builds = 0
+    maximum_active_builds = 0
+    build_count_lock = Lock()
+    original_build = servicer_module._ActivePolicy._build_processor
+    policy = servicer_module._ActivePolicy(
+        create_builtin_registry(),
         timeout_seconds=1,
         log_request_content=False,
     )
-    first = cache.resolve(values[0])
-    entry_weight = cache._processors[identities[0][0]].weight_bytes
-    assert entry_weight > identities[0][1]
-    monkeypatch.setattr(
-        servicer_module,
-        "MAX_PROCESSOR_CACHE_WEIGHT_BYTES",
-        entry_weight * 2,
-    )
+    initial = policy.processor_for(_values(action="detect"))
 
-    with caplog.at_level(logging.DEBUG, logger="privacy_guard.service.servicer"):
-        cache.resolve(values[1])
-        assert cache.resolve(values[0]) is first
-        cache.resolve(values[2])
-
-    assert tuple(cache._processors) == (identities[0][0], identities[2][0])
-    assert cache._weight_bytes == entry_weight * 2
-    assert "privacy_guard_cache_eviction cache=processor entries=1" in caplog.text
-    assert "sensitive-stage" not in caplog.text
-    cache.clear()
-
-
-def test_processor_cache_evicts_least_recently_used_processor_by_count(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    registry = create_builtin_registry()
-    values = tuple(
-        _values(action="detect", stage_name=f"stage-{suffix}")
-        for suffix in ("a", "b", "c")
-    )
-    fingerprints = tuple(
-        configuration_fingerprint_and_size(registry.validate_config(item))[0]
-        for item in values
-    )
-    monkeypatch.setattr(servicer_module, "_MAX_CACHED_PROCESSORS", 2)
-    cache = servicer_module._RequestProcessorCache(
-        registry,
-        timeout_seconds=1,
-        log_request_content=False,
-    )
-
-    first = cache.resolve(values[0])
-    cache.resolve(values[1])
-    assert cache.resolve(values[0]) is first
-    cache.resolve(values[2])
-
-    assert tuple(cache._processors) == (fingerprints[0], fingerprints[2])
-    assert cache._weight_bytes == sum(
-        entry.weight_bytes for entry in cache._processors.values()
-    )
-    cache.clear()
-
-
-def test_processor_cache_builds_but_does_not_retain_oversized_processor(
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    registry = create_builtin_registry()
-    values = _values(action="detect", stage_name="sensitive-oversized-stage")
-    monkeypatch.setattr(
-        servicer_module,
-        "MAX_PROCESSOR_CACHE_WEIGHT_BYTES",
-        1,
-    )
-    build_count = 0
-    original_build = servicer_module._RequestProcessorCache._build_processor
-
-    def record_build(
-        cache: servicer_module._RequestProcessorCache,
+    def control_build(
+        active_policy: servicer_module._ActivePolicy,
         config: PrivacyGuardConfig[EngineConfig],
-    ) -> servicer_module._PreparedProcessor:
-        nonlocal build_count
-        build_count += 1
-        return original_build(cache, config)
+    ) -> RequestProcessor:
+        nonlocal active_builds, maximum_active_builds
+        action = config.on_detection.action.value
+        with build_count_lock:
+            active_builds += 1
+            maximum_active_builds = max(maximum_active_builds, active_builds)
+            build_actions.append(action)
+        try:
+            if action == "block":
+                first_build_started.set()
+                assert release_first_build.wait(timeout=5)
+            elif action == "replace":
+                second_build_started.set()
+            return original_build(active_policy, config)
+        finally:
+            with build_count_lock:
+                active_builds -= 1
 
     monkeypatch.setattr(
-        servicer_module._RequestProcessorCache,
+        servicer_module._ActivePolicy,
         "_build_processor",
-        record_build,
-    )
-    cache = servicer_module._RequestProcessorCache(
-        registry,
-        timeout_seconds=1,
-        log_request_content=False,
-    )
-
-    with caplog.at_level(logging.DEBUG, logger="privacy_guard.service.servicer"):
-        first = cache.resolve(values)
-        second = cache.resolve(values)
-
-    assert first is not second
-    assert build_count == 2
-    assert cache._processors == {}
-    assert cache._weight_bytes == 0
-    assert caplog.text.count("privacy_guard_cache_skip cache=processor") == 2
-    assert "sensitive-oversized-stage" not in caplog.text
-    cache.clear()
-
-
-def test_oversized_same_fingerprint_misses_remain_single_flight(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    publication_started = Event()
-    waiter_ready = Event()
-    release_publication = Event()
-
-    class _PublicationPausingFuture(Future[RequestProcessor]):
-        def result(self, timeout: float | None = None) -> RequestProcessor:
-            waiter_ready.set()
-            return super().result(timeout)
-
-        def set_result(self, result: RequestProcessor) -> None:
-            publication_started.set()
-            assert release_publication.wait(timeout=5)
-            super().set_result(result)
-
-    registry = create_builtin_registry()
-    values = _values(action="detect", stage_name="oversized-single-flight")
-    monkeypatch.setattr(
-        servicer_module,
-        "MAX_PROCESSOR_CACHE_WEIGHT_BYTES",
-        1,
-    )
-    monkeypatch.setattr(servicer_module, "Future", _PublicationPausingFuture)
-    build_count = 0
-    original_build = servicer_module._RequestProcessorCache._build_processor
-
-    def record_build(
-        cache: servicer_module._RequestProcessorCache,
-        config: PrivacyGuardConfig[EngineConfig],
-    ) -> servicer_module._PreparedProcessor:
-        nonlocal build_count
-        build_count += 1
-        return original_build(cache, config)
-
-    monkeypatch.setattr(
-        servicer_module._RequestProcessorCache,
-        "_build_processor",
-        record_build,
-    )
-    cache = servicer_module._RequestProcessorCache(
-        registry,
-        timeout_seconds=1,
-        log_request_content=False,
+        control_build,
     )
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        owner = executor.submit(cache.resolve, values)
-        assert publication_started.wait(timeout=5)
-        waiter = executor.submit(cache.resolve, values)
-        try:
-            assert waiter_ready.wait(timeout=5)
-        finally:
-            release_publication.set()
-        processors = (owner.result(timeout=5), waiter.result(timeout=5))
+        first_update = executor.submit(policy.processor_for, _values(action="block"))
+        assert first_build_started.wait(timeout=5)
+        second_update = executor.submit(
+            policy.processor_for,
+            _values(action="replace"),
+        )
+        assert not second_build_started.wait(timeout=0.1)
+        release_first_build.set()
+        first_processor = first_update.result(timeout=5)
+        second_processor = second_update.result(timeout=5)
 
-    assert processors[0] is processors[1]
-    assert build_count == 1
-    assert cache._processors == {}
-    assert cache._weight_bytes == 0
-    assert cache._in_flight == {}
-    cache.clear()
+    assert second_build_started.is_set()
+    assert build_actions == ["block", "replace"]
+    assert maximum_active_builds == 1
+    assert first_processor is not initial
+    assert second_processor is not first_processor
+    assert policy.processor_for(_values(action="replace")) is second_processor
 
 
-def test_compiled_cache_eviction_does_not_invalidate_cached_processor(
+def test_failed_policy_update_preserves_the_active_processor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    failure = PrivacyGuardError(ErrorCode.UNEXPECTED_SERVICE_FAILURE)
+    original_build = servicer_module._ActivePolicy._build_processor
+    policy = servicer_module._ActivePolicy(
+        create_builtin_registry(),
+        timeout_seconds=1,
+        log_request_content=False,
+    )
+    active_values = _values(action="detect")
+    update_values = _values(action="block")
+    active = policy.processor_for(active_values)
+
+    def fail_update(
+        active_policy: servicer_module._ActivePolicy,
+        config: PrivacyGuardConfig[EngineConfig],
+    ) -> RequestProcessor:
+        if config.on_detection.action.value == "block":
+            raise failure
+        return original_build(active_policy, config)
+
+    monkeypatch.setattr(
+        servicer_module._ActivePolicy,
+        "_build_processor",
+        fail_update,
+    )
+
+    with pytest.raises(PrivacyGuardError) as captured:
+        policy.processor_for(update_values)
+
+    assert captured.value is failure
+    assert policy.processor_for(active_values) is active
+
+    monkeypatch.setattr(
+        servicer_module._ActivePolicy,
+        "_build_processor",
+        original_build,
+    )
+    updated = policy.processor_for(update_values)
+
+    assert updated is not active
+    assert policy.processor_for(update_values) is updated
+
+
+def test_compiled_cache_eviction_does_not_invalidate_active_processor(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     regex_module._clear_compiled_pattern_cache()
     registry = create_builtin_registry()
-    cache = servicer_module._RequestProcessorCache(
+    policy = servicer_module._ActivePolicy(
         registry,
         timeout_seconds=1,
         log_request_content=False,
@@ -902,7 +725,7 @@ def test_compiled_cache_eviction_does_not_invalidate_cached_processor(
     )
 
     try:
-        processor = cache.resolve(processor_values)
+        processor = policy.processor_for(processor_values)
         entry_weight = regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES
         monkeypatch.setattr(
             regex_module,
@@ -914,75 +737,29 @@ def test_compiled_cache_eviction_does_not_invalidate_cached_processor(
 
         result = processor.process("aaa")
         assert len(result.detection_summaries) == 1
-        assert cache.resolve(processor_values) is processor
+        assert policy.processor_for(processor_values) is processor
         assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES <= entry_weight
     finally:
-        cache.clear()
+        policy.clear()
         regex_module._clear_compiled_pattern_cache()
 
 
-def test_oversized_regex_processor_preserves_cached_processor(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    regex_module._clear_compiled_pattern_cache()
-    registry = create_builtin_registry()
-    cache = servicer_module._RequestProcessorCache(
-        registry,
-        timeout_seconds=1,
-        log_request_content=False,
-    )
-    retained_values = _values(
-        "detect",
-        patterns=[{"pattern": "aaa", "confidence": "high"}],
-    )
-    oversized_values = _values(
-        "detect",
-        patterns=[
-            {"pattern": "bbb", "confidence": "high"},
-            {"pattern": "ccc", "confidence": "high"},
-        ],
-    )
-
-    try:
-        retained = cache.resolve(retained_values)
-        retained_fingerprint, _ = configuration_fingerprint_and_size(
-            registry.validate_config(retained_values)
-        )
-        retained_weight = cache._processors[retained_fingerprint].weight_bytes
-        monkeypatch.setattr(
-            servicer_module,
-            "MAX_PROCESSOR_CACHE_WEIGHT_BYTES",
-            retained_weight + 1,
-        )
-
-        oversized = cache.resolve(oversized_values)
-
-        assert oversized is not retained
-        assert tuple(cache._processors) == (retained_fingerprint,)
-        assert cache._processors[retained_fingerprint].processor is retained
-        assert cache._weight_bytes == retained_weight
-    finally:
-        cache.clear()
-        regex_module._clear_compiled_pattern_cache()
-
-
-def test_middleware_shutdown_clears_processor_cache() -> None:
+def test_middleware_shutdown_clears_active_policy() -> None:
     regex_module._clear_compiled_pattern_cache()
     middleware = PrivacyGuardMiddleware(create_builtin_registry())
     try:
-        middleware._processors.resolve(_values("detect"))
-        assert middleware._processors._processors
+        middleware._policy.processor_for(_values("detect"))
 
         asyncio.run(middleware.close())
 
-        assert middleware._processors._processors == {}
-        assert middleware._processors._weight_bytes == 0
+        assert middleware._policy._config is None
+        assert middleware._policy._processor is None
     finally:
-        middleware._processors.clear()
+        middleware._policy.clear()
         regex_module._clear_compiled_pattern_cache()
 
 
-def test_oversized_stage_list_fails_before_fingerprinting_or_construction(
+def test_oversized_stage_list_fails_before_engine_construction(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     values = _values(action="detect", stage_count=10_000)
@@ -992,11 +769,6 @@ def test_oversized_stage_list_fails_before_fingerprinting_or_construction(
         raise AssertionError("oversized stage list reached preparation")
 
     monkeypatch.setattr(
-        servicer_module,
-        "configuration_fingerprint_and_size",
-        unexpected_call,
-    )
-    monkeypatch.setattr(
         servicer_module.EngineRegistry,
         "create_engine",
         unexpected_call,
@@ -1004,7 +776,7 @@ def test_oversized_stage_list_fails_before_fingerprinting_or_construction(
     middleware = PrivacyGuardMiddleware(create_builtin_registry())
     try:
         with pytest.raises(PrivacyGuardError) as captured:
-            middleware._processors.resolve(values)
+            middleware._policy.processor_for(values)
     finally:
         asyncio.run(middleware.close())
 

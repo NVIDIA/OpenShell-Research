@@ -243,27 +243,31 @@ validation without a concrete failure mode and a clear owning layer.
 
 ## State and retention
 
-Cross-request entity memory is not implemented. Privacy Guard retains validated
-configuration and immutable engine state in its processor cache, but never
-retains request text, detections, or replacement mappings there.
+Cross-request entity memory is not implemented. Privacy Guard retains one active
+validated policy and its immutable configured engine state, but never request
+text, detections, or replacement mappings. The active processor is deliberate
+process state, not an LRU entry: it remains until successful replacement or
+shutdown.
 
-Prepared state is bounded by weight and least-recently-used entry count:
+During an update, the fully prepared candidate may coexist with the active
+processor. Evaluations that already captured the prior processor may keep it
+alive until they finish. A failed candidate leaves active state unchanged.
+
+Regex's supporting caches remain independently bounded:
 
 | Cache | Weight budget | Entry cap | Entry weight |
 | --- | ---: | ---: | --- |
 | Parsed Regex file catalogs | 8 MiB | 64 | source file bytes |
 | Compiled Regex rules | 32 MiB | 128 | canonical catalog bytes plus 4 KiB per rule |
-| Request processors | 32 MiB | 16 | canonical expanded configuration plus the full Regex state estimate for every Regex stage |
 
 The compiled-rule allowance accounts for retained backend state that is much
-larger than short pattern text. Cache budgets are independent. The compiled-rule
-cache charges each retained catalog once. The processor cache charges every
-processor for its full estimated Regex state, even when equivalent rules are
-referenced elsewhere. This conservative accounting avoids coupling eviction or
-ownership between caches. Custom engines do not need a cache-size hook. One
-entry that exceeds its cache budget remains valid and usable for the current
-evaluation but is not retained. Debug skip and eviction records contain only
-cache names and weights, plus eviction counts.
+larger than short pattern text. Cache budgets are independent. One entry that
+exceeds a Regex cache budget remains valid and usable for the current operation
+but is not retained there. This does not invalidate an active or candidate
+processor holding those rules. The active policy is not rejected by cache
+admission; policy and schema limits bound its shape, while custom-engine
+prepared memory remains an operator responsibility. Regex cache skip and
+eviction records contain only cache names and weights, plus eviction counts.
 
 ## Changing a limit
 
