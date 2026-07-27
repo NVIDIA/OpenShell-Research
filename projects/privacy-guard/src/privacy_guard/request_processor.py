@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections import OrderedDict
 from collections.abc import Sequence
 from enum import StrEnum
 
@@ -183,10 +182,10 @@ class RequestProcessor:
 def _aggregate_detections(
     stage_results: Sequence[tuple[str, TextProcessingResult]],
 ) -> tuple[EntityDetectionSummary, ...]:
-    groups: OrderedDict[
+    groups: dict[
         tuple[str, str, ConfidenceLevel | None],
         int,
-    ] = OrderedDict()
+    ] = {}
     for source, result in stage_results:
         for detection in result.detections:
             key = (source, detection.entity, detection.confidence)

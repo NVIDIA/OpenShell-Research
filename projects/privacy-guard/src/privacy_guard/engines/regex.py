@@ -31,7 +31,6 @@ from privacy_guard.constants import (
     MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES,
     MAX_REGEX_ENTITIES_PER_CATALOG,
     MAX_REGEX_NAME_BYTES,
-    MAX_REGEX_PARSED_CATALOG_CACHE_BYTES,
     MAX_REGEX_PATTERN_BYTES,
     MAX_REGEX_RULES_PER_CATALOG,
     REGEX_COMPILED_RULE_WEIGHT_BYTES,
@@ -408,12 +407,7 @@ def _load_pattern_catalog_file(value: str) -> RegexPatternCatalog:
             raise ValueError
         return _read_pattern_catalog_file(
             descriptor,
-            path_text,
-            metadata.st_dev,
-            metadata.st_ino,
             metadata.st_size,
-            metadata.st_mtime_ns,
-            metadata.st_ctime_ns,
         )
     except (
         OSError,
@@ -444,79 +438,16 @@ def _open_pattern_catalog_file(relative_path: Path) -> int:
 
 def _read_pattern_catalog_file(
     descriptor: int,
-    path: str,
-    device: int,
-    inode: int,
-    size: int,
-    modified_at_ns: int,
-    changed_at_ns: int,
+    expected_size: int,
 ) -> RegexPatternCatalog:
-    cache_key = (
-        path,
-        device,
-        inode,
-        size,
-        modified_at_ns,
-        changed_at_ns,
-    )
-    with _PATTERN_CATALOG_CACHE_LOCK:
-        cached = _PATTERN_CATALOG_CACHE.get(cache_key)
-        if cached is not None:
-            _PATTERN_CATALOG_CACHE.move_to_end(cache_key)
-            return cached[0]
-
     contents = _read_bounded_file(descriptor)
-    if len(contents) != size or len(contents) > MAX_REGEX_CATALOG_FILE_BYTES:
-        raise ValueError
-    final_metadata = os.fstat(descriptor)
-    if (
-        final_metadata.st_dev,
-        final_metadata.st_ino,
-        final_metadata.st_size,
-        final_metadata.st_mtime_ns,
-        final_metadata.st_ctime_ns,
-    ) != (device, inode, size, modified_at_ns, changed_at_ns):
+    if len(contents) != expected_size or len(contents) > MAX_REGEX_CATALOG_FILE_BYTES:
         raise ValueError
     values = yaml.load(
         contents.decode("utf-8", errors="strict"),
         Loader=_StrictCatalogLoader,
     )
-    catalog = RegexPatternCatalog.model_validate(values)
-    if size > MAX_REGEX_PARSED_CATALOG_CACHE_BYTES:
-        _LOGGER.debug(
-            "privacy_guard_cache_skip cache=regex_parsed_catalog "
-            "weight_bytes=%d budget_bytes=%d",
-            size,
-            MAX_REGEX_PARSED_CATALOG_CACHE_BYTES,
-        )
-        return catalog
-    evicted_entries = 0
-    evicted_weight_bytes = 0
-    with _PATTERN_CATALOG_CACHE_LOCK:
-        cached = _PATTERN_CATALOG_CACHE.get(cache_key)
-        if cached is not None:
-            _PATTERN_CATALOG_CACHE.move_to_end(cache_key)
-            return cached[0]
-        _PATTERN_CATALOG_CACHE[cache_key] = (catalog, size)
-        global _PATTERN_CATALOG_CACHE_WEIGHT_BYTES
-        _PATTERN_CATALOG_CACHE_WEIGHT_BYTES += size
-        while (
-            len(_PATTERN_CATALOG_CACHE) > _MAX_CACHED_PATTERN_CATALOGS
-            or _PATTERN_CATALOG_CACHE_WEIGHT_BYTES
-            > MAX_REGEX_PARSED_CATALOG_CACHE_BYTES
-        ):
-            _, (_, evicted_weight) = _PATTERN_CATALOG_CACHE.popitem(last=False)
-            _PATTERN_CATALOG_CACHE_WEIGHT_BYTES -= evicted_weight
-            evicted_entries += 1
-            evicted_weight_bytes += evicted_weight
-    if evicted_entries:
-        _LOGGER.debug(
-            "privacy_guard_cache_eviction cache=regex_parsed_catalog "
-            "entries=%d weight_bytes=%d",
-            evicted_entries,
-            evicted_weight_bytes,
-        )
-    return catalog
+    return RegexPatternCatalog.model_validate(values)
 
 
 def _read_bounded_file(descriptor: int) -> bytes:
@@ -623,13 +554,6 @@ def _clear_compiled_pattern_cache() -> None:
     with _COMPILED_PATTERN_CACHE_LOCK:
         _COMPILED_PATTERN_CACHE.clear()
         _COMPILED_PATTERN_CACHE_WEIGHT_BYTES = 0
-
-
-def _clear_parsed_pattern_catalog_cache() -> None:
-    global _PATTERN_CATALOG_CACHE_WEIGHT_BYTES
-    with _PATTERN_CATALOG_CACHE_LOCK:
-        _PATTERN_CATALOG_CACHE.clear()
-        _PATTERN_CATALOG_CACHE_WEIGHT_BYTES = 0
 
 
 def _compile_rule(
@@ -780,14 +704,9 @@ _CONFIDENCE_RANK = {
     ConfidenceLevel.HIGH: 2,
 }
 _RULE_METADATA_KEY = "rule"
-_MAX_CACHED_PATTERN_CATALOGS = 64
-_PATTERN_CATALOG_CACHE: OrderedDict[
-    tuple[str, int, int, int, int, int],
-    tuple[RegexPatternCatalog, int],
-] = OrderedDict()
-_PATTERN_CATALOG_CACHE_WEIGHT_BYTES = 0
-_PATTERN_CATALOG_CACHE_LOCK = RLock()
 _MAX_CACHED_COMPILED_CATALOGS = 128
+# Python dict preserves insertion order, but this LRU must move cache hits to the
+# newest position and efficiently evict the oldest entry.
 _COMPILED_PATTERN_CACHE: OrderedDict[
     RegexPatternCatalog,
     tuple[tuple[_CompiledRule, ...], int],

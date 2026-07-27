@@ -85,10 +85,11 @@ without aliases, duplicate keys, or unsafe tags.
 
 File-backed and inline inputs normalize to the same `RegexPatternCatalog`.
 The complete validated configuration contains the structured catalog rather
-than its source path. File metadata keys a bounded parser cache; the normalized
-immutable catalog keys a bounded compiled-rule cache. A content change produces
-a different validated configuration and causes the next evaluation to prepare
-an active-policy replacement.
+than its source path. File-backed catalogs are read and validated on each policy
+validation. The normalized immutable catalog keys a bounded compiled-rule
+cache, so equivalent rules do not need to be recompiled. A content change
+produces a different validated configuration and causes the next evaluation to
+prepare an active-policy replacement.
 
 Privacy Guard maintains the catalog schema and safety limits but does not ship
 an authoritative pattern set. Repository catalogs are examples to copy and

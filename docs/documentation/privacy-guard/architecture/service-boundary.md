@@ -66,13 +66,12 @@ run in the bounded worker pool. Validation still occurs for every evaluation.
 Equivalent normalized Regex catalogs may reuse an entry in the independent
 compiled-rule cache during validation and engine construction.
 
-Regex maintains two independent LRU caches. Parsed file catalogs retain at most
-64 entries and 8 MiB of source files. Compiled rules retain at most 128 catalogs
-and 32 MiB; each entry weighs its canonical catalog bytes plus 4 KiB per rule.
-Evicting a compiled-rule entry only removes that cache's reference. A processor
-that already uses those rules remains valid.
+Regex's compiled-rule LRU retains at most 128 catalogs and 32 MiB. Each entry
+weighs its canonical catalog bytes plus 4 KiB per rule. Evicting an entry only
+removes the cache's reference. A processor that already uses those rules remains
+valid.
 
-An otherwise valid Regex cache entry larger than its byte budget is built and
+An otherwise valid compiled-rule entry larger than the byte budget is built and
 used for the current operation but is not retained in that cache. The active
 processor itself has no LRU admission budget: it is deliberate process state
 retained until replacement or shutdown. Regex cache eviction or a skipped entry

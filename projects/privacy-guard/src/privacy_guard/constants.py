@@ -49,8 +49,7 @@ MAX_REGEX_PATTERN_BYTES = 16 * 1024
 MAX_REGEX_CATALOG_FILE_BYTES = 16 * 1024 * 1024
 MAX_REGEX_CATALOG_PATH_BYTES = 1024
 
-# Prepared-state cache budgets. Entry-count caps remain secondary guards.
-MAX_REGEX_PARSED_CATALOG_CACHE_BYTES = 8 * 1024 * 1024
+# Prepared-state cache budget. The entry-count cap remains a secondary guard.
 MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES = 32 * 1024 * 1024
 REGEX_COMPILED_RULE_WEIGHT_BYTES = 4 * 1024
 

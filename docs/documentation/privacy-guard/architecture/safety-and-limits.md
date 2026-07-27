@@ -253,21 +253,20 @@ During an update, the fully prepared candidate may coexist with the active
 processor. Evaluations that already captured the prior processor may keep it
 alive until they finish. A failed candidate leaves active state unchanged.
 
-Regex's supporting caches remain independently bounded:
+Regex's supporting compiled-rule cache remains bounded:
 
 | Cache | Weight budget | Entry cap | Entry weight |
 | --- | ---: | ---: | --- |
-| Parsed Regex file catalogs | 8 MiB | 64 | source file bytes |
 | Compiled Regex rules | 32 MiB | 128 | canonical catalog bytes plus 4 KiB per rule |
 
 The compiled-rule allowance accounts for retained backend state that is much
-larger than short pattern text. Cache budgets are independent. One entry that
-exceeds a Regex cache budget remains valid and usable for the current operation
-but is not retained there. This does not invalidate an active or candidate
-processor holding those rules. The active policy is not rejected by cache
-admission; policy and schema limits bound its shape, while custom-engine
-prepared memory remains an operator responsibility. Regex cache skip and
-eviction records contain only cache names and weights, plus eviction counts.
+larger than short pattern text. One entry that exceeds the budget remains valid
+and usable for the current operation but is not retained there. This does not
+invalidate an active or candidate processor holding those rules. The active
+policy is not rejected by cache admission; policy and schema limits bound its
+shape, while custom-engine prepared memory remains an operator responsibility.
+Regex cache skip and eviction records contain only the cache name and weights,
+plus eviction counts.
 
 ## Changing a limit
 
