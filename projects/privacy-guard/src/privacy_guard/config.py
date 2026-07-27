@@ -113,15 +113,7 @@ class PrivacyGuardConfig(
     on_detection: OnDetection = Field(repr=False)
 
 
-def configuration_fingerprint(
-    config: PrivacyGuardConfig[EngineConfig],
-) -> str:
-    """Return the canonical SHA-256 fingerprint of an expanded policy config."""
-    fingerprint, _ = _configuration_fingerprint_and_size(config)
-    return fingerprint
-
-
-def _configuration_fingerprint_and_size(
+def configuration_fingerprint_and_size(
     config: PrivacyGuardConfig[EngineConfig],
 ) -> tuple[str, int]:
     """Return the canonical fingerprint and encoded size of an expanded config."""
@@ -141,5 +133,5 @@ __all__ = [
     "OnDetection",
     "PolicyAction",
     "PrivacyGuardConfig",
-    "configuration_fingerprint",
+    "configuration_fingerprint_and_size",
 ]

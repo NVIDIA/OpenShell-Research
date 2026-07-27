@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections import OrderedDict
 from collections.abc import Sequence
 from enum import StrEnum
-from typing import Protocol
 
 from pydantic import Field
 
@@ -21,6 +20,8 @@ from privacy_guard.constants import (
 from privacy_guard.engines import (
     ConfidenceLevel,
     EngineConfig,
+    EngineResources,
+    EntityProcessingEngine,
     EntityProcessingStrategy,
     TextProcessingResult,
 )
@@ -69,21 +70,26 @@ class RequestProcessor:
     def __init__(
         self,
         config: PrivacyGuardConfig[EngineConfig],
-        stages: Sequence[tuple[str, _RunnableEngine]],
+        configured_engines: Sequence[
+            tuple[
+                str,
+                EntityProcessingEngine[EngineConfig, EngineResources | None],
+            ]
+        ],
         *,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         log_request_content: bool = False,
     ) -> None:
-        configured_stages = tuple(stages)
-        if len(configured_stages) != len(config.entity_processing.stages):
-            raise ValueError("configured stages do not match the policy")
-        if not configured_stages:
-            raise ValueError("at least one configured stage is required")
-        sources = tuple(source for source, _ in configured_stages)
+        engines = tuple(configured_engines)
+        if len(engines) != len(config.entity_processing.stages):
+            raise ValueError("configured engines do not match the policy")
+        if not engines:
+            raise ValueError("at least one configured engine is required")
+        sources = tuple(source for source, _ in engines)
         if any(not source for source in sources) or len(sources) != len(set(sources)):
-            raise ValueError("stage sources must be non-empty and unique")
+            raise ValueError("engine sources must be non-empty and unique")
         self._config = config
-        self._stages = configured_stages
+        self._engines = engines
         self._timeout_seconds = validate_timeout_seconds(timeout_seconds)
         self._log_request_content = log_request_content
 
@@ -108,7 +114,7 @@ class RequestProcessor:
         current_text = input_text
         stage_results: list[tuple[str, TextProcessingResult]] = []
         try:
-            for source, engine in self._stages:
+            for source, engine in self._engines:
                 _LOGGER.debug(
                     "privacy_guard_stage_run source=%s strategy=%s",
                     source,
@@ -194,18 +200,6 @@ def _aggregate_detections(
         )
         for (source, entity, confidence), count in groups.items()
     )
-
-
-class _RunnableEngine(Protocol):
-    """The engine behavior needed by request orchestration."""
-
-    def run(
-        self,
-        text: str,
-        *,
-        strategy: EntityProcessingStrategy,
-        timeout: Timeout,
-    ) -> TextProcessingResult: ...
 
 
 _LOGGER = get_logger(__name__)

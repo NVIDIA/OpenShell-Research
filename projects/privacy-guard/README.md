@@ -282,4 +282,5 @@ make check-py311
 ```
 
 `make check` delegates to `scripts/check.sh`, the authoritative local and CI
-gate. It runs tests, formatting, lint, `ty`, import smoke, and package builds.
+gate. It runs tests, formatting, lint, `ty`, an import smoke check, and a
+dependency audit.

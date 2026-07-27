@@ -17,7 +17,7 @@ from google.protobuf.message import Message
 from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
 from privacy_guard.config import (
     PrivacyGuardConfig,
-    _configuration_fingerprint_and_size,
+    configuration_fingerprint_and_size,
 )
 from privacy_guard.constants import (
     LIMIT_REASON,
@@ -90,7 +90,7 @@ def _expected_processor_cache_weight(
     values: dict[str, object],
 ) -> int:
     config = registry.validate_config(values)
-    _, config_weight = _configuration_fingerprint_and_size(config)
+    _, config_weight = configuration_fingerprint_and_size(config)
     regex_weight = sum(
         regex_module._compiled_pattern_weight(
             stage.config.pattern_catalog,
@@ -711,7 +711,7 @@ def test_processor_cache_evicts_least_recently_used_processor_by_weight(
         for suffix in ("a", "b", "c")
     )
     identities = tuple(
-        _configuration_fingerprint_and_size(registry.validate_config(item))
+        configuration_fingerprint_and_size(registry.validate_config(item))
         for item in values
     )
     cache = servicer_module._RequestProcessorCache(
@@ -749,7 +749,7 @@ def test_processor_cache_evicts_least_recently_used_processor_by_count(
         for suffix in ("a", "b", "c")
     )
     fingerprints = tuple(
-        _configuration_fingerprint_and_size(registry.validate_config(item))[0]
+        configuration_fingerprint_and_size(registry.validate_config(item))[0]
         for item in values
     )
     monkeypatch.setattr(servicer_module, "_MAX_CACHED_PROCESSORS", 2)
@@ -945,7 +945,7 @@ def test_oversized_regex_processor_preserves_cached_processor(
 
     try:
         retained = cache.resolve(retained_values)
-        retained_fingerprint, _ = _configuration_fingerprint_and_size(
+        retained_fingerprint, _ = configuration_fingerprint_and_size(
             registry.validate_config(retained_values)
         )
         retained_weight = cache._processors[retained_fingerprint].weight_bytes
@@ -993,7 +993,7 @@ def test_oversized_stage_list_fails_before_fingerprinting_or_construction(
 
     monkeypatch.setattr(
         servicer_module,
-        "_configuration_fingerprint_and_size",
+        "configuration_fingerprint_and_size",
         unexpected_call,
     )
     monkeypatch.setattr(

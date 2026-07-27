@@ -21,7 +21,7 @@ from privacy_guard.bindings import supervisor_middleware_pb2 as pb2
 from privacy_guard.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
 from privacy_guard.config import (
     PrivacyGuardConfig,
-    _configuration_fingerprint_and_size,
+    configuration_fingerprint_and_size,
 )
 from privacy_guard.constants import (
     BLOCK_REASON,
@@ -269,7 +269,7 @@ class _RequestProcessorCache:
     def resolve(self, values: object) -> RequestProcessor:
         """Return the cached or newly prepared processor for expanded config."""
         config = self._registry.validate_config(values)
-        fingerprint, config_weight_bytes = _configuration_fingerprint_and_size(config)
+        fingerprint, config_weight_bytes = configuration_fingerprint_and_size(config)
         with self._lock:
             cached = self._processors.get(fingerprint)
             if cached is not None:
