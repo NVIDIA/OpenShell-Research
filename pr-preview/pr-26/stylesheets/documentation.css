@@ -1,0 +1,21 @@
+/* SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved. */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/*
+ * Keep documentation diagrams subordinate to the surrounding explanation.
+ * Small screens retain the full available width so labels remain legible.
+ */
+.md-typeset img[src*="assets/privacy-guard/diagrams/"] {
+  display: block;
+  width: 88%;
+  max-width: 52rem;
+  height: auto;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+@media screen and (max-width: 48rem) {
+  .md-typeset img[src*="assets/privacy-guard/diagrams/"] {
+    width: 100%;
+  }
+}
