@@ -6,5 +6,7 @@ agent_markdown: true
 
 # Documentation
 
-As Dev Notes introduce reusable software, this section will collect the technical
-documentation and references needed to install, use, and reproduce that work.
+Technical documentation and references for installing, using, and extending
+OpenShell Research projects.
+
+- [Privacy Guard](privacy-guard/index.md): middleware for protecting sensitive data in OpenShell.

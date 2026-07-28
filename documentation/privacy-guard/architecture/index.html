@@ -6,40 +6,40 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Technical guides for projects featured in OpenShell Dev Notes.">
+        <meta name="description" content="Privacy Guard components, boundaries, state, and request-processing structure.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
       
       
       
-        <link rel="prev" href="../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/">
+        <link rel="prev" href="../engines/custom/">
       
       
-        <link rel="next" href="./privacy-guard/">
+        <link rel="next" href="./request-lifecycle/">
       
       
         
       
       
-      <link rel="icon" href="../assets/brand/favicon.svg">
+      <link rel="icon" href="../../../assets/brand/favicon.svg">
       <meta name="generator" content="zensical-0.0.44">
     
     
       
-        <title>Documentation - OpenShell Research</title>
+        <title>System architecture - OpenShell Research</title>
       
     
     
       
         
       
-      <link rel="stylesheet" href="../assets/stylesheets/modern/main.fba56155.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/modern/main.fba56155.min.css">
       
         
           
         
-        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.dfe2e883.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/modern/palette.dfe2e883.min.css">
       
       
 
@@ -58,11 +58,11 @@
       
     
     
-      <link rel="stylesheet" href="../stylesheets/dev-notes.css">
+      <link rel="stylesheet" href="../../../stylesheets/dev-notes.css">
     
-      <link rel="stylesheet" href="../stylesheets/documentation.css">
+      <link rel="stylesheet" href="../../../stylesheets/documentation.css">
     
-    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    <script>__md_scope=new URL("../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
     
       
 
@@ -92,7 +92,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#documentation" class="md-skip">
+        <a href="#system-architecture" class="md-skip">
           Skip to content
         </a>
       
@@ -108,9 +108,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="./.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../../.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
@@ -127,7 +127,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Documentation
+              System architecture
             
           </span>
         </div>
@@ -216,9 +216,9 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="./.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../../.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     OpenShell Research
@@ -270,7 +270,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../dev-notes/" class="md-nav__link ">
+            <a href="../../../dev-notes/" class="md-nav__link ">
               
   
   
@@ -363,7 +363,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
+      <a href="../../../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
         
   
   
@@ -432,7 +432,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="././" class="md-nav__link md-nav__link--active">
+            <a href="../../" class="md-nav__link ">
               
   
   
@@ -449,7 +449,7 @@
             </a>
             
               
-              <label class="md-nav__link md-nav__link--active" for="__nav_2" id="__nav_2_label" tabindex="">
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -471,6 +471,8 @@
                 
   
   
+    
+  
   
   
     
@@ -494,15 +496,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="./privacy-guard/" class="md-nav__link ">
+            <a href="../" class="md-nav__link ">
               
   
   
@@ -525,7 +527,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -597,7 +599,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./privacy-guard/configuration/" class="md-nav__link">
+      <a href="../configuration/" class="md-nav__link">
         
   
   
@@ -624,7 +626,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./privacy-guard/operations/" class="md-nav__link">
+      <a href="../operations/" class="md-nav__link">
         
   
   
@@ -683,7 +685,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="./privacy-guard/engines/" class="md-nav__link ">
+            <a href="../engines/" class="md-nav__link ">
               
   
   
@@ -725,7 +727,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./privacy-guard/engines/regex/" class="md-nav__link">
+      <a href="../engines/regex/" class="md-nav__link">
         
   
   
@@ -752,7 +754,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./privacy-guard/engines/custom/" class="md-nav__link">
+      <a href="../engines/custom/" class="md-nav__link">
         
   
   
@@ -784,6 +786,8 @@
                 
   
   
+    
+  
   
   
     
@@ -803,15 +807,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2_4" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="./privacy-guard/architecture/" class="md-nav__link ">
+            <a href="././" class="md-nav__link md-nav__link--active">
               
   
   
@@ -828,13 +832,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_2_2_4" id="__nav_2_2_4_label" tabindex="0">
+              <label class="md-nav__link md-nav__link--active" for="__nav_2_2_4" id="__nav_2_2_4_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_2_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_2_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_2_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -853,7 +857,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./privacy-guard/architecture/request-lifecycle/" class="md-nav__link">
+      <a href="./request-lifecycle/" class="md-nav__link">
         
   
   
@@ -880,7 +884,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./privacy-guard/architecture/service-boundary/" class="md-nav__link">
+      <a href="./service-boundary/" class="md-nav__link">
         
   
   
@@ -966,7 +970,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./privacy-guard/reference/limits-and-failures/" class="md-nav__link">
+      <a href="../reference/limits-and-failures/" class="md-nav__link">
         
   
   
@@ -1026,6 +1030,11 @@
                       
                     
                     
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
                   
                   <div class="md-sidebar__inner">
                     
@@ -1037,6 +1046,113 @@
   
     
   
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#system-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        System boundary
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Components
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-and-runtime-resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Configuration and runtime resources
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#text-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Text boundary
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#processing-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Processing pipeline
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        State
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#concurrency" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Concurrency
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#result-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Result boundary
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#read-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Read next
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -1061,7 +1177,7 @@
   
   
     <li class="md-path__item">
-      <a href="./.." class="md-path__link">
+      <a href="../../.." class="md-path__link">
         
   
   <span class="md-ellipsis">
@@ -1091,11 +1207,79 @@
     
     
       <li class="md-path__item">
-        <a href="././" class="md-path__link">
+        <a href="../../" class="md-path__link">
           
   
   <span class="md-ellipsis">
     Documentation
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Privacy Guard
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="././" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Architecture
   </span>
 
         </a>
@@ -1122,11 +1306,158 @@
   </a>
 
 
-<h1 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h1>
-<p>Technical documentation and references for installing, using, and extending
-OpenShell Research projects.</p>
+<h1 id="system-architecture">System architecture<a class="headerlink" href="#system-architecture" title="Permanent link">&para;</a></h1>
+<p>Privacy Guard is a pre-credentials OpenShell middleware. It translates an
+OpenShell HTTP-request evaluation into one text-processing run and returns an
+allow, replacement, or deny result.</p>
+<p>This is an experimental network-middleware boundary. It does not mediate
+harness filesystem writes, so raw prompts and session histories may be stored
+before a request reaches Privacy Guard.</p>
+<h2 id="system-boundary">System boundary<a class="headerlink" href="#system-boundary" title="Permanent link">&para;</a></h2>
+<p><img alt="Privacy Guard component architecture. The service layer translates
+OpenShell gRPC messages, the request processor applies policy, and registered
+engines detect or replace entities without depending on the transport
+layer." src="../assets/diagrams/component-architecture.svg" /></p>
+<p>OpenShell owns request routing and provider credential attachment. Privacy
+Guard does not send provider requests.</p>
+<h2 id="components">Components<a class="headerlink" href="#components" title="Permanent link">&para;</a></h2>
+<p>Source paths below are relative to
+<code>projects/privacy-guard/src/privacy_guard/</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cli.py</code></td>
+<td>CLI commands, registry-factory loading, engine discovery, schema output, and server startup</td>
+</tr>
+<tr>
+<td><code>gateway_config.py</code></td>
+<td>Safe updates to OpenShell gateway middleware registrations</td>
+</tr>
+<tr>
+<td><code>service/</code></td>
+<td>gRPC lifecycle, protobuf conversion, transport validation, active configuration, worker scheduling, and result serialization</td>
+</tr>
+<tr>
+<td><code>request_processor.py</code></td>
+<td>Ordered stage execution, shared timeout, aggregation, and policy action</td>
+</tr>
+<tr>
+<td><code>engines/base.py</code></td>
+<td>Engine lifecycle and result-contract enforcement</td>
+</tr>
+<tr>
+<td><code>engines/registry.py</code></td>
+<td>Engine and resource registration, policy schema construction, discovery, and engine creation</td>
+</tr>
+<tr>
+<td><code>engines/regex.py</code></td>
+<td>Regex catalog validation, matching, overlap handling, caching, and replacement</td>
+</tr>
+<tr>
+<td><code>config.py</code></td>
+<td>Policy stages and action models</td>
+</tr>
+<tr>
+<td><code>base.py</code></td>
+<td>Shared strict immutable domain-model base</td>
+</tr>
+<tr>
+<td><code>timeout.py</code></td>
+<td>Monotonic shared request deadline</td>
+</tr>
+<tr>
+<td><code>errors.py</code></td>
+<td>Stable content-safe error catalog</td>
+</tr>
+<tr>
+<td><code>logging.py</code></td>
+<td>Standard-library logging configuration and content-safe records</td>
+</tr>
+</tbody>
+</table>
+<p>Only <code>service/</code> imports gRPC and generated protobuf bindings. Engines and the
+request processor use domain models and can be tested without the transport
+layer.</p>
+<h2 id="configuration-and-runtime-resources">Configuration and runtime resources<a class="headerlink" href="#configuration-and-runtime-resources" title="Permanent link">&para;</a></h2>
+<p>Privacy behavior comes from the OpenShell policy:</p>
 <ul>
-<li><a href="privacy-guard/">Privacy Guard</a>: middleware for protecting sensitive data in OpenShell.</li>
+<li>ordered stages</li>
+<li>concrete engine configuration</li>
+<li>entity definitions</li>
+<li>replacement recipes</li>
+<li>final <code>detect</code>, <code>block</code>, or <code>replace</code> action</li>
+</ul>
+<p>Operational resources come from the running application:</p>
+<ul>
+<li>installed engine implementations</li>
+<li>clients and SDK adapters</li>
+<li>endpoints and credential providers</li>
+<li>approved models or profiles</li>
+<li>processing timeout</li>
+</ul>
+<p><code>EngineRegistry.finalize()</code> constructs one Pydantic discriminated union from
+the exact config type registered for each engine. <code>stage.config.engine</code> selects
+the union member.</p>
+<h2 id="text-boundary">Text boundary<a class="headerlink" href="#text-boundary" title="Permanent link">&para;</a></h2>
+<p>The service validates request bytes and decodes a non-empty body as strict
+UTF-8. The request processor receives exactly one <code>str</code>.</p>
+<p>Headers, target, request ID, content type, and protobuf values do not cross the
+processor boundary. Privacy Guard does not parse JSON or create structured
+regions.</p>
+<p>Detect and block leave the original bytes untouched. Replace UTF-8 encodes the
+final text and returns it as the new body.</p>
+<h2 id="processing-pipeline">Processing pipeline<a class="headerlink" href="#processing-pipeline" title="Permanent link">&para;</a></h2>
+<p><img alt="Privacy Guard processing pipeline from validated policy and input text
+through strategy selection, one shared timeout, ordered engine stages,
+validation, aggregation, and the final policy
+decision." src="../assets/diagrams/processing-pipeline.svg" /></p>
+<p>Engines receive <code>DETECT</code> or <code>REPLACE</code>, not the user-facing policy action.
+Blocking is applied after detection by <code>RequestProcessor</code>.</p>
+<h2 id="state">State<a class="headerlink" href="#state" title="Permanent link">&para;</a></h2>
+<p>Privacy Guard retains:</p>
+<ul>
+<li>one active validated policy</li>
+<li>one configured <code>RequestProcessor</code></li>
+<li>immutable configured engine instances</li>
+<li>operator-injected resources</li>
+<li>a bounded compiled Regex catalog cache</li>
+</ul>
+<p>It does not retain request text, detections, replacement mappings, or
+cross-request entity memory.</p>
+<p>Equal validated configuration reuses the active processor. A changed
+configuration is fully prepared and atomically activated. Failed preparation
+does not replace the active processor.</p>
+<h2 id="concurrency">Concurrency<a class="headerlink" href="#concurrency" title="Permanent link">&para;</a></h2>
+<p>The gRPC server accepts at most 16 concurrent RPCs. Synchronous configuration
+and processing use a four-slot worker pool.</p>
+<p>Engine instances and resources can be used by multiple worker threads. They
+must keep per-request state local to the call and support concurrent access.
+Policy preparation is serialized; evaluations already using the previous
+processor may finish while later evaluations use the replacement.</p>
+<h2 id="result-boundary">Result boundary<a class="headerlink" href="#result-boundary" title="Permanent link">&para;</a></h2>
+<p>The processor returns only:</p>
+<ul>
+<li>allow or deny</li>
+<li>final replacement text when applicable</li>
+<li>stage-qualified detection summaries</li>
+<li>a stable deny reason when applicable</li>
+</ul>
+<p>Framework-controlled detection summaries omit matched text, context, offsets,
+patterns, and raw engine metadata. Custom engines must keep entity identifiers
+stable and independent of request text.</p>
+<h2 id="read-next">Read next<a class="headerlink" href="#read-next" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="request-lifecycle/">Request lifecycle</a></li>
+<li><a href="service-boundary/">Service boundary</a></li>
+<li><a href="../configuration/">Configure policies</a></li>
+<li><a href="../engines/custom/">Add a custom engine</a></li>
+<li><a href="../reference/limits-and-failures/">Limits and failure behavior</a></li>
 </ul>
 
 
@@ -1188,12 +1519,12 @@ OpenShell Research projects.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["navigation.sections","navigation.indexes","navigation.path","navigation.top","search.highlight","toc.follow"],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["navigation.sections","navigation.indexes","navigation.path","navigation.top","search.highlight","toc.follow"],"search":"../../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
-      <script src="../assets/javascripts/bundle.6e5f0216.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.6e5f0216.min.js"></script>
       
-        <script src="../javascripts/navigation-drawer.js"></script>
+        <script src="../../../javascripts/navigation-drawer.js"></script>
       
     
   </body>
