@@ -1,171 +1,136 @@
 ---
-title: Privacy Guard architecture
-description: System structure, component boundaries, and request flow for Privacy Guard.
+title: System architecture
+description: Privacy Guard components, boundaries, state, and request-processing structure.
 agent_markdown: true
 ---
 
-# Privacy Guard architecture
+# System architecture
 
-Privacy Guard is OpenShell middleware that detects and optionally replaces
-sensitive entities in provider-bound HTTP request text before OpenShell adds
-provider credentials.
+Privacy Guard is a pre-credentials OpenShell middleware. It translates an
+OpenShell HTTP-request evaluation into one text-processing run and returns an
+allow, replacement, or deny result.
 
-This architecture is a clean break from the earlier implementation. A processor
-run receives one UTF-8 text value and invokes an ordered pipeline of
-entity-processing engines. Structured-body parsing and compatibility with the
-previous extension and policy APIs are intentionally out of scope.
+## System boundary
 
-Privacy Guard can allow the original body, allow a replacement body, or deny
-the request. It never sends the provider request itself.
+![Privacy Guard component architecture. The service layer translates
+OpenShell gRPC messages, the request processor applies policy, and registered
+engines detect or replace entities without depending on the transport
+layer.](../../../assets/privacy-guard/diagrams/component-architecture.svg)
 
-## Where Privacy Guard runs
+OpenShell owns request routing and provider credential attachment. Privacy
+Guard does not send provider requests.
 
-```text
-Sandbox process
-      |
-      | provider-bound HTTP request
-      v
-OpenShell supervisor
-      |
-      | gRPC: SupervisorMiddleware
-      v
-Privacy Guard
-      |
-      | allow original body, allow replacement body, or deny
-      v
-OpenShell supervisor
-      |
-      | credentials added only after middleware allows
-      v
-Provider
-```
+## Components
 
-Privacy Guard implements the OpenShell-owned `SupervisorMiddleware` gRPC
-service and advertises one HTTP-request binding in the pre-credentials phase.
-The checked-in protocol and generated bindings are canonical copies from
-OpenShell and must not be edited locally.
-
-## Component boundaries
-
-Source paths on these pages are relative to
+Source paths below are relative to
 `projects/privacy-guard/src/privacy_guard/`.
 
-- `service/` owns gRPC, protobuf conversion, UTF-8 decoding and encoding,
-  bounded worker scheduling, active-processor preparation and replacement, and
-  finding serialization. Outside generated `bindings/`, no other package
-  imports gRPC or generated bindings.
-- `cli.py` owns command parsing, registry-factory loading, engine discovery,
-  configuration-schema output, logging options, and the adapter that starts
-  the programmatic server. Top-level `logging.py` provides the shared,
-  standard-library logging configuration used by the CLI and available to
-  programmatic deployments.
-- `request_processor.py` runs configured stages over one text value, shares one
-  timeout across them, aggregates detections, and applies the user-facing
-  policy action. It does not import gRPC or implement an engine's algorithms.
-- `engines/` defines the custom-engine contract, registers engine
-  implementations and operator-owned resources, builds the exact Pydantic
-  discriminated union, and contains the built-in Regex implementation. Each
-  engine owns its detection and replacement algorithms.
-- `config.py` defines ordered stages and the required policy action.
-- top-level `base.py` defines the package-wide strict immutable domain-model
-  base.
-- `string_validators.py` defines shared string validators and field types.
-
-The OpenShell policy is the single source of privacy behavior: stage order,
-each stage's exact engine configuration, entity definitions, replacement
-recipes, and the final `detect`, `block`, or `replace` action. Deployment
-configuration registers implementations and injects operational resources such
-as model profiles, endpoints, clients, and credentials.
-
-## Request flow
-
-```text
-HttpRequestEvaluation protobuf
-        |
-        v
-PrivacyGuardMiddleware
-  validates phase and body size
-  validates and normalizes policy configuration
-  reuses the matching active RequestProcessor or prepares and activates
-  a replacement
-  decodes a non-empty body as strict UTF-8
-        |
-        v
-RequestProcessor.process(text)
-  derives DETECT or REPLACE engine strategy
-  creates one shared Timeout
-        |
-        v
-stage 1 engine.run(current text)
-        |
-        v
-stage 2 engine.run(stage 1 text)
-        |
-       ...
-        |
-        v
-RequestProcessor
-  aggregates stage-qualified detections
-  applies detect, block, or replace
-        |
-        v
-RequestProcessingResult
-        |
-        v
-PrivacyGuardMiddleware
-  serializes bounded findings
-  encodes replacement text only for replace
-        |
-        v
-HttpRequestResult protobuf
-```
-
-The processor passes only `EntityProcessingStrategy.DETECT` or
-`EntityProcessingStrategy.REPLACE` to engines. Blocking is a request
-disposition and never crosses the engine boundary.
-
-The processor is synchronous. The service runs it in a dedicated thread pool
-so engine work does not block the gRPC event loop.
-
-## Core data types
-
-| Type | Meaning |
+| Component | Responsibility |
 | --- | --- |
-| `PrivacyGuardConfig` | Ordered entity-processing stages and the required action on detection |
-| `EntityProcessingStage` | One configured engine invocation with an optional diagnostic name |
-| `EngineConfig` | Nominal strict base for an engine's exact policy configuration |
-| `EntityProcessingStrategy` | Per-run engine selection: detect or replace |
-| `EntityDetection` | One occurrence with stage-input offsets and optional confidence |
-| `TextProcessingResult` | One engine's authoritative output text and detections |
-| `Timeout` | One monotonic deadline shared across all stages |
-| `EntityDetectionSummary` | Bounded stage/entity/confidence aggregate for audit output |
-| `RequestProcessingResult` | Allow or deny decision, detection summaries, and replacement text when requested |
+| `cli.py` | CLI commands, registry-factory loading, engine discovery, schema output, and server startup |
+| `gateway_config.py` | Safe updates to OpenShell gateway middleware registrations |
+| `service/` | gRPC lifecycle, protobuf conversion, transport validation, active configuration, worker scheduling, and result serialization |
+| `request_processor.py` | Ordered stage execution, shared timeout, aggregation, and policy action |
+| `engines/base.py` | Engine lifecycle and result-contract enforcement |
+| `engines/registry.py` | Engine and resource registration, policy schema construction, discovery, and engine creation |
+| `engines/regex.py` | Regex catalog validation, matching, overlap handling, caching, and replacement |
+| `config.py` | Policy stages and action models |
+| `base.py` | Shared strict immutable domain-model base |
+| `timeout.py` | Monotonic shared request deadline |
+| `errors.py` | Stable content-safe error catalog |
+| `logging.py` | Standard-library logging configuration and content-safe records |
 
-Pydantic domain models are strict, frozen, reject unknown fields, hide rejected
-input from validation errors, and suppress sensitive fields from normal
-representations.
+Only `service/` imports gRPC and generated protobuf bindings. Engines and the
+request processor use domain models and can be tested without the transport
+layer.
 
-## Deliberate omissions
+## Configuration and runtime resources
 
-- Cross-request entity memory is not part of v0.
-- Engines do not receive transport metadata or the user-facing policy action.
-- There is no parallel execution-plan model; preparation constructs a
-  `RequestProcessor` directly.
-- There is no generic replacement field or replacement-strategy enum. Each
-  engine owns any replacement settings appropriate to its underlying
-  algorithm.
-- Regex catalogs may be supplied inline or as bounded relative YAML paths
-  beneath Privacy Guard's working directory.
+Privacy behavior comes from the OpenShell policy:
+
+- ordered stages
+- concrete engine configuration
+- entity definitions
+- replacement recipes
+- final `detect`, `block`, or `replace` action
+
+Operational resources come from the running application:
+
+- installed engine implementations
+- clients and SDK adapters
+- endpoints and credential providers
+- approved models or profiles
+- processing timeout
+
+`EngineRegistry.finalize()` constructs one Pydantic discriminated union from
+the exact config type registered for each engine. `stage.config.engine` selects
+the union member.
+
+## Text boundary
+
+The service validates request bytes and decodes a non-empty body as strict
+UTF-8. The request processor receives exactly one `str`.
+
+Headers, target, request ID, content type, and protobuf values do not cross the
+processor boundary. Privacy Guard does not parse JSON or create structured
+regions.
+
+Detect and block leave the original bytes untouched. Replace UTF-8 encodes the
+final text and returns it as the new body.
+
+## Processing pipeline
+
+![Privacy Guard processing pipeline from validated policy and input text
+through strategy selection, one shared timeout, ordered engine stages,
+validation, aggregation, and the final policy
+decision.](../../../assets/privacy-guard/diagrams/processing-pipeline.svg)
+
+Engines receive `DETECT` or `REPLACE`, not the user-facing policy action.
+Blocking is applied after detection by `RequestProcessor`.
+
+## State
+
+Privacy Guard retains:
+
+- one active validated policy
+- one configured `RequestProcessor`
+- immutable configured engine instances
+- operator-injected resources
+- a bounded compiled Regex catalog cache
+
+It does not retain request text, detections, replacement mappings, or
+cross-request entity memory.
+
+Equal validated configuration reuses the active processor. A changed
+configuration is fully prepared and atomically activated. Failed preparation
+does not replace the active processor.
+
+## Concurrency
+
+The gRPC server accepts at most 16 concurrent RPCs. Synchronous configuration
+and processing use a four-slot worker pool.
+
+Engine instances and resources can be used by multiple worker threads. They
+must keep per-request state local to the call and support concurrent access.
+Policy preparation is serialized; evaluations already using the previous
+processor may finish while later evaluations use the replacement.
+
+## Result boundary
+
+The processor returns only:
+
+- allow or deny
+- final replacement text when applicable
+- stage-qualified detection summaries
+- a stable deny reason when applicable
+
+Detection summaries omit matched text, context, offsets, patterns, and raw
+engine metadata.
 
 ## Read next
 
-- [Request lifecycle](request-lifecycle.md) explains configuration resolution,
-  ordered execution, actions, and output behavior.
-- [Entity-processing engines](entity-processing-engines.md) defines the
-  extension contract and built-in engines.
-- [Configuration and text boundary](configuration.md) covers the one-text
-  contract, configuration ownership, and current catalog limits.
-- [Service boundary](service-boundary.md) covers gRPC adaptation, policy
-  activation, and concurrency.
-- [Safety and limits](safety-and-limits.md) records failure behavior and
-  resource bounds.
+- [Request lifecycle](request-lifecycle.md)
+- [Service boundary](service-boundary.md)
+- [Configure policies](../configuration.md)
+- [Add a custom engine](../engines/custom.md)
+- [Limits and failure behavior](../reference/limits-and-failures.md)

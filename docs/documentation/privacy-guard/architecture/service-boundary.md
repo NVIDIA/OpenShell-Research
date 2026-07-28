@@ -1,234 +1,152 @@
 ---
 title: Service boundary
-description: gRPC adaptation, policy activation, worker scheduling, and server lifecycle.
+description: Privacy Guard gRPC methods, protobuf translation, active policy management, and worker scheduling.
 agent_markdown: true
 ---
 
 # Service boundary
 
-Outside the generated `bindings/` package, `service/` is the only layer that
-imports gRPC or generated protobuf bindings. It translates between OpenShell's
-transport contract and Privacy Guard's one-text domain contract.
+The `service/` package adapts OpenShell's `SupervisorMiddleware` gRPC contract
+to Privacy Guard's protobuf-free domain model. No other handwritten package
+imports gRPC or generated bindings.
 
-The `.proto` file and generated bindings checked into this project are copied
-from OpenShell. Protocol changes must land upstream and be adopted from a new
-canonical copy; Privacy Guard must not create a private fork.
+The checked-in protocol and generated bindings are canonical OpenShell copies.
 
 ## gRPC methods
 
-Privacy Guard implements the three methods currently defined by
-`SupervisorMiddleware`:
-
 | RPC | Behavior |
 | --- | --- |
-| `Describe` | Advertises service identity, one pre-credentials HTTP binding, and the 4 MiB body limit |
-| `ValidateConfig` | Validates supplied policy configuration and registered resources |
-| `EvaluateHttpRequest` | Validates transport input, resolves the active processor, processes text, and returns a decision |
+| `Describe` | Advertise service identity, the pre-credentials HTTP binding, and the 4 MiB body limit |
+| `ValidateConfig` | Validate policy configuration against the active engine registry and resources |
+| `EvaluateHttpRequest` | Validate transport input, resolve the configured processor, process text, and return a decision |
 
 `Describe` advertises only
-`SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS`. Evaluations at any other phase
-are invalid input.
+`SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS`.
 
-The current manifest message has no field for the finalized policy schema or
-engine discovery metadata. Those are available through the local
-`privacy-guard configuration-schema` and `privacy-guard engines` commands.
+Engine discovery and the finalized policy schema are available through:
 
-## Configuration lifecycle
+```bash
+privacy-guard engines
+privacy-guard configuration-schema
+```
 
-The current protocol carries a complete `google.protobuf.Struct` on both
-validation and every request evaluation.
+## Configuration transport
 
-`ValidateConfig`:
+OpenShell supplies the complete policy config as `google.protobuf.Struct` for
+validation and evaluation. The service:
 
-1. rejects an encoded `Struct` larger than 64 KiB before conversion
+1. rejects an encoded config larger than 64 KiB
 2. converts the `Struct` to a mapping
-3. validates the registry-built discriminated policy model
-4. validates each exact engine config against registered resources
-5. validates replacement support for a replace action
-6. returns `valid=true`, or a content-safe reason
+3. normalizes finite integral doubles in the safe integer range
+4. validates the registry-built policy model
+5. validates engine config against registered resources
+6. checks replacement support for `replace`
 
-It does not construct engines, change the active policy, contact model providers,
-download resources, or write artifacts. Validation runs in the bounded worker
-pool so catalog parsing and engine-specific checks do not block the async gRPC
-event loop.
+`Struct` represents every number as a double. The service converts finite
+integral values only within `-(2^53 - 1)` through `2^53 - 1` before strict
+model validation. Other values remain floats.
 
-During evaluation, the service validates and normalizes the same config. It
-retains one active pair: the complete immutable validated configuration and its
-configured `RequestProcessor`. Equal config reuses the processor. When no
-processor is active or config differs, one serialized update path constructs
-engines from the exact stage configs and operator-injected resources, constructs
-a candidate processor, and atomically replaces the active pair only after
-preparation succeeds. Failure preserves the prior active pair and fails the
-triggering evaluation.
+## Active policy
 
-Validation, resolution or preparation, strict UTF-8 decoding, and processing all
-run in the bounded worker pool. Validation still occurs for every evaluation.
-Equivalent normalized Regex catalogs may reuse an entry in the independent
-compiled-rule cache during validation and engine construction.
+The service retains one pair:
 
-Regex's compiled-rule LRU retains at most 128 catalogs and 32 MiB. Each entry
-weighs its canonical catalog bytes plus 4 KiB per rule. Evicting an entry only
-removes the cache's reference. A processor that already uses those rules remains
-valid.
+```text
+validated PrivacyGuardConfig + configured RequestProcessor
+```
 
-An otherwise valid compiled-rule entry larger than the byte budget is built and
-used for the current operation but is not retained in that cache. The active
-processor itself has no LRU admission budget: it is deliberate process state
-retained until replacement or shutdown. Regex cache eviction or a skipped entry
-never invalidates it. Process restart discards the active processor, and the
-first later evaluation reconstructs it from supplied configuration.
+Equal validated configuration reuses this pair. A changed configuration enters
+a serialized preparation path:
 
-Each active processor receives the server's operational processing timeout.
-The default is 1 second shared across every configured stage. Operators may set
-up to 30 seconds with `privacy-guard serve --timeout-seconds`; programmatic
-applications pass the same `timeout_seconds` argument to `PrivacyGuardServer`.
-OpenShell's outer middleware `timeout` must include the processing timeout plus
-additional headroom for worker queueing, repeated configuration validation,
-and occasional candidate preparation so the supervisor does not end the RPC
-first.
+1. construct each configured engine from its exact config and registered
+   resources
+2. construct the candidate processor
+3. activate the complete candidate atomically
 
-## Incoming requests
+Failed preparation leaves the active pair unchanged. An evaluation that already
+captured the previous processor can finish with it while later evaluations use
+the replacement.
+
+## Request adaptation
 
 For each evaluation, the service:
 
-1. validates the pre-credentials phase
-2. validates the encoded context (4 KiB), configuration (64 KiB), target
-   (32 KiB), headers (128 entries and 64 KiB), and body (4 MiB) limits
-3. acquires one bounded worker slot
-4. converts transport-safe integral numbers, validates the maximum ten stages,
-   and resolves or updates the active policy in that worker
-5. allows an empty body without invoking an engine
+1. validates the phase
+2. validates context, config, target, headers, and body limits
+3. acquires a processing slot
+4. validates config and resolves the processor in a worker
+5. allows an empty body without engine invocation
 6. decodes a non-empty body as strict UTF-8
-7. calls `RequestProcessor.process(text)` in the same worker
+7. runs `RequestProcessor.process(text)` in the same worker
 
-Request context, target, headers, middleware name, and protobuf values remain at
-the service boundary. The request ID is used only for content-safe operational
-logging.
+Request metadata stays in the service layer. The request ID is used only for
+content-safe logging.
 
-## Outgoing results
+## Result adaptation
 
-The processor returns `RequestProcessingResult`. The service maps it to
-`HttpRequestResult`:
-
-| Domain result | Protobuf result |
-| --- | --- |
-| Detect allow | `DECISION_ALLOW`, `has_body=false` |
-| Block allow with no detections | `DECISION_ALLOW`, `has_body=false` |
-| Replace allow | `DECISION_ALLOW`, `has_body=true`, final UTF-8 body |
-| Policy block | `DECISION_DENY`, `privacy_guard_blocked`, no body |
-| Limit deny | `DECISION_DENY`, `privacy_guard_limit_exceeded`, no body or partial findings |
-
-The service checks the encoded replacement size again before serialization.
+The service maps `RequestProcessingResult` to `HttpRequestResult` and validates
+the encoded replacement and finding representation before returning.
 
 ### Findings
 
-The processor has already aggregated occurrences by source stage, entity, and
-confidence. For each `EntityDetectionSummary`, the service emits:
+Each aggregated detection summary becomes one OpenShell finding:
 
-- `type`: `detected_entity`
-- `label`: `entity (source-stage)`
-- `confidence`: the categorical value or empty when absent
-- `count`: aggregate occurrence count
+| Finding field | Value |
+| --- | --- |
+| `type` | `detected_entity` |
+| `label` | `entity (source-stage)` |
+| `confidence` | `low`, `medium`, `high`, or empty |
+| `count` | Number of aggregated occurrences |
 
-The current OpenShell `Finding` message has no dedicated source field.
-Stage provenance is therefore secondary text in the bounded label while the
-entity remains primary. Matched content, offsets, patterns, and raw engine
-metadata never cross the protobuf boundary.
+Matched content, context, offsets, patterns, and raw engine metadata do not
+cross the protobuf boundary.
 
-## Concurrency model
+If the complete result cannot fit OpenShell's finding bounds, the service
+returns `privacy_guard_limit_exceeded` without partial findings.
 
-The gRPC server accepts at most 16 concurrent RPCs. Synchronous processing uses
-a dedicated executor and semaphore with four active slots:
+## Worker scheduling
 
-```text
-gRPC event loop
-      |
-      | acquire processing slot
-      v
-4-slot semaphore
-      |
-      v
-4-thread executor
-      |
-      v
-configuration validation
-and active-policy resolution
-      |
-      v
-RequestProcessor.process
-      |
-      v
-ordered engine pipeline
-```
+The async gRPC server accepts at most 16 concurrent RPCs. Synchronous config
+validation, processor preparation, UTF-8 decoding, and engine processing run in
+a dedicated four-thread executor guarded by a four-slot semaphore.
 
-This keeps synchronous configuration and engine work off the async event loop
-and bounds the number of active operations.
-
-The active processor, engine instances, and injected resources may be used by
-multiple worker threads. They must retain no mutable per-request state and must
-be safe for concurrent access. Policy preparation is serialized. A candidate is
-fully prepared before the active reference is swapped. An evaluation that
-already captured the old processor may finish with it while later evaluations
-use the replacement; this is an atomic reference cutover, not a draining
-cutover.
+This prevents synchronous engine work from blocking the gRPC event loop and
+bounds active processing.
 
 ## Cancellation
 
-Cancelling an async RPC cannot stop Python code already running in its worker
-thread. The service shields the worker bridge and releases the semaphore slot
-only after that worker actually finishes.
+Cancelling the async RPC does not stop Python code already running in a worker
+thread. The service keeps the worker bridge alive and releases the semaphore
+slot only when that worker exits.
 
-Cancellation therefore cannot create more than four active synchronous
-operations.
-An engine should pass the remaining shared timeout to any delegated API that
-supports bounded execution. A non-preemptible call continues to occupy its slot
-until it exits.
+Engines should pass the shared remaining timeout to interruptible collaborators.
+A non-interruptible call continues to occupy its worker slot.
 
-During shutdown, the server stops gRPC and waits for active executor work.
+Server shutdown stops gRPC, waits for active executor work, and closes the
+middleware executor.
 
 ## Error mapping
 
-`PrivacyGuardError` classifies each cataloged failure as invalid input or
-internal failure:
-
-| Error kind | gRPC status |
+| Privacy Guard error kind | gRPC status |
 | --- | --- |
-| `invalid_input` | `INVALID_ARGUMENT` |
-| `internal` | `INTERNAL` |
+| Invalid input | `INVALID_ARGUMENT` |
+| Internal failure | `INTERNAL` |
 
-This mapping applies to evaluation. `ValidateConfig` instead returns
-`valid=false` with a content-safe reason.
+`ValidateConfig` returns `valid=false` with a content-safe reason instead of a
+gRPC error for invalid policy configuration.
 
-Unexpected failures become `unexpected_service_failure`. The service does not
-return caught collaborator messages or exception chains.
+Unexpected failures map to the stable `unexpected_service_failure` error.
+Collaborator exception messages and chains are not returned.
 
-A gRPC failure is distinct from a successful policy deny. OpenShell applies the
-middleware registration's failure behavior when an RPC fails. A policy deny is
-a successful RPC result that explicitly stops the request.
+A gRPC failure is different from a successful policy deny:
 
-## Programmatic server lifecycle
+- OpenShell applies middleware `on_error` after a gRPC failure.
+- OpenShell follows the explicit deny after `privacy_guard_blocked` or
+  `privacy_guard_limit_exceeded`.
 
-`PrivacyGuardServer` is the high-level programmatic API. It owns:
+## Server API
 
-```text
-EngineRegistry
-  -> PrivacyGuardMiddleware
-  -> gRPC server
-```
-
-The built-in registry includes `RegexEngine`. Operators register custom engines
-and resource-backed tool integrations before registry finalization, then pass
-that registry to `PrivacyGuardServer`.
-
-The registry is an explicit application-scoped dependency, not a global
-singleton. `PrivacyGuardServer` and `PrivacyGuardMiddleware` reject unfinalized
-registries. A deployment creates and finalizes one registry during startup;
-the middleware constructs configured stage engines and the active processor
-from that registry.
-Different middleware applications in the same process may intentionally use
-different engine inventories or runtime resources.
-
-Synchronous applications use:
+`PrivacyGuardServer` owns the finalized registry, middleware adapter, gRPC
+server, and shutdown lifecycle:
 
 ```python
 from privacy_guard.engines.registry import create_builtin_registry
@@ -241,106 +159,18 @@ server = PrivacyGuardServer(
 server.serve_sync("127.0.0.1:50051")
 ```
 
-Async applications call `await server.serve_async(address)` instead. The
-explicit suffixes make the blocking behavior visible at each call site. Both
-entry points use the same server instance and lifecycle.
+Async applications use `await server.serve_async(address)`.
 
-The listen address uses `host:port` or bracketed IPv6 `[address]:port` form,
-with an explicit port from 1 through 65535. Privacy Guard rejects zero and
-out-of-range numeric ports before calling gRPC, then verifies that gRPC bound
-the requested port before starting the service.
+The server rejects an unfinalized registry, invalid listen address, or port
+outside 1 through 65535. Bind and startup failures use the stable
+`server_bind_failed` error.
 
-The server:
+See [Run and operate Privacy Guard](../operations.md) for CLI startup and
+gateway registration.
 
-1. creates an unstarted async gRPC server with receive and concurrency limits
-2. binds the configured address
-3. starts and waits for termination
-4. stops gRPC
-5. closes the middleware executor
+## Related pages
 
-A bind or asynchronous gRPC startup `RuntimeError` becomes the stable
-`server_bind_failed` error. Its catalog operation is the broader `server.start`
-phase so the rendered failure does not mislabel a post-bind startup error.
-
-The server module has no command framework, module-import-string, discovery,
-schema-rendering, or command-logging responsibilities.
-
-## Command-line application
-
-`privacy_guard.cli` owns the Typer application. The `--registry-factory` option
-identifies a Python function in `module:function` form. At startup, the CLI
-imports the module, calls the function once, and uses the returned finalized
-`EngineRegistry` for the selected command:
-
-```bash
-privacy-guard --registry-factory my_engines:create_registry engines
-privacy-guard --registry-factory my_engines:create_registry configuration-schema
-privacy-guard --registry-factory my_engines:create_registry serve
-```
-
-This is a deployment setting, not part of an OpenShell policy. The person
-starting Privacy Guard chooses the function, and importing its module executes
-Python code, so it must refer to code that the deployer controls. A policy
-cannot select a factory or cause Privacy Guard to import a module.
-
-Applications that start `PrivacyGuardServer` from Python do not need this CLI
-option. They create the registry normally and pass it to the server:
-
-```python
-registry = create_registry()
-PrivacyGuardServer(registry, timeout_seconds=5).serve_sync()
-```
-
-The CLI exposes:
-
-```bash
-privacy-guard engines
-privacy-guard configuration-schema
-privacy-guard serve --listen 127.0.0.1:50051 --timeout-seconds 5
-```
-
-Entity behavior comes from policy configuration, not server startup flags.
-Engine implementations and operational resources come from the selected
-application registry. The processing timeout is an operational server bound,
-not policy-controlled behavior.
-
-## Upstream protocol work
-
-The intended large-catalog and discovery experience requires coordinated
-OpenShell changes for:
-
-- explicit preparation and activation that accepts expanded configuration
-  larger than the current 64 KiB evaluation limit
-- versioned policy references on evaluations
-- finalized policy schema and engine discovery in the manifest
-- a dedicated finding source field
-
-These are protocol evolution items, not local implementation hooks. Until they
-land upstream, Privacy Guard continues to validate the per-evaluation config,
-treat a changed valid config as an active-policy update, expose discovery
-through the CLI, and render stage provenance inside the finding label.
-
-The protocol cannot distinguish an intentional update from any other changed
-configuration. Each process must receive one consistent policy stream.
-Interleaved old and new configurations can repeatedly switch the active policy.
-
-## Testing the boundary
-
-Service tests should cover:
-
-- protobuf/domain translation
-- manifest fields supported by the current protocol
-- pure policy validation
-- phase, body-size, and UTF-8 validation
-- first activation, equal-config reuse, serialized replacement, failed-update
-  preservation, and concurrent cutover
-- detect, replacement, block, and limit serialization
-- finding encoding and limits
-- gRPC status mapping
-- worker-slot behavior under cancellation
-- startup, bind failure, and shutdown
-
-Engine algorithms and ordered policy semantics belong in engine and processor
-tests unless transport translation is essential to the case.
-
-[Back to the architecture overview](index.md)
+- [System architecture](index.md)
+- [Request lifecycle](request-lifecycle.md)
+- [Add a custom engine](../engines/custom.md)
+- [Limits and failure behavior](../reference/limits-and-failures.md)

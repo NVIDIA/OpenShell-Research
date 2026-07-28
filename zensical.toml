@@ -9,7 +9,10 @@ copyright = """
 """
 docs_dir = "docs"
 site_dir = "site"
-extra_css = ["stylesheets/dev-notes.css"]
+extra_css = [
+  "stylesheets/dev-notes.css",
+  "stylesheets/documentation.css"
+]
 extra_javascript = ["javascripts/navigation-drawer.js"]
 nav = [
   {"Dev Notes" = [
@@ -23,13 +26,22 @@ nav = [
   {"Documentation" = [
     "documentation/index.md",
     {"Privacy Guard" = [
+      "documentation/privacy-guard/index.md",
+      {"Guides" = [
+        {"Configure policies" = "documentation/privacy-guard/configuration.md"},
+        {"Run and operate Privacy Guard" = "documentation/privacy-guard/operations.md"}
+      ]},
+      {"Engines" = [
+        {"Use RegexEngine" = "documentation/privacy-guard/engines/regex.md"},
+        {"Add a custom engine" = "documentation/privacy-guard/engines/custom.md"}
+      ]},
       {"Architecture" = [
         "documentation/privacy-guard/architecture/index.md",
         {"Request lifecycle" = "documentation/privacy-guard/architecture/request-lifecycle.md"},
-        {"Entity-processing engines" = "documentation/privacy-guard/architecture/entity-processing-engines.md"},
-        {"Configuration and text boundary" = "documentation/privacy-guard/architecture/configuration.md"},
-        {"Service boundary" = "documentation/privacy-guard/architecture/service-boundary.md"},
-        {"Safety and limits" = "documentation/privacy-guard/architecture/safety-and-limits.md"}
+        {"Service boundary" = "documentation/privacy-guard/architecture/service-boundary.md"}
+      ]},
+      {"Reference" = [
+        {"Limits and failure behavior" = "documentation/privacy-guard/reference/limits-and-failures.md"}
       ]}
     ]}
   ]}

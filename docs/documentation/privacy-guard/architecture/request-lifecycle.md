@@ -1,100 +1,82 @@
 ---
 title: Request lifecycle
-description: How Privacy Guard prepares policy, runs ordered engines, and applies one request action.
+description: How Privacy Guard validates configuration, runs stages, and returns an OpenShell request decision.
 agent_markdown: true
 ---
 
 # Request lifecycle
 
-`RequestProcessor` owns the complete protobuf-free flow for one text value. It
-runs configured entity-processing stages in order, aggregates detections, and
-applies the policy action.
+Each OpenShell evaluation carries request metadata, body bytes, and complete
+Privacy Guard configuration. The service validates the transport, resolves the
+active processor, processes one text value, and serializes the result.
 
-The gRPC service owns the surrounding bytes/text and configuration transport
-boundaries.
+## Lifecycle summary
 
-## Policy configuration
+![Privacy Guard request lifecycle. The service validates the transport and
+policy, resolves the active processor, handles an empty body or decodes UTF-8
+text, runs the ordered engine stages, then returns either a gRPC failure or a
+successful allow, replacement, or deny
+result.](../../../assets/privacy-guard/diagrams/request-lifecycle.svg)
 
-The policy supplies:
+## 1. Validate the transport
 
-```yaml
-entity_processing:
-  stages:
-    - name: optional-diagnostic-name
-      config:
-        engine: regex
-        pattern_catalog:
-          entities:
-            - name: email
-              rules:
-                - pattern: '...'
-                  confidence: high
-        replacement:
-          strategy: template
-          template: "[{entity}]"
-on_detection:
-  action: detect
-```
+The service checks:
 
-`entity_processing` groups the ordered stages and owns their non-empty-list and
-unique-diagnostic-name validation. V0 defines only `stages`.
+- pre-credentials middleware phase
+- request context size
+- policy configuration size
+- target size
+- header count and size
+- request body size
 
-Each `EntityProcessingStage` contains:
+Input at another middleware phase or outside a transport bound fails the RPC as
+invalid input.
 
-- optional `name`, used only as bounded diagnostic provenance
-- required `config`, which is the exact concrete configuration model owned by
-  the selected engine
+## 2. Validate configuration
 
-`config.engine` is a Pydantic discriminator. After every implementation is
-registered, `EngineRegistry.finalize()` constructs a real discriminated union
-of their concrete config models. Engine-specific fields and nested replacement
-variants therefore validate, serialize, and appear in JSON Schema without a
-generic mapping or translation layer.
+The service converts the protobuf `Struct` to a mapping and validates it through
+the finalized registry-backed Pydantic model.
 
-When a stage name is omitted, Privacy Guard derives a deterministic one-based
-label such as `regex[1]`. All resulting diagnostic names must be unique.
+Validation includes:
 
-## Configuration resolution and preparation
+- exact fields and strict types
+- known engine discriminator
+- stage count and unique stage names
+- engine-specific config
+- registered resource compatibility
+- action and replacement-strategy compatibility
+- catalog shape and Regex pattern compilation
 
-For each evaluation under the current OpenShell protocol, the service:
+`ValidateConfig` performs these checks without constructing engines or changing
+the active processor.
 
-1. converts the protobuf `Struct` to a mapping
-2. validates it through the finalized registry-backed Pydantic model
-3. validates each concrete config against its registered implementation and
-   injected resources
-4. validates the action/replacement compatibility
-5. reuses the active `RequestProcessor` when its complete immutable validated
-   configuration is equal
-6. otherwise serializes preparation, constructs every configured engine and a
-   candidate processor, and atomically activates the candidate only after full
-   success
+## 3. Resolve the active processor
 
-The first evaluation establishes the active policy and pays its preparation
-cost. A failed validation or preparation leaves an existing active processor
-unchanged and fails the triggering evaluation. `ValidateConfig` performs
-validation without constructing engines or changing the active policy.
+The service compares the complete immutable validated configuration with the
+active one:
 
-There is no separate execution-plan abstraction. The validated stage order
-already contains the necessary policy structure, and the active processor
-privately retains the corresponding ordered engine instances.
+| State | Behavior |
+| --- | --- |
+| Equal configuration | Reuse the active processor |
+| No active processor | Construct every stage engine and activate the processor |
+| Changed configuration | Prepare a complete candidate and atomically replace the active processor |
+| Validation or preparation failure | Keep the active processor unchanged and fail the triggering evaluation |
 
-## Text input
+Only one preparation path runs at a time. Configuration validation still runs
+for every evaluation.
 
-The service validates the pre-credentials phase and the request body byte
-limit before processing. It still validates configuration and resolves the
-active processor for an empty body, then immediately allows that body without
-invoking an engine.
+## 4. Decode the request body
+
+An empty body is allowed without invoking an engine after configuration
+validation and processor resolution.
 
 A non-empty body must decode as strict UTF-8. The decoded `str` is the only
-request input passed to `RequestProcessor`; headers, content type, request ID,
-target, and protobuf messages do not cross that boundary.
+request input passed to `RequestProcessor`. Headers, target, content type,
+request ID, and protobuf objects remain in the service layer.
 
-The processor validates the encoded UTF-8 byte bound before running the
-pipeline.
+## 5. Select the engine strategy
 
-## Ordered stage execution
-
-The processor derives one invocation strategy for the whole pipeline:
+The processor derives one strategy for the complete stage pipeline:
 
 | Policy action | Engine strategy |
 | --- | --- |
@@ -102,77 +84,90 @@ The processor derives one invocation strategy for the whole pipeline:
 | `block` | `DETECT` |
 | `replace` | `REPLACE` |
 
-`PolicyAction` is never passed to an engine.
+Engines never receive `PolicyAction`.
 
-The processor then:
+## 6. Run stages in order
 
-1. creates one monotonic `Timeout`
-2. calls each stage exactly once in policy order
-3. passes the current text, invocation strategy, and shared timeout to
-   `engine.run()`
-4. validates intermediate UTF-8 byte and detection limits
-5. passes the returned text to the next stage
-6. checks the same timeout after the final result
+The processor:
 
-In detect and block mode, the public engine contract requires returned text to
-equal that stage's input. In replace mode, each later stage sees the preceding
-stage's processed text.
+1. validates the input UTF-8 size
+2. creates one monotonic `Timeout`
+3. calls each stage once in policy order
+4. passes the current text, strategy, and shared timeout
+5. validates each returned result and intermediate size
+6. passes returned text to the next stage
+7. checks the timeout after final result validation
 
-Detection offsets always refer to the input revision seen by the producing
-stage. Privacy Guard does not reinterpret earlier offsets after a later stage
-changes the text.
+In `DETECT`, each engine must return its input text unchanged. In `REPLACE`, a
+later stage receives the preceding stage's output.
 
-If a stage times out, exceeds an execution limit, or fails, its partial text and
-detections are discarded. No later stage runs.
+If a stage times out, exceeds a limit, or fails, its partial output is discarded
+and later stages do not run.
 
-## Detection aggregation
+## 7. Validate engine output
 
-After all stages succeed, the processor aggregates detections by:
+The public engine wrapper checks:
+
+- returned model type
+- supported strategy
+- non-empty spans within the stage input
+- per-stage detection count
+- output UTF-8 size
+- unchanged text in `DETECT`
+- at least one detection when text changes in `REPLACE`
+
+Detection offsets refer to the stage input. Privacy Guard does not remap earlier
+offsets after later replacement stages change the text.
+
+## 8. Aggregate detections
+
+After all stages succeed, the processor aggregates occurrences by:
 
 ```text
-source stage + entity + confidence representation
+source stage + entity + confidence
 ```
 
-It does not deduplicate across stages. Two stages may have inspected different
-text revisions, and confidence values from different tools are not assumed to
-be calibrated.
+It does not deduplicate across stages. Stages may inspect different text
+revisions, and confidence values from different engines are not assumed to be
+calibrated.
 
-The aggregate `EntityDetectionSummary` intentionally omits matched text,
-surrounding text, offsets, patterns, and raw engine metadata.
+Aggregated summaries exclude matched text, surrounding text, offsets, patterns,
+and engine metadata.
 
-## Applying the policy action
-
-The processor owns the final disposition:
+## 9. Apply the policy action
 
 | Action | No detections | One or more detections |
 | --- | --- | --- |
-| `detect` | Allow original body | Allow original body and report detection summaries |
-| `block` | Allow original body | Deny with `privacy_guard_blocked` and report detection summaries |
-| `replace` | Allow final processed text | Allow final processed text and report detection summaries |
+| `detect` | Allow original body | Allow original body and report summaries |
+| `block` | Allow original body | Deny with `privacy_guard_blocked` and report summaries |
+| `replace` | Allow final text | Allow final text and report summaries |
 
-For `replace`, configuration validation requires every stage to advertise
-replacement support and to include its valid engine-specific replacement
-recipe. A recipe may remain configured but dormant when the action is changed
-to detect or block.
+A timeout or processing-limit failure returns a deny with
+`privacy_guard_limit_exceeded` and no partial summaries or replacement.
 
-Replacement behavior belongs to each engine. For example, `RegexEngine`
-selects deterministic non-overlapping matches and renders its constrained
-template. A custom engine backed by another tool owns that tool's native
-replacement operation. `RequestProcessor` does not reproduce either algorithm.
+## 10. Serialize the result
 
-## Output
+The service maps the domain result to OpenShell:
 
-`RequestProcessor.process()` returns a `RequestProcessingResult`:
+| Domain result | OpenShell result |
+| --- | --- |
+| Detect allow | `DECISION_ALLOW`, `has_body=false` |
+| Block with no detections | `DECISION_ALLOW`, `has_body=false` |
+| Replace allow | `DECISION_ALLOW`, `has_body=true`, final UTF-8 body |
+| Policy block | `DECISION_DENY`, `privacy_guard_blocked` |
+| Limit deny | `DECISION_DENY`, `privacy_guard_limit_exceeded` |
 
-- detect and block-without-detections return `ALLOW` without replacement text
-- block-with-detections returns `DENY`, detection summaries, and
-  `privacy_guard_blocked`
-- replace returns `ALLOW`, the final text, and detection summaries
-- timeout or execution-limit exhaustion returns `DENY` with
-  `privacy_guard_limit_exceeded` and no partial summaries or replacement
+For detect and block, OpenShell keeps the exact original bytes. For replace,
+Privacy Guard returns the final encoded text even when it equals the input.
 
-The service leaves the original request bytes untouched for detect and block.
-For replace it UTF-8 encodes the final text and sets `has_body=true`, including
-when the final text happens to equal the input.
+## Failure outcomes
 
-[Back to the architecture overview](index.md)
+| Outcome | Transport status | Request effect |
+| --- | --- | --- |
+| Policy block | Successful RPC | Deny |
+| Processing limit | Successful RPC | Deny |
+| Invalid request or configuration | `INVALID_ARGUMENT` | OpenShell applies middleware `on_error` |
+| Internal engine or service error | `INTERNAL` | OpenShell applies middleware `on_error` |
+
+See [Limits and failure behavior](../reference/limits-and-failures.md) for the
+complete error and bound reference.
