@@ -32,7 +32,8 @@ nav = [
         {"Run and operate Privacy Guard" = "documentation/privacy-guard/operations.md"}
       ]},
       {"Engines" = [
-        {"Use RegexEngine" = "documentation/privacy-guard/engines/regex.md"},
+        "documentation/privacy-guard/engines/index.md",
+        {"RegexEngine" = "documentation/privacy-guard/engines/regex.md"},
         {"Add a custom engine" = "documentation/privacy-guard/engines/custom.md"}
       ]},
       {"Architecture" = [

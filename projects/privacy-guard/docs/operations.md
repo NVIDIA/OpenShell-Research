@@ -278,5 +278,5 @@ openshell status
 ## Next steps
 
 - [Configure policies](configuration.md)
-- [Use RegexEngine](engines/regex.md)
+- [RegexEngine](engines/regex.md)
 - [Limits and failure behavior](reference/limits-and-failures.md)

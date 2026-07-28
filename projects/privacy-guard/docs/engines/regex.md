@@ -1,10 +1,10 @@
 ---
-title: Use RegexEngine
+title: RegexEngine
 description: Configure RegexEngine catalogs, matching flags, findings, and deterministic replacement.
 agent_markdown: true
 ---
 
-# Use RegexEngine
+# RegexEngine
 
 `RegexEngine` is the built-in Privacy Guard engine. It detects every configured
 regular-expression match and can replace a deterministic non-overlapping subset
