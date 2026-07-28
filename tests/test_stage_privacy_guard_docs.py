@@ -55,6 +55,23 @@ class StagePrivacyGuardDocsTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "must not contain symlinks"):
                 STAGER.stage_privacy_guard_docs(source, root / "site-docs")
 
+    def test_stage_rejects_destination_inside_source(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            source = Path(temporary_directory) / "project-docs"
+            source.mkdir()
+
+            with self.assertRaisesRegex(ValueError, "must not overlap"):
+                STAGER.stage_privacy_guard_docs(source, source / "published")
+
+    def test_stage_rejects_source_inside_destination(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            destination = Path(temporary_directory) / "site-docs"
+            source = destination / "project-docs"
+            source.mkdir(parents=True)
+
+            with self.assertRaisesRegex(ValueError, "must not overlap"):
+                STAGER.stage_privacy_guard_docs(source, destination)
+
 
 if __name__ == "__main__":
     unittest.main()

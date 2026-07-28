@@ -97,8 +97,10 @@ Each aggregated detection summary becomes one OpenShell finding:
 | `confidence` | `low`, `medium`, `high`, or empty |
 | `count` | Number of aggregated occurrences |
 
-Matched content, context, offsets, patterns, and raw engine metadata do not
-cross the protobuf boundary.
+The protobuf has no fields for matched content, context, offsets, patterns, or
+raw engine metadata. Engine-provided entity identifiers and configured stage
+names do cross in `label`, so custom engines must keep identifiers independent
+of request text.
 
 If the complete result cannot fit OpenShell's finding bounds, the service
 returns `privacy_guard_limit_exceeded` without partial findings.

@@ -41,7 +41,7 @@ For OpenShell sandbox supervisors running outside the host network namespace:
 ```bash
 uv run privacy-guard serve \
   --listen 0.0.0.0:50051 \
-  --timeout-seconds 5
+  --timeout-seconds 4
 ```
 
 `--timeout-seconds` is one deadline shared by every stage in a request. It
@@ -84,6 +84,12 @@ The command writes to:
 
 Use `--config PATH` to write a different gateway TOML. Existing unrelated
 gateway settings are preserved.
+
+`configure-gateway` writes a five-second OpenShell middleware timeout. The
+four-second processing timeout above leaves one second for queueing,
+configuration validation, processor preparation, and transport overhead. If
+you select a longer processing timeout, edit the generated registration to add
+headroom. Rerunning `configure-gateway` restores the timeout to five seconds.
 
 The registration name must match the policy's `middleware` field:
 
@@ -159,7 +165,9 @@ For a provider request, inspect:
 | findings | Aggregated entity, stage, confidence, and count |
 | deny reason | `privacy_guard_blocked` or `privacy_guard_limit_exceeded` |
 
-Findings never contain matched values or surrounding request text.
+Framework-controlled finding fields and `RegexEngine` do not add matched values
+or surrounding request text. Custom engines must use stable, declared entity
+identifiers that are not derived from request text.
 
 ## Privacy Guard logging
 

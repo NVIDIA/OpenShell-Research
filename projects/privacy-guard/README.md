@@ -15,8 +15,10 @@ pipeline of entity-processing engines.
 | `block` | Deny requests containing configured entities |
 | `replace` | Allow the final body returned by replacement-capable engines |
 
-Findings contain entity, stage, confidence, and count. They do not contain
-matched text, surrounding text, offsets, patterns, headers, or credentials.
+Findings contain entity, stage, confidence, and count. Framework-controlled
+fields and the built-in `RegexEngine` do not add matched text, surrounding
+text, offsets, patterns, headers, or credentials. Custom engines must use
+stable entity identifiers that are not derived from request text.
 
 ## Developer start
 
@@ -89,7 +91,7 @@ uv run privacy-guard configuration-schema
 uv run privacy-guard configure-gateway --host-ip YOUR_HOST_IPV4
 uv run privacy-guard serve \
   --listen 0.0.0.0:50051 \
-  --timeout-seconds 5
+  --timeout-seconds 4
 ```
 
 `configure-gateway` adds or updates a Privacy Guard registration in the
@@ -97,9 +99,10 @@ OpenShell gateway TOML. Its registration name must match the policy's
 `middleware` field. Restart the gateway after changing registrations.
 
 The processing timeout is one bound shared by every stage. It defaults to 1
-second and cannot exceed 30 seconds. Configure a longer OpenShell middleware
-timeout to include worker queueing, configuration validation, and processor
-preparation.
+second and cannot exceed 30 seconds. `configure-gateway` writes a five-second
+OpenShell middleware timeout, so use a shorter processing timeout or edit the
+registration to provide more headroom. Rerunning `configure-gateway` restores
+the five-second value.
 
 Use a trusted registry factory for custom engines:
 

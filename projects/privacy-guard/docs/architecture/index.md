@@ -124,8 +124,9 @@ The processor returns only:
 - stage-qualified detection summaries
 - a stable deny reason when applicable
 
-Detection summaries omit matched text, context, offsets, patterns, and raw
-engine metadata.
+Framework-controlled detection summaries omit matched text, context, offsets,
+patterns, and raw engine metadata. Custom engines must keep entity identifiers
+stable and independent of request text.
 
 ## Read next
 

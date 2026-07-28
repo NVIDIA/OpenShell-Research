@@ -224,6 +224,27 @@ engine exceptions. Do not include:
 Stable engine and entity identifiers may appear in findings and diagnostic
 logs when they satisfy shared validation.
 
+Use a static, content-safe message when translating an operational failure:
+
+```python
+from privacy_guard.engines import EngineExecutionError
+
+try:
+    result = self.resources.client.process(text)
+except AcmeClientError:
+    raise EngineExecutionError("Acme processing failed") from None
+```
+
+| Exception | Use in a custom engine |
+| --- | --- |
+| `EngineConfigurationError` | Strategy-specific configuration is unusable |
+| `EngineExecutionError` | A collaborator or runtime operation failed |
+| `EngineLimitExceededError` | Engine-owned bounded work or output exceeded its limit |
+
+The framework raises `EngineContractError` when returned text or detections
+violate the engine contract; custom engines should not use it for collaborator
+failures.
+
 ## Register the engine
 
 Create one application-scoped registry factory:

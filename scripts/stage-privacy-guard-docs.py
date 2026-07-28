@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import argparse
 import os
 from pathlib import Path
 import shutil
@@ -21,13 +20,14 @@ def stage_privacy_guard_docs(source: Path, destination: Path) -> None:
     """Replace the generated site mirror with one canonical project-docs tree."""
 
     source = source.resolve()
-    destination = destination.absolute()
+    destination_is_symlink = destination.is_symlink()
+    destination = destination.resolve(strict=False)
     if not source.is_dir():
         raise ValueError(f"documentation source does not exist: {source}")
-    if destination.is_symlink():
+    if destination_is_symlink:
         raise ValueError(f"documentation destination must not be a symlink: {destination}")
-    if source == destination.resolve():
-        raise ValueError("documentation source and destination must differ")
+    if source.is_relative_to(destination) or destination.is_relative_to(source):
+        raise ValueError("documentation source and destination must not overlap")
 
     symlinks = sorted(path for path in source.rglob("*") if path.is_symlink())
     if symlinks:
@@ -46,16 +46,8 @@ def stage_privacy_guard_docs(source: Path, destination: Path) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
-    parser.add_argument("--destination", type=Path, default=DEFAULT_DESTINATION)
-    args = parser.parse_args()
-
-    try:
-        stage_privacy_guard_docs(args.source, args.destination)
-    except ValueError as error:
-        parser.error(str(error))
-    print(f"Staged Privacy Guard documentation from {args.source}.")
+    stage_privacy_guard_docs(DEFAULT_SOURCE, DEFAULT_DESTINATION)
+    print(f"Staged Privacy Guard documentation from {DEFAULT_SOURCE}.")
     return 0
 
 

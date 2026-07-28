@@ -38,9 +38,20 @@ address and customer ID. It requires:
 
 - Python 3.11 or newer
 - `uv` 0.11 or newer
-- OpenShell and `openshell-gateway` at the version recorded by the Privacy
-  Guard project
+- OpenShell and `openshell-gateway` `v0.0.90`, the version recorded in the
+  [middleware manifest](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/privacy-guard/.openshell-middleware-manifest.json)
 - a Docker or Podman backend supported by OpenShell
+- Claude Code installed and Claude Code subscription access for the final
+  provider request
+
+Confirm the installed command versions:
+
+```bash
+uv --version
+openshell --version
+openshell-gateway --version
+claude --version
+```
 
 Run the commands from a checkout of OpenShell Research.
 
@@ -185,11 +196,12 @@ Each stage receives the current text. In `replace` mode, later stages receive
 the text returned by earlier stages. In `detect` and `block` mode, engines must
 return the input text unchanged.
 
-### Findings do not contain matched values
+### Findings use stable identifiers
 
-Findings contain the entity name, stage, confidence, and occurrence count.
-Matched text, surrounding text, offsets, regex patterns, headers, and request
-bodies do not cross the service boundary.
+Framework-controlled fields do not add matched text, surrounding text, offsets,
+regex patterns, headers, or request bodies to findings. `RegexEngine` uses
+configured entity identifiers. Custom engines must also return stable,
+declared entity identifiers that are not derived from request text.
 
 ### Processing is bounded
 

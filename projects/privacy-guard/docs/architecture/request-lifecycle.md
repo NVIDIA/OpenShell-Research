@@ -131,8 +131,9 @@ It does not deduplicate across stages. Stages may inspect different text
 revisions, and confidence values from different engines are not assumed to be
 calibrated.
 
-Aggregated summaries exclude matched text, surrounding text, offsets, patterns,
-and engine metadata.
+Framework-controlled summary fields exclude matched text, surrounding text,
+offsets, patterns, and engine metadata. Engine-provided entity identifiers
+cross the boundary, so custom engines must not derive them from request text.
 
 ## 9. Apply the policy action
 
