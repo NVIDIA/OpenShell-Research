@@ -9,5 +9,4 @@ agent_markdown: true
 Technical documentation and references for installing, using, and extending
 OpenShell Research projects.
 
-- [Privacy Guard](privacy-guard/index.md): quickstart, policy configuration,
-  operations, engines, architecture, and limits.
+- [Privacy Guard](privacy-guard/index.md): middleware for protecting sensitive data in OpenShell.
