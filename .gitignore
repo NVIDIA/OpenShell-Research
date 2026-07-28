@@ -121,6 +121,7 @@ lib/
 # Static site and docs output
 public/
 site/
+docs/documentation/privacy-guard/
 .docusaurus/
 .vitepress/cache/
 .vitepress/dist/

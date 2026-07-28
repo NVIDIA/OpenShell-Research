@@ -1,18 +1,64 @@
 # Privacy Guard
 
-Privacy Guard is an OpenShell supervisor middleware that detects and optionally
-replaces sensitive entities in provider-bound request text before credentials
-are attached.
+Privacy Guard is an OpenShell supervisor middleware that detects, blocks, or
+replaces configured entities in provider-bound HTTP request bodies before
+OpenShell attaches provider credentials.
 
-This release is a clean-break redesign. It does not preserve the former
-`Scanner`, `FormatHandler`, JSON traversal, `observe`, `redact`, startup catalog,
-or scanner-profile APIs. A processor run accepts one UTF-8 text body and runs
-the policy's entity-processing stages in order.
+It processes the complete request body as UTF-8 text through an ordered
+pipeline of entity-processing engines.
 
-## Policy experience
+> **Experimental:** Privacy Guard is a proof of concept. It reduces exposure on
+> provider-bound network requests that OpenShell routes through the middleware;
+> it does not guarantee that sensitive data cannot leak.
 
-The OpenShell policy owns entity behavior: ordered stages, each engine's exact
-configuration, and the final `detect`, `block`, or `replace` action.
+Privacy Guard does not intercept data before a harness writes it to disk.
+Prompts, tool output, transcripts, and session histories may therefore retain
+raw sensitive values even when the provider-bound request is later replaced or
+blocked. Use harness persistence controls and appropriate storage isolation,
+retention, and cleanup in addition to Privacy Guard.
+
+## What it does
+
+| Policy action | Behavior |
+| --- | --- |
+| `detect` | Allow the original body and report bounded findings |
+| `block` | Deny requests containing configured entities |
+| `replace` | Allow the final body returned by replacement-capable engines |
+
+Findings contain entity, stage, confidence, and count. Framework-controlled
+fields and the built-in `RegexEngine` do not add matched text, surrounding
+text, offsets, patterns, headers, or credentials. Custom engines must use
+stable entity identifiers that are not derived from request text.
+
+## Developer start
+
+Requirements:
+
+- Python 3.11 or newer
+- `uv` 0.11 or newer
+
+From this directory:
+
+```bash
+uv sync --locked
+uv run privacy-guard engines
+uv run privacy-guard configuration-schema
+```
+
+Start the built-in `RegexEngine` service locally:
+
+```bash
+uv run privacy-guard serve \
+  --listen 127.0.0.1:50051
+```
+
+Use `0.0.0.0` when OpenShell sandbox supervisors outside the host network
+namespace must reach the service. The development server uses plaintext gRPC;
+restrict the port to trusted host and sandbox networks.
+
+## Policy configuration
+
+Privacy behavior comes from the OpenShell policy:
 
 ```yaml
 entity_processing:
@@ -33,148 +79,54 @@ on_detection:
   action: replace
 ```
 
-`entity_processing.stages` is ordered. In replace mode, each stage receives the
-preceding stage's processed text. Detect and block run the same engines with the
-detection-only strategy, so replacement recipes may remain configured but
-dormant.
+`entity_processing.stages` runs in order. In replace mode, each stage receives
+the text returned by the preceding stage. Detect and block invoke engines with
+the detection-only strategy.
 
-`pattern_catalog` accepts either the structured catalog or a relative path to a
-complete `.yaml` or `.yml` catalog. File-backed catalogs are resolved beneath
-Privacy Guard's working directory and normalized to the same
-`RegexPatternCatalog` model as inline input. Absolute paths, traversal, symlinks,
-unsafe YAML tags, aliases, duplicate keys, invalid UTF-8, and oversized files
-are rejected. The
-[RegexEngine end-to-end example](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/privacy-guard/examples/regex-engine/README.md)
-passes its catalog as `patterns.yaml`.
+`RegexEngine` accepts an inline catalog or a relative `.yaml` or `.yml` path:
 
-## Architecture
-
-```text
-OpenShell HttpRequestEvaluation
-  -> finalized Pydantic policy union (config.engine discriminator)
-  -> reuse the matching active RequestProcessor, or fully prepare and
-     atomically activate a replacement
-  -> strict UTF-8 decode
-  -> RequestProcessor.process(one text string)
-       -> stage 1 engine.run(current text)
-       -> stage 2 engine.run(stage 1 text)
-       -> ...
-  -> policy action: detect, block, or replace
-  -> safe aggregated entity findings
-  -> OpenShell HttpRequestResult
+```yaml
+pattern_catalog: patterns.yaml
 ```
 
-The policy action never crosses the engine boundary. Engines receive only
-`EntityProcessingStrategy.DETECT` or `EntityProcessingStrategy.REPLACE`.
-Blocking is a request-level disposition owned by `RequestProcessor`.
+Relative paths resolve beneath Privacy Guard's working directory. Absolute
+paths, traversal, symlinks, unsafe YAML tags, aliases, duplicate keys, invalid
+UTF-8, and oversized catalogs are rejected.
 
-The copied `proto/supervisor_middleware.proto` and generated bindings are owned
-by OpenShell. Update them only through the repository's middleware-kit workflow;
-never hand-edit them. Today's protocol carries a `google.protobuf.Struct`
-configuration on each evaluation. Privacy Guard validates it every time and
-retains one active configured processor. The first evaluation prepares that
-processor. A different validated configuration is fully prepared and atomically
-replaces it only after preparation succeeds; failure leaves the active processor
-unchanged.
-
-The protocol has no explicit update or policy-version marker, so any changed
-per-evaluation configuration is treated as an update. Each Privacy Guard process
-must therefore receive one consistent policy stream. Large-catalog preparation
-RPCs, versioned policy references, manifest schema fields, and a dedicated
-finding-source field require a coordinated change in the canonical OpenShell
-protocol rather than a private proto fork.
-
-## Built-in engines
-
-### RegexEngine
-
-`RegexEngine` compiles configured rules once and supports overlapping
-detection and deterministic template replacement. It preserves numeric
-backreferences by wrapping each rule's pattern in a non-capturing group followed
-by a private named marker. Rule names are optional diagnostic identities;
-`pattern` is the only field containing the regex string. Equivalent
-normalized catalogs reuse a bounded compiled-rule cache across validation and
-engine construction.
-
-The third-party `regex` backend provides enforceable per-search timeouts.
-Explicit `ignore_case`, `multiline`, `dot_all`, and `ascii` flags are supported;
-inline flags and user-defined named groups are rejected to protect the wrapper
-contract.
-
-Privacy Guard owns the catalog schema but maintains no authoritative patterns.
-
-## Custom engines
-
-Custom engines are a first-class extension point. Authors declare one typed
-config, optional typed resources, `supported_strategies`, and `_run`. They do not
-write `__init__`; `_initialize` is optional, and `@override` is not required.
-The public wrapper validates strategy support, input, timeout, spans, output
-size, mutation behavior, and result cardinality for every returned result.
-`TextProcessingResult.from_detections()` is an optional safe materializer for
-lazy detection streams, not the enforcement boundary.
-
-Resource-backed engines define an `EngineResources` subclass containing their
-operator-owned runtime dependencies. Resource bundles may contain initialized
-tool clients, SDK adapters, models, endpoints, or credential providers, but
-must contain no policy behavior or per-request state and must be safe for
-concurrent use. Resource-free engines omit the second
-`EntityProcessingEngine` generic argument entirely.
-
-The first NeMo Anonymizer integration will be implemented as a custom engine,
-not as a built-in or placeholder abstraction in Privacy Guard.
-
-Application startup registers engines and operator-owned resources, then
-returns one finalized registry:
-
-```python
-from privacy_guard.engines.registry import EngineRegistry
-
-
-def create_registry() -> EngineRegistry:
-    registry = EngineRegistry(include_builtin_engines=True)
-    registry.register(AcmeEngine, resources=AcmeResources(client=client))
-    return registry.finalize()
-```
-
-Set `include_builtin_engines=True` when a custom deployment should extend the
-standard engine inventory. Leave it at the default `False` for an intentionally
-isolated registry.
-
-Pass that factory to every CLI operation so discovery, schema generation, and
-the running server use the same engine inventory. The module must be installed
-or otherwise present on Python's import path:
+## CLI
 
 ```bash
-uv run privacy-guard --registry-factory my_engines:create_registry engines
-uv run privacy-guard --registry-factory my_engines:create_registry configuration-schema
-uv run privacy-guard --registry-factory my_engines:create_registry serve
+uv run privacy-guard engines
+uv run privacy-guard configuration-schema
+uv run privacy-guard configure-gateway --host-ip YOUR_HOST_IPV4
+uv run privacy-guard serve \
+  --listen 0.0.0.0:50051 \
+  --timeout-seconds 4
 ```
 
-The
-[custom engine end-to-end example](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/privacy-guard/examples/custom-engine/README.md)
-contains one Python file with a typed detection config, engine implementation,
-and registry factory, plus its OpenShell policy and walkthrough. It also shows
-the explicit `PYTHONPATH` setup needed when the factory is a standalone local
-module rather than an installed package.
+`configure-gateway` adds or updates a Privacy Guard registration in the
+OpenShell gateway TOML. Its registration name must match the policy's
+`middleware` field. Restart the gateway after changing registrations.
 
-The registry is application-scoped, not a process-global singleton. A
-`PrivacyGuardServer` requires an explicit finalized registry. The finalized
-registry builds a Pydantic discriminated union containing the exact config type
-of every registered engine, so `stage.config` round-trips without dropping
-engine-specific or replacement-variant fields.
+The processing timeout is one bound shared by every stage. It defaults to 1
+second and cannot exceed 30 seconds. `configure-gateway` writes a five-second
+OpenShell middleware timeout, so use a shorter processing timeout or edit the
+registration to provide more headroom. Rerunning `configure-gateway` restores
+the five-second value.
 
-The base installation has an explicit built-in registry containing
-`RegexEngine`:
+Use a trusted registry factory for custom engines:
 
-```python
-from privacy_guard.engines.registry import create_builtin_registry
+```bash
+uv run privacy-guard \
+  --registry-factory my_engines:create_registry \
+  engines
 
-registry = create_builtin_registry()
+uv run privacy-guard \
+  --registry-factory my_engines:create_registry \
+  serve
 ```
 
-## Programmatic server
-
-The server is a library API independent of the command-line application:
+## Python server API
 
 ```python
 from privacy_guard.engines.registry import create_builtin_registry
@@ -187,117 +139,40 @@ server = PrivacyGuardServer(
 server.serve_sync("127.0.0.1:50051")
 ```
 
-`serve_sync()` is the blocking entry point. Async applications use the
-explicitly named asynchronous counterpart:
+Async applications use:
 
 ```python
 await server.serve_async("127.0.0.1:50051")
 ```
 
-Listen addresses use `host:port` or bracketed IPv6 `[address]:port` form. The
-port must be an explicit integer from 1 through 65535.
+## Documentation
 
-Custom applications pass their own finalized registry to
-`PrivacyGuardServer`. The server owns the middleware adapter, bounded gRPC
-transport, worker executor, and shutdown lifecycle; it does not load Python
-modules, select engines, generate schemas, or parse command-line options.
+- [Overview and end-to-end quickstart](docs/index.md)
+- [Configure policies](docs/configuration.md)
+- [Run and operate Privacy Guard](docs/operations.md)
+- [Use RegexEngine](docs/engines/regex.md)
+- [Add a custom engine](docs/engines/custom.md)
+- [System architecture](docs/architecture/index.md)
+- [Limits and failure behavior](docs/reference/limits-and-failures.md)
 
-Privacy Guard emits records through Python's standard `privacy_guard` logger
-and does not configure logging when imported. Applications may use their own
-standard-library logging setup or opt into Privacy Guard's concise console
-format:
+## Runnable examples
 
-```python
-from privacy_guard.logging import ColorMode, LoggingConfig, configure_logging
+- [`examples/regex-engine`](examples/regex-engine/README.md): detect and replace
+  email addresses and customer IDs with the built-in engine.
+- [`examples/custom-engine`](examples/custom-engine/README.md): implement,
+  register, and run a typed custom engine.
 
-configure_logging(LoggingConfig(level="DEBUG", color_mode=ColorMode.AUTO))
-```
+## Logging
 
-Repeated calls replace only the handler installed by `configure_logging()`;
-application-owned handlers are preserved. The CLI uses this same configuration
-path. The default format includes the date, time, padded level, logger name,
-and message. It adds level-aware ANSI colors when writing to an interactive
-terminal and stays plain when redirected. Set `color_mode=ColorMode.ALWAYS` or
-`color_mode=ColorMode.NEVER` for an explicit choice instead of the default
-`ColorMode.AUTO`. Its default level is `INFO`, and `--debug` enables
-content-safe `DEBUG` diagnostics. `--debug-log-content` additionally logs
-complete request and processed text and should be enabled only in a controlled
-environment.
+`--debug` enables content-safe diagnostic records.
 
-## CLI
+`--debug-log-content` logs complete input and processed text. Use it only in a
+controlled development environment.
 
-```bash
-uv run privacy-guard engines
-uv run privacy-guard configuration-schema
-uv run privacy-guard configure-gateway --host-ip YOUR_HOST_IPV4
-uv run privacy-guard serve \
-  --listen 127.0.0.1:50051 \
-  --timeout-seconds 5
-```
+Imported applications can configure the standard `privacy_guard` logger
+themselves or use `privacy_guard.logging.configure_logging()`.
 
-Replace `YOUR_HOST_IPV4` with the non-loopback IPv4 address that the OpenShell
-gateway and sandbox supervisors use to reach this host. `configure-gateway`
-adds or updates a registration named `privacy-guard` in the path set by
-OpenShell's `OPENSHELL_GATEWAY_CONFIG` override, or OpenShell's standard
-per-user gateway config location when that variable is unset:
-`$XDG_CONFIG_HOME/openshell/gateway.toml` (normally
-`~/.config/openshell/gateway.toml`). Privacy Guard does not guess which host
-interface is correct. Use `--name` when the policy references a different
-registration name, `--port` when Privacy Guard does not listen on 50051, and
-`--config` for a nonstandard gateway TOML. OpenShell middleware registration
-names must use 1–128 ASCII bytes containing only letters, digits, `.`, `_`, `-`,
-or `/`; the `openshell/` prefix is reserved. The command preserves unrelated
-settings and updates the named registration when it already exists. Start
-Privacy Guard before restarting the gateway, because OpenShell connects to
-registered middleware during startup.
-
-Entity behavior is supplied by OpenShell policy config, not server startup
-flags. Deployment startup owns only installed engine implementations and
-operator resources such as model profiles, endpoints, clients, and credentials.
-The processing timeout is an operational bound shared by every stage; it
-defaults to 1 second and may be increased to at most 30 seconds. When increasing
-it, configure OpenShell's middleware `timeout` with additional headroom for
-worker queueing and configuration or engine preparation so the supervisor does
-not end the RPC first. Use `--registry-factory module:factory` for a custom
-engine installation.
-Registry factories execute operator Python code; load only trusted modules.
-The `privacy_guard.cli` module owns the executable application and adapts its
-`serve` command to the programmatic server API.
-
-## Safety and limits
-
-- Input and replacement bodies are limited to 4 MiB.
-- One monotonic `Timeout` is shared across every stage and result validation.
-- Regex searches receive the remaining timeout and fail atomically.
-- Intermediate text and detection cardinality are bounded.
-- Detect and block never return a body mutation; replace returns final text.
-- Findings expose entity, bounded confidence, count, and stage provenance.
-  Framework-controlled fields and compliant custom engines never expose matched
-  or surrounding text, offsets, patterns, or raw tool metadata. Custom engines
-  must return stable, declared identifiers rather than request-derived values.
-- Engine instances and injected resources must be safe for concurrent requests.
-- Cross-request entity memory is intentionally out of scope.
-
-## Updating the OpenShell protocol
-
-Privacy Guard uses
-[`openshell-middleware-kit`](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-middleware-kit/README.md)
-to keep its copied protocol and generated Python bindings aligned with an
-OpenShell release.
-Install the repository's local `omkit`, then update:
-
-```bash
-uv tool install --force ../openshell-middleware-kit
-omkit update --openshell-version v0.0.90
-```
-
-The updater replaces only the copied protocol, generated bindings, lockfile, and
-`.openshell-middleware-manifest.json` from a validated temporary copy. Review
-those generated changes and run `make check`.
-
-## Development validation
-
-The project Makefile exposes the normal workflow:
+## Development
 
 ```bash
 make help
@@ -307,6 +182,10 @@ make check
 make check-py311
 ```
 
-`make check` delegates to `scripts/check.sh`, the authoritative local and CI
-gate. It runs tests, formatting, lint, `ty`, an import smoke check, and a
-dependency audit.
+`make check` runs tests, formatting, lint, type checking, an import smoke check,
+and a dependency audit.
+
+The copied `proto/supervisor_middleware.proto` and generated bindings are owned
+by OpenShell. Update them through the repository's
+[`openshell-middleware-kit`](../openshell-middleware-kit/README.md), then run
+`make check`.

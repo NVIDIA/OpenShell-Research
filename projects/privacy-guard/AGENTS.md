@@ -42,8 +42,8 @@ Run focused tests while working and `make check` before handoff.
 - `src/privacy_guard/string_validators.py`: shared string validators and field types
 - `src/privacy_guard/service/`: gRPC lifecycle and protobuf adapter
 - `src/privacy_guard/bindings/`: generated protobuf files; never hand-edit
-- [`docs/architecture/`](docs/architecture/index.md): symlink to the canonical
-  site sources under `../../docs/documentation/privacy-guard/architecture/`
+- `docs/`: canonical user and architecture documentation; the repository docs
+  build stages this tree at the public Privacy Guard documentation route
 - `tests/`: tests that mirror source boundaries
 - `examples/`: copyable policy-authoring examples
 

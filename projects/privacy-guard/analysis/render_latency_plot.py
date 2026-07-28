@@ -11,7 +11,13 @@ from pathlib import Path
 
 _ANALYSIS_DIR = Path(__file__).resolve().parent
 _DEFAULT_DATA = _ANALYSIS_DIR / "privacy-guard-latency.csv"
-_DEFAULT_OUTPUT = _ANALYSIS_DIR / "privacy-guard-latency-vs-prompt-size.svg"
+_DEFAULT_OUTPUT = (
+    _ANALYSIS_DIR.parent
+    / "docs"
+    / "assets"
+    / "analysis"
+    / "privacy-guard-latency-vs-prompt-size.svg"
+)
 
 _WIDTH = 1200
 _HEIGHT = 720
