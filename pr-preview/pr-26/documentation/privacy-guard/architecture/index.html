@@ -1297,6 +1297,9 @@
 <p>Privacy Guard is a pre-credentials OpenShell middleware. It translates an
 OpenShell HTTP-request evaluation into one text-processing run and returns an
 allow, replacement, or deny result.</p>
+<p>This is an experimental network-middleware boundary. It does not mediate
+harness filesystem writes, so raw prompts and session histories may be stored
+before a request reaches Privacy Guard.</p>
 <h2 id="system-boundary">System boundary<a class="headerlink" href="#system-boundary" title="Permanent link">&para;</a></h2>
 <p><img alt="Privacy Guard component architecture. The service layer translates
 OpenShell gRPC messages, the request processor applies policy, and registered
@@ -1432,8 +1435,9 @@ processor may finish while later evaluations use the replacement.</p>
 <li>stage-qualified detection summaries</li>
 <li>a stable deny reason when applicable</li>
 </ul>
-<p>Detection summaries omit matched text, context, offsets, patterns, and raw
-engine metadata.</p>
+<p>Framework-controlled detection summaries omit matched text, context, offsets,
+patterns, and raw engine metadata. Custom engines must keep entity identifiers
+stable and independent of request text.</p>
 <h2 id="read-next">Read next<a class="headerlink" href="#read-next" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="request-lifecycle/">Request lifecycle</a></li>

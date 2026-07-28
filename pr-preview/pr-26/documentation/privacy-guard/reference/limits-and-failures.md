@@ -46,17 +46,20 @@ bytes unchanged. Replace returns UTF-8 encoded final text.
 | Concurrent gRPC calls | 16 |
 
 One monotonic timeout covers every stage and final result validation. A stage
-can consume the complete request detection or timeout budget.
+can consume the complete timeout budget. Detections remain subject to both the
+256-per-stage and 4,096-per-request limits.
 
 Set the processing timeout with:
 
 ```bash
-privacy-guard serve --timeout-seconds 5
+privacy-guard serve --timeout-seconds 4
 ```
 
 OpenShell's middleware timeout must be longer than the Privacy Guard processing
 timeout. Include headroom for worker queueing, configuration validation, and
-processor preparation.
+processor preparation. `configure-gateway` writes a five-second OpenShell
+timeout, so edit that registration before using a processing timeout of five
+seconds or longer.
 
 ## Finding and diagnostic limits
 
@@ -68,8 +71,10 @@ processor preparation.
 | Encoded bytes per finding | 4 KiB |
 
 Diagnostic bounds apply to stage names, entity names, metadata keys and values,
-model-profile names, and request IDs used in logs. Invalid request IDs are
-replaced with a constant placeholder for logging and do not change evaluation.
+and request IDs used in logs. Custom configuration fields such as model-profile
+names are bounded only when their engine config declares an explicit constraint.
+Invalid request IDs are replaced with a constant placeholder for logging and do
+not change evaluation.
 
 If aggregated summaries cannot fit the OpenShell finding representation,
 Privacy Guard returns `privacy_guard_limit_exceeded` with no partial findings.

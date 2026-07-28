@@ -687,6 +687,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#protection-boundary-and-local-persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Protection boundary and local persistence
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#install-the-project-environment" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1248,6 +1259,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#protection-boundary-and-local-persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Protection boundary and local persistence
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#install-the-project-environment" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1561,6 +1583,16 @@
 <p>Privacy Guard runs as a gRPC service reachable by the OpenShell gateway and
 sandbox supervisors. The CLI uses the built-in <code>RegexEngine</code> registry unless
 you supply a custom registry factory.</p>
+<h2 id="protection-boundary-and-local-persistence">Protection boundary and local persistence<a class="headerlink" href="#protection-boundary-and-local-persistence" title="Permanent link">&para;</a></h2>
+<p>Privacy Guard is experimental. It evaluates provider-bound network requests at
+the OpenShell middleware boundary; it is not a guarantee that sensitive data
+cannot leak.</p>
+<p>The middleware does not run before harness filesystem writes. A harness may
+persist raw prompts, tool output, transcripts, or session history before
+OpenShell sends a provider request to Privacy Guard. Configure the harness to
+disable or minimize persistence where possible, restrict access to sandbox and
+host storage, set an appropriate retention policy, and remove sensitive session
+artifacts after use.</p>
 <h2 id="install-the-project-environment">Install the project environment<a class="headerlink" href="#install-the-project-environment" title="Permanent link">&para;</a></h2>
 <p>From the repository checkout:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">cd</span><span class="w"> </span>projects/privacy-guard
@@ -1578,7 +1610,7 @@ you supply a custom registry factory.</p>
 <p>For OpenShell sandbox supervisors running outside the host network namespace:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>serve<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--listen<span class="w"> </span><span class="m">0</span>.0.0.0:50051<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--timeout-seconds<span class="w"> </span><span class="m">5</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--timeout-seconds<span class="w"> </span><span class="m">4</span>
 </span></code></pre></div>
 <p><code>--timeout-seconds</code> is one deadline shared by every stage in a request. It
 defaults to 1 second and must not exceed 30 seconds. OpenShell's middleware
@@ -1611,6 +1643,11 @@ sandbox supervisors:</p>
 </ol>
 <p>Use <code>--config PATH</code> to write a different gateway TOML. Existing unrelated
 gateway settings are preserved.</p>
+<p><code>configure-gateway</code> writes a five-second OpenShell middleware timeout. The
+four-second processing timeout above leaves one second for queueing,
+configuration validation, processor preparation, and transport overhead. If
+you select a longer processing timeout, edit the generated registration to add
+headroom. Rerunning <code>configure-gateway</code> restores the timeout to five seconds.</p>
 <p>The registration name must match the policy's <code>middleware</code> field:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">network_middlewares</span><span class="p">:</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">privacy_guard_replace</span><span class="p">:</span>
@@ -1676,7 +1713,9 @@ configuration.</p>
 </tr>
 </tbody>
 </table>
-<p>Findings never contain matched values or surrounding request text.</p>
+<p>Framework-controlled finding fields and <code>RegexEngine</code> do not add matched values
+or surrounding request text. Custom engines must use stable, declared entity
+identifiers that are not derived from request text.</p>
 <h2 id="privacy-guard-logging">Privacy Guard logging<a class="headerlink" href="#privacy-guard-logging" title="Permanent link">&para;</a></h2>
 <p>Default logs contain request IDs, evaluation duration, decision, aggregate
 finding count, and stable error codes. They exclude request bodies, replacement

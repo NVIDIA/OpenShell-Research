@@ -1602,8 +1602,10 @@ the encoded replacement and finding representation before returning.</p>
 </tr>
 </tbody>
 </table>
-<p>Matched content, context, offsets, patterns, and raw engine metadata do not
-cross the protobuf boundary.</p>
+<p>The protobuf has no fields for matched content, context, offsets, patterns, or
+raw engine metadata. Engine-provided entity identifiers and configured stage
+names do cross in <code>label</code>, so custom engines must keep identifiers independent
+of request text.</p>
 <p>If the complete result cannot fit OpenShell's finding bounds, the service
 returns <code>privacy_guard_limit_exceeded</code> without partial findings.</p>
 <h2 id="worker-scheduling">Worker scheduling<a class="headerlink" href="#worker-scheduling" title="Permanent link">&para;</a></h2>

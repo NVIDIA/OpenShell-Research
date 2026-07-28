@@ -16,6 +16,16 @@ instruct Privacy Guard to:
 | `block` | Deny the request and report bounded findings |
 | `replace` | Allow a body produced by the configured replacement engines and report bounded findings |
 
+> **Experimental:** Privacy Guard is a proof of concept, not a guarantee that
+> sensitive data cannot leak. It currently protects only provider-bound network
+> requests that OpenShell routes through this middleware.
+
+Privacy Guard does not intercept prompts, tool output, transcripts, or session
+history before a harness writes them to disk. Those files may contain raw
+sensitive values even when Privacy Guard later replaces or blocks the network
+request. Use harness persistence controls and appropriate storage isolation,
+retention, and cleanup in addition to Privacy Guard.
+
 Privacy Guard processes the complete request body as UTF-8 text. It does not
 parse JSON fields, inspect files in the sandbox, modify provider responses, or
 send network requests to the provider.
@@ -38,9 +48,19 @@ address and customer ID. It requires:
 
 - Python 3.11 or newer
 - `uv` 0.11 or newer
-- OpenShell and `openshell-gateway` at the version recorded by the Privacy
-  Guard project
+- OpenShell and `openshell-gateway` `v0.0.90`, the version recorded in the
+  [middleware manifest](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/privacy-guard/.openshell-middleware-manifest.json)
 - a Docker or Podman backend supported by OpenShell
+- Claude Code subscription access for the final provider request; the OpenShell
+  base sandbox supplies the Claude Code binary
+
+Confirm the installed command versions:
+
+```bash
+uv --version
+openshell --version
+openshell-gateway --version
+```
 
 Run the commands from a checkout of OpenShell Research.
 
@@ -185,11 +205,12 @@ Each stage receives the current text. In `replace` mode, later stages receive
 the text returned by earlier stages. In `detect` and `block` mode, engines must
 return the input text unchanged.
 
-### Findings do not contain matched values
+### Findings use stable identifiers
 
-Findings contain the entity name, stage, confidence, and occurrence count.
-Matched text, surrounding text, offsets, regex patterns, headers, and request
-bodies do not cross the service boundary.
+Framework-controlled fields do not add matched text, surrounding text, offsets,
+regex patterns, headers, or request bodies to findings. `RegexEngine` uses
+configured entity identifiers. Custom engines must also return stable,
+declared entity identifiers that are not derived from request text.
 
 ### Processing is bounded
 

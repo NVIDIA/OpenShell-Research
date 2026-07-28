@@ -1737,37 +1737,73 @@ engine exceptions. Do not include:</p>
 </ul>
 <p>Stable engine and entity identifiers may appear in findings and diagnostic
 logs when they satisfy shared validation.</p>
+<p>Use a static, content-safe message when translating an operational failure:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.engines</span><span class="w"> </span><span class="kn">import</span> <span class="n">EngineExecutionError</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="k">try</span><span class="p">:</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">process</span><span class="p">(</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>        <span class="n">text</span><span class="p">,</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>        <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="o">.</span><span class="n">remaining_seconds</span><span class="p">(),</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="p">)</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="k">except</span> <span class="n">AcmeClientError</span><span class="p">:</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="k">raise</span> <span class="n">EngineExecutionError</span><span class="p">(</span><span class="s2">&quot;Acme processing failed&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Exception</th>
+<th>Use in a custom engine</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>EngineConfigurationError</code></td>
+<td>Strategy-specific configuration is unusable</td>
+</tr>
+<tr>
+<td><code>EngineExecutionError</code></td>
+<td>A collaborator or runtime operation failed</td>
+</tr>
+<tr>
+<td><code>EngineLimitExceededError</code></td>
+<td>Engine-owned bounded work or output exceeded its limit</td>
+</tr>
+</tbody>
+</table>
+<p>The framework raises <code>EngineContractError</code> when returned text or detections
+violate the engine contract; custom engines should not use it for collaborator
+failures.</p>
 <h2 id="register-the-engine">Register the engine<a class="headerlink" href="#register-the-engine" title="Permanent link">&para;</a></h2>
 <p>Create one application-scoped registry factory:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.engines.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">EngineRegistry</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_registry</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">EngineRegistry</span><span class="p">:</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">registry</span> <span class="o">=</span> <span class="n">EngineRegistry</span><span class="p">(</span><span class="n">include_builtin_engines</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">KeywordEngine</span><span class="p">)</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="k">return</span> <span class="n">registry</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.engines.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">EngineRegistry</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_registry</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">EngineRegistry</span><span class="p">:</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">registry</span> <span class="o">=</span> <span class="n">EngineRegistry</span><span class="p">(</span><span class="n">include_builtin_engines</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">KeywordEngine</span><span class="p">)</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="k">return</span> <span class="n">registry</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
 </span></code></pre></div>
 <p>Pass resources during registration when required:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">AcmeEngine</span><span class="p">,</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">resources</span><span class="o">=</span><span class="n">AcmeResources</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="n">client</span><span class="p">),</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="n">AcmeEngine</span><span class="p">,</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">resources</span><span class="o">=</span><span class="n">AcmeResources</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="n">client</span><span class="p">),</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>Use <code>include_builtin_engines=True</code> to add the built-in <code>RegexEngine</code>. Omit it
 when the registry should contain only explicitly registered custom engines.</p>
 <h2 id="inspect-and-run-the-registry">Inspect and run the registry<a class="headerlink" href="#inspect-and-run-the-registry" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span>engines
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span>configuration-schema
-</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>
-</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">  </span>serve<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">  </span>--listen<span class="w"> </span><span class="m">0</span>.0.0.0:50051
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span>engines
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span>configuration-schema
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">  </span>serve<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">  </span>--listen<span class="w"> </span><span class="m">0</span>.0.0.0:50051
 </span></code></pre></div>
 <p>The module must be installed or available on <code>PYTHONPATH</code>. The factory is
 trusted deployment code and executes for each CLI invocation.</p>

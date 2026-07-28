@@ -1624,13 +1624,16 @@ bytes unchanged. Replace returns UTF-8 encoded final text.</p>
 </tbody>
 </table>
 <p>One monotonic timeout covers every stage and final result validation. A stage
-can consume the complete request detection or timeout budget.</p>
+can consume the complete timeout budget. Detections remain subject to both the
+256-per-stage and 4,096-per-request limits.</p>
 <p>Set the processing timeout with:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>privacy-guard<span class="w"> </span>serve<span class="w"> </span>--timeout-seconds<span class="w"> </span><span class="m">5</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>privacy-guard<span class="w"> </span>serve<span class="w"> </span>--timeout-seconds<span class="w"> </span><span class="m">4</span>
 </span></code></pre></div>
 <p>OpenShell's middleware timeout must be longer than the Privacy Guard processing
 timeout. Include headroom for worker queueing, configuration validation, and
-processor preparation.</p>
+processor preparation. <code>configure-gateway</code> writes a five-second OpenShell
+timeout, so edit that registration before using a processing timeout of five
+seconds or longer.</p>
 <h2 id="finding-and-diagnostic-limits">Finding and diagnostic limits<a class="headerlink" href="#finding-and-diagnostic-limits" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1659,8 +1662,10 @@ processor preparation.</p>
 </tbody>
 </table>
 <p>Diagnostic bounds apply to stage names, entity names, metadata keys and values,
-model-profile names, and request IDs used in logs. Invalid request IDs are
-replaced with a constant placeholder for logging and do not change evaluation.</p>
+and request IDs used in logs. Custom configuration fields such as model-profile
+names are bounded only when their engine config declares an explicit constraint.
+Invalid request IDs are replaced with a constant placeholder for logging and do
+not change evaluation.</p>
 <p>If aggregated summaries cannot fit the OpenShell finding representation,
 Privacy Guard returns <code>privacy_guard_limit_exceeded</code> with no partial findings.</p>
 <h2 id="regex-limits">Regex limits<a class="headerlink" href="#regex-limits" title="Permanent link">&para;</a></h2>

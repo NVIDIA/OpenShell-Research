@@ -1639,8 +1639,9 @@ offsets after later replacement stages change the text.</p>
 <p>It does not deduplicate across stages. Stages may inspect different text
 revisions, and confidence values from different engines are not assumed to be
 calibrated.</p>
-<p>Aggregated summaries exclude matched text, surrounding text, offsets, patterns,
-and engine metadata.</p>
+<p>Framework-controlled summary fields exclude matched text, surrounding text,
+offsets, patterns, and engine metadata. Engine-provided entity identifiers
+cross the boundary, so custom engines must not derive them from request text.</p>
 <h2 id="9-apply-the-policy-action">9. Apply the policy action<a class="headerlink" href="#9-apply-the-policy-action" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
