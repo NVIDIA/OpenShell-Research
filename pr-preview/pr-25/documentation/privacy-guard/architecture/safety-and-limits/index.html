@@ -1,0 +1,1719 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Validation ownership, bounded entity processing, failure behavior, and logging rules.">
+      
+      
+        <meta name="author" content="OpenShell Research Engineering">
+      
+      
+      
+        <link rel="prev" href="../service-boundary/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../../assets/brand/favicon.svg">
+      <meta name="generator" content="zensical-0.0.44">
+    
+    
+      
+        <title>Safety and limits - OpenShell Research</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../../../assets/stylesheets/modern/main.fba56155.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../stylesheets/dev-notes.css">
+    
+    <script>__md_scope=new URL("../../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  
+  
+    <link rel="alternate" type="text/markdown" href="../safety-and-limits.md" title="Markdown source">
+  
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#safety-and-limits" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../../.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+      
+  <img src="../../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            OpenShell Research
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Safety and limits
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/NVIDIA/OpenShell-Research" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    OpenShell Research on GitHub
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+      
+  <img src="../../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+
+    </a>
+    OpenShell Research
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/NVIDIA/OpenShell-Research" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    OpenShell Research on GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../../dev-notes/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Dev Notes
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_1" id="__nav_1_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Dev Notes
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_1_2" id="__nav_1_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Posts
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_1_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_1_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Posts
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Bringing Privacy and Security to the Edge with OpenShell
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Documentation
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Documentation
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Privacy Guard
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Privacy Guard
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2_1" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Architecture
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2_2_1" id="__nav_2_2_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_2_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2_2_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Architecture
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../request-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Request lifecycle
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../entity-processing-engines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Entity-processing engines
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuration and text boundary
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../service-boundary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Service boundary
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Safety and limits
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Safety and limits
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#validation-ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Validation ownership
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#text-processing-and-transport-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Text, processing, and transport limits
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#diagnostic-and-result-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Diagnostic and result limits
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#regex-and-catalog-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Regex and catalog limits
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#regex-execution-safety" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Regex execution safety
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-a-limit-is-exceeded" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        When a limit is exceeded
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Error catalog
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Logging
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extension-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Extension requirements
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-and-retention" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        State and retention
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changing-a-limit" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Changing a limit
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#validation-ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Validation ownership
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#text-processing-and-transport-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Text, processing, and transport limits
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#diagnostic-and-result-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Diagnostic and result limits
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#regex-and-catalog-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Regex and catalog limits
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#regex-execution-safety" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Regex execution safety
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-a-limit-is-exceeded" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        When a limit is exceeded
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-catalog" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Error catalog
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Logging
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extension-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Extension requirements
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-and-retention" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        State and retention
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#changing-a-limit" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Changing a limit
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../../../.." class="md-path__link">
+        
+  
+  <span class="md-ellipsis">
+    OpenShell Research
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../../../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Documentation
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+    
+      
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Privacy Guard
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Architecture
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+  
+  <a href="../safety-and-limits.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.56 18H3.44C2.65 18 2 17.37 2 16.59V7.41C2 6.63 2.65 6 3.44 6h17.12c.79 0 1.44.63 1.44 1.41v9.18c0 .78-.65 1.41-1.44 1.41M3.44 6.94c-.26 0-.48.21-.48.47v9.19c0 .25.22.46.48.46h17.12c.26 0 .48-.21.48-.46V7.41c0-.26-.22-.47-.48-.47zm1.45 8.25V8.81h1.92l1.92 2.35 1.92-2.35h1.93v6.38h-1.93v-3.66l-1.92 2.35-1.92-2.35v3.66zm12.01 0-2.9-3.1h1.94V8.81h1.92v3.28h1.93z"/></svg>
+  </a>
+
+
+<h1 id="safety-and-limits">Safety and limits<a class="headerlink" href="#safety-and-limits" title="Permanent link">&para;</a></h1>
+<p>Privacy Guard bounds request text, engine output, detections, regex execution,
+transport output, and concurrency. Limits are part of the architecture, not
+optional tuning defaults.</p>
+<p>Package-wide values live in <code>constants.py</code>.</p>
+<h2 id="validation-ownership">Validation ownership<a class="headerlink" href="#validation-ownership" title="Permanent link">&para;</a></h2>
+<p>Each layer validates facts it can establish:</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Validates</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Policy and engine config models</td>
+<td>Strict types, exact fields, discriminators, local field rules, catalog bounds, and regex validity</td>
+</tr>
+<tr>
+<td><code>EngineRegistry</code></td>
+<td>Registration contracts, exact config and resource types, pure resource-backed config checks, and action/replacement compatibility</td>
+</tr>
+<tr>
+<td><code>EntityProcessingEngine.run()</code></td>
+<td>Text and invocation types, supported strategy, timeout, result model, spans, detection-only immutability, mutation attribution, and stage output bounds</td>
+</tr>
+<tr>
+<td>Concrete engine</td>
+<td>Algorithm-specific execution, replacement completeness, backend timeout propagation, and native failure normalization</td>
+</tr>
+<tr>
+<td><code>RequestProcessor</code></td>
+<td>Request text bounds, shared timeout, intermediate output, request-wide detection count, aggregation, and policy disposition</td>
+</tr>
+<tr>
+<td>Service</td>
+<td>Phase, transport body size, strict UTF-8, protobuf conversion, replacement encoding, finding representation, and response limits</td>
+</tr>
+</tbody>
+</table>
+<p>Keep request-wide policy decisions in the processor and algorithm-specific
+behavior in the concrete engine. The service adapts transport but does not
+reimplement either.</p>
+<h2 id="text-processing-and-transport-limits">Text, processing, and transport limits<a class="headerlink" href="#text-processing-and-transport-limits" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Limit</th>
+<th>Constant</th>
+<th style="text-align: right;">Value</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Incoming request body</td>
+<td><code>MAX_BODY_BYTES</code></td>
+<td style="text-align: right;">4 MiB</td>
+<td>Service</td>
+</tr>
+<tr>
+<td>Input or intermediate UTF-8 bytes</td>
+<td><code>MAX_BODY_BYTES</code></td>
+<td style="text-align: right;">4 MiB</td>
+<td>Processor</td>
+</tr>
+<tr>
+<td>Engine output UTF-8 bytes</td>
+<td><code>MAX_BODY_BYTES</code></td>
+<td style="text-align: right;">4 MiB</td>
+<td>Engine wrapper</td>
+</tr>
+<tr>
+<td>Encoded replacement body</td>
+<td><code>MAX_BODY_BYTES</code></td>
+<td style="text-align: right;">4 MiB</td>
+<td>Service</td>
+</tr>
+<tr>
+<td>gRPC receive message</td>
+<td><code>MAX_RECEIVE_MESSAGE_BYTES</code></td>
+<td style="text-align: right;">5 MiB</td>
+<td>gRPC server</td>
+</tr>
+<tr>
+<td>Detections returned by one stage</td>
+<td><code>MAX_DETECTIONS_PER_STAGE</code></td>
+<td style="text-align: right;">256</td>
+<td>Engine wrapper</td>
+</tr>
+<tr>
+<td>Detections across one request</td>
+<td><code>MAX_DETECTIONS_PER_REQUEST</code></td>
+<td style="text-align: right;">4,096</td>
+<td>Processor</td>
+</tr>
+<tr>
+<td>Default shared timeout</td>
+<td><code>DEFAULT_TIMEOUT_SECONDS</code></td>
+<td style="text-align: right;">1 second</td>
+<td>Server and processor</td>
+</tr>
+<tr>
+<td>Maximum configured timeout</td>
+<td><code>MAX_TIMEOUT_SECONDS</code></td>
+<td style="text-align: right;">30 seconds</td>
+<td>Server, processor, and <code>Timeout</code></td>
+</tr>
+<tr>
+<td>Active processor workers</td>
+<td><code>MAX_CONCURRENT_PROCESSING</code></td>
+<td style="text-align: right;">4</td>
+<td>Service</td>
+</tr>
+<tr>
+<td>Concurrent gRPC calls</td>
+<td><code>MAX_CONCURRENT_RPCS</code></td>
+<td style="text-align: right;">16</td>
+<td>gRPC server</td>
+</tr>
+</tbody>
+</table>
+<p>The gRPC receive allowance is 1 MiB larger than the request body limit for the
+protobuf envelope. The service still enforces the advertised 4 MiB body bound.</p>
+<p>One monotonic <code>Timeout</code> is shared by all stages and final result validation.
+<code>RegexEngine</code> passes the remaining duration into every backend search.
+Third-party calls that accept a timeout should receive the same remaining
+duration; calls that cannot be interrupted continue to occupy a service worker
+until they exit.</p>
+<p>Operators configure the internal bound with <code>--timeout-seconds</code> or the
+programmatic <code>PrivacyGuardServer(timeout_seconds=...)</code> argument. OpenShell's
+outer middleware timeout must include additional headroom for worker queueing
+and configuration or engine preparation beyond this internal bound.</p>
+<h2 id="diagnostic-and-result-limits">Diagnostic and result limits<a class="headerlink" href="#diagnostic-and-result-limits" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Limit</th>
+<th>Constant</th>
+<th style="text-align: right;">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bounded diagnostic string</td>
+<td><code>MAX_DIAGNOSTIC_TEXT_BYTES</code></td>
+<td style="text-align: right;">1,024 UTF-8 bytes</td>
+</tr>
+<tr>
+<td>Metadata entries per detection</td>
+<td><code>MAX_FINDING_METADATA_ENTRIES</code></td>
+<td style="text-align: right;">32</td>
+</tr>
+<tr>
+<td>Aggregated protobuf finding groups</td>
+<td><code>MAX_PROTO_FINDING_GROUPS</code></td>
+<td style="text-align: right;">32</td>
+</tr>
+<tr>
+<td>Encoded size per protobuf finding</td>
+<td><code>MAX_PROTO_FINDING_BYTES</code></td>
+<td style="text-align: right;">4 KiB</td>
+</tr>
+</tbody>
+</table>
+<p>The diagnostic-string bound applies to stage names, entity names, metadata
+keys and values, model-profile names, and other audit-safe identifiers built
+from the shared domain field type. These values must be non-empty printable
+Unicode without control or bidirectional formatting characters. Untrusted
+request IDs use the same content and size rules for logging; an invalid request
+ID is represented by a constant placeholder and does not change the evaluation
+result. The human-readable log message quotes request IDs and escapes ASCII
+spaces so their text cannot introduce another key/value token; structured log
+records retain the exact validated ID. Regex entity and supplied rule names
+have a stricter ASCII grammar and limit described below.</p>
+<p>The processor aggregates occurrences before the service applies protobuf
+limits. If a safe result cannot be represented, the service returns a limit
+deny with no partial findings.</p>
+<h2 id="regex-and-catalog-limits">Regex and catalog limits<a class="headerlink" href="#regex-and-catalog-limits" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Limit</th>
+<th>Constant</th>
+<th style="text-align: right;">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Regex entity or supplied rule name</td>
+<td><code>MAX_REGEX_NAME_BYTES</code></td>
+<td style="text-align: right;">128 ASCII bytes</td>
+</tr>
+<tr>
+<td>Entities per catalog</td>
+<td><code>MAX_REGEX_ENTITIES_PER_CATALOG</code></td>
+<td style="text-align: right;">2,000</td>
+</tr>
+<tr>
+<td>Rules per catalog</td>
+<td><code>MAX_REGEX_RULES_PER_CATALOG</code></td>
+<td style="text-align: right;">10,000</td>
+</tr>
+<tr>
+<td>Pattern string</td>
+<td><code>MAX_REGEX_PATTERN_BYTES</code></td>
+<td style="text-align: right;">16 KiB</td>
+</tr>
+</tbody>
+</table>
+<p>Entity and rule names use
+<code>[A-Za-z_][A-Za-z0-9_-]*</code>. Rule names are optional; their deterministic
+derived diagnostic identities are not serialized back into configuration.</p>
+<p>The per-evaluation config <code>Struct</code> is limited to 64 KiB. A catalog may satisfy
+Privacy Guard's engine limits yet remain too large for the current upstream
+protocol. Internal caching does not raise that transport ceiling.</p>
+<h2 id="regex-execution-safety">Regex execution safety<a class="headerlink" href="#regex-execution-safety" title="Permanent link">&para;</a></h2>
+<p><code>RegexEngine</code> validates and compiles the complete catalog before accepting
+configuration. It:</p>
+<ul>
+<li>rejects invalid and empty pattern strings</li>
+<li>rejects patterns that match empty input</li>
+<li>rejects user-defined named groups and inline flags</li>
+<li>verifies its private trailing marker on every match</li>
+<li>treats a context-dependent zero-width match as an atomic configuration
+  failure</li>
+<li>evaluates patterns independently to retain overlaps</li>
+<li>uses the timeout-capable third-party <code>regex</code> backend</li>
+<li>caps detections per stage</li>
+<li>projects exact UTF-8 replacement size before rendering</li>
+</ul>
+<p>No timeout, limit, or pattern failure returns partial stage detections or
+mutated text.</p>
+<h2 id="when-a-limit-is-exceeded">When a limit is exceeded<a class="headerlink" href="#when-a-limit-is-exceeded" title="Permanent link">&para;</a></h2>
+<p>The processor returns a successful deny with
+<code>privacy_guard_limit_exceeded</code> and no partial findings or replacement when:</p>
+<ul>
+<li>the shared timeout expires</li>
+<li>an engine exceeds its detection or output limit</li>
+<li>intermediate text exceeds the UTF-8 byte limit</li>
+<li>aggregate request detections exceed the limit</li>
+</ul>
+<p>The service returns the same bounded deny when:</p>
+<ul>
+<li>findings exceed the protobuf group or encoded-size limit</li>
+<li>replacement text cannot be encoded within the body limit</li>
+<li>a deny reason code is not safely representable</li>
+</ul>
+<p>The processor emits a content-safe <code>timeout</code> or <code>resource</code> limit kind, and the
+service adapter emits <code>resource</code> for representation limits. Neither log includes
+request content or collaborator error text. The deny reason directs users to
+check that log, then reduce the request or replacement size, simplify the
+configured stages and rules, or increase <code>--timeout-seconds</code> or
+<code>PrivacyGuardServer(timeout_seconds=...)</code> up to 30 seconds. When increasing the
+processing timeout, users must give OpenShell's middleware timeout additional
+headroom for worker queueing and configuration or engine preparation. These
+options reduce bounded output pressure or provide appropriate time without
+weakening the fail-closed behavior.</p>
+<p>Malformed input and engine contract or execution failures instead abort the RPC
+with a cataloged error. OpenShell then applies the middleware registration's
+failure behavior.</p>
+<p>The distinction is deliberate:</p>
+<ul>
+<li>an exhausted declared processing bound is a closed, successful deny</li>
+<li>invalid user input is an <code>INVALID_ARGUMENT</code> RPC failure</li>
+<li>an engine or middleware defect is an <code>INTERNAL</code> RPC failure</li>
+</ul>
+<h2 id="error-catalog">Error catalog<a class="headerlink" href="#error-catalog" title="Permanent link">&para;</a></h2>
+<p>Production failures use <code>PrivacyGuardError</code> and a stable <code>ErrorCode</code>. Each
+error spec defines:</p>
+<ul>
+<li>invalid-input or internal classification</li>
+<li>responsible component</li>
+<li>failed operation</li>
+<li>content-safe summary</li>
+<li>remediation hint</li>
+</ul>
+<p>Successful policy and safety-limit denials use stable reason codes plus
+content-safe recovery guidance; they do not add domain fields solely for
+diagnostic logging. CLI validation failures name the rejected option and state
+the accepted form or next action. Cataloged server-startup failures print one
+content-safe message and exit nonzero rather than exposing a traceback.
+Internal engine and third-party failures remain concise because the owning
+boundary translates them before they reach users.</p>
+<p>Caught extension and third-party exceptions are translated at their trust
+boundary. Raw exception messages and chains are not exposed. Configuration
+errors do not include rejected pattern strings, paths, credentials, provider
+endpoints, or request text.</p>
+<p>Use a new catalog entry for a genuinely new externally observable failure. Do
+not return raw Pydantic, regex-backend, engine, or protobuf exceptions.</p>
+<h2 id="logging">Logging<a class="headerlink" href="#logging" title="Permanent link">&para;</a></h2>
+<p>Default operational logs include:</p>
+<ul>
+<li>request ID</li>
+<li>evaluation duration</li>
+<li>allow or deny action</li>
+<li>aggregate finding count</li>
+<li>stable error code</li>
+<li>stage source and invocation strategy at debug level</li>
+</ul>
+<p>They do not include:</p>
+<ul>
+<li>request or replacement text</li>
+<li>matched or surrounding text</li>
+<li>offsets</li>
+<li>patterns or catalog contents</li>
+<li>headers, targets, or credentials</li>
+<li>model endpoints</li>
+<li>arbitrary exception text</li>
+</ul>
+<p>Sensitive domain fields use <code>repr=False</code> to reduce accidental exposure. This
+does not replace safe exception handling.</p>
+<p><code>--debug</code> enables content-safe processing diagnostics.
+<code>--debug-log-content</code> deliberately logs complete input and processed text and
+emits a warning; use it only in a controlled development environment.</p>
+<h2 id="extension-requirements">Extension requirements<a class="headerlink" href="#extension-requirements" title="Permanent link">&para;</a></h2>
+<p>Custom engines should:</p>
+<ul>
+<li>use the base constructor and public <code>run()</code> wrapper</li>
+<li>return the exact <code>TextProcessingResult</code> contract</li>
+<li>return stable, declared entity identifiers rather than values derived from
+  request text</li>
+<li>keep request data local to <code>_run()</code></li>
+<li>keep initialized state immutable and make resources concurrency-safe</li>
+<li>pass the shared remaining timeout to delegated APIs when they support it</li>
+<li>fail the stage on native partial failure</li>
+<li>use <code>TextProcessingResult.from_detections()</code> to bound lazy detection streams</li>
+<li>add manual bounds only when a low-level collaborator allocates proportional
+  output before Privacy Guard can consume it</li>
+<li>translate expected collaborator failures to the content-safe engine
+  exception hierarchy</li>
+<li>avoid logging input or caught exception text</li>
+</ul>
+<p>Privacy Guard keeps framework-controlled fields and identifiers that pass its
+shared validation content-safe for findings and operational logs.
+Operator-installed Python engine code is trusted deployment code: it can access
+request text and must honor the declared identifier and logging contract. The
+framework cannot make arbitrary trusted Python code non-exfiltrating, so
+operators must review and install custom engines with the same care as other
+code in the middleware process.</p>
+<p>Do not add retries, fallback providers, persistent request artifacts, or extra
+validation without a concrete failure mode and a clear owning layer.</p>
+<h2 id="state-and-retention">State and retention<a class="headerlink" href="#state-and-retention" title="Permanent link">&para;</a></h2>
+<p>Cross-request entity memory is not implemented. Privacy Guard retains one active
+validated policy and its immutable configured engine state, but never request
+text, detections, or replacement mappings. The active processor is deliberate
+process state, not an LRU entry: it remains until successful replacement or
+shutdown.</p>
+<p>During an update, the fully prepared candidate may coexist with the active
+processor. Evaluations that already captured the prior processor may keep it
+alive until they finish. A failed candidate leaves active state unchanged.</p>
+<p>Regex's supporting compiled-rule cache remains bounded:</p>
+<table>
+<thead>
+<tr>
+<th>Cache</th>
+<th style="text-align: right;">Weight budget</th>
+<th style="text-align: right;">Entry cap</th>
+<th>Entry weight</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Compiled Regex rules</td>
+<td style="text-align: right;">32 MiB</td>
+<td style="text-align: right;">128</td>
+<td>canonical catalog bytes plus 4 KiB per rule</td>
+</tr>
+</tbody>
+</table>
+<p>The compiled-rule allowance accounts for retained backend state that is much
+larger than short pattern text. One entry that exceeds the budget remains valid
+and usable for the current operation but is not retained there. This does not
+invalidate an active or candidate processor holding those rules. The active
+policy is not rejected by cache admission; policy and schema limits bound its
+shape, while custom-engine prepared memory remains an operator responsibility.
+Regex cache skip and eviction records contain only the cache name and weights,
+plus eviction counts.</p>
+<h2 id="changing-a-limit">Changing a limit<a class="headerlink" href="#changing-a-limit" title="Permanent link">&para;</a></h2>
+<p>A limit change may affect policy schema, processor behavior, engine contracts,
+protobuf serialization, tests, examples, and the OpenShell middleware
+registration.</p>
+<p>Before changing a limit:</p>
+<ol>
+<li>identify every layer that enforces or advertises it</li>
+<li>update exact-boundary tests</li>
+<li>check the failure result immediately above the boundary</li>
+<li>run the complete project validation</li>
+<li>benchmark changes that affect regex compilation or request processing</li>
+<li>coordinate upstream when the copied OpenShell protocol is involved</li>
+</ol>
+<p><a href="../">Back to the architecture overview</a></p>
+
+
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      <a href="https://github.com/NVIDIA/OpenShell">OpenShell on GitHub <span aria-hidden="true">↗</span></a>
+
+    </div>
+  
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../../..","features":["navigation.sections","navigation.indexes","navigation.path","navigation.top","search.highlight","toc.follow"],"search":"../../../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.6e5f0216.min.js"></script>
+      
+        <script src="../../../../javascripts/navigation-drawer.js"></script>
+      
+    
+  </body>
+</html>
