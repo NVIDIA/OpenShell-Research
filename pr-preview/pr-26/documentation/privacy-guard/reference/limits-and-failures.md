@@ -205,7 +205,7 @@ latency_ms = 6.69 + 23.28 * (prompt_tokens / 100,000)
 R² = 0.976
 ```
 
-![Scatter plot of Privacy Guard latency against prompt tokens on logarithmic axes. Point color maps the number of entities detected from 3 to 429. Ninety-six service measurements follow one fitted line. A dashed line marks the nominal one-million-token context threshold.](../../../assets/privacy-guard/analysis/privacy-guard-latency-vs-prompt-size.svg)
+![Scatter plot of Privacy Guard latency against prompt tokens on logarithmic axes. Point color maps the number of entities detected from 3 to 429. Ninety-six service measurements follow one fitted line. A dashed line marks the nominal one-million-token context threshold.](../assets/analysis/privacy-guard-latency-vs-prompt-size.svg)
 
 Across the 12 completed large-context turns with end-to-end timing, Privacy
 Guard service processing averaged 0.56% of request-admission-to-last-output

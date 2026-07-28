@@ -1112,32 +1112,36 @@
 
 
 <h1 id="documentation-site-development">Documentation site development<a class="headerlink" href="#documentation-site-development" title="Permanent link">&para;</a></h1>
-<p>Follow these instructions for changes under <code>docs/</code>, <code>zensical.toml</code>, the Dev
-Notes renderer, or the documentation workflow. Run commands from the repository
-root. Use Python 3.10 or newer.</p>
+<p>Follow these instructions for changes under <code>docs/</code>, a project's <code>docs/</code> tree,
+<code>zensical.toml</code>, the Dev Notes renderer, or the documentation workflow. Run
+commands from the repository root. Use Python 3.10 or newer.</p>
 <h2 id="content-routing">Content routing<a class="headerlink" href="#content-routing" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Put durable software knowledge—installation, usage, reproducibility, and known
-  limitations—under <code>docs/documentation/</code>.</li>
+<li>Put project-specific software knowledge—installation, usage, reproducibility,
+  and known limitations—under <code>projects/&lt;name&gt;/docs/</code>. The clean build stages
+  configured project documentation under <code>docs/documentation/</code> for publishing.</li>
+<li>Put cross-project software documentation directly under
+  <code>docs/documentation/</code>.</li>
 <li>Put dated experiments, benchmarks, releases, use cases, and engineering updates
   under <code>docs/dev-notes/</code>.</li>
-<li>When a Dev Note introduces reusable software, add its durable guide under
-  <code>docs/documentation/</code>, link it to the originating Dev Note, and add it to
-  <code>zensical.toml</code>.</li>
+<li>When a Dev Note introduces reusable software, add its durable guide to the
+  owning project, link it to the originating Dev Note, and add its staged site
+  path to <code>zensical.toml</code>.</li>
 </ul>
 <h2 id="agent-readable-markdown">Agent-readable Markdown<a class="headerlink" href="#agent-readable-markdown" title="Permanent link">&para;</a></h2>
-<p>Every canonical content page under <code>docs/dev-notes/posts/</code> and
-<code>docs/documentation/</code> must declare <code>agent_markdown: true</code> in its front matter.
-The clean site build copies those sources byte-for-byte into <code>site/</code> at the same
-path relative to <code>docs/</code>, and each rendered page links to its same-origin
-Markdown source for people and agents. The generated copies under <code>site/</code> must
-not be edited.</p>
-<p>Every page in the two canonical content directories is published, including
-the Documentation index. Keep presentation-only landing pages such as the
-homepage and Dev Notes card index, redirect-only pages, obsolete or orphan
-project pages, internal development documentation, and the 404 page outside
-those directories and do not add the marker to them. Those pages are not
-canonical content for agent consumption.</p>
+<p>Every canonical content page under <code>docs/dev-notes/posts/</code>,
+<code>docs/documentation/</code>, and a staged project documentation tree must declare
+<code>agent_markdown: true</code> in its front matter. The clean site build first stages
+project documentation, then copies all published Markdown sources byte-for-byte
+into <code>site/</code> at their site paths. Each rendered page links to its same-origin
+Markdown source for people and agents. Generated copies under
+<code>docs/documentation/</code> and <code>site/</code> must not be edited.</p>
+<p>Every page in a published content tree is included, including the Documentation
+index. Keep presentation-only landing pages such as the homepage and Dev Notes
+card index, redirect-only pages, obsolete or orphan project pages, internal
+development documentation, and the 404 page outside those trees and do not add
+the marker to them. Those pages are not canonical content for agent
+consumption.</p>
 <h2 id="dev-notes">Dev Notes<a class="headerlink" href="#dev-notes" title="Permanent link">&para;</a></h2>
 <p>Dev Notes are Markdown posts under <code>docs/dev-notes/posts/</code>. Each post requires
 <code>title</code>, an exact <code>YYYY-MM-DD</code> date, <code>description</code>, and at least one <code>authors</code> ID
@@ -1177,8 +1181,10 @@ project site prefix.</p>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>scripts/build-docs.sh
 </span></code></pre></div>
 <p><code>scripts/build-docs.sh</code> recreates <code>.venv-docs</code>, installs the pinned toolchain,
-renders Dev Notes metadata, and runs <code>zensical build --clean --strict</code>. Do not
-report success unless it completes without issues.</p>
+stages canonical Privacy Guard documentation from
+<code>projects/privacy-guard/docs/</code>, renders Dev Notes metadata, and runs
+<code>zensical build --clean --strict</code>. Do not report success unless it completes
+without issues.</p>
 <p>For documentation-site changes, serve the complete built artifact before
 handing the task back:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>http.server<span class="w"> </span><span class="m">8000</span><span class="w"> </span>--directory<span class="w"> </span>site

@@ -25,7 +25,7 @@ send network requests to the provider.
 ![A provider-bound request travels from the sandbox through OpenShell and
 Privacy Guard. Privacy Guard returns an allow, replacement, or deny decision
 before OpenShell attaches credentials and sends an allowed request to the
-provider.](../../assets/privacy-guard/diagrams/request-path.svg)
+provider.](assets/diagrams/request-path.svg)
 
 Privacy Guard exposes OpenShell's `SupervisorMiddleware` gRPC service. It
 registers for the pre-credentials request phase so replacement happens before
