@@ -10,6 +10,10 @@ Privacy Guard is a pre-credentials OpenShell middleware. It translates an
 OpenShell HTTP-request evaluation into one text-processing run and returns an
 allow, replacement, or deny result.
 
+This is an experimental network-middleware boundary. It does not mediate
+harness filesystem writes, so raw prompts and session histories may be stored
+before a request reaches Privacy Guard.
+
 ## System boundary
 
 ![Privacy Guard component architecture. The service layer translates

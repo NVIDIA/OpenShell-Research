@@ -230,7 +230,10 @@ Use a static, content-safe message when translating an operational failure:
 from privacy_guard.engines import EngineExecutionError
 
 try:
-    result = self.resources.client.process(text)
+    result = self.resources.client.process(
+        text,
+        timeout=timeout.remaining_seconds(),
+    )
 except AcmeClientError:
     raise EngineExecutionError("Acme processing failed") from None
 ```

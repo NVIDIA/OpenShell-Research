@@ -7,6 +7,16 @@ OpenShell attaches provider credentials.
 It processes the complete request body as UTF-8 text through an ordered
 pipeline of entity-processing engines.
 
+> **Experimental:** Privacy Guard is a proof of concept. It reduces exposure on
+> provider-bound network requests that OpenShell routes through the middleware;
+> it does not guarantee that sensitive data cannot leak.
+
+Privacy Guard does not intercept data before a harness writes it to disk.
+Prompts, tool output, transcripts, and session histories may therefore retain
+raw sensitive values even when the provider-bound request is later replaced or
+blocked. Use harness persistence controls and appropriate storage isolation,
+retention, and cleanup in addition to Privacy Guard.
+
 ## What it does
 
 | Policy action | Behavior |

@@ -10,6 +10,19 @@ Privacy Guard runs as a gRPC service reachable by the OpenShell gateway and
 sandbox supervisors. The CLI uses the built-in `RegexEngine` registry unless
 you supply a custom registry factory.
 
+## Protection boundary and local persistence
+
+Privacy Guard is experimental. It evaluates provider-bound network requests at
+the OpenShell middleware boundary; it is not a guarantee that sensitive data
+cannot leak.
+
+The middleware does not run before harness filesystem writes. A harness may
+persist raw prompts, tool output, transcripts, or session history before
+OpenShell sends a provider request to Privacy Guard. Configure the harness to
+disable or minimize persistence where possible, restrict access to sandbox and
+host storage, set an appropriate retention policy, and remove sensitive session
+artifacts after use.
+
 ## Install the project environment
 
 From the repository checkout:
