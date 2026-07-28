@@ -5,35 +5,39 @@ description: Agent instructions for maintaining the OpenShell Research documenta
 
 # Documentation site development
 
-Follow these instructions for changes under `docs/`, `zensical.toml`, the Dev
-Notes renderer, or the documentation workflow. Run commands from the repository
-root. Use Python 3.10 or newer.
+Follow these instructions for changes under `docs/`, a project's `docs/` tree,
+`zensical.toml`, the Dev Notes renderer, or the documentation workflow. Run
+commands from the repository root. Use Python 3.10 or newer.
 
 ## Content routing
 
-- Put durable software knowledge—installation, usage, reproducibility, and known
-  limitations—under `docs/documentation/`.
+- Put project-specific software knowledge—installation, usage, reproducibility,
+  and known limitations—under `projects/<name>/docs/`. The clean build stages
+  configured project documentation under `docs/documentation/` for publishing.
+- Put cross-project software documentation directly under
+  `docs/documentation/`.
 - Put dated experiments, benchmarks, releases, use cases, and engineering updates
   under `docs/dev-notes/`.
-- When a Dev Note introduces reusable software, add its durable guide under
-  `docs/documentation/`, link it to the originating Dev Note, and add it to
-  `zensical.toml`.
+- When a Dev Note introduces reusable software, add its durable guide to the
+  owning project, link it to the originating Dev Note, and add its staged site
+  path to `zensical.toml`.
 
 ## Agent-readable Markdown
 
-Every canonical content page under `docs/dev-notes/posts/` and
-`docs/documentation/` must declare `agent_markdown: true` in its front matter.
-The clean site build copies those sources byte-for-byte into `site/` at the same
-path relative to `docs/`, and each rendered page links to its same-origin
-Markdown source for people and agents. The generated copies under `site/` must
-not be edited.
+Every canonical content page under `docs/dev-notes/posts/`,
+`docs/documentation/`, and a staged project documentation tree must declare
+`agent_markdown: true` in its front matter. The clean site build first stages
+project documentation, then copies all published Markdown sources byte-for-byte
+into `site/` at their site paths. Each rendered page links to its same-origin
+Markdown source for people and agents. Generated copies under
+`docs/documentation/` and `site/` must not be edited.
 
-Every page in the two canonical content directories is published, including
-the Documentation index. Keep presentation-only landing pages such as the
-homepage and Dev Notes card index, redirect-only pages, obsolete or orphan
-project pages, internal development documentation, and the 404 page outside
-those directories and do not add the marker to them. Those pages are not
-canonical content for agent consumption.
+Every page in a published content tree is included, including the Documentation
+index. Keep presentation-only landing pages such as the homepage and Dev Notes
+card index, redirect-only pages, obsolete or orphan project pages, internal
+development documentation, and the 404 page outside those trees and do not add
+the marker to them. Those pages are not canonical content for agent
+consumption.
 
 ## Dev Notes
 
@@ -88,8 +92,10 @@ scripts/build-docs.sh
 ```
 
 `scripts/build-docs.sh` recreates `.venv-docs`, installs the pinned toolchain,
-renders Dev Notes metadata, and runs `zensical build --clean --strict`. Do not
-report success unless it completes without issues.
+stages canonical Privacy Guard documentation from
+`projects/privacy-guard/docs/`, renders Dev Notes metadata, and runs
+`zensical build --clean --strict`. Do not report success unless it completes
+without issues.
 
 For documentation-site changes, serve the complete built artifact before
 handing the task back:

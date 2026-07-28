@@ -134,13 +134,13 @@ await server.serve_async("127.0.0.1:50051")
 
 ## Documentation
 
-- [Overview and end-to-end quickstart](../../docs/documentation/privacy-guard/index.md)
-- [Configure policies](../../docs/documentation/privacy-guard/configuration.md)
-- [Run and operate Privacy Guard](../../docs/documentation/privacy-guard/operations.md)
-- [Use RegexEngine](../../docs/documentation/privacy-guard/engines/regex.md)
-- [Add a custom engine](../../docs/documentation/privacy-guard/engines/custom.md)
-- [System architecture](../../docs/documentation/privacy-guard/architecture/index.md)
-- [Limits and failure behavior](../../docs/documentation/privacy-guard/reference/limits-and-failures.md)
+- [Overview and end-to-end quickstart](docs/index.md)
+- [Configure policies](docs/configuration.md)
+- [Run and operate Privacy Guard](docs/operations.md)
+- [Use RegexEngine](docs/engines/regex.md)
+- [Add a custom engine](docs/engines/custom.md)
+- [System architecture](docs/architecture/index.md)
+- [Limits and failure behavior](docs/reference/limits-and-failures.md)
 
 ## Runnable examples
 

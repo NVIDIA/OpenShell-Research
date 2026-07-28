@@ -15,7 +15,7 @@ allow, replacement, or deny result.
 ![Privacy Guard component architecture. The service layer translates
 OpenShell gRPC messages, the request processor applies policy, and registered
 engines detect or replace entities without depending on the transport
-layer.](../../../assets/privacy-guard/diagrams/component-architecture.svg)
+layer.](../assets/diagrams/component-architecture.svg)
 
 OpenShell owns request routing and provider credential attachment. Privacy
 Guard does not send provider requests.
@@ -83,7 +83,7 @@ final text and returns it as the new body.
 ![Privacy Guard processing pipeline from validated policy and input text
 through strategy selection, one shared timeout, ordered engine stages,
 validation, aggregation, and the final policy
-decision.](../../../assets/privacy-guard/diagrams/processing-pipeline.svg)
+decision.](../assets/diagrams/processing-pipeline.svg)
 
 Engines receive `DETECT` or `REPLACE`, not the user-facing policy action.
 Blocking is applied after detection by `RequestProcessor`.

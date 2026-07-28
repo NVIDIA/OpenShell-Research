@@ -5,7 +5,7 @@
  * Keep documentation diagrams subordinate to the surrounding explanation.
  * Small screens retain the full available width so labels remain legible.
  */
-.md-typeset img[src*="assets/privacy-guard/diagrams/"] {
+.md-typeset img[src*="assets/diagrams/"] {
   display: block;
   width: 88%;
   max-width: 52rem;
@@ -15,7 +15,7 @@
 }
 
 @media screen and (max-width: 48rem) {
-  .md-typeset img[src*="assets/privacy-guard/diagrams/"] {
+  .md-typeset img[src*="assets/diagrams/"] {
     width: 100%;
   }
 }

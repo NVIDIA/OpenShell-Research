@@ -13,10 +13,10 @@ Run from `projects/privacy-guard/`:
 uv run python analysis/render_latency_plot.py
 ```
 
-The command writes:
+The command writes the documentation asset:
 
 ```text
-analysis/privacy-guard-latency-vs-prompt-size.svg
+docs/assets/analysis/privacy-guard-latency-vs-prompt-size.svg
 ```
 
 Verify that the committed figure matches the data and renderer:

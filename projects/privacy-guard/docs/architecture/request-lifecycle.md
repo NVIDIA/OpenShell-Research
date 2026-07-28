@@ -16,7 +16,7 @@ active processor, processes one text value, and serializes the result.
 policy, resolves the active processor, handles an empty body or decodes UTF-8
 text, runs the ordered engine stages, then returns either a gRPC failure or a
 successful allow, replacement, or deny
-result.](../../../assets/privacy-guard/diagrams/request-lifecycle.svg)
+result.](../assets/diagrams/request-lifecycle.svg)
 
 ## 1. Validate the transport
 

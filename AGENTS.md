@@ -8,7 +8,8 @@ documentation for work that uses OpenShell as its runtime.
 ## Work routing
 
 - Put self-contained implementations and experiments in `projects/<name>/`.
-- Put durable user-facing guides and references in `docs/documentation/`.
+- Put project-specific user guides and references in `projects/<name>/docs/`.
+- Put cross-project user-facing documentation in `docs/documentation/`.
 - Put Dev Notes (human-written technical notes) `docs/dev-notes/`.
 - Put agent-facing repository maintenance workflows in `docs/development/`.
 
@@ -32,6 +33,9 @@ read `docs/development/index.md`.
   `.env.example`.
 - Do not hand-edit generated Dev Notes cards, bylines, or navigation; use
   `python3 scripts/render-dev-notes.py`.
+- Do not hand-edit generated project-documentation mirrors under
+  `docs/documentation/`; use the project's canonical `docs/` tree and its
+  documented staging script.
 - When adding a project or workflow with distinct conventions, add a nested
   `AGENTS.md` in that directory instead of expanding this root file.
 
