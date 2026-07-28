@@ -1194,14 +1194,14 @@ Dependabot pull requests validate with read-only credentials but do not publish
 previews on the production documentation origin.</p>
 <p>The <code>gh-pages</code> branch stores the composite production site and active previews;
 GitHub Pages remains configured with <strong>GitHub Actions</strong> as its publishing
-source. Pushes to <code>main</code> validate documentation without publishing it. When the
-current documentation is ready for production, manually run the <strong>Docs</strong>
-workflow from <code>main</code>; that run updates the production site while preserving
-active previews, then deploys the complete branch through the official Pages
-artifact workflow. The first production deployment creates <code>gh-pages</code>
-automatically. To roll back to a revision before preview support, leave the
-Pages source set to <strong>GitHub Actions</strong> and rerun the restored documentation
-workflow.</p>
+source. Every successful push to <code>main</code> updates the production site while
+preserving active previews, then deploys the complete branch through the
+official Pages artifact workflow. Merging a pull request therefore publishes
+its documentation after the <strong>Docs</strong> workflow passes. A manual <strong>Docs</strong>
+workflow dispatch from <code>main</code> can republish the current revision without a new
+commit. The first production deployment creates <code>gh-pages</code> automatically. To
+roll back to a revision before preview support, leave the Pages source set to
+<strong>GitHub Actions</strong> and rerun the restored documentation workflow.</p>
 
 
 
