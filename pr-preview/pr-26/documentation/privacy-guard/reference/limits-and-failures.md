@@ -240,6 +240,6 @@ For maintainers:
 ## Related pages
 
 - [Run and operate Privacy Guard](../operations.md)
-- [Use RegexEngine](../engines/regex.md)
+- [RegexEngine](../engines/regex.md)
 - [Request lifecycle](../architecture/request-lifecycle.md)
 - [Service boundary](../architecture/service-boundary.md)

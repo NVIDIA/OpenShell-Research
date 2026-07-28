@@ -224,7 +224,7 @@ without returning partial replacement text or partial findings.
   recipes.
 - [Run and operate Privacy Guard](operations.md): CLI, gateway registration,
   server lifecycle, logging, and troubleshooting.
-- [Use RegexEngine](engines/regex.md): pattern catalogs, flags, matching, and
+- [RegexEngine](engines/regex.md): pattern catalogs, flags, matching, and
   replacement.
 - [Add a custom engine](engines/custom.md): engine contract, resources,
   registry factories, and tests.

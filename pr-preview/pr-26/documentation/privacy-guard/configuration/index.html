@@ -862,6 +862,10 @@
     
       
         
+          
+        
+      
+        
       
         
       
@@ -878,8 +882,9 @@
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2_3" >
         
           
-          <label class="md-nav__link" for="__nav_2_2_3" id="__nav_2_2_3_label" tabindex="0">
-            
+          <div class="md-nav__link md-nav__container">
+            <a href="../engines/" class="md-nav__link ">
+              
   
   
   <span class="md-ellipsis">
@@ -892,8 +897,14 @@
   
   
 
-            <span class="md-nav__icon md-icon"></span>
-          </label>
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2_2_3" id="__nav_2_2_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
         
         <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_2_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2_2_3">
@@ -904,6 +915,8 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
             
               
                 
@@ -919,7 +932,7 @@
   <span class="md-ellipsis">
     
   
-  Use RegexEngine
+  RegexEngine
 
     
   </span>
@@ -1731,7 +1744,7 @@ policy.</p>
 end in <code>.yaml</code> or <code>.yml</code>. Absolute paths, <code>..</code> traversal, and symlinks are
 rejected. Start Privacy Guard from the directory that contains the referenced
 catalog, or use a path relative to that directory.</p>
-<p>See <a href="../engines/regex/">Use RegexEngine</a> for the complete catalog schema.</p>
+<p>See <a href="../engines/regex/">RegexEngine</a> for the complete catalog schema.</p>
 <h2 id="inspect-and-validate-configuration">Inspect and validate configuration<a class="headerlink" href="#inspect-and-validate-configuration" title="Permanent link">&para;</a></h2>
 <p>List the engines installed in the selected registry:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>engines
@@ -1790,7 +1803,7 @@ carry only their relative path through the transport and are loaded by the
 Privacy Guard process.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../engines/regex/">Use RegexEngine</a></li>
+<li><a href="../engines/regex/">RegexEngine</a></li>
 <li><a href="../engines/custom/">Add a custom engine</a></li>
 <li><a href="../operations/">Run and operate Privacy Guard</a></li>
 <li><a href="../reference/limits-and-failures/">Limits and failure behavior</a></li>

@@ -199,7 +199,7 @@ end in `.yaml` or `.yml`. Absolute paths, `..` traversal, and symlinks are
 rejected. Start Privacy Guard from the directory that contains the referenced
 catalog, or use a path relative to that directory.
 
-See [Use RegexEngine](engines/regex.md) for the complete catalog schema.
+See [RegexEngine](engines/regex.md) for the complete catalog schema.
 
 ## Inspect and validate configuration
 
@@ -275,7 +275,7 @@ Privacy Guard process.
 
 ## Next steps
 
-- [Use RegexEngine](engines/regex.md)
+- [RegexEngine](engines/regex.md)
 - [Add a custom engine](engines/custom.md)
 - [Run and operate Privacy Guard](operations.md)
 - [Limits and failure behavior](reference/limits-and-failures.md)
