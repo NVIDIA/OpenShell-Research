@@ -57,7 +57,7 @@ privacy-guard serve --timeout-seconds 4
 
 OpenShell's middleware timeout must be longer than the Privacy Guard processing
 timeout. Include headroom for worker queueing, configuration validation, and
-processor preparation. `configure-gateway` writes a five-second OpenShell
+processor preparation. `add-gateway-registration` writes a five-second OpenShell
 timeout, so edit that registration before using a processing timeout of five
 seconds or longer.
 
