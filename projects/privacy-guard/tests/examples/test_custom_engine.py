@@ -127,14 +127,20 @@ def test_openshell_walkthrough_uses_the_custom_registry_and_current_policy() -> 
     assert config["on_detection"]["action"] == "detect"
     assert "--registry-factory custom_engine:create_registry" in readme
     assert "cd projects/privacy-guard/examples/custom-engine" in readme
+    assert "uv sync --locked" not in readme
+    assert "uv run --locked privacy-guard" in readme
     assert 'export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"' in readme
     assert "uv run privacy-guard configure-gateway" in readme
-    assert '--host-ip "$YOUR_HOST_IP"' in readme
+    assert "--host-ip YOUR_HOST_IPV4" in readme
     assert "--name privacy-guard-custom-engine" in readme
-    assert "--config gateway.local.toml" in readme
+    assert "--config" not in readme
+    assert "brew services stop openshell" in readme
+    assert "brew services start openshell" in readme
+    assert "systemctl --user stop openshell-gateway" in readme
+    assert "systemctl --user start openshell-gateway" in readme
+    assert "openshell-gateway --config" not in readme
     assert 'sed "s/REPLACE_WITH_HOST_IP/' not in readme
     assert not (EXAMPLE_DIRECTORY / "gateway.toml").exists()
-    assert "openshell gateway select openshell" in readme
     assert "openshell gateway add" not in readme
     assert "OpenShell `v0.0.90`" in readme
     assert "transformed:false" in readme
