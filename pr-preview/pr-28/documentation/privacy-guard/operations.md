@@ -257,15 +257,37 @@ port must be between 1 and 65535.
 
 ## Shutdown and cleanup
 
-Stop Privacy Guard with `Ctrl-C`. Delete test sandboxes explicitly:
+Delete test sandboxes explicitly, then stop Privacy Guard with `Ctrl-C`:
 
 ```bash
 openshell sandbox delete SANDBOX_NAME
 ```
 
-The gateway continues to run in the background. Verify its connection:
+When the registration is no longer needed, stop the gateway before removing
+it. Replace `REGISTRATION_NAME` with the name passed to
+`add-gateway-registration`:
 
 ```bash
+# macOS with Homebrew
+brew services stop openshell
+
+# Linux with a Debian or RPM package
+systemctl --user stop openshell-gateway
+
+uv run privacy-guard remove-gateway-registration \
+  --name REGISTRATION_NAME
+```
+
+Restart the gateway with the command for your system, then verify its
+connection:
+
+```bash
+# macOS with Homebrew
+brew services start openshell
+
+# Linux with a Debian or RPM package
+systemctl --user start openshell-gateway
+
 openshell status
 ```
 

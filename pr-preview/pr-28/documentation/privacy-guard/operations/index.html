@@ -1755,11 +1755,30 @@ port must be between 1 and 65535.</p>
 </tbody>
 </table>
 <h2 id="shutdown-and-cleanup">Shutdown and cleanup<a class="headerlink" href="#shutdown-and-cleanup" title="Permanent link">&para;</a></h2>
-<p>Stop Privacy Guard with <code>Ctrl-C</code>. Delete test sandboxes explicitly:</p>
+<p>Delete test sandboxes explicitly, then stop Privacy Guard with <code>Ctrl-C</code>:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>openshell<span class="w"> </span>sandbox<span class="w"> </span>delete<span class="w"> </span>SANDBOX_NAME
 </span></code></pre></div>
-<p>The gateway continues to run in the background. Verify its connection:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>openshell<span class="w"> </span>status
+<p>When the registration is no longer needed, stop the gateway before removing
+it. Replace <code>REGISTRATION_NAME</code> with the name passed to
+<code>add-gateway-registration</code>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># macOS with Homebrew</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>brew<span class="w"> </span>services<span class="w"> </span>stop<span class="w"> </span>openshell
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="c1"># Linux with a Debian or RPM package</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>stop<span class="w"> </span>openshell-gateway
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>
+</span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>remove-gateway-registration<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a><span class="w">  </span>--name<span class="w"> </span>REGISTRATION_NAME
+</span></code></pre></div>
+<p>Restart the gateway with the command for your system, then verify its
+connection:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># macOS with Homebrew</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>brew<span class="w"> </span>services<span class="w"> </span>start<span class="w"> </span>openshell
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># Linux with a Debian or RPM package</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>start<span class="w"> </span>openshell-gateway
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>
+</span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>openshell<span class="w"> </span>status
 </span></code></pre></div>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
