@@ -18,8 +18,10 @@ from privacy_guard.errors import PrivacyGuardError
 from privacy_guard.gateway_config import (
     MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES,
     GatewayConfigError,
+    GatewayConfigRemoval,
     GatewayConfigUpdate,
     default_gateway_config_path,
+    remove_gateway_config,
     update_gateway_config,
     validate_middleware_name,
 )
@@ -30,8 +32,8 @@ from privacy_guard.timeout import validate_timeout_seconds
 app = typer.Typer(
     name="privacy-guard",
     help=(
-        "Run Privacy Guard, configure a local OpenShell gateway, and inspect "
-        "installed entity-processing engines."
+        "Run Privacy Guard, manage local OpenShell gateway registrations, and "
+        "inspect installed entity-processing engines."
     ),
     no_args_is_help=True,
     add_completion=False,
@@ -127,8 +129,8 @@ def serve(
         raise typer.Exit(code=1) from None
 
 
-@app.command("configure-gateway")
-def configure_gateway(
+@app.command("add-gateway-registration")
+def add_gateway_registration(
     host_ip: Annotated[
         str,
         typer.Option(
@@ -201,7 +203,10 @@ def configure_gateway(
             port=port,
         )
     except GatewayConfigError as error:
-        typer.echo(f"Could not configure the OpenShell gateway: {error}", err=True)
+        typer.echo(
+            f"Could not add or update the OpenShell gateway registration: {error}",
+            err=True,
+        )
         raise typer.Exit(code=1) from None
 
     action = {
@@ -216,6 +221,59 @@ def configure_gateway(
         "Next: start Privacy Guard, then restart the OpenShell gateway so it "
         "loads this registration."
     )
+
+
+@app.command("remove-gateway-registration")
+def remove_gateway_registration(
+    name: Annotated[
+        str,
+        typer.Option(
+            help=(
+                "Gateway registration name to remove. OpenShell allows "
+                f"1-{MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES} ASCII bytes."
+            ),
+        ),
+    ],
+    config: Annotated[
+        Path | None,
+        typer.Option(
+            help=(
+                "Gateway TOML to update. Defaults to "
+                "`$OPENSHELL_GATEWAY_CONFIG` when set, otherwise `gateway.toml` "
+                "under `$XDG_CONFIG_HOME/openshell`."
+            ),
+        ),
+    ] = None,
+) -> None:
+    """Remove a named registration from an OpenShell gateway TOML file."""
+    try:
+        validated_name = validate_middleware_name(name)
+    except GatewayConfigError as error:
+        raise typer.BadParameter(
+            str(error),
+            param_hint="--name",
+        ) from None
+
+    config_path = config or default_gateway_config_path()
+    try:
+        result = remove_gateway_config(
+            config_path,
+            middleware_name=validated_name,
+        )
+    except GatewayConfigError as error:
+        typer.echo(
+            f"Could not remove the OpenShell gateway registration: {error}",
+            err=True,
+        )
+        raise typer.Exit(code=1) from None
+
+    if result is GatewayConfigRemoval.REMOVED:
+        typer.echo(f"Removed {validated_name} from {config_path}")
+        typer.echo(
+            "Next: restart the OpenShell gateway so it unloads this registration."
+        )
+    else:
+        typer.echo(f"No registration named {validated_name} found in {config_path}")
 
 
 @app.command("configuration-schema")

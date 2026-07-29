@@ -98,20 +98,23 @@ UTF-8, and oversized catalogs are rejected.
 ```bash
 uv run privacy-guard engines
 uv run privacy-guard configuration-schema
-uv run privacy-guard configure-gateway --host-ip YOUR_HOST_IPV4
+uv run privacy-guard add-gateway-registration --host-ip YOUR_HOST_IPV4
+uv run privacy-guard remove-gateway-registration --name privacy-guard
 uv run privacy-guard serve \
   --listen 0.0.0.0:50051 \
   --timeout-seconds 4
 ```
 
-`configure-gateway` adds or updates a Privacy Guard registration in the
+`add-gateway-registration` adds or updates a Privacy Guard registration in the
 OpenShell gateway TOML. Its registration name must match the policy's
 `middleware` field. Restart the gateway after changing registrations.
+`remove-gateway-registration` removes one registration by name while preserving
+unrelated gateway settings.
 
 The processing timeout is one bound shared by every stage. It defaults to 1
-second and cannot exceed 30 seconds. `configure-gateway` writes a five-second
+second and cannot exceed 30 seconds. `add-gateway-registration` writes a five-second
 OpenShell middleware timeout, so use a shorter processing timeout or edit the
-registration to provide more headroom. Rerunning `configure-gateway` restores
+registration to provide more headroom. Rerunning `add-gateway-registration` restores
 the five-second value.
 
 Use a trusted registry factory for custom engines:

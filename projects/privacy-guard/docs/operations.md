@@ -91,7 +91,7 @@ Replace `YOUR_HOST_IPV4` with the address you selected. Then add or update the
 gateway registration:
 
 ```bash
-uv run privacy-guard configure-gateway \
+uv run privacy-guard add-gateway-registration \
   --host-ip YOUR_HOST_IPV4 \
   --name privacy-guard \
   --port 50051
@@ -106,11 +106,22 @@ The command writes to:
 Use `--config PATH` to write a different gateway TOML. Existing unrelated
 gateway settings are preserved.
 
-`configure-gateway` writes a five-second OpenShell middleware timeout. The
+Remove a registration by name when it is no longer needed:
+
+```bash
+uv run privacy-guard remove-gateway-registration \
+  --name privacy-guard
+```
+
+This command uses the same default config path and accepts `--config PATH`.
+It leaves unrelated registrations and gateway settings unchanged. Restart the
+gateway after a registration is removed.
+
+`add-gateway-registration` writes a five-second OpenShell middleware timeout. The
 four-second processing timeout above leaves one second for queueing,
 configuration validation, processor preparation, and transport overhead. If
 you select a longer processing timeout, edit the generated registration to add
-headroom. Rerunning `configure-gateway` restores the timeout to five seconds.
+headroom. Rerunning `add-gateway-registration` restores the timeout to five seconds.
 
 The registration name must match the policy's `middleware` field:
 
@@ -135,7 +146,8 @@ brew services start openshell
 systemctl --user start openshell-gateway
 ```
 
-The gateway reads the default configuration that `configure-gateway` updated.
+The gateway reads the default configuration that `add-gateway-registration`
+updated.
 
 ## Verify connectivity
 
@@ -245,15 +257,37 @@ port must be between 1 and 65535.
 
 ## Shutdown and cleanup
 
-Stop Privacy Guard with `Ctrl-C`. Delete test sandboxes explicitly:
+Delete test sandboxes explicitly, then stop Privacy Guard with `Ctrl-C`:
 
 ```bash
 openshell sandbox delete SANDBOX_NAME
 ```
 
-The gateway continues to run in the background. Verify its connection:
+When the registration is no longer needed, stop the gateway before removing
+it. Replace `REGISTRATION_NAME` with the name passed to
+`add-gateway-registration`:
 
 ```bash
+# macOS with Homebrew
+brew services stop openshell
+
+# Linux with a Debian or RPM package
+systemctl --user stop openshell-gateway
+
+uv run privacy-guard remove-gateway-registration \
+  --name REGISTRATION_NAME
+```
+
+Restart the gateway with the command for your system, then verify its
+connection:
+
+```bash
+# macOS with Homebrew
+brew services start openshell
+
+# Linux with a Debian or RPM package
+systemctl --user start openshell-gateway
+
 openshell status
 ```
 

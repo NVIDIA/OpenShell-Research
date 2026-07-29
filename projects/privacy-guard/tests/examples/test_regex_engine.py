@@ -101,7 +101,8 @@ def test_regex_walkthrough_uses_current_policy_and_gateway_schema() -> None:
     RegexPatternCatalog.model_validate(catalog)
     assert "uv sync --locked" not in readme
     assert "uv run --locked privacy-guard serve --listen 0.0.0.0:50051" in readme
-    assert "uv run privacy-guard configure-gateway" in readme
+    assert "uv run privacy-guard add-gateway-registration" in readme
+    assert "uv run privacy-guard remove-gateway-registration" in readme
     assert "--host-ip YOUR_HOST_IPV4" in readme
     assert "--name privacy-guard-regex" in readme
     assert "--config" not in readme

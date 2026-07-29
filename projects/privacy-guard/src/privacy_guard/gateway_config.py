@@ -1,7 +1,8 @@
-"""OpenShell gateway configuration updates for the command-line application."""
+"""OpenShell gateway registration management for the command-line application."""
 
 from __future__ import annotations
 
+import copy
 import os
 import re
 import stat
@@ -20,8 +21,15 @@ class GatewayConfigUpdate(Enum):
     UNCHANGED = "unchanged"
 
 
+class GatewayConfigRemoval(Enum):
+    """Result of removing one Privacy Guard middleware registration."""
+
+    REMOVED = "removed"
+    UNCHANGED = "unchanged"
+
+
 class GatewayConfigError(ValueError):
-    """A safe, actionable gateway configuration update error."""
+    """A safe, actionable gateway registration management error."""
 
 
 # Mirrors OpenShell's stable-identifier byte limit for external middleware
@@ -115,6 +123,74 @@ def update_gateway_config(
         return GatewayConfigUpdate.UNCHANGED
     _write_atomically(path, updated)
     return result
+
+
+def remove_gateway_config(
+    path: Path,
+    *,
+    middleware_name: str,
+) -> GatewayConfigRemoval:
+    """Remove one named Privacy Guard middleware registration."""
+    validate_middleware_name(middleware_name)
+    try:
+        original = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return GatewayConfigRemoval.UNCHANGED
+    except (OSError, UnicodeError) as error:
+        raise GatewayConfigError(
+            f"Could not read {path}. Check that the file is readable UTF-8 TOML."
+        ) from error
+
+    if not original.strip():
+        return GatewayConfigRemoval.UNCHANGED
+
+    values = _load_gateway_config(original, path)
+    middleware = _middleware_entries(values, path)
+    matching_indexes = [
+        index
+        for index, entry in enumerate(middleware)
+        if entry.get("name") == middleware_name
+    ]
+    if len(matching_indexes) > 1:
+        raise GatewayConfigError(
+            f"{path} contains multiple middleware registrations named "
+            f"{middleware_name!r}. Remove the duplicate entries, then retry."
+        )
+    if not matching_indexes:
+        return GatewayConfigRemoval.UNCHANGED
+
+    blocks = list(_MIDDLEWARE_BLOCK_PATTERN.finditer(original))
+    if len(blocks) != len(middleware):
+        raise GatewayConfigError(
+            f"Could not safely locate every middleware registration in {path}. "
+            "Format the file as standard TOML tables, then retry."
+        )
+
+    matching_index = matching_indexes[0]
+    block = blocks[matching_index]
+    updated = (
+        original[: block.start()]
+        + _trailing_middleware_block_layout(block.group(0))
+        + original[block.end() :]
+    )
+    unsafe_removal_message = (
+        f"Could not safely remove the middleware registration from {path}. "
+        "Format it as a standard TOML array table without child tables, then retry."
+    )
+    try:
+        updated_values = _load_gateway_config(updated, path)
+        updated_middleware = _middleware_entries(updated_values, path)
+    except GatewayConfigError as error:
+        raise GatewayConfigError(unsafe_removal_message) from error
+    expected_middleware = [
+        entry for index, entry in enumerate(middleware) if index != matching_index
+    ]
+    if updated_middleware != expected_middleware or _without_middleware_entries(
+        updated_values
+    ) != _without_middleware_entries(values):
+        raise GatewayConfigError(unsafe_removal_message)
+    _write_atomically(path, updated)
+    return GatewayConfigRemoval.REMOVED
 
 
 def validate_middleware_name(name: str) -> str:
@@ -253,6 +329,29 @@ def _replace_or_append_assignment(block: str, *, key: str, value: str) -> str:
     return block.rstrip() + f"\n{key} = {value}\n"
 
 
+def _trailing_middleware_block_layout(block: str) -> str:
+    lines = block.splitlines(keepends=True)
+    for index in range(len(lines) - 1, -1, -1):
+        stripped = lines[index].lstrip()
+        if stripped.strip() and not stripped.startswith("#"):
+            return "".join(lines[index + 1 :])
+    raise AssertionError("middleware block header is unavailable")
+
+
+def _without_middleware_entries(values: dict[str, object]) -> dict[str, object]:
+    copied_values = copy.deepcopy(values)
+    openshell = copied_values["openshell"]
+    if not isinstance(openshell, dict):
+        raise AssertionError("validated OpenShell table is unavailable")
+    supervisor = openshell.get("supervisor")
+    if not isinstance(supervisor, dict):
+        return copied_values
+    supervisor.pop("middleware", None)
+    if not supervisor:
+        openshell.pop("supervisor", None)
+    return copied_values
+
+
 def _write_atomically(path: Path, contents: str) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -286,9 +385,11 @@ _MIDDLEWARE_NAME_CHARACTERS = frozenset(
 
 __all__ = [
     "GatewayConfigError",
+    "GatewayConfigRemoval",
     "GatewayConfigUpdate",
     "MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES",
     "default_gateway_config_path",
+    "remove_gateway_config",
     "update_gateway_config",
     "validate_middleware_name",
 ]

@@ -33,7 +33,8 @@ def test_cli_help_exposes_server_and_discovery_commands() -> None:
     output = _plain_output(result)
     assert "serve" in output
     assert "configuration-schema" in output
-    assert "configure-gateway" in output
+    assert "add-gateway-registration" in output
+    assert "remove-gateway-registration" in output
     assert "engines" in output
     assert "--debug" in output
     assert "--debug-log-content" in output
@@ -43,10 +44,10 @@ def test_cli_help_exposes_server_and_discovery_commands() -> None:
     assert "--scanner-name" not in output
 
 
-def test_cli_configure_gateway_help_requires_an_explicit_host_ip() -> None:
+def test_cli_add_gateway_registration_help_requires_an_explicit_host_ip() -> None:
     result = CliRunner().invoke(
         app,
-        ["configure-gateway", "--help"],
+        ["add-gateway-registration", "--help"],
         terminal_width=240,
     )
 
@@ -61,7 +62,7 @@ def test_cli_configure_gateway_help_requires_an_explicit_host_ip() -> None:
     assert "restart the OpenShell gateway" not in output
 
 
-def test_cli_configure_gateway_updates_the_default_xdg_config(
+def test_cli_add_gateway_registration_updates_the_default_xdg_config(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -69,7 +70,7 @@ def test_cli_configure_gateway_updates_the_default_xdg_config(
 
     result = CliRunner().invoke(
         app,
-        ["configure-gateway", "--host-ip", "192.168.1.20"],
+        ["add-gateway-registration", "--host-ip", "192.168.1.20"],
     )
 
     assert result.exit_code == 0
@@ -82,10 +83,10 @@ def test_cli_configure_gateway_updates_the_default_xdg_config(
 
 
 @pytest.mark.parametrize("host_ip", ["host.openshell.internal", "127.0.0.1", "0.0.0.0"])
-def test_cli_configure_gateway_rejects_unusable_host_ip(host_ip: str) -> None:
+def test_cli_add_gateway_registration_rejects_unusable_host_ip(host_ip: str) -> None:
     result = CliRunner().invoke(
         app,
-        ["configure-gateway", "--host-ip", host_ip],
+        ["add-gateway-registration", "--host-ip", host_ip],
         terminal_width=240,
     )
 
@@ -103,13 +104,13 @@ def test_cli_configure_gateway_rejects_unusable_host_ip(host_ip: str) -> None:
         "openshell/privacy-guard",
     ],
 )
-def test_cli_configure_gateway_rejects_invalid_registration_name(
+def test_cli_add_gateway_registration_rejects_invalid_registration_name(
     name: str,
 ) -> None:
     result = CliRunner().invoke(
         app,
         [
-            "configure-gateway",
+            "add-gateway-registration",
             "--host-ip",
             "192.168.1.20",
             "--name",
@@ -122,7 +123,7 @@ def test_cli_configure_gateway_rejects_invalid_registration_name(
     assert "--name" in _normalized_output(result)
 
 
-def test_cli_configure_gateway_reports_invalid_existing_config(
+def test_cli_add_gateway_registration_reports_invalid_existing_config(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "gateway.toml"
@@ -131,7 +132,7 @@ def test_cli_configure_gateway_reports_invalid_existing_config(
     result = CliRunner().invoke(
         app,
         [
-            "configure-gateway",
+            "add-gateway-registration",
             "--host-ip",
             "192.168.1.20",
             "--config",
@@ -141,9 +142,76 @@ def test_cli_configure_gateway_reports_invalid_existing_config(
 
     assert result.exit_code == 1
     output = _plain_output(result)
-    assert "Could not configure the OpenShell gateway" in output
+    assert "Could not add or update the OpenShell gateway registration" in output
     assert "not valid TOML" in output
     assert path.read_text() == "not valid TOML"
+
+
+def test_cli_remove_gateway_registration_removes_the_named_registration(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "gateway.toml"
+    path.write_text(
+        "[openshell]\n"
+        "version = 1\n\n"
+        "[[openshell.supervisor.middleware]]\n"
+        'name = "privacy-guard-regex"\n'
+        'grpc_endpoint = "http://192.168.1.20:50051"\n'
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "remove-gateway-registration",
+            "--name",
+            "privacy-guard-regex",
+            "--config",
+            str(path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    output = _plain_output(result)
+    assert f"Removed privacy-guard-regex from {path}" in output
+    assert "restart the OpenShell gateway" in output
+    assert "privacy-guard-regex" not in path.read_text()
+
+
+def test_cli_remove_gateway_registration_requires_a_name() -> None:
+    result = CliRunner().invoke(
+        app,
+        ["remove-gateway-registration"],
+        terminal_width=240,
+    )
+
+    assert result.exit_code == 2
+    output = _normalized_output(result)
+    assert "--name" in output
+    assert "missing option" in output.lower()
+
+
+def test_cli_remove_gateway_registration_reports_absent_name(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "gateway.toml"
+    path.write_text("[openshell]\nversion = 1\n")
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "remove-gateway-registration",
+            "--name",
+            "privacy-guard-regex",
+            "--config",
+            str(path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert (
+        f"No registration named privacy-guard-regex found in {path}"
+        in _plain_output(result)
+    )
 
 
 def test_console_script_targets_the_cli_module() -> None:

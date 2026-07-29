@@ -119,7 +119,7 @@ the address you selected, then update the default gateway configuration:
 
 ```bash
 cd projects/privacy-guard/examples/custom-engine
-uv run privacy-guard configure-gateway \
+uv run privacy-guard add-gateway-registration \
   --host-ip YOUR_HOST_IPV4 \
   --name privacy-guard-custom-engine
 ```
@@ -193,10 +193,30 @@ Exit Claude and delete the sandbox:
 openshell sandbox delete privacy-guard-custom-engine
 ```
 
-Stop Privacy Guard with `Ctrl-C`. The gateway continues to run in the
-background. Verify its connection:
+Stop Privacy Guard with `Ctrl-C`, then stop the gateway before removing the
+example registration:
 
 ```bash
+# macOS with Homebrew
+brew services stop openshell
+
+# Linux with a Debian or RPM package
+systemctl --user stop openshell-gateway
+
+uv run privacy-guard remove-gateway-registration \
+  --name privacy-guard-custom-engine
+```
+
+Restart the gateway with the command for your system, then verify its
+connection:
+
+```bash
+# macOS with Homebrew
+brew services start openshell
+
+# Linux with a Debian or RPM package
+systemctl --user start openshell-gateway
+
 openshell status
 ```
 
