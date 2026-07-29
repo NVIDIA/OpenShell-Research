@@ -99,14 +99,19 @@ def test_regex_walkthrough_uses_current_policy_and_gateway_schema() -> None:
     assert stage_config["engine"] == "regex"
     assert stage_config["pattern_catalog"] == "patterns.yaml"
     RegexPatternCatalog.model_validate(catalog)
-    assert "uv run privacy-guard serve --listen 0.0.0.0:50051" in readme
+    assert "uv sync --locked" not in readme
+    assert "uv run --locked privacy-guard serve --listen 0.0.0.0:50051" in readme
     assert "uv run privacy-guard configure-gateway" in readme
-    assert '--host-ip "$YOUR_HOST_IP"' in readme
+    assert "--host-ip YOUR_HOST_IPV4" in readme
     assert "--name privacy-guard-regex" in readme
-    assert "--config gateway.local.toml" in readme
+    assert "--config" not in readme
+    assert "brew services stop openshell" in readme
+    assert "brew services start openshell" in readme
+    assert "systemctl --user stop openshell-gateway" in readme
+    assert "systemctl --user start openshell-gateway" in readme
+    assert "openshell-gateway --config" not in readme
     assert 'sed "s/REPLACE_WITH_HOST_IP/' not in readme
     assert not (EXAMPLE_DIRECTORY / "gateway.toml").exists()
-    assert "openshell gateway select openshell" in readme
     assert "openshell gateway add" not in readme
     assert "OpenShell `v0.0.90`" in readme
     assert "transformed:true" in readme
