@@ -1075,10 +1075,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-prepare-the-example" class="md-nav__link">
+  <a href="#1-stop-the-local-gateway" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        1. Prepare the example
+        1. Stop the local gateway
       </span>
     </span>
   </a>
@@ -1097,10 +1097,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#3-register-privacy-guard-with-the-gateway" class="md-nav__link">
+  <a href="#3-configure-and-start-the-gateway" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        3. Register Privacy Guard with the gateway
+        3. Configure and start the gateway
       </span>
     </span>
   </a>
@@ -1377,112 +1377,80 @@ registers for the pre-credentials request phase so replacement happens before
 the provider receives the request.</p>
 <h2 id="quickstart">Quickstart<a class="headerlink" href="#quickstart" title="Permanent link">&para;</a></h2>
 <p>This quickstart uses the built-in <code>RegexEngine</code> example to replace an email
-address and customer ID. It requires:</p>
+address and customer ID. Before you start, install:</p>
 <ul>
 <li>Python 3.11 or newer</li>
 <li><code>uv</code> 0.11 or newer</li>
-<li>OpenShell and <code>openshell-gateway</code> <code>v0.0.90</code>, the version recorded in the
-  <a href="https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/privacy-guard/.openshell-middleware-manifest.json">middleware manifest</a></li>
-<li>a Docker or Podman backend supported by OpenShell</li>
-<li>Claude Code subscription access for the final provider request; the OpenShell
-  base sandbox supplies the Claude Code binary</li>
+<li><a href="https://github.com/NVIDIA/OpenShell">OpenShell</a> <code>v0.0.90</code> or a later
+  compatible version</li>
 </ul>
-<p>Confirm the installed command versions:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>--version
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>openshell<span class="w"> </span>--version
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>openshell-gateway<span class="w"> </span>--version
+<p>Privacy Guard is tested with the version recorded in the
+<a href="https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/privacy-guard/.openshell-middleware-manifest.json">middleware manifest</a>.
+A later version must support the same supervisor middleware contract.</p>
+<p>Run the following commands from a checkout of OpenShell Research.</p>
+<h3 id="1-stop-the-local-gateway">1. Stop the local gateway<a class="headerlink" href="#1-stop-the-local-gateway" title="Permanent link">&para;</a></h3>
+<p>First, check the local gateway:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>openshell<span class="w"> </span>status
 </span></code></pre></div>
-<p>Run the commands from a checkout of OpenShell Research.</p>
-<h3 id="1-prepare-the-example">1. Prepare the example<a class="headerlink" href="#1-prepare-the-example" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>projects/privacy-guard/examples/regex-engine
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>uv<span class="w"> </span>sync<span class="w"> </span>--locked
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>engines
+<p>If the gateway is running, stop it before you change its configuration. Use the
+command for your system:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># macOS with Homebrew</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>brew<span class="w"> </span>services<span class="w"> </span>stop<span class="w"> </span>openshell
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Linux with a Debian or RPM package</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>stop<span class="w"> </span>openshell-gateway
 </span></code></pre></div>
-<p>The engine list should contain:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>regex    detect,replace
-</span></code></pre></div>
-<p>The example files are:</p>
-<table>
-<thead>
-<tr>
-<th>File</th>
-<th>Purpose</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>patterns.yaml</code></td>
-<td>Email and customer-ID rules</td>
-</tr>
-<tr>
-<td><code>privacy-guard-config.yaml</code></td>
-<td>Standalone Privacy Guard policy configuration</td>
-</tr>
-<tr>
-<td><code>policy.yaml</code></td>
-<td>Complete OpenShell sandbox policy with the same configuration</td>
-</tr>
-</tbody>
-</table>
 <h3 id="2-start-privacy-guard">2. Start Privacy Guard<a class="headerlink" href="#2-start-privacy-guard" title="Permanent link">&para;</a></h3>
-<p>From the example directory:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>serve<span class="w"> </span>--listen<span class="w"> </span><span class="m">0</span>.0.0.0:50051
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">cd</span><span class="w"> </span>projects/privacy-guard/examples/regex-engine
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>uv<span class="w"> </span>run<span class="w"> </span>--locked<span class="w"> </span>privacy-guard<span class="w"> </span>serve<span class="w"> </span>--listen<span class="w"> </span><span class="m">0</span>.0.0.0:50051
 </span></code></pre></div>
 <p>Keep the process running. The development server uses plaintext gRPC and
 receives request bodies. Restrict port 50051 to the host and trusted sandbox
 network.</p>
-<h3 id="3-register-privacy-guard-with-the-gateway">3. Register Privacy Guard with the gateway<a class="headerlink" href="#3-register-privacy-guard-with-the-gateway" title="Permanent link">&para;</a></h3>
+<h3 id="3-configure-and-start-the-gateway">3. Configure and start the gateway<a class="headerlink" href="#3-configure-and-start-the-gateway" title="Permanent link">&para;</a></h3>
 <p>Choose a non-loopback host IPv4 address that both the gateway and sandbox
-supervisor can reach:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># macOS</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>ipconfig<span class="w"> </span>getifaddr<span class="w"> </span>en0
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Linux</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>hostname<span class="w"> </span>-I
-</span></code></pre></div>
-<p>Create a local gateway configuration:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PRIVACY_GUARD_HOST_IP</span><span class="o">=</span>YOUR_HOST_IPV4
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>add-gateway-registration<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>--host-ip<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PRIVACY_GUARD_HOST_IP</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>--name<span class="w"> </span>privacy-guard-regex<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span>--config<span class="w"> </span>gateway.local.toml
+supervisor can reach.</p>
+<p>Open another terminal and return to the example directory. Replace
+<code>YOUR_HOST_IPV4</code> with the address you selected. Then update the default gateway
+configuration:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">cd</span><span class="w"> </span>projects/privacy-guard/examples/regex-engine
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>add-gateway-registration<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--host-ip<span class="w"> </span>YOUR_HOST_IPV4<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--name<span class="w"> </span>privacy-guard-regex
 </span></code></pre></div>
 <p>Do not use <code>127.0.0.1</code>: loopback inside the sandbox supervisor does not refer to
 the host.</p>
-<p>Restart the local gateway with <code>gateway.local.toml</code>. For a Homebrew
-installation:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>brew<span class="w"> </span>services<span class="w"> </span>stop<span class="w"> </span>openshell
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">OPENSHELL_LOCAL_TLS_DIR</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$HOME</span><span class="s2">/.local/state/openshell/homebrew/tls&quot;</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>openshell-gateway<span class="w"> </span>--config<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/gateway.local.toml&quot;</span>
+<p>The command above updates the default OpenShell gateway configuration. Next,
+use the command for your system to start the gateway in the background:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># macOS with Homebrew</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>brew<span class="w"> </span>services<span class="w"> </span>start<span class="w"> </span>openshell
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Linux with a Debian or RPM package</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>start<span class="w"> </span>openshell-gateway
 </span></code></pre></div>
-<p>For a Debian or RPM installation:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>stop<span class="w"> </span>openshell-gateway
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">OPENSHELL_LOCAL_TLS_DIR</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$HOME</span><span class="s2">/.local/state/openshell/tls&quot;</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>openshell-gateway<span class="w"> </span>--config<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/gateway.local.toml&quot;</span>
-</span></code></pre></div>
-<p>Keep the foreground gateway running.</p>
 <h3 id="4-create-a-sandbox">4. Create a sandbox<a class="headerlink" href="#4-create-a-sandbox" title="Permanent link">&para;</a></h3>
-<p>In another terminal, return to the example directory and verify the gateway:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>openshell<span class="w"> </span>gateway<span class="w"> </span><span class="k">select</span><span class="w"> </span>openshell
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>openshell<span class="w"> </span>status
+<p>Open another terminal, return to the example directory, and check the gateway:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nb">cd</span><span class="w"> </span>projects/privacy-guard/examples/regex-engine
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>openshell<span class="w"> </span>status
 </span></code></pre></div>
+<p>This walkthrough starts Claude Code in the sandbox. To use a different harness,
+replace everything after <code>--</code> with its command.</p>
 <p>Create the example sandbox:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>openshell<span class="w"> </span>sandbox<span class="w"> </span>create<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span>--name<span class="w"> </span>privacy-guard-regex<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span>--from<span class="w"> </span>base<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span>--no-auto-providers<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span>--policy<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/policy.yaml&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span>--<span class="w"> </span>env<span class="w"> </span><span class="nv">CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>claude
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>openshell<span class="w"> </span>sandbox<span class="w"> </span>create<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>--name<span class="w"> </span>privacy-guard-regex<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>--from<span class="w"> </span>base<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>--no-auto-providers<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span>--policy<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/policy.yaml&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span>--<span class="w"> </span>env<span class="w"> </span><span class="nv">CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>claude
 </span></code></pre></div>
 <p>After authenticating Claude Code, submit:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>Draft a short greeting for user@example.com about customer CUST-12345678.
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Draft a short greeting for user@example.com about customer CUST-12345678.
 </span></code></pre></div>
 <p>The provider-bound body should contain <code>[email]</code> and <code>[customer-id]</code> instead of
 the original values.</p>
 <h3 id="5-verify-the-result">5. Verify the result<a class="headerlink" href="#5-verify-the-result" title="Permanent link">&para;</a></h3>
 <p>From a host terminal:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>openshell<span class="w"> </span>logs<span class="w"> </span>privacy-guard-regex<span class="w"> </span>-n<span class="w"> </span><span class="m">100</span><span class="w"> </span>--source<span class="w"> </span>sandbox
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>openshell<span class="w"> </span>logs<span class="w"> </span>privacy-guard-regex<span class="w"> </span>-n<span class="w"> </span><span class="m">100</span><span class="w"> </span>--source<span class="w"> </span>sandbox
 </span></code></pre></div>
 <p>Find the provider request and confirm:</p>
 <ul>

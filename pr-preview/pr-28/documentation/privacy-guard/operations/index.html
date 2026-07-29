@@ -731,41 +731,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#run-a-local-foreground-gateway" class="md-nav__link">
+  <a href="#start-the-local-gateway" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Run a local foreground gateway
+        Start the local gateway
       </span>
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Run a local foreground gateway">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#macos-with-homebrew" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        macOS with Homebrew
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#linux-with-a-debian-or-rpm-package" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Linux with a Debian or RPM package
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1316,41 +1288,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#run-a-local-foreground-gateway" class="md-nav__link">
+  <a href="#start-the-local-gateway" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Run a local foreground gateway
+        Start the local gateway
       </span>
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Run a local foreground gateway">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#macos-with-homebrew" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        macOS with Homebrew
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#linux-with-a-debian-or-rpm-package" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Linux with a Debian or RPM package
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1632,21 +1576,25 @@ processor preparation.</p>
 <p>The development server uses plaintext gRPC and receives request bodies.
 Restrict its listen port to trusted host and sandbox networks.</p>
 <h2 id="register-the-service-with-openshell">Register the service with OpenShell<a class="headerlink" href="#register-the-service-with-openshell" title="Permanent link">&para;</a></h2>
-<p>Choose a non-loopback IPv4 address reachable by both the local gateway and
-sandbox supervisors:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># macOS</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>ipconfig<span class="w"> </span>getifaddr<span class="w"> </span>en0
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Linux</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>hostname<span class="w"> </span>-I
+<p>First, check the local gateway:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>openshell<span class="w"> </span>status
 </span></code></pre></div>
-<p>Add or update a gateway registration:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PRIVACY_GUARD_HOST_IP</span><span class="o">=</span>YOUR_HOST_IPV4
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>add-gateway-registration<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>--host-ip<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PRIVACY_GUARD_HOST_IP</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>--name<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span>--port<span class="w"> </span><span class="m">50051</span>
+<p>If the gateway is running, stop it before you change its configuration. Use the
+command for your system:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># macOS with Homebrew</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>brew<span class="w"> </span>services<span class="w"> </span>stop<span class="w"> </span>openshell
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># Linux with a Debian or RPM package</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>stop<span class="w"> </span>openshell-gateway
+</span></code></pre></div>
+<p>Choose a non-loopback IPv4 address reachable by both the local gateway and
+sandbox supervisors.</p>
+<p>Replace <code>YOUR_HOST_IPV4</code> with the address you selected. Then add or update the
+gateway registration:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>add-gateway-registration<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>--host-ip<span class="w"> </span>YOUR_HOST_IPV4<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>--name<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>--port<span class="w"> </span><span class="m">50051</span>
 </span></code></pre></div>
 <p>The command writes to:</p>
 <ol>
@@ -1657,8 +1605,8 @@ sandbox supervisors:</p>
 <p>Use <code>--config PATH</code> to write a different gateway TOML. Existing unrelated
 gateway settings are preserved.</p>
 <p>Remove a registration by name when it is no longer needed:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>remove-gateway-registration<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>--name<span class="w"> </span>privacy-guard
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>remove-gateway-registration<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span>--name<span class="w"> </span>privacy-guard
 </span></code></pre></div>
 <p>This command uses the same default config path and accepts <code>--config PATH</code>.
 It leaves unrelated registrations and gateway settings unchanged. Restart the
@@ -1669,42 +1617,31 @@ configuration validation, processor preparation, and transport overhead. If
 you select a longer processing timeout, edit the generated registration to add
 headroom. Rerunning <code>add-gateway-registration</code> restores the timeout to five seconds.</p>
 <p>The registration name must match the policy's <code>middleware</code> field:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">network_middlewares</span><span class="p">:</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">privacy_guard_replace</span><span class="p">:</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="nt">middleware</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">privacy-guard</span>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">network_middlewares</span><span class="p">:</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">privacy_guard_replace</span><span class="p">:</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="nt">middleware</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">privacy-guard</span>
 </span></code></pre></div>
 <p>OpenShell does not dynamically reload middleware registrations. Restart the
 gateway after changing its configuration.</p>
-<h2 id="run-a-local-foreground-gateway">Run a local foreground gateway<a class="headerlink" href="#run-a-local-foreground-gateway" title="Permanent link">&para;</a></h2>
-<p>Stop the package-managed service before starting another gateway on the same
-port.</p>
-<h3 id="macos-with-homebrew">macOS with Homebrew<a class="headerlink" href="#macos-with-homebrew" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>brew<span class="w"> </span>services<span class="w"> </span>stop<span class="w"> </span>openshell
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">OPENSHELL_LOCAL_TLS_DIR</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$HOME</span><span class="s2">/.local/state/openshell/homebrew/tls&quot;</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>openshell-gateway<span class="w"> </span>--config<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$HOME</span><span class="s2">/.config/openshell/gateway.toml&quot;</span>
+<h2 id="start-the-local-gateway">Start the local gateway<a class="headerlink" href="#start-the-local-gateway" title="Permanent link">&para;</a></h2>
+<p>Use the command for your system to start the gateway in the background:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># macOS with Homebrew</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>brew<span class="w"> </span>services<span class="w"> </span>start<span class="w"> </span>openshell
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># Linux with a Debian or RPM package</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>start<span class="w"> </span>openshell-gateway
 </span></code></pre></div>
-<p>Restore it after testing:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>brew<span class="w"> </span>services<span class="w"> </span>start<span class="w"> </span>openshell
-</span></code></pre></div>
-<h3 id="linux-with-a-debian-or-rpm-package">Linux with a Debian or RPM package<a class="headerlink" href="#linux-with-a-debian-or-rpm-package" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>stop<span class="w"> </span>openshell-gateway
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">OPENSHELL_LOCAL_TLS_DIR</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$HOME</span><span class="s2">/.local/state/openshell/tls&quot;</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>openshell-gateway<span class="w"> </span>--config<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$HOME</span><span class="s2">/.config/openshell/gateway.toml&quot;</span>
-</span></code></pre></div>
-<p>Restore it after testing:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>start<span class="w"> </span>openshell-gateway
-</span></code></pre></div>
-<p>For a custom gateway path, replace the <code>--config</code> argument accordingly.</p>
+<p>The gateway reads the default configuration that <code>add-gateway-registration</code>
+updated.</p>
 <h2 id="verify-connectivity">Verify connectivity<a class="headerlink" href="#verify-connectivity" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>openshell<span class="w"> </span>gateway<span class="w"> </span><span class="k">select</span><span class="w"> </span>openshell
-</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>openshell<span class="w"> </span>status
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>openshell<span class="w"> </span>status
 </span></code></pre></div>
 <p>Do not create a sandbox until the selected gateway reports as connected.
 Sandbox creation validates each referenced external middleware and its policy
 configuration.</p>
 <h2 id="inspect-request-results">Inspect request results<a class="headerlink" href="#inspect-request-results" title="Permanent link">&para;</a></h2>
 <p>Use a finite log window:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>openshell<span class="w"> </span>logs<span class="w"> </span>SANDBOX_NAME<span class="w"> </span>-n<span class="w"> </span><span class="m">100</span><span class="w"> </span>--source<span class="w"> </span>sandbox
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>openshell<span class="w"> </span>logs<span class="w"> </span>SANDBOX_NAME<span class="w"> </span>-n<span class="w"> </span><span class="m">100</span><span class="w"> </span>--source<span class="w"> </span>sandbox
 </span></code></pre></div>
 <p>For a provider request, inspect:</p>
 <table>
@@ -1741,40 +1678,40 @@ identifiers that are not derived from request text.</p>
 finding count, and stable error codes. They exclude request bodies, replacement
 text, matches, offsets, regex patterns, headers, targets, and credentials.</p>
 <p>Enable content-safe diagnostic logging:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>--debug<span class="w"> </span>serve
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>--debug<span class="w"> </span>serve
 </span></code></pre></div>
 <p><code>--debug-log-content</code> logs complete input and processed text. Use it only in a
 controlled development environment:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>--debug<span class="w"> </span>--debug-log-content<span class="w"> </span>serve
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>--debug<span class="w"> </span>--debug-log-content<span class="w"> </span>serve
 </span></code></pre></div>
 <p>When imported as a library, Privacy Guard uses the standard <code>privacy_guard</code>
 logger and does not modify application logging unless requested.</p>
 <h2 id="use-a-custom-registry">Use a custom registry<a class="headerlink" href="#use-a-custom-registry" title="Permanent link">&para;</a></h2>
 <p>Pass a trusted <code>module:function</code> factory to every CLI command:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span>engines
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>
-</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="w">  </span>serve<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="w">  </span>--listen<span class="w"> </span><span class="m">0</span>.0.0.0:50051
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span>engines
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">  </span>serve<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">  </span>--listen<span class="w"> </span><span class="m">0</span>.0.0.0:50051
 </span></code></pre></div>
 <p>The function is imported and executed in the Privacy Guard process. It must
 return a finalized <code>EngineRegistry</code>. See
 <a href="../engines/custom/">Add a custom engine</a>.</p>
 <h2 id="run-the-server-from-python">Run the server from Python<a class="headerlink" href="#run-the-server-from-python" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.engines.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_builtin_registry</span>
-</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.service</span><span class="w"> </span><span class="kn">import</span> <span class="n">PrivacyGuardServer</span>
-</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
-</span><span id="__span-17-4"><a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="n">server</span> <span class="o">=</span> <span class="n">PrivacyGuardServer</span><span class="p">(</span>
-</span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>    <span class="n">create_builtin_registry</span><span class="p">(),</span>
-</span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>    <span class="n">timeout_seconds</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
-</span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="p">)</span>
-</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="n">server</span><span class="o">.</span><span class="n">serve_sync</span><span class="p">(</span><span class="s2">&quot;127.0.0.1:50051&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.engines.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_builtin_registry</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.service</span><span class="w"> </span><span class="kn">import</span> <span class="n">PrivacyGuardServer</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="n">server</span> <span class="o">=</span> <span class="n">PrivacyGuardServer</span><span class="p">(</span>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>    <span class="n">create_builtin_registry</span><span class="p">(),</span>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>    <span class="n">timeout_seconds</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="p">)</span>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="n">server</span><span class="o">.</span><span class="n">serve_sync</span><span class="p">(</span><span class="s2">&quot;127.0.0.1:50051&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Async applications use:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="k">await</span> <span class="n">server</span><span class="o">.</span><span class="n">serve_async</span><span class="p">(</span><span class="s2">&quot;127.0.0.1:50051&quot;</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="k">await</span> <span class="n">server</span><span class="o">.</span><span class="n">serve_async</span><span class="p">(</span><span class="s2">&quot;127.0.0.1:50051&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Listen addresses use <code>host:port</code> or bracketed IPv6 <code>[address]:port</code> form. The
 port must be between 1 and 65535.</p>
@@ -1790,14 +1727,6 @@ port must be between 1 and 65535.</p>
 <tr>
 <td>Sandbox creation reports unavailable middleware</td>
 <td>Confirm Privacy Guard is running, the registration name matches the policy, the host IP is reachable from the sandbox network, and the port is allowed</td>
-</tr>
-<tr>
-<td>Gateway port is already in use</td>
-<td>Stop the package-managed gateway before starting a foreground instance</td>
-</tr>
-<tr>
-<td>Foreground gateway cannot find certificates</td>
-<td>Set <code>OPENSHELL_LOCAL_TLS_DIR</code> to the package-specific path shown above</td>
 </tr>
 <tr>
 <td>Policy config is rejected</td>
@@ -1826,13 +1755,11 @@ port must be between 1 and 65535.</p>
 </tbody>
 </table>
 <h2 id="shutdown-and-cleanup">Shutdown and cleanup<a class="headerlink" href="#shutdown-and-cleanup" title="Permanent link">&para;</a></h2>
-<p>Stop foreground Privacy Guard and gateway processes with <code>Ctrl-C</code>. Delete test
-sandboxes explicitly:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>openshell<span class="w"> </span>sandbox<span class="w"> </span>delete<span class="w"> </span>SANDBOX_NAME
+<p>Stop Privacy Guard with <code>Ctrl-C</code>. Delete test sandboxes explicitly:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>openshell<span class="w"> </span>sandbox<span class="w"> </span>delete<span class="w"> </span>SANDBOX_NAME
 </span></code></pre></div>
-<p>Restore the package-managed gateway and verify connectivity:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>openshell<span class="w"> </span>gateway<span class="w"> </span><span class="k">select</span><span class="w"> </span>openshell
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>openshell<span class="w"> </span>status
+<p>The gateway continues to run in the background. Verify its connection:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>openshell<span class="w"> </span>status
 </span></code></pre></div>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>

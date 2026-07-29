@@ -67,24 +67,32 @@ Restrict its listen port to trusted host and sandbox networks.
 
 ## Register the service with OpenShell
 
-Choose a non-loopback IPv4 address reachable by both the local gateway and
-sandbox supervisors:
+First, check the local gateway:
 
 ```bash
-# macOS
-ipconfig getifaddr en0
-
-# Linux
-hostname -I
+openshell status
 ```
 
-Add or update a gateway registration:
+If the gateway is running, stop it before you change its configuration. Use the
+command for your system:
 
 ```bash
-export PRIVACY_GUARD_HOST_IP=YOUR_HOST_IPV4
+# macOS with Homebrew
+brew services stop openshell
 
+# Linux with a Debian or RPM package
+systemctl --user stop openshell-gateway
+```
+
+Choose a non-loopback IPv4 address reachable by both the local gateway and
+sandbox supervisors.
+
+Replace `YOUR_HOST_IPV4` with the address you selected. Then add or update the
+gateway registration:
+
+```bash
 uv run privacy-guard add-gateway-registration \
-  --host-ip "$PRIVACY_GUARD_HOST_IP" \
+  --host-ip YOUR_HOST_IPV4 \
   --name privacy-guard \
   --port 50051
 ```
@@ -126,45 +134,24 @@ network_middlewares:
 OpenShell does not dynamically reload middleware registrations. Restart the
 gateway after changing its configuration.
 
-## Run a local foreground gateway
+## Start the local gateway
 
-Stop the package-managed service before starting another gateway on the same
-port.
-
-### macOS with Homebrew
+Use the command for your system to start the gateway in the background:
 
 ```bash
-brew services stop openshell
-export OPENSHELL_LOCAL_TLS_DIR="$HOME/.local/state/openshell/homebrew/tls"
-openshell-gateway --config "$HOME/.config/openshell/gateway.toml"
-```
-
-Restore it after testing:
-
-```bash
+# macOS with Homebrew
 brew services start openshell
-```
 
-### Linux with a Debian or RPM package
-
-```bash
-systemctl --user stop openshell-gateway
-export OPENSHELL_LOCAL_TLS_DIR="$HOME/.local/state/openshell/tls"
-openshell-gateway --config "$HOME/.config/openshell/gateway.toml"
-```
-
-Restore it after testing:
-
-```bash
+# Linux with a Debian or RPM package
 systemctl --user start openshell-gateway
 ```
 
-For a custom gateway path, replace the `--config` argument accordingly.
+The gateway reads the default configuration that `add-gateway-registration`
+updated.
 
 ## Verify connectivity
 
 ```bash
-openshell gateway select openshell
 openshell status
 ```
 
@@ -261,8 +248,6 @@ port must be between 1 and 65535.
 | Symptom | Check |
 | --- | --- |
 | Sandbox creation reports unavailable middleware | Confirm Privacy Guard is running, the registration name matches the policy, the host IP is reachable from the sandbox network, and the port is allowed |
-| Gateway port is already in use | Stop the package-managed gateway before starting a foreground instance |
-| Foreground gateway cannot find certificates | Set `OPENSHELL_LOCAL_TLS_DIR` to the package-specific path shown above |
 | Policy config is rejected | Run `privacy-guard configuration-schema` with the same registry factory used by the server |
 | Relative Regex catalog is not found | Start Privacy Guard from the directory against which the catalog path is defined |
 | Request is denied with `privacy_guard_limit_exceeded` | Inspect Privacy Guard logs, reduce input/output/detections, simplify stages, or increase the processing timeout with OpenShell headroom |
@@ -272,17 +257,15 @@ port must be between 1 and 65535.
 
 ## Shutdown and cleanup
 
-Stop foreground Privacy Guard and gateway processes with `Ctrl-C`. Delete test
-sandboxes explicitly:
+Stop Privacy Guard with `Ctrl-C`. Delete test sandboxes explicitly:
 
 ```bash
 openshell sandbox delete SANDBOX_NAME
 ```
 
-Restore the package-managed gateway and verify connectivity:
+The gateway continues to run in the background. Verify its connection:
 
 ```bash
-openshell gateway select openshell
 openshell status
 ```
 
