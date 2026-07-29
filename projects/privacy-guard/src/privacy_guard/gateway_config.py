@@ -173,12 +173,12 @@ def remove_gateway_config(
         + _trailing_middleware_block_layout(block.group(0))
         + original[block.end() :]
     )
-    updated_values = _load_gateway_config(updated, path)
     unsafe_removal_message = (
         f"Could not safely remove the middleware registration from {path}. "
         "Format it as a standard TOML array table without child tables, then retry."
     )
     try:
+        updated_values = _load_gateway_config(updated, path)
         updated_middleware = _middleware_entries(updated_values, path)
     except GatewayConfigError as error:
         raise GatewayConfigError(unsafe_removal_message) from error

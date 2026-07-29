@@ -334,3 +334,29 @@ def test_remove_gateway_config_rejects_table_headers_inside_multiline_strings(
         )
 
     assert path.read_text() == contents
+
+
+def test_remove_gateway_config_reports_unsafe_multiline_registration_layout(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "gateway.toml"
+    contents = (
+        "[openshell]\n"
+        "version = 1\n\n"
+        "[[openshell.supervisor.middleware]]\n"
+        'name = "privacy-guard-regex"\n'
+        'description = """\n'
+        "[looks.like.a.table]\n"
+        "still string\n"
+        '"""\n'
+        'grpc_endpoint = "http://10.0.0.3:50051"\n'
+    )
+    path.write_text(contents)
+
+    with pytest.raises(GatewayConfigError, match="Could not safely remove"):
+        remove_gateway_config(
+            path,
+            middleware_name="privacy-guard-regex",
+        )
+
+    assert path.read_text() == contents
