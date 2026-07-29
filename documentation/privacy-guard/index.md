@@ -44,114 +44,90 @@ the provider receives the request.
 ## Quickstart
 
 This quickstart uses the built-in `RegexEngine` example to replace an email
-address and customer ID. It requires:
+address and customer ID. Before you start, install:
 
 - Python 3.11 or newer
 - `uv` 0.11 or newer
-- OpenShell and `openshell-gateway` `v0.0.90`, the version recorded in the
-  [middleware manifest](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/privacy-guard/.openshell-middleware-manifest.json)
-- a Docker or Podman backend supported by OpenShell
-- Claude Code subscription access for the final provider request; the OpenShell
-  base sandbox supplies the Claude Code binary
+- [OpenShell](https://github.com/NVIDIA/OpenShell) `v0.0.90` or a later
+  compatible version
 
-Confirm the installed command versions:
+Privacy Guard is tested with the version recorded in the
+[middleware manifest](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/privacy-guard/.openshell-middleware-manifest.json).
+A later version must support the same supervisor middleware contract.
 
-```bash
-uv --version
-openshell --version
-openshell-gateway --version
-```
+Run the following commands from a checkout of OpenShell Research.
 
-Run the commands from a checkout of OpenShell Research.
+### 1. Stop the local gateway
 
-### 1. Prepare the example
+First, check the local gateway:
 
 ```bash
-cd projects/privacy-guard/examples/regex-engine
-uv sync --locked
-uv run privacy-guard engines
+openshell status
 ```
 
-The engine list should contain:
+If the gateway is running, stop it before you change its configuration. Use the
+command for your system:
 
-```text
-regex    detect,replace
+```bash
+# macOS with Homebrew
+brew services stop openshell
+
+# Linux with a Debian or RPM package
+systemctl --user stop openshell-gateway
 ```
-
-The example files are:
-
-| File | Purpose |
-| --- | --- |
-| `patterns.yaml` | Email and customer-ID rules |
-| `privacy-guard-config.yaml` | Standalone Privacy Guard policy configuration |
-| `policy.yaml` | Complete OpenShell sandbox policy with the same configuration |
 
 ### 2. Start Privacy Guard
 
-From the example directory:
-
 ```bash
-uv run privacy-guard serve --listen 0.0.0.0:50051
+cd projects/privacy-guard/examples/regex-engine
+uv run --locked privacy-guard serve --listen 0.0.0.0:50051
 ```
 
 Keep the process running. The development server uses plaintext gRPC and
 receives request bodies. Restrict port 50051 to the host and trusted sandbox
 network.
 
-### 3. Register Privacy Guard with the gateway
+### 3. Configure and start the gateway
 
 Choose a non-loopback host IPv4 address that both the gateway and sandbox
-supervisor can reach:
+supervisor can reach.
+
+Open another terminal and return to the example directory. Replace
+`YOUR_HOST_IPV4` with the address you selected. Then update the default gateway
+configuration:
 
 ```bash
-# macOS
-ipconfig getifaddr en0
-
-# Linux
-hostname -I
-```
-
-Create a local gateway configuration:
-
-```bash
-export PRIVACY_GUARD_HOST_IP=YOUR_HOST_IPV4
-
+cd projects/privacy-guard/examples/regex-engine
 uv run privacy-guard configure-gateway \
-  --host-ip "$PRIVACY_GUARD_HOST_IP" \
-  --name privacy-guard-regex \
-  --config gateway.local.toml
+  --host-ip YOUR_HOST_IPV4 \
+  --name privacy-guard-regex
 ```
 
 Do not use `127.0.0.1`: loopback inside the sandbox supervisor does not refer to
 the host.
 
-Restart the local gateway with `gateway.local.toml`. For a Homebrew
-installation:
+The command above updates the default OpenShell gateway configuration. Next,
+use the command for your system to start the gateway in the background:
 
 ```bash
-brew services stop openshell
-export OPENSHELL_LOCAL_TLS_DIR="$HOME/.local/state/openshell/homebrew/tls"
-openshell-gateway --config "$PWD/gateway.local.toml"
+# macOS with Homebrew
+brew services start openshell
+
+# Linux with a Debian or RPM package
+systemctl --user start openshell-gateway
 ```
-
-For a Debian or RPM installation:
-
-```bash
-systemctl --user stop openshell-gateway
-export OPENSHELL_LOCAL_TLS_DIR="$HOME/.local/state/openshell/tls"
-openshell-gateway --config "$PWD/gateway.local.toml"
-```
-
-Keep the foreground gateway running.
 
 ### 4. Create a sandbox
 
-In another terminal, return to the example directory and verify the gateway:
+Open another terminal, return to the example directory, and check the gateway:
 
 ```bash
-openshell gateway select openshell
+cd projects/privacy-guard/examples/regex-engine
 openshell status
 ```
+
+This walkthrough starts Claude Code in the sandbox. To use a different harness,
+replace everything after `--` with its command.
 
 Create the example sandbox:
 
