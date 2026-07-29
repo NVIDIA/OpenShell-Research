@@ -32,8 +32,8 @@ from privacy_guard.timeout import validate_timeout_seconds
 app = typer.Typer(
     name="privacy-guard",
     help=(
-        "Run Privacy Guard, configure a local OpenShell gateway, and inspect "
-        "installed entity-processing engines."
+        "Run Privacy Guard, manage local OpenShell gateway registrations, and "
+        "inspect installed entity-processing engines."
     ),
     no_args_is_help=True,
     add_completion=False,
@@ -203,7 +203,10 @@ def add_gateway_registration(
             port=port,
         )
     except GatewayConfigError as error:
-        typer.echo(f"Could not configure the OpenShell gateway: {error}", err=True)
+        typer.echo(
+            f"Could not add or update the OpenShell gateway registration: {error}",
+            err=True,
+        )
         raise typer.Exit(code=1) from None
 
     action = {

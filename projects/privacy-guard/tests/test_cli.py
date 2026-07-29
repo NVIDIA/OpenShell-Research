@@ -142,7 +142,7 @@ def test_cli_add_gateway_registration_reports_invalid_existing_config(
 
     assert result.exit_code == 1
     output = _plain_output(result)
-    assert "Could not configure the OpenShell gateway" in output
+    assert "Could not add or update the OpenShell gateway registration" in output
     assert "not valid TOML" in output
     assert path.read_text() == "not valid TOML"
 

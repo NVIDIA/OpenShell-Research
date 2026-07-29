@@ -1,4 +1,4 @@
-"""OpenShell gateway configuration updates for the command-line application."""
+"""OpenShell gateway registration management for the command-line application."""
 
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ class GatewayConfigRemoval(Enum):
 
 
 class GatewayConfigError(ValueError):
-    """A safe, actionable gateway configuration update error."""
+    """A safe, actionable gateway registration management error."""
 
 
 # Mirrors OpenShell's stable-identifier byte limit for external middleware

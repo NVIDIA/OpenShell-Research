@@ -1,4 +1,4 @@
-"""OpenShell gateway configuration update tests."""
+"""OpenShell gateway registration management tests."""
 
 from __future__ import annotations
 
