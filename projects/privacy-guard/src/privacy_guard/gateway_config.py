@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import os
 import re
 import stat
@@ -165,9 +166,29 @@ def remove_gateway_config(
             "Format the file as standard TOML tables, then retry."
         )
 
-    block = blocks[matching_indexes[0]]
-    updated = original[: block.start()] + original[block.end() :]
-    _load_gateway_config(updated, path)
+    matching_index = matching_indexes[0]
+    block = blocks[matching_index]
+    updated = (
+        original[: block.start()]
+        + _trailing_middleware_block_layout(block.group(0))
+        + original[block.end() :]
+    )
+    updated_values = _load_gateway_config(updated, path)
+    unsafe_removal_message = (
+        f"Could not safely remove the middleware registration from {path}. "
+        "Format it as a standard TOML array table without child tables, then retry."
+    )
+    try:
+        updated_middleware = _middleware_entries(updated_values, path)
+    except GatewayConfigError as error:
+        raise GatewayConfigError(unsafe_removal_message) from error
+    expected_middleware = [
+        entry for index, entry in enumerate(middleware) if index != matching_index
+    ]
+    if updated_middleware != expected_middleware or _without_middleware_entries(
+        updated_values
+    ) != _without_middleware_entries(values):
+        raise GatewayConfigError(unsafe_removal_message)
     _write_atomically(path, updated)
     return GatewayConfigRemoval.REMOVED
 
@@ -306,6 +327,29 @@ def _replace_or_append_assignment(block: str, *, key: str, value: str) -> str:
             count=1,
         )
     return block.rstrip() + f"\n{key} = {value}\n"
+
+
+def _trailing_middleware_block_layout(block: str) -> str:
+    lines = block.splitlines(keepends=True)
+    for index in range(len(lines) - 1, -1, -1):
+        stripped = lines[index].lstrip()
+        if stripped.strip() and not stripped.startswith("#"):
+            return "".join(lines[index + 1 :])
+    raise AssertionError("middleware block header is unavailable")
+
+
+def _without_middleware_entries(values: dict[str, object]) -> dict[str, object]:
+    copied_values = copy.deepcopy(values)
+    openshell = copied_values["openshell"]
+    if not isinstance(openshell, dict):
+        raise AssertionError("validated OpenShell table is unavailable")
+    supervisor = openshell.get("supervisor")
+    if not isinstance(supervisor, dict):
+        return copied_values
+    supervisor.pop("middleware", None)
+    if not supervisor:
+        openshell.pop("supervisor", None)
+    return copied_values
 
 
 def _write_atomically(path: Path, contents: str) -> None:

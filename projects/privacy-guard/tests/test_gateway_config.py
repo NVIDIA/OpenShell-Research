@@ -209,6 +209,7 @@ def test_remove_gateway_config_removes_only_the_named_registration(
         'grpc_endpoint = "http://10.0.0.3:50051"\n'
         "max_body_bytes = 4194304\n"
         'timeout = "5s"\n\n'
+        "# Keep this other-service comment.\n"
         "[[openshell.supervisor.middleware]]\n"
         'name = "other-service"\n'
         'grpc_endpoint = "http://10.0.0.2:9000"\n'
@@ -225,6 +226,7 @@ def test_remove_gateway_config_removes_only_the_named_registration(
     contents = path.read_text()
     assert "privacy-guard-regex" not in contents
     assert "# Keep this operator comment." in contents
+    assert "# Keep this other-service comment." in contents
     assert 'name = "other-service"' in contents
     assert tomllib.loads(contents)["openshell"]["supervisor"]["middleware"] == [
         {
@@ -272,6 +274,60 @@ def test_remove_gateway_config_rejects_duplicate_named_registrations(
     path.write_text(contents)
 
     with pytest.raises(GatewayConfigError, match="multiple middleware registrations"):
+        remove_gateway_config(
+            path,
+            middleware_name="privacy-guard-regex",
+        )
+
+    assert path.read_text() == contents
+
+
+def test_remove_gateway_config_rejects_registration_child_tables(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "gateway.toml"
+    contents = (
+        "[openshell]\n"
+        "version = 1\n\n"
+        "[[openshell.supervisor.middleware]]\n"
+        'name = "privacy-guard-regex"\n'
+        'grpc_endpoint = "http://10.0.0.3:50051"\n\n'
+        "[openshell.supervisor.middleware.metadata]\n"
+        'owner = "privacy-team"\n'
+    )
+    path.write_text(contents)
+
+    with pytest.raises(GatewayConfigError, match="Could not safely remove"):
+        remove_gateway_config(
+            path,
+            middleware_name="privacy-guard-regex",
+        )
+
+    assert path.read_text() == contents
+
+
+def test_remove_gateway_config_rejects_table_headers_inside_multiline_strings(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "gateway.toml"
+    contents = (
+        "[openshell]\n"
+        "version = 1\n"
+        'note = """\n'
+        "[[openshell.supervisor.middleware]]\n"
+        "fake = true\n"
+        "[[not.a.real.table]]\n"
+        "still string\n"
+        '"""\n\n'
+        "[openshell.supervisor]\n"
+        "middleware = [\n"
+        '  { name = "privacy-guard-regex", '
+        'grpc_endpoint = "http://10.0.0.3:50051" },\n'
+        "]\n"
+    )
+    path.write_text(contents)
+
+    with pytest.raises(GatewayConfigError, match="Could not safely remove"):
         remove_gateway_config(
             path,
             middleware_name="privacy-guard-regex",
