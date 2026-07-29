@@ -20,6 +20,13 @@ class GatewayConfigUpdate(Enum):
     UNCHANGED = "unchanged"
 
 
+class GatewayConfigRemoval(Enum):
+    """Result of removing one Privacy Guard middleware registration."""
+
+    REMOVED = "removed"
+    UNCHANGED = "unchanged"
+
+
 class GatewayConfigError(ValueError):
     """A safe, actionable gateway configuration update error."""
 
@@ -115,6 +122,54 @@ def update_gateway_config(
         return GatewayConfigUpdate.UNCHANGED
     _write_atomically(path, updated)
     return result
+
+
+def remove_gateway_config(
+    path: Path,
+    *,
+    middleware_name: str,
+) -> GatewayConfigRemoval:
+    """Remove one named Privacy Guard middleware registration."""
+    validate_middleware_name(middleware_name)
+    try:
+        original = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return GatewayConfigRemoval.UNCHANGED
+    except (OSError, UnicodeError) as error:
+        raise GatewayConfigError(
+            f"Could not read {path}. Check that the file is readable UTF-8 TOML."
+        ) from error
+
+    if not original.strip():
+        return GatewayConfigRemoval.UNCHANGED
+
+    values = _load_gateway_config(original, path)
+    middleware = _middleware_entries(values, path)
+    matching_indexes = [
+        index
+        for index, entry in enumerate(middleware)
+        if entry.get("name") == middleware_name
+    ]
+    if len(matching_indexes) > 1:
+        raise GatewayConfigError(
+            f"{path} contains multiple middleware registrations named "
+            f"{middleware_name!r}. Remove the duplicate entries, then retry."
+        )
+    if not matching_indexes:
+        return GatewayConfigRemoval.UNCHANGED
+
+    blocks = list(_MIDDLEWARE_BLOCK_PATTERN.finditer(original))
+    if len(blocks) != len(middleware):
+        raise GatewayConfigError(
+            f"Could not safely locate every middleware registration in {path}. "
+            "Format the file as standard TOML tables, then retry."
+        )
+
+    block = blocks[matching_indexes[0]]
+    updated = original[: block.start()] + original[block.end() :]
+    _load_gateway_config(updated, path)
+    _write_atomically(path, updated)
+    return GatewayConfigRemoval.REMOVED
 
 
 def validate_middleware_name(name: str) -> str:
@@ -286,9 +341,11 @@ _MIDDLEWARE_NAME_CHARACTERS = frozenset(
 
 __all__ = [
     "GatewayConfigError",
+    "GatewayConfigRemoval",
     "GatewayConfigUpdate",
     "MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES",
     "default_gateway_config_path",
+    "remove_gateway_config",
     "update_gateway_config",
     "validate_middleware_name",
 ]

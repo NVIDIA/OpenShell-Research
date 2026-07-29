@@ -130,7 +130,8 @@ def test_openshell_walkthrough_uses_the_custom_registry_and_current_policy() -> 
     assert "uv sync --locked" not in readme
     assert "uv run --locked privacy-guard" in readme
     assert 'export PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}"' in readme
-    assert "uv run privacy-guard configure-gateway" in readme
+    assert "uv run privacy-guard add-gateway-registration" in readme
+    assert "uv run privacy-guard remove-gateway-registration" in readme
     assert "--host-ip YOUR_HOST_IPV4" in readme
     assert "--name privacy-guard-custom-engine" in readme
     assert "--config" not in readme

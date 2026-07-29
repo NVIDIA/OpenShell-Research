@@ -10,8 +10,10 @@ import pytest
 from privacy_guard.gateway_config import (
     MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES,
     GatewayConfigError,
+    GatewayConfigRemoval,
     GatewayConfigUpdate,
     default_gateway_config_path,
+    remove_gateway_config,
     update_gateway_config,
     validate_middleware_name,
 )
@@ -189,6 +191,90 @@ def test_update_gateway_config_rejects_invalid_existing_config(
             middleware_name="privacy-guard",
             host_ip="192.168.1.20",
             port=50051,
+        )
+
+    assert path.read_text() == contents
+
+
+def test_remove_gateway_config_removes_only_the_named_registration(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "gateway.toml"
+    path.write_text(
+        "# Keep this operator comment.\n"
+        "[openshell]\n"
+        "version = 1\n\n"
+        "[[openshell.supervisor.middleware]]\n"
+        'name = "privacy-guard-regex"\n'
+        'grpc_endpoint = "http://10.0.0.3:50051"\n'
+        "max_body_bytes = 4194304\n"
+        'timeout = "5s"\n\n'
+        "[[openshell.supervisor.middleware]]\n"
+        'name = "other-service"\n'
+        'grpc_endpoint = "http://10.0.0.2:9000"\n'
+        "max_body_bytes = 1000\n"
+        'timeout = "1s"\n'
+    )
+
+    result = remove_gateway_config(
+        path,
+        middleware_name="privacy-guard-regex",
+    )
+
+    assert result is GatewayConfigRemoval.REMOVED
+    contents = path.read_text()
+    assert "privacy-guard-regex" not in contents
+    assert "# Keep this operator comment." in contents
+    assert 'name = "other-service"' in contents
+    assert tomllib.loads(contents)["openshell"]["supervisor"]["middleware"] == [
+        {
+            "name": "other-service",
+            "grpc_endpoint": "http://10.0.0.2:9000",
+            "max_body_bytes": 1000,
+            "timeout": "1s",
+        }
+    ]
+
+
+@pytest.mark.parametrize("create_file", [False, True])
+def test_remove_gateway_config_is_unchanged_when_registration_is_absent(
+    tmp_path: Path,
+    create_file: bool,
+) -> None:
+    path = tmp_path / "gateway.toml"
+    if create_file:
+        path.write_text("[openshell]\nversion = 1\n")
+
+    result = remove_gateway_config(
+        path,
+        middleware_name="privacy-guard-regex",
+    )
+
+    assert result is GatewayConfigRemoval.UNCHANGED
+    if create_file:
+        assert path.read_text() == "[openshell]\nversion = 1\n"
+    else:
+        assert not path.exists()
+
+
+def test_remove_gateway_config_rejects_duplicate_named_registrations(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "gateway.toml"
+    contents = (
+        "[openshell]\n"
+        "version = 1\n\n"
+        "[[openshell.supervisor.middleware]]\n"
+        'name = "privacy-guard-regex"\n\n'
+        "[[openshell.supervisor.middleware]]\n"
+        'name = "privacy-guard-regex"\n'
+    )
+    path.write_text(contents)
+
+    with pytest.raises(GatewayConfigError, match="multiple middleware registrations"):
+        remove_gateway_config(
+            path,
+            middleware_name="privacy-guard-regex",
         )
 
     assert path.read_text() == contents

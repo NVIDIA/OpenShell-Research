@@ -98,7 +98,7 @@ configuration:
 
 ```bash
 cd projects/privacy-guard/examples/regex-engine
-uv run privacy-guard configure-gateway \
+uv run privacy-guard add-gateway-registration \
   --host-ip YOUR_HOST_IPV4 \
   --name privacy-guard-regex
 ```
