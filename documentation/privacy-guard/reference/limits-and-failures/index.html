@@ -1532,13 +1532,13 @@
   </a>
 
 
-<h1 id="limits-and-failure-behavior">Limits and failure behavior<a class="headerlink" href="#limits-and-failure-behavior" title="Permanent link">&para;</a></h1>
+<h1 id="limits-and-failure-behavior">Limits and failure behavior</h1>
 <p>Privacy Guard enforces bounds at the transport, processor, engine, and result
 boundaries. Limit failures are atomic: they return no partial replacement text
 or partial findings.</p>
 <p>Package-wide values are defined in
 <code>projects/privacy-guard/src/privacy_guard/constants.py</code>.</p>
-<h2 id="request-and-transport-limits">Request and transport limits<a class="headerlink" href="#request-and-transport-limits" title="Permanent link">&para;</a></h2>
+<h2 id="request-and-transport-limits">Request and transport limits</h2>
 <table>
 <thead>
 <tr>
@@ -1589,7 +1589,7 @@ or partial findings.</p>
 advertised body limit.</p>
 <p>A non-empty request body must be valid UTF-8. Detect and block leave the original
 bytes unchanged. Replace returns UTF-8 encoded final text.</p>
-<h2 id="processing-limits">Processing limits<a class="headerlink" href="#processing-limits" title="Permanent link">&para;</a></h2>
+<h2 id="processing-limits">Processing limits</h2>
 <table>
 <thead>
 <tr>
@@ -1640,14 +1640,14 @@ bytes unchanged. Replace returns UTF-8 encoded final text.</p>
 can consume the complete timeout budget. Detections remain subject to both the
 256-per-stage and 4,096-per-request limits.</p>
 <p>Set the processing timeout with:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>privacy-guard<span class="w"> </span>serve<span class="w"> </span>--timeout-seconds<span class="w"> </span><span class="m">4</span>
-</span></code></pre></div>
+<p><code>bash
+privacy-guard serve --timeout-seconds 4</code></p>
 <p>OpenShell's middleware timeout must be longer than the Privacy Guard processing
 timeout. Include headroom for worker queueing, configuration validation, and
 processor preparation. <code>add-gateway-registration</code> writes a five-second OpenShell
 timeout, so edit that registration before using a processing timeout of five
 seconds or longer.</p>
-<h2 id="finding-and-diagnostic-limits">Finding and diagnostic limits<a class="headerlink" href="#finding-and-diagnostic-limits" title="Permanent link">&para;</a></h2>
+<h2 id="finding-and-diagnostic-limits">Finding and diagnostic limits</h2>
 <table>
 <thead>
 <tr>
@@ -1681,7 +1681,7 @@ Invalid request IDs are replaced with a constant placeholder for logging and do
 not change evaluation.</p>
 <p>If aggregated summaries cannot fit the OpenShell finding representation,
 Privacy Guard returns <code>privacy_guard_limit_exceeded</code> with no partial findings.</p>
-<h2 id="regex-limits">Regex limits<a class="headerlink" href="#regex-limits" title="Permanent link">&para;</a></h2>
+<h2 id="regex-limits">Regex limits</h2>
 <table>
 <thead>
 <tr>
@@ -1721,12 +1721,12 @@ Privacy Guard returns <code>privacy_guard_limit_exceeded</code> with no partial 
 </tbody>
 </table>
 <p>Entity and rule names use:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>[A-Za-z_][A-Za-z0-9_-]*
-</span></code></pre></div>
+<p><code>text
+[A-Za-z_][A-Za-z0-9_-]*</code></p>
 <p>The 64 KiB policy transport limit still applies to inline catalogs. A catalog
 can fit Regex limits while being too large to send inline. Use a relative
 file-backed catalog in that case.</p>
-<h2 id="regex-execution-controls">Regex execution controls<a class="headerlink" href="#regex-execution-controls" title="Permanent link">&para;</a></h2>
+<h2 id="regex-execution-controls">Regex execution controls</h2>
 <p><code>RegexEngine</code>:</p>
 <ul>
 <li>rejects empty or invalid patterns</li>
@@ -1740,7 +1740,7 @@ file-backed catalog in that case.</p>
 </ul>
 <p>The engine uses the timeout-capable <code>regex</code> package rather than Python's
 standard <code>re</code> package.</p>
-<h2 id="request-outcomes">Request outcomes<a class="headerlink" href="#request-outcomes" title="Permanent link">&para;</a></h2>
+<h2 id="request-outcomes">Request outcomes</h2>
 <table>
 <thead>
 <tr>
@@ -1794,7 +1794,7 @@ standard <code>re</code> package.</p>
 </table>
 <p>Policy and limit denials are successful gRPC results. RPC failures use the
 OpenShell middleware registration's <code>on_error</code> behavior.</p>
-<h2 id="respond-to-a-limit-denial">Respond to a limit denial<a class="headerlink" href="#respond-to-a-limit-denial" title="Permanent link">&para;</a></h2>
+<h2 id="respond-to-a-limit-denial">Respond to a limit denial</h2>
 <p>When a request returns <code>privacy_guard_limit_exceeded</code>:</p>
 <ol>
 <li>inspect Privacy Guard logs for the content-safe limit kind</li>
@@ -1805,13 +1805,13 @@ OpenShell middleware registration's <code>on_error</code> behavior.</p>
 <li>increase the OpenShell middleware timeout with additional headroom</li>
 </ol>
 <p>Do not retry the same request without changing the limiting condition.</p>
-<h2 id="error-information">Error information<a class="headerlink" href="#error-information" title="Permanent link">&para;</a></h2>
+<h2 id="error-information">Error information</h2>
 <p>Production errors use stable <code>PrivacyGuardError</code> codes. Error responses and
 logs do not expose raw Pydantic, regex backend, protobuf, engine, or collaborator
 exception messages.</p>
 <p>Expected custom-engine failures must be translated into Privacy Guard's
 content-safe engine exception hierarchy.</p>
-<h2 id="logging">Logging<a class="headerlink" href="#logging" title="Permanent link">&para;</a></h2>
+<h2 id="logging">Logging</h2>
 <p>Default operational logs include:</p>
 <ul>
 <li>request ID</li>
@@ -1834,7 +1834,7 @@ content-safe engine exception hierarchy.</p>
 <p><code>--debug</code> adds content-safe diagnostics.</p>
 <p><code>--debug-log-content</code> logs complete input and processed text. Enable it only in
 a controlled development environment.</p>
-<h2 id="state-and-retention">State and retention<a class="headerlink" href="#state-and-retention" title="Permanent link">&para;</a></h2>
+<h2 id="state-and-retention">State and retention</h2>
 <p>Privacy Guard retains one active validated policy and its configured engines
 until replacement or shutdown. It does not retain request text, detections, or
 replacement mappings across requests.</p>
@@ -1864,13 +1864,13 @@ replacement mappings across requests.</p>
 <p>An entry larger than the cache budget can be used for the current operation but
 is not retained. Cache eviction does not invalidate an active processor that
 already references compiled rules.</p>
-<h2 id="measured-latency">Measured latency<a class="headerlink" href="#measured-latency" title="Permanent link">&para;</a></h2>
+<h2 id="measured-latency">Measured latency</h2>
 <p>The following proof-of-concept data uses the built-in <code>RegexEngine</code> with
 synthetic repeated text. It contains 96 service-duration measurements from
 18,291 to 1,140,979 prompt tokens and 3 to 429 detections per request.</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>latency_ms = 6.69 + 23.28 * (prompt_tokens / 100,000)
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>R² = 0.976
-</span></code></pre></div>
+<p><code>text
+latency_ms = 6.69 + 23.28 * (prompt_tokens / 100,000)
+R² = 0.976</code></p>
 <p><img alt="Scatter plot of Privacy Guard latency against prompt tokens on logarithmic axes. Point color maps the number of entities detected from 3 to 429. Ninety-six service measurements follow one fitted line. A dashed line marks the nominal one-million-token context threshold." src="../../assets/analysis/privacy-guard-latency-vs-prompt-size.svg" /></p>
 <p>Across the 12 completed large-context turns with end-to-end timing, Privacy
 Guard service processing averaged 0.56% of request-admission-to-last-output
@@ -1882,7 +1882,7 @@ and concurrency in the target deployment.</p>
 <p>The source data and deterministic renderer are in the
 <a href="https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/privacy-guard/analysis"><code>projects/privacy-guard/analysis</code></a>
 directory.</p>
-<h2 id="changing-a-limit">Changing a limit<a class="headerlink" href="#changing-a-limit" title="Permanent link">&para;</a></h2>
+<h2 id="changing-a-limit">Changing a limit</h2>
 <p>For maintainers:</p>
 <ol>
 <li>identify every layer that enforces or advertises the limit</li>
@@ -1893,7 +1893,7 @@ directory.</p>
 <li>benchmark changes that affect compilation or request processing</li>
 <li>coordinate protocol changes with OpenShell</li>
 </ol>
-<h2 id="related-pages">Related pages<a class="headerlink" href="#related-pages" title="Permanent link">&para;</a></h2>
+<h2 id="related-pages">Related pages</h2>
 <ul>
 <li><a href="../../operations/">Run and operate Privacy Guard</a></li>
 <li><a href="../../engines/regex/">RegexEngine</a></li>

@@ -1548,7 +1548,7 @@
   </a>
 
 
-<h1 id="configure-policies">Configure policies<a class="headerlink" href="#configure-policies" title="Permanent link">&para;</a></h1>
+<h1 id="configure-policies">Configure policies</h1>
 <p>Privacy Guard configuration is embedded in an OpenShell
 <code>network_middlewares</code> entry. The policy determines:</p>
 <ul>
@@ -1559,42 +1559,42 @@
 <li>OpenShell's behavior when the middleware RPC fails</li>
 </ul>
 <p>Privacy Guard validates the complete configuration before processing a request.</p>
-<h2 id="complete-middleware-entry">Complete middleware entry<a class="headerlink" href="#complete-middleware-entry" title="Permanent link">&para;</a></h2>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">network_middlewares</span><span class="p">:</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">privacy_guard_replace</span><span class="p">:</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Replace email addresses and customer IDs</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">middleware</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">privacy-guard</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">order</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">config</span><span class="p">:</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="nt">entity_processing</span><span class="p">:</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">        </span><span class="nt">stages</span><span class="p">:</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">identifiers</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">            </span><span class="nt">config</span><span class="p">:</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">              </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">              </span><span class="nt">pattern_catalog</span><span class="p">:</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">                </span><span class="nt">entities</span><span class="p">:</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">                  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">                    </span><span class="nt">rules</span><span class="p">:</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">                      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">conventional-email</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">                        </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;(?&lt;![\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])&#39;</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">                        </span><span class="nt">confidence</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">high</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">                </span><span class="nt">replacement</span><span class="p">:</span>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">                  </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">template</span>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">                  </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;[{entity}]&quot;</span>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="w">      </span><span class="nt">on_detection</span><span class="p">:</span>
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="w">        </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace</span>
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="w">    </span><span class="nt">on_error</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fail_closed</span>
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="w">    </span><span class="nt">endpoints</span><span class="p">:</span>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="w">      </span><span class="nt">include</span><span class="p">:</span>
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api.anthropic.com</span>
-</span></code></pre></div>
+<h2 id="complete-middleware-entry">Complete middleware entry</h2>
+<p><code>yaml
+network_middlewares:
+  privacy_guard_replace:
+    name: Replace email addresses and customer IDs
+    middleware: privacy-guard
+    order: 0
+    config:
+      entity_processing:
+        stages:
+          - name: identifiers
+            config:
+              engine: regex
+              pattern_catalog:
+                entities:
+                  - name: email
+                    rules:
+                      - name: conventional-email
+                        pattern: '(?&lt;![\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])'
+                        confidence: high
+                replacement:
+                  strategy: template
+                  template: "[{entity}]"
+      on_detection:
+        action: replace
+    on_error: fail_closed
+    endpoints:
+      include:
+        - api.anthropic.com</code></p>
 <p><code>middleware</code> must match the name registered in the OpenShell gateway
 configuration. <code>endpoints.include</code> restricts the middleware to the listed
 provider hosts.</p>
 <p>Use <code>on_error: fail_closed</code> when a Privacy Guard RPC failure must stop the
 request. A policy block or processing-limit denial is a successful middleware
 result and does not use <code>on_error</code>.</p>
-<h2 id="entity-processing-stages">Entity-processing stages<a class="headerlink" href="#entity-processing-stages" title="Permanent link">&para;</a></h2>
+<h2 id="entity-processing-stages">Entity-processing stages</h2>
 <p><code>entity_processing.stages</code> is a non-empty ordered list with at most ten stages.
 Each stage has:</p>
 <table>
@@ -1626,11 +1626,11 @@ Each stage has:</p>
 <p>Stage names must be unique when supplied. Privacy Guard derives names such as
 <code>regex[1]</code> for unnamed stages.</p>
 <p>In <code>replace</code> mode, the output of one stage becomes the input to the next:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>original text -&gt; stage 1 -&gt; stage 2 -&gt; final replacement text
-</span></code></pre></div>
+<p><code>text
+original text -&gt; stage 1 -&gt; stage 2 -&gt; final replacement text</code></p>
 <p>Detection offsets belong to the input revision seen by the stage that produced
 them. Findings aggregate by stage, entity, and confidence.</p>
-<h2 id="detection-actions">Detection actions<a class="headerlink" href="#detection-actions" title="Permanent link">&para;</a></h2>
+<h2 id="detection-actions">Detection actions</h2>
 <p>Set <code>on_detection.action</code> to one of:</p>
 <table>
 <thead>
@@ -1666,109 +1666,108 @@ them. Findings aggregate by stage, entity, and confidence.</p>
 its engine-specific replacement requirements. A replacement recipe may remain
 configured when the action is <code>detect</code> or <code>block</code>; it is not used in those
 modes.</p>
-<h2 id="common-policy-recipes">Common policy recipes<a class="headerlink" href="#common-policy-recipes" title="Permanent link">&para;</a></h2>
-<h3 id="detect-without-changing-the-request">Detect without changing the request<a class="headerlink" href="#detect-without-changing-the-request" title="Permanent link">&para;</a></h3>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">entity_processing</span><span class="p">:</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">stages</span><span class="p">:</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">identifiers</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">      </span><span class="nt">config</span><span class="p">:</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">        </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">        </span><span class="nt">pattern_catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">patterns.yaml</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="nt">on_detection</span><span class="p">:</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">detect</span>
-</span></code></pre></div>
+<h2 id="common-policy-recipes">Common policy recipes</h2>
+<h3 id="detect-without-changing-the-request">Detect without changing the request</h3>
+<p><code>yaml
+entity_processing:
+  stages:
+    - name: identifiers
+      config:
+        engine: regex
+        pattern_catalog: patterns.yaml
+on_detection:
+  action: detect</code></p>
 <p>Use this to observe findings while leaving the provider-bound body unchanged.</p>
-<h3 id="block-requests-containing-configured-entities">Block requests containing configured entities<a class="headerlink" href="#block-requests-containing-configured-entities" title="Permanent link">&para;</a></h3>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">entity_processing</span><span class="p">:</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">stages</span><span class="p">:</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">restricted-values</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">      </span><span class="nt">config</span><span class="p">:</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">        </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">        </span><span class="nt">pattern_catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">patterns.yaml</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="nt">on_detection</span><span class="p">:</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">block</span>
-</span></code></pre></div>
+<h3 id="block-requests-containing-configured-entities">Block requests containing configured entities</h3>
+<p><code>yaml
+entity_processing:
+  stages:
+    - name: restricted-values
+      config:
+        engine: regex
+        pattern_catalog: patterns.yaml
+on_detection:
+  action: block</code></p>
 <p>The request is denied only when at least one configured entity is detected.</p>
-<h3 id="replace-entities">Replace entities<a class="headerlink" href="#replace-entities" title="Permanent link">&para;</a></h3>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">entity_processing</span><span class="p">:</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">stages</span><span class="p">:</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">identifiers</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">      </span><span class="nt">config</span><span class="p">:</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">        </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">        </span><span class="nt">pattern_catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">patterns.yaml</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">        </span><span class="nt">replacement</span><span class="p">:</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">          </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">template</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">          </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;[{entity}]&quot;</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="nt">on_detection</span><span class="p">:</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">  </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace</span>
-</span></code></pre></div>
+<h3 id="replace-entities">Replace entities</h3>
+<p><code>yaml
+entity_processing:
+  stages:
+    - name: identifiers
+      config:
+        engine: regex
+        pattern_catalog: patterns.yaml
+        replacement:
+          strategy: template
+          template: "[{entity}]"
+on_detection:
+  action: replace</code></p>
 <p><code>{entity}</code> is replaced with the catalog entity name. For example,
 <code>user@example.com</code> becomes <code>[email]</code>.</p>
-<h3 id="run-multiple-stages">Run multiple stages<a class="headerlink" href="#run-multiple-stages" title="Permanent link">&para;</a></h3>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">entity_processing</span><span class="p">:</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">stages</span><span class="p">:</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">structured-identifiers</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">      </span><span class="nt">config</span><span class="p">:</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">        </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">        </span><span class="nt">pattern_catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">identifiers.yaml</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">        </span><span class="nt">replacement</span><span class="p">:</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">          </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">template</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">          </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;[{entity}]&quot;</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">organization-model</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="w">      </span><span class="nt">config</span><span class="p">:</span>
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="w">        </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">acme-pii</span>
-</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="w">        </span><span class="nt">model_profile</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">organization-default</span>
-</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">        </span><span class="nt">replacement</span><span class="p">:</span>
-</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="w">          </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">native</span>
-</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="nt">on_detection</span><span class="p">:</span>
-</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">  </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace</span>
-</span></code></pre></div>
+<h3 id="run-multiple-stages">Run multiple stages</h3>
+<p><code>yaml
+entity_processing:
+  stages:
+    - name: structured-identifiers
+      config:
+        engine: regex
+        pattern_catalog: identifiers.yaml
+        replacement:
+          strategy: template
+          template: "[{entity}]"
+    - name: organization-model
+      config:
+        engine: acme-pii
+        model_profile: organization-default
+        replacement:
+          strategy: native
+on_detection:
+  action: replace</code></p>
 <p>The <code>acme-pii</code> engine and its configuration are examples of a custom
 installation. The running registry must contain every engine named by the
 policy.</p>
-<h2 id="regex-catalogs">Regex catalogs<a class="headerlink" href="#regex-catalogs" title="Permanent link">&para;</a></h2>
+<h2 id="regex-catalogs">Regex catalogs</h2>
 <p><code>RegexEngine</code> accepts an inline catalog or a relative YAML path.</p>
 <p>Inline:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">pattern_catalog</span><span class="p">:</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">entities</span><span class="p">:</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer-id</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">      </span><span class="nt">rules</span><span class="p">:</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefixed-eight-digit-id</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">          </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;\bCUST-[0-9]{8}\b&#39;</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">          </span><span class="nt">confidence</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">high</span>
-</span></code></pre></div>
+<p><code>yaml
+pattern_catalog:
+  entities:
+    - name: customer-id
+      rules:
+        - name: prefixed-eight-digit-id
+          pattern: '\bCUST-[0-9]{8}\b'
+          confidence: high</code></p>
 <p>File-backed:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">pattern_catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">patterns.yaml</span>
-</span></code></pre></div>
+<p><code>yaml
+pattern_catalog: patterns.yaml</code></p>
 <p>Relative paths resolve beneath Privacy Guard's working directory. The path must
 end in <code>.yaml</code> or <code>.yml</code>. Absolute paths, <code>..</code> traversal, and symlinks are
 rejected. Start Privacy Guard from the directory that contains the referenced
 catalog, or use a path relative to that directory.</p>
 <p>See <a href="../engines/regex/">RegexEngine</a> for the complete catalog schema.</p>
-<h2 id="inspect-and-validate-configuration">Inspect and validate configuration<a class="headerlink" href="#inspect-and-validate-configuration" title="Permanent link">&para;</a></h2>
+<h2 id="inspect-and-validate-configuration">Inspect and validate configuration</h2>
 <p>List the engines installed in the selected registry:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>engines
-</span></code></pre></div>
+<p><code>bash
+uv run privacy-guard engines</code></p>
 <p>Print the exact JSON Schema accepted by that registry:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>configuration-schema
-</span></code></pre></div>
+<p><code>bash
+uv run privacy-guard configuration-schema</code></p>
 <p>For a custom registry, pass the same factory to inspection and serving:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span>engines
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span>configuration-schema
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>
-</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">  </span>serve
-</span></code></pre></div>
+<p>```bash
+uv run privacy-guard \
+  --registry-factory my_engines:create_registry \
+  engines</p>
+<p>uv run privacy-guard \
+  --registry-factory my_engines:create_registry \
+  configuration-schema</p>
+<p>uv run privacy-guard \
+  --registry-factory my_engines:create_registry \
+  serve
+```</p>
 <p>Sandbox creation calls <code>ValidateConfig</code>. A successful creation proves that the
 middleware registration is reachable and that the supplied config matches the
 running registry.</p>
-<h2 id="policy-and-deployment-ownership">Policy and deployment ownership<a class="headerlink" href="#policy-and-deployment-ownership" title="Permanent link">&para;</a></h2>
+<h2 id="policy-and-deployment-ownership">Policy and deployment ownership</h2>
 <p>Keep privacy behavior in policy:</p>
 <ul>
 <li>stage order</li>
@@ -1786,7 +1785,7 @@ running registry.</p>
 <li>processing timeout</li>
 </ul>
 <p>A policy cannot select a registry factory or import Python code.</p>
-<h2 id="configuration-activation">Configuration activation<a class="headerlink" href="#configuration-activation" title="Permanent link">&para;</a></h2>
+<h2 id="configuration-activation">Configuration activation</h2>
 <p>OpenShell sends the complete configuration on each evaluation. Privacy Guard
 validates it and compares the normalized immutable result with the active
 configuration:</p>
@@ -1801,7 +1800,7 @@ Interleaving configurations causes the active processor to switch between them.<
 <p>The transport configuration is limited to 64 KiB. File-backed Regex catalogs
 carry only their relative path through the transport and are loaded by the
 Privacy Guard process.</p>
-<h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<h2 id="next-steps">Next steps</h2>
 <ul>
 <li><a href="../engines/regex/">RegexEngine</a></li>
 <li><a href="../engines/custom/">Add a custom engine</a></li>

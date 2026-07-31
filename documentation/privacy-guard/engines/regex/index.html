@@ -1508,20 +1508,20 @@
   </a>
 
 
-<h1 id="regexengine">RegexEngine<a class="headerlink" href="#regexengine" title="Permanent link">&para;</a></h1>
+<h1 id="regexengine">RegexEngine</h1>
 <p><code>RegexEngine</code> is the built-in Privacy Guard engine. It detects every configured
 regular-expression match and can replace a deterministic non-overlapping subset
 with a constrained template.</p>
 <p>Privacy Guard provides the catalog schema and execution bounds. It does not
 provide an authoritative pattern catalog. Define and test patterns for the data
 your deployment handles.</p>
-<h2 id="engine-configuration">Engine configuration<a class="headerlink" href="#engine-configuration" title="Permanent link">&para;</a></h2>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">pattern_catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">patterns.yaml</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nt">replacement</span><span class="p">:</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">template</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;[{entity}]&quot;</span>
-</span></code></pre></div>
+<h2 id="engine-configuration">Engine configuration</h2>
+<p><code>yaml
+engine: regex
+pattern_catalog: patterns.yaml
+replacement:
+  strategy: template
+  template: "[{entity}]"</code></p>
 <table>
 <thead>
 <tr>
@@ -1548,21 +1548,21 @@ your deployment handles.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="catalog-structure">Catalog structure<a class="headerlink" href="#catalog-structure" title="Permanent link">&para;</a></h2>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">entities</span><span class="p">:</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">rules</span><span class="p">:</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">conventional-email</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">        </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;(?&lt;![\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])&#39;</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">        </span><span class="nt">confidence</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">high</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer-id</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">rules</span><span class="p">:</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefixed-eight-digit-id</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">        </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;\bCUST-[0-9]{8}\b&#39;</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">        </span><span class="nt">confidence</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">high</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">        </span><span class="nt">ignore_case</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
-</span></code></pre></div>
-<h3 id="entity-fields">Entity fields<a class="headerlink" href="#entity-fields" title="Permanent link">&para;</a></h3>
+<h2 id="catalog-structure">Catalog structure</h2>
+<p><code>yaml
+entities:
+  - name: email
+    rules:
+      - name: conventional-email
+        pattern: '(?&lt;![\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])'
+        confidence: high
+  - name: customer-id
+    rules:
+      - name: prefixed-eight-digit-id
+        pattern: '\bCUST-[0-9]{8}\b'
+        confidence: high
+        ignore_case: false</code></p>
+<h3 id="entity-fields">Entity fields</h3>
 <table>
 <thead>
 <tr>
@@ -1584,7 +1584,7 @@ your deployment handles.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="rule-fields">Rule fields<a class="headerlink" href="#rule-fields" title="Permanent link">&para;</a></h3>
+<h3 id="rule-fields">Rule fields</h3>
 <table>
 <thead>
 <tr>
@@ -1643,23 +1643,23 @@ your deployment handles.</p>
 are deterministic and do not alter serialized configuration.</p>
 <p>Use the explicit flag fields. Inline regex flags and user-defined named groups
 are rejected.</p>
-<h2 id="inline-and-file-backed-catalogs">Inline and file-backed catalogs<a class="headerlink" href="#inline-and-file-backed-catalogs" title="Permanent link">&para;</a></h2>
+<h2 id="inline-and-file-backed-catalogs">Inline and file-backed catalogs</h2>
 <p>Use an inline catalog when it fits comfortably within OpenShell's 64 KiB
 configuration transport:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">config</span><span class="p">:</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">pattern_catalog</span><span class="p">:</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">entities</span><span class="p">:</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api-key</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">        </span><span class="nt">rules</span><span class="p">:</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;\bAK_[A-Za-z0-9]{32}\b&#39;</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">            </span><span class="nt">confidence</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">high</span>
-</span></code></pre></div>
+<p><code>yaml
+config:
+  engine: regex
+  pattern_catalog:
+    entities:
+      - name: api-key
+        rules:
+          - pattern: '\bAK_[A-Za-z0-9]{32}\b'
+            confidence: high</code></p>
 <p>Use a file-backed catalog for larger or separately maintained rule sets:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">config</span><span class="p">:</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">engine</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">pattern_catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">catalogs/identifiers.yaml</span>
-</span></code></pre></div>
+<p><code>yaml
+config:
+  engine: regex
+  pattern_catalog: catalogs/identifiers.yaml</code></p>
 <p>The path:</p>
 <ul>
 <li>is relative to Privacy Guard's working directory</li>
@@ -1670,7 +1670,7 @@ configuration transport:</p>
 </ul>
 <p>Catalog YAML must be UTF-8 and cannot contain aliases, duplicate keys, or unsafe
 tags. File-backed and inline catalogs normalize to the same immutable model.</p>
-<h2 id="detection-behavior">Detection behavior<a class="headerlink" href="#detection-behavior" title="Permanent link">&para;</a></h2>
+<h2 id="detection-behavior">Detection behavior</h2>
 <p><code>RegexEngine</code> evaluates each rule independently. It retains overlapping matches
 within one rule and across different rules. Each detection records:</p>
 <ul>
@@ -1684,12 +1684,12 @@ offsets, patterns, and rule metadata are not serialized to OpenShell findings.</
 <p>Patterns must consume at least one character. A pattern that matches empty input
 during validation is rejected. A context-dependent zero-width match discovered
 during evaluation rejects the configuration for that request.</p>
-<h2 id="replacement-behavior">Replacement behavior<a class="headerlink" href="#replacement-behavior" title="Permanent link">&para;</a></h2>
+<h2 id="replacement-behavior">Replacement behavior</h2>
 <p>Configure replacement for policies using <code>on_detection.action: replace</code>:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">replacement</span><span class="p">:</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">template</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;[{entity}]&quot;</span>
-</span></code></pre></div>
+<p><code>yaml
+replacement:
+  strategy: template
+  template: "[{entity}]"</code></p>
 <p>The template may contain:</p>
 <ul>
 <li>literal text</li>
@@ -1709,11 +1709,11 @@ order:</p>
 </ol>
 <p>Selected replacements are applied from left to right. The engine calculates
 the final UTF-8 size before allocating replacement output.</p>
-<h2 id="pattern-design">Pattern design<a class="headerlink" href="#pattern-design" title="Permanent link">&para;</a></h2>
+<h2 id="pattern-design">Pattern design</h2>
 <p>Prefer patterns with explicit boundaries that do not consume neighboring text.
 For example:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;(?&lt;![A-Za-z0-9])CUST-[0-9]{8}(?![A-Za-z0-9])&#39;</span>
-</span></code></pre></div>
+<p><code>yaml
+pattern: '(?&lt;![A-Za-z0-9])CUST-[0-9]{8}(?![A-Za-z0-9])'</code></p>
 <p>For each rule, test:</p>
 <ul>
 <li>representative matches</li>
@@ -1728,16 +1728,16 @@ For example:</p>
 <p>Do not treat a passing example as proof that a regex is safe for arbitrary
 input. Privacy Guard enforces a shared timeout, but a slow pattern can consume
 the complete request budget.</p>
-<h2 id="validate-the-installed-schema">Validate the installed schema<a class="headerlink" href="#validate-the-installed-schema" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>engines
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>configuration-schema
-</span></code></pre></div>
+<h2 id="validate-the-installed-schema">Validate the installed schema</h2>
+<p><code>bash
+uv run privacy-guard engines
+uv run privacy-guard configuration-schema</code></p>
 <p>The built-in registry reports <code>regex</code> with <code>detect,replace</code>. The schema includes
 <code>RegexEngineConfig</code>, <code>RegexPatternCatalog</code>, <code>RegexEntity</code>, <code>RegexRule</code>, and
 <code>RegexReplacement</code>.</p>
 <p>The complete runnable example is in
 <a href="https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/privacy-guard/examples/regex-engine"><code>projects/privacy-guard/examples/regex-engine</code></a>.</p>
-<h2 id="limits">Limits<a class="headerlink" href="#limits" title="Permanent link">&para;</a></h2>
+<h2 id="limits">Limits</h2>
 <table>
 <thead>
 <tr>
@@ -1778,7 +1778,7 @@ the complete request budget.</p>
 </table>
 <p>See <a href="../../reference/limits-and-failures/">Limits and failure behavior</a> for
 request-wide, transport, timeout, and result limits.</p>
-<h2 id="related-pages">Related pages<a class="headerlink" href="#related-pages" title="Permanent link">&para;</a></h2>
+<h2 id="related-pages">Related pages</h2>
 <ul>
 <li><a href="../../configuration/">Configure policies</a></li>
 <li><a href="../../architecture/request-lifecycle/">Request lifecycle</a></li>

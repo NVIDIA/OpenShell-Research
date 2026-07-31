@@ -1508,12 +1508,12 @@
   </a>
 
 
-<h1 id="service-boundary">Service boundary<a class="headerlink" href="#service-boundary" title="Permanent link">&para;</a></h1>
+<h1 id="service-boundary">Service boundary</h1>
 <p>The <code>service/</code> package adapts OpenShell's <code>SupervisorMiddleware</code> gRPC contract
 to Privacy Guard's protobuf-free domain model. No other handwritten package
 imports gRPC or generated bindings.</p>
 <p>The checked-in protocol and generated bindings are canonical OpenShell copies.</p>
-<h2 id="grpc-methods">gRPC methods<a class="headerlink" href="#grpc-methods" title="Permanent link">&para;</a></h2>
+<h2 id="grpc-methods">gRPC methods</h2>
 <table>
 <thead>
 <tr>
@@ -1539,10 +1539,10 @@ imports gRPC or generated bindings.</p>
 <p><code>Describe</code> advertises only
 <code>SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS</code>.</p>
 <p>Engine discovery and the finalized policy schema are available through:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>privacy-guard<span class="w"> </span>engines
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>privacy-guard<span class="w"> </span>configuration-schema
-</span></code></pre></div>
-<h2 id="configuration-transport">Configuration transport<a class="headerlink" href="#configuration-transport" title="Permanent link">&para;</a></h2>
+<p><code>bash
+privacy-guard engines
+privacy-guard configuration-schema</code></p>
+<h2 id="configuration-transport">Configuration transport</h2>
 <p>OpenShell supplies the complete policy config as <code>google.protobuf.Struct</code> for
 validation and evaluation. The service:</p>
 <ol>
@@ -1556,10 +1556,10 @@ validation and evaluation. The service:</p>
 <p><code>Struct</code> represents every number as a double. The service converts finite
 integral values only within <code>-(2^53 - 1)</code> through <code>2^53 - 1</code> before strict
 model validation. Other values remain floats.</p>
-<h2 id="active-policy">Active policy<a class="headerlink" href="#active-policy" title="Permanent link">&para;</a></h2>
+<h2 id="active-policy">Active policy</h2>
 <p>The service retains one pair:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>validated PrivacyGuardConfig + configured RequestProcessor
-</span></code></pre></div>
+<p><code>text
+validated PrivacyGuardConfig + configured RequestProcessor</code></p>
 <p>Equal validated configuration reuses this pair. A changed configuration enters
 a serialized preparation path:</p>
 <ol>
@@ -1571,7 +1571,7 @@ a serialized preparation path:</p>
 <p>Failed preparation leaves the active pair unchanged. An evaluation that already
 captured the previous processor can finish with it while later evaluations use
 the replacement.</p>
-<h2 id="request-adaptation">Request adaptation<a class="headerlink" href="#request-adaptation" title="Permanent link">&para;</a></h2>
+<h2 id="request-adaptation">Request adaptation</h2>
 <p>For each evaluation, the service:</p>
 <ol>
 <li>validates the phase</li>
@@ -1584,10 +1584,10 @@ the replacement.</p>
 </ol>
 <p>Request metadata stays in the service layer. The request ID is used only for
 content-safe logging.</p>
-<h2 id="result-adaptation">Result adaptation<a class="headerlink" href="#result-adaptation" title="Permanent link">&para;</a></h2>
+<h2 id="result-adaptation">Result adaptation</h2>
 <p>The service maps <code>RequestProcessingResult</code> to <code>HttpRequestResult</code> and validates
 the encoded replacement and finding representation before returning.</p>
-<h3 id="findings">Findings<a class="headerlink" href="#findings" title="Permanent link">&para;</a></h3>
+<h3 id="findings">Findings</h3>
 <p>Each aggregated detection summary becomes one OpenShell finding:</p>
 <table>
 <thead>
@@ -1621,13 +1621,13 @@ names do cross in <code>label</code>, so custom engines must keep identifiers in
 of request text.</p>
 <p>If the complete result cannot fit OpenShell's finding bounds, the service
 returns <code>privacy_guard_limit_exceeded</code> without partial findings.</p>
-<h2 id="worker-scheduling">Worker scheduling<a class="headerlink" href="#worker-scheduling" title="Permanent link">&para;</a></h2>
+<h2 id="worker-scheduling">Worker scheduling</h2>
 <p>The async gRPC server accepts at most 16 concurrent RPCs. Synchronous config
 validation, processor preparation, UTF-8 decoding, and engine processing run in
 a dedicated four-thread executor guarded by a four-slot semaphore.</p>
 <p>This prevents synchronous engine work from blocking the gRPC event loop and
 bounds active processing.</p>
-<h2 id="cancellation">Cancellation<a class="headerlink" href="#cancellation" title="Permanent link">&para;</a></h2>
+<h2 id="cancellation">Cancellation</h2>
 <p>Cancelling the async RPC does not stop Python code already running in a worker
 thread. The service keeps the worker bridge alive and releases the semaphore
 slot only when that worker exits.</p>
@@ -1635,7 +1635,7 @@ slot only when that worker exits.</p>
 A non-interruptible call continues to occupy its worker slot.</p>
 <p>Server shutdown stops gRPC, waits for active executor work, and closes the
 middleware executor.</p>
-<h2 id="error-mapping">Error mapping<a class="headerlink" href="#error-mapping" title="Permanent link">&para;</a></h2>
+<h2 id="error-mapping">Error mapping</h2>
 <table>
 <thead>
 <tr>
@@ -1664,25 +1664,25 @@ Collaborator exception messages and chains are not returned.</p>
 <li>OpenShell follows the explicit deny after <code>privacy_guard_blocked</code> or
   <code>privacy_guard_limit_exceeded</code>.</li>
 </ul>
-<h2 id="server-api">Server API<a class="headerlink" href="#server-api" title="Permanent link">&para;</a></h2>
+<h2 id="server-api">Server API</h2>
 <p><code>PrivacyGuardServer</code> owns the finalized registry, middleware adapter, gRPC
 server, and shutdown lifecycle:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.engines.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_builtin_registry</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.service</span><span class="w"> </span><span class="kn">import</span> <span class="n">PrivacyGuardServer</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">server</span> <span class="o">=</span> <span class="n">PrivacyGuardServer</span><span class="p">(</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">create_builtin_registry</span><span class="p">(),</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">timeout_seconds</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">)</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">server</span><span class="o">.</span><span class="n">serve_sync</span><span class="p">(</span><span class="s2">&quot;127.0.0.1:50051&quot;</span><span class="p">)</span>
-</span></code></pre></div>
+<p>```python
+from privacy_guard.engines.registry import create_builtin_registry
+from privacy_guard.service import PrivacyGuardServer</p>
+<p>server = PrivacyGuardServer(
+    create_builtin_registry(),
+    timeout_seconds=5,
+)
+server.serve_sync("127.0.0.1:50051")
+```</p>
 <p>Async applications use <code>await server.serve_async(address)</code>.</p>
 <p>The server rejects an unfinalized registry, invalid listen address, or port
 outside 1 through 65535. Bind and startup failures use the stable
 <code>server_bind_failed</code> error.</p>
 <p>See <a href="../../operations/">Run and operate Privacy Guard</a> for CLI startup and
 gateway registration.</p>
-<h2 id="related-pages">Related pages<a class="headerlink" href="#related-pages" title="Permanent link">&para;</a></h2>
+<h2 id="related-pages">Related pages</h2>
 <ul>
 <li><a href="../">System architecture</a></li>
 <li><a href="../request-lifecycle/">Request lifecycle</a></li>

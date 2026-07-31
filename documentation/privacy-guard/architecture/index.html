@@ -1306,21 +1306,21 @@
   </a>
 
 
-<h1 id="system-architecture">System architecture<a class="headerlink" href="#system-architecture" title="Permanent link">&para;</a></h1>
+<h1 id="system-architecture">System architecture</h1>
 <p>Privacy Guard is a pre-credentials OpenShell middleware. It translates an
 OpenShell HTTP-request evaluation into one text-processing run and returns an
 allow, replacement, or deny result.</p>
 <p>This is an experimental network-middleware boundary. It does not mediate
 harness filesystem writes, so raw prompts and session histories may be stored
 before a request reaches Privacy Guard.</p>
-<h2 id="system-boundary">System boundary<a class="headerlink" href="#system-boundary" title="Permanent link">&para;</a></h2>
+<h2 id="system-boundary">System boundary</h2>
 <p><img alt="Privacy Guard component architecture. The service layer translates
 OpenShell gRPC messages, the request processor applies policy, and registered
 engines detect or replace entities without depending on the transport
 layer." src="../assets/diagrams/component-architecture.svg" /></p>
 <p>OpenShell owns request routing and provider credential attachment. Privacy
 Guard does not send provider requests.</p>
-<h2 id="components">Components<a class="headerlink" href="#components" title="Permanent link">&para;</a></h2>
+<h2 id="components">Components</h2>
 <p>Source paths below are relative to
 <code>projects/privacy-guard/src/privacy_guard/</code>.</p>
 <table>
@@ -1384,7 +1384,7 @@ Guard does not send provider requests.</p>
 <p>Only <code>service/</code> imports gRPC and generated protobuf bindings. Engines and the
 request processor use domain models and can be tested without the transport
 layer.</p>
-<h2 id="configuration-and-runtime-resources">Configuration and runtime resources<a class="headerlink" href="#configuration-and-runtime-resources" title="Permanent link">&para;</a></h2>
+<h2 id="configuration-and-runtime-resources">Configuration and runtime resources</h2>
 <p>Privacy behavior comes from the OpenShell policy:</p>
 <ul>
 <li>ordered stages</li>
@@ -1404,7 +1404,7 @@ layer.</p>
 <p><code>EngineRegistry.finalize()</code> constructs one Pydantic discriminated union from
 the exact config type registered for each engine. <code>stage.config.engine</code> selects
 the union member.</p>
-<h2 id="text-boundary">Text boundary<a class="headerlink" href="#text-boundary" title="Permanent link">&para;</a></h2>
+<h2 id="text-boundary">Text boundary</h2>
 <p>The service validates request bytes and decodes a non-empty body as strict
 UTF-8. The request processor receives exactly one <code>str</code>.</p>
 <p>Headers, target, request ID, content type, and protobuf values do not cross the
@@ -1412,14 +1412,14 @@ processor boundary. Privacy Guard does not parse JSON or create structured
 regions.</p>
 <p>Detect and block leave the original bytes untouched. Replace UTF-8 encodes the
 final text and returns it as the new body.</p>
-<h2 id="processing-pipeline">Processing pipeline<a class="headerlink" href="#processing-pipeline" title="Permanent link">&para;</a></h2>
+<h2 id="processing-pipeline">Processing pipeline</h2>
 <p><img alt="Privacy Guard processing pipeline from validated policy and input text
 through strategy selection, one shared timeout, ordered engine stages,
 validation, aggregation, and the final policy
 decision." src="../assets/diagrams/processing-pipeline.svg" /></p>
 <p>Engines receive <code>DETECT</code> or <code>REPLACE</code>, not the user-facing policy action.
 Blocking is applied after detection by <code>RequestProcessor</code>.</p>
-<h2 id="state">State<a class="headerlink" href="#state" title="Permanent link">&para;</a></h2>
+<h2 id="state">State</h2>
 <p>Privacy Guard retains:</p>
 <ul>
 <li>one active validated policy</li>
@@ -1433,14 +1433,14 @@ cross-request entity memory.</p>
 <p>Equal validated configuration reuses the active processor. A changed
 configuration is fully prepared and atomically activated. Failed preparation
 does not replace the active processor.</p>
-<h2 id="concurrency">Concurrency<a class="headerlink" href="#concurrency" title="Permanent link">&para;</a></h2>
+<h2 id="concurrency">Concurrency</h2>
 <p>The gRPC server accepts at most 16 concurrent RPCs. Synchronous configuration
 and processing use a four-slot worker pool.</p>
 <p>Engine instances and resources can be used by multiple worker threads. They
 must keep per-request state local to the call and support concurrent access.
 Policy preparation is serialized; evaluations already using the previous
 processor may finish while later evaluations use the replacement.</p>
-<h2 id="result-boundary">Result boundary<a class="headerlink" href="#result-boundary" title="Permanent link">&para;</a></h2>
+<h2 id="result-boundary">Result boundary</h2>
 <p>The processor returns only:</p>
 <ul>
 <li>allow or deny</li>
@@ -1451,7 +1451,7 @@ processor may finish while later evaluations use the replacement.</p>
 <p>Framework-controlled detection summaries omit matched text, context, offsets,
 patterns, and raw engine metadata. Custom engines must keep entity identifiers
 stable and independent of request text.</p>
-<h2 id="read-next">Read next<a class="headerlink" href="#read-next" title="Permanent link">&para;</a></h2>
+<h2 id="read-next">Read next</h2>
 <ul>
 <li><a href="request-lifecycle/">Request lifecycle</a></li>
 <li><a href="service-boundary/">Service boundary</a></li>

@@ -1540,14 +1540,14 @@
   </a>
 
 
-<h1 id="add-a-custom-engine">Add a custom engine<a class="headerlink" href="#add-a-custom-engine" title="Permanent link">&para;</a></h1>
+<h1 id="add-a-custom-engine">Add a custom engine</h1>
 <p>A custom engine integrates another detector or replacement tool with Privacy
 Guard. It receives one text string, an invocation strategy, a shared timeout,
 and validated engine-specific configuration. It returns processed text and
 bounded detections.</p>
 <p>Custom engine code runs inside the Privacy Guard process and can access request
 text. Install only reviewed, trusted implementations.</p>
-<h2 id="engine-contract">Engine contract<a class="headerlink" href="#engine-contract" title="Permanent link">&para;</a></h2>
+<h2 id="engine-contract">Engine contract</h2>
 <p>A custom engine defines:</p>
 <ol>
 <li>a concrete <code>EngineConfig</code></li>
@@ -1559,56 +1559,51 @@ text. Install only reviewed, trusted implementations.</p>
 <p>Do not override <code>__init__()</code> or the public <code>run()</code> method. The framework-owned
 wrapper validates strategy support, timeouts, detection spans, detection
 cardinality, output size, and mutation behavior.</p>
-<h2 id="minimal-detection-engine">Minimal detection engine<a class="headerlink" href="#minimal-detection-engine" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Literal</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">Field</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.engines</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">EngineConfig</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">EntityDetection</span><span class="p">,</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">EntityProcessingEngine</span><span class="p">,</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">EntityProcessingStrategy</span><span class="p">,</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">TextProcessingResult</span><span class="p">,</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.timeout</span><span class="w"> </span><span class="kn">import</span> <span class="n">Timeout</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="k">class</span><span class="w"> </span><span class="nc">KeywordEngineConfig</span><span class="p">(</span><span class="n">EngineConfig</span><span class="p">):</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="n">engine</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;keyword&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;keyword&quot;</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="n">keyword</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">min_length</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">max_length</span><span class="o">=</span><span class="mi">256</span><span class="p">)</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="k">class</span><span class="w"> </span><span class="nc">KeywordEngine</span><span class="p">(</span><span class="n">EntityProcessingEngine</span><span class="p">[</span><span class="n">KeywordEngineConfig</span><span class="p">]):</span>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>    <span class="n">supported_strategies</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>        <span class="p">{</span><span class="n">EntityProcessingStrategy</span><span class="o">.</span><span class="n">DETECT</span><span class="p">}</span>
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>    <span class="p">)</span>
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_run</span><span class="p">(</span>
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>        <span class="bp">self</span><span class="p">,</span>
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>        <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>        <span class="o">*</span><span class="p">,</span>
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>        <span class="n">strategy</span><span class="p">:</span> <span class="n">EntityProcessingStrategy</span><span class="p">,</span>
-</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>        <span class="n">timeout</span><span class="p">:</span> <span class="n">Timeout</span><span class="p">,</span>
-</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TextProcessingResult</span><span class="p">:</span>
-</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>        <span class="n">matches</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">finditer</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">escape</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">keyword</span><span class="p">),</span> <span class="n">text</span><span class="p">)</span>
-</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>        <span class="k">return</span> <span class="n">TextProcessingResult</span><span class="o">.</span><span class="n">from_detections</span><span class="p">(</span>
-</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>            <span class="n">text</span><span class="o">=</span><span class="n">text</span><span class="p">,</span>
-</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>            <span class="n">detections</span><span class="o">=</span><span class="p">(</span>
-</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>                <span class="n">EntityDetection</span><span class="p">(</span>
-</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>                    <span class="n">entity</span><span class="o">=</span><span class="s2">&quot;keyword&quot;</span><span class="p">,</span>
-</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>                    <span class="n">start</span><span class="o">=</span><span class="n">match</span><span class="o">.</span><span class="n">start</span><span class="p">(),</span>
-</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>                    <span class="n">end</span><span class="o">=</span><span class="n">match</span><span class="o">.</span><span class="n">end</span><span class="p">(),</span>
-</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>                <span class="p">)</span>
-</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>                <span class="k">for</span> <span class="n">match</span> <span class="ow">in</span> <span class="n">matches</span>
-</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>            <span class="p">),</span>
-</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>        <span class="p">)</span>
-</span></code></pre></div>
+<h2 id="minimal-detection-engine">Minimal detection engine</h2>
+<p>```python
+import re
+from typing import Literal</p>
+<p>from pydantic import Field</p>
+<p>from privacy_guard.engines import (
+    EngineConfig,
+    EntityDetection,
+    EntityProcessingEngine,
+    EntityProcessingStrategy,
+    TextProcessingResult,
+)
+from privacy_guard.timeout import Timeout</p>
+<p>class KeywordEngineConfig(EngineConfig):
+    engine: Literal["keyword"] = "keyword"
+    keyword: str = Field(min_length=1, max_length=256)</p>
+<p>class KeywordEngine(EntityProcessingEngine[KeywordEngineConfig]):
+    supported_strategies = frozenset(
+        {EntityProcessingStrategy.DETECT}
+    )</p>
+<pre><code>def _run(
+    self,
+    text: str,
+    *,
+    strategy: EntityProcessingStrategy,
+    timeout: Timeout,
+) -&gt; TextProcessingResult:
+    matches = re.finditer(re.escape(self.config.keyword), text)
+    return TextProcessingResult.from_detections(
+        text=text,
+        detections=(
+            EntityDetection(
+                entity="keyword",
+                start=match.start(),
+                end=match.end(),
+            )
+            for match in matches
+        ),
+    )
+</code></pre>
+<p>```</p>
 <p><code>TextProcessingResult.from_detections()</code> stops consuming a lazy detection
 stream when the per-stage limit is exceeded. The public engine wrapper remains
 the enforcement boundary.</p>
-<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
+<h2 id="configuration">Configuration</h2>
 <p>Each config class must:</p>
 <ul>
 <li>subclass <code>EngineConfig</code></li>
@@ -1617,33 +1612,29 @@ the enforcement boundary.</p>
 <li>reject unknown fields through the shared base model</li>
 <li>keep sensitive values out of normal representations when applicable</li>
 </ul>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">AcmeEngineConfig</span><span class="p">(</span><span class="n">EngineConfig</span><span class="p">):</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">engine</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;acme-pii&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;acme-pii&quot;</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">model_profile</span><span class="p">:</span> <span class="nb">str</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">replacement</span><span class="p">:</span> <span class="n">AcmeReplacement</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span></code></pre></div>
+<p><code>python
+class AcmeEngineConfig(EngineConfig):
+    engine: Literal["acme-pii"] = "acme-pii"
+    model_profile: str
+    replacement: AcmeReplacement | None = None</code></p>
 <p>Privacy Guard adds the exact config type to the registry-built Pydantic
 discriminated union. The policy object is passed unchanged to the engine.</p>
 <p>OpenShell transports numbers through protobuf <code>Struct</code>. Integer settings must
 fit the safe range <code>-(2^53 - 1)</code> through <code>2^53 - 1</code>.</p>
-<h2 id="operational-resources">Operational resources<a class="headerlink" href="#operational-resources" title="Permanent link">&para;</a></h2>
+<h2 id="operational-resources">Operational resources</h2>
 <p>Use <code>EngineResources</code> for deployment-owned clients, adapters, endpoints,
 credential providers, or preloaded models:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.engines</span><span class="w"> </span><span class="kn">import</span> <span class="n">EngineResources</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="k">class</span><span class="w"> </span><span class="nc">AcmeResources</span><span class="p">(</span><span class="n">EngineResources</span><span class="p">):</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">client</span><span class="p">:</span> <span class="n">AcmeClient</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="k">class</span><span class="w"> </span><span class="nc">AcmeEngine</span><span class="p">(</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>    <span class="n">EntityProcessingEngine</span><span class="p">[</span><span class="n">AcmeEngineConfig</span><span class="p">,</span> <span class="n">AcmeResources</span><span class="p">]</span>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="p">):</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>    <span class="o">...</span>
-</span></code></pre></div>
+<p>```python
+from dataclasses import dataclass</p>
+<p>from privacy_guard.engines import EngineResources</p>
+<p>@dataclass(frozen=True)
+class AcmeResources(EngineResources):
+    client: AcmeClient</p>
+<p>class AcmeEngine(
+    EntityProcessingEngine[AcmeEngineConfig, AcmeResources]
+):
+    ...
+```</p>
 <p>Resources must:</p>
 <ul>
 <li>contain operational dependencies, not policy behavior</li>
@@ -1652,21 +1643,21 @@ credential providers, or preloaded models:</p>
 <li>be created before request processing</li>
 </ul>
 <p>A resource-free engine omits the second generic argument.</p>
-<h2 id="supported-strategies">Supported strategies<a class="headerlink" href="#supported-strategies" title="Permanent link">&para;</a></h2>
+<h2 id="supported-strategies">Supported strategies</h2>
 <p>Declare the exact operations exposed by the engine:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">supported_strategies</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="p">{</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>        <span class="n">EntityProcessingStrategy</span><span class="o">.</span><span class="n">DETECT</span><span class="p">,</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>        <span class="n">EntityProcessingStrategy</span><span class="o">.</span><span class="n">REPLACE</span><span class="p">,</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="p">}</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">)</span>
-</span></code></pre></div>
+<p><code>python
+supported_strategies = frozenset(
+    {
+        EntityProcessingStrategy.DETECT,
+        EntityProcessingStrategy.REPLACE,
+    }
+)</code></p>
 <p><code>block</code> is not an engine strategy. The processor invokes <code>DETECT</code> and applies
 the block decision after successful engine execution.</p>
 <p>Override <code>_validate_run_config()</code> when a strategy requires additional
 configuration. For example, a replacement engine can require a replacement
 recipe only when invoked with <code>REPLACE</code>.</p>
-<h2 id="result-requirements">Result requirements<a class="headerlink" href="#result-requirements" title="Permanent link">&para;</a></h2>
+<h2 id="result-requirements">Result requirements</h2>
 <p>Return <code>TextProcessingResult</code> with:</p>
 <table>
 <thead>
@@ -1720,29 +1711,29 @@ recipe only when invoked with <code>REPLACE</code>.</p>
 <p>For <code>DETECT</code>, returned text must exactly equal input text. For <code>REPLACE</code>, text
 may change only when the result contains at least one detection. Do not return
 partial text or detections after a collaborator failure.</p>
-<h2 id="timeouts">Timeouts<a class="headerlink" href="#timeouts" title="Permanent link">&para;</a></h2>
+<h2 id="timeouts">Timeouts</h2>
 <p>One <code>Timeout</code> is shared across the complete stage pipeline. Pass its remaining
 duration to APIs that accept a timeout:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">process</span><span class="p">(</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">text</span><span class="p">,</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="o">.</span><span class="n">remaining_seconds</span><span class="p">(),</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="p">)</span>
-</span></code></pre></div>
+<p><code>python
+result = client.process(
+    text,
+    timeout=timeout.remaining_seconds(),
+)</code></p>
 <p>Translate Python <code>TimeoutError</code> with the shared context manager:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">with</span> <span class="n">timeout</span><span class="o">.</span><span class="n">enforce</span><span class="p">():</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">process</span><span class="p">(</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>        <span class="n">text</span><span class="p">,</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>        <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="o">.</span><span class="n">remaining_seconds</span><span class="p">(),</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="p">)</span>
-</span></code></pre></div>
+<p><code>python
+with timeout.enforce():
+    result = client.process(
+        text,
+        timeout=timeout.remaining_seconds(),
+    )</code></p>
 <p>Long-running local loops may call <code>timeout.raise_if_expired()</code>. Document and
 bound operations that cannot be interrupted.</p>
-<h2 id="concurrency">Concurrency<a class="headerlink" href="#concurrency" title="Permanent link">&para;</a></h2>
+<h2 id="concurrency">Concurrency</h2>
 <p>One configured engine instance may process requests concurrently. Keep request
 text, detections, counters, and temporary objects local to <code>_run()</code>. Treat
 configuration and derived initialization state as immutable. Ensure injected
 clients and resources support concurrent calls.</p>
-<h2 id="errors-and-logging">Errors and logging<a class="headerlink" href="#errors-and-logging" title="Permanent link">&para;</a></h2>
+<h2 id="errors-and-logging">Errors and logging</h2>
 <p>Translate expected collaborator failures into Privacy Guard's content-safe
 engine exceptions. Do not include:</p>
 <ul>
@@ -1755,16 +1746,16 @@ engine exceptions. Do not include:</p>
 <p>Stable engine and entity identifiers may appear in findings and diagnostic
 logs when they satisfy shared validation.</p>
 <p>Use a static, content-safe message when translating an operational failure:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.engines</span><span class="w"> </span><span class="kn">import</span> <span class="n">EngineExecutionError</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="k">try</span><span class="p">:</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">process</span><span class="p">(</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>        <span class="n">text</span><span class="p">,</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>        <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="o">.</span><span class="n">remaining_seconds</span><span class="p">(),</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>    <span class="p">)</span>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="k">except</span> <span class="n">AcmeClientError</span><span class="p">:</span>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="k">raise</span> <span class="n">EngineExecutionError</span><span class="p">(</span><span class="s2">&quot;Acme processing failed&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
-</span></code></pre></div>
+<p>```python
+from privacy_guard.engines import EngineExecutionError</p>
+<p>try:
+    result = self.resources.client.process(
+        text,
+        timeout=timeout.remaining_seconds(),
+    )
+except AcmeClientError:
+    raise EngineExecutionError("Acme processing failed") from None
+```</p>
 <table>
 <thead>
 <tr>
@@ -1790,43 +1781,41 @@ logs when they satisfy shared validation.</p>
 <p>The framework raises <code>EngineContractError</code> when returned text or detections
 violate the engine contract; custom engines should not use it for collaborator
 failures.</p>
-<h2 id="register-the-engine">Register the engine<a class="headerlink" href="#register-the-engine" title="Permanent link">&para;</a></h2>
+<h2 id="register-the-engine">Register the engine</h2>
 <p>Create one application-scoped registry factory:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">privacy_guard.engines.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">EngineRegistry</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_registry</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">EngineRegistry</span><span class="p">:</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">registry</span> <span class="o">=</span> <span class="n">EngineRegistry</span><span class="p">(</span><span class="n">include_builtin_engines</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">KeywordEngine</span><span class="p">)</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="k">return</span> <span class="n">registry</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
-</span></code></pre></div>
+<p>```python
+from privacy_guard.engines.registry import EngineRegistry</p>
+<p>def create_registry() -&gt; EngineRegistry:
+    registry = EngineRegistry(include_builtin_engines=True)
+    registry.register(KeywordEngine)
+    return registry.finalize()
+```</p>
 <p>Pass resources during registration when required:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="n">AcmeEngine</span><span class="p">,</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="n">resources</span><span class="o">=</span><span class="n">AcmeResources</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="n">client</span><span class="p">),</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="p">)</span>
-</span></code></pre></div>
+<p><code>python
+registry.register(
+    AcmeEngine,
+    resources=AcmeResources(client=client),
+)</code></p>
 <p>Use <code>include_builtin_engines=True</code> to add the built-in <code>RegexEngine</code>. Omit it
 when the registry should contain only explicitly registered custom engines.</p>
-<h2 id="inspect-and-run-the-registry">Inspect and run the registry<a class="headerlink" href="#inspect-and-run-the-registry" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span>engines
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span>configuration-schema
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_engines:create_registry<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">  </span>serve<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">  </span>--listen<span class="w"> </span><span class="m">0</span>.0.0.0:50051
-</span></code></pre></div>
+<h2 id="inspect-and-run-the-registry">Inspect and run the registry</h2>
+<p>```bash
+uv run privacy-guard \
+  --registry-factory my_engines:create_registry \
+  engines</p>
+<p>uv run privacy-guard \
+  --registry-factory my_engines:create_registry \
+  configuration-schema</p>
+<p>uv run privacy-guard \
+  --registry-factory my_engines:create_registry \
+  serve \
+  --listen 0.0.0.0:50051
+```</p>
 <p>The module must be installed or available on <code>PYTHONPATH</code>. The factory is
 trusted deployment code and executes for each CLI invocation.</p>
 <p>The complete runnable example is in
 <a href="https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/privacy-guard/examples/custom-engine"><code>projects/privacy-guard/examples/custom-engine</code></a>.</p>
-<h2 id="verify-the-integration">Verify the integration<a class="headerlink" href="#verify-the-integration" title="Permanent link">&para;</a></h2>
+<h2 id="verify-the-integration">Verify the integration</h2>
 <p>Before deploying a custom engine:</p>
 <ol>
 <li>Run its unit tests directly against <code>run()</code> for every supported strategy.
@@ -1844,7 +1833,7 @@ trusted deployment code and executes for each CLI invocation.</p>
 <p>Test engine-specific behavior and integrations. Privacy Guard's own suite
 covers the shared wrapper contract, processor ordering, request-wide limits,
 and gRPC result mapping.</p>
-<h2 id="related-pages">Related pages<a class="headerlink" href="#related-pages" title="Permanent link">&para;</a></h2>
+<h2 id="related-pages">Related pages</h2>
 <ul>
 <li><a href="../../configuration/">Configure policies</a></li>
 <li><a href="../../operations/">Run and operate Privacy Guard</a></li>

@@ -1085,124 +1085,8 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#2-start-privacy-guard" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        2. Start Privacy Guard
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#3-configure-and-start-the-gateway" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        3. Configure and start the gateway
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4-create-a-sandbox" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        4. Create a sandbox
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#5-verify-the-result" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        5. Verify the result
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#core-concepts" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Core concepts
-      </span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Core concepts">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#policies-control-behavior" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Policies control behavior
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#stages-run-in-order" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Stages run in order
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#findings-use-stable-identifiers" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Findings use stable identifiers
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#processing-is-bounded" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Processing is bounded
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#documentation-map" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Documentation map
-      </span>
-    </span>
-  </a>
   
 </li>
       
@@ -1328,7 +1212,13 @@
   </a>
 
 
-<h1 id="privacy-guard">Privacy Guard<a class="headerlink" href="#privacy-guard" title="Permanent link">&para;</a></h1>
+<h1 id="privacy-guard">Privacy Guard</h1>
+<div class="admonition warning">
+<p class="admonition-title">Experimental software</p>
+<p>Privacy Guard is a proof of concept, not a guarantee that sensitive data
+cannot leak. It currently protects only provider-bound network requests
+that OpenShell routes through this middleware.</p>
+</div>
 <p>Privacy Guard is an OpenShell supervisor middleware. It examines provider-bound
 HTTP request bodies before OpenShell attaches provider credentials. A policy can
 instruct Privacy Guard to:</p>
@@ -1354,11 +1244,6 @@ instruct Privacy Guard to:</p>
 </tr>
 </tbody>
 </table>
-<blockquote>
-<p><strong>Experimental:</strong> Privacy Guard is a proof of concept, not a guarantee that
-sensitive data cannot leak. It currently protects only provider-bound network
-requests that OpenShell routes through this middleware.</p>
-</blockquote>
 <p>Privacy Guard does not intercept prompts, tool output, transcripts, or session
 history before a harness writes them to disk. Those files may contain raw
 sensitive values even when Privacy Guard later replaces or blocks the network
@@ -1367,7 +1252,7 @@ retention, and cleanup in addition to Privacy Guard.</p>
 <p>Privacy Guard processes the complete request body as UTF-8 text. It does not
 parse JSON fields, inspect files in the sandbox, modify provider responses, or
 send network requests to the provider.</p>
-<h2 id="how-it-fits-into-openshell">How it fits into OpenShell<a class="headerlink" href="#how-it-fits-into-openshell" title="Permanent link">&para;</a></h2>
+<h2 id="how-it-fits-into-openshell">How it fits into OpenShell</h2>
 <p><img alt="A provider-bound request travels from the sandbox through OpenShell and
 Privacy Guard. Privacy Guard returns an allow, replacement, or deny decision
 before OpenShell attaches credentials and sends an allowed request to the
@@ -1375,7 +1260,7 @@ provider." src="assets/diagrams/request-path.svg" /></p>
 <p>Privacy Guard exposes OpenShell's <code>SupervisorMiddleware</code> gRPC service. It
 registers for the pre-credentials request phase so replacement happens before
 the provider receives the request.</p>
-<h2 id="quickstart">Quickstart<a class="headerlink" href="#quickstart" title="Permanent link">&para;</a></h2>
+<h2 id="quickstart">Quickstart</h2>
 <p>This quickstart uses the built-in <code>RegexEngine</code> example to replace an email
 address and customer ID. Before you start, install:</p>
 <ul>
@@ -1388,70 +1273,70 @@ address and customer ID. Before you start, install:</p>
 <a href="https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/privacy-guard/.openshell-middleware-manifest.json">middleware manifest</a>.
 A later version must support the same supervisor middleware contract.</p>
 <p>Run the following commands from a checkout of OpenShell Research.</p>
-<h3 id="1-stop-the-local-gateway">1. Stop the local gateway<a class="headerlink" href="#1-stop-the-local-gateway" title="Permanent link">&para;</a></h3>
+<h3 id="1-stop-the-local-gateway">1. Stop the local gateway</h3>
 <p>First, check the local gateway:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>openshell<span class="w"> </span>status
-</span></code></pre></div>
+<p><code>bash
+openshell status</code></p>
 <p>If the gateway is running, stop it before you change its configuration. Use the
 command for your system:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># macOS with Homebrew</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>brew<span class="w"> </span>services<span class="w"> </span>stop<span class="w"> </span>openshell
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Linux with a Debian or RPM package</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>stop<span class="w"> </span>openshell-gateway
-</span></code></pre></div>
-<h3 id="2-start-privacy-guard">2. Start Privacy Guard<a class="headerlink" href="#2-start-privacy-guard" title="Permanent link">&para;</a></h3>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">cd</span><span class="w"> </span>projects/privacy-guard/examples/regex-engine
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>uv<span class="w"> </span>run<span class="w"> </span>--locked<span class="w"> </span>privacy-guard<span class="w"> </span>serve<span class="w"> </span>--listen<span class="w"> </span><span class="m">0</span>.0.0.0:50051
-</span></code></pre></div>
+<p>```bash</p>
+<h1 id="macos-with-homebrew">macOS with Homebrew</h1>
+<p>brew services stop openshell</p>
+<h1 id="linux-with-a-debian-or-rpm-package">Linux with a Debian or RPM package</h1>
+<p>systemctl --user stop openshell-gateway
+```</p>
+<h3 id="2-start-privacy-guard">2. Start Privacy Guard</h3>
+<p><code>bash
+cd projects/privacy-guard/examples/regex-engine
+uv run --locked privacy-guard serve --listen 0.0.0.0:50051</code></p>
 <p>Keep the process running. The development server uses plaintext gRPC and
 receives request bodies. Restrict port 50051 to the host and trusted sandbox
 network.</p>
-<h3 id="3-configure-and-start-the-gateway">3. Configure and start the gateway<a class="headerlink" href="#3-configure-and-start-the-gateway" title="Permanent link">&para;</a></h3>
+<h3 id="3-configure-and-start-the-gateway">3. Configure and start the gateway</h3>
 <p>Choose a non-loopback host IPv4 address that both the gateway and sandbox
 supervisor can reach.</p>
 <p>Open another terminal and return to the example directory. Replace
 <code>YOUR_HOST_IPV4</code> with the address you selected. Then update the default gateway
 configuration:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">cd</span><span class="w"> </span>projects/privacy-guard/examples/regex-engine
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>uv<span class="w"> </span>run<span class="w"> </span>privacy-guard<span class="w"> </span>add-gateway-registration<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--host-ip<span class="w"> </span>YOUR_HOST_IPV4<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--name<span class="w"> </span>privacy-guard-regex
-</span></code></pre></div>
+<p><code>bash
+cd projects/privacy-guard/examples/regex-engine
+uv run privacy-guard add-gateway-registration \
+  --host-ip YOUR_HOST_IPV4 \
+  --name privacy-guard-regex</code></p>
 <p>Do not use <code>127.0.0.1</code>: loopback inside the sandbox supervisor does not refer to
 the host.</p>
 <p>The command above updates the default OpenShell gateway configuration. Next,
 use the command for your system to start the gateway in the background:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># macOS with Homebrew</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>brew<span class="w"> </span>services<span class="w"> </span>start<span class="w"> </span>openshell
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># Linux with a Debian or RPM package</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>systemctl<span class="w"> </span>--user<span class="w"> </span>start<span class="w"> </span>openshell-gateway
-</span></code></pre></div>
-<h3 id="4-create-a-sandbox">4. Create a sandbox<a class="headerlink" href="#4-create-a-sandbox" title="Permanent link">&para;</a></h3>
+<p>```bash</p>
+<h1 id="macos-with-homebrew_1">macOS with Homebrew</h1>
+<p>brew services start openshell</p>
+<h1 id="linux-with-a-debian-or-rpm-package_1">Linux with a Debian or RPM package</h1>
+<p>systemctl --user start openshell-gateway
+```</p>
+<h3 id="4-create-a-sandbox">4. Create a sandbox</h3>
 <p>Open another terminal, return to the example directory, and check the gateway:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nb">cd</span><span class="w"> </span>projects/privacy-guard/examples/regex-engine
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>openshell<span class="w"> </span>status
-</span></code></pre></div>
+<p><code>bash
+cd projects/privacy-guard/examples/regex-engine
+openshell status</code></p>
 <p>This walkthrough starts Claude Code in the sandbox. To use a different harness,
 replace everything after <code>--</code> with its command.</p>
 <p>Create the example sandbox:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>openshell<span class="w"> </span>sandbox<span class="w"> </span>create<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>--name<span class="w"> </span>privacy-guard-regex<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span>--from<span class="w"> </span>base<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>--no-auto-providers<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span>--policy<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PWD</span><span class="s2">/policy.yaml&quot;</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span>--<span class="w"> </span>env<span class="w"> </span><span class="nv">CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>claude
-</span></code></pre></div>
+<p><code>bash
+openshell sandbox create \
+  --name privacy-guard-regex \
+  --from base \
+  --no-auto-providers \
+  --policy "$PWD/policy.yaml" \
+  -- env CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude</code></p>
 <p>After authenticating Claude Code, submit:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Draft a short greeting for user@example.com about customer CUST-12345678.
-</span></code></pre></div>
+<p><code>text
+Draft a short greeting for user@example.com about customer CUST-12345678.</code></p>
 <p>The provider-bound body should contain <code>[email]</code> and <code>[customer-id]</code> instead of
 the original values.</p>
-<h3 id="5-verify-the-result">5. Verify the result<a class="headerlink" href="#5-verify-the-result" title="Permanent link">&para;</a></h3>
+<h3 id="5-verify-the-result">5. Verify the result</h3>
 <p>From a host terminal:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>openshell<span class="w"> </span>logs<span class="w"> </span>privacy-guard-regex<span class="w"> </span>-n<span class="w"> </span><span class="m">100</span><span class="w"> </span>--source<span class="w"> </span>sandbox
-</span></code></pre></div>
+<p><code>bash
+openshell logs privacy-guard-regex -n 100 --source sandbox</code></p>
 <p>Find the provider request and confirm:</p>
 <ul>
 <li><code>transformed:true</code></li>
@@ -1461,25 +1346,25 @@ the original values.</p>
 </ul>
 <p>See <a href="operations/">Run and operate Privacy Guard</a> for cleanup, gateway
 configuration, logging, timeouts, and troubleshooting.</p>
-<h2 id="core-concepts">Core concepts<a class="headerlink" href="#core-concepts" title="Permanent link">&para;</a></h2>
-<h3 id="policies-control-behavior">Policies control behavior<a class="headerlink" href="#policies-control-behavior" title="Permanent link">&para;</a></h3>
+<h2 id="core-concepts">Core concepts</h2>
+<h3 id="policies-control-behavior">Policies control behavior</h3>
 <p>The OpenShell policy supplies the ordered engine stages and final action.
 Privacy Guard startup selects which engine implementations and operational
 resources are installed.</p>
-<h3 id="stages-run-in-order">Stages run in order<a class="headerlink" href="#stages-run-in-order" title="Permanent link">&para;</a></h3>
+<h3 id="stages-run-in-order">Stages run in order</h3>
 <p>Each stage receives the current text. In <code>replace</code> mode, later stages receive
 the text returned by earlier stages. In <code>detect</code> and <code>block</code> mode, engines must
 return the input text unchanged.</p>
-<h3 id="findings-use-stable-identifiers">Findings use stable identifiers<a class="headerlink" href="#findings-use-stable-identifiers" title="Permanent link">&para;</a></h3>
+<h3 id="findings-use-stable-identifiers">Findings use stable identifiers</h3>
 <p>Framework-controlled fields do not add matched text, surrounding text, offsets,
 regex patterns, headers, or request bodies to findings. <code>RegexEngine</code> uses
 configured entity identifiers. Custom engines must also return stable,
 declared entity identifiers that are not derived from request text.</p>
-<h3 id="processing-is-bounded">Processing is bounded<a class="headerlink" href="#processing-is-bounded" title="Permanent link">&para;</a></h3>
+<h3 id="processing-is-bounded">Processing is bounded</h3>
 <p>Request size, output size, detections, regex execution, concurrency, and
 processing time have explicit limits. A limit failure denies the request
 without returning partial replacement text or partial findings.</p>
-<h2 id="documentation-map">Documentation map<a class="headerlink" href="#documentation-map" title="Permanent link">&para;</a></h2>
+<h2 id="documentation-map">Documentation map</h2>
 <ul>
 <li><a href="configuration/">Configure policies</a>: stages, actions, catalogs, and policy
   recipes.</li>

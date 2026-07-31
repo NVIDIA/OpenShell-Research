@@ -1518,17 +1518,17 @@
   </a>
 
 
-<h1 id="request-lifecycle">Request lifecycle<a class="headerlink" href="#request-lifecycle" title="Permanent link">&para;</a></h1>
+<h1 id="request-lifecycle">Request lifecycle</h1>
 <p>Each OpenShell evaluation carries request metadata, body bytes, and complete
 Privacy Guard configuration. The service validates the transport, resolves the
 active processor, processes one text value, and serializes the result.</p>
-<h2 id="lifecycle-summary">Lifecycle summary<a class="headerlink" href="#lifecycle-summary" title="Permanent link">&para;</a></h2>
+<h2 id="lifecycle-summary">Lifecycle summary</h2>
 <p><img alt="Privacy Guard request lifecycle. The service validates the transport and
 policy, resolves the active processor, handles an empty body or decodes UTF-8
 text, runs the ordered engine stages, then returns either a gRPC failure or a
 successful allow, replacement, or deny
 result." src="../../assets/diagrams/request-lifecycle.svg" /></p>
-<h2 id="1-validate-the-transport">1. Validate the transport<a class="headerlink" href="#1-validate-the-transport" title="Permanent link">&para;</a></h2>
+<h2 id="1-validate-the-transport">1. Validate the transport</h2>
 <p>The service checks:</p>
 <ul>
 <li>pre-credentials middleware phase</li>
@@ -1540,7 +1540,7 @@ result." src="../../assets/diagrams/request-lifecycle.svg" /></p>
 </ul>
 <p>Input at another middleware phase or outside a transport bound fails the RPC as
 invalid input.</p>
-<h2 id="2-validate-configuration">2. Validate configuration<a class="headerlink" href="#2-validate-configuration" title="Permanent link">&para;</a></h2>
+<h2 id="2-validate-configuration">2. Validate configuration</h2>
 <p>The service converts the protobuf <code>Struct</code> to a mapping and validates it through
 the finalized registry-backed Pydantic model.</p>
 <p>Validation includes:</p>
@@ -1555,7 +1555,7 @@ the finalized registry-backed Pydantic model.</p>
 </ul>
 <p><code>ValidateConfig</code> performs these checks without constructing engines or changing
 the active processor.</p>
-<h2 id="3-resolve-the-active-processor">3. Resolve the active processor<a class="headerlink" href="#3-resolve-the-active-processor" title="Permanent link">&para;</a></h2>
+<h2 id="3-resolve-the-active-processor">3. Resolve the active processor</h2>
 <p>The service compares the complete immutable validated configuration with the
 active one:</p>
 <table>
@@ -1586,13 +1586,13 @@ active one:</p>
 </table>
 <p>Only one preparation path runs at a time. Configuration validation still runs
 for every evaluation.</p>
-<h2 id="4-decode-the-request-body">4. Decode the request body<a class="headerlink" href="#4-decode-the-request-body" title="Permanent link">&para;</a></h2>
+<h2 id="4-decode-the-request-body">4. Decode the request body</h2>
 <p>An empty body is allowed without invoking an engine after configuration
 validation and processor resolution.</p>
 <p>A non-empty body must decode as strict UTF-8. The decoded <code>str</code> is the only
 request input passed to <code>RequestProcessor</code>. Headers, target, content type,
 request ID, and protobuf objects remain in the service layer.</p>
-<h2 id="5-select-the-engine-strategy">5. Select the engine strategy<a class="headerlink" href="#5-select-the-engine-strategy" title="Permanent link">&para;</a></h2>
+<h2 id="5-select-the-engine-strategy">5. Select the engine strategy</h2>
 <p>The processor derives one strategy for the complete stage pipeline:</p>
 <table>
 <thead>
@@ -1617,7 +1617,7 @@ request ID, and protobuf objects remain in the service layer.</p>
 </tbody>
 </table>
 <p>Engines never receive <code>PolicyAction</code>.</p>
-<h2 id="6-run-stages-in-order">6. Run stages in order<a class="headerlink" href="#6-run-stages-in-order" title="Permanent link">&para;</a></h2>
+<h2 id="6-run-stages-in-order">6. Run stages in order</h2>
 <p>The processor:</p>
 <ol>
 <li>validates the input UTF-8 size</li>
@@ -1632,7 +1632,7 @@ request ID, and protobuf objects remain in the service layer.</p>
 later stage receives the preceding stage's output.</p>
 <p>If a stage times out, exceeds a limit, or fails, its partial output is discarded
 and later stages do not run.</p>
-<h2 id="7-validate-engine-output">7. Validate engine output<a class="headerlink" href="#7-validate-engine-output" title="Permanent link">&para;</a></h2>
+<h2 id="7-validate-engine-output">7. Validate engine output</h2>
 <p>The public engine wrapper checks:</p>
 <ul>
 <li>returned model type</li>
@@ -1645,17 +1645,17 @@ and later stages do not run.</p>
 </ul>
 <p>Detection offsets refer to the stage input. Privacy Guard does not remap earlier
 offsets after later replacement stages change the text.</p>
-<h2 id="8-aggregate-detections">8. Aggregate detections<a class="headerlink" href="#8-aggregate-detections" title="Permanent link">&para;</a></h2>
+<h2 id="8-aggregate-detections">8. Aggregate detections</h2>
 <p>After all stages succeed, the processor aggregates occurrences by:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>source stage + entity + confidence
-</span></code></pre></div>
+<p><code>text
+source stage + entity + confidence</code></p>
 <p>It does not deduplicate across stages. Stages may inspect different text
 revisions, and confidence values from different engines are not assumed to be
 calibrated.</p>
 <p>Framework-controlled summary fields exclude matched text, surrounding text,
 offsets, patterns, and engine metadata. Engine-provided entity identifiers
 cross the boundary, so custom engines must not derive them from request text.</p>
-<h2 id="9-apply-the-policy-action">9. Apply the policy action<a class="headerlink" href="#9-apply-the-policy-action" title="Permanent link">&para;</a></h2>
+<h2 id="9-apply-the-policy-action">9. Apply the policy action</h2>
 <table>
 <thead>
 <tr>
@@ -1684,7 +1684,7 @@ cross the boundary, so custom engines must not derive them from request text.</p
 </table>
 <p>A timeout or processing-limit failure returns a deny with
 <code>privacy_guard_limit_exceeded</code> and no partial summaries or replacement.</p>
-<h2 id="10-serialize-the-result">10. Serialize the result<a class="headerlink" href="#10-serialize-the-result" title="Permanent link">&para;</a></h2>
+<h2 id="10-serialize-the-result">10. Serialize the result</h2>
 <p>The service maps the domain result to OpenShell:</p>
 <table>
 <thead>
@@ -1718,7 +1718,7 @@ cross the boundary, so custom engines must not derive them from request text.</p
 </table>
 <p>For detect and block, OpenShell keeps the exact original bytes. For replace,
 Privacy Guard returns the final encoded text even when it equals the input.</p>
-<h2 id="failure-outcomes">Failure outcomes<a class="headerlink" href="#failure-outcomes" title="Permanent link">&para;</a></h2>
+<h2 id="failure-outcomes">Failure outcomes</h2>
 <table>
 <thead>
 <tr>
