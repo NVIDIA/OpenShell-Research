@@ -1,6 +1,6 @@
-# OpenShell Middleware Kit
+# OpenShell Middleware Manager
 
-`openshell-middleware-kit` creates and updates Python or Rust services for OpenShell
+`openshell-middleware-manager` creates and updates Python or Rust services for OpenShell
 supervisor middleware. Each new project starts as a working pass-through gRPC
 service. It includes the protocol file for one OpenShell release, tests,
 dependency locks, and instructions for registering the service.
@@ -16,27 +16,27 @@ The CLI does not install or change OpenShell.
 
 ## Install the CLI
 
-Install `omkit` from GitHub with `uv`:
+Install `omm` from GitHub with `uv`:
 
 ```sh
 uv tool install \
-  "openshell-middleware-kit @ git+https://github.com/NVIDIA/OpenShell-Research.git#subdirectory=projects/openshell-middleware-kit"
+  "openshell-middleware-manager @ git+https://github.com/NVIDIA/OpenShell-Research.git#subdirectory=projects/openshell-middleware-manager"
 ```
 
 If you already have this repository checked out, install from its local path
 instead:
 
 ```sh
-uv tool install /path/to/OpenShell-Research/projects/openshell-middleware-kit
+uv tool install /path/to/OpenShell-Research/projects/openshell-middleware-manager
 ```
 
-Both commands install `omkit` for use outside this repository.
+Both commands install `omm` for use outside this repository.
 
 To work on the CLI itself, use the locked project environment:
 
 ```sh
 uv sync --locked
-uv run omkit --help
+uv run omm --help
 ```
 
 ## Quick start
@@ -44,7 +44,7 @@ uv run omkit --help
 Generate and run a Python starter with the installed command:
 
 ```sh
-omkit create audit-headers \
+omm create audit-headers \
   --language python \
   --openshell-version v0.0.86 \
   --output /tmp/audit-headers
@@ -57,7 +57,7 @@ uv run audit-headers
 Or generate and run a Rust starter:
 
 ```sh
-omkit create audit-headers \
+omm create audit-headers \
   --language rust \
   --openshell-version v0.0.86 \
   --output /tmp/audit-headers-rust
@@ -70,7 +70,7 @@ cargo run --locked -- 127.0.0.1:50051
 The output path must not exist. Pin an OpenShell tag when you need repeatable
 builds. Use `--openshell-version latest` when you want the newest release.
 
-Run `omkit --help` for all options. By default, `omkit` derives the Python package
+Run `omm --help` for all options. By default, `omm` derives the Python package
 name from the project name. Use `--package-name` to set it yourself.
 
 ## Update a project
@@ -78,21 +78,21 @@ name from the project name. Use `--package-name` to set it yourself.
 Run this inside a generated project to use the latest OpenShell release:
 
 ```sh
-omkit update
+omm update
 ```
 
 To choose a release or update a project in another directory:
 
 ```sh
-omkit update /path/to/audit-headers \
+omm update /path/to/audit-headers \
   --openshell-version v0.0.90
 ```
 
-`omkit update` reads `.openshell-middleware-manifest.json` to find the project language
+`omm update` reads `.openshell-middleware-manifest.json` to find the project language
 and Python package. It downloads the selected `supervisor_middleware.proto`,
 regenerates Python protobuf and gRPC bindings when needed, updates `uv.lock` or
 `Cargo.lock`, and writes the version and protocol checksum to the manifest.
-The manifest must name `openshell-middleware-kit` as its generator.
+The manifest must name `openshell-middleware-manager` as its generator.
 
 ## What you get
 
@@ -111,29 +111,33 @@ Start by implementing policy behavior in the generated `validate_config` and
 `evaluate_http_request` functions. The generated README explains how to run the
 service and register it with OpenShell.
 
-## How `omkit` protects your files
+## How `omm` protects your files
 
-`omkit create` builds and checks the project in a temporary directory next to
+`omm create` builds and checks the project in a temporary directory next to
 the output path. It moves the finished project into place only after every
 check passes. If the output path already exists, including as a symlink, the
 command stops without changing it.
 
-`omkit update` works on a temporary copy of the project. It changes only the
+`omm update` works on a temporary copy of the project. It changes only the
 protocol, generated bindings or Rust build files, lockfile, and manifest. It
 runs the project checks before replacing those files. Your implementation files
-stay unchanged. If a file replacement fails, `omkit` restores the files it
+stay unchanged. If a file replacement fails, `omm` restores the files it
 already replaced.
 
-A lock prevents two `omkit` processes from changing the same path at once.
+A lock prevents two `omm` processes from changing the same path at once.
 Normal failures remove the lock and temporary files. If an update and its
-rollback both fail, `omkit` keeps the recovery files and prints their locations.
+rollback both fail, `omm` keeps the recovery files and prints their locations.
 
-If the process is killed, it may leave a `.<output>.openshell-middleware-kit.lock`
-directory and a temporary project directory. Clean them up as follows:
+If the process is killed, it may leave
+`.<output>.openshell-middleware-manager.lock`, the transition-safety lock
+`.<output>.openshell-middleware-kit.lock`, and a temporary project directory.
+The legacy-named lock prevents an older `omkit` process from updating the same
+project concurrently during the rename transition. Clean up both lock
+directories as follows:
 
 1. Open `metadata.json` in the lock directory.
 2. On the host listed in that file, check that the listed PID is no longer an
-   `omkit` process.
+   `omm` or legacy `omkit` process.
 3. For `create`, also check that the requested output path does not exist.
    Never remove the project directory after an interrupted `update`.
 4. Inspect the temporary directory listed in `metadata.json`, then remove only

@@ -70,7 +70,7 @@ checks.
 - Outside generated `bindings/`, only `service/` may import gRPC or generated
   bindings.
 - The copied OpenShell `.proto` and generated bindings must be updated only
-  through `openshell-middleware-kit`; never edit them manually.
+  through `openshell-middleware-manager`; never edit them manually.
 
 ## Extension pattern
 

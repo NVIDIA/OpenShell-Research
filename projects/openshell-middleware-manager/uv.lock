@@ -166,7 +166,7 @@ wheels = [
 ]
 
 [[package]]
-name = "openshell-middleware-kit"
+name = "openshell-middleware-manager"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

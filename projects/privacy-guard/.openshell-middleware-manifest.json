@@ -7,7 +7,7 @@
   ],
   "python_package": "privacy_guard",
   "generator": {
-    "name": "openshell-middleware-kit",
+    "name": "openshell-middleware-manager",
     "version": "0.1.0"
   }
 }
