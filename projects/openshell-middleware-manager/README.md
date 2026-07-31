@@ -128,8 +128,12 @@ A lock prevents two `omm` processes from changing the same path at once.
 Normal failures remove the lock and temporary files. If an update and its
 rollback both fail, `omm` keeps the recovery files and prints their locations.
 
-If the process is killed, it may leave a `.<output>.openshell-middleware-manager.lock`
-directory and a temporary project directory. Clean them up as follows:
+If the process is killed, it may leave
+`.<output>.openshell-middleware-manager.lock`, the transition-safety lock
+`.<output>.openshell-middleware-kit.lock`, and a temporary project directory.
+The legacy-named lock prevents an older `omkit` process from updating the same
+project concurrently during the rename transition. Clean up both lock
+directories as follows:
 
 1. Open `metadata.json` in the lock directory.
 2. On the host listed in that file, check that the listed PID is no longer an

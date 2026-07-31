@@ -720,6 +720,25 @@ def test_refuses_a_reserved_destination(tmp_path: Path) -> None:
             command_runner=no_op_runner,
         )
 
+    assert not (tmp_path / ".reserved.openshell-middleware-kit.lock").exists()
+
+
+def test_refuses_a_legacy_reserved_destination(tmp_path: Path) -> None:
+    destination = tmp_path / "reserved"
+    (tmp_path / ".reserved.openshell-middleware-kit.lock").mkdir()
+
+    with pytest.raises(ProjectError, match="reserved by another openshell-middleware-manager"):
+        create_project(
+            name="reserved",
+            language="rust",
+            requested_version="v0.0.86",
+            destination=destination,
+            download_proto=local_proto,
+            command_runner=no_op_runner,
+        )
+
+    assert not (tmp_path / ".reserved.openshell-middleware-manager.lock").exists()
+
 
 def test_concurrent_destination_is_not_replaced(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -1233,13 +1252,13 @@ def test_require_command_returns_resolved_path(monkeypatch: pytest.MonkeyPatch) 
 
 def test_run_passes_environment_to_subprocess(tmp_path: Path) -> None:
     environment = os.environ.copy()
-    environment["MIDDLEWARE_KIT_TEST_VALUE"] = "present"
+    environment["MIDDLEWARE_MANAGER_TEST_VALUE"] = "present"
 
     generator._run(
         (
             sys.executable,
             "-c",
-            "import os; assert os.environ['MIDDLEWARE_KIT_TEST_VALUE'] == 'present'",
+            "import os; assert os.environ['MIDDLEWARE_MANAGER_TEST_VALUE'] == 'present'",
         ),
         cwd=tmp_path,
         environment=environment,

@@ -37,6 +37,7 @@ _PYTHON_PACKAGE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 _PROJECT_NAME_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$")
 _NETWORK_ATTEMPTS = 4
 _TOOL_NAME = "openshell-middleware-manager"
+_LEGACY_TOOL_NAME = "openshell-middleware-kit"
 _MANIFEST_FILENAME = ".openshell-middleware-manifest.json"
 _STAGING_IGNORED_ROOT_ENTRIES = {
     ".coverage",
@@ -210,9 +211,7 @@ def create_project(
     runner = command_runner if command_runner is not None else _prepare_project
 
     destination.parent.mkdir(parents=True, exist_ok=True)
-    lock_path = destination.parent / f".{destination.name}.{_TOOL_NAME}.lock"
-    lock_token = secrets.token_hex(16)
-    reservation = _acquire_lock(lock_path, lock_token, destination, version)
+    legacy_reservation, reservation = _acquire_output_locks(destination, version)
     staging_path: Path | None = None
     try:
         _validate_destination(destination)
@@ -234,6 +233,7 @@ def create_project(
             python_package=context.package_name if language == "python" else None,
         )
         runner(language, staging_path, context.package_name)
+        _verify_lock(legacy_reservation)
         _verify_lock(reservation)
         _publish_no_replace(staging_path, destination)
         staging_path = None
@@ -245,6 +245,7 @@ def create_project(
         if staging_path is not None:
             shutil.rmtree(staging_path, ignore_errors=True)
         _release_lock(reservation)
+        _release_lock(legacy_reservation)
 
     return ProjectResult(
         destination=destination,
@@ -278,9 +279,7 @@ def update_project(
     downloader = download_proto if download_proto is not None else _download_proto
     runner = command_runner if command_runner is not None else _prepare_project
 
-    lock_path = project_dir.parent / f".{project_dir.name}.{_TOOL_NAME}.lock"
-    lock_token = secrets.token_hex(16)
-    reservation = _acquire_lock(lock_path, lock_token, project_dir, version)
+    legacy_reservation, reservation = _acquire_output_locks(project_dir, version)
     staging_path: Path | None = None
     published = False
     preserve_recovery = False
@@ -298,6 +297,7 @@ def update_project(
             proto=proto,
         )
         runner(metadata.language, staging_path, metadata.python_package or "unused")
+        _verify_lock(legacy_reservation)
         _verify_lock(reservation)
         _verify_project_identity(project_dir, project_stat.st_dev, project_stat.st_ino)
         _validate_refresh_targets(
@@ -323,10 +323,13 @@ def update_project(
         if preserve_recovery:
             with suppress(OSError):
                 os.close(reservation.directory_fd)
+            with suppress(OSError):
+                os.close(legacy_reservation.directory_fd)
         else:
             if staging_path is not None:
                 shutil.rmtree(staging_path, ignore_errors=True)
             _release_lock(reservation)
+            _release_lock(legacy_reservation)
 
     if not published:  # pragma: no cover - defensive; failures raise above
         raise AssertionError("updated project was not published")
@@ -654,6 +657,22 @@ def _acquire_lock(
         _cleanup_reservation(reservation)
         raise
     return reservation
+
+
+def _acquire_output_locks(
+    destination: Path, version: str
+) -> tuple[OutputReservation, OutputReservation]:
+    """Reserve both lock namespaces so older and renamed processes cannot overlap."""
+    token = secrets.token_hex(16)
+    legacy_lock_path = destination.parent / f".{destination.name}.{_LEGACY_TOOL_NAME}.lock"
+    legacy_reservation = _acquire_lock(legacy_lock_path, token, destination, version)
+    current_lock_path = destination.parent / f".{destination.name}.{_TOOL_NAME}.lock"
+    try:
+        current_reservation = _acquire_lock(current_lock_path, token, destination, version)
+    except (OSError, ProjectError):
+        _release_lock(legacy_reservation)
+        raise
+    return legacy_reservation, current_reservation
 
 
 def _write_reservation_file(reservation: OutputReservation, name: str, content: str) -> None:
