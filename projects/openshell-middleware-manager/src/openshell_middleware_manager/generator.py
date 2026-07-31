@@ -624,7 +624,8 @@ def _acquire_lock(
         lock_path.mkdir(mode=0o700)
     except FileExistsError as error:
         raise ProjectError(
-            f"project path is reserved by another {_TOOL_NAME} process: {destination}; "
+            f"project path is reserved by another {_TOOL_NAME} or legacy "
+            f"{_LEGACY_TOOL_NAME} process: {destination}; "
             f"inspect {lock_path / 'metadata.json'} and follow the stale-reservation "
             f"recovery steps in the {_TOOL_NAME} README"
         ) from error

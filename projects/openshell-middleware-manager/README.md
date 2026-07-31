@@ -137,7 +137,7 @@ directories as follows:
 
 1. Open `metadata.json` in the lock directory.
 2. On the host listed in that file, check that the listed PID is no longer an
-   `omm` process.
+   `omm` or legacy `omkit` process.
 3. For `create`, also check that the requested output path does not exist.
    Never remove the project directory after an interrupted `update`.
 4. Inspect the temporary directory listed in `metadata.json`, then remove only
