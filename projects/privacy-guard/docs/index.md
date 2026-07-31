@@ -6,6 +6,12 @@ agent_markdown: true
 
 # Privacy Guard
 
+!!! warning "Experimental software"
+
+    Privacy Guard is a proof of concept, not a guarantee that sensitive data
+    cannot leak. It currently protects only provider-bound network requests
+    that OpenShell routes through this middleware.
+
 Privacy Guard is an OpenShell supervisor middleware. It examines provider-bound
 HTTP request bodies before OpenShell attaches provider credentials. A policy can
 instruct Privacy Guard to:
@@ -15,10 +21,6 @@ instruct Privacy Guard to:
 | `detect` | Allow the original body and report bounded findings |
 | `block` | Deny the request and report bounded findings |
 | `replace` | Allow a body produced by the configured replacement engines and report bounded findings |
-
-> **Experimental:** Privacy Guard is a proof of concept, not a guarantee that
-> sensitive data cannot leak. It currently protects only provider-bound network
-> requests that OpenShell routes through this middleware.
 
 Privacy Guard does not intercept prompts, tool output, transcripts, or session
 history before a harness writes them to disk. Those files may contain raw

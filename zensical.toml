@@ -52,6 +52,8 @@ nav = [
 homepage = "."
 generator = false
 
+[project.markdown_extensions.admonition]
+
 [project.theme]
 custom_dir = "overrides"
 favicon = "assets/brand/favicon.svg"
