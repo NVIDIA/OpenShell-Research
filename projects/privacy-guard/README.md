@@ -190,5 +190,5 @@ and a dependency audit.
 
 The copied `proto/supervisor_middleware.proto` and generated bindings are owned
 by OpenShell. Update them through the repository's
-[`openshell-middleware-kit`](../openshell-middleware-kit/README.md), then run
+[`openshell-middleware-manager`](../openshell-middleware-manager/README.md), then run
 `make check`.

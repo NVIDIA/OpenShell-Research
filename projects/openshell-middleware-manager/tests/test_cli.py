@@ -2,8 +2,8 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from openshell_middleware_kit import cli
-from openshell_middleware_kit.generator import ProjectError, ProjectResult
+from openshell_middleware_manager import cli
+from openshell_middleware_manager.generator import ProjectError, ProjectResult
 
 runner = CliRunner()
 
@@ -79,7 +79,7 @@ def test_cli_reports_project_error(monkeypatch, tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 1
-    assert "omkit: error: output exists" in result.stderr
+    assert "omm: error: output exists" in result.stderr
 
 
 def test_cli_reports_update_success(monkeypatch, tmp_path: Path) -> None:
@@ -124,4 +124,4 @@ def test_cli_reports_update_error(monkeypatch, tmp_path: Path) -> None:
     result = runner.invoke(cli.app, ["update", str(tmp_path)])
 
     assert result.exit_code == 1
-    assert "omkit: error: not generated" in result.stderr
+    assert "omm: error: not generated" in result.stderr

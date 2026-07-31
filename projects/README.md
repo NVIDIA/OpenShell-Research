@@ -6,7 +6,7 @@ layout.
 
 Current projects:
 
-- `openshell-middleware-kit`: `omkit` CLI that creates and updates version-matched
+- `openshell-middleware-manager`: `omm` CLI that creates and updates version-matched
   Python and Rust OpenShell supervisor middleware projects.
 - `privacy-guard`: OpenShell supervisor middleware for inspecting and enforcing
   policy on provider-bound requests before credentials are attached.
