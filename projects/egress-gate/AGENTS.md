@@ -31,7 +31,8 @@ Run focused tests while working and `make check` before handoff.
 
 ## Project map
 
-- `src/egress_gate/gates/`: `Gate`, helper bases, regex-body, and registry
+- `src/egress_gate/gates/`: `Gate`, helper bases, registry, regex-body, and
+  request-rules
 - `src/egress_gate/config.py`: strict `pipeline.gates` and `default_decision`
   policy models
 - `src/egress_gate/request.py`: protobuf-free request and ordered patch models
@@ -70,10 +71,11 @@ dependencies and no request state or policy behavior.
 
 ## Current built-ins and boundaries
 
-This slice ships exactly one built-in: `regex-body`. It preserves bounded
-catalog loading, regex matching, overlap resolution, UTF-8 body handling, and
-detect/deny/replace modes. `request-rules` is the next planned built-in and is
-not implemented in this slice; do not add it speculatively.
+This slice ships exactly two built-ins. `regex-body` preserves bounded catalog
+loading, regex matching, overlap resolution, UTF-8 body handling, and
+detect/deny/replace modes. `request-rules` owns deterministic matching over
+normalized request facts, deny precedence, and terminal rule decisions. Do not
+add more built-ins speculatively.
 
 The OpenShell wire `Finding` remains the released five-field contract:
 `type`, `label`, `count`, `confidence`, and `severity`. Gate provenance is
@@ -89,7 +91,7 @@ middleware phase.
 ## Plan boundaries
 
 The current implementation slice covers the gate contract, strict pipeline
-configuration, finalized registry, regex-body behavior, and request processor.
-Request-rules, active-policy fingerprint replacement hardening, evaluation
+configuration, finalized registry, regex-body and request-rules behavior, and
+request processor. Active-policy fingerprint replacement hardening, evaluation
 tooling, custom semantic examples, and broader documentation remain separate
 planned slices. Do not edit `plans/` as part of implementation work.

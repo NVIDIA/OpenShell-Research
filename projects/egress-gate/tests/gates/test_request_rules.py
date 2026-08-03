@@ -394,6 +394,57 @@ def test_glob_supports_only_literal_characters_and_star_including_slashes() -> N
         _config(_rule("fragment-delimiter", {"path": {"type": "glob", "value": "/x#"}}))
 
 
+@pytest.mark.parametrize(
+    ("pattern", "path", "expected"),
+    [
+        ("*", "", True),
+        ("a*", "a", True),
+        ("*b", "b", True),
+        ("a**b", "a/one/two/b", True),
+        ("a*b*c", "abc", True),
+        ("a*b*c", "a/bee/c", True),
+        ("a*b*c", "a/c/b", False),
+        ("a*b", "ab-tail", False),
+        ("a*b", "prefix-ab", False),
+    ],
+)
+def test_glob_preserves_full_match_and_empty_wildcard_semantics(
+    pattern: str,
+    path: str,
+    expected: bool,
+) -> None:
+    assert (
+        request_rules_module._glob_matches(
+            pattern,
+            path,
+            Timeout.from_seconds(1),
+        )
+        is expected
+    )
+
+
+def test_glob_long_failed_suffix_is_a_normal_no_match() -> None:
+    pattern = "*" + ("a" * 256) + "b"
+    path = "a" * 1024
+
+    assert not request_rules_module._glob_matches(
+        pattern,
+        path,
+        Timeout.from_seconds(1),
+    )
+
+
+def test_glob_many_literal_chunks_match_in_order_without_rescanning() -> None:
+    pattern = "*".join(("start", *(f"part{index}" for index in range(32)), "end"))
+    path = "/".join(("start", *(f"part{index}" for index in range(32)), "end"))
+
+    assert request_rules_module._glob_matches(
+        pattern,
+        path,
+        Timeout.from_seconds(1),
+    )
+
+
 def test_process_matching_is_exact_and_does_not_use_basenames() -> None:
     config = _config(
         _rule(

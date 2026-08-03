@@ -10,7 +10,6 @@ from pydantic import Field, ValidationInfo, field_validator, model_validator
 
 from egress_gate.base import StrictDomainModel
 from egress_gate.constants import MAX_PROTO_TARGET_BYTES
-from egress_gate.errors import GateLimitExceededError
 from egress_gate.gates.base import Gate, GateCapabilities, GateConfig
 from egress_gate.request import HttpRequest
 from egress_gate.result import (
@@ -26,7 +25,6 @@ from egress_gate.timeout import Timeout
 _MAX_RULES = 256
 _MAX_MATCH_VALUES = 64
 _MAX_GLOB_WILDCARDS = 64
-_MAX_GLOB_STEPS = (4 * MAX_PROTO_TARGET_BYTES) + 1
 _HEADER_TOKEN_CHARS = frozenset("!#$%&'*+-.^_`|~")
 _UniqueValueT = TypeVar("_UniqueValueT", str, int)
 
@@ -538,45 +536,44 @@ def _path_matches(
 
 
 def _glob_matches(pattern: str, value: str, timeout: Timeout) -> bool:
-    """Match literal characters and ``*`` in linear time with a shared deadline."""
+    """Match literal chunks separated by ``*`` with a monotonic search cursor."""
 
-    pattern_index = 0
-    value_index = 0
-    star_index = -1
-    star_value_index = -1
-    steps = 0
+    timeout.raise_if_expired()
+    if "*" not in pattern:
+        return pattern == value
 
-    while value_index < len(value):
-        timeout.raise_if_expired()
-        steps += 1
-        if steps > _MAX_GLOB_STEPS:
-            raise GateLimitExceededError("glob matching exceeds the size limit")
-        if (
-            pattern_index < len(pattern)
-            and pattern[pattern_index] != "*"
-            and pattern[pattern_index] == value[value_index]
-        ):
-            pattern_index += 1
-            value_index += 1
-        elif pattern_index < len(pattern) and pattern[pattern_index] == "*":
-            star_index = pattern_index
-            star_value_index = value_index
-            pattern_index += 1
-        elif star_index >= 0:
-            pattern_index = star_index + 1
-            star_value_index += 1
-            value_index = star_value_index
-        else:
+    chunks = pattern.split("*")
+    search_start = 0
+    first_interior_index = 0
+    last_interior_index = len(chunks)
+
+    if chunks[0]:
+        if not value.startswith(chunks[0]):
+            return False
+        search_start = len(chunks[0])
+        first_interior_index = 1
+
+    search_end = len(value)
+    if chunks[-1]:
+        suffix = chunks[-1]
+        if not value.endswith(suffix):
+            return False
+        search_end -= len(suffix)
+        last_interior_index -= 1
+        if search_start > search_end:
             return False
 
-    while pattern_index < len(pattern) and pattern[pattern_index] == "*":
+    for chunk in chunks[first_interior_index:last_interior_index]:
         timeout.raise_if_expired()
-        steps += 1
-        if steps > _MAX_GLOB_STEPS:
-            raise GateLimitExceededError("glob matching exceeds the size limit")
-        pattern_index += 1
+        if not chunk:
+            continue
+        chunk_start = value.find(chunk, search_start, search_end)
+        if chunk_start < 0:
+            return False
+        search_start = chunk_start + len(chunk)
+
     timeout.raise_if_expired()
-    return pattern_index == len(pattern)
+    return search_start <= search_end
 
 
 __all__ = [
