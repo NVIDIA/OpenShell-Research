@@ -37,6 +37,7 @@ from egress_gate.gates.base import (
 )
 from egress_gate.gates.regex_body import RegexBodyGate
 from egress_gate.result import FindingTypeDefinition
+from egress_gate.timeout import Timeout
 
 if TYPE_CHECKING:
     from egress_gate.config import EgressGateConfig
@@ -153,12 +154,21 @@ class GateRegistry:
                 raise EgressGateError(ErrorCode.CONFIG_INVALID) from None
         return config
 
-    def create_gate(self, config: GateConfig) -> Gate[GateConfig, GateResources | None]:
+    def create_gate(
+        self,
+        config: GateConfig,
+        *,
+        timeout: Timeout | None = None,
+    ) -> Gate[GateConfig, GateResources | None]:
         """Construct one initialized gate from its exact validated config."""
         registration = self._resolve_registration(config)
         if type(config) is not registration.config_type:
             raise GateRegistryError("gate config concrete type is invalid")
-        return registration.gate_type(config, registration.resources)
+        return registration.gate_type(
+            config,
+            registration.resources,
+            timeout=timeout,
+        )
 
     def configuration_json_schema(self) -> dict[str, object]:
         """Return the finalized complete pipeline JSON Schema."""

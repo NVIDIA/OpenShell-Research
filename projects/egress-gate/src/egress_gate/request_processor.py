@@ -112,15 +112,20 @@ class RequestProcessor:
                 evaluation = gate.evaluate(current_request, timeout=timeout)
                 evaluation = _reconstruct_evaluation(evaluation)
                 mutation_kinds = _mutation_kinds(evaluation.patch)
+                trace_finding_count = sum(
+                    finding.count for finding in evaluation.findings
+                )
+                if trace_finding_count > MAX_FINDING_COUNT:
+                    raise GateLimitExceededError(
+                        "gate trace finding count exceeds the limit"
+                    )
                 traces.append(
                     GateTrace(
                         gate_name=gate_name,
                         gate_type=gate_type,
                         control=evaluation.control,
                         duration_ms=max(0.0, (monotonic() - started) * 1000),
-                        finding_count=sum(
-                            finding.count for finding in evaluation.findings
-                        ),
+                        finding_count=trace_finding_count,
                         mutation_kinds=mutation_kinds,
                     )
                 )
@@ -297,14 +302,19 @@ def _append_findings(
 
 
 def _compose_patches(first: RequestPatch, second: RequestPatch) -> RequestPatch:
-    return RequestPatch(
-        replacement_body=(
-            second.replacement_body
-            if second.replacement_body is not None
-            else first.replacement_body
-        ),
-        header_mutations=first.header_mutations + second.header_mutations,
-    )
+    try:
+        return RequestPatch(
+            replacement_body=(
+                second.replacement_body
+                if second.replacement_body is not None
+                else first.replacement_body
+            ),
+            header_mutations=first.header_mutations + second.header_mutations,
+        )
+    except (TypeError, ValueError, ValidationError):
+        raise GateLimitExceededError(
+            "composed request patch exceeds a runtime limit"
+        ) from None
 
 
 def _mutation_kinds(patch: RequestPatch) -> tuple[MutationKind, ...]:

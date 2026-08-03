@@ -31,6 +31,9 @@ class _RegistryGate(Gate[_RegistryConfig, None]):
     capabilities = GateCapabilities(reads_context=True)
     finding_types = ()
 
+    def _initialize(self, *, timeout: Timeout | None = None) -> None:
+        self.preparation_timeout = timeout
+
     def _evaluate(
         self,
         request: HttpRequest,
@@ -104,6 +107,21 @@ def test_registry_validates_exact_pipeline_and_gate_config() -> None:
     gate = registry.create_gate(config.pipeline.gates[0].config)
     assert type(gate) is _RegistryGate
     assert gate.config.answer == 42
+
+
+def test_registry_forwards_the_shared_preparation_timeout() -> None:
+    registry = GateRegistry()
+    registry.register(_RegistryGate)
+    registry.finalize()
+    config = registry.validate_config(
+        _pipeline({"gate": "registry-test", "answer": 42})
+    )
+    timeout = Timeout.from_seconds(1)
+
+    gate = registry.create_gate(config.pipeline.gates[0].config, timeout=timeout)
+
+    assert isinstance(gate, _RegistryGate)
+    assert gate.preparation_timeout is timeout
 
 
 def test_registry_injects_typed_application_resources() -> None:

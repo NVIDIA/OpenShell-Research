@@ -87,8 +87,25 @@ def test_detect_mode_reports_overlaps_without_mutating_the_body() -> None:
 
     assert evaluation.control is GateControl.PROCEED
     assert evaluation.patch.replacement_body is None
-    assert len(evaluation.findings) == 3
+    assert len(evaluation.findings) == 2
+    assert sum(finding.count for finding in evaluation.findings) == 3
     assert {finding.label for finding in evaluation.findings} == {"token"}
+
+
+def test_equivalent_detections_are_aggregated_before_evaluation_bounds() -> None:
+    evaluation = _run(
+        _config([{"pattern": "x", "confidence": "high"}]),
+        "x" * 33,
+    )
+
+    assert evaluation.findings == (
+        regex_module.Finding(
+            type="sensitive_entity",
+            label="token",
+            count=33,
+            confidence="high",
+        ),
+    )
 
 
 def test_deny_mode_is_terminal_and_uses_the_stable_gate_reason() -> None:
@@ -155,13 +172,27 @@ def test_regex_features_and_backreferences_keep_their_original_semantics() -> No
     assert len(flags.findings) == 1
 
 
-@pytest.mark.parametrize("pattern", ["", "x*", "(?P<user>x)", "(?i:x)"])
-def test_invalid_patterns_are_rejected_content_safely(pattern: str) -> None:
+@pytest.mark.parametrize("pattern", ["", "(?i:x)"])
+def test_structurally_invalid_patterns_are_rejected_content_safely(
+    pattern: str,
+) -> None:
     with pytest.raises(ValidationError) as exception_info:
         _config([{"pattern": pattern, "confidence": "high"}])
 
     if pattern:
         assert pattern not in str(exception_info.value)
+
+
+@pytest.mark.parametrize("pattern", ["x*", "(?P<user>x)"])
+def test_compile_dependent_pattern_errors_are_rejected_during_preparation(
+    pattern: str,
+) -> None:
+    config = _config([{"pattern": pattern, "confidence": "high"}])
+
+    with pytest.raises(GateConfigurationError) as exception_info:
+        RegexBodyGate(config, None, timeout=Timeout.from_seconds(1))
+
+    assert pattern not in str(exception_info.value)
 
 
 @pytest.mark.parametrize(
@@ -292,7 +323,7 @@ def test_pattern_search_has_an_enforceable_timeout() -> None:
         )
 
 
-def test_patterns_compile_during_validation_and_preparation_not_each_run(
+def test_patterns_compile_during_preparation_not_validation_or_each_run(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     regex_module._clear_compiled_pattern_cache()
@@ -306,13 +337,40 @@ def test_patterns_compile_during_validation_and_preparation_not_each_run(
 
     monkeypatch.setattr(regex_module.regex, "compile", recording_compile)
     config = _config([{"pattern": "x", "confidence": "high"}])
-    RegexBodyGate(config, None)
+    assert compile_count == 0
+    RegexBodyGate(config, None, timeout=Timeout.from_seconds(1))
     prepared_count = compile_count
 
     _run(config, "x")
 
     assert prepared_count > 0
     assert compile_count == prepared_count
+
+
+def test_gate_preparation_honors_an_expired_timeout() -> None:
+    regex_module._clear_compiled_pattern_cache()
+    config = _config([{"pattern": "x", "confidence": "high"}])
+
+    with pytest.raises(TimeoutExpiredError):
+        RegexBodyGate(config, None, timeout=Timeout(deadline=0))
+
+
+def test_compiled_catalog_cache_wait_honors_preparation_timeout() -> None:
+    regex_module._clear_compiled_pattern_cache()
+    catalog = _catalog("cache-contention")
+    regex_module._COMPILED_PATTERN_CACHE_LOCK.acquire()
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(
+                regex_module._compile_pattern_catalog,
+                catalog,
+                timeout=Timeout.from_seconds(0.01),
+            )
+            with pytest.raises(TimeoutExpiredError):
+                future.result(timeout=1)
+    finally:
+        regex_module._COMPILED_PATTERN_CACHE_LOCK.release()
+        regex_module._clear_compiled_pattern_cache()
 
 
 def test_compiled_catalog_cache_evicts_least_recently_used_entry(
@@ -416,9 +474,17 @@ def test_compiled_catalog_same_key_race_accounts_once(
         rule: regex_module.RegexRule,
         catalog_index: int,
         entity_rule_index: int,
+        *,
+        timeout: Timeout | None = None,
     ) -> regex_module._CompiledRule:
         workers_ready.wait(timeout=5)
-        return original_compile_rule(entity, rule, catalog_index, entity_rule_index)
+        return original_compile_rule(
+            entity,
+            rule,
+            catalog_index,
+            entity_rule_index,
+            timeout=timeout,
+        )
 
     monkeypatch.setattr(regex_module, "_compile_rule", synchronized_compile)
     try:

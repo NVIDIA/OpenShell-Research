@@ -70,11 +70,15 @@ class Gate(ABC, Generic[GateConfigT, GateResourcesT]):
         self,
         config: GateConfigT,
         resources: GateResourcesT,
+        *,
+        timeout: Timeout | None = None,
     ) -> None:
         type(self).validate_config(config, resources)
         self.__config = config
         self.__resources = resources
-        self._initialize()
+        if timeout is not None and not isinstance(timeout, Timeout):
+            raise GateConfigurationError("gate preparation timeout is invalid")
+        self._initialize(timeout=timeout)
 
     @classmethod
     def validate_config(
@@ -174,8 +178,8 @@ class Gate(ABC, Generic[GateConfigT, GateResourcesT]):
     ) -> None:
         """Optionally validate resource-backed config without side effects."""
 
-    def _initialize(self) -> None:
-        """Optionally derive reusable state from config and resources."""
+    def _initialize(self, *, timeout: Timeout | None = None) -> None:
+        """Optionally derive reusable state under the preparation deadline."""
 
     @abstractmethod
     def _evaluate(

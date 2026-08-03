@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 import os
 from collections import OrderedDict
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -40,6 +41,7 @@ from egress_gate.errors import (
     GateConfigurationError,
     GateContractError,
     GateLimitExceededError,
+    TimeoutExpiredError,
 )
 from egress_gate.gates.base import GateCapabilities, GateConfig, Utf8BodyGate
 from egress_gate.logging import get_logger
@@ -210,10 +212,12 @@ class RegexBodyConfig(GateConfig):
 
     @model_validator(mode="after")
     def _rules_are_valid(self) -> Self:
-        try:
-            _compile_pattern_catalog(self.pattern_catalog)
-        except (RecursionError, ValueError, regex.error):
-            raise ValueError("regex pattern catalog is invalid") from None
+        if any(
+            _contains_inline_flags(rule.pattern)
+            for entity in self.pattern_catalog.entities
+            for rule in entity.rules
+        ):
+            raise ValueError("regex pattern catalog is invalid")
         if (self.mode is RegexBodyMode.REPLACE) != (self.replacement is not None):
             raise ValueError("regex replacement is required only when mode is replace")
         return self
@@ -230,9 +234,12 @@ class RegexBodyGate(Utf8BodyGate[RegexBodyConfig, None]):
     )
     finding_types = (FindingTypeDefinition(type="sensitive_entity"),)
 
-    def _initialize(self) -> None:
+    def _initialize(self, *, timeout: Timeout | None = None) -> None:
         try:
-            self._rules = _compile_pattern_catalog(self.config.pattern_catalog)
+            self._rules = _compile_pattern_catalog(
+                self.config.pattern_catalog,
+                timeout=timeout,
+            )
         except (RecursionError, ValueError, regex.error):
             raise GateConfigurationError(
                 "regex-body gate configuration is invalid"
@@ -287,14 +294,7 @@ class RegexBodyGate(Utf8BodyGate[RegexBodyConfig, None]):
             )
         )
         detections = tuple(item[0] for item in detections_with_identity)
-        findings = tuple(
-            Finding(
-                type="sensitive_entity",
-                label=detection.entity,
-                confidence=detection.confidence.value,
-            )
-            for detection in detections
-        )
+        findings = _aggregate_findings(detections)
         output_text = text
         if self.config.mode is RegexBodyMode.REPLACE and detections:
             replacement = self.config.replacement
@@ -334,6 +334,24 @@ class _RegexDetection:
     start: int
     end: int
     confidence: ConfidenceLevel
+
+
+def _aggregate_findings(
+    detections: tuple[_RegexDetection, ...],
+) -> tuple[Finding, ...]:
+    counts: OrderedDict[tuple[str, ConfidenceLevel], int] = OrderedDict()
+    for detection in detections:
+        key = (detection.entity, detection.confidence)
+        counts[key] = counts.get(key, 0) + 1
+    return tuple(
+        Finding(
+            type="sensitive_entity",
+            label=entity,
+            count=count,
+            confidence=confidence.value,
+        )
+        for (entity, confidence), count in counts.items()
+    )
 
 
 class _RegexMatch(Protocol):
@@ -506,24 +524,32 @@ def _validate_name(value: str) -> str:
 
 def _compile_pattern_catalog(
     catalog: RegexPatternCatalog,
+    *,
+    timeout: Timeout | None = None,
 ) -> tuple[_CompiledRule, ...]:
-    with _COMPILED_PATTERN_CACHE_LOCK:
+    _raise_if_expired(timeout)
+    with _compiled_pattern_cache_lock(timeout):
         cached = _COMPILED_PATTERN_CACHE.get(catalog)
         if cached is not None:
             _COMPILED_PATTERN_CACHE.move_to_end(catalog)
             return cached[0]
 
-    rules = tuple(
-        _compile_rule(
-            entity,
-            rule,
-            catalog_index=global_index,
-            entity_rule_index=rule_index,
+    rules_list: list[_CompiledRule] = []
+    for global_index, (entity, rule_index, rule) in enumerate(
+        _iter_catalog_rules(catalog)
+    ):
+        _raise_if_expired(timeout)
+        rules_list.append(
+            _compile_rule(
+                entity,
+                rule,
+                catalog_index=global_index,
+                entity_rule_index=rule_index,
+                timeout=timeout,
+            )
         )
-        for global_index, (entity, rule_index, rule) in enumerate(
-            _iter_catalog_rules(catalog)
-        )
-    )
+    rules = tuple(rules_list)
+    _raise_if_expired(timeout)
     weight_bytes = _compiled_pattern_weight(catalog, len(rules))
     if weight_bytes > MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES:
         _LOGGER.debug(
@@ -536,7 +562,7 @@ def _compile_pattern_catalog(
 
     evicted_entries = 0
     evicted_weight_bytes = 0
-    with _COMPILED_PATTERN_CACHE_LOCK:
+    with _compiled_pattern_cache_lock(timeout):
         cached = _COMPILED_PATTERN_CACHE.get(catalog)
         if cached is not None:
             _COMPILED_PATTERN_CACHE.move_to_end(catalog)
@@ -562,6 +588,25 @@ def _compile_pattern_catalog(
             evicted_weight_bytes,
         )
     return rules
+
+
+@contextmanager
+def _compiled_pattern_cache_lock(timeout: Timeout | None) -> Iterator[None]:
+    if timeout is None:
+        _COMPILED_PATTERN_CACHE_LOCK.acquire()
+    elif not _COMPILED_PATTERN_CACHE_LOCK.acquire(timeout=timeout.remaining_seconds()):
+        raise TimeoutExpiredError
+    try:
+        _raise_if_expired(timeout)
+        yield
+        _raise_if_expired(timeout)
+    finally:
+        _COMPILED_PATTERN_CACHE_LOCK.release()
+
+
+def _raise_if_expired(timeout: Timeout | None) -> None:
+    if timeout is not None:
+        timeout.raise_if_expired()
 
 
 def _compiled_pattern_weight(
@@ -592,7 +637,10 @@ def _compile_rule(
     rule: RegexRule,
     catalog_index: int,
     entity_rule_index: int,
+    *,
+    timeout: Timeout | None = None,
 ) -> _CompiledRule:
+    _raise_if_expired(timeout)
     flags = 0
     if rule.ignore_case:
         flags |= regex.IGNORECASE
@@ -605,12 +653,19 @@ def _compile_rule(
     if _contains_inline_flags(rule.pattern):
         raise ValueError("inline flags are unsupported")
     unmarked = regex.compile(rule.pattern, flags)
+    _raise_if_expired(timeout)
     if unmarked.groupindex:
         raise ValueError("named groups are reserved")
-    if unmarked.search("") is not None:
+    if timeout is None:
+        empty_match = unmarked.search("")
+    else:
+        with timeout.enforce():
+            empty_match = unmarked.search("", timeout=timeout.remaining_seconds())
+    if empty_match is not None:
         raise ValueError("pattern must not match empty input")
     marker = f"_eg_rule_{catalog_index:06d}"
     compiled = regex.compile(f"(?:{rule.pattern})(?P<{marker}>)", flags)
+    _raise_if_expired(timeout)
     if marker not in compiled.groupindex:
         raise ValueError("internal marker is missing")
     rule_identity = rule.name or f"{entity.name}.rules[{entity_rule_index}]"
@@ -625,12 +680,10 @@ def _compile_rule(
 
 def _iter_catalog_rules(
     catalog: RegexPatternCatalog,
-) -> tuple[tuple[RegexEntity, int, RegexRule], ...]:
-    return tuple(
-        (entity, rule_index, rule)
-        for entity in catalog.entities
-        for rule_index, rule in enumerate(entity.rules)
-    )
+) -> Iterator[tuple[RegexEntity, int, RegexRule]]:
+    for entity in catalog.entities:
+        for rule_index, rule in enumerate(entity.rules):
+            yield entity, rule_index, rule
 
 
 def _contains_inline_flags(pattern: str) -> bool:

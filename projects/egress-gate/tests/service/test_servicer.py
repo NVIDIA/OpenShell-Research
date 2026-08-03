@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier, Event
 from typing import Never
 
 import grpc
@@ -11,6 +14,7 @@ from google.protobuf import json_format
 from google.protobuf.message import Message
 
 from egress_gate.bindings import supervisor_middleware_pb2 as pb2
+from egress_gate.config import EgressGateConfig
 from egress_gate.constants import (
     BLOCK_REASON,
     DEFAULT_DENY_REASON_CODE,
@@ -24,8 +28,8 @@ from egress_gate.constants import (
     MAX_PROTO_HEADERS_BYTES,
     MAX_PROTO_TARGET_BYTES,
 )
-from egress_gate.errors import EgressGateError, ErrorCode
-from egress_gate.gates import create_builtin_registry
+from egress_gate.errors import EgressGateError, ErrorCode, GateRegistryError
+from egress_gate.gates import GateConfig, create_builtin_registry
 from egress_gate.request import (
     ExistingHeaderAction,
     RequestPatch,
@@ -33,6 +37,7 @@ from egress_gate.request import (
 )
 from egress_gate.result import (
     DecisionSource,
+    DecisionSourceKind,
     EgressDecision,
     EgressResult,
     Finding,
@@ -281,6 +286,282 @@ def test_processor_preparation_reuses_only_the_current_validated_policy() -> Non
 
     assert same is first
     assert changed is not first
+
+
+def test_concurrent_same_candidate_is_prepared_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    middleware = EgressGateMiddleware(create_builtin_registry())
+    original_create_gate = middleware._registry.create_gate
+    workers_ready = Barrier(2)
+    build_started = Event()
+    release_build = Event()
+    create_count = 0
+
+    def counted_create_gate(
+        config: GateConfig,
+        *,
+        timeout: Timeout | None = None,
+    ) -> object:
+        nonlocal create_count
+        create_count += 1
+        build_started.set()
+        assert release_build.wait(2)
+        return original_create_gate(config, timeout=timeout)
+
+    monkeypatch.setattr(middleware._registry, "create_gate", counted_create_gate)
+
+    def resolve_candidate() -> object:
+        workers_ready.wait(timeout=2)
+        return middleware._policy.processor_for(
+            _values(),
+            timeout=Timeout.from_seconds(2),
+        )
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            first_future = executor.submit(resolve_candidate)
+            second_future = executor.submit(resolve_candidate)
+            assert build_started.wait(1)
+            assert not first_future.done()
+            assert not second_future.done()
+            release_build.set()
+            first = first_future.result()
+            second = second_future.result()
+    finally:
+        release_build.set()
+        asyncio.run(middleware.close())
+
+    assert second is first
+    assert create_count == 1
+
+
+def test_failed_candidate_leaves_the_old_policy_active(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    middleware = EgressGateMiddleware(create_builtin_registry())
+    old = middleware._policy.processor_for(_values(), timeout=Timeout.from_seconds(1))
+    original_create_gate = middleware._registry.create_gate
+
+    def fail_changed_candidate(
+        config: GateConfig,
+        *,
+        timeout: Timeout | None = None,
+    ) -> object:
+        if getattr(config, "mode", None) == "replace":
+            raise GateRegistryError("candidate preparation failed")
+        return original_create_gate(config, timeout=timeout)
+
+    monkeypatch.setattr(
+        middleware._registry,
+        "create_gate",
+        fail_changed_candidate,
+    )
+    try:
+        with pytest.raises(EgressGateError) as error:
+            middleware._policy.processor_for(
+                _values(mode="replace"),
+                timeout=Timeout.from_seconds(1),
+            )
+        active = middleware._policy.processor_for(
+            _values(), timeout=Timeout.from_seconds(1)
+        )
+    finally:
+        asyncio.run(middleware.close())
+
+    assert error.value.code is ErrorCode.CONFIG_INVALID
+    assert active is old
+
+
+def test_in_flight_processor_reference_survives_policy_replacement() -> None:
+    middleware = EgressGateMiddleware(create_builtin_registry())
+    try:
+        old = middleware._policy.processor_for(
+            _values(), timeout=Timeout.from_seconds(1)
+        )
+        replacement = middleware._policy.processor_for(
+            _values(mode="replace"), timeout=Timeout.from_seconds(1)
+        )
+        domain_request = servicer_module._request_from_proto(_request())
+
+        old_result = old.process(domain_request, timeout=Timeout.from_seconds(1))
+        replacement_result = replacement.process(
+            domain_request,
+            timeout=Timeout.from_seconds(1),
+        )
+    finally:
+        asyncio.run(middleware.close())
+
+    assert old_result.patch.replacement_body is None
+    assert replacement_result.patch.replacement_body == b"[token]"
+
+
+@pytest.mark.asyncio
+async def test_cancelled_candidate_keeps_its_slot_and_is_not_published(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    middleware = EgressGateMiddleware(
+        create_builtin_registry(),
+        timeout_seconds=5,
+    )
+    old = middleware._policy.processor_for(_values(), timeout=Timeout.from_seconds(1))
+    started = Event()
+    release = Event()
+    original_build = middleware._policy._build_processor
+
+    def blocked_build(
+        config: EgressGateConfig[GateConfig],
+        *,
+        timeout: Timeout,
+    ) -> object:
+        started.set()
+        assert release.wait(2)
+        return original_build(config, timeout=timeout)
+
+    monkeypatch.setattr(middleware._policy, "_build_processor", blocked_build)
+    changed_request = _request()
+    changed_request.config.CopyFrom(_proto_config(_values(mode="replace")))
+    task = asyncio.create_task(
+        middleware._evaluate_http_request(
+            changed_request,
+            Timeout.from_seconds(5),
+        )
+    )
+    try:
+        assert await asyncio.to_thread(started.wait, 1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert middleware._processing_slots._value == 3
+
+        release.set()
+        for _ in range(100):
+            if middleware._processing_slots._value == 4:
+                break
+            await asyncio.sleep(0.01)
+
+        assert middleware._processing_slots._value == 4
+        assert middleware._policy._processor is old
+    finally:
+        release.set()
+        await middleware.close()
+
+
+@pytest.mark.asyncio
+async def test_result_serialization_is_bracketed_by_the_shared_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    middleware = EgressGateMiddleware(create_builtin_registry())
+    result = EgressResult(
+        decision=EgressDecision.ALLOW,
+        decision_source=DecisionSource.pipeline_default(),
+    )
+    events: list[str] = []
+    original_serialize = servicer_module._result_to_proto_with_source
+
+    async def return_result(*args: object, **kwargs: object) -> EgressResult:
+        del args, kwargs
+        return result
+
+    def record_deadline_check(self: Timeout) -> None:
+        del self
+        events.append("deadline")
+
+    def record_serialization(
+        value: EgressResult,
+    ) -> tuple[pb2.HttpRequestResult, str]:
+        events.append("serialize")
+        return original_serialize(value)
+
+    monkeypatch.setattr(middleware, "_run_in_worker", return_result)
+    monkeypatch.setattr(Timeout, "raise_if_expired", record_deadline_check)
+    monkeypatch.setattr(
+        servicer_module,
+        "_result_to_proto_with_source",
+        record_serialization,
+    )
+    try:
+        await middleware._evaluate_http_request(
+            _request(),
+            Timeout.from_seconds(1),
+        )
+    finally:
+        await middleware.close()
+
+    assert events == ["deadline", "serialize", "deadline"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("mode", "expected_source"),
+    (("detect", "pipeline_default"), ("deny", "gate")),
+)
+async def test_evaluation_log_records_decision_source(
+    mode: str,
+    expected_source: str,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    middleware = EgressGateMiddleware(create_builtin_registry())
+    request = _request()
+    request.config.CopyFrom(_proto_config(_values(mode=mode)))
+    try:
+        with caplog.at_level(logging.INFO, logger=servicer_module.__name__):
+            await middleware._evaluate_rpc(request, _SuccessfulEvaluationContext())
+    finally:
+        await middleware.close()
+
+    record = next(
+        item
+        for item in caplog.records
+        if item.message.startswith("egress_gate_evaluation")
+    )
+    assert getattr(record, "decision_source_kind", None) == expected_source
+
+
+@pytest.mark.asyncio
+async def test_evaluation_log_records_runtime_limit_source(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    middleware = EgressGateMiddleware(create_builtin_registry())
+
+    async def return_limit(
+        *args: object,
+        **kwargs: object,
+    ) -> tuple[pb2.HttpRequestResult, str]:
+        del args, kwargs
+        return servicer_module._limit_deny(), DecisionSourceKind.RUNTIME_LIMIT.value
+
+    monkeypatch.setattr(
+        middleware,
+        "_evaluate_http_request_with_source",
+        return_limit,
+    )
+    try:
+        with caplog.at_level(logging.INFO, logger=servicer_module.__name__):
+            await middleware._evaluate_rpc(_request(), _SuccessfulEvaluationContext())
+    finally:
+        await middleware.close()
+
+    record = next(
+        item
+        for item in caplog.records
+        if item.message.startswith("egress_gate_evaluation")
+    )
+    assert getattr(record, "decision_source_kind", None) == "runtime_limit"
+
+
+def test_serialized_limit_result_reports_runtime_limit_source() -> None:
+    result = EgressResult(
+        decision=EgressDecision.DENY,
+        decision_source=DecisionSource.runtime_limit(),
+        reason_code=LIMIT_REASON_CODE,
+    )
+
+    response, source_kind = servicer_module._result_to_proto_with_source(result)
+
+    assert response.reason_code == LIMIT_REASON_CODE
+    assert source_kind == DecisionSourceKind.RUNTIME_LIMIT.value
 
 
 def test_invalid_utf8_is_an_input_failure_before_wire_evaluation() -> None:

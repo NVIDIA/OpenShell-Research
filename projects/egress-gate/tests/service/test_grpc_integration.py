@@ -12,6 +12,7 @@ from google.protobuf.message import Message
 
 from egress_gate.bindings import supervisor_middleware_pb2 as pb2
 from egress_gate.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
+from egress_gate.errors import EgressGateError, ErrorCode
 from egress_gate.gates import create_builtin_registry
 from egress_gate.service.servicer import EgressGateMiddleware
 
@@ -140,3 +141,22 @@ async def test_generated_stub_maps_invalid_phase_to_invalid_argument() -> None:
 
     assert error.value.code() is grpc.StatusCode.INVALID_ARGUMENT
     assert "request_phase_invalid" in (error.value.details() or "")
+
+
+@pytest.mark.asyncio
+async def test_generated_stub_maps_gate_failure_to_internal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    middleware = EgressGateMiddleware(create_builtin_registry())
+
+    def fail_processing(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        raise EgressGateError(ErrorCode.GATE_EXECUTION_FAILED)
+
+    monkeypatch.setattr(middleware, "_prepare_and_process", fail_processing)
+    async with _running_stub(middleware) as stub:
+        with pytest.raises(grpc.aio.AioRpcError) as error:
+            await stub.EvaluateHttpRequest(_evaluation(b"body"))
+
+    assert error.value.code() is grpc.StatusCode.INTERNAL
+    assert "gate_execution_failed" in (error.value.details() or "")

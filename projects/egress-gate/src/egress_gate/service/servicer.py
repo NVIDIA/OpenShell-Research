@@ -8,7 +8,7 @@ import math
 import time
 from collections.abc import Callable, Iterable
 from concurrent.futures import Future, ThreadPoolExecutor
-from threading import Lock
+from threading import Event, Lock
 from typing import Never, Protocol, TypedDict, TypeVar
 
 import grpc
@@ -58,7 +58,12 @@ from egress_gate.request import (
     WriteHeaderMutation,
 )
 from egress_gate.request_processor import RequestProcessor
-from egress_gate.result import EgressDecision, EgressResult, SourcedFinding
+from egress_gate.result import (
+    DecisionSourceKind,
+    EgressDecision,
+    EgressResult,
+    SourcedFinding,
+)
 from egress_gate.string_validators import validate_bounded_metadata_string
 from egress_gate.timeout import Timeout, validate_timeout_seconds
 
@@ -160,13 +165,17 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         source_kind = "none"
         try:
             timeout = Timeout.from_seconds(self._timeout_seconds)
-            response = await self._evaluate_http_request(request, timeout)
+            response, source_kind = await self._evaluate_http_request_with_source(
+                request,
+                timeout,
+            )
             action = "allow" if response.decision == pb2.DECISION_ALLOW else "deny"
             finding_count = sum(finding.count for finding in response.findings)
             return response
         except TimeoutExpiredError:
             response = _limit_deny()
             action = "deny"
+            source_kind = DecisionSourceKind.RUNTIME_LIMIT.value
             return response
         except EgressGateError as error:
             failure = error
@@ -204,24 +213,47 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         request: pb2.HttpRequestEvaluation,
         timeout: Timeout,
     ) -> pb2.HttpRequestResult:
+        response, _ = await self._evaluate_http_request_with_source(request, timeout)
+        return response
+
+    async def _evaluate_http_request_with_source(
+        self,
+        request: pb2.HttpRequestEvaluation,
+        timeout: Timeout,
+    ) -> tuple[pb2.HttpRequestResult, str]:
         if request.phase != pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS:
             raise EgressGateError(ErrorCode.REQUEST_PHASE_INVALID)
         if len(request.body) > MAX_BODY_BYTES:
             raise EgressGateError(ErrorCode.REQUEST_BODY_TOO_LARGE)
         _validate_evaluation_envelope(request)
+        publication_cancelled = Event()
         result = await self._run_in_worker(
-            lambda: self._prepare_and_process(request, timeout),
+            lambda: self._prepare_and_process(
+                request,
+                timeout,
+                publication_cancelled=publication_cancelled,
+            ),
             timeout=timeout,
+            on_cancel=publication_cancelled.set,
         )
-        return _result_to_proto(result)
+        timeout.raise_if_expired()
+        response, source_kind = _result_to_proto_with_source(result)
+        timeout.raise_if_expired()
+        return response, source_kind
 
     def _prepare_and_process(
         self,
         request: pb2.HttpRequestEvaluation,
         timeout: Timeout,
+        *,
+        publication_cancelled: Event | None = None,
     ) -> EgressResult:
         values = _mapping_from_proto(request.config)
-        processor = self._policy.processor_for(values, timeout=timeout)
+        processor = self._policy.processor_for(
+            values,
+            timeout=timeout,
+            publication_cancelled=publication_cancelled,
+        )
         domain_request = _request_from_proto(request)
         return processor.process(domain_request, timeout=timeout)
 
@@ -230,6 +262,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         operation: Callable[[], _WorkerResultT],
         *,
         timeout: Timeout | None = None,
+        on_cancel: Callable[[], None] | None = None,
     ) -> _WorkerResultT:
         """Run one bounded synchronous operation without blocking the event loop."""
         try:
@@ -250,8 +283,18 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         except BaseException:
             self._processing_slots.release()
             raise
-        future.add_done_callback(lambda _: self._processing_slots.release())
-        return await asyncio.shield(future)
+        future.add_done_callback(self._worker_finished)
+        try:
+            return await asyncio.shield(future)
+        except asyncio.CancelledError:
+            if on_cancel is not None:
+                on_cancel()
+            raise
+
+    def _worker_finished(self, future: asyncio.Future[object]) -> None:
+        self._processing_slots.release()
+        if not future.cancelled():
+            future.exception()
 
 
 class _ActivePolicy:
@@ -274,6 +317,7 @@ class _ActivePolicy:
         values: object,
         *,
         timeout: Timeout,
+        publication_cancelled: Event | None = None,
     ) -> RequestProcessor:
         """Validate and activate a complete candidate under the shared deadline."""
         config = self._registry.validate_config(values)
@@ -286,6 +330,8 @@ class _ActivePolicy:
                 return self._processor
             processor = self._build_processor(config, timeout=timeout)
             timeout.raise_if_expired()
+            if publication_cancelled is not None and publication_cancelled.is_set():
+                raise _PolicyPublicationCancelled
             self._config = config
             self._processor = processor
             return processor
@@ -310,7 +356,10 @@ class _ActivePolicy:
                 (
                     configured_gate.name,
                     gate_type,
-                    self._registry.create_gate(configured_gate.config),
+                    self._registry.create_gate(
+                        configured_gate.config,
+                        timeout=timeout,
+                    ),
                 )
             )
         fingerprint = self._registry.policy_fingerprint(config)
@@ -473,6 +522,23 @@ def _varint_size(value: int) -> int:
 
 
 def _result_to_proto(result: EgressResult) -> pb2.HttpRequestResult:
+    response, _ = _result_to_proto_with_source(result)
+    return response
+
+
+def _result_to_proto_with_source(
+    result: EgressResult,
+) -> tuple[pb2.HttpRequestResult, str]:
+    response = _serialize_result(result)
+    if (
+        response.reason_code == LIMIT_REASON_CODE
+        and result.reason_code != LIMIT_REASON_CODE
+    ):
+        return response, DecisionSourceKind.RUNTIME_LIMIT.value
+    return response, result.decision_source.kind.value
+
+
+def _serialize_result(result: EgressResult) -> pb2.HttpRequestResult:
     try:
         response = pb2.HttpRequestResult(
             decision=(
@@ -565,6 +631,10 @@ def _limit_deny() -> pb2.HttpRequestResult:
 _LOGGER = get_logger(__name__)
 _INVALID_REQUEST_ID = "invalid"
 _MAX_PROTO_SAFE_INTEGER = (1 << 53) - 1
+
+
+class _PolicyPublicationCancelled(Exception):
+    """Signal that a disconnected RPC no longer owns candidate publication."""
 
 
 __all__ = ["EgressGateMiddleware"]

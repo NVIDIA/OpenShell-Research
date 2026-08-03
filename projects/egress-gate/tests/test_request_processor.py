@@ -9,7 +9,12 @@ from typing import Literal
 import pytest
 
 from egress_gate.config import DefaultDecision
-from egress_gate.constants import DEFAULT_DENY_REASON_CODE, LIMIT_REASON_CODE
+from egress_gate.constants import (
+    DEFAULT_DENY_REASON_CODE,
+    LIMIT_REASON_CODE,
+    MAX_FINDING_COUNT,
+    MAX_HEADER_MUTATIONS,
+)
 from egress_gate.errors import (
     EgressGateError,
     ErrorCode,
@@ -48,7 +53,9 @@ class _ControlConfig(GateConfig):
     replacement: str | None = None
     expected_body: str | None = None
     header_value: str | None = None
+    header_count: int = 0
     finding_label: str | None = None
+    finding_count: int = 1
     emit_twice: bool = False
     reason_code: str | None = None
 
@@ -81,6 +88,7 @@ class _ControlGate(Gate[_ControlConfig, None]):
             finding = Finding(
                 type="test_observation",
                 label=self.config.finding_label,
+                count=self.config.finding_count,
             )
             findings = (finding,)
             if self.config.emit_twice:
@@ -92,8 +100,15 @@ class _ControlGate(Gate[_ControlConfig, None]):
             )
         if self.config.control == "allow":
             return GateEvaluation.allow(findings=findings)
-        mutations: tuple[WriteHeaderMutation, ...] = ()
-        if self.config.header_value is not None:
+        mutations: tuple[WriteHeaderMutation, ...] = tuple(
+            WriteHeaderMutation(
+                name=f"x-openshell-middleware-test-{index}",
+                value=self.config.header_value or "true",
+                on_existing=ExistingHeaderAction.OVERWRITE,
+            )
+            for index in range(self.config.header_count)
+        )
+        if self.config.header_value is not None and not mutations:
             mutations = (
                 WriteHeaderMutation(
                     name="x-openshell-middleware-test",
@@ -326,6 +341,58 @@ def test_expired_shared_timeout_returns_atomic_runtime_limit_result() -> None:
     assert result.decision_source.kind is DecisionSourceKind.RUNTIME_LIMIT
     assert result.reason_code == LIMIT_REASON_CODE
     assert result.patch.is_empty
+
+
+def test_composed_header_mutation_overflow_is_an_atomic_runtime_limit() -> None:
+    processor = _processor(
+        (
+            (
+                "first",
+                {"gate": "test-control", "header_count": MAX_HEADER_MUTATIONS // 2},
+            ),
+            (
+                "second",
+                {
+                    "gate": "test-control",
+                    "header_count": MAX_HEADER_MUTATIONS // 2 + 1,
+                },
+            ),
+        )
+    )
+
+    result = processor.process(_request(), timeout=Timeout.from_seconds(1))
+
+    assert result.decision is EgressDecision.DENY
+    assert result.decision_source.kind is DecisionSourceKind.RUNTIME_LIMIT
+    assert result.reason_code == LIMIT_REASON_CODE
+    assert result.patch.is_empty
+    assert result.findings == ()
+    assert result.traces == ()
+
+
+def test_trace_finding_count_overflow_is_an_atomic_runtime_limit() -> None:
+    processor = _processor(
+        (
+            (
+                "observations",
+                {
+                    "gate": "test-control",
+                    "finding_label": "same",
+                    "finding_count": MAX_FINDING_COUNT,
+                    "emit_twice": True,
+                },
+            ),
+        )
+    )
+
+    result = processor.process(_request(), timeout=Timeout.from_seconds(1))
+
+    assert result.decision is EgressDecision.DENY
+    assert result.decision_source.kind is DecisionSourceKind.RUNTIME_LIMIT
+    assert result.reason_code == LIMIT_REASON_CODE
+    assert result.patch.is_empty
+    assert result.findings == ()
+    assert result.traces == ()
 
 
 def test_invalid_utf8_is_translated_to_the_stable_input_error() -> None:
