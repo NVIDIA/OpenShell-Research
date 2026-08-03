@@ -51,15 +51,16 @@ by its literal `gate` discriminator. Unknown fields, unknown gate types,
 missing defaults, duplicate names, and more than ten entries are rejected.
 There is no compatibility acceptance for legacy policy keys.
 
-## Built-in regex-body
+## Built-in gates
 
-The shipped registry contains `regex-body`. See [Regex-body](gates/regex.md)
-for catalogs and replacement templates. Its `mode` is required and is one of
-`detect`, `deny`, or `replace`; a replacement recipe is required exactly when
-the mode is `replace`.
+The shipped registry contains `regex-body` and `request-rules`. See
+[Regex-body](gates/regex.md) for catalogs and replacement templates. Its `mode`
+is required and is one of `detect`, `deny`, or `replace`; a replacement recipe
+is required exactly when the mode is `replace`.
 
-`request-rules` is planned but is not installed by this slice. Other behavior
-is supplied by a trusted application registry factory, not by configuration.
+See [Request-rules](gates/request-rules.md) for deterministic matching over
+request target, visible headers, and process ancestry. Other behavior is
+supplied by a trusted application registry factory, not by configuration.
 
 ## Inspect the installed registry
 

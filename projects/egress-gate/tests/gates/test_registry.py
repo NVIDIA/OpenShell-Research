@@ -80,17 +80,18 @@ def _pipeline(config: dict[str, object]) -> dict[str, object]:
     }
 
 
-def test_builtin_registry_is_finalized_and_contains_only_regex_body() -> None:
+def test_builtin_registry_is_finalized_and_contains_exactly_the_two_builtins() -> None:
     registry = create_builtin_registry()
 
     assert registry.is_finalized
     assert tuple(item.gate_type for item in registry.describe_gates()) == (
         "regex-body",
+        "request-rules",
     )
     schema = registry.configuration_json_schema()
     assert "pipeline" in str(schema.get("properties"))
     assert "entity_processing" not in str(schema)
-    assert "request-rules" not in str(schema)
+    assert "request-rules" in str(schema)
 
 
 def test_registry_validates_exact_pipeline_and_gate_config() -> None:

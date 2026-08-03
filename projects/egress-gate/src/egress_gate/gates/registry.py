@@ -36,6 +36,7 @@ from egress_gate.gates.base import (
     GateResources,
 )
 from egress_gate.gates.regex_body import RegexBodyGate
+from egress_gate.gates.request_rules import RequestRulesGate
 from egress_gate.result import FindingTypeDefinition
 from egress_gate.timeout import Timeout
 
@@ -61,6 +62,7 @@ class GateRegistry:
         self._config_adapter: TypeAdapter[object] | None = None
         if include_builtin_gates:
             self.register(RegexBodyGate)
+            self.register(RequestRulesGate)
 
     @property
     def is_finalized(self) -> bool:

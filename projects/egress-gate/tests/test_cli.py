@@ -18,6 +18,7 @@ def test_cli_gates_describes_the_request_level_builtin() -> None:
 
     assert result.exit_code == 0
     assert result.stdout.startswith("regex-body\tsensitive_entity\t")
+    assert "request-rules\trequest_rule_match\t" in result.stdout
     assert "engines" not in result.stdout
 
 

@@ -22,6 +22,18 @@ from egress_gate.gates.registry import (
     GateRegistry,
     create_builtin_registry,
 )
+from egress_gate.gates.request_rules import (
+    AllowRequestRule,
+    DenyRequestRule,
+    ExactPath,
+    GlobPath,
+    PrefixPath,
+    RequestRule,
+    RequestRuleMatch,
+    RequestRulePath,
+    RequestRulesConfig,
+    RequestRulesGate,
+)
 from egress_gate.result import FindingTypeDefinition
 
 __all__ = [
@@ -40,6 +52,16 @@ __all__ = [
     "RegexPatternCatalog",
     "RegexReplacement",
     "RegexRule",
+    "AllowRequestRule",
+    "DenyRequestRule",
+    "ExactPath",
+    "GlobPath",
+    "PrefixPath",
+    "RequestRule",
+    "RequestRuleMatch",
+    "RequestRulePath",
+    "RequestRulesConfig",
+    "RequestRulesGate",
     "Utf8BodyGate",
     "create_builtin_registry",
 ]

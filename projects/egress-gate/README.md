@@ -43,10 +43,11 @@ pipeline:
   default_decision: allow
 ```
 
-The shipped registry contains `regex-body`. It supports `detect`, `deny`, and
-`replace`; replacement mode preserves an explicit body-replacement intent even
-when the resulting bytes equal the input. `request-rules` is planned for a
-later slice. Custom trusted gates can be added through `--registry-factory`.
+The shipped registry contains exactly `regex-body` and `request-rules`.
+`regex-body` supports `detect`, `deny`, and `replace`; replacement mode
+preserves an explicit body-replacement intent even when the resulting bytes
+equal the input. `request-rules` provides deterministic matching over request
+facts. Custom trusted gates can be added through `--registry-factory`.
 
 ```bash
 uv run egress-gate --registry-factory my_gates:create_registry gates
@@ -77,9 +78,11 @@ through slot acquisition, policy preparation, and `RequestProcessor.process`.
 - [Operations](docs/operations.md)
 - [Gate authoring](docs/gates/custom.md)
 - [Regex-body](docs/gates/regex.md)
+- [Request-rules](docs/gates/request-rules.md)
 - [Architecture](docs/architecture/index.md)
 - [Limits and failures](docs/reference/limits-and-failures.md)
 - [Regex-body example](examples/regex-engine/README.md)
+- [Deterministic request-rules example](examples/deterministic-gate/README.md)
 - [Custom gate example](examples/custom-engine/README.md)
 
 ## Development
