@@ -1,4 +1,4 @@
-"""gRPC boundary for active entity-processing policy evaluation."""
+"""gRPC boundary for the protobuf-free Egress Gate pipeline runtime."""
 
 from __future__ import annotations
 
@@ -20,7 +20,6 @@ from egress_gate.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
 from egress_gate.config import EgressGateConfig
 from egress_gate.constants import (
     BLOCK_REASON,
-    BLOCK_REASON_CODE,
     DEFAULT_TIMEOUT_SECONDS,
     LIMIT_REASON,
     LIMIT_REASON_CODE,
@@ -37,23 +36,31 @@ from egress_gate.constants import (
     SERVICE_NAME,
     SERVICE_VERSION,
 )
-from egress_gate.engines import EngineConfig
-from egress_gate.engines.registry import EngineRegistry
 from egress_gate.errors import (
     EgressGateError,
-    EngineRegistryError,
     ErrorCode,
     ErrorKind,
+    GateConfigurationError,
+    GateRegistryError,
+    TimeoutExpiredError,
 )
+from egress_gate.gates.base import Gate, GateConfig, GateResources
+from egress_gate.gates.registry import GateRegistry
 from egress_gate.logging import get_logger
-from egress_gate.request_processor import (
-    EntityDetectionSummary,
-    RequestDecision,
-    RequestProcessingResult,
-    RequestProcessor,
+from egress_gate.request import (
+    HeaderMutation,
+    HttpHeader,
+    HttpRequest,
+    HttpTarget,
+    Process,
+    RemoveHeaderMutation,
+    RequestContext,
+    WriteHeaderMutation,
 )
+from egress_gate.request_processor import RequestProcessor
+from egress_gate.result import EgressDecision, EgressResult, SourcedFinding
 from egress_gate.string_validators import validate_bounded_metadata_string
-from egress_gate.timeout import validate_timeout_seconds
+from egress_gate.timeout import Timeout, validate_timeout_seconds
 
 
 class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
@@ -61,17 +68,17 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
 
     def __init__(
         self,
-        registry: EngineRegistry,
+        registry: GateRegistry,
         *,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         log_request_content: bool = False,
     ) -> None:
         if not registry.is_finalized:
-            raise EngineRegistryError("middleware requires a finalized engine registry")
+            raise GateRegistryError("middleware requires a finalized gate registry")
         self._registry = registry
+        self._timeout_seconds = validate_timeout_seconds(timeout_seconds)
         self._policy = _ActivePolicy(
             registry,
-            timeout_seconds=validate_timeout_seconds(timeout_seconds),
             log_request_content=log_request_content,
         )
         self._processing_slots = asyncio.Semaphore(MAX_CONCURRENT_PROCESSING)
@@ -81,7 +88,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         )
 
     async def close(self) -> None:
-        """Wait for in-flight synchronous engines during shutdown."""
+        """Wait for in-flight synchronous gates during shutdown."""
         self._processing_executor.shutdown(wait=True, cancel_futures=True)
         self._policy.clear()
 
@@ -122,7 +129,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
             pb2.HttpRequestResult,
         ],
     ) -> pb2.HttpRequestResult:
-        """Resolve the prepared config, decode one text, and process it."""
+        """Resolve the prepared pipeline and evaluate one current request."""
         return await self._evaluate_rpc(request, context)
 
     def _validate_config(
@@ -150,10 +157,16 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         failure: EgressGateError | None = None
         action = "error"
         finding_count = 0
+        source_kind = "none"
         try:
-            response = await self._evaluate_http_request(request)
+            timeout = Timeout.from_seconds(self._timeout_seconds)
+            response = await self._evaluate_http_request(request, timeout)
             action = "allow" if response.decision == pb2.DECISION_ALLOW else "deny"
             finding_count = sum(finding.count for finding in response.findings)
+            return response
+        except TimeoutExpiredError:
+            response = _limit_deny()
+            action = "deny"
             return response
         except EgressGateError as error:
             failure = error
@@ -165,15 +178,17 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                 started=started,
                 action=action,
                 finding_count=finding_count,
+                source_kind=source_kind,
                 failure=failure,
             )
             _LOGGER.info(
                 "egress_gate_evaluation request_id=%s duration_ms=%.3f "
-                "action=%s finding_count=%d error_code=%s",
+                "action=%s finding_count=%d decision_source_kind=%s error_code=%s",
                 _request_id_for_log_message(log_extra["request_id"]),
                 log_extra["duration_ms"],
                 log_extra["action"],
                 log_extra["finding_count"],
+                log_extra["decision_source_kind"],
                 log_extra["error_code"] or "none",
                 extra=log_extra,
             )
@@ -187,6 +202,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
     async def _evaluate_http_request(
         self,
         request: pb2.HttpRequestEvaluation,
+        timeout: Timeout,
     ) -> pb2.HttpRequestResult:
         if request.phase != pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS:
             raise EgressGateError(ErrorCode.REQUEST_PHASE_INVALID)
@@ -194,32 +210,41 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
             raise EgressGateError(ErrorCode.REQUEST_BODY_TOO_LARGE)
         _validate_evaluation_envelope(request)
         result = await self._run_in_worker(
-            lambda: self._prepare_and_process(request.config, request.body)
+            lambda: self._prepare_and_process(request, timeout),
+            timeout=timeout,
         )
         return _result_to_proto(result)
 
     def _prepare_and_process(
         self,
-        config: Message,
-        body: bytes,
-    ) -> RequestProcessingResult:
-        values = _mapping_from_proto(config)
-        processor = self._policy.processor_for(values)
-        if not body:
-            return RequestProcessingResult(decision=RequestDecision.ALLOW)
-        try:
-            text = body.decode("utf-8", errors="strict")
-        except UnicodeDecodeError:
-            raise EgressGateError(ErrorCode.BODY_ENCODING_INVALID) from None
-        return processor.process(text)
+        request: pb2.HttpRequestEvaluation,
+        timeout: Timeout,
+    ) -> EgressResult:
+        values = _mapping_from_proto(request.config)
+        processor = self._policy.processor_for(values, timeout=timeout)
+        domain_request = _request_from_proto(request)
+        return processor.process(domain_request, timeout=timeout)
 
     async def _run_in_worker(
         self,
         operation: Callable[[], _WorkerResultT],
+        *,
+        timeout: Timeout | None = None,
     ) -> _WorkerResultT:
         """Run one bounded synchronous operation without blocking the event loop."""
-        await self._processing_slots.acquire()
         try:
+            if timeout is None:
+                await self._processing_slots.acquire()
+            else:
+                await asyncio.wait_for(
+                    self._processing_slots.acquire(),
+                    timeout=timeout.remaining_seconds(),
+                )
+        except TimeoutError:
+            raise TimeoutExpiredError from None
+        try:
+            if timeout is not None:
+                timeout.raise_if_expired()
             worker = self._processing_executor.submit(operation)
             future = asyncio.create_task(_await_worker(worker))
         except BaseException:
@@ -230,51 +255,69 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
 
 
 class _ActivePolicy:
-    """Own the process's active policy and its prepared processor."""
+    """Own one active validated policy and its prepared immutable gates."""
 
     def __init__(
         self,
-        registry: EngineRegistry,
+        registry: GateRegistry,
         *,
-        timeout_seconds: float,
         log_request_content: bool,
     ) -> None:
         self._registry = registry
-        self._timeout_seconds = timeout_seconds
         self._log_request_content = log_request_content
-        self._config: EgressGateConfig[EngineConfig] | None = None
+        self._config: EgressGateConfig[GateConfig] | None = None
         self._processor: RequestProcessor | None = None
         self._lock = Lock()
 
-    def processor_for(self, values: object) -> RequestProcessor:
-        """Return the processor for the requested policy, activating it if needed."""
+    def processor_for(
+        self,
+        values: object,
+        *,
+        timeout: Timeout,
+    ) -> RequestProcessor:
+        """Validate and activate a complete candidate under the shared deadline."""
         config = self._registry.validate_config(values)
-        with self._lock:
+        timeout.raise_if_expired()
+        if not self._lock.acquire(timeout=timeout.remaining_seconds()):
+            raise TimeoutExpiredError
+        try:
+            timeout.raise_if_expired()
             if config == self._config and self._processor is not None:
                 return self._processor
-            processor = self._build_processor(config)
+            processor = self._build_processor(config, timeout=timeout)
+            timeout.raise_if_expired()
             self._config = config
             self._processor = processor
             return processor
+        except (GateConfigurationError, GateRegistryError):
+            raise EgressGateError(ErrorCode.CONFIG_INVALID) from None
+        finally:
+            self._lock.release()
 
     def _build_processor(
         self,
-        config: EgressGateConfig[EngineConfig],
+        config: EgressGateConfig[GateConfig],
+        *,
+        timeout: Timeout,
     ) -> RequestProcessor:
-        stages = tuple(
-            (
-                stage.diagnostic_name(index),
-                self._registry.create_engine(stage.config),
+        prepared: list[tuple[str, str, Gate[GateConfig, GateResources | None]]] = []
+        for configured_gate in config.pipeline.gates:
+            timeout.raise_if_expired()
+            gate_type = getattr(configured_gate.config, "gate", None)
+            if not isinstance(gate_type, str):
+                raise GateRegistryError("gate config discriminator is invalid")
+            prepared.append(
+                (
+                    configured_gate.name,
+                    gate_type,
+                    self._registry.create_gate(configured_gate.config),
+                )
             )
-            for index, stage in enumerate(
-                config.entity_processing.stages,
-                start=1,
-            )
-        )
+        fingerprint = self._registry.policy_fingerprint(config)
         return RequestProcessor(
             config,
-            stages,
-            timeout_seconds=self._timeout_seconds,
+            tuple(prepared),
+            policy_fingerprint=fingerprint,
             log_request_content=self._log_request_content,
         )
 
@@ -304,6 +347,7 @@ class _EvaluationLogExtra(TypedDict):
     duration_ms: float
     action: str
     finding_count: int
+    decision_source_kind: str
     error_code: str | None
 
 
@@ -313,6 +357,7 @@ def _evaluation_log_extra(
     started: float,
     action: str,
     finding_count: int,
+    source_kind: str,
     failure: EgressGateError | None,
 ) -> _EvaluationLogExtra:
     return {
@@ -320,6 +365,7 @@ def _evaluation_log_extra(
         "duration_ms": round((time.monotonic() - started) * 1000, 3),
         "action": action,
         "finding_count": finding_count,
+        "decision_source_kind": source_kind,
         "error_code": failure.code.value if failure is not None else None,
     }
 
@@ -365,6 +411,39 @@ def _normalize_proto_numbers(value: object) -> object:
     return value
 
 
+def _request_from_proto(request: pb2.HttpRequestEvaluation) -> HttpRequest:
+    process = None
+    if request.context.HasField("originating_process"):
+        process = Process(
+            binary=request.context.originating_process.binary,
+            pid=request.context.originating_process.pid,
+            ancestors=tuple(request.context.originating_process.ancestors),
+        )
+    try:
+        return HttpRequest(
+            context=RequestContext(
+                request_id=request.context.request_id,
+                sandbox_id=request.context.sandbox_id,
+                originating_process=process,
+            ),
+            target=HttpTarget(
+                scheme=request.target.scheme,
+                host=request.target.host,
+                port=request.target.port,
+                method=request.target.method,
+                path=request.target.path,
+                query=request.target.query,
+            ),
+            headers=tuple(
+                HttpHeader(name=header.name, value=header.value)
+                for header in request.headers
+            ),
+            body=request.body,
+        )
+    except (TypeError, ValueError):
+        raise EgressGateError(ErrorCode.REQUEST_ENVELOPE_INVALID) from None
+
+
 def _validate_evaluation_envelope(request: pb2.HttpRequestEvaluation) -> None:
     if request.config.ByteSize() > MAX_PROTO_CONFIG_BYTES:
         raise EgressGateError(ErrorCode.CONFIG_INVALID)
@@ -393,51 +472,85 @@ def _varint_size(value: int) -> int:
     return size
 
 
-def _result_to_proto(result: RequestProcessingResult) -> pb2.HttpRequestResult:
-    findings: list[pb2.Finding] = []
-    for detection in result.detection_summaries:
-        finding = _detection_to_proto(detection)
-        if finding.ByteSize() > MAX_PROTO_FINDING_BYTES:
+def _result_to_proto(result: EgressResult) -> pb2.HttpRequestResult:
+    try:
+        response = pb2.HttpRequestResult(
+            decision=(
+                pb2.DECISION_ALLOW
+                if result.decision is EgressDecision.ALLOW
+                else pb2.DECISION_DENY
+            ),
+            reason_code=result.reason_code or "",
+        )
+        for sourced in result.findings:
+            finding = _finding_to_proto(sourced)
+            if finding.ByteSize() > MAX_PROTO_FINDING_BYTES:
+                return _limit_deny()
+            response.findings.append(finding)
+        if len(response.findings) > MAX_PROTO_FINDING_GROUPS:
             return _limit_deny()
-        findings.append(finding)
-    if len(findings) > MAX_PROTO_FINDING_GROUPS:
+        if result.decision is EgressDecision.ALLOW:
+            if result.patch.replacement_body is not None:
+                if len(result.patch.replacement_body) > MAX_BODY_BYTES:
+                    return _limit_deny()
+                response.body = result.patch.replacement_body
+                response.has_body = True
+            for mutation in result.patch.header_mutations:
+                _append_header_mutation(response, mutation)
+            response.metadata.update(
+                {entry.key: entry.value for entry in result.metadata}
+            )
+            if (
+                _encoded_headers_size(response.header_mutations)
+                > MAX_PROTO_HEADERS_BYTES
+            ):
+                return _limit_deny()
+            return response
+        if (
+            result.reason_code is None
+            or REASON_CODE_PATTERN.fullmatch(result.reason_code) is None
+        ):
+            return _limit_deny()
+        response.reason = (
+            LIMIT_REASON if result.reason_code == LIMIT_REASON_CODE else BLOCK_REASON
+        )
+        return response
+    except (TypeError, ValueError):
         return _limit_deny()
-    if result.decision is RequestDecision.ALLOW:
-        replacement = result.replacement_text
-        replacement_body = (
-            replacement.encode("utf-8") if replacement is not None else b""
-        )
-        if len(replacement_body) > MAX_BODY_BYTES:
-            return _limit_deny()
-        return pb2.HttpRequestResult(
-            decision=pb2.DECISION_ALLOW,
-            body=replacement_body,
-            has_body=replacement is not None,
-            findings=findings,
-        )
-    if result.decision is RequestDecision.DENY:
-        reason_code = result.reason_code or BLOCK_REASON_CODE
-        if REASON_CODE_PATTERN.fullmatch(reason_code) is None:
-            return _limit_deny()
-        return pb2.HttpRequestResult(
-            decision=pb2.DECISION_DENY,
-            reason=LIMIT_REASON if reason_code == LIMIT_REASON_CODE else BLOCK_REASON,
-            reason_code=reason_code,
-            findings=findings,
-        )
-    raise EgressGateError(ErrorCode.UNEXPECTED_SERVICE_FAILURE)
 
 
-def _detection_to_proto(detection: EntityDetectionSummary) -> pb2.Finding:
-    confidence = detection.confidence
-    confidence_text = confidence.value if confidence is not None else ""
-    result = pb2.Finding(
-        type="detected_entity",
-        label=f"{detection.entity} ({detection.source_stage})",
-        confidence=confidence_text,
-        count=detection.count,
+def _finding_to_proto(sourced: SourcedFinding) -> pb2.Finding:
+    finding = sourced.finding
+    return pb2.Finding(
+        type=finding.type,
+        label=finding.label,
+        count=finding.count,
+        confidence=finding.confidence or "",
+        severity=finding.severity or "",
     )
-    return result
+
+
+def _append_header_mutation(
+    response: pb2.HttpRequestResult,
+    mutation: HeaderMutation,
+) -> None:
+    if isinstance(mutation, WriteHeaderMutation):
+        action = {
+            "append": pb2.EXISTING_HEADER_ACTION_APPEND,
+            "overwrite": pb2.EXISTING_HEADER_ACTION_OVERWRITE,
+            "skip": pb2.EXISTING_HEADER_ACTION_SKIP,
+        }[mutation.on_existing.value]
+        response.header_mutations.add(
+            write=pb2.WriteHeader(
+                name=mutation.name,
+                value=mutation.value,
+                on_existing=action,
+            )
+        )
+    elif isinstance(mutation, RemoveHeaderMutation):
+        response.header_mutations.add(remove=pb2.RemoveHeader(name=mutation.name))
+    else:
+        raise ValueError("header mutation is invalid")
 
 
 def _limit_deny() -> pb2.HttpRequestResult:

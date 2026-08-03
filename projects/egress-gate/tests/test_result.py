@@ -7,7 +7,17 @@ import math
 import pytest
 from pydantic import ValidationError
 
-from egress_gate.constants import MAX_FINDING_COUNT, MAX_PROTO_FINDING_GROUPS
+from egress_gate.constants import (
+    DEFAULT_DENY_REASON_CODE,
+    LIMIT_REASON_CODE,
+    MAX_FINDING_COUNT,
+    MAX_GATE_TRACES,
+    MAX_PROTO_FINDING_BYTES,
+    MAX_PROTO_FINDING_GROUPS,
+    MAX_RESULT_METADATA_BYTES,
+    MAX_RESULT_METADATA_ENTRIES,
+    MAX_TRACE_MUTATION_KINDS,
+)
 from egress_gate.request import RequestPatch
 from egress_gate.result import (
     DecisionSource,
@@ -19,6 +29,7 @@ from egress_gate.result import (
     GateEvaluation,
     GateTrace,
     MutationKind,
+    ResultMetadata,
     SourcedFinding,
 )
 
@@ -51,6 +62,25 @@ def test_finding_matches_the_current_five_field_wire_contract() -> None:
 def test_finding_count_is_bounded(count: int) -> None:
     with pytest.raises(ValidationError):
         _finding(count=count)
+
+
+def test_finding_encoded_size_has_an_exact_four_kibibyte_boundary() -> None:
+    exact = Finding(
+        type="t" * 1024,
+        label="l" * 1024,
+        confidence="c" * 1024,
+        severity="s" * 1010,
+    )
+    assert exact.model_dump()
+
+    with pytest.raises(ValidationError):
+        Finding(
+            type="t" * 1024,
+            label="l" * 1024,
+            confidence="c" * 1024,
+            severity="s" * 1011,
+        )
+    assert MAX_PROTO_FINDING_BYTES == 4 * 1024
 
 
 def test_gate_evaluation_helpers_and_control_invariants() -> None:
@@ -154,4 +184,147 @@ def test_egress_result_limits_finding_groups_and_trace_values() -> None:
             control=GateControl.PROCEED,
             duration_ms=math.inf,
             finding_count=0,
+        )
+
+
+def test_gate_evaluation_and_result_group_limits_have_exact_boundaries() -> None:
+    findings = tuple(
+        _finding(label=f"label-{index}") for index in range(MAX_PROTO_FINDING_GROUPS)
+    )
+    assert len(GateEvaluation.proceed(findings=findings).findings) == (
+        MAX_PROTO_FINDING_GROUPS
+    )
+    with pytest.raises(ValidationError):
+        GateEvaluation.proceed(findings=findings + (_finding(label="over"),))
+
+    sourced = tuple(
+        SourcedFinding(source_gate=f"gate-{index}", finding=finding)
+        for index, finding in enumerate(findings)
+    )
+    result = EgressResult(
+        decision=EgressDecision.ALLOW,
+        decision_source=DecisionSource.pipeline_default(),
+        findings=sourced,
+    )
+    assert len(result.findings) == MAX_PROTO_FINDING_GROUPS
+    with pytest.raises(ValidationError):
+        EgressResult(
+            decision=EgressDecision.ALLOW,
+            decision_source=DecisionSource.pipeline_default(),
+            findings=sourced
+            + (SourcedFinding(source_gate="over", finding=_finding(label="over")),),
+        )
+
+
+def test_metadata_count_and_aggregate_byte_limits_have_exact_boundaries() -> None:
+    entries = tuple(
+        ResultMetadata(
+            key=f"k{index}",
+            value="v" * (510 if index < 10 else 509),
+        )
+        for index in range(MAX_RESULT_METADATA_ENTRIES)
+    )
+    result = EgressResult(
+        decision=EgressDecision.ALLOW,
+        decision_source=DecisionSource.pipeline_default(),
+        metadata=entries,
+    )
+    assert len(result.metadata) == MAX_RESULT_METADATA_ENTRIES
+    assert (
+        sum(len(entry.key.encode()) + len(entry.value.encode()) for entry in entries)
+        == MAX_RESULT_METADATA_BYTES
+    )
+
+    with pytest.raises(ValidationError):
+        EgressResult(
+            decision=EgressDecision.ALLOW,
+            decision_source=DecisionSource.pipeline_default(),
+            metadata=entries[:-1]
+            + (
+                ResultMetadata(
+                    key="k63",
+                    value="v" * 510,
+                ),
+            ),
+        )
+    with pytest.raises(ValidationError):
+        EgressResult(
+            decision=EgressDecision.ALLOW,
+            decision_source=DecisionSource.pipeline_default(),
+            metadata=entries + (ResultMetadata(key="over", value="v"),),
+        )
+
+
+def test_trace_count_and_mutation_kind_limits_have_exact_boundaries() -> None:
+    trace = GateTrace(
+        gate_name="gate",
+        gate_type="test",
+        control=GateControl.PROCEED,
+        duration_ms=0,
+        finding_count=0,
+        mutation_kinds=(MutationKind.BODY, MutationKind.HEADERS),
+    )
+    assert len(trace.mutation_kinds) == MAX_TRACE_MUTATION_KINDS
+    with pytest.raises(ValidationError):
+        GateTrace(
+            gate_name="gate",
+            gate_type="test",
+            control=GateControl.PROCEED,
+            duration_ms=0,
+            finding_count=0,
+            mutation_kinds=(
+                MutationKind.BODY,
+                MutationKind.HEADERS,
+                MutationKind.BODY,
+            ),
+        )
+
+    traces = tuple(
+        trace.model_copy(update={"gate_name": f"gate-{index}"})
+        for index in range(MAX_GATE_TRACES)
+    )
+    result = EgressResult(
+        decision=EgressDecision.ALLOW,
+        decision_source=DecisionSource.pipeline_default(),
+        traces=traces,
+    )
+    assert len(result.traces) == MAX_GATE_TRACES
+    with pytest.raises(ValidationError):
+        EgressResult(
+            decision=EgressDecision.ALLOW,
+            decision_source=DecisionSource.pipeline_default(),
+            traces=traces + (trace,),
+        )
+
+
+def test_decision_source_reason_code_ownership_is_strict() -> None:
+    default_deny = EgressResult(
+        decision=EgressDecision.DENY,
+        decision_source=DecisionSource.pipeline_default(),
+        reason_code=DEFAULT_DENY_REASON_CODE,
+    )
+    runtime_limit = EgressResult(
+        decision=EgressDecision.DENY,
+        decision_source=DecisionSource.runtime_limit(),
+        reason_code=LIMIT_REASON_CODE,
+    )
+    assert default_deny.reason_code == DEFAULT_DENY_REASON_CODE
+    assert runtime_limit.reason_code == LIMIT_REASON_CODE
+
+    with pytest.raises(ValidationError):
+        EgressResult(
+            decision=EgressDecision.ALLOW,
+            decision_source=DecisionSource.runtime_limit(),
+        )
+    with pytest.raises(ValidationError):
+        EgressResult(
+            decision=EgressDecision.DENY,
+            decision_source=DecisionSource.runtime_limit(),
+            reason_code=DEFAULT_DENY_REASON_CODE,
+        )
+    with pytest.raises(ValidationError):
+        EgressResult(
+            decision=EgressDecision.DENY,
+            decision_source=DecisionSource.pipeline_default(),
+            reason_code=LIMIT_REASON_CODE,
         )

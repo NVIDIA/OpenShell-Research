@@ -31,10 +31,10 @@ nav = [
         {"Configure policies" = "documentation/egress-gate/configuration.md"},
         {"Run and operate Egress Gate" = "documentation/egress-gate/operations.md"}
       ]},
-      {"Engines" = [
-        "documentation/egress-gate/engines/index.md",
-        {"RegexEngine" = "documentation/egress-gate/engines/regex.md"},
-        {"Add a custom engine" = "documentation/egress-gate/engines/custom.md"}
+      {"Gates" = [
+        "documentation/egress-gate/gates/index.md",
+        {"Regex-body gate" = "documentation/egress-gate/gates/regex.md"},
+        {"Add a custom gate" = "documentation/egress-gate/gates/custom.md"}
       ]},
       {"Architecture" = [
         "documentation/egress-gate/architecture/index.md",

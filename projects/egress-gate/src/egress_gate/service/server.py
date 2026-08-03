@@ -12,8 +12,8 @@ from egress_gate.constants import (
     MAX_CONCURRENT_RPCS,
     MAX_RECEIVE_MESSAGE_BYTES,
 )
-from egress_gate.engines.registry import EngineRegistry
 from egress_gate.errors import EgressGateError, ErrorCode
+from egress_gate.gates.registry import GateRegistry
 from egress_gate.logging import get_logger
 from egress_gate.service.servicer import EgressGateMiddleware
 
@@ -25,7 +25,7 @@ class EgressGateServer:
 
     def __init__(
         self,
-        registry: EngineRegistry,
+        registry: GateRegistry,
         *,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         log_request_content: bool = False,

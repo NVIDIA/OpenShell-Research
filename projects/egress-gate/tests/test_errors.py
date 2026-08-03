@@ -27,7 +27,7 @@ def test_every_error_code_has_one_safe_complete_specification() -> None:
 
 def test_error_kinds_distinguish_invalid_input_from_internal_failures() -> None:
     assert EgressGateError(ErrorCode.CONFIG_INVALID).kind is ErrorKind.INVALID_INPUT
-    assert EgressGateError(ErrorCode.ENGINE_EXECUTION_FAILED).kind is ErrorKind.INTERNAL
+    assert EgressGateError(ErrorCode.GATE_EXECUTION_FAILED).kind is ErrorKind.INTERNAL
     assert EgressGateError(ErrorCode.CONFIG_INVALID).component is ErrorComponent.CONFIG
 
 

@@ -18,10 +18,11 @@ SERVICE_NAME = "egress-gate"
 SERVICE_VERSION = version("egress-gate")
 BLOCK_REASON = "Egress Gate blocked the request"
 BLOCK_REASON_CODE = "egress_gate_blocked"
+DEFAULT_DENY_REASON_CODE = "egress_gate_default_deny"
 LIMIT_REASON = (
     "Egress Gate exceeded a processing safety limit. Check Egress Gate logs "
     "for the limit kind. Reduce the request or replacement size, simplify the "
-    "configured stages and rules, or increase the processing timeout with "
+    "configured gates and rules, or increase the processing timeout with "
     "--timeout-seconds or "
     "EgressGateServer(timeout_seconds=...) to at most "
     f"{MAX_TIMEOUT_SECONDS:g} seconds. If increasing it, give OpenShell's "
@@ -32,22 +33,26 @@ LIMIT_REASON_CODE = "egress_gate_limit_exceeded"
 # Text input limits.
 MAX_BODY_BYTES = 4 * 1024 * 1024
 
-# Engine and result limits.
-MAX_DETECTIONS_PER_STAGE = 256
+# Gate and result limits.
+MAX_DETECTIONS_PER_GATE = 256
 MAX_DETECTIONS_PER_REQUEST = 4096
 MAX_DIAGNOSTIC_TEXT_BYTES = 1024
 MAX_FINDING_METADATA_ENTRIES = 32
 MAX_PROTO_FINDING_GROUPS = 32
 MAX_PROTO_FINDING_BYTES = 4 * 1024
 MAX_FINDING_COUNT = 2**32 - 1
+MAX_RESULT_METADATA_ENTRIES = 64
+MAX_RESULT_METADATA_BYTES = 32 * 1024
+MAX_GATE_TRACES = 10
+MAX_TRACE_MUTATION_KINDS = 2
 
 # Domain request-mutation limits mirrored from the OpenShell middleware
 # contract. Encoded protobuf size remains a service-boundary concern.
 MAX_HEADER_MUTATIONS = 64
 MAX_HEADER_MUTATION_DATA_BYTES = 32 * 1024
 
-# Engine configuration and regex execution limits.
-MAX_ENTITY_PROCESSING_STAGES = 10
+# Pipeline configuration and regex execution limits.
+MAX_PIPELINE_GATES = 10
 MAX_REGEX_NAME_BYTES = 128
 MAX_REGEX_ENTITIES_PER_CATALOG = 2_000
 MAX_REGEX_RULES_PER_CATALOG = 10_000

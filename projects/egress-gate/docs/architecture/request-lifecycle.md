@@ -1,174 +1,53 @@
 ---
 title: Request lifecycle
-description: How Egress Gate validates configuration, runs stages, and returns an OpenShell request decision.
+description: How one OpenShell evaluation becomes an EgressResult.
 agent_markdown: true
 ---
 
 # Request lifecycle
 
-Each OpenShell evaluation carries request metadata, body bytes, and complete
-Egress Gate configuration. The service validates the transport, resolves the
-active processor, processes one text value, and serializes the result.
-
-## Lifecycle summary
-
-![Egress Gate request lifecycle. The service validates the transport and
-policy, resolves the active processor, handles an empty body or decodes UTF-8
-text, runs the ordered engine stages, then returns either a gRPC failure or a
-successful allow, replacement, or deny
-result.](../assets/diagrams/request-lifecycle.svg)
-
 ## 1. Validate the transport
 
-The service checks:
+The service checks the pre-credentials phase, exact protobuf configuration,
+context, target, header, and body bounds. Domain models then enforce bounded
+scalar and aggregate values. Invalid input produces a cataloged gRPC failure.
 
-- pre-credentials middleware phase
-- request context size
-- policy configuration size
-- target size
-- header count and size
-- request body size
+## 2. Validate and prepare the policy
 
-Input at another middleware phase or outside a transport bound fails the RPC as
-invalid input.
+The service converts the protobuf `Struct` to a mapping and asks the finalized
+`GateRegistry` for an exact `EgressGateConfig`. It prepares every configured
+gate and passes the policy fingerprint to a `RequestProcessor`. Preparation is
+under one replacement lock and uses the same `Timeout` as the request's later
+execution. The candidate is published only after a final deadline check.
 
-## 2. Validate configuration
+## 3. Execute the pipeline
 
-The service converts the protobuf `Struct` to a mapping and validates it through
-the finalized registry-backed Pydantic model.
+For each configured gate:
 
-Validation includes:
+1. Check the shared deadline.
+2. Evaluate the current immutable `HttpRequest`.
+3. Reconstruct and validate the returned `GateEvaluation`.
+4. Add a content-safe `GateTrace` and runtime-owned `SourcedFinding` values.
+5. On `proceed`, apply the patch to form the next current request.
+6. On terminal `allow` or `deny`, stop without invoking later gates.
 
-- exact fields and strict types
-- known engine discriminator
-- stage count and unique stage names
-- engine-specific config
-- registered resource compatibility
-- action and replacement-strategy compatibility
-- catalog shape and Regex pattern compilation
+The original request remains private to the processor. The final allowed patch
+is the ordered composition of preceding patches; a denied result always has an
+empty patch. Body replacement `None` and `b""` remain distinct.
 
-`ValidateConfig` performs these checks without constructing engines or changing
-the active processor.
+If every gate proceeds, `default_decision` owns the result. Default deny uses
+`egress_gate_default_deny`; default allow carries no reason code.
 
-## 3. Resolve the active processor
+## 4. Handle runtime limits
 
-The service compares the complete immutable validated configuration with the
-active one:
+Deadline expiry, worker-slot exhaustion, mutation bounds, finding limits, and
+encoded output limits return an atomic deny with source `runtime_limit` and
+`egress_gate_limit_exceeded`. No partial mutations or findings are returned.
+Gate contract and execution failures remain gRPC failures.
 
-| State | Behavior |
-| --- | --- |
-| Equal configuration | Reuse the active processor |
-| No active processor | Construct every stage engine and activate the processor |
-| Changed configuration | Prepare a complete candidate and atomically replace the active processor |
-| Validation or preparation failure | Keep the active processor unchanged and fail the triggering evaluation |
+## 5. Serialize the result
 
-Only one preparation path runs at a time. Configuration validation still runs
-for every evaluation.
-
-## 4. Decode the request body
-
-An empty body is allowed without invoking an engine after configuration
-validation and processor resolution.
-
-A non-empty body must decode as strict UTF-8. The decoded `str` is the only
-request input passed to `RequestProcessor`. Headers, target, content type,
-request ID, and protobuf objects remain in the service layer.
-
-## 5. Select the engine strategy
-
-The processor derives one strategy for the complete stage pipeline:
-
-| Policy action | Engine strategy |
-| --- | --- |
-| `detect` | `DETECT` |
-| `block` | `DETECT` |
-| `replace` | `REPLACE` |
-
-Engines never receive `PolicyAction`.
-
-## 6. Run stages in order
-
-The processor:
-
-1. validates the input UTF-8 size
-2. creates one monotonic `Timeout`
-3. calls each stage once in policy order
-4. passes the current text, strategy, and shared timeout
-5. validates each returned result and intermediate size
-6. passes returned text to the next stage
-7. checks the timeout after final result validation
-
-In `DETECT`, each engine must return its input text unchanged. In `REPLACE`, a
-later stage receives the preceding stage's output.
-
-If a stage times out, exceeds a limit, or fails, its partial output is discarded
-and later stages do not run.
-
-## 7. Validate engine output
-
-The public engine wrapper checks:
-
-- returned model type
-- supported strategy
-- non-empty spans within the stage input
-- per-stage detection count
-- output UTF-8 size
-- unchanged text in `DETECT`
-- at least one detection when text changes in `REPLACE`
-
-Detection offsets refer to the stage input. Egress Gate does not remap earlier
-offsets after later replacement stages change the text.
-
-## 8. Aggregate detections
-
-After all stages succeed, the processor aggregates occurrences by:
-
-```text
-source stage + entity + confidence
-```
-
-It does not deduplicate across stages. Stages may inspect different text
-revisions, and confidence values from different engines are not assumed to be
-calibrated.
-
-Framework-controlled summary fields exclude matched text, surrounding text,
-offsets, patterns, and engine metadata. Engine-provided entity identifiers
-cross the boundary, so custom engines must not derive them from request text.
-
-## 9. Apply the policy action
-
-| Action | No detections | One or more detections |
-| --- | --- | --- |
-| `detect` | Allow original body | Allow original body and report summaries |
-| `block` | Allow original body | Deny with `egress_gate_blocked` and report summaries |
-| `replace` | Allow final text | Allow final text and report summaries |
-
-A timeout or processing-limit failure returns a deny with
-`egress_gate_limit_exceeded` and no partial summaries or replacement.
-
-## 10. Serialize the result
-
-The service maps the domain result to OpenShell:
-
-| Domain result | OpenShell result |
-| --- | --- |
-| Detect allow | `DECISION_ALLOW`, `has_body=false` |
-| Block with no detections | `DECISION_ALLOW`, `has_body=false` |
-| Replace allow | `DECISION_ALLOW`, `has_body=true`, final UTF-8 body |
-| Policy block | `DECISION_DENY`, `egress_gate_blocked` |
-| Limit deny | `DECISION_DENY`, `egress_gate_limit_exceeded` |
-
-For detect and block, OpenShell keeps the exact original bytes. For replace,
-Egress Gate returns the final encoded text even when it equals the input.
-
-## Failure outcomes
-
-| Outcome | Transport status | Request effect |
-| --- | --- | --- |
-| Policy block | Successful RPC | Deny |
-| Processing limit | Successful RPC | Deny |
-| Invalid request or configuration | `INVALID_ARGUMENT` | OpenShell applies middleware `on_error` |
-| Internal engine or service error | `INTERNAL` | OpenShell applies middleware `on_error` |
-
-See [Limits and failure behavior](../reference/limits-and-failures.md) for the
-complete error and bound reference.
+The service converts the protobuf-free `EgressResult` to the current OpenShell
+wire contract. It serializes exactly five finding fields and never puts source
+or attributes into labels or result metadata. An explicit empty replacement
+sets `has_body=true` with an empty body.

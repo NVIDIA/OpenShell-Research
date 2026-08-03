@@ -1,120 +1,75 @@
-"""Strict entity-processing policy configuration.
-
-The concrete model accepted at the policy boundary is finalized by
-``EngineRegistry``.  Its stage ``config`` field is a Pydantic discriminated
-union containing the exact config model registered by every engine.
-"""
+"""Strict pipeline policy configuration."""
 
 from __future__ import annotations
 
 from enum import StrEnum
 from typing import Generic, Self, TypeVar
 
-from pydantic import (
-    Field,
-    field_validator,
-    model_validator,
-)
+from pydantic import Field, field_validator, model_validator
 
 from egress_gate.base import StrictDomainModel
-from egress_gate.constants import MAX_ENTITY_PROCESSING_STAGES
-from egress_gate.engines import EngineConfig
-from egress_gate.string_validators import (
-    BoundedMetadataString,
-    validate_scalar_string,
-)
+from egress_gate.constants import MAX_PIPELINE_GATES
+from egress_gate.gates.base import GateConfig
+from egress_gate.result import GateName
+from egress_gate.string_validators import validate_scalar_string
 
 
-class PolicyAction(StrEnum):
-    """User-facing disposition applied after all configured stages run."""
+class DefaultDecision(StrEnum):
+    """Pipeline disposition when every gate proceeds."""
 
-    DETECT = "detect"
-    BLOCK = "block"
-    REPLACE = "replace"
+    ALLOW = "allow"
+    DENY = "deny"
 
 
-class OnDetection(StrictDomainModel):
-    """Required policy disposition for detected entities."""
+_GateConfigT = TypeVar("_GateConfigT", bound=GateConfig)
 
-    action: PolicyAction
 
-    @field_validator("action", mode="before")
+class ConfiguredGate(StrictDomainModel, Generic[_GateConfigT]):
+    """One named pipeline entry and its exact gate configuration."""
+
+    name: GateName
+    config: _GateConfigT = Field(repr=False)
+
+
+class PipelineConfig(StrictDomainModel, Generic[_GateConfigT]):
+    """Ordered configured gates and the required final default."""
+
+    gates: tuple[ConfiguredGate[_GateConfigT], ...] = Field(repr=False)
+    default_decision: DefaultDecision
+
+    @field_validator("gates", mode="before")
     @classmethod
-    def _parse_action(cls, value: object) -> PolicyAction:
-        if isinstance(value, PolicyAction):
-            return value
-        return PolicyAction(validate_scalar_string(value))
-
-
-_EngineConfigT = TypeVar(
-    "_EngineConfigT",
-    bound=EngineConfig,
-)
-
-
-class EntityProcessingStage(
-    StrictDomainModel,
-    Generic[_EngineConfigT],
-):
-    """One ordered invocation of an engine with an optional diagnostic name."""
-
-    name: BoundedMetadataString | None = None
-    config: _EngineConfigT = Field(repr=False)
-
-    def diagnostic_name(self, stage_number: int) -> str:
-        """Return the explicit name or a deterministic one-based source label."""
-        if self.name is not None:
-            return self.name
-        if isinstance(stage_number, bool) or stage_number < 1:
-            raise ValueError("stage number must be a positive integer")
-        engine = getattr(self.config, "engine", None)
-        if not isinstance(engine, str):
-            raise ValueError("stage config has no engine discriminator")
-        return f"{engine}[{stage_number}]"
-
-
-class EntityProcessingStages(
-    StrictDomainModel,
-    Generic[_EngineConfigT],
-):
-    """The ordered entity-processing stages for one policy."""
-
-    stages: tuple[EntityProcessingStage[_EngineConfigT], ...] = Field(repr=False)
-
-    @field_validator("stages", mode="before")
-    @classmethod
-    def _parse_stages(cls, value: object) -> object:
+    def _gates_are_bounded_tuple(cls, value: object) -> object:
         if not isinstance(value, list | tuple) or not value:
-            raise ValueError("stages must be a non-empty list")
-        if len(value) > MAX_ENTITY_PROCESSING_STAGES:
-            raise ValueError("policy has too many entity-processing stages")
+            raise ValueError("pipeline gates must be a non-empty list")
+        if len(value) > MAX_PIPELINE_GATES:
+            raise ValueError("pipeline has too many gates")
         return tuple(value)
 
+    @field_validator("default_decision", mode="before")
+    @classmethod
+    def _parse_default_decision(cls, value: object) -> DefaultDecision:
+        if isinstance(value, DefaultDecision):
+            return value
+        return DefaultDecision(validate_scalar_string(value))
+
     @model_validator(mode="after")
-    def _diagnostic_names_are_unique(self) -> Self:
-        names = [
-            stage.diagnostic_name(index)
-            for index, stage in enumerate(self.stages, start=1)
-        ]
+    def _gate_names_are_unique(self) -> Self:
+        names = tuple(gate.name for gate in self.gates)
         if len(names) != len(set(names)):
-            raise ValueError("stage diagnostic names must be unique")
+            raise ValueError("pipeline gate names must be unique")
         return self
 
 
-class EgressGateConfig(
-    StrictDomainModel,
-    Generic[_EngineConfigT],
-):
-    """Complete validated Egress Gate behavior for one OpenShell policy."""
+class EgressGateConfig(StrictDomainModel, Generic[_GateConfigT]):
+    """Complete strict Egress Gate policy configuration."""
 
-    entity_processing: EntityProcessingStages[_EngineConfigT] = Field(repr=False)
-    on_detection: OnDetection = Field(repr=False)
+    pipeline: PipelineConfig[_GateConfigT] = Field(repr=False)
 
 
 __all__ = [
-    "EntityProcessingStage",
-    "EntityProcessingStages",
-    "OnDetection",
-    "PolicyAction",
+    "ConfiguredGate",
+    "DefaultDecision",
     "EgressGateConfig",
+    "PipelineConfig",
 ]

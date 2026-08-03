@@ -1,8 +1,8 @@
 # Egress Gate
 
-Egress Gate is OpenShell middleware that runs an ordered pipeline of
-entity-processing engines over one UTF-8 request body and applies a user-facing
-detect, block, or replace action.
+Egress Gate is OpenShell pre-credentials middleware. It receives one bounded,
+immutable byte-oriented `HttpRequest`, runs an ordered pipeline of trusted
+request-level gates, and returns an explicit allow, deny, or mutation result.
 
 ## Development commands
 
@@ -17,114 +17,79 @@ Run focused tests while working and `make check` before handoff.
 
 ## Engineering approach
 
-- Backwards compatibility is explicitly not a concern for the v0 redesign. Do
-  not restore legacy behavior, schemas, imports, names, tests, or examples.
-- Add defensive handling only for a concrete failure mode at the layer that
-  owns it. Avoid speculative guards, duplicate validation, broad catches,
-  retries, and fallbacks.
-- Prefer explicit, domain-specific names. Avoid generic intermediate
-  abstractions that do not own behavior.
-- Keep public declarations before private helper types, functions, methods, and
-  constants when dependency ordering permits. Put private implementation
-  details at the bottom of their module or class.
+- Backwards compatibility with the removed legacy policy API is not a concern.
+  Do not restore old schemas, imports, names, aliases, or obsolete pipeline terms.
+- Gates are trusted application code. Capabilities enforce declared output
+  behavior and finding declarations; read capabilities are discovery metadata,
+  not Python isolation or a security sandbox.
+- Keep request bytes and headers in immutable domain models. Only the service
+  package imports gRPC or generated protobuf bindings.
+- Use the smallest owner for each validation. The service owns exact encoded
+  protobuf limits; domain models own bounded scalar and aggregate invariants.
+- Avoid speculative infrastructure, policy caches, observer interfaces, and
+  transport abstractions.
 
 ## Project map
 
-- `src/egress_gate/engines/`: engine contract, registry, and built-in implementations
-- `src/egress_gate/config.py`: policy action and ordered stage configuration
-- `src/egress_gate/request_processor.py`: stage execution and policy disposition
-- `src/egress_gate/cli.py`: command parsing, discovery, gateway registration
-  management, configuration-schema output, and server adapter
-- `src/egress_gate/gateway_config.py`: safe OpenShell gateway TOML
-  registration management
-- `src/egress_gate/logging.py`: package-scoped standard-library logging configuration
-- `src/egress_gate/base.py`: package-wide strict immutable domain-model base
-- `src/egress_gate/string_validators.py`: shared string validators and field types
-- `src/egress_gate/service/`: gRPC lifecycle and protobuf adapter
-- `src/egress_gate/bindings/`: generated protobuf files; never hand-edit
-- `docs/`: canonical user and architecture documentation; the repository docs
-  build stages this tree at the public Egress Gate documentation route
-- `tests/`: tests that mirror source boundaries
-- `examples/`: copyable policy-authoring examples
+- `src/egress_gate/gates/`: `Gate`, helper bases, regex-body, and registry
+- `src/egress_gate/config.py`: strict `pipeline.gates` and `default_decision`
+  policy models
+- `src/egress_gate/request.py`: protobuf-free request and ordered patch models
+- `src/egress_gate/result.py`: gate evaluations, five-field findings, provenance,
+  traces, metadata, and final results
+- `src/egress_gate/request_processor.py`: shared deadline, current-request
+  mutation flow, terminal controls, aggregation, and default decisions
+- `src/egress_gate/service/`: gRPC lifecycle and the only protobuf adapter
+- `src/egress_gate/timeout.py`: monotonic shared request deadline
+- `src/egress_gate/errors.py`: stable content-safe error catalog
+- `src/egress_gate/gateway_config.py`: safe OpenShell gateway TOML management
+- `tests/`: domain, gate, processor, service, and boundary tests
 
-Before changing `request_processor.py`, `engines/`, or `service/`, read the
-architecture overview and matching topic page. Architecture changes follow
-[`docs/development/index.md`](../../docs/development/index.md) and require its
-checks.
+Before changing `request_processor.py`, `gates/`, or `service/`, read the
+architecture overview and matching topic page under `docs/architecture/`.
 
-## Design boundaries
+## Gate contract
 
-- One processor call receives one text string. Do not reintroduce request-body
-  codecs, format handlers, document regions, or JSON traversal.
-- An `EntityProcessingEngine` receives engine configuration, a processing
-  strategy, and a shared `Timeout`. It never receives or infers the policy
-  action.
-- `RequestProcessor` runs configured stages in order and owns detect, block, or
-  replace disposition.
-- Engine configuration lives inside the OpenShell policy as the exact Pydantic
-  discriminated-union member registered for that engine.
-- Deployment startup owns only installed engine implementations and operational
-  resources such as clients, endpoints, models, and credentials.
-- Engine instances and injected resources serve concurrent requests. Do not
-  retain request content or mutable per-request state.
-- Outside generated `bindings/`, only `service/` may import gRPC or generated
-  bindings.
-- The copied OpenShell `.proto` and generated bindings must be updated only
-  through `openshell-middleware-manager`; never edit them manually.
+Every gate declares a strict `GateConfig` with a literal `gate` discriminator,
+an optional typed `GateResources` bundle, `GateCapabilities`, and its
+`FindingTypeDefinition` declarations. `GateRegistry.finalize()` creates the
+exact discriminated pipeline schema for the installed gates and prepares
+validated gate instances from trusted application-owned resources.
 
-## Extension pattern
+`Gate.evaluate()` receives the current `HttpRequest` and one shared `Timeout`.
+It returns a validated `GateEvaluation` with explicit `proceed`, terminal
+`allow`, or terminal `deny` control. A proceeding patch is applied before the
+next gate; body replacement intent is preserved even when replacement bytes are
+equal to the input. Runtime provenance is added by `RequestProcessor`, never by
+gate configuration or gate-produced findings.
 
-Define a concrete `EngineConfig` and implement `_run`. Custom engines do not
-define `__init__`; use optional `_initialize` for derived immutable state.
-`@override` is not required.
+Custom gates are trusted and must be safe for concurrent calls. Tests should
+exercise concurrent evaluation, but the Python implementation is not claimed to
+be deeply immutable. Resource bundles contain operator-owned, concurrency-safe
+dependencies and no request state or policy behavior.
 
-Resource-free engines omit the second generic argument. Resource-backed engines
-declare an `EngineResources` subclass as that argument; the bundle contains
-only operator-owned, concurrency-safe runtime dependencies and no policy
-behavior or per-request state.
+## Current built-ins and boundaries
 
-```python
-from typing import Literal
+This slice ships exactly one built-in: `regex-body`. It preserves bounded
+catalog loading, regex matching, overlap resolution, UTF-8 body handling, and
+detect/deny/replace modes. `request-rules` is the next planned built-in and is
+not implemented in this slice; do not add it speculatively.
 
-from egress_gate.engines import (
-    EngineConfig,
-    EntityProcessingEngine,
-    EntityProcessingStrategy,
-    TextProcessingResult,
-)
-from egress_gate.timeout import Timeout
+The OpenShell wire `Finding` remains the released five-field contract:
+`type`, `label`, `count`, `confidence`, and `severity`. Gate provenance is
+runtime-internal in `SourcedFinding` and `DecisionSource`; do not serialize
+source or attributes or encode them into labels or result metadata.
 
+The service adapts protobuf messages to `HttpRequest`, validates exact encoded
+transport boundaries, and serializes `EgressResult`. Core domain and gate code
+must not import gRPC or protobuf. The request model may contain body bytes and
+visible pre-credentials headers, but provider credentials are outside this
+middleware phase.
 
-class KeywordConfig(EngineConfig):
-    engine: Literal["keyword"] = "keyword"
-    keyword: str
+## Plan boundaries
 
-
-class KeywordEngine(EntityProcessingEngine[KeywordConfig]):
-    supported_strategies = frozenset({EntityProcessingStrategy.DETECT})
-
-    def _run(
-        self,
-        text: str,
-        *,
-        strategy: EntityProcessingStrategy,
-        timeout: Timeout,
-    ) -> TextProcessingResult:
-        return TextProcessingResult(text=text, detections=())
-```
-
-The public `run` method validates input, strategy, timeout, and extension
-output. Custom code checks the timeout itself only for delegated calls or
-unique long-running loops. Register every engine before finalizing the registry
-so policy serialization retains its exact config type. Custom deployments
-expose a `module:factory` callable that returns the application-scoped finalized
-registry and pass it to the CLI with `--registry-factory`.
-
-## Change limits
-
-- Add or update tests at the layer that owns the behavior.
-- Ask before adding dependencies or changing the OpenShell protobuf contract,
-  stable error codes, protocol limits, or fail-closed defaults.
-- Do not remove or weaken relevant tests merely to pass checks.
-- Do not add casts, explicit `Any`, blanket ignores, or broad type suppressions
-  to handwritten code. `tests/test_typing_policy.py` enforces this.
+The current implementation slice covers the gate contract, strict pipeline
+configuration, finalized registry, regex-body behavior, and request processor.
+Request-rules, active-policy fingerprint replacement hardening, evaluation
+tooling, custom semantic examples, and broader documentation remain separate
+planned slices. Do not edit `plans/` as part of implementation work.

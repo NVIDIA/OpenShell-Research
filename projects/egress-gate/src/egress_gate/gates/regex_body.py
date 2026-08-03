@@ -1,4 +1,4 @@
-"""Bounded regular-expression entity detection and replacement."""
+"""Bounded regular-expression request-body detection and replacement."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import os
 from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from stat import S_ISREG
 from string import Formatter
@@ -24,7 +25,7 @@ from yaml.resolver import BaseResolver
 from egress_gate.base import StrictDomainModel
 from egress_gate.constants import (
     MAX_BODY_BYTES,
-    MAX_DETECTIONS_PER_STAGE,
+    MAX_DETECTIONS_PER_GATE,
     MAX_DIAGNOSTIC_TEXT_BYTES,
     MAX_REGEX_CATALOG_FILE_BYTES,
     MAX_REGEX_CATALOG_PATH_BYTES,
@@ -35,22 +36,25 @@ from egress_gate.constants import (
     MAX_REGEX_RULES_PER_CATALOG,
     REGEX_COMPILED_RULE_WEIGHT_BYTES,
 )
-from egress_gate.engines.base import (
-    ConfidenceLevel,
-    EngineConfig,
-    EntityDetection,
-    EntityProcessingEngine,
-    EntityProcessingStrategy,
-    TextProcessingResult,
-)
 from egress_gate.errors import (
-    EngineConfigurationError,
-    EngineContractError,
-    EngineLimitExceededError,
+    GateConfigurationError,
+    GateContractError,
+    GateLimitExceededError,
 )
+from egress_gate.gates.base import GateCapabilities, GateConfig, Utf8BodyGate
 from egress_gate.logging import get_logger
+from egress_gate.request import RequestPatch
+from egress_gate.result import Finding, FindingTypeDefinition, GateEvaluation
 from egress_gate.string_validators import ScalarString, validate_scalar_string
 from egress_gate.timeout import Timeout
+
+
+class ConfidenceLevel(StrEnum):
+    """Categorical certainty reported by the regex-body gate."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
 
 
 class RegexRule(StrictDomainModel):
@@ -113,7 +117,7 @@ class RegexEntity(StrictDomainModel):
 
 
 class RegexPatternCatalog(StrictDomainModel):
-    """The complete ordered entity catalog for one RegexEngine stage."""
+    """The complete ordered entity catalog for one regex-body gate."""
 
     entities: tuple[RegexEntity, ...] = Field(repr=False)
 
@@ -161,17 +165,33 @@ class RegexReplacement(StrictDomainModel):
         return value
 
 
-class RegexEngineConfig(EngineConfig):
-    """Exact policy configuration owned by ``RegexEngine``."""
+class RegexBodyMode(StrEnum):
+    """The disposition applied when the regex-body gate finds a match."""
 
-    engine: Literal["regex"] = "regex"
+    DETECT = "detect"
+    DENY = "deny"
+    REPLACE = "replace"
+
+
+class RegexBodyConfig(GateConfig):
+    """Exact policy configuration owned by ``RegexBodyGate``."""
+
+    gate: Literal["regex-body"] = "regex-body"
     pattern_catalog: RegexPatternCatalog = Field(
         repr=False,
         description=(
             "Complete structured catalog or relative path to a complete YAML catalog."
         ),
     )
+    mode: RegexBodyMode
     replacement: RegexReplacement | None = None
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def _parse_mode(cls, value: object) -> RegexBodyMode:
+        if isinstance(value, RegexBodyMode):
+            return value
+        return RegexBodyMode(validate_scalar_string(value))
 
     @field_validator(
         "pattern_catalog",
@@ -194,49 +214,37 @@ class RegexEngineConfig(EngineConfig):
             _compile_pattern_catalog(self.pattern_catalog)
         except (RecursionError, ValueError, regex.error):
             raise ValueError("regex pattern catalog is invalid") from None
+        if (self.mode is RegexBodyMode.REPLACE) != (self.replacement is not None):
+            raise ValueError("regex replacement is required only when mode is replace")
         return self
 
 
-class RegexEngine(EntityProcessingEngine[RegexEngineConfig]):
+class RegexBodyGate(Utf8BodyGate[RegexBodyConfig, None]):
     """Detect every regex match, including matches that share input characters."""
 
-    supported_strategies = frozenset(
-        {
-            EntityProcessingStrategy.DETECT,
-            EntityProcessingStrategy.REPLACE,
-        }
+    capabilities = GateCapabilities(
+        reads_body=True,
+        replaces_body=True,
+        produces_findings=True,
+        may_deny=True,
     )
-
-    @classmethod
-    def _validate_run_config(
-        cls,
-        config: RegexEngineConfig,
-        resources: None,
-        *,
-        strategy: EntityProcessingStrategy,
-    ) -> None:
-        del cls, resources
-        if strategy is EntityProcessingStrategy.REPLACE and config.replacement is None:
-            raise EngineConfigurationError(
-                "regex replacement configuration is required"
-            )
+    finding_types = (FindingTypeDefinition(type="sensitive_entity"),)
 
     def _initialize(self) -> None:
         try:
             self._rules = _compile_pattern_catalog(self.config.pattern_catalog)
         except (RecursionError, ValueError, regex.error):
-            raise EngineConfigurationError(
-                "regex engine configuration is invalid"
+            raise GateConfigurationError(
+                "regex-body gate configuration is invalid"
             ) from None
 
-    def _run(
+    def _evaluate_text(
         self,
         text: str,
         *,
-        strategy: EntityProcessingStrategy,
         timeout: Timeout,
-    ) -> TextProcessingResult:
-        detections_with_identity: list[tuple[EntityDetection, str]] = []
+    ) -> GateEvaluation:
+        detections_with_identity: list[tuple[_RegexDetection, str]] = []
         for rule in self._rules:
             next_position = 0
             while next_position <= len(text):
@@ -250,23 +258,22 @@ class RegexEngine(EntityProcessingEngine[RegexEngineConfig]):
                     break
                 start, end = match.span()
                 if start == end:
-                    raise EngineConfigurationError(
-                        "regex engine configuration is invalid"
+                    raise GateConfigurationError(
+                        "regex-body configuration matches an empty span"
                     )
                 if match.span(rule.marker) != (end, end):
-                    raise EngineConfigurationError(
-                        "regex engine configuration is invalid"
+                    raise GateConfigurationError(
+                        "regex-body configuration marker is invalid"
                     )
-                detection = EntityDetection(
+                detection = _RegexDetection(
                     entity=rule.entity,
                     start=start,
                     end=end,
                     confidence=rule.confidence,
-                    metadata={_RULE_METADATA_KEY: rule.rule_identity},
                 )
                 detections_with_identity.append((detection, rule.rule_identity))
-                if len(detections_with_identity) > MAX_DETECTIONS_PER_STAGE:
-                    raise EngineLimitExceededError(
+                if len(detections_with_identity) > MAX_DETECTIONS_PER_GATE:
+                    raise GateLimitExceededError(
                         "regex detection count exceeds the limit"
                     )
                 next_position = start + 1
@@ -280,20 +287,36 @@ class RegexEngine(EntityProcessingEngine[RegexEngineConfig]):
             )
         )
         detections = tuple(item[0] for item in detections_with_identity)
+        findings = tuple(
+            Finding(
+                type="sensitive_entity",
+                label=detection.entity,
+                confidence=detection.confidence.value,
+            )
+            for detection in detections
+        )
         output_text = text
-        if strategy is EntityProcessingStrategy.REPLACE and detections:
+        if self.config.mode is RegexBodyMode.REPLACE and detections:
             replacement = self.config.replacement
             if replacement is None:
-                raise EngineConfigurationError(
-                    "regex replacement configuration is required"
-                )
+                raise GateConfigurationError("regex replacement is missing")
             winners = _resolve_overlaps(detections_with_identity)
             output_text = _render_bounded_replacement(
                 text,
                 winners,
                 replacement.template,
             )
-        return TextProcessingResult(text=output_text, detections=detections)
+        if self.config.mode is RegexBodyMode.DENY and detections:
+            return GateEvaluation.deny(
+                "egress_gate_regex_denied",
+                findings=findings,
+            )
+        if self.config.mode is RegexBodyMode.REPLACE:
+            return GateEvaluation.proceed(
+                patch=RequestPatch(replacement_body=output_text.encode("utf-8")),
+                findings=findings,
+            )
+        return GateEvaluation.proceed(findings=findings)
 
 
 @dataclass(frozen=True)
@@ -303,6 +326,14 @@ class _CompiledRule:
     confidence: ConfidenceLevel
     marker: str
     compiled: _CompiledPattern
+
+
+@dataclass(frozen=True)
+class _RegexDetection:
+    entity: str
+    start: int
+    end: int
+    confidence: ConfidenceLevel
 
 
 class _RegexMatch(Protocol):
@@ -578,7 +609,7 @@ def _compile_rule(
         raise ValueError("named groups are reserved")
     if unmarked.search("") is not None:
         raise ValueError("pattern must not match empty input")
-    marker = f"_pg_rule_{catalog_index:06d}"
+    marker = f"_eg_rule_{catalog_index:06d}"
     compiled = regex.compile(f"(?:{rule.pattern})(?P<{marker}>)", flags)
     if marker not in compiled.groupindex:
         raise ValueError("internal marker is missing")
@@ -625,9 +656,9 @@ def _contains_inline_flags(pattern: str) -> bool:
 
 
 def _resolve_overlaps(
-    detections: list[tuple[EntityDetection, str]],
-) -> tuple[EntityDetection, ...]:
-    winners: list[EntityDetection] = []
+    detections: list[tuple[_RegexDetection, str]],
+) -> tuple[_RegexDetection, ...]:
+    winners: list[_RegexDetection] = []
     ranked = sorted(
         detections,
         key=lambda item: (
@@ -655,13 +686,13 @@ def _resolve_overlaps(
 
 def _categorical_confidence_rank(confidence: object) -> int:
     if not isinstance(confidence, ConfidenceLevel):
-        raise EngineContractError("regex detection confidence is invalid")
+        raise GateContractError("regex detection confidence is invalid")
     return _CONFIDENCE_RANK[confidence]
 
 
 def _render_bounded_replacement(
     text: str,
-    detections: tuple[EntityDetection, ...],
+    detections: tuple[_RegexDetection, ...],
     template: str,
 ) -> str:
     projected_size = 0
@@ -670,11 +701,11 @@ def _render_bounded_replacement(
         projected_size += len(text[cursor : detection.start].encode("utf-8"))
         projected_size += _rendered_template_size(template, detection.entity)
         if projected_size > MAX_BODY_BYTES:
-            raise EngineLimitExceededError("regex replacement exceeds the size limit")
+            raise GateLimitExceededError("regex replacement exceeds the size limit")
         cursor = detection.end
     projected_size += len(text[cursor:].encode("utf-8"))
     if projected_size > MAX_BODY_BYTES:
-        raise EngineLimitExceededError("regex replacement exceeds the size limit")
+        raise GateLimitExceededError("regex replacement exceeds the size limit")
 
     parts: list[str] = []
     cursor = 0
@@ -703,7 +734,6 @@ _CONFIDENCE_RANK = {
     ConfidenceLevel.MEDIUM: 1,
     ConfidenceLevel.HIGH: 2,
 }
-_RULE_METADATA_KEY = "rule"
 _MAX_CACHED_COMPILED_CATALOGS = 128
 # Python dict preserves insertion order, but this LRU must move cache hits to the
 # newest position and efficiently evict the oldest entry.
@@ -717,8 +747,10 @@ _LOGGER = get_logger(__name__)
 
 
 __all__ = [
-    "RegexEngine",
-    "RegexEngineConfig",
+    "ConfidenceLevel",
+    "RegexBodyConfig",
+    "RegexBodyGate",
+    "RegexBodyMode",
     "RegexEntity",
     "RegexPatternCatalog",
     "RegexReplacement",

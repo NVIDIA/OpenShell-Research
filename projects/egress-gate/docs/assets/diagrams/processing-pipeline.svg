@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 560" role="img" aria-labelledby="title description">
   <title id="title">Egress Gate processing pipeline</title>
-  <desc id="description">Validated policy and input text produce one detect or replace strategy and shared timeout. Ordered engine stages run and validate their output. Egress Gate aggregates detections and applies the final detect, block, or replace action.</desc>
+  <desc id="description">A validated policy and immutable byte-oriented request share one timeout. Ordered gates run and validate their evaluations, applying patches to the current request. Egress Gate aggregates findings and applies an explicit terminal or default decision.</desc>
   <defs>
     <style>
       text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#1f2933}
@@ -49,7 +49,7 @@
   <rect x="690" y="38" width="250" height="96" rx="16" class="engine"/>
   <circle cx="722" cy="70" r="17" class="number"/><text x="722" y="76" text-anchor="middle" class="number-text">3</text>
   <text x="755" y="72" class="title">Stage 1</text>
-  <text x="722" y="105" class="subtitle">engine.run(current text)</text>
+  <text x="722" y="105" class="subtitle">gate.evaluate(current request)</text>
 
   <path d="M815 134v72" class="arrow"/>
 
@@ -63,7 +63,7 @@
 
   <rect x="358" y="208" width="264" height="96" rx="16" class="engine"/>
   <circle cx="390" cy="240" r="17" class="number"/><text x="390" y="246" text-anchor="middle" class="number-text">5</text>
-  <text x="423" y="242" class="title">Next stage</text>
+  <text x="423" y="242" class="title">Next gate</text>
   <text x="390" y="275" class="subtitle">Repeat in configured order</text>
 
   <path d="M358 256h-66" class="arrow"/>
@@ -71,7 +71,7 @@
   <rect x="40" y="208" width="250" height="96" rx="16" class="card"/>
   <circle cx="72" cy="240" r="17" class="number"/><text x="72" y="246" text-anchor="middle" class="number-text">6</text>
   <text x="105" y="242" class="title">Aggregate</text>
-  <text x="72" y="275" class="subtitle">Stage + entity + confidence</text>
+  <text x="72" y="275" class="subtitle">Gate + type + label + confidence</text>
 
   <path d="M165 304v72" class="arrow"/>
 
@@ -90,5 +90,5 @@
   <text x="779" y="485" text-anchor="middle" class="subtitle">allow final text</text>
 
   <path d="M490 208v-38c0-20 16-36 36-36h164" class="loop"/>
-  <text x="548" y="184" class="arrow-label">repeat until final stage</text>
+  <text x="548" y="184" class="arrow-label">repeat until terminal or default</text>
 </svg>

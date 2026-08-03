@@ -9,8 +9,10 @@ from egress_gate.constants import (
     MAX_BODY_BYTES,
     MAX_HEADER_MUTATION_DATA_BYTES,
     MAX_HEADER_MUTATIONS,
+    MAX_PROTO_CONTEXT_BYTES,
     MAX_PROTO_HEADERS,
     MAX_PROTO_HEADERS_BYTES,
+    MAX_PROTO_TARGET_BYTES,
 )
 from egress_gate.request import (
     ExistingHeaderAction,
@@ -168,4 +170,54 @@ def test_request_models_reject_non_tuple_sequences_and_extra_fields() -> None:
                 "query": "",
                 "extra": "forbidden",
             }
+        )
+
+
+def test_request_context_string_aggregate_has_an_exact_boundary() -> None:
+    exact = RequestContext(
+        request_id="r" * (MAX_PROTO_CONTEXT_BYTES - 1),
+        sandbox_id="s",
+    )
+    assert len(exact.request_id.encode()) + len(exact.sandbox_id.encode()) == (
+        MAX_PROTO_CONTEXT_BYTES
+    )
+
+    with pytest.raises(ValidationError):
+        RequestContext(
+            request_id="r" * MAX_PROTO_CONTEXT_BYTES,
+            sandbox_id="s",
+        )
+
+
+def test_http_target_string_aggregate_has_an_exact_boundary() -> None:
+    exact = HttpTarget(
+        scheme="s" * (MAX_PROTO_TARGET_BYTES - 4),
+        host="h",
+        port=443,
+        method="m",
+        path="p",
+        query="q",
+    )
+    assert (
+        sum(
+            len(value.encode())
+            for value in (
+                exact.scheme,
+                exact.host,
+                exact.method,
+                exact.path,
+                exact.query,
+            )
+        )
+        == MAX_PROTO_TARGET_BYTES
+    )
+
+    with pytest.raises(ValidationError):
+        HttpTarget(
+            scheme="s" * (MAX_PROTO_TARGET_BYTES - 3),
+            host="h",
+            port=443,
+            method="m",
+            path="p",
+            query="q",
         )

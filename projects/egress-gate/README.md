@@ -1,194 +1,94 @@
 # Egress Gate
 
-Egress Gate is an OpenShell supervisor middleware that detects, blocks, or
-replaces configured entities in provider-bound HTTP request bodies before
-OpenShell attaches provider credentials.
+Egress Gate is an OpenShell supervisor middleware for inspecting and enforcing
+policy on provider-bound HTTP requests during the pre-credentials phase. It
+receives an immutable byte-oriented `HttpRequest`, evaluates an ordered
+pipeline of trusted request-level gates, and returns an allow, deny, or
+validated mutation result.
 
-It processes the complete request body as UTF-8 text through an ordered
-pipeline of entity-processing engines.
+The current released OpenShell `Finding` contract has five fields:
+`type`, `label`, `count`, `confidence`, and `severity`. Gate provenance stays
+inside the runtime; it is not serialized into findings or labels.
 
-> **Experimental:** Egress Gate is a proof of concept. It reduces exposure on
-> provider-bound network requests that OpenShell routes through the middleware;
-> it does not guarantee that sensitive data cannot leak.
+## Quickstart
 
-Egress Gate does not intercept data before a harness writes it to disk.
-Prompts, tool output, transcripts, and session histories may therefore retain
-raw sensitive values even when the provider-bound request is later replaced or
-blocked. Use harness persistence controls and appropriate storage isolation,
-retention, and cleanup in addition to Egress Gate.
-
-## What it does
-
-| Policy action | Behavior |
-| --- | --- |
-| `detect` | Allow the original body and report bounded findings |
-| `block` | Deny requests containing configured entities |
-| `replace` | Allow the final body returned by replacement-capable engines |
-
-Findings contain entity, stage, confidence, and count. Framework-controlled
-fields and the built-in `RegexEngine` do not add matched text, surrounding
-text, offsets, patterns, headers, or credentials. Custom engines must use
-stable entity identifiers that are not derived from request text.
-
-## Developer start
-
-Requirements:
-
-- Python 3.11 or newer
-- `uv` 0.11 or newer
-
-From this directory:
+Requirements: Python 3.11+ and `uv` 0.11+.
 
 ```bash
-uv sync --locked
-uv run egress-gate engines
+uv sync --frozen
+uv run egress-gate gates
 uv run egress-gate configuration-schema
+uv run egress-gate serve --listen 127.0.0.1:50051
 ```
 
-Start the built-in `RegexEngine` service locally:
+Use `0.0.0.0` only when the OpenShell supervisor must reach the service across
+network namespaces. The development server uses plaintext gRPC; restrict its
+listen port to trusted networks.
 
-```bash
-uv run egress-gate serve \
-  --listen 127.0.0.1:50051
-```
+## Policy shape
 
-Use `0.0.0.0` when OpenShell sandbox supervisors outside the host network
-namespace must reach the service. The development server uses plaintext gRPC;
-restrict the port to trusted host and sandbox networks.
-
-## Policy configuration
-
-Privacy behavior comes from the OpenShell policy:
+The registry builds an exact strict schema from installed gate types:
 
 ```yaml
-entity_processing:
-  stages:
+pipeline:
+  gates:
     - name: identifiers
       config:
-        engine: regex
-        pattern_catalog:
-          entities:
-            - name: email
-              rules:
-                - pattern: '(?<![\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])'
-                  confidence: high
+        gate: regex-body
+        pattern_catalog: patterns.yaml
+        mode: replace
         replacement:
           strategy: template
           template: "[{entity}]"
-on_detection:
-  action: replace
+  default_decision: allow
 ```
 
-`entity_processing.stages` runs in order. In replace mode, each stage receives
-the text returned by the preceding stage. Detect and block invoke engines with
-the detection-only strategy.
-
-`RegexEngine` accepts an inline catalog or a relative `.yaml` or `.yml` path:
-
-```yaml
-pattern_catalog: patterns.yaml
-```
-
-Relative paths resolve beneath Egress Gate's working directory. Absolute
-paths, traversal, symlinks, unsafe YAML tags, aliases, duplicate keys, invalid
-UTF-8, and oversized catalogs are rejected.
-
-## CLI
+The shipped registry contains `regex-body`. It supports `detect`, `deny`, and
+`replace`; replacement mode preserves an explicit body-replacement intent even
+when the resulting bytes equal the input. `request-rules` is planned for a
+later slice. Custom trusted gates can be added through `--registry-factory`.
 
 ```bash
-uv run egress-gate engines
-uv run egress-gate configuration-schema
-uv run egress-gate add-gateway-registration --host-ip YOUR_HOST_IPV4
-uv run egress-gate remove-gateway-registration --name egress-gate
-uv run egress-gate serve \
-  --listen 0.0.0.0:50051 \
-  --timeout-seconds 4
+uv run egress-gate --registry-factory my_gates:create_registry gates
+uv run egress-gate --registry-factory my_gates:create_registry serve
 ```
 
-`add-gateway-registration` adds or updates a Egress Gate registration in the
-OpenShell gateway TOML. Its registration name must match the policy's
-`middleware` field. Restart the gateway after changing registrations.
-`remove-gateway-registration` removes one registration by name while preserving
-unrelated gateway settings.
-
-The processing timeout is one bound shared by every stage. It defaults to 1
-second and cannot exceed 30 seconds. `add-gateway-registration` writes a five-second
-OpenShell middleware timeout, so use a shorter processing timeout or edit the
-registration to provide more headroom. Rerunning `add-gateway-registration` restores
-the five-second value.
-
-Use a trusted registry factory for custom engines:
-
-```bash
-uv run egress-gate \
-  --registry-factory my_engines:create_registry \
-  engines
-
-uv run egress-gate \
-  --registry-factory my_engines:create_registry \
-  serve
-```
+OpenShell owns interception, routing, and credential attachment. Egress Gate
+does not act as an HTTP proxy, inspect responses, or protect data already
+written by a harness to disk.
 
 ## Python server API
 
 ```python
-from egress_gate.engines.registry import create_builtin_registry
+from egress_gate.gates import create_builtin_registry
 from egress_gate.service import EgressGateServer
 
-server = EgressGateServer(
-    create_builtin_registry(),
-    timeout_seconds=5,
-)
+server = EgressGateServer(create_builtin_registry(), timeout_seconds=5)
 server.serve_sync("127.0.0.1:50051")
 ```
 
-Async applications use:
+The service creates one `Timeout` per evaluation and passes that deadline
+through slot acquisition, policy preparation, and `RequestProcessor.process`.
 
-```python
-await server.serve_async("127.0.0.1:50051")
-```
+## Documentation and examples
 
-## Documentation
-
-- [Overview and end-to-end quickstart](docs/index.md)
-- [Configure policies](docs/configuration.md)
-- [Run and operate Egress Gate](docs/operations.md)
-- [Use RegexEngine](docs/engines/regex.md)
-- [Add a custom engine](docs/engines/custom.md)
-- [System architecture](docs/architecture/index.md)
-- [Limits and failure behavior](docs/reference/limits-and-failures.md)
-
-## Runnable examples
-
-- [`examples/regex-engine`](examples/regex-engine/README.md): detect and replace
-  email addresses and customer IDs with the built-in engine.
-- [`examples/custom-engine`](examples/custom-engine/README.md): implement,
-  register, and run a typed custom engine.
-
-## Logging
-
-`--debug` enables content-safe diagnostic records.
-
-`--debug-log-content` logs complete input and processed text. Use it only in a
-controlled development environment.
-
-Imported applications can configure the standard `egress_gate` logger
-themselves or use `egress_gate.logging.configure_logging()`.
+- [Overview](docs/index.md)
+- [Configuration](docs/configuration.md)
+- [Operations](docs/operations.md)
+- [Gate authoring](docs/gates/custom.md)
+- [Regex-body](docs/gates/regex.md)
+- [Architecture](docs/architecture/index.md)
+- [Limits and failures](docs/reference/limits-and-failures.md)
+- [Regex-body example](examples/regex-engine/README.md)
+- [Custom gate example](examples/custom-engine/README.md)
 
 ## Development
 
 ```bash
 make help
-make test PYTEST_ARGS="tests/test_request_processor.py"
-make fix
+make test PYTEST_ARGS="tests/gates tests/test_request_processor.py"
 make check
-make check-py311
 ```
 
-`make check` runs tests, formatting, lint, type checking, an import smoke check,
-and a dependency audit.
-
-The copied `proto/supervisor_middleware.proto` and generated bindings are owned
-by OpenShell. Update them through the repository's
-[`openshell-middleware-manager`](../openshell-middleware-manager/README.md), then run
-`make check`.
+Only `service/` imports generated protobuf/gRPC bindings. Do not edit
+`plans/egress-gate-refactor.md` as part of implementation work.

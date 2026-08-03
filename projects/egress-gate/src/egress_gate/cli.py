@@ -12,9 +12,8 @@ from typing import Annotated
 import typer
 
 from egress_gate.constants import DEFAULT_TIMEOUT_SECONDS, MAX_TIMEOUT_SECONDS
-from egress_gate.engines import EntityProcessingStrategy
-from egress_gate.engines.registry import EngineRegistry, create_builtin_registry
 from egress_gate.errors import EgressGateError
+from egress_gate.gates.registry import GateRegistry, create_builtin_registry
 from egress_gate.gateway_config import (
     MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES,
     GatewayConfigError,
@@ -33,7 +32,7 @@ app = typer.Typer(
     name="egress-gate",
     help=(
         "Run Egress Gate, manage local OpenShell gateway registrations, and "
-        "inspect installed entity-processing engines."
+        "inspect installed request-level gates."
     ),
     no_args_is_help=True,
     add_completion=False,
@@ -47,8 +46,8 @@ def configure_cli(
         str | None,
         typer.Option(
             help=(
-                "Load engines from a trusted Python callable, formatted as "
-                "module:factory. The callable must return a finalized EngineRegistry."
+                "Load gates from a trusted Python callable, formatted as "
+                "module:factory. The callable must return a finalized GateRegistry."
             ),
         ),
     ] = None,
@@ -72,7 +71,7 @@ def configure_cli(
         ),
     ] = False,
 ) -> None:
-    """Configure the command application and its engine inventory."""
+    """Configure the command application and its gate inventory."""
     configure_logging(
         LoggingConfig(level="DEBUG" if debug or debug_log_content else "INFO")
     )
@@ -103,7 +102,7 @@ def serve(
         float,
         typer.Option(
             help=(
-                "Maximum seconds shared by all processing stages in one request; "
+                "Maximum seconds shared by all processing gates in one request; "
                 f"must be greater than 0 and at most {MAX_TIMEOUT_SECONDS:g}."
             ),
         ),
@@ -277,7 +276,7 @@ def remove_gateway_registration(
 
 @app.command("configuration-schema")
 def configuration_schema(context: typer.Context) -> None:
-    """Print the policy configuration JSON Schema for the installed engines."""
+    """Print the policy configuration JSON Schema for the installed gates."""
     typer.echo(
         json.dumps(
             _command_options(context).registry.configuration_json_schema(),
@@ -288,17 +287,14 @@ def configuration_schema(context: typer.Context) -> None:
     )
 
 
-@app.command("engines")
-def engines(context: typer.Context) -> None:
-    """List installed engines, supported strategies, and their behavior."""
-    for description in _command_options(context).registry.describe_engines():
-        strategies = ",".join(
-            strategy.value
-            for strategy in EntityProcessingStrategy
-            if strategy in description.supported_strategies
-        )
+@app.command("gates")
+def gates(context: typer.Context) -> None:
+    """List installed gates, capabilities, and declared finding types."""
+    for description in _command_options(context).registry.describe_gates():
+        finding_types = ",".join(item.type for item in description.finding_types)
         typer.echo(
-            f"{description.engine_name}\t{strategies}\t{description.description}"
+            f"{description.gate_type}\t{finding_types or '-'}\t"
+            f"{description.description}"
         )
 
 
@@ -307,17 +303,17 @@ _LOGGER = get_logger(__name__)
 
 @dataclass(frozen=True)
 class _CommandOptions:
-    registry: EngineRegistry
+    registry: GateRegistry
     log_request_content: bool
 
 
-def _load_registry(factory_reference: str | None) -> EngineRegistry:
+def _load_registry(factory_reference: str | None) -> GateRegistry:
     if factory_reference is None:
         return create_builtin_registry()
     module_name, separator, factory_name = factory_reference.partition(":")
     if not separator or not module_name or not factory_name:
         raise typer.BadParameter(
-            "Use module:factory, for example my_engines:create_registry.",
+            "Use module:factory, for example my_gates:create_registry.",
             param_hint="--registry-factory",
         )
     try:
@@ -341,7 +337,7 @@ def _load_registry(factory_reference: str | None) -> EngineRegistry:
     if not callable(factory):
         raise typer.BadParameter(
             "Registry factory is not callable. Export a callable that returns a "
-            "finalized EngineRegistry.",
+            "finalized GateRegistry.",
             param_hint="--registry-factory",
         )
     try:
@@ -352,9 +348,9 @@ def _load_registry(factory_reference: str | None) -> EngineRegistry:
             "diagnostics and fix its startup error.",
             param_hint="--registry-factory",
         ) from None
-    if not isinstance(registry, EngineRegistry):
+    if not isinstance(registry, GateRegistry):
         raise typer.BadParameter(
-            "Registry factory returned an invalid object. Return an EngineRegistry.",
+            "Registry factory returned an invalid object. Return a GateRegistry.",
             param_hint="--registry-factory",
         )
     if not registry.is_finalized:

@@ -19,7 +19,7 @@ class ErrorComponent(StrEnum):
     """The Egress Gate component responsible for a failure."""
 
     CONFIG = "config"
-    ENGINE = "engine"
+    GATE = "gate"
     PROCESSOR = "processor"
     SERVICE = "service"
     SERVER = "server"
@@ -33,8 +33,8 @@ class ErrorCode(StrEnum):
     REQUEST_ENVELOPE_INVALID = "request_envelope_invalid"
     REQUEST_BODY_TOO_LARGE = "request_body_too_large"
     BODY_ENCODING_INVALID = "body_encoding_invalid"
-    ENGINE_OUTPUT_INVALID = "engine_output_invalid"
-    ENGINE_EXECUTION_FAILED = "engine_execution_failed"
+    GATE_OUTPUT_INVALID = "gate_output_invalid"
+    GATE_EXECUTION_FAILED = "gate_execution_failed"
     SERVER_BIND_FAILED = "server_bind_failed"
     UNEXPECTED_SERVICE_FAILURE = "unexpected_service_failure"
 
@@ -85,39 +85,43 @@ class EgressGateError(Exception):
         )
 
 
-class EntityProcessingError(Exception):
-    """Base for content-safe entity-processing failures."""
+class GateError(Exception):
+    """Base for content-safe gate lifecycle failures."""
 
 
-class EngineConfigurationError(EntityProcessingError):
-    """An engine class or configured instance is invalid."""
+class GateConfigurationError(GateError):
+    """A gate class or configured instance is invalid."""
 
 
-class EngineContractError(EntityProcessingError):
-    """An engine invocation or returned result violated the public contract."""
+class GateContractError(GateError):
+    """A gate invocation or returned result violated the public contract."""
 
 
-class EngineExecutionError(EntityProcessingError):
-    """An engine's configured runtime failed to complete one text input."""
+class GateExecutionError(GateError):
+    """A gate's configured runtime failed to complete one request."""
 
 
-class EngineLimitExceededError(EntityProcessingError):
-    """An engine exceeded a bounded configuration or output limit."""
+class GateLimitExceededError(GateError):
+    """A gate exceeded a bounded configuration or output limit."""
 
 
-class TimeoutExpiredError(EntityProcessingError):
-    """The shared entity-processing timeout expired."""
+class GateInputError(GateError):
+    """A gate could not interpret a bounded request input."""
+
+
+class TimeoutExpiredError(Exception):
+    """The shared request-processing timeout expired."""
 
     def __init__(self) -> None:
         super().__init__(
             "Egress Gate processing timed out. Reduce the request size or simplify "
-            "the configured stages and rules, or increase the processing timeout "
+            "the configured gates and rules, or increase the processing timeout "
             f"to at most {MAX_TIMEOUT_SECONDS:g} seconds, then retry."
         )
 
 
-class EngineRegistryError(Exception):
-    """A content-safe engine registration or registry lifecycle failure."""
+class GateRegistryError(Exception):
+    """A content-safe gate registration or registry lifecycle failure."""
 
 
 _ERROR_SPECS: dict[ErrorCode, _ErrorSpec] = {
@@ -128,8 +132,8 @@ _ERROR_SPECS: dict[ErrorCode, _ErrorSpec] = {
         "Policy configuration is invalid.",
         "Keep the encoded configuration at or below "
         f"{MAX_PROTO_CONFIG_BYTES // 1024} KiB, compare it with "
-        "`egress-gate configuration-schema`, then check the stages, engine "
-        "settings, pattern catalogs, replacements, and action.",
+        "`egress-gate configuration-schema`, then check the pipeline, gates, "
+        "pattern catalogs, replacements, and default decision.",
     ),
     ErrorCode.REQUEST_PHASE_INVALID: _ErrorSpec(
         ErrorKind.INVALID_INPUT,
@@ -160,21 +164,21 @@ _ERROR_SPECS: dict[ErrorCode, _ErrorSpec] = {
         "Request body encoding is invalid.",
         "Supply a valid UTF-8 request body.",
     ),
-    ErrorCode.ENGINE_OUTPUT_INVALID: _ErrorSpec(
+    ErrorCode.GATE_OUTPUT_INVALID: _ErrorSpec(
         ErrorKind.INTERNAL,
         ErrorComponent.PROCESSOR,
-        "validate_engine",
-        "An entity-processing engine returned an invalid result.",
-        "Custom engine developers should check the run contract, result model, "
-        "spans, processing strategy, and output limits.",
+        "validate_gate",
+        "A gate returned an invalid result.",
+        "Gate authors should check the evaluate contract, capabilities, findings, "
+        "mutations, and output limits.",
     ),
-    ErrorCode.ENGINE_EXECUTION_FAILED: _ErrorSpec(
+    ErrorCode.GATE_EXECUTION_FAILED: _ErrorSpec(
         ErrorKind.INTERNAL,
-        ErrorComponent.ENGINE,
-        "run",
-        "An entity-processing engine failed.",
+        ErrorComponent.GATE,
+        "evaluate",
+        "A configured gate failed.",
         "Check the request ID and error code in service logs, then run the "
-        "configured engine's focused configuration and single-text tests.",
+        "configured gate's focused configuration and request tests.",
     ),
     ErrorCode.SERVER_BIND_FAILED: _ErrorSpec(
         ErrorKind.INTERNAL,

@@ -1,11 +1,11 @@
-entity_processing:
-  stages:
+pipeline:
+  gates:
     - name: identifiers
       config:
-        engine: regex
+        gate: regex-body
         pattern_catalog: patterns.yaml
+        mode: replace
         replacement:
           strategy: template
           template: "[{entity}]"
-on_detection:
-  action: replace
+  default_decision: allow

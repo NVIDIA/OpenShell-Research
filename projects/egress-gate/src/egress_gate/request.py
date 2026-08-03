@@ -12,8 +12,10 @@ from egress_gate.constants import (
     MAX_BODY_BYTES,
     MAX_HEADER_MUTATION_DATA_BYTES,
     MAX_HEADER_MUTATIONS,
+    MAX_PROTO_CONTEXT_BYTES,
     MAX_PROTO_HEADERS,
     MAX_PROTO_HEADERS_BYTES,
+    MAX_PROTO_TARGET_BYTES,
 )
 from egress_gate.string_validators import ScalarString, validate_scalar_string
 
@@ -55,6 +57,21 @@ class RequestContext(StrictDomainModel):
     sandbox_id: ScalarString
     originating_process: Process | None = None
 
+    @model_validator(mode="after")
+    def _context_strings_are_bounded(self) -> RequestContext:
+        string_bytes = len(self.request_id.encode("utf-8")) + len(
+            self.sandbox_id.encode("utf-8")
+        )
+        if self.originating_process is not None:
+            string_bytes += len(self.originating_process.binary.encode("utf-8"))
+            string_bytes += sum(
+                len(ancestor.encode("utf-8"))
+                for ancestor in self.originating_process.ancestors
+            )
+        if string_bytes > MAX_PROTO_CONTEXT_BYTES:
+            raise ValueError("request context strings exceed the size limit")
+        return self
+
 
 class HttpTarget(StrictDomainModel):
     """The bounded destination and request target visible before credentials."""
@@ -65,6 +82,22 @@ class HttpTarget(StrictDomainModel):
     method: ScalarString
     path: ScalarString
     query: ScalarString
+
+    @model_validator(mode="after")
+    def _target_strings_are_bounded(self) -> HttpTarget:
+        string_bytes = sum(
+            len(value.encode("utf-8"))
+            for value in (
+                self.scheme,
+                self.host,
+                self.method,
+                self.path,
+                self.query,
+            )
+        )
+        if string_bytes > MAX_PROTO_TARGET_BYTES:
+            raise ValueError("request target strings exceed the size limit")
+        return self
 
 
 class HttpHeader(StrictDomainModel):

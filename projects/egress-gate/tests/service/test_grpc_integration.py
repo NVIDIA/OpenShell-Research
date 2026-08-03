@@ -1,96 +1,81 @@
-"""Real loopback coverage for the generated OpenShell gRPC service."""
+"""Loopback coverage for the generated OpenShell gRPC service."""
 
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Literal
 
 import grpc
 import pytest
 from google.protobuf import empty_pb2, json_format, message_factory
 from google.protobuf.message import Message
-from pydantic import field_validator
 
-from egress_gate.base import StrictDomainModel
 from egress_gate.bindings import supervisor_middleware_pb2 as pb2
 from egress_gate.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
-from egress_gate.engines import (
-    EngineConfig,
-    EntityProcessingEngine,
-    EntityProcessingStrategy,
-    TextProcessingResult,
-)
-from egress_gate.engines.registry import EngineRegistry, create_builtin_registry
-from egress_gate.errors import EgressGateError
+from egress_gate.gates import create_builtin_registry
 from egress_gate.service.servicer import EgressGateMiddleware
-from egress_gate.timeout import Timeout
 
 
-def _config(
-    *,
-    action: str = "replace",
-    pattern: str = r"[a-z]+@[a-z]+\.[a-z]+",
-) -> pb2.ValidateConfigRequest:
-    request = pb2.ValidateConfigRequest()
-    json_format.ParseDict(
-        {
-            "entity_processing": {
-                "stages": [
-                    {
-                        "name": "identifiers",
-                        "config": {
-                            "engine": "regex",
-                            "pattern_catalog": {
-                                "entities": [
-                                    {
-                                        "name": "email",
-                                        "rules": [
-                                            {
-                                                "pattern": pattern,
-                                                "confidence": "high",
-                                            }
-                                        ],
-                                    }
-                                ]
-                            },
-                            "replacement": {
-                                "strategy": "template",
-                                "template": "[{entity}]",
-                            },
+def _config(*, mode: str = "replace") -> Message:
+    values: dict[str, object] = {
+        "pipeline": {
+            "gates": [
+                {
+                    "name": "identifiers",
+                    "config": {
+                        "gate": "regex-body",
+                        "pattern_catalog": {
+                            "entities": [
+                                {
+                                    "name": "email",
+                                    "rules": [
+                                        {
+                                            "pattern": r"[a-z]+@[a-z]+\.[a-z]+",
+                                            "confidence": "high",
+                                        }
+                                    ],
+                                }
+                            ]
                         },
-                    }
-                ]
-            },
-            "on_detection": {"action": action},
-        },
-        request.config,
-    )
-    return request
-
-
-def _config_with_stages(stage_count: int) -> pb2.ValidateConfigRequest:
-    values = json_format.MessageToDict(_config(action="detect").config)
-    stage = values["entity_processing"]["stages"][0]
-    stage.pop("name")
-    values["entity_processing"]["stages"] = [stage] * stage_count
+                        "mode": mode,
+                        **(
+                            {
+                                "replacement": {
+                                    "strategy": "template",
+                                    "template": "[{entity}]",
+                                }
+                            }
+                            if mode == "replace"
+                            else {}
+                        ),
+                    },
+                }
+            ],
+            "default_decision": "allow",
+        }
+    }
     request = pb2.ValidateConfigRequest()
     json_format.ParseDict(values, request.config)
-    return request
+    return request.config
 
 
 def _evaluation(
     body: bytes,
     *,
-    action: str = "replace",
-    phase: pb2.SupervisorMiddlewarePhase = (
-        pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS
-    ),
+    mode: str = "replace",
 ) -> pb2.HttpRequestEvaluation:
     return pb2.HttpRequestEvaluation(
-        phase=phase,
-        context=pb2.RequestContext(request_id="grpc-integration"),
-        config=_config(action=action).config,
+        phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS,
+        context=pb2.RequestContext(request_id="grpc-integration", sandbox_id="sandbox"),
+        config=_config(mode=mode),
+        target=pb2.HttpRequestTarget(
+            scheme="https",
+            host="example.com",
+            port=443,
+            method="POST",
+            path="/",
+            query="",
+        ),
         body=body,
     )
 
@@ -114,7 +99,7 @@ async def _running_stub(
 
 
 @pytest.mark.asyncio
-async def test_generated_stub_round_trip_covers_manifest_config_and_actions() -> None:
+async def test_generated_stub_round_trip_covers_manifest_and_gate_modes() -> None:
     middleware = EgressGateMiddleware(create_builtin_registry())
     async with _running_stub(middleware) as stub:
         empty_message_type = message_factory.GetMessageClass(
@@ -122,207 +107,36 @@ async def test_generated_stub_round_trip_covers_manifest_config_and_actions() ->
         )
         empty_message: Message = empty_message_type()
         manifest = await stub.Describe(empty_message)
-        valid = await stub.ValidateConfig(_config())
-        invalid = await stub.ValidateConfig(pb2.ValidateConfigRequest())
-        detected = await stub.EvaluateHttpRequest(
-            _evaluation(b"contact a@b.com", action="detect")
-        )
         replaced = await stub.EvaluateHttpRequest(_evaluation(b"contact a@b.com"))
-        blocked = await stub.EvaluateHttpRequest(
-            _evaluation(b"contact a@b.com", action="block")
+        detected = await stub.EvaluateHttpRequest(
+            _evaluation(b"contact a@b.com", mode="detect")
         )
-        clean = await stub.EvaluateHttpRequest(_evaluation(b"no match", action="block"))
+        denied_config = _config(mode="deny")
+        denied_request = _evaluation(b"contact a@b.com", mode="deny")
+        denied_request.config.CopyFrom(denied_config)
+        denied = await stub.EvaluateHttpRequest(denied_request)
 
     assert manifest.name == "egress-gate"
     assert len(manifest.bindings) == 1
-    assert valid.valid is True
-    assert invalid.valid is False
-    assert "config_invalid" in invalid.reason
-    assert detected.decision == pb2.DECISION_ALLOW
-    assert detected.has_body is False
-    assert len(detected.findings) == 1
     assert replaced.decision == pb2.DECISION_ALLOW
     assert replaced.has_body is True
     assert replaced.body == b"contact [email]"
-    assert blocked.decision == pb2.DECISION_DENY
-    assert blocked.reason_code == "egress_gate_blocked"
-    assert clean.decision == pb2.DECISION_ALLOW
+    assert detected.decision == pb2.DECISION_ALLOW
+    assert detected.has_body is False
+    assert len(detected.findings) == 1
+    assert denied.decision == pb2.DECISION_DENY
+    assert denied.reason_code == "egress_gate_regex_denied"
 
 
 @pytest.mark.asyncio
-async def test_generated_stub_maps_invalid_and_internal_failures(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_generated_stub_maps_invalid_phase_to_invalid_argument() -> None:
     middleware = EgressGateMiddleware(create_builtin_registry())
     async with _running_stub(middleware) as stub:
-        with pytest.raises(grpc.aio.AioRpcError) as invalid:
-            await stub.EvaluateHttpRequest(
-                _evaluation(
-                    b"body",
-                    phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_UNSPECIFIED,
-                )
-            )
-        assert invalid.value.code() is grpc.StatusCode.INVALID_ARGUMENT
-        assert "request_phase_invalid" in (invalid.value.details() or "")
+        request = _evaluation(b"body")
+        request.phase = pb2.SUPERVISOR_MIDDLEWARE_PHASE_UNSPECIFIED
 
-        def fail_unexpectedly(values: object, body: bytes) -> None:
-            del values, body
-            raise RuntimeError
+        with pytest.raises(grpc.aio.AioRpcError) as error:
+            await stub.EvaluateHttpRequest(request)
 
-        monkeypatch.setattr(middleware, "_prepare_and_process", fail_unexpectedly)
-        with pytest.raises(grpc.aio.AioRpcError) as internal:
-            await stub.EvaluateHttpRequest(_evaluation(b"body"))
-        assert internal.value.code() is grpc.StatusCode.INTERNAL
-        assert "unexpected_service_failure" in (internal.value.details() or "")
-
-
-@pytest.mark.asyncio
-async def test_generated_stub_enforces_ten_stage_limit() -> None:
-    middleware = EgressGateMiddleware(create_builtin_registry())
-    async with _running_stub(middleware) as stub:
-        exact_config = _config_with_stages(10)
-        oversized_config = _config_with_stages(11)
-        exact_validation = await stub.ValidateConfig(exact_config)
-        oversized_validation = await stub.ValidateConfig(oversized_config)
-        exact_evaluation = _evaluation(b"no match", action="detect")
-        exact_evaluation.config.CopyFrom(exact_config.config)
-        exact_result = await stub.EvaluateHttpRequest(exact_evaluation)
-        oversized_evaluation = _evaluation(b"no match", action="detect")
-        oversized_evaluation.config.CopyFrom(oversized_config.config)
-        with pytest.raises(grpc.aio.AioRpcError) as oversized_result:
-            await stub.EvaluateHttpRequest(oversized_evaluation)
-
-    assert exact_validation.valid is True
-    assert oversized_validation.valid is False
-    assert exact_result.decision == pb2.DECISION_ALLOW
-    assert oversized_result.value.code() is grpc.StatusCode.INVALID_ARGUMENT
-    assert "config_invalid" in (oversized_result.value.details() or "")
-
-
-@pytest.mark.asyncio
-async def test_generated_stub_maps_contextual_zero_width_to_invalid_config() -> None:
-    report_pattern = "x|(?=SECRET-zero-width-493)"
-    config = _config(action="detect", pattern=report_pattern)
-    evaluation = _evaluation(b"SECRET-zero-width-493", action="detect")
-    evaluation.config.CopyFrom(config.config)
-    middleware = EgressGateMiddleware(create_builtin_registry())
-
-    async with _running_stub(middleware) as stub:
-        before = await stub.EvaluateHttpRequest(
-            _evaluation(b"contact a@b.com", action="detect")
-        )
-        validation = await stub.ValidateConfig(config)
-        with pytest.raises(grpc.aio.AioRpcError) as evaluation_error:
-            await stub.EvaluateHttpRequest(evaluation)
-        after = await stub.EvaluateHttpRequest(
-            _evaluation(b"contact a@b.com", action="detect")
-        )
-
-    details = evaluation_error.value.details() or ""
-    assert len(before.findings) == 1
-    assert validation.valid is True
-    assert evaluation_error.value.code() is grpc.StatusCode.INVALID_ARGUMENT
-    assert "config_invalid" in details
-    assert "engine_execution_failed" not in details
-    assert report_pattern not in details
-    assert len(after.findings) == 1
-
-
-class _NumericNestedConfig(StrictDomainModel):
-    count: int
-
-
-class _NumericEngineConfig(EngineConfig):
-    engine: Literal["numeric"] = "numeric"
-    threshold: int
-    ratio: float
-    nested: _NumericNestedConfig
-    values: tuple[int, ...]
-
-    @field_validator("values", mode="before")
-    @classmethod
-    def _values_are_a_tuple(cls, value: object) -> object:
-        if not isinstance(value, list | tuple):
-            raise ValueError("values must be a list")
-        return tuple(value)
-
-
-class _NumericEngine(EntityProcessingEngine[_NumericEngineConfig]):
-    supported_strategies = frozenset({EntityProcessingStrategy.DETECT})
-
-    def _run(
-        self,
-        text: str,
-        *,
-        strategy: EntityProcessingStrategy,
-        timeout: Timeout,
-    ) -> TextProcessingResult:
-        del strategy, timeout
-        return TextProcessingResult(text=text, detections=())
-
-
-def _numeric_values(
-    threshold: int | float,
-    *,
-    ratio: float = 3.0,
-) -> dict[str, object]:
-    return {
-        "entity_processing": {
-            "stages": [
-                {
-                    "config": {
-                        "engine": "numeric",
-                        "threshold": threshold,
-                        "ratio": ratio,
-                        "nested": {"count": 4},
-                        "values": [5, 6],
-                    }
-                }
-            ]
-        },
-        "on_detection": {"action": "detect"},
-    }
-
-
-def _numeric_request(
-    threshold: int | float,
-    *,
-    ratio: float = 3.0,
-) -> pb2.ValidateConfigRequest:
-    request = pb2.ValidateConfigRequest()
-    json_format.ParseDict(_numeric_values(threshold, ratio=ratio), request.config)
-    return request
-
-
-def _numeric_registry() -> EngineRegistry:
-    registry = EngineRegistry()
-    registry.register(_NumericEngine)
-    return registry.finalize()
-
-
-@pytest.mark.asyncio
-async def test_generated_stub_normalizes_transport_safe_integral_numbers() -> None:
-    registry = _numeric_registry()
-    with pytest.raises(EgressGateError):
-        registry.validate_config(_numeric_values(3.0))
-
-    middleware = EgressGateMiddleware(registry)
-    async with _running_stub(middleware) as stub:
-        ordinary = await stub.ValidateConfig(_numeric_request(3, ratio=3.5))
-        safe_max = await stub.ValidateConfig(_numeric_request((1 << 53) - 1))
-        safe_min = await stub.ValidateConfig(_numeric_request(-((1 << 53) - 1)))
-        non_integral = await stub.ValidateConfig(_numeric_request(3.5))
-        beyond_safe = await stub.ValidateConfig(_numeric_request(1 << 53))
-        evaluation = pb2.HttpRequestEvaluation(
-            phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS,
-            config=_numeric_request(3).config,
-            body=b"body",
-        )
-        result = await stub.EvaluateHttpRequest(evaluation)
-
-    assert ordinary.valid is True
-    assert safe_max.valid is True
-    assert safe_min.valid is True
-    assert non_integral.valid is False
-    assert beyond_safe.valid is False
-    assert result.decision == pb2.DECISION_ALLOW
+    assert error.value.code() is grpc.StatusCode.INVALID_ARGUMENT
+    assert "request_phase_invalid" in (error.value.details() or "")

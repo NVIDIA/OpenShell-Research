@@ -1,4 +1,4 @@
-"""A shared monotonic timeout for one entity-processing run."""
+"""A shared monotonic timeout for one request-pipeline run."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def validate_timeout_seconds(seconds: object) -> float:
 
 
 class Timeout(StrictDomainModel):
-    """An immutable monotonic deadline shared across processing stages."""
+    """A monotonic deadline shared across gate preparation and execution."""
 
     deadline: float = Field(allow_inf_nan=False)
 

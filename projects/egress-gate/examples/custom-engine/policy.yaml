@@ -38,15 +38,14 @@ network_middlewares:
     middleware: egress-gate-custom-engine
     order: 0
     config:
-      entity_processing:
-        stages:
+      pipeline:
+        gates:
           - name: project-names
             config:
-              engine: keyword-tool
-              entity: confidential-project
+              gate: keyword-deny
               keyword: Project Cobalt
-      on_detection:
-        action: detect
+              reason_code: egress_gate_keyword_denied
+        default_decision: allow
     on_error: fail_closed
     endpoints:
       include:

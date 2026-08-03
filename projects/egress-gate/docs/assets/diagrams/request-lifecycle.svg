@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 620" role="img" aria-labelledby="title description">
   <title id="title">Egress Gate request lifecycle</title>
-  <desc id="description">The request lifecycle has four phases: validate the OpenShell transport, validate and activate configuration, decode and process text, and serialize the result. Empty bodies bypass engine processing. Invalid input fails the RPC, while policy and limit decisions return successful allow or deny results.</desc>
+  <desc id="description">The request lifecycle has four phases: validate the OpenShell transport, validate and activate configuration, adapt and process the current request, and serialize the result. Invalid input fails the RPC, while policy and limit decisions return successful allow or deny results.</desc>
   <defs>
     <style>
       text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#1f2933}
@@ -53,7 +53,7 @@
   <text x="310" y="65" class="phase-label">2 · CONFIGURATION</text>
   <rect x="310" y="88" width="166" height="96" rx="13" class="config"/>
   <text x="393" y="116" text-anchor="middle" class="title">Validate policy</text>
-  <text x="393" y="141" text-anchor="middle" class="step">typed union · engines</text>
+  <text x="393" y="141" text-anchor="middle" class="step">typed union · gates</text>
   <text x="393" y="163" text-anchor="middle" class="step">resources · action</text>
   <path d="M393 184v38" class="arrow"/>
   <rect x="310" y="224" width="166" height="106" rx="13" class="config"/>
@@ -72,7 +72,7 @@
   <path d="M647 174v38" class="arrow"/>
   <rect x="564" y="214" width="166" height="116" rx="13" class="process"/>
   <text x="647" y="242" text-anchor="middle" class="title">Run pipeline</text>
-  <text x="647" y="267" text-anchor="middle" class="step">ordered stages</text>
+  <text x="647" y="267" text-anchor="middle" class="step">ordered gates</text>
   <text x="647" y="289" text-anchor="middle" class="step">one shared timeout</text>
   <text x="647" y="311" text-anchor="middle" class="step">aggregate findings</text>
 
