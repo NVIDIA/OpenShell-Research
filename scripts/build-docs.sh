@@ -30,7 +30,7 @@ fi
 python -m pip install --upgrade pip
 python -m pip install -r requirements-docs.txt
 
-python scripts/stage-privacy-guard-docs.py
+python scripts/stage-egress-gate-docs.py
 python scripts/render-dev-notes.py
 zensical build --clean --strict
 python scripts/publish-agent-markdown.py

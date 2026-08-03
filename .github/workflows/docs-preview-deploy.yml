@@ -99,17 +99,17 @@ jobs:
                 'scripts/build-docs.sh',
                 'scripts/publish-agent-markdown.py',
                 'scripts/render-dev-notes.py',
-                'scripts/stage-privacy-guard-docs.py',
+                'scripts/stage-egress-gate-docs.py',
                 'tests/test_agent_markdown.py',
                 'tests/test_docs_404.py',
                 'tests/test_render_dev_notes.py',
-                'tests/test_stage_privacy_guard_docs.py',
+                'tests/test_stage_egress_gate_docs.py',
                 'zensical.toml',
               ]);
               const docsChanged = files.some(
                 ({ filename }) => filename.startsWith('docs/') ||
                   filename.startsWith('overrides/') ||
-                  filename.startsWith('projects/privacy-guard/docs/') ||
+                  filename.startsWith('projects/egress-gate/docs/') ||
                   exactInputs.has(filename),
               );
               operation = docsChanged ? 'deploy' : 'remove';

@@ -1,0 +1,1 @@
+"""Egress Gate service tests."""
