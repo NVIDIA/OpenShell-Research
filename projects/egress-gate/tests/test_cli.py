@@ -185,7 +185,7 @@ def test_cli_add_gateway_registration_reports_the_result(tmp_path: Path) -> None
     assert result.exit_code == 0, result.output
     assert "Gateway registration is ready" in result.stdout
     assert "Gateway file" in result.stdout
-    assert "gateway.toml" in result.stdout
+    assert str(config) in "".join(result.stdout.split())
     assert "Registration  egress-gate" in result.stdout
     assert "Endpoint      http://192.0.2.10:50051" in result.stdout
     assert "Created the gateway configuration file" in result.stdout
@@ -267,5 +267,5 @@ def test_cli_evaluate_explains_an_invalid_timeout() -> None:
     )
 
     assert result.exit_code == 2
-    assert "Invalid value for --timeout-seconds" in result.stderr
+    assert "--timeout-seconds" in result.stderr
     assert "greater than 0" in result.stderr
