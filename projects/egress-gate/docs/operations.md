@@ -62,9 +62,10 @@ is not replaced by a failed candidate. See [Limits and failures](reference/limit
 ## Policy rollout
 
 Each Egress Gate service keeps one active prepared policy. During a policy
-change, stop admitting the old configuration before sending the new one so the
-service performs one serialized cutover. Run separate service instances when
-distinct policies must remain active concurrently.
+change, stop admitting the old configuration and let already-admitted requests
+finish before sending the new one. This gives the service one serialized
+cutover. Run separate service instances when distinct policies must remain
+active concurrently.
 
 ## Troubleshooting
 

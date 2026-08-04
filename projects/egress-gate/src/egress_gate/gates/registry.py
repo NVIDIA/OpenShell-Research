@@ -21,7 +21,6 @@ from typing import (
 )
 
 from pydantic import Field, TypeAdapter, ValidationError
-from pydantic_core import PydanticUndefined
 
 from egress_gate.errors import (
     EgressGateError,
@@ -333,7 +332,7 @@ def _gate_discriminator(config_type: type[GateConfig]) -> str:
     gate_name = values[0]
     if _GATE_NAME.fullmatch(gate_name) is None:
         raise GateRegistryError("gate discriminator is invalid")
-    if field.default is not PydanticUndefined:
+    if not field.is_required():
         raise GateRegistryError("gate discriminator must be required")
     return gate_name
 

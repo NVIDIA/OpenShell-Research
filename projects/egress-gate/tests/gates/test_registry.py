@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from typing import Literal
 
 import pytest
+from pydantic import Field
 
 from egress_gate.errors import EgressGateError, GateRegistryError
 from egress_gate.gates import (
@@ -154,6 +155,27 @@ def test_registry_requires_an_explicit_gate_discriminator() -> None:
 
     with pytest.raises(GateRegistryError, match="discriminator must be required"):
         GateRegistry().register(DefaultedGate)
+
+    class FactoryDefaultedConfig(GateConfig):
+        gate: Literal["factory-defaulted"] = Field(
+            default_factory=lambda: "factory-defaulted"
+        )
+
+    class FactoryDefaultedGate(Gate[FactoryDefaultedConfig, None]):
+        capabilities = GateCapabilities()
+        finding_types = ()
+
+        def _evaluate(
+            self,
+            request: HttpRequest,
+            *,
+            timeout: Timeout,
+        ) -> GateEvaluation:
+            del request, timeout
+            return GateEvaluation.proceed()
+
+    with pytest.raises(GateRegistryError, match="discriminator must be required"):
+        GateRegistry().register(FactoryDefaultedGate)
 
 
 def test_registry_forwards_the_shared_preparation_timeout() -> None:
