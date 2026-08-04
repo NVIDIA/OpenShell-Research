@@ -1,4 +1,4 @@
-# Regex-body example
+# Privacy Guard composition
 
 This example runs the built-in `regex-body` gate in `replace` mode. Its
 relative `patterns.yaml` catalog replaces email addresses and customer IDs
@@ -15,13 +15,13 @@ uv run egress-gate configuration-schema
 Start the middleware:
 
 ```bash
-cd projects/egress-gate/examples/regex-engine
+cd projects/egress-gate/examples/privacy-guard
 uv run egress-gate serve --listen 0.0.0.0:50051 --timeout-seconds 4
 ```
 
 Register that address with the OpenShell gateway using a reachable host IPv4
 address, then create a sandbox with `policy.yaml`. The policy embeds the
-`pipeline.gates` configuration and uses `egress-gate-regex` as the middleware
+`pipeline.gates` configuration and uses `egress-gate-privacy` as the middleware
 registration name.
 
 The `regex-body` gate is byte-oriented at the runtime boundary and performs

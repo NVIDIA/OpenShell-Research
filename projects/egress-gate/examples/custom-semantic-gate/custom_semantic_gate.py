@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
+from types import MappingProxyType
 from typing import ClassVar, Literal, Protocol, runtime_checkable
 
 from pydantic import Field, field_validator, model_validator
 
 from egress_gate.base import StrictDomainModel
 from egress_gate.constants import MAX_BODY_BYTES
+from egress_gate.errors import GateConfigurationError
 from egress_gate.gates import (
     FindingTypeDefinition,
     Gate,
@@ -65,8 +68,8 @@ class SemanticGateConfig(GateConfig):
     include: SemanticInclude
     mode: Literal["enforce", "observe"]
     on_allow: Literal["allow"] = "allow"
+    allow_label: BoundedMetadataString
     deny_label: BoundedMetadataString
-    observation_label: BoundedMetadataString
     deny_reason_code: ReasonCode
 
     @field_validator("policy")
@@ -101,12 +104,23 @@ class JudgeClient(Protocol):
 class SemanticGateResources(GateResources):
     """Typed application-owned resources borrowed by the semantic gate."""
 
-    __slots__ = ("judge_client",)
+    __slots__ = ("_profiles",)
 
-    def __init__(self, judge_client: JudgeClient) -> None:
-        if not isinstance(judge_client, JudgeClient):
-            raise TypeError("judge client does not implement the example protocol")
-        self.judge_client = judge_client
+    def __init__(self, profiles: Mapping[str, JudgeClient]) -> None:
+        if not profiles or any(
+            not isinstance(name, str) or not name or not isinstance(client, JudgeClient)
+            for name, client in profiles.items()
+        ):
+            raise TypeError("judge profiles are invalid")
+        self._profiles = MappingProxyType(dict(profiles))
+
+    def has_profile(self, profile: str) -> bool:
+        """Return whether one operator-approved profile is installed."""
+        return profile in self._profiles
+
+    def resolve(self, profile: str) -> JudgeClient:
+        """Resolve one already-validated operator-approved profile."""
+        return self._profiles[profile]
 
 
 class FakeJudgeClient:
@@ -157,6 +171,15 @@ class SemanticGate(Gate[SemanticGateConfig, SemanticGateResources]):
         FindingTypeDefinition(type="semantic_assessment"),
     )
 
+    @classmethod
+    def _validate_config(
+        cls,
+        config: SemanticGateConfig,
+        resources: SemanticGateResources,
+    ) -> None:
+        if not resources.has_profile(config.profile):
+            raise GateConfigurationError("semantic profile is not installed")
+
     def _evaluate(
         self,
         request: HttpRequest,
@@ -164,7 +187,7 @@ class SemanticGate(Gate[SemanticGateConfig, SemanticGateResources]):
         timeout: Timeout,
     ) -> GateEvaluation:
         serialized_request = _serialize_selected_request(request, self.config.include)
-        result = self.resources.judge_client.judge(
+        result = self.resources.resolve(self.config.profile).judge(
             serialized_request,
             profile=self.config.profile,
             policy=self.config.policy,
@@ -173,19 +196,18 @@ class SemanticGate(Gate[SemanticGateConfig, SemanticGateResources]):
         if not isinstance(result, JudgeResult):
             raise TypeError("judge client returned an invalid result")
         result = JudgeResult.model_validate(result.model_dump())
-        if result.decision == "allow":
-            if self.config.mode == "observe":
-                return GateEvaluation.proceed()
-            return GateEvaluation.allow()
-
-        finding_label = (
-            self.config.deny_label
-            if self.config.mode == "enforce"
-            else self.config.observation_label
+        finding = Finding(
+            type="semantic_assessment",
+            label=(
+                self.config.allow_label
+                if result.decision == "allow"
+                else self.config.deny_label
+            ),
         )
-        finding = Finding(type="semantic_assessment", label=finding_label)
         if self.config.mode == "observe":
             return GateEvaluation.proceed(findings=(finding,))
+        if result.decision == "allow":
+            return GateEvaluation.allow(findings=(finding,))
         return GateEvaluation.deny(
             self.config.deny_reason_code,
             findings=(finding,),
@@ -200,7 +222,13 @@ def _serialize_selected_request(
     if include.method:
         values["method"] = request.target.method
     if include.target:
-        values["target"] = request.target.model_dump(mode="json")
+        values["target"] = {
+            "host": request.target.host,
+            "path": request.target.path,
+            "port": request.target.port,
+            "query": request.target.query,
+            "scheme": request.target.scheme,
+        }
     if include.headers:
         selected_headers = {header.lower() for header in include.headers}
         values["headers"] = [
@@ -214,12 +242,14 @@ def _serialize_selected_request(
         except UnicodeDecodeError:
             raise ValueError("semantic gate requires a UTF-8 request body") from None
         body_bytes = body.encode("utf-8")
-        if len(body_bytes) > include.body_max_bytes:
+        truncated = len(body_bytes) > include.body_max_bytes
+        if truncated:
             body = body_bytes[: include.body_max_bytes].decode(
                 "utf-8",
                 errors="ignore",
             )
         values["body"] = body
+        values["body_truncated"] = truncated
     serialized = json.dumps(
         values,
         allow_nan=False,
@@ -238,7 +268,11 @@ def create_registry() -> GateRegistry:
     registry.register(
         SemanticGate,
         resources=SemanticGateResources(
-            FakeJudgeClient(deny_markers=("[semantic-deny]",)),
+            {
+                "organization-default": FakeJudgeClient(
+                    deny_markers=("[semantic-deny]",)
+                )
+            },
         ),
     )
     return registry.finalize()

@@ -310,6 +310,31 @@ def configuration_schema(context: typer.Context) -> None:
     )
 
 
+@app.command("validate")
+def validate_policy(
+    context: typer.Context,
+    policy: Annotated[
+        Path,
+        typer.Option(
+            "--policy",
+            help="Strict YAML pipeline policy to validate without preparing gates.",
+        ),
+    ],
+) -> None:
+    """Validate policy configuration and registered resources without side effects."""
+    options = _command_options(context)
+    try:
+        values = _load_policy(policy)
+        options.registry.validate_config(values)
+    except _EvaluationCorpusError:
+        typer.echo("VALIDATE_ERROR invalid_input", err=True)
+        raise typer.Exit(code=1) from None
+    except EgressGateError:
+        typer.echo("VALIDATE_ERROR config_invalid", err=True)
+        raise typer.Exit(code=1) from None
+    typer.echo("VALID")
+
+
 @app.command("evaluate")
 def evaluate(
     context: typer.Context,
@@ -372,9 +397,16 @@ def gates(context: typer.Context) -> None:
     """List installed gates, capabilities, and declared finding types."""
     for description in _command_options(context).registry.describe_gates():
         finding_types = ",".join(item.type for item in description.finding_types)
+        capabilities = ",".join(
+            name
+            for name, enabled in description.capabilities.model_dump().items()
+            if enabled
+        )
         typer.echo(
-            f"{description.gate_type}\t{finding_types or '-'}\t"
-            f"{description.description}"
+            f"{description.gate_type}\tfindings={finding_types or '-'}\t"
+            f"capabilities={capabilities or '-'}\t"
+            f"resources={description.resource_type or '-'}\t"
+            f"config={description.config_type}\t{description.description}"
         )
 
 
@@ -738,7 +770,8 @@ def _format_summary(summary: _EvaluationSummary) -> str:
 
 def _load_yaml(path: Path) -> object:
     try:
-        contents = path.read_bytes()
+        with path.open("rb") as source:
+            contents = source.read(MAX_EVALUATION_FILE_BYTES + 1)
         if len(contents) > MAX_EVALUATION_FILE_BYTES:
             raise ValueError
         text = contents.decode("utf-8", errors="strict")

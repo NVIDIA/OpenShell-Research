@@ -91,7 +91,6 @@ def test_builtin_registry_is_finalized_and_contains_exactly_the_two_builtins() -
     )
     schema = registry.configuration_json_schema()
     assert "pipeline" in str(schema.get("properties"))
-    assert "entity_processing" not in str(schema)
     assert "request-rules" in str(schema)
 
 
@@ -159,13 +158,13 @@ def test_registry_injects_typed_application_resources() -> None:
         GateRegistry().register(_ResourceGate, resources=object())
 
 
-def test_registry_rejects_old_or_unknown_policy_shapes() -> None:
+def test_registry_rejects_unknown_policy_shapes() -> None:
     registry = GateRegistry()
     registry.register(_RegistryGate)
     registry.finalize()
 
     for values in (
-        {"entity_processing": {"stages": []}},
+        {"unexpected": {}},
         _pipeline({"gate": "missing", "answer": 1}),
         _pipeline({"gate": "registry-test", "answer": 1, "extra": True}),
         {

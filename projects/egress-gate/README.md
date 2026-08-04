@@ -18,6 +18,8 @@ Requirements: Python 3.11+ and `uv` 0.11+.
 uv sync --frozen
 uv run egress-gate gates
 uv run egress-gate configuration-schema
+uv run egress-gate validate \
+  --policy examples/deterministic-gate/egress-gate-config.yaml
 uv run egress-gate serve --listen 127.0.0.1:50051
 uv run egress-gate evaluate \
   --policy examples/deterministic-gate/egress-gate-config.yaml \
@@ -85,9 +87,8 @@ through slot acquisition, policy preparation, and `RequestProcessor.process`.
 - [Request-rules](docs/gates/request-rules.md)
 - [Architecture](docs/architecture/index.md)
 - [Limits and failures](docs/reference/limits-and-failures.md)
-- [Regex-body example](examples/regex-engine/README.md)
+- [Privacy Guard composition](examples/privacy-guard/README.md)
 - [Deterministic request-rules example](examples/deterministic-gate/README.md)
-- [Custom gate example](examples/custom-engine/README.md)
 - [Custom semantic gate example](examples/custom-semantic-gate/README.md)
 
 ## Development

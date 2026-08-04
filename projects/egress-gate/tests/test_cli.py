@@ -18,9 +18,12 @@ def test_cli_gates_describes_the_request_level_builtin() -> None:
     result = CliRunner().invoke(app, ["gates"])
 
     assert result.exit_code == 0
-    assert result.stdout.startswith("regex-body\tsensitive_entity\t")
-    assert "request-rules\trequest_rule_match\t" in result.stdout
-    assert "engines" not in result.stdout
+    assert result.stdout.startswith("regex-body\tfindings=sensitive_entity\t")
+    assert "capabilities=reads_body,replaces_body,produces_findings,may_deny" in (
+        result.stdout
+    )
+    assert "resources=-\tconfig=RegexBodyConfig" in result.stdout
+    assert "request-rules\tfindings=request_rule_match\t" in result.stdout
 
 
 def test_cli_configuration_schema_exposes_pipeline_only() -> None:
@@ -29,8 +32,6 @@ def test_cli_configuration_schema_exposes_pipeline_only() -> None:
     assert result.exit_code == 0
     assert '"pipeline"' in result.stdout
     assert '"default_decision"' in result.stdout
-    assert "entity_processing" not in result.stdout
-    assert "on_detection" not in result.stdout
 
 
 def test_registry_factory_loader_requires_a_finalized_gate_registry(
@@ -76,6 +77,42 @@ def test_cli_evaluate_runs_the_builtin_policy_corpus() -> None:
     assert result.exit_code == 0, result.output
     assert 'PASS case="known-read-is-allowed"' in result.stdout
     assert "SUMMARY total=2 passed=2 failed=0" in result.stdout
+
+
+def test_cli_validate_checks_policy_without_preparing_gates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_dir = Path(__file__).parents[1]
+
+    def unexpected_preparation(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        raise AssertionError("validation prepared a gate")
+
+    monkeypatch.setattr(GateRegistry, "create_gate", unexpected_preparation)
+    result = CliRunner().invoke(
+        app,
+        [
+            "validate",
+            "--policy",
+            str(project_dir / "examples/deterministic-gate/egress-gate-config.yaml"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert result.stdout == "VALID\n"
+
+
+def test_cli_validate_rejects_invalid_policy(tmp_path: Path) -> None:
+    policy = tmp_path / "invalid.yaml"
+    policy.write_text("unexpected: true\n")
+
+    result = CliRunner().invoke(
+        app,
+        ["validate", "--policy", str(policy)],
+    )
+
+    assert result.exit_code == 1
+    assert result.stderr == "VALIDATE_ERROR config_invalid\n"
 
 
 def test_cli_evaluate_reports_content_safe_mismatch_status(tmp_path: Path) -> None:

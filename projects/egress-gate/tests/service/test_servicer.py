@@ -123,9 +123,7 @@ def test_validate_config_is_pure_and_reports_invalid_config() -> None:
             pb2.ValidateConfigRequest(config=_proto_config(_values()))
         )
         invalid = middleware._validate_config(
-            pb2.ValidateConfigRequest(
-                config=_proto_config({"entity_processing": {"stages": []}})
-            )
+            pb2.ValidateConfigRequest(config=_proto_config({"unexpected": {}}))
         )
     finally:
         asyncio.run(middleware.close())
@@ -371,6 +369,23 @@ def test_failed_candidate_leaves_the_old_policy_active(
 
     assert error.value.code is ErrorCode.CONFIG_INVALID
     assert active is old
+
+
+def test_invalid_request_cannot_publish_a_changed_policy() -> None:
+    middleware = EgressGateMiddleware(create_builtin_registry())
+    old = middleware._policy.processor_for(_values(), timeout=Timeout.from_seconds(1))
+    invalid = _request()
+    invalid.config.CopyFrom(_proto_config(_values(mode="replace")))
+    invalid.headers[0].name = ""
+
+    try:
+        with pytest.raises(EgressGateError) as error:
+            middleware._prepare_and_process(invalid, Timeout.from_seconds(1))
+        assert middleware._policy._processor is old
+    finally:
+        asyncio.run(middleware.close())
+
+    assert error.value.code is ErrorCode.REQUEST_ENVELOPE_INVALID
 
 
 def test_in_flight_processor_reference_survives_policy_replacement() -> None:

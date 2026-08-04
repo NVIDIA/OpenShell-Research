@@ -67,6 +67,7 @@ supplied by a trusted application registry factory, not by configuration.
 ```bash
 uv run egress-gate gates
 uv run egress-gate configuration-schema
+uv run egress-gate validate --policy path/to/policy.yaml
 ```
 
 Custom registries use the same factory for inspection and serving:
@@ -81,6 +82,12 @@ uv run egress-gate \
 The factory must return a finalized `GateRegistry`. It owns trusted gate
 classes and typed `GateResources`; policy configuration cannot import Python,
 choose a resource implementation, or provide credentials.
+
+`validate` performs the same strict policy and registered-resource validation
+used by the processing domain, without constructing gates, loading catalogs,
+preparing a processor, or changing the running service's active policy. Use
+`evaluate` to exercise preparation-time artifacts. Exact encoded OpenShell
+configuration size remains a gRPC service-boundary check.
 
 For repeatable request-level checks, the `evaluate` command accepts a pipeline
 policy and a strict version-one corpus. It uses the registry's prepared

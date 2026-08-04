@@ -61,12 +61,7 @@ def test_pipeline_default_deny_is_explicit() -> None:
         EgressGateConfig[RegexBodyConfig].model_validate(missing_default)
 
 
-def test_pipeline_rejects_legacy_shapes_unknown_fields_and_duplicate_names() -> None:
-    with pytest.raises(ValidationError):
-        EgressGateConfig[RegexBodyConfig].model_validate(
-            {"entity_processing": {"stages": []}}
-        )
-
+def test_pipeline_rejects_unknown_fields_and_duplicate_names() -> None:
     unknown = {
         "pipeline": {
             "gates": [{"name": "body", "config": _regex_config()}],

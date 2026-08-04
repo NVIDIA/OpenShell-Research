@@ -2,7 +2,9 @@
 
 ## Status
 
-Proposed implementation plan.
+Implemented design specification. The phased sequence below records the
+intended construction and acceptance boundaries; it is not a remaining-work
+checklist and must not be replayed against the completed refactor.
 
 This plan intentionally makes no provision for backwards compatibility. The
 current Privacy Guard package name, Python imports, CLI, policy schema, public
@@ -651,6 +653,8 @@ class Gate(Generic[GateConfigT, GateResourcesT]):
         self,
         config: GateConfigT,
         resources: GateResourcesT,
+        *,
+        timeout: Timeout | None = None,
     ) -> None: ...
 
     @classmethod
@@ -665,7 +669,7 @@ class Gate(Generic[GateConfigT, GateResourcesT]):
     @property
     def resources(self) -> GateResourcesT: ...
 
-    def _initialize(self) -> None: ...
+    def _initialize(self, *, timeout: Timeout | None = None) -> None: ...
 
     @final
     def evaluate(
@@ -684,18 +688,19 @@ class Gate(Generic[GateConfigT, GateResourcesT]):
 ```
 
 As today, custom implementations do not define arbitrary constructors. The
-base class owns construction, immutable config, optional resource validation,
-the public `evaluate` wrapper, input/result validation, and content-safe error
-translation. Implementations provide a protected initialization hook for
-derived immutable state and a protected `_evaluate` method. Construction
+base class owns construction, read-only config access, optional resource
+validation, the public `evaluate` wrapper, input/result validation, and
+content-safe error translation. Implementations provide a protected initialization hook for
+derived reusable state and a protected `_evaluate` method. Construction
 validates the exact config and resource types, stores them as read-only
-properties, and calls `_initialize` exactly once while preparing the policy.
-The resulting instance is immutable, thread-safe, and shared by evaluations.
+properties, and calls `_initialize` exactly once with the preparation timeout.
+The resulting instance must be safe for concurrent calls and is shared by
+evaluations; the runtime does not claim Python-level deep immutability.
 The wrapper rejects terminal evaluations with non-empty patches before they
 reach the pipeline.
 
 The generic arguments are the single source of truth for exact config and
-resource types, matching the current engine pattern. The resources type
+resource types, preserving the former extension pattern. The resources type
 defaults to `None`, so `Gate[KeywordDenyConfig]` is the complete declaration
 for a resource-free gate. Base-owned read-only class methods infer the runtime
 types; implementations do not repeat them as class attributes, and registry
@@ -754,10 +759,9 @@ the constructor argument; it passes `None` explicitly for resource-free gates,
 while a missing or wrong resource for a resource-backed gate is a registration
 error.
 
-Ship a reusable gate-contract test helper. Custom projects should be able to
-verify configuration round trips, concurrency assumptions, capability
-declarations, timeouts, content-safe errors, and output validation without
-copying internal tests.
+Document the gate contract and test the example custom gate directly. Add a
+reusable external contract-test package only after a concrete second consumer
+shows that the abstraction reduces duplication.
 
 ### Gate configuration
 
@@ -824,16 +828,13 @@ base class or result type should not require repetitive declarations.
 
 ### Helper bases
 
-Provide narrow helper bases for common extension patterns without creating a
-second policy runtime:
+Provide one narrow helper base for the built-in text-inspection pattern:
 
 - `Utf8BodyGate`: strict UTF-8 decoding, unchanged-body checks, and bounded
   body replacement
-- `FindingGate`: finding validation and common detect/deny disposition helpers
 
 The built-in regex implementation should use `Utf8BodyGate`. A custom privacy
-gate should require roughly the same amount of code as a current custom
-`EntityProcessingEngine`.
+gate should remain comparably compact.
 
 ## Registry and application assembly
 
@@ -846,7 +847,7 @@ The registry must:
 3. bind application-owned resource profiles
 4. generate the exact pipeline configuration schema
 5. validate gate capabilities and finding-type declarations
-6. prepare immutable gate instances
+6. prepare reusable gate instances that satisfy the concurrent-call contract
 7. expose content-safe gate and finding discovery information for the CLI
 8. finalize exactly once before serving requests
 
@@ -1069,29 +1070,32 @@ example tree.
 
 One running Egress Gate service owns exactly one active prepared policy at a
 time. The application registry, injected resources, executor, and server live
-for the process lifetime. The active policy contains only canonical validated
-configuration, its fingerprint, and immutable configured gates.
+for the process lifetime. The active policy contains only validated
+configuration and its prepared processor. The processor carries a fingerprint
+for diagnostics and offline comparison; the active-policy holder uses exact
+validated-config equality for reuse.
 
 OpenShell's request configuration remains authoritative. The first evaluation
-prepares and publishes its policy lazily. Later evaluations with the same
-canonical fingerprint reuse the prepared pipeline. An evaluation carrying a
+prepares and publishes its policy lazily. Later evaluations with an equal
+validated configuration reuse the prepared pipeline. An evaluation carrying a
 different valid configuration is a policy update, not a second cache entry.
 
 ### Policy update behavior
 
-1. Validate and canonicalize the candidate policy completely.
-2. If its fingerprint matches the active policy, reuse the active immutable
+1. Validate the candidate policy completely.
+2. Serialize active-config comparison and candidate preparation under one
+   replacement lock.
+3. If the validated config equals the active config, reuse the prepared
    pipeline.
-3. Otherwise, serialize candidate preparation under one replacement lock.
-4. Recheck the active fingerprint after acquiring the lock so concurrent
+4. Otherwise prepare the candidate while retaining the lock, so concurrent
    requests for the same successful update reuse the published result.
 5. Fail with the defined runtime-limit result if the deadline expires while
    waiting for the lock; after acquiring it, check the deadline again.
 6. Prepare every configured gate with the remaining request deadline.
 7. Recheck cancellation and the deadline immediately before publication. An
    expired or cancelled evaluation cannot publish its candidate.
-8. Publish the complete candidate pipeline and fingerprint atomically.
-9. Let evaluations that already captured the previous immutable pipeline
+8. Publish the complete candidate config and processor atomically.
+9. Let evaluations that already captured the previous prepared processor
    finish on it; do not mutate or prematurely close it.
 10. If validation or preparation fails, leave the previous policy active and
    fail the request carrying the candidate. Never evaluate that request using
@@ -1112,7 +1116,7 @@ Policy rollout is deliberately an operator-side serialized operation. Before
 allowing requests with a new configuration to reach the service, the deployer
 must stop admitting requests with the old configuration and allow already
 admitted old requests to resolve which pipeline they will use. Those in-flight
-evaluations may then complete on the old immutable pipeline while the new one
+evaluations may then complete on the old prepared processor while the new one
 becomes active. After cutover, the old configuration must not be sent again.
 
 The service does not add policy revisions or an administrative control plane to
@@ -1158,15 +1162,11 @@ remaining timeout to interruptible collaborators.
 Include:
 
 - request ID
-- policy fingerprint prefix
 - decision
 - `decision_source_kind` (`gate`, `pipeline_default`, or `runtime_limit`)
-- terminal `gate_name` and `gate_type` only when the source kind is `gate`
-- total and per-gate duration
+- total duration
 - finding count
-- mutation kinds and counts
-- stable error or deny code
-- active-policy reuse, preparation, and replacement outcome
+- stable error code
 
 Exclude:
 
@@ -1186,8 +1186,12 @@ service ownership points. Do not introduce a public observer interface,
 `DecisionEvent`, metrics sink abstraction, or metrics-backend dependency until
 a concrete second consumer requires one.
 
-The structured operational log fields above are sufficient for initial
-diagnostics and external log-derived metrics. Any later metrics integration
+The compact structured operational log fields above are sufficient for initial
+diagnostics without adding cross-layer outcome plumbing solely for telemetry.
+Detailed traces, policy fingerprints, terminal gate provenance, mutation
+summaries, and policy-replacement outcomes remain available in domain results
+or focused diagnostics and can be promoted into service logs after a concrete
+operational need. Any later metrics integration
 must preserve bounded cardinality and must not derive labels from request
 paths, queries, header values, bodies, sandbox IDs, request IDs, policy text,
 or user-provided gate names. Persistent audit storage, dashboards, alerting,
@@ -1251,10 +1255,12 @@ optional trusted `--registry-factory module:factory` argument.
 type, declared finding types, and configuration schema
 reference without importing service code.
 
-`validate` performs complete policy and registered-resource validation but
-never constructs gates, prepares a pipeline, or changes the active policy.
-Gate config and resource models must expose enough pure validation to catch
-invalid configuration before `_initialize` runs.
+`validate` performs pure policy-model and registered-resource validation but
+never constructs gates, loads preparation-time artifacts, compiles derived
+state, prepares a pipeline, or changes the active policy. Preparation-only
+failures remain visible through `evaluate` and the service. The CLI validates
+the protobuf-free policy domain; exact encoded OpenShell `Struct` size remains
+a service-boundary check.
 
 Gateway registration uses the new service and registration names and retains
 safe atomic TOML updates. It does not recognize or remove old Privacy Guard
@@ -1362,9 +1368,9 @@ accurate, and comparison/migration-independent prose.
 
 ### Protocol boundary
 
-Implement against the current released OpenShell middleware contract. Core
-OpenShell protocol changes are out of scope. In particular, the wire finding
-contract has only `type`, `label`, `count`, `confidence`, and `severity`;
+Implement against the unmodified manifest-pinned OpenShell v0.0.97 middleware
+contract. Core OpenShell protocol changes are out of scope. In particular, the
+wire finding contract has only `type`, `label`, `count`, `confidence`, and `severity`;
 runtime-owned gate provenance remains internal to Egress Gate and is omitted
 when serializing findings.
 
@@ -1377,9 +1383,8 @@ redesign PRs if the branch is explicitly managed as a coordinated v0 rewrite.
 1. Move the project and rename packaging, imports, CLI, workflow, registration,
    and documentation staging surfaces.
 2. Replace project and nested agent instructions with the new boundaries.
-3. Update the copied protocol and generated bindings to the selected current
-   released OpenShell version with `omm update` from
-   `openshell-middleware-manager`.
+3. Retain the copied protocol and generated bindings from manifest-pinned
+   OpenShell v0.0.97; do not change the core contract.
 4. Add immutable domain request, target, context, header, patch, finding,
    internally-sourced-finding, finding-definition, gate-evaluation, gate-trace, and
    egress-result models.
@@ -1411,7 +1416,7 @@ Acceptance criteria:
    declarations, and the finalized `GateRegistry`.
 2. Build the exact discriminated-union pipeline schema from registered gates.
 3. Add gate finding-type declarations to registry validation and discovery.
-4. Implement gate preparation and immutable configured instances.
+4. Implement gate preparation and reusable concurrent-call-safe instances.
 5. Port enough of the current regex catalog, compilation, matching,
    replacement, and safety behavior to register a working `regex-body` gate.
 6. Replace `PrivacyGuardConfig` with the strict pipeline config and rewrite
@@ -1475,8 +1480,9 @@ Acceptance criteria:
 
 1. Define canonical matching rules for scheme, authority, method, path, visible
    header presence, and process ancestry.
-2. Implement exact, prefix, and bounded glob path matching with explicit URL
-   normalization.
+2. Implement exact, prefix, and bounded glob matching over the raw path field;
+   do not percent-decode, Unicode-normalize, collapse dot segments or slashes,
+   or include the query.
 3. Define and test case sensitivity, default ports, percent encoding, Unicode,
    repeated headers, IPv4/IPv6 authority forms, and malformed inputs.
 4. Implement deny precedence and explicit terminal allows.
@@ -1485,7 +1491,8 @@ Acceptance criteria:
 Acceptance criteria:
 
 - matching behavior is documented precisely enough to reproduce independently
-- URL normalization cannot make a rule appear to cover a different authority
+- raw component semantics cannot make a rule appear to cover a different
+  authority
 - matched deny wins over matched allow within the gate
 - static allow visibly prevents later gates from running
 - rule IDs, not request content, appear in declared request-rule findings
@@ -1494,13 +1501,13 @@ Acceptance criteria:
 
 ### Phase 5: Harden active policy reuse and replacement
 
-1. Implement canonical validated policy fingerprinting.
+1. Implement deterministic policy fingerprinting for diagnostics and results.
 2. Implement one active prepared pipeline and a serialized candidate-replacement
    path.
-3. Reuse the active pipeline for matching fingerprints and coordinate
+3. Reuse the active pipeline for equal validated configs and coordinate
    concurrent requests carrying the same successful candidate update.
 4. Publish successful candidates atomically while preserving in-flight
-   references to the prior immutable pipeline.
+   references to the prior prepared processor.
 5. Leave the active pipeline unchanged after validation or preparation failure.
 6. Make replacement-lock waits and final publication checks consume the
    request's overall deadline.
@@ -1511,7 +1518,7 @@ Acceptance criteria:
 
 - repeated requests with the active policy reuse the same prepared gates
 - a valid changed policy becomes active without restarting the service
-- in-flight evaluations may finish on the prior immutable pipeline during an
+- in-flight evaluations may finish on the prior prepared processor during an
   update
 - failed candidate preparation is never published and never falls back to the
   previous policy for the candidate request
@@ -1563,7 +1570,7 @@ Acceptance criteria:
 4. Add one `custom-semantic-gate` example with separate
    `deterministic-plus-semantics` and `privacy-before-semantics` policies that
    reuse its implementation and README.
-5. Run the reusable gate-contract tests against the example custom gate.
+5. Run direct contract-focused tests against the example custom gate.
 
 Acceptance criteria:
 
@@ -1629,11 +1636,10 @@ Acceptance criteria:
 
 ### Contract tests for extensions
 
-Provide reusable fixtures that custom gates can run against their own
-implementations. Cover concurrency, immutability, content-safe errors, deadline
-handling, declared capabilities, declared finding types, and
-invalid output rejection, including terminal controls that attempt to carry
-mutations and non-deny controls that attempt to carry reason codes.
+Test the example custom gate directly for concurrent-call safety, content-safe
+errors, deadline handling, declared capabilities and finding types, and invalid
+output rejection. Keep generic wrapper contract coverage in the core gate
+tests; do not add a public testing framework without another consumer.
 
 ### Service integration tests
 
@@ -1771,8 +1777,8 @@ built-in package to make the example shorter.
 ### Policy replacement races activate the wrong configuration
 
 Mitigation: support one active policy, serialize candidate preparation, recheck
-the active fingerprint under the replacement lock, publish only complete
-immutable pipelines, let existing references finish, and never fall back to the
+validated-config equality under the replacement lock, publish only complete
+prepared processors, let existing references finish, and never fall back to the
 old policy for a request carrying a failed candidate. Document that unrelated
 concurrent policies require separate service instances.
 

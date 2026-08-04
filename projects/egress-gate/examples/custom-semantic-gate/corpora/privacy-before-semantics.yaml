@@ -23,7 +23,7 @@ cases:
     expected:
       decision: allow
       decision_source_kind: pipeline_default
-      finding_types: [sensitive_entity]
+      finding_types: [sensitive_entity, semantic_assessment]
   - name: observed-semantic-marker-still-allows
     tags: [privacy, semantic]
     provenance:

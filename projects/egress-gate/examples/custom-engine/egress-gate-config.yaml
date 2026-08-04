@@ -1,8 +1,0 @@
-pipeline:
-  gates:
-    - name: project-names
-      config:
-        gate: keyword-deny
-        keyword: Project Cobalt
-        reason_code: egress_gate_keyword_denied
-  default_decision: allow

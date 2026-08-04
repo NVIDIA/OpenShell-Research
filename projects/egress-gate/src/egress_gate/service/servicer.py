@@ -248,13 +248,13 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         *,
         publication_cancelled: Event | None = None,
     ) -> EgressResult:
+        domain_request = _request_from_proto(request)
         values = _mapping_from_proto(request.config)
         processor = self._policy.processor_for(
             values,
             timeout=timeout,
             publication_cancelled=publication_cancelled,
         )
-        domain_request = _request_from_proto(request)
         return processor.process(domain_request, timeout=timeout)
 
     async def _run_in_worker(

@@ -17,7 +17,6 @@ MAX_TIMEOUT_SECONDS = 30.0
 SERVICE_NAME = "egress-gate"
 SERVICE_VERSION = version("egress-gate")
 BLOCK_REASON = "Egress Gate blocked the request"
-BLOCK_REASON_CODE = "egress_gate_blocked"
 DEFAULT_DENY_REASON_CODE = "egress_gate_default_deny"
 LIMIT_REASON = (
     "Egress Gate exceeded a processing safety limit. Check Egress Gate logs "
@@ -39,9 +38,7 @@ MAX_EVALUATION_TAGS = 16
 
 # Gate and result limits.
 MAX_DETECTIONS_PER_GATE = 256
-MAX_DETECTIONS_PER_REQUEST = 4096
 MAX_DIAGNOSTIC_TEXT_BYTES = 1024
-MAX_FINDING_METADATA_ENTRIES = 32
 MAX_PROTO_FINDING_GROUPS = 32
 MAX_PROTO_FINDING_BYTES = 4 * 1024
 MAX_FINDING_COUNT = 2**32 - 1

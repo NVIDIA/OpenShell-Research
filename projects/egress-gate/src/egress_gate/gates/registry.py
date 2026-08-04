@@ -53,6 +53,8 @@ class GateDescription:
     description: str
     capabilities: GateCapabilities
     finding_types: tuple[FindingTypeDefinition, ...]
+    resource_type: str | None
+    config_type: str
 
 
 class GateRegistry:
@@ -227,6 +229,13 @@ class GateRegistry:
                 description=_gate_description(registration.gate_type),
                 capabilities=registration.gate_type.capabilities,
                 finding_types=registration.gate_type.finding_types,
+                resource_type=(
+                    resources_type.__name__
+                    if (resources_type := registration.gate_type.get_resources_type())
+                    is not None
+                    else None
+                ),
+                config_type=registration.config_type.__name__,
             )
             for gate_name, registration in self._registrations.items()
         )

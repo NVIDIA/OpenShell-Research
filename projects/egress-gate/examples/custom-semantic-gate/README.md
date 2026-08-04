@@ -11,13 +11,14 @@ modes:
 
 - `enforce` turns a judge deny into a terminal deny with the configured stable
   label and reason code. A judge allow is a terminal allow.
-- `observe` records a configured stable observation label when the judge would
-  deny, then always proceeds with an empty patch. It cannot make the request
+- `observe` records the proposed decision using configured stable allow or deny
+  labels, then always proceeds with an empty patch. It cannot make the request
   deny or mutate it.
 
 The judge receives deterministic, bounded JSON containing only the configured
-selected request fields. A body bound intentionally truncates the body and
-creates a blind spot. Deterministic serialization does not prevent prompt
+selected request fields. A body bound intentionally truncates the body, sets an
+explicit `body_truncated` flag, and creates a blind spot. Deterministic
+serialization does not prevent prompt
 injection; it is a reproducibility and data-minimization boundary, not a
 semantic security proof. A deterministic terminal allow can skip later gates,
 while deterministic denies constrain the semantic gate's authority.

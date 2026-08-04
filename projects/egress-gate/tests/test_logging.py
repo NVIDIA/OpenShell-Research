@@ -84,9 +84,9 @@ def test_configure_logging_can_force_colors_for_redirected_output() -> None:
 
 
 def test_get_logger_returns_named_package_logger() -> None:
-    logger = get_logger("egress_gate.custom_engine")
+    logger = get_logger("egress_gate.custom_gate")
 
-    assert logger is logging.getLogger("egress_gate.custom_engine")
+    assert logger is logging.getLogger("egress_gate.custom_gate")
 
 
 def test_configure_logging_accepts_native_log_levels() -> None:
