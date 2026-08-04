@@ -6,14 +6,17 @@ agent_markdown: true
 
 # Egress Gate
 
-Egress Gate is an OpenShell supervisor middleware for the pre-credentials HTTP
-request phase. OpenShell owns interception, routing, and credential
-attachment; Egress Gate evaluates one immutable byte-oriented `HttpRequest`
-and returns an explicit domain result.
+Egress Gate is an extensible OpenShell supervisor middleware service for the
+pre-credentials HTTP request phase. OpenShell owns interception, routing, and
+credential attachment. Egress Gate evaluates one immutable byte-oriented
+`HttpRequest` and returns an explicit result.
 
-It is not a forward proxy, TLS interceptor, response filter, or protection for
-content already persisted by a harness. Configure storage and retention
-controls separately.
+An application can install trusted custom gates. Each gate has a strict
+configuration type and an explicit control result.
+
+It is not a forward proxy, TLS interceptor, or response filter. It does not
+protect content that a harness already wrote to disk. Configure storage and
+retention controls separately.
 
 ## Runtime shape
 
@@ -53,13 +56,14 @@ gRPC or contacting an upstream provider.
 ## Core rules
 
 - A policy has one through ten named gates and a required `default_decision`.
-- Each gate sees the current request after preceding proceeding patches.
-- `proceed` applies a patch; terminal `allow` and `deny` require empty patches.
-- `None` body replacement means no replacement; `b""` is an explicit empty
+- Each gate sees the request after Egress Gate applies patches from earlier
+  gates.
+- `proceed` applies a patch. Terminal `allow` and `deny` require empty patches.
+- `None` body replacement means no replacement. `b""` is an explicit empty
   replacement.
-- Runtime safety limits deny with source `runtime_limit` and
-  `egress_gate_limit_exceeded`.
-- Pipeline default deny uses source `pipeline_default` and
+- When a runtime safety limit occurs, Egress Gate denies the request. The result
+  uses source `runtime_limit` and code `egress_gate_limit_exceeded`.
+- Pipeline default deny uses source `pipeline_default` and code
   `egress_gate_default_deny`.
 - The released Finding wire contract has only five fields. Gate source and
   decision provenance remain runtime-internal.

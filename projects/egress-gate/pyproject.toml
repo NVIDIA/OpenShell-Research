@@ -1,7 +1,7 @@
 [project]
 name = "egress-gate"
 version = "0.1.0"
-description = "Inspect and enforce policy on provider-bound OpenShell requests."
+description = "Run extensible gates on provider-bound OpenShell HTTP requests."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"

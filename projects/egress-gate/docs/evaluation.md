@@ -17,15 +17,13 @@ uv run egress-gate evaluate \
   --timeout-seconds 1
 ```
 
-The command's `--registry-factory` global option is available for trusted
-application-owned gates, using the same finalized registry factory accepted by
-the service and discovery commands.
+Use the global `--registry-factory` option for trusted application-owned gates.
+The service and discovery commands accept the same finalized registry factory.
 
 ## Corpus v1
 
-The corpus is strict bounded YAML. It rejects aliases, duplicate keys, unknown
-fields, invalid base64, oversized bodies or request aggregates, and any case
-name repeated in the document.
+The corpus is strict, bounded YAML. The parser rejects aliases, duplicate keys,
+unknown fields, invalid base64, oversized requests, and duplicate case names.
 
 ```yaml
 version: 1
@@ -57,21 +55,22 @@ cases:
 ```
 
 `request.context`, `request.target`, and `request.headers` use the existing
-protobuf-free domain fields exactly. `request.body` is decoded into the same
-bounded `HttpRequest` model used by the service. `expected.decision` is
-required; source kind, gate name/type, and ordered finding types are optional
-projections. Gate name/type projections require a `gate` source kind. Omitted
-projections are not compared.
+protobuf-free domain fields. The evaluator decodes `request.body` into the
+bounded `HttpRequest` model that the service uses. `expected.decision` is
+required. Source kind, gate name, gate type, and ordered finding types are
+optional projections. Gate name and gate type require a `gate` source kind.
+The evaluator does not compare omitted projections.
 
-Each case gets a fresh `Timeout`; preparation gets its own timeout and the
-prepared processor is reused for all cases. Output is content-safe and stable:
+Each case gets a new `Timeout`. Policy preparation gets a separate timeout.
+The evaluator reuses one prepared processor for all cases. Output is
+content-safe and stable:
 
 ```text
 PASS case="ordinary-request"
 SUMMARY total=1 passed=1 failed=0
 ```
 
-Exit status is `0` when every case matches, `1` when at least one case
-mismatches, and `2` for invalid input, preparation failure, or execution
-failure. Mismatch lines contain only expected/actual decision metadata and
-finding types; request bodies and raw exception text are never printed.
+Exit status `0` means that every case matches. Status `1` means that one or
+more cases do not match. Status `2` means that input, preparation, or execution
+failed. Mismatch lines contain only decision metadata and finding types. The
+command does not print request bodies or raw exception text.

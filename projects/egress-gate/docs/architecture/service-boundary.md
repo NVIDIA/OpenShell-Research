@@ -6,9 +6,9 @@ agent_markdown: true
 
 # Service boundary
 
-The `service/` package is the only handwritten package allowed to import
-OpenShell protobuf/gRPC bindings. It owns exact encoded wire limits and
-transport status mapping; domain models own protobuf-free invariants.
+The `service/` package is the only handwritten package that imports OpenShell
+protobuf/gRPC bindings. It owns exact encoded wire limits and transport status
+mapping. Domain models own protobuf-free invariants.
 
 ## RPCs
 
@@ -29,9 +29,9 @@ used for semaphore acquisition, policy preparation, replacement-lock waits,
 gate execution, and final result checks. `RequestProcessor.process` accepts the
 caller-owned timeout and never creates or stores one.
 
-Synchronous work runs in a bounded four-slot executor while the gRPC server
-limits concurrent RPCs to sixteen. Cancellation does not stop Python code
-already running in a worker; the slot remains owned until the worker exits.
+Synchronous work runs in a bounded four-slot executor. The gRPC server permits
+sixteen concurrent RPCs. Cancellation does not stop Python code that already
+runs in a worker. The worker owns its slot until it exits.
 
 ## Wire findings and mutations
 
@@ -45,10 +45,11 @@ replacement, while empty bytes are emitted with `has_body=true`.
 
 ## Lifecycle and errors
 
-The active policy is one validated config plus one prepared processor. Equal
-configs reuse it; changed candidates are prepared completely before atomic
-publication. Invalid candidates do not replace the active pair.
+The active policy contains one validated configuration and one prepared
+processor. An equal configuration reuses the active processor. The service
+prepares a changed candidate before it publishes that candidate. An invalid
+candidate does not replace the active policy.
 
-Invalid input maps to `INVALID_ARGUMENT`; internal gate or service failures map
-to `INTERNAL`. A successful runtime-limit deny is not a gRPC failure and uses
+Invalid input maps to `INVALID_ARGUMENT`. Internal gate or service failures map
+to `INTERNAL`. A runtime-limit deny is not a gRPC failure. It uses
 `egress_gate_limit_exceeded`.

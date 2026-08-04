@@ -1,8 +1,8 @@
 # Minimal custom gate
 
-This example adds a `keyword-deny` gate in one Python file. It is intentionally
-small: if the configured keyword occurs in the request body, the gate denies
-the request; otherwise it returns `proceed` and the pipeline continues.
+This example adds a `keyword-deny` gate in one Python file. If the configured
+keyword occurs in the request body, the gate denies the request. Otherwise, it
+returns `proceed`, and the pipeline continues.
 
 The implementation has three pieces:
 
@@ -34,11 +34,14 @@ uv run python -m egress_gate.cli \
 Using `python -m` keeps the repository root importable for this local example.
 An installed custom-gate package can use the regular `egress-gate` executable.
 
-The first corpus case is denied by `block-secret-keyword`. The second gate
-evaluation proceeds, so the pipeline's explicit `default_decision: allow`
-determines the result.
+The `block-secret-keyword` gate denies the first corpus case. The second gate
+evaluation proceeds. The explicit `default_decision: allow` then determines
+the result.
 
-This is a teaching example, not a robust content classifier. A production gate
-should define deliberate text-decoding and matching semantics, enforce input
-bounds, avoid request-derived error or finding content, honor the shared
-timeout in all expensive work, and remain safe for concurrent calls.
+This is a teaching example, not a robust content classifier. The runtime
+already checks the `HttpRequest` limits. Do not check those limits again.
+
+A production gate must define its text-decoding and matching behavior. Add
+limits only for work that belongs to the gate. Do not put request content in
+errors or findings. Check the shared timeout during expensive work, and keep
+request state local.

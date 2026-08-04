@@ -1,14 +1,13 @@
 # Egress Gate
 
-Egress Gate is an OpenShell supervisor middleware for inspecting and enforcing
-policy on provider-bound HTTP requests during the pre-credentials phase. It
-receives an immutable byte-oriented `HttpRequest`, evaluates an ordered
-pipeline of trusted request-level gates, and returns an allow, deny, or
-validated mutation result.
+Egress Gate is an extensible OpenShell supervisor middleware service. It
+evaluates provider-bound HTTP requests during the pre-credentials phase. Each
+request moves through an ordered pipeline of trusted gates. A gate can allow
+the request, deny it, or return a validated mutation.
 
 The current released OpenShell `Finding` contract has five fields:
 `type`, `label`, `count`, `confidence`, and `severity`. Gate provenance stays
-inside the runtime; it is not serialized into findings or labels.
+inside the runtime. Egress Gate does not add provenance to findings or labels.
 
 ## Quickstart
 
@@ -27,7 +26,7 @@ uv run egress-gate evaluate \
 ```
 
 Use `0.0.0.0` only when the OpenShell supervisor must reach the service across
-network namespaces. The development server uses plaintext gRPC; restrict its
+network namespaces. The development server uses plaintext gRPC. Restrict its
 listen port to trusted networks.
 
 ## Policy shape
@@ -49,10 +48,9 @@ pipeline:
 ```
 
 The shipped registry contains exactly `regex-body`. It supports `detect`,
-`deny`, and `replace`; replacement mode
-preserves an explicit body-replacement intent even when the resulting bytes
-equal the input. Custom trusted gates can be added through
-`--registry-factory`.
+`deny`, and `replace`. Replacement mode preserves an explicit body-replacement
+intent even when the resulting bytes equal the input. Add custom trusted gates
+through `--registry-factory`.
 
 ```bash
 uv run egress-gate --registry-factory my_gates:create_registry gates

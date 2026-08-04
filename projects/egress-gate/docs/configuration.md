@@ -38,26 +38,22 @@ network_middlewares:
       include: [api.anthropic.com]
 ```
 
-The top-level policy is exactly:
+The top-level policy has one `pipeline`. The pipeline has two required fields:
 
-```yaml
-pipeline:
-  gates: []             # one through ten named entries
-  default_decision: allow  # allow or deny; required
-```
+- `gates` contains one through ten named gate configurations.
+- `default_decision` is `allow` or `deny`.
 
-Each entry has a unique bounded `name` and a gate-specific `config` selected
-by its literal `gate` discriminator. Unknown fields, unknown gate types,
-missing defaults, duplicate names, and more than ten entries are rejected.
-There is no compatibility acceptance for legacy policy keys.
+Each gate entry has a unique, bounded `name`. Its literal `gate` field selects
+the exact configuration type. The registry rejects unknown fields, unknown gate
+types, missing defaults, and duplicate names.
 
 ## Built-in gates
 
 The shipped registry contains only `regex-body`. See
 [Regex-body](gates/regex.md) for catalogs and replacement templates. Its
-`mode` is required and is one of `detect`, `deny`, or `replace`; a replacement
-recipe is required exactly when the mode is `replace`. Other behavior is
-supplied by a trusted application registry factory, not by configuration.
+`mode` is required and is one of `detect`, `deny`, or `replace`. A replacement
+recipe is required only when the mode is `replace`. A trusted application
+registry factory supplies other behavior.
 
 ## Inspect the installed registry
 
@@ -77,15 +73,16 @@ uv run egress-gate \
 ```
 
 The factory must return a finalized `GateRegistry`. It owns trusted gate
-classes and typed `GateResources`; policy configuration cannot import Python,
+classes and typed `GateResources`. Policy configuration cannot import Python,
 choose a resource implementation, or provide credentials.
 
-`validate` performs the same strict policy and registered-resource validation
-used by the processing domain, without constructing gates, loading catalogs,
-preparing a processor, or changing the running service's active policy. Use
-`evaluate` to exercise preparation-time artifacts. Exact encoded OpenShell
-configuration size remains a gRPC service-boundary check.
+`validate` checks the policy and registered resources. It also reads and checks
+a file-backed pattern catalog. It does not construct gates, prepare a
+processor, or change the active policy. Use `evaluate` to check artifacts that
+the gate creates during preparation. The gRPC service checks the exact encoded
+size of the OpenShell configuration.
 
 For repeatable request-level checks, the `evaluate` command accepts a pipeline
 policy and a strict version-one corpus. It uses the registry's prepared
-processor seam and does not start the gRPC service; see [Offline evaluation](evaluation.md).
+processor path and does not start the gRPC service. See
+[Offline evaluation](evaluation.md).
