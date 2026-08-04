@@ -91,6 +91,6 @@
   <text x="779" y="466" text-anchor="middle" class="title">Findings</text>
   <text x="779" y="485" text-anchor="middle" class="subtitle">bounded + sourced</text>
 
-  <path d="M490 208v-38c0-20 16-36 36-36h164" class="loop"/>
-  <text x="548" y="184" class="arrow-label">proceed · next gate</text>
+  <path d="M606 208h36c8 0 14-6 14-14v-64c0-8 6-14 14-14h20" class="loop"/>
+  <text x="560" y="174" text-anchor="middle" class="arrow-label">proceed · next gate</text>
 </svg>
