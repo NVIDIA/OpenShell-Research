@@ -1225,7 +1225,7 @@ from egress_gate.request import HttpRequest
 from egress_gate.result import GateEvaluation
 from egress_gate.timeout import Timeout</p>
 <p>class KeywordDenyConfig(GateConfig):
-    gate: Literal["keyword-deny"] = "keyword-deny"
+    gate: Literal["keyword-deny"]
     keyword: str</p>
 <p>class KeywordDenyGate(Gate[KeywordDenyConfig, None]):
     capabilities = GateCapabilities(reads_body=True, may_deny=True)

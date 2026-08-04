@@ -709,6 +709,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#policy-rollout" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Policy rollout
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1156,6 +1167,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#policy-rollout" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Policy rollout
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1377,6 +1399,11 @@ body content.</p>
 </table>
 <p>Runtime limit results contain no partial patch or findings. The active policy
 is not replaced by a failed candidate. See <a href="../reference/limits-and-failures/">Limits and failures</a>.</p>
+<h2 id="policy-rollout">Policy rollout</h2>
+<p>Each Egress Gate service keeps one active prepared policy. During a policy
+change, stop admitting the old configuration before sending the new one so the
+service performs one serialized cutover. Run separate service instances when
+distinct policies must remain active concurrently.</p>
 <h2 id="troubleshooting">Troubleshooting</h2>
 <p>Inspect a finite OpenShell log window:</p>
 <p><code>bash

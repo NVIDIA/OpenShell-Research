@@ -19,7 +19,7 @@ pattern_catalog:
     - name: customer-id
       rules:
         - name: customer-id-rule
-          pattern: '\\bCUST-[0-9]{8}\\b'
+          pattern: '\bCUST-[0-9]{8}\b'
           confidence: high
 mode: replace
 replacement:

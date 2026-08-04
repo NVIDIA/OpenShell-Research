@@ -33,7 +33,7 @@ from egress_gate.timeout import Timeout
 
 
 class KeywordDenyConfig(GateConfig):
-    gate: Literal["keyword-deny"] = "keyword-deny"
+    gate: Literal["keyword-deny"]
     keyword: str
 
 
