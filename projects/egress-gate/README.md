@@ -78,7 +78,7 @@ through slot acquisition, policy preparation, and `RequestProcessor.process`.
 
 - [Overview](docs/index.md)
 - [Configuration](docs/configuration.md)
-- [Offline evaluation](docs/evaluation.md)
+- [Test policies offline](docs/evaluation.md)
 - [Operations](docs/operations.md)
 - [Gate authoring](docs/gates/custom.md)
 - [Regex-body](docs/gates/regex.md)

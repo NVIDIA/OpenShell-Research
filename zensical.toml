@@ -29,7 +29,7 @@ nav = [
       "documentation/egress-gate/index.md",
       {"Guides" = [
         {"Configure policies" = "documentation/egress-gate/configuration.md"},
-        {"Offline policy evaluation" = "documentation/egress-gate/evaluation.md"},
+        {"Test policies offline" = "documentation/egress-gate/evaluation.md"},
         {"Run and operate Egress Gate" = "documentation/egress-gate/operations.md"}
       ]},
       {"Gates" = [
