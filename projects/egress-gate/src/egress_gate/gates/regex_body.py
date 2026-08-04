@@ -205,7 +205,6 @@ class RegexBodyConfig(GateConfig):
         cls,
         value: object,
     ) -> object:
-        del cls
         if isinstance(value, str):
             return _load_pattern_catalog_file(value)
         return value

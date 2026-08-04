@@ -11,10 +11,7 @@ from enum import StrEnum
 from typing import Annotated, Self, TypeAlias
 
 from pydantic import (
-    BeforeValidator,
     Field,
-    ValidationInfo,
-    field_validator,
     model_validator,
 )
 
@@ -32,40 +29,9 @@ from egress_gate.constants import (
     REASON_CODE_PATTERN,
 )
 from egress_gate.request import RequestPatch
-from egress_gate.string_validators import (
-    BoundedMetadataString,
-    validate_scalar_string,
-)
+from egress_gate.string_validators import BoundedMetadataString
 
-
-def _require_tuple(value: object, field_name: str) -> tuple[object, ...]:
-    if not isinstance(value, tuple):
-        raise ValueError(f"{field_name} must be a tuple")
-    return value
-
-
-def _validate_reason_code(value: object) -> str:
-    reason_code = validate_scalar_string(value)
-    if not reason_code or REASON_CODE_PATTERN.fullmatch(reason_code) is None:
-        raise ValueError("reason code is invalid")
-    return reason_code
-
-
-def _varint_size(value: int) -> int:
-    size = 1
-    while value >= 0x80:
-        value >>= 7
-        size += 1
-    return size
-
-
-def _encoded_string_field_size(field_number: int, value: str) -> int:
-    del field_number
-    length = len(value.encode("utf-8"))
-    return 1 + _varint_size(length) + length
-
-
-ReasonCode = Annotated[str, BeforeValidator(_validate_reason_code)]
+ReasonCode = Annotated[str, Field(pattern=REASON_CODE_PATTERN)]
 FindingType: TypeAlias = BoundedMetadataString
 FindingLabel: TypeAlias = BoundedMetadataString
 GateName: TypeAlias = BoundedMetadataString
@@ -114,15 +80,15 @@ class Finding(StrictDomainModel):
     @model_validator(mode="after")
     def _wire_size_is_bounded(self) -> Self:
         encoded_size = (
-            _encoded_string_field_size(1, self.type)
-            + _encoded_string_field_size(2, self.label)
+            _encoded_string_field_size(self.type)
+            + _encoded_string_field_size(self.label)
             + 1
             + _varint_size(self.count)
         )
         if self.confidence is not None:
-            encoded_size += _encoded_string_field_size(4, self.confidence)
+            encoded_size += _encoded_string_field_size(self.confidence)
         if self.severity is not None:
-            encoded_size += _encoded_string_field_size(5, self.severity)
+            encoded_size += _encoded_string_field_size(self.severity)
         if encoded_size > MAX_PROTO_FINDING_BYTES:
             raise ValueError("finding exceeds the encoded size limit")
         return self
@@ -184,18 +150,14 @@ class GateEvaluation(StrictDomainModel):
 
     control: GateControl
     patch: RequestPatch = Field(default_factory=RequestPatch)
-    findings: tuple[Finding, ...] = ()
+    findings: tuple[Finding, ...] = Field(
+        default=(),
+        max_length=MAX_PROTO_FINDING_GROUPS,
+    )
     reason_code: ReasonCode | None = None
-
-    @field_validator("findings", mode="before")
-    @classmethod
-    def _findings_are_a_tuple(cls, value: object) -> object:
-        return _require_tuple(value, "findings")
 
     @model_validator(mode="after")
     def _control_contract_is_valid(self) -> Self:
-        if len(self.findings) > MAX_PROTO_FINDING_GROUPS:
-            raise ValueError("gate evaluation has too many findings")
         if self.control is GateControl.PROCEED:
             if self.reason_code is not None:
                 raise ValueError("proceed evaluations cannot carry a reason code")
@@ -250,18 +212,10 @@ class GateTrace(StrictDomainModel):
     control: GateControl
     duration_ms: float = Field(ge=0, allow_inf_nan=False)
     finding_count: int = Field(ge=0, le=MAX_FINDING_COUNT)
-    mutation_kinds: tuple[MutationKind, ...] = ()
-
-    @field_validator("mutation_kinds", mode="before")
-    @classmethod
-    def _mutation_kinds_are_a_tuple(cls, value: object) -> object:
-        return _require_tuple(value, "mutation_kinds")
-
-    @model_validator(mode="after")
-    def _trace_is_bounded(self) -> Self:
-        if len(self.mutation_kinds) > MAX_TRACE_MUTATION_KINDS:
-            raise ValueError("gate trace has too many mutation kinds")
-        return self
+    mutation_kinds: tuple[MutationKind, ...] = Field(
+        default=(),
+        max_length=MAX_TRACE_MUTATION_KINDS,
+    )
 
 
 class ResultMetadata(StrictDomainModel):
@@ -277,36 +231,29 @@ class EgressResult(StrictDomainModel):
     decision: EgressDecision
     decision_source: DecisionSource
     patch: RequestPatch = Field(default_factory=RequestPatch)
-    findings: tuple[SourcedFinding, ...] = ()
+    findings: tuple[SourcedFinding, ...] = Field(
+        default=(),
+        max_length=MAX_PROTO_FINDING_GROUPS,
+    )
     reason_code: ReasonCode | None = None
-    metadata: tuple[ResultMetadata, ...] = ()
+    metadata: tuple[ResultMetadata, ...] = Field(
+        default=(),
+        max_length=MAX_RESULT_METADATA_ENTRIES,
+    )
     policy_fingerprint: BoundedMetadataString | None = None
-    traces: tuple[GateTrace, ...] = ()
-
-    @field_validator("findings", "metadata", "traces", mode="before")
-    @classmethod
-    def _result_sequences_are_tuples(
-        cls,
-        value: object,
-        info: ValidationInfo,
-    ) -> object:
-        return _require_tuple(value, info.field_name or "result field")
+    traces: tuple[GateTrace, ...] = Field(
+        default=(),
+        max_length=MAX_GATE_TRACES,
+    )
 
     @model_validator(mode="after")
     def _result_contract_is_valid(self) -> Self:
-        if len(self.findings) > MAX_PROTO_FINDING_GROUPS:
-            raise ValueError("result has too many finding groups")
-        if len(self.metadata) > MAX_RESULT_METADATA_ENTRIES:
-            raise ValueError("result has too many metadata entries")
         metadata_bytes = sum(
             len(item.key.encode("utf-8")) + len(item.value.encode("utf-8"))
             for item in self.metadata
         )
         if metadata_bytes > MAX_RESULT_METADATA_BYTES:
             raise ValueError("result metadata exceeds the size limit")
-        if len(self.traces) > MAX_GATE_TRACES:
-            raise ValueError("result has too many gate traces")
-
         source_kind = self.decision_source.kind
         if self.decision is EgressDecision.DENY:
             if not self.patch.is_empty:
@@ -328,6 +275,19 @@ class EgressResult(StrictDomainModel):
             elif self.reason_code is not None:
                 raise ValueError("default allows cannot carry a reason code")
         return self
+
+
+def _varint_size(value: int) -> int:
+    size = 1
+    while value >= 0x80:
+        value >>= 7
+        size += 1
+    return size
+
+
+def _encoded_string_field_size(value: str) -> int:
+    length = len(value.encode("utf-8"))
+    return 1 + _varint_size(length) + length
 
 
 __all__ = [

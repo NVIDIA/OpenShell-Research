@@ -41,7 +41,6 @@ from egress_gate.result import (
     EgressResult,
     Finding,
     GateControl,
-    GateEvaluation,
     GateTrace,
     MutationKind,
     SourcedFinding,
@@ -110,7 +109,6 @@ class RequestProcessor:
                 timeout.raise_if_expired()
                 started = monotonic()
                 evaluation = gate.evaluate(current_request, timeout=timeout)
-                evaluation = _reconstruct_evaluation(evaluation)
                 mutation_kinds = _mutation_kinds(evaluation.patch)
                 trace_finding_count = sum(
                     finding.count for finding in evaluation.findings
@@ -262,15 +260,6 @@ def apply_request_patch(request: HttpRequest, patch: RequestPatch) -> HttpReques
         raise GateLimitExceededError(
             "request mutation exceeds a domain limit"
         ) from None
-
-
-def _reconstruct_evaluation(evaluation: GateEvaluation) -> GateEvaluation:
-    if not isinstance(evaluation, GateEvaluation):
-        raise GateContractError("gate evaluation is invalid")
-    try:
-        return GateEvaluation.model_validate(evaluation.model_dump())
-    except (TypeError, ValueError, ValidationError):
-        raise GateContractError("gate evaluation is invalid") from None
 
 
 def _append_findings(

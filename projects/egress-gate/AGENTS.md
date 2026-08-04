@@ -26,6 +26,11 @@ Run focused tests while working and `make check` before handoff.
   package imports gRPC or generated protobuf bindings.
 - Use the smallest owner for each validation. The service owns exact encoded
   protobuf limits; domain models own bounded scalar and aggregate invariants.
+- Put public declarations before private helpers, implementation types, and
+  module state when dependencies allow. Keep private implementation details at
+  the bottom of a module rather than interrupting its public surface.
+- Do not add validators or runtime type checks that duplicate strict Pydantic
+  validation or an already validated caller boundary.
 - Avoid speculative infrastructure, policy caches, observer interfaces, and
   transport abstractions.
 

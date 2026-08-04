@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Literal, TypeAlias
 
-from pydantic import BeforeValidator, Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from egress_gate.base import StrictDomainModel
 from egress_gate.constants import (
@@ -17,23 +17,9 @@ from egress_gate.constants import (
     MAX_PROTO_HEADERS_BYTES,
     MAX_PROTO_TARGET_BYTES,
 )
-from egress_gate.string_validators import ScalarString, validate_scalar_string
+from egress_gate.string_validators import ScalarString
 
-
-def _require_tuple(value: object, field_name: str) -> tuple[object, ...]:
-    if not isinstance(value, tuple):
-        raise ValueError(f"{field_name} must be a tuple")
-    return value
-
-
-def _validate_non_empty_header_name(value: object) -> str:
-    name = validate_scalar_string(value)
-    if not name:
-        raise ValueError("header name must not be empty")
-    return name
-
-
-HeaderName = Annotated[str, BeforeValidator(_validate_non_empty_header_name)]
+HeaderName = Annotated[ScalarString, Field(min_length=1)]
 HeaderValue = ScalarString
 
 
@@ -43,11 +29,6 @@ class Process(StrictDomainModel):
     binary: ScalarString
     pid: int = Field(ge=0, le=2**32 - 1)
     ancestors: tuple[ScalarString, ...] = ()
-
-    @field_validator("ancestors", mode="before")
-    @classmethod
-    def _ancestors_are_a_tuple(cls, value: object) -> object:
-        return _require_tuple(value, "ancestors")
 
 
 class RequestContext(StrictDomainModel):
@@ -112,34 +93,20 @@ class HttpRequest(StrictDomainModel):
 
     context: RequestContext
     target: HttpTarget
-    headers: tuple[HttpHeader, ...]
-    body: bytes = Field(repr=False)
-
-    @field_validator("headers", mode="before")
-    @classmethod
-    def _headers_are_a_tuple(cls, value: object) -> object:
-        return _require_tuple(value, "headers")
+    headers: tuple[HttpHeader, ...] = Field(max_length=MAX_PROTO_HEADERS)
+    body: bytes = Field(max_length=MAX_BODY_BYTES, repr=False)
 
     @field_validator("headers")
     @classmethod
     def _headers_are_bounded(
         cls, value: tuple[HttpHeader, ...]
     ) -> tuple[HttpHeader, ...]:
-        if len(value) > MAX_PROTO_HEADERS:
-            raise ValueError("request has too many headers")
         encoded_size = sum(
             len(header.name.encode("utf-8")) + len(header.value.encode("utf-8"))
             for header in value
         )
         if encoded_size > MAX_PROTO_HEADERS_BYTES:
             raise ValueError("request headers exceed the size limit")
-        return value
-
-    @field_validator("body")
-    @classmethod
-    def _body_is_bounded(cls, value: bytes) -> bytes:
-        if len(value) > MAX_BODY_BYTES:
-            raise ValueError("request body exceeds the size limit")
         return value
 
 
@@ -176,25 +143,18 @@ HeaderMutation: TypeAlias = Annotated[
 class RequestPatch(StrictDomainModel):
     """Validated body and header mutations proposed by one gate."""
 
-    replacement_body: bytes | None = Field(default=None, repr=False)
-    header_mutations: tuple[HeaderMutation, ...] = ()
-
-    @field_validator("header_mutations", mode="before")
-    @classmethod
-    def _mutations_are_a_tuple(cls, value: object) -> object:
-        return _require_tuple(value, "header_mutations")
-
-    @field_validator("replacement_body")
-    @classmethod
-    def _replacement_body_is_bounded(cls, value: bytes | None) -> bytes | None:
-        if value is not None and len(value) > MAX_BODY_BYTES:
-            raise ValueError("replacement body exceeds the size limit")
-        return value
+    replacement_body: bytes | None = Field(
+        default=None,
+        max_length=MAX_BODY_BYTES,
+        repr=False,
+    )
+    header_mutations: tuple[HeaderMutation, ...] = Field(
+        default=(),
+        max_length=MAX_HEADER_MUTATIONS,
+    )
 
     @model_validator(mode="after")
     def _mutations_are_bounded(self) -> RequestPatch:
-        if len(self.header_mutations) > MAX_HEADER_MUTATIONS:
-            raise ValueError("request patch has too many header mutations")
         data_size = sum(
             len(mutation.name.encode("utf-8"))
             + (

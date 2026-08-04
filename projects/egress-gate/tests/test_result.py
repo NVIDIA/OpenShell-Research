@@ -101,6 +101,12 @@ def test_gate_evaluation_helpers_and_control_invariants() -> None:
         GateEvaluation(control=GateControl.PROCEED, reason_code="invalid_control")
 
 
+@pytest.mark.parametrize("reason_code", ["", "UPPERCASE", "has-hyphen", "x" * 65])
+def test_reason_codes_use_stable_identifier_format(reason_code: str) -> None:
+    with pytest.raises(ValidationError):
+        GateEvaluation.deny(reason_code)
+
+
 def test_decision_source_keeps_gate_provenance_outside_finding() -> None:
     source = DecisionSource.gate(name="identifiers", gate_type="regex")
     sourced = SourcedFinding(source_gate="identifiers", finding=_finding())

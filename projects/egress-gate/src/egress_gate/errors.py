@@ -39,17 +39,6 @@ class ErrorCode(StrEnum):
     UNEXPECTED_SERVICE_FAILURE = "unexpected_service_failure"
 
 
-@dataclass(frozen=True)
-class _ErrorSpec:
-    """Immutable, developer-authored classification and remediation text."""
-
-    kind: ErrorKind
-    component: ErrorComponent
-    operation: str
-    summary: str
-    hint: str
-
-
 class EgressGateError(Exception):
     """A catalog-only failure whose public representation is content-safe."""
 
@@ -122,6 +111,17 @@ class TimeoutExpiredError(Exception):
 
 class GateRegistryError(Exception):
     """A content-safe gate registration or registry lifecycle failure."""
+
+
+@dataclass(frozen=True)
+class _ErrorSpec:
+    """Immutable, developer-authored classification and remediation text."""
+
+    kind: ErrorKind
+    component: ErrorComponent
+    operation: str
+    summary: str
+    hint: str
 
 
 _ERROR_SPECS: dict[ErrorCode, _ErrorSpec] = {
