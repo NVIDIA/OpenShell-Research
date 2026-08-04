@@ -70,13 +70,13 @@
   <text x="702" y="581" text-anchor="middle" class="implementation">Custom gates</text>
   <text x="702" y="601" text-anchor="middle" class="subtitle">trusted integrations</text>
 
-  <path d="M636 132v18c0 8-6 14-14 14H262c-8 0-14 6-14 14v47" class="arrow"/>
-  <text x="452" y="157" text-anchor="middle" class="arrow-label">validate config</text>
+  <path d="M636 132v18c0 8-6 14-14 14H438c-10 0-18 8-18 18v43" class="arrow"/>
+  <text x="535" y="153" text-anchor="middle" class="arrow-label">validate config</text>
   <path d="M248 287v93" class="arrow"/>
   <text x="268" y="342" class="arrow-label">validated policy</text>
   <path d="M706 287v93" class="dependency"/>
   <text x="726" y="342" class="arrow-label">construct gates</text>
-  <text x="510" y="485" class="arrow-label">run gates</text>
+  <text x="510" y="477" class="arrow-label">run gates</text>
   <path d="M448 256h52" class="dependency"/>
   <path d="M490 442v84" class="arrow"/>
 </svg>
