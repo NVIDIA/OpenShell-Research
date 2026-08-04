@@ -1385,25 +1385,24 @@
 
 <h1 id="run-and-operate-egress-gate">Run and operate Egress Gate</h1>
 <p>The OpenShell gateway and sandbox supervisors call Egress Gate through gRPC.
-Install and run the service from <code>projects/egress-gate</code>:</p>
-<div class="language-bash highlight"><span class="filename">Start Egress Gate</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>sync<span class="w"> </span>--frozen
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>egress-gate<span class="w"> </span>gates
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>egress-gate<span class="w"> </span>configuration-schema
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>egress-gate<span class="w"> </span>serve<span class="w"> </span>--listen<span class="w"> </span><span class="m">0</span>.0.0.0:50051<span class="w"> </span>--timeout-seconds<span class="w"> </span><span class="m">4</span>
+Run the service from <code>projects/egress-gate</code>. <code>uv run</code> prepares the project
+environment as needed.</p>
+<div class="language-bash highlight"><span class="filename">Start Egress Gate</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>gates<span class="w"> </span>list
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>gates<span class="w"> </span>schema
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>serve<span class="w"> </span>--listen<span class="w"> </span><span class="m">0</span>.0.0.0:50051<span class="w"> </span>--timeout-seconds<span class="w"> </span><span class="m">4</span>
 </span></code></pre></div>
 <p>Use a reachable non-loopback address only when the supervisor is outside the
 host network namespace of the service. Plaintext gRPC is for a restricted,
 trusted network. Do not expose the port to an untrusted network.</p>
 <h2 id="openshell-registration">OpenShell registration</h2>
-<div class="language-bash highlight"><span class="filename">Register Egress Gate</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>egress-gate<span class="w"> </span>add-gateway-registration<span class="w"> </span><span class="se">\</span>
+<div class="language-bash highlight"><span class="filename">Register Egress Gate</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>add-gateway-registration<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--host-ip<span class="w"> </span>YOUR_HOST_IPV4<span class="w"> </span>--name<span class="w"> </span>egress-gate<span class="w"> </span>--port<span class="w"> </span><span class="m">50051</span>
 </span></code></pre></div>
 <p>The command updates <code>OPENSHELL_GATEWAY_CONFIG</code>, then
 <code>$XDG_CONFIG_HOME/openshell/gateway.toml</code>, then
 <code>~/.config/openshell/gateway.toml</code>. Use <code>--config PATH</code> for another file.
 Restart the OpenShell gateway after changing registrations. Remove one with:</p>
-<div class="language-bash highlight"><span class="filename">Remove the registration</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>egress-gate<span class="w"> </span>remove-gateway-registration<span class="w"> </span>--name<span class="w"> </span>egress-gate
+<div class="language-bash highlight"><span class="filename">Remove the registration</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>remove-gateway-registration<span class="w"> </span>--name<span class="w"> </span>egress-gate
 </span></code></pre></div>
 <p>The generated OpenShell middleware timeout is five seconds. Keep the Egress
 Gate <code>--timeout-seconds</code> below it so queueing, preparation, and transport have
@@ -1459,7 +1458,7 @@ time.</p>
 </span></code></pre></div>
 <p>Check the request ID and stable error code in content-safe Egress Gate logs.
 Reduce request, header, finding, metadata, or regex catalog size when the
-limit reason is returned. Check the exact schema with <code>configuration-schema</code>
+limit reason is returned. Check the exact schema with <code>gates schema</code>
 when validation fails.</p>
 
 
