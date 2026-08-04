@@ -35,7 +35,7 @@ network_policies:
 network_middlewares:
   egress_gate_replace:
     name: Replace email addresses and customer IDs
-    middleware: egress-gate-privacy
+    middleware: egress-gate-redaction
     order: 0
     config:
       pipeline:

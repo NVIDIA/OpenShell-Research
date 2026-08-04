@@ -7,16 +7,15 @@ intended construction and acceptance boundaries; it is not a remaining-work
 checklist and must not be replayed against the completed refactor.
 
 This plan intentionally makes no provision for backwards compatibility. The
-current Privacy Guard package name, Python imports, CLI, policy schema, public
-classes, examples, documentation routes, and tests may all be removed or
-replaced. Do not add compatibility aliases, schema translation, deprecation
-warnings, legacy command names, or dual implementations.
+superseded package name, Python imports, CLI, policy schema, public classes,
+examples, documentation routes, and tests may all be removed or replaced. Do
+not add compatibility aliases, schema translation, deprecation warnings,
+legacy command names, or dual implementations.
 
 ## Executive decision
 
-Refactor Privacy Guard into **Egress Gate**, an extensible OpenShell middleware
-that evaluates and transforms sandbox HTTP egress during the pre-credentials
-request phase.
+Build **Egress Gate** as an extensible OpenShell middleware that evaluates and
+transforms sandbox HTTP egress during the pre-credentials request phase.
 
 The product is not a fixed DLP service and is not a standalone forward proxy.
 It is an OpenShell supervisor middleware designed directly around OpenShell's
@@ -31,9 +30,9 @@ pre-credentials HTTP request contract, with:
 - bounded preparation, atomic policy replacement, execution, and concurrency
 - a protobuf-free processing core behind the OpenShell gRPC service boundary
 
-Privacy Guard becomes a first-party configuration of the built-in regex gate,
-not a separate compatibility layer. Deterministic request control is a
-first-party configuration of the built-in request-rules gate. The generic
+Body inspection and redaction are a first-party configuration of the built-in
+regex gate, not a separate compatibility layer. Deterministic request control
+is a first-party configuration of the built-in request-rules gate. The generic
 registry remains available for organization-specific gates without shipping
 another concrete integration.
 
@@ -60,14 +59,13 @@ revisited before implementation starts:
 | Documentation route | `documentation/egress-gate/` |
 | GitHub workflow | `egress-gate.yml` |
 
-“Privacy Guard” remains the name of a documented reference composition that
-uses body-inspection and transformation gates. It does not retain a separate
-binary, service, import path, or configuration schema.
+The regex redaction composition uses the same binary, service, import path, and
+configuration schema as every other Egress Gate policy.
 
 ## Goals
 
 1. Preserve and strengthen customization as a first-class feature.
-2. Make a Privacy-Guard-like detect, deny, and replace setup concise.
+2. Make regex-based detect, deny, and replace setups concise.
 3. Make deterministic HTTP request control concise with request rules.
 4. Let custom gates reason about the complete bounded request rather than only
    one decoded text body.
@@ -87,7 +85,7 @@ binary, service, import path, or configuration schema.
 
 ## Project non-goals
 
-- Preserving any current Privacy Guard API or configuration.
+- Preserving any superseded API or configuration.
 - Supporting runtimes or transports outside OpenShell.
 - Implementing a forward proxy or TLS interception.
 - Inspecting or transforming HTTP responses; the current OpenShell protocol
@@ -187,8 +185,8 @@ callback or interceptor API.
 ### The current request is the only gate input
 
 Each gate sees the request after mutations from all preceding gates. This
-preserves Privacy Guard's ordered replacement behavior and enables a privacy
-gate to redact a body before a later custom gate sees it.
+preserves ordered replacement behavior and enables a redaction gate to rewrite
+a body before a later custom gate sees it.
 
 The runtime may retain the original OpenShell request privately so it can
 produce one final mutation result for OpenShell. Gates must not receive an
@@ -219,7 +217,7 @@ effect. A failure must not silently become `proceed` or `allow`.
 
 Expected runtime safety-limit exhaustion returns a stable fail-closed deny when
 the request envelope and policy were otherwise valid, following the existing
-Privacy Guard approach. Do not introduce a general passthrough fallback.
+fail-closed approach. Do not introduce a general passthrough fallback.
 
 Use this normative outcome matrix:
 
@@ -618,7 +616,7 @@ messages, or gate-defined free-form metadata.
 The reframed product has three intentionally separate customization levels:
 
 1. **Policy composition:** operators assemble installed gates without writing
-   Python. This is how most Privacy Guard and deterministic request-control
+   Python. This is how most regex-redaction and deterministic request-control
    deployments should be built.
 2. **Gate authoring:** developers add one focused request behavior through a
    typed config and `Gate` implementation.
@@ -967,7 +965,7 @@ allow prevents subsequent gates from running.
 
 ## Reference compositions
 
-### Privacy Guard composition
+### Regex redaction composition
 
 Ship a runnable example and complete documentation for:
 
@@ -991,8 +989,7 @@ pipeline:
 ```
 
 Provide equally concise detect and deny variants. This example is the
-acceptance baseline for preserving Privacy Guard's usability and customization
-story.
+acceptance baseline for preserving regex-body usability and customization.
 
 ### Deterministic request-gate composition
 
@@ -1223,8 +1220,8 @@ the protobuf-free policy domain; exact encoded OpenShell `Struct` size remains
 a service-boundary check.
 
 Gateway registration uses the new service and registration names and retains
-safe atomic TOML updates. It does not recognize or remove old Privacy Guard
-registrations unless the operator names one explicitly.
+safe atomic TOML updates. It removes only the registration explicitly named by
+the operator.
 
 ## Proposed project layout
 
@@ -1262,7 +1259,7 @@ projects/egress-gate/
 │       └── servicer.py
 ├── tests/
 ├── examples/
-│   ├── privacy-guard/
+│   ├── regex-redaction/
 │   └── deterministic-gate/
 ├── docs/
 └── analysis/
@@ -1280,8 +1277,8 @@ not to make the refactor look architecturally different.
 
 ### Net-new source files
 
-Relative to the current Privacy Guard package, only three handwritten source
-files are genuinely new:
+Relative to the superseded implementation, only three handwritten source files
+are genuinely new:
 
 | File | Why it is separate |
 | --- | --- |
@@ -1301,27 +1298,25 @@ or keeps them outside the product.
 
 Because compatibility is irrelevant, perform a complete replacement:
 
-- move `projects/privacy-guard/` to `projects/egress-gate/`
+- replace the superseded project with `projects/egress-gate/`
 - rename the Python package, distribution, CLI, logger hierarchy, service
   identity, manifest, examples, analysis assets, and test imports
-- replace `.github/workflows/privacy-guard.yml`
+- replace the superseded project workflow
 - replace the documentation staging script and its tests
 - replace the generated documentation route and `zensical.toml` navigation
 - update `projects/README.md` and repository-level documentation references
 - update Dev Notes only through the documented renderer if any relevant notes
   are intentionally changed
-- delete old Privacy Guard configuration examples and architecture text
+- delete superseded configuration examples and architecture text
 - delete tests whose only purpose is asserting removed names or schemas
 - add new tests for the replacement behavior; do not mechanically rename tests
   that encode obsolete concepts
-- leave no `privacy_guard` imports, console scripts, service registrations, or
+- leave no superseded imports, console scripts, service registrations, or
   compatibility modules in the final tree
 - leave no names or branding from external comparison projects in
   `projects/egress-gate/` implementation or documentation artifacts
 
-The phrase “Privacy Guard” should remain only in the name and explanation of
-the reference composition, historical Dev Notes that must remain historically
-accurate, and comparison/migration-independent prose.
+The superseded product identity must not remain in current project artifacts.
 
 ## Implementation sequence
 
@@ -1358,7 +1353,7 @@ Acceptance criteria:
 
 - the distribution installs as `egress-gate`
 - `import egress_gate` and the new CLI work
-- no `privacy_guard` Python import or executable remains
+- no superseded Python import or executable remains
 - core domain modules do not import gRPC
 - the copied OpenShell protocol is generated from and records the selected
   released OpenShell contract version
@@ -1378,7 +1373,7 @@ Acceptance criteria:
 4. Implement gate preparation and reusable concurrent-call-safe instances.
 5. Port enough of the current regex catalog, compilation, matching,
    replacement, and safety behavior to register a working `regex-body` gate.
-6. Replace `PrivacyGuardConfig` with the strict pipeline config and rewrite
+6. Replace the superseded top-level config with the strict pipeline config and rewrite
    `RequestProcessor` around `HttpRequest`, configured gates, and
    `EgressResult`. Keep the processor module and public-wrapper style because
    they still own the same generalized orchestration behavior.
@@ -1415,20 +1410,19 @@ Acceptance criteria:
 - output-capability violations fail at the gate wrapper boundary; read
   capabilities remain explicitly declarative
 
-### Phase 3: Complete the privacy composition and coverage
+### Phase 3: Complete the regex redaction composition and coverage
 
 1. Complete detect, deny, and replace behavior and the remaining regex safety
    coverage on the Phase 2 `regex-body` gate.
 2. Rewrite the gate-authoring documentation snippet and reusable contract-test
-   fixture against `Gate` and `Utf8BodyGate`. Do not create another runnable
-   example directory; Phase 7 owns the sole custom implementation example.
-3. Add the Privacy Guard example.
+   fixture against `Gate` and `Utf8BodyGate`. Do not add a runnable custom-gate
+   implementation without a concrete consumer.
+3. Add the regex redaction example.
 4. Re-run and adapt relevant performance analysis against the new runtime.
 
 Acceptance criteria:
 
-- the new Privacy Guard example is no more conceptually complex than the
-  current example
+- the regex redaction example remains concise
 - all current regex safety properties remain covered by new behavior-focused
   tests
 - detect leaves bytes unchanged, deny returns no partial mutation, and replace
@@ -1542,7 +1536,7 @@ Acceptance criteria:
    and failures.
 4. Replace examples and documentation mirrors through the documented staging
    workflow.
-5. Remove obsolete Privacy Guard assets, analyses, scripts, tests, navigation,
+5. Remove obsolete predecessor assets, analyses, scripts, tests, navigation,
    and workflow references.
 6. Search the complete repository for stale code identifiers and user-facing
    claims. In `projects/egress-gate/`, audit case-insensitive `stage`
@@ -1553,7 +1547,7 @@ Acceptance criteria:
 Acceptance criteria:
 
 - the public documentation leads with modular policy composition
-- Privacy Guard and deterministic request-control setups are both first-class
+- Regex redaction and deterministic request-control setups are both first-class
   quickstarts
 - no default log or finding contains request content
 - repository search finds no obsolete compatibility surface
@@ -1668,7 +1662,7 @@ The final documentation set should include:
 
 - product overview and explicit boundary
 - OpenShell request-path quickstart
-- Privacy Guard quickstart
+- regex redaction quickstart
 - deterministic HTTP gate quickstart
 - full pipeline configuration reference
 - request-rules normalization and precedence reference
@@ -1701,7 +1695,7 @@ Mitigation: make allow terminal and visibly named, document it at every request
 rules example, emit the terminal gate in traces, and test that later gates are
 skipped. Do not add a separate policy linter in v0.
 
-### General request handling weakens Privacy Guard's body guarantees
+### General request handling weakens regex-body guarantees
 
 Mitigation: keep the regex-body gate's full accepted-body processing, strict
 UTF-8 contract, atomic replacement, deadlines, and resource limits. Binary
@@ -1733,7 +1727,7 @@ responses and non-HTTP traffic are outside the v1 boundary.
 
 The refactor is complete when:
 
-1. The repository contains one `egress-gate` project and no Privacy Guard
+1. The repository contains one `egress-gate` project and no predecessor
    compatibility surface.
 2. Custom request gates and resources are first-class, typed, discoverable,
    schema-generating, bounded, protobuf-free, and explicitly aligned with the
@@ -1747,7 +1741,7 @@ The refactor is complete when:
    wire.
 5. The default registry contains exactly the `regex-body` and `request-rules`
    built-ins.
-6. The Privacy Guard reference composition detects, denies, and replaces with
+6. The regex redaction composition detects, denies, and replaces with
    the current hardened regex behavior.
 7. A deterministic request gate is expressible entirely in policy.
 8. One active policy is reused across requests and can be replaced atomically
@@ -1759,7 +1753,7 @@ The refactor is complete when:
 12. The OpenShell middleware service passes all exact-boundary and concurrency
     tests.
 13. Project and repository documentation validation passes.
-14. Public documentation presents Privacy Guard and deterministic request
+14. Public documentation presents regex redaction and deterministic request
     control as documented policy compositions using the built-in gates; it
     does not imply that semantic judgment is implemented.
 15. No standalone proxy or non-OpenShell transport exists or is implied to be

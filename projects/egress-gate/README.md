@@ -87,7 +87,7 @@ through slot acquisition, policy preparation, and `RequestProcessor.process`.
 - [Request-rules](docs/gates/request-rules.md)
 - [Architecture](docs/architecture/index.md)
 - [Limits and failures](docs/reference/limits-and-failures.md)
-- [Privacy Guard composition](examples/privacy-guard/README.md)
+- [Regex redaction composition](examples/regex-redaction/README.md)
 - [Deterministic request-rules example](examples/deterministic-gate/README.md)
 
 ## Development
