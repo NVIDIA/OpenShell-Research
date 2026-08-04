@@ -7,14 +7,13 @@ agent_markdown: true
 # Run and operate Egress Gate
 
 The OpenShell gateway and sandbox supervisors call Egress Gate through gRPC.
-Install and run the service from `projects/egress-gate`:
+Run the service from `projects/egress-gate`. `uv run` prepares the project
+environment as needed.
 
 ```bash title="Start Egress Gate"
-uv sync --frozen
-source .venv/bin/activate
-egress-gate gates
-egress-gate configuration-schema
-egress-gate serve --listen 0.0.0.0:50051 --timeout-seconds 4
+uv run egress-gate gates list
+uv run egress-gate gates schema
+uv run egress-gate serve --listen 0.0.0.0:50051 --timeout-seconds 4
 ```
 
 Use a reachable non-loopback address only when the supervisor is outside the
@@ -24,7 +23,7 @@ trusted network. Do not expose the port to an untrusted network.
 ## OpenShell registration
 
 ```bash title="Register Egress Gate"
-egress-gate add-gateway-registration \
+uv run egress-gate add-gateway-registration \
   --host-ip YOUR_HOST_IPV4 --name egress-gate --port 50051
 ```
 
@@ -34,7 +33,7 @@ The command updates `OPENSHELL_GATEWAY_CONFIG`, then
 Restart the OpenShell gateway after changing registrations. Remove one with:
 
 ```bash title="Remove the registration"
-egress-gate remove-gateway-registration --name egress-gate
+uv run egress-gate remove-gateway-registration --name egress-gate
 ```
 
 The generated OpenShell middleware timeout is five seconds. Keep the Egress
@@ -80,5 +79,5 @@ openshell logs SANDBOX_NAME -n 100 --source sandbox
 
 Check the request ID and stable error code in content-safe Egress Gate logs.
 Reduce request, header, finding, metadata, or regex catalog size when the
-limit reason is returned. Check the exact schema with `configuration-schema`
+limit reason is returned. Check the exact schema with `gates schema`
 when validation fails.

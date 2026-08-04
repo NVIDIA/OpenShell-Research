@@ -11,25 +11,24 @@ Custom gates are trusted application code. They target the protobuf-free
 protobuf, or `RequestProcessor` internals.
 
 The repository includes a runnable
-[minimal custom gate](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/custom_gate)
+[minimal custom gate](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/custom-gate)
 that pairs the implementation below with a policy and two offline evaluation
-cases. From `projects/egress-gate/`, activate the installed project environment
-and run it with:
+cases. Run it from `projects/egress-gate/`; `uv` prepares the locked environment
+automatically:
 
 ```bash title="Run the custom-gate example"
-source .venv/bin/activate
-egress-gate \
-  --registry-factory examples.custom_gate.keyword_gate:create_registry \
+uv run egress-gate \
+  --registry-factory examples.custom-gate.keyword_gate:create_registry \
   evaluate \
-  --policy examples/custom_gate/egress-gate-config.yaml \
-  --cases examples/custom_gate/cases.yaml
+  --policy examples/custom-gate/egress-gate-config.yaml \
+  --cases examples/custom-gate/cases.yaml
 ```
 
 The executable resolves the explicit `module:factory` reference from the
 working directory. A packaged deployment can resolve the same reference from
 an installed custom-gate package.
 
-```python title="examples/custom_gate/keyword_gate.py"
+```python title="examples/custom-gate/keyword_gate.py"
 from typing import Literal
 
 from egress_gate.gates import Gate, GateCapabilities, GateConfig, GateRegistry

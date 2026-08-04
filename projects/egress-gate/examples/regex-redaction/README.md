@@ -10,16 +10,15 @@ Inspect the installed gate and exact policy schema:
 
 ```bash
 cd projects/egress-gate
-source .venv/bin/activate
-egress-gate gates
-egress-gate configuration-schema
+uv run egress-gate gates list
+uv run egress-gate gates schema
 ```
 
 Start the middleware:
 
 ```bash
 cd projects/egress-gate/examples/regex-redaction
-egress-gate serve --listen 0.0.0.0:50051 --timeout-seconds 4
+uv run egress-gate serve --listen 0.0.0.0:50051 --timeout-seconds 4
 ```
 
 Register that address with the OpenShell gateway using a reachable host IPv4

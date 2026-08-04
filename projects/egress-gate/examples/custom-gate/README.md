@@ -13,24 +13,23 @@ The implementation has three pieces:
 3. `create_registry` registers the trusted Python class and finalizes the
    configuration schema.
 
-Run the example from `projects/egress-gate/`. Activate the installed project
-environment once, then use the CLI executable directly:
+Run the example from `projects/egress-gate/`. `uv run` prepares the project
+environment before each command:
 
 ```bash
-source .venv/bin/activate
-egress-gate \
-  --registry-factory examples.custom_gate.keyword_gate:create_registry \
-  gates
+uv run egress-gate \
+  --registry-factory examples.custom-gate.keyword_gate:create_registry \
+  gates list
 
-egress-gate \
-  --registry-factory examples.custom_gate.keyword_gate:create_registry \
-  validate --policy examples/custom_gate/egress-gate-config.yaml
+uv run egress-gate \
+  --registry-factory examples.custom-gate.keyword_gate:create_registry \
+  validate --policy examples/custom-gate/egress-gate-config.yaml
 
-egress-gate \
-  --registry-factory examples.custom_gate.keyword_gate:create_registry \
+uv run egress-gate \
+  --registry-factory examples.custom-gate.keyword_gate:create_registry \
   evaluate \
-  --policy examples/custom_gate/egress-gate-config.yaml \
-  --cases examples/custom_gate/cases.yaml
+  --policy examples/custom-gate/egress-gate-config.yaml \
+  --cases examples/custom-gate/cases.yaml
 ```
 
 The executable resolves the explicit `module:factory` reference from the

@@ -32,14 +32,14 @@ protobuf-free and can be evaluated offline.
 
 From `projects/egress-gate/`:
 
-```bash title="Install, inspect, validate, and serve"
-uv sync --frozen
-source .venv/bin/activate
-egress-gate gates
-egress-gate configuration-schema
-egress-gate validate \
+`uv run` prepares the project environment before each command.
+
+```bash title="Inspect, validate, and serve"
+uv run egress-gate gates list
+uv run egress-gate gates schema
+uv run egress-gate validate \
   --policy examples/regex-redaction/egress-gate-config.yaml
-egress-gate serve --listen 127.0.0.1:50051
+uv run egress-gate serve --listen 127.0.0.1:50051
 ```
 
 Use the [regex guide](gates/regex.md) for an OpenShell policy and a

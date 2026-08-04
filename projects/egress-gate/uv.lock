@@ -165,6 +165,51 @@ wheels = [
 ]
 
 [[package]]
+name = "egress-gate"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "grpcio" },
+    { name = "protobuf" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "regex" },
+    { name = "rich" },
+    { name = "typer" },
+    { name = "typing-extensions" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pip-audit" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "ruff" },
+    { name = "ty" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "grpcio", specifier = ">=1.81.1,<2" },
+    { name = "protobuf", specifier = ">=6.33.5,<7" },
+    { name = "pydantic", specifier = ">=2.11,<3" },
+    { name = "pyyaml", specifier = ">=6,<7" },
+    { name = "regex", specifier = ">=2026.7.19,<2027" },
+    { name = "rich", specifier = ">=14,<16" },
+    { name = "typer", specifier = ">=0.16,<1" },
+    { name = "typing-extensions", specifier = ">=4.12,<5" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pip-audit", specifier = "==2.10.1" },
+    { name = "pytest", specifier = ">=9.0.3,<10" },
+    { name = "pytest-asyncio", specifier = ">=0.25,<2" },
+    { name = "ruff", specifier = ">=0.12,<0.13" },
+    { name = "ty", specifier = ">=0.0.1a16,<0.1" },
+]
+
+[[package]]
 name = "filelock"
 version = "3.32.0"
 source = { registry = "https://pypi.org/simple" }
@@ -427,49 +472,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3", size = 69412, upload-time = "2025-05-15T12:30:07.975Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
-]
-
-[[package]]
-name = "egress-gate"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "grpcio" },
-    { name = "protobuf" },
-    { name = "pydantic" },
-    { name = "pyyaml" },
-    { name = "regex" },
-    { name = "typer" },
-    { name = "typing-extensions" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pip-audit" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "ruff" },
-    { name = "ty" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "grpcio", specifier = ">=1.81.1,<2" },
-    { name = "protobuf", specifier = ">=6.33.5,<7" },
-    { name = "pydantic", specifier = ">=2.11,<3" },
-    { name = "pyyaml", specifier = ">=6,<7" },
-    { name = "regex", specifier = ">=2026.7.19,<2027" },
-    { name = "typer", specifier = ">=0.16,<1" },
-    { name = "typing-extensions", specifier = ">=4.12,<5" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pip-audit", specifier = "==2.10.1" },
-    { name = "pytest", specifier = ">=9.0.3,<10" },
-    { name = "pytest-asyncio", specifier = ">=0.25,<2" },
-    { name = "ruff", specifier = ">=0.12,<0.13" },
-    { name = "ty", specifier = ">=0.0.1a16,<0.1" },
 ]
 
 [[package]]

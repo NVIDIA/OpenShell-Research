@@ -59,21 +59,22 @@ trusted application registry factory supplies other behavior.
 
 ## Inspect the installed registry
 
-Run these commands with the Egress Gate environment active:
+Run these commands from `projects/egress-gate/`. `uv` prepares the locked
+environment automatically:
 
 ```bash title="Inspect the default registry"
-egress-gate gates
-egress-gate configuration-schema
-egress-gate validate --policy path/to/policy.yaml
+uv run egress-gate gates list
+uv run egress-gate gates schema
+uv run egress-gate validate --policy path/to/policy.yaml
 ```
 
 Custom registries use the same factory for inspection and serving:
 
 ```bash title="Inspect a custom registry"
-egress-gate \
-  --registry-factory my_gates:create_registry gates
-egress-gate \
-  --registry-factory my_gates:create_registry configuration-schema
+uv run egress-gate \
+  --registry-factory my_gates:create_registry gates list
+uv run egress-gate \
+  --registry-factory my_gates:create_registry gates schema
 ```
 
 The factory must return a finalized `GateRegistry`. It owns trusted gate

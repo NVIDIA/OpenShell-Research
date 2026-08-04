@@ -16,6 +16,12 @@ from typing import Annotated, Literal, Self
 import typer
 import yaml
 from pydantic import ValidationError, field_validator, model_validator
+from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.syntax import Syntax
+from rich.table import Table
+from rich.text import Text
 from yaml.constructor import ConstructorError
 from yaml.events import AliasEvent
 from yaml.nodes import MappingNode
@@ -53,12 +59,17 @@ from egress_gate.timeout import Timeout, validate_timeout_seconds
 app = typer.Typer(
     name="egress-gate",
     help=(
-        "Run Egress Gate, manage local OpenShell gateway registrations, and "
-        "inspect installed request-level gates."
+        "Run the OpenShell middleware, test policies offline, manage the OpenShell "
+        "gateway registration, and inspect installed gates."
     ),
     no_args_is_help=True,
     add_completion=False,
 )
+gates_app = typer.Typer(
+    help="Inspect installed gates and the policy schema they accept.",
+    no_args_is_help=True,
+)
+app.add_typer(gates_app, name="gates")
 
 
 @app.callback()
@@ -68,8 +79,8 @@ def configure_cli(
         str | None,
         typer.Option(
             help=(
-                "Load gates from a trusted Python callable, formatted as "
-                "module:factory. The callable must return a finalized GateRegistry."
+                "Load a trusted MODULE:FACTORY callable that returns a finalized "
+                "GateRegistry. This option applies to every command."
             ),
         ),
     ] = None,
@@ -77,9 +88,7 @@ def configure_cli(
         bool,
         typer.Option(
             "--debug",
-            help=(
-                "Log content-safe diagnostic details for startup and request handling."
-            ),
+            help="Log content-safe startup and request diagnostics.",
         ),
     ] = False,
     debug_log_content: Annotated[
@@ -87,8 +96,8 @@ def configure_cli(
         typer.Option(
             "--debug-log-content",
             help=(
-                "DANGEROUS: log complete request and processed text, which may "
-                "contain secrets or personal data."
+                "DANGEROUS: log original and replacement request bodies. Bodies "
+                "can contain credentials, secrets, or personal data."
             ),
         ),
     ] = False,
@@ -115,8 +124,8 @@ def serve(
         str,
         typer.Option(
             help=(
-                "Host and port on which Egress Gate listens, formatted as "
-                "host:port. Use 0.0.0.0 when sandbox supervisors must reach it."
+                "Listen address in HOST:PORT form. Use 0.0.0.0 only when sandbox "
+                "supervisors must connect across a network namespace."
             ),
         ),
     ] = "127.0.0.1:50051",
@@ -124,13 +133,13 @@ def serve(
         float,
         typer.Option(
             help=(
-                "Maximum seconds shared by all processing gates in one request; "
-                f"must be greater than 0 and at most {MAX_TIMEOUT_SECONDS:g}."
+                "Total processing time available to all gates for one request. "
+                f"The value must be greater than 0 and at most {MAX_TIMEOUT_SECONDS:g}."
             ),
         ),
     ] = DEFAULT_TIMEOUT_SECONDS,
 ) -> None:
-    """Run Egress Gate until the process receives a shutdown signal."""
+    """Start the Egress Gate gRPC service and run until shutdown."""
     options = _command_options(context)
     from egress_gate.service.server import EgressGateServer
 
@@ -148,7 +157,7 @@ def serve(
             log_request_content=options.log_request_content,
         ).serve_sync(listen)
     except EgressGateError as error:
-        typer.echo(str(error), err=True)
+        _render_egress_error("Egress Gate could not start", error)
         raise typer.Exit(code=1) from None
 
 
@@ -158,8 +167,8 @@ def add_gateway_registration(
         str,
         typer.Option(
             help=(
-                "Non-loopback IPv4 address of this host that both the OpenShell "
-                "gateway and sandbox supervisors can reach."
+                "Non-loopback IPv4 address that the OpenShell gateway and sandbox "
+                "supervisors can use to reach this Egress Gate service."
             ),
         ),
     ],
@@ -167,9 +176,8 @@ def add_gateway_registration(
         Path | None,
         typer.Option(
             help=(
-                "Gateway TOML to update. Defaults to "
-                "`$OPENSHELL_GATEWAY_CONFIG` when set, otherwise `gateway.toml` "
-                "under `$XDG_CONFIG_HOME/openshell`."
+                "OpenShell gateway TOML file to update. By default, use "
+                "OPENSHELL_GATEWAY_CONFIG, then the standard per-user file."
             ),
         ),
     ] = None,
@@ -177,8 +185,8 @@ def add_gateway_registration(
         str,
         typer.Option(
             help=(
-                "Gateway registration name referenced by the policy's middleware "
-                "field. OpenShell allows "
+                "Registration name used by an OpenShell policy's middleware field. "
+                "OpenShell allows "
                 f"1-{MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES} ASCII bytes."
             ),
         ),
@@ -189,7 +197,8 @@ def add_gateway_registration(
             min=1,
             max=65535,
             help=(
-                "Egress Gate port. Use the same port in `egress-gate serve --listen`."
+                "Port to advertise to OpenShell. It must match the port in the "
+                "egress-gate serve --listen address."
             ),
         ),
     ] = 50051,
@@ -225,23 +234,29 @@ def add_gateway_registration(
             port=port,
         )
     except GatewayConfigError as error:
-        typer.echo(
-            f"Could not add or update the OpenShell gateway registration: {error}",
-            err=True,
+        _render_cli_error(
+            "Gateway registration could not be saved",
+            code="gateway_config_error",
+            message=str(error),
         )
         raise typer.Exit(code=1) from None
 
-    action = {
-        GatewayConfigUpdate.CREATED: "Created",
-        GatewayConfigUpdate.ADDED: "Added the registration to",
-        GatewayConfigUpdate.UPDATED: "Updated",
-        GatewayConfigUpdate.UNCHANGED: "No changes needed in",
+    change = {
+        GatewayConfigUpdate.CREATED: "Created the gateway configuration file",
+        GatewayConfigUpdate.ADDED: "Added the registration",
+        GatewayConfigUpdate.UPDATED: "Updated the registration",
+        GatewayConfigUpdate.UNCHANGED: "Registration was already current",
     }[result]
-    typer.echo(f"{action} {config_path}")
-    typer.echo(f"Registered {validated_name} at http://{address}:{port}")
-    typer.echo(
-        "Next: start Egress Gate, then restart the OpenShell gateway so it "
-        "loads this registration."
+    _render_registration(
+        title="Gateway registration is ready",
+        config_path=config_path,
+        name=validated_name,
+        endpoint=f"http://{address}:{port}",
+        change=change,
+        next_step=(
+            "Start Egress Gate, then restart the OpenShell gateway to load this "
+            "registration."
+        ),
     )
 
 
@@ -251,7 +266,7 @@ def remove_gateway_registration(
         str,
         typer.Option(
             help=(
-                "Gateway registration name to remove. OpenShell allows "
+                "Registration name to remove. OpenShell allows "
                 f"1-{MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES} ASCII bytes."
             ),
         ),
@@ -260,9 +275,8 @@ def remove_gateway_registration(
         Path | None,
         typer.Option(
             help=(
-                "Gateway TOML to update. Defaults to "
-                "`$OPENSHELL_GATEWAY_CONFIG` when set, otherwise `gateway.toml` "
-                "under `$XDG_CONFIG_HOME/openshell`."
+                "OpenShell gateway TOML file to update. By default, use "
+                "OPENSHELL_GATEWAY_CONFIG, then the standard per-user file."
             ),
         ),
     ] = None,
@@ -283,31 +297,52 @@ def remove_gateway_registration(
             middleware_name=validated_name,
         )
     except GatewayConfigError as error:
-        typer.echo(
-            f"Could not remove the OpenShell gateway registration: {error}",
-            err=True,
+        _render_cli_error(
+            "Gateway registration could not be removed",
+            code="gateway_config_error",
+            message=str(error),
         )
         raise typer.Exit(code=1) from None
 
     if result is GatewayConfigRemoval.REMOVED:
-        typer.echo(f"Removed {validated_name} from {config_path}")
-        typer.echo(
-            "Next: restart the OpenShell gateway so it unloads this registration."
+        _render_registration(
+            title="Gateway registration was removed",
+            config_path=config_path,
+            name=validated_name,
+            next_step=("Restart the OpenShell gateway to unload this registration."),
         )
     else:
-        typer.echo(f"No registration named {validated_name} found in {config_path}")
-
-
-@app.command("configuration-schema")
-def configuration_schema(context: typer.Context) -> None:
-    """Print the policy configuration JSON Schema for the installed gates."""
-    typer.echo(
-        json.dumps(
-            _command_options(context).registry.configuration_json_schema(),
-            indent=2,
-            ensure_ascii=False,
-            sort_keys=True,
+        _render_registration(
+            title="Gateway registration was not found",
+            config_path=config_path,
+            name=validated_name,
+            status_style="bold yellow",
         )
+
+
+@gates_app.command("list")
+def list_gates(context: typer.Context) -> None:
+    """Show what each installed gate can read, change, decide, and report."""
+    _render_gates(_command_options(context).registry)
+
+
+@gates_app.command("schema")
+def gate_schema(context: typer.Context) -> None:
+    """Print the complete policy JSON Schema for the installed gates."""
+    schema = json.dumps(
+        _command_options(context).registry.configuration_json_schema(),
+        indent=2,
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+    _CONSOLE.print(
+        Syntax(
+            schema,
+            "json",
+            theme="ansi_dark",
+            word_wrap=False,
+        ),
+        soft_wrap=True,
     )
 
 
@@ -318,22 +353,34 @@ def validate_policy(
         Path,
         typer.Option(
             "--policy",
-            help="Strict YAML pipeline policy to validate without preparing gates.",
+            help="Path to the YAML policy to check.",
         ),
     ],
 ) -> None:
-    """Validate policy configuration and registered resources without side effects."""
+    """Check a policy without preparing gates or activating the policy."""
     options = _command_options(context)
     try:
         values = _load_policy(policy)
         options.registry.validate_config(values)
     except _EvaluationCorpusError:
-        typer.echo("VALIDATE_ERROR invalid_input", err=True)
+        _render_cli_error(
+            "Policy validation failed",
+            code="invalid_input",
+            message="The policy file could not be read as a supported YAML policy.",
+        )
         raise typer.Exit(code=1) from None
     except EgressGateError:
-        typer.echo("VALIDATE_ERROR config_invalid", err=True)
+        _render_cli_error(
+            "Policy validation failed",
+            code="config_invalid",
+            message="The policy does not match the schema for the installed gates.",
+            hint=(
+                "Run egress-gate gates schema, then check the pipeline, gate kinds, "
+                "required fields, and pattern catalog."
+            ),
+        )
         raise typer.Exit(code=1) from None
-    typer.echo("VALID")
+    _CONSOLE.print("[bold green]✓[/bold green] Policy is valid")
 
 
 @app.command("evaluate")
@@ -343,75 +390,84 @@ def evaluate(
         Path,
         typer.Option(
             "--policy",
-            help="Strict YAML pipeline policy to prepare and evaluate.",
+            help="Path to the YAML policy to test.",
         ),
     ],
     cases: Annotated[
         Path,
         typer.Option(
             "--cases",
-            help="Strict YAML version-one evaluation corpus.",
+            help="Path to the YAML file of saved request cases and expected results.",
         ),
     ],
     timeout_seconds: Annotated[
         float,
         typer.Option(
             help=(
-                "Maximum seconds for preparation and each case; "
-                f"must be greater than 0 and at most {MAX_TIMEOUT_SECONDS:g}."
+                "Maximum seconds for policy preparation and, separately, each case. "
+                f"The value must be greater than 0 and at most {MAX_TIMEOUT_SECONDS:g}."
             ),
         ),
     ] = DEFAULT_TIMEOUT_SECONDS,
 ) -> None:
-    """Evaluate a policy corpus offline through the production processor."""
+    """Test saved requests against a policy without starting the service."""
     options = _command_options(context)
     try:
         validated_timeout_seconds = validate_timeout_seconds(timeout_seconds)
+    except ValueError as error:
+        raise typer.BadParameter(
+            str(error),
+            param_hint="--timeout-seconds",
+        ) from None
+    try:
         policy_values = _load_policy(policy)
+    except _EvaluationCorpusError:
+        _render_cli_error(
+            "Evaluation could not start",
+            code="invalid_policy_file",
+            message="The policy file could not be read as a supported YAML policy.",
+        )
+        raise typer.Exit(code=2) from None
+    try:
         corpus = _load_corpus(cases)
+    except _EvaluationCorpusError:
+        _render_cli_error(
+            "Evaluation could not start",
+            code="invalid_cases_file",
+            message=(
+                "The cases file could not be read as a valid version 1 YAML test suite."
+            ),
+        )
+        raise typer.Exit(code=2) from None
+    try:
         summary = _run_corpus(
             options.registry,
             policy_values,
             corpus,
             timeout_seconds=validated_timeout_seconds,
         )
-    except _EvaluationCorpusError:
-        typer.echo("EVALUATE_ERROR invalid_input", err=True)
-        raise typer.Exit(code=2) from None
-    except EgressGateError:
-        typer.echo("EVALUATE_ERROR egress_gate_failure", err=True)
+    except EgressGateError as error:
+        _render_egress_error("Evaluation failed", error)
         raise typer.Exit(code=2) from None
     except Exception:
-        typer.echo("EVALUATE_ERROR execution_failed", err=True)
+        _render_cli_error(
+            "Evaluation failed",
+            code="execution_failed",
+            message="An unexpected error stopped the evaluation.",
+            hint=(
+                "Check custom gate and application-owned resource setup, then retry."
+            ),
+        )
         raise typer.Exit(code=2) from None
 
-    for case in summary.cases:
-        for line in _format_case_evaluation(case):
-            typer.echo(line)
-    typer.echo(_format_summary(summary))
+    _render_evaluation(summary)
     if summary.failed:
         raise typer.Exit(code=1)
 
 
-@app.command("gates")
-def gates(context: typer.Context) -> None:
-    """List installed gates, capabilities, and declared finding types."""
-    for description in _command_options(context).registry.describe_gates():
-        finding_types = ",".join(item.type for item in description.finding_types)
-        capabilities = ",".join(
-            name
-            for name, enabled in description.capabilities.model_dump().items()
-            if enabled
-        )
-        typer.echo(
-            f"{description.gate_type}\tfindings={finding_types or '-'}\t"
-            f"capabilities={capabilities or '-'}\t"
-            f"resources={description.resource_type or '-'}\t"
-            f"config={description.config_type}\t{description.description}"
-        )
-
-
 _LOGGER = get_logger(__name__)
+_CONSOLE = Console()
+_ERROR_CONSOLE = Console(stderr=True)
 
 
 @dataclass(frozen=True)
@@ -748,25 +804,158 @@ def _run_corpus(
     return _EvaluationSummary(cases=tuple(evaluations))
 
 
-def _format_case_evaluation(evaluation: _CaseEvaluation) -> tuple[str, ...]:
-    """Render one content-safe case result as stable text lines."""
-    if evaluation.matched:
-        return (f"PASS case={_format_value(evaluation.name)}",)
-    return tuple(
-        "FAIL "
-        f"case={_format_value(evaluation.name)} "
-        f"field={difference.field} "
-        f"expected={_format_value(difference.expected)} "
-        f"actual={_format_value(difference.actual)}"
-        for difference in evaluation.differences
+def _render_evaluation(summary: _EvaluationSummary) -> None:
+    """Render content-safe case results and their aggregate."""
+    table = Table(
+        title="Policy evaluation",
+        box=box.ROUNDED,
+        header_style="bold cyan",
+        title_style="bold",
+        show_lines=True,
+    )
+    table.add_column("Status", no_wrap=True)
+    table.add_column("Case", ratio=2)
+    table.add_column("Details", ratio=3)
+
+    for evaluation in summary.cases:
+        if evaluation.matched:
+            status = Text("PASS", style="bold green")
+            details = Text("All checks matched", style="dim")
+        else:
+            status = Text("FAIL", style="bold red")
+            details = Text()
+            for index, difference in enumerate(evaluation.differences):
+                if index:
+                    details.append("\n")
+                details.append(f"{difference.field}: ", style="bold")
+                details.append("expected ", style="dim")
+                details.append(_format_value(difference.expected))
+                details.append(" · actual ", style="dim")
+                details.append(_format_value(difference.actual))
+        table.add_row(status, Text(evaluation.name), details)
+
+    _CONSOLE.print(table)
+    _CONSOLE.print(
+        Text.assemble(
+            (f"{summary.passed} passed", "bold green"),
+            " · ",
+            (
+                f"{summary.failed} failed",
+                "bold red" if summary.failed else "dim",
+            ),
+            " · ",
+            (f"{summary.total} total", "dim"),
+        )
     )
 
 
-def _format_summary(summary: _EvaluationSummary) -> str:
-    """Render the stable aggregate line for one corpus run."""
-    return (
-        f"SUMMARY total={summary.total} passed={summary.passed} failed={summary.failed}"
+def _render_gates(registry: GateRegistry) -> None:
+    """Render the installed gate inventory for a person."""
+    _CONSOLE.print("[bold]Installed gates[/bold]")
+    for description in registry.describe_gates():
+        finding_types = (
+            ", ".join(item.type for item in description.finding_types)
+            or "None declared"
+        )
+        capability_values = description.capabilities.model_dump()
+        request_access = ", ".join(
+            label
+            for name, label in _REQUEST_ACCESS_LABELS.items()
+            if capability_values[name]
+        )
+        possible_results = ", ".join(
+            label
+            for name, label in _RESULT_CAPABILITY_LABELS.items()
+            if capability_values[name]
+        )
+        details = Table.grid(padding=(0, 2))
+        details.add_column(style="bold cyan", no_wrap=True)
+        details.add_column()
+        details.add_row("Description", Text(description.description))
+        details.add_row("Request access", Text(request_access or "None declared"))
+        details.add_row(
+            "Possible results",
+            Text(possible_results or "None declared"),
+        )
+        details.add_row("Finding types", Text(finding_types))
+        details.add_row("Python config", Text(description.config_type))
+        if description.resource_type is not None:
+            details.add_row("Python resources", Text(description.resource_type))
+        _CONSOLE.print(
+            Panel(
+                details,
+                title=Text(description.gate_type, style="bold green"),
+                title_align="left",
+                border_style="bright_blue",
+            )
+        )
+
+
+def _render_registration(
+    *,
+    title: str,
+    config_path: Path,
+    name: str,
+    endpoint: str | None = None,
+    change: str | None = None,
+    next_step: str | None = None,
+    status_style: str = "bold green",
+) -> None:
+    """Render one gateway registration outcome and its relevant values."""
+    _CONSOLE.print(Text(title, style=status_style))
+    details = Table.grid(padding=(0, 2))
+    details.add_column(style="bold cyan", no_wrap=True)
+    details.add_column(overflow="fold")
+    details.add_row("Gateway file", Text(str(config_path)))
+    details.add_row("Registration", Text(name))
+    if endpoint is not None:
+        details.add_row("Endpoint", Text(endpoint))
+    if change is not None:
+        details.add_row("Change", Text(change))
+    _CONSOLE.print(details)
+    if next_step is not None:
+        _CONSOLE.print(Text.assemble(("Next: ", "bold"), next_step))
+
+
+def _render_egress_error(title: str, error: EgressGateError) -> None:
+    """Render one cataloged error without internal component terminology."""
+    _render_cli_error(
+        title,
+        code=error.code.value,
+        message=error.summary,
+        hint=error.hint,
     )
+
+
+def _render_cli_error(
+    title: str,
+    *,
+    code: str,
+    message: str,
+    hint: str | None = None,
+) -> None:
+    """Render a concise content-safe CLI failure."""
+    heading = Text(title, style="bold red")
+    heading.append(f" [{code}]", style="dim")
+    _ERROR_CONSOLE.print(heading)
+    _ERROR_CONSOLE.print(Text(message))
+    if hint is not None:
+        _ERROR_CONSOLE.print(Text.assemble(("Next: ", "bold"), hint))
+
+
+_REQUEST_ACCESS_LABELS = {
+    "reads_target": "target",
+    "reads_context": "request context",
+    "reads_headers": "headers",
+    "reads_body": "body",
+}
+_RESULT_CAPABILITY_LABELS = {
+    "replaces_body": "body replacement",
+    "mutates_headers": "header changes",
+    "produces_findings": "findings",
+    "may_allow": "allow decision",
+    "may_deny": "deny decision",
+}
 
 
 def _load_yaml(path: Path) -> object:
@@ -854,7 +1043,7 @@ def _load_registry(factory_reference: str | None) -> GateRegistry:
     module_name, separator, factory_name = factory_reference.partition(":")
     if not separator or not module_name or not factory_name:
         raise typer.BadParameter(
-            "Use module:factory, for example my_gates:create_registry.",
+            "Use MODULE:FACTORY, for example my_gates:create_registry.",
             param_hint="--registry-factory",
         )
     working_directory = str(Path.cwd())
@@ -864,43 +1053,39 @@ def _load_registry(factory_reference: str | None) -> GateRegistry:
         module = importlib.import_module(module_name)
     except Exception:
         raise typer.BadParameter(
-            "Registry module could not be imported. Verify the module:factory "
-            "reference, then import the module directly with content-safe "
-            "diagnostics to find missing dependencies or startup failures.",
+            "Could not import the registry module. Check MODULE:FACTORY and the "
+            "module's dependencies.",
             param_hint="--registry-factory",
         ) from None
     try:
         factory = getattr(module, factory_name)
     except Exception:
         raise typer.BadParameter(
-            "Registry factory could not be resolved. Verify the module:factory "
-            "reference and exported callable, then access it directly with "
-            "content-safe diagnostics.",
+            "Could not find the registry factory. Check the callable name in "
+            "MODULE:FACTORY.",
             param_hint="--registry-factory",
         ) from None
     if not callable(factory):
         raise typer.BadParameter(
-            "Registry factory is not callable. Export a callable that returns a "
-            "finalized GateRegistry.",
+            "The registry factory must be callable.",
             param_hint="--registry-factory",
         )
     try:
         registry = factory()
     except Exception:
         raise typer.BadParameter(
-            "Registry factory failed. Run the factory directly with content-safe "
-            "diagnostics and fix its startup error.",
+            "The registry factory raised an exception. Run it directly to inspect "
+            "the startup failure.",
             param_hint="--registry-factory",
         ) from None
     if not isinstance(registry, GateRegistry):
         raise typer.BadParameter(
-            "Registry factory returned an invalid object. Return a GateRegistry.",
+            "The registry factory must return a GateRegistry.",
             param_hint="--registry-factory",
         )
     if not registry.is_finalized:
         raise typer.BadParameter(
-            "Registry factory returned an unfinalized registry. Call finalize() "
-            "before returning it.",
+            "The registry factory must call finalize() before returning.",
             param_hint="--registry-factory",
         )
     return registry

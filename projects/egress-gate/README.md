@@ -13,15 +13,15 @@ inside the runtime. Egress Gate does not add provenance to findings or labels.
 
 Requirements: Python 3.11+ and `uv` 0.11+.
 
+`uv run` prepares the project environment before it starts the command.
+
 ```bash
-uv sync --frozen
-source .venv/bin/activate
-egress-gate gates
-egress-gate configuration-schema
-egress-gate validate \
+uv run egress-gate gates list
+uv run egress-gate gates schema
+uv run egress-gate validate \
   --policy examples/regex-redaction/egress-gate-config.yaml
-egress-gate serve --listen 127.0.0.1:50051
-egress-gate evaluate \
+uv run egress-gate serve --listen 127.0.0.1:50051
+uv run egress-gate evaluate \
   --policy examples/regex-redaction/egress-gate-config.yaml \
   --cases examples/regex-redaction/cases.yaml
 ```
@@ -57,8 +57,8 @@ preserves an explicit body-replacement intent even when the resulting bytes
 equal the input. Add custom trusted gates through `--registry-factory`.
 
 ```bash
-egress-gate --registry-factory my_gates:create_registry gates
-egress-gate --registry-factory my_gates:create_registry serve
+uv run egress-gate --registry-factory my_gates:create_registry gates list
+uv run egress-gate --registry-factory my_gates:create_registry serve
 ```
 
 OpenShell owns interception, routing, and credential attachment. Egress Gate
@@ -89,7 +89,7 @@ through slot acquisition, policy preparation, and `RequestProcessor.process`.
 - [Architecture](docs/architecture/index.md)
 - [Limits and failures](docs/reference/limits-and-failures.md)
 - [Regex redaction composition](examples/regex-redaction/README.md)
-- [Minimal custom gate](examples/custom_gate/README.md)
+- [Minimal custom gate](examples/custom-gate/README.md)
 
 ## Development
 

@@ -29,24 +29,34 @@ benchmark harness around the same request set when you need performance data.
 
 ## Try the included example
 
-The repository includes a regex policy and two request cases. Activate the
-installed project environment, then run them from `projects/egress-gate/`:
+The repository includes a regex policy and two request cases. Run them from
+`projects/egress-gate/`; `uv` prepares the locked environment automatically:
 
 ```bash title="Run the example policy tests"
-egress-gate evaluate \
+uv run egress-gate evaluate \
   --policy examples/regex-redaction/egress-gate-config.yaml \
   --cases examples/regex-redaction/cases.yaml \
   --timeout-seconds 1
 ```
 
 The command prepares the policy once, runs each case with a fresh timeout, and
-prints a short result:
+shows whether each request produced its expected result:
 
 ```text title="Evaluation output"
-PASS case="email-is-detected-and-request-is-allowed"
-PASS case="ordinary-body-is-allowed"
-SUMMARY total=2 passed=2 failed=0
+                            Policy evaluation
+╭────────┬──────────────────────────────────────────┬────────────────────╮
+│ Status │ Case                                     │ Details            │
+├────────┼──────────────────────────────────────────┼────────────────────┤
+│ PASS   │ email-is-detected-and-request-is-allowed │ All checks matched │
+├────────┼──────────────────────────────────────────┼────────────────────┤
+│ PASS   │ ordinary-body-is-allowed                 │ All checks matched │
+╰────────┴──────────────────────────────────────────┴────────────────────╯
+2 passed · 0 failed · 2 total
 ```
+
+If a case fails, the Details column shows each field that differed and its
+expected and actual values. The summary and exit status make the same result
+easy to use in CI.
 
 No request goes to an upstream service. The command does not start gRPC,
 attach credentials, or persist request data.
@@ -125,11 +135,11 @@ Use `--registry-factory` when the policy contains application-owned custom
 gates:
 
 ```bash title="Test a custom gate"
-egress-gate \
-  --registry-factory examples.custom_gate.keyword_gate:create_registry \
+uv run egress-gate \
+  --registry-factory examples.custom-gate.keyword_gate:create_registry \
   evaluate \
-  --policy examples/custom_gate/egress-gate-config.yaml \
-  --cases examples/custom_gate/cases.yaml
+  --policy examples/custom-gate/egress-gate-config.yaml \
+  --cases examples/custom-gate/cases.yaml
 ```
 
 ## Use the result in automation

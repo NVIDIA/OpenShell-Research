@@ -279,7 +279,7 @@ class RegexConfig(GateConfig):
 
 
 class RegexGate(Gate[RegexConfig, None]):
-    """Run one typed request scan, including overlapping matches."""
+    """Scan the request body, path, query, or selected headers with regex rules."""
 
     capabilities = GateCapabilities(
         reads_target=True,
