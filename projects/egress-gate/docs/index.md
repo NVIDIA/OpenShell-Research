@@ -32,7 +32,7 @@ protobuf-free and can be evaluated offline.
 
 From `projects/egress-gate/`:
 
-```bash
+```bash title="Install, inspect, validate, and serve"
 uv sync --frozen
 uv run egress-gate gates
 uv run egress-gate configuration-schema

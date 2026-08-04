@@ -15,7 +15,7 @@ The repository includes a runnable
 that pairs the implementation below with a policy and two offline evaluation
 cases. From `projects/egress-gate/`, run it with:
 
-```bash
+```bash title="Run the custom-gate example"
 uv run python -m egress_gate.cli \
   --registry-factory examples.custom_gate.keyword_gate:create_registry \
   evaluate \
@@ -23,7 +23,7 @@ uv run python -m egress_gate.cli \
   --cases examples/custom_gate/cases.yaml
 ```
 
-```python
+```python title="examples/custom_gate/keyword_gate.py"
 from typing import Literal
 
 from egress_gate.gates import Gate, GateCapabilities, GateConfig, GateRegistry

@@ -12,7 +12,7 @@ A catalog can be inline or in a relative `.yaml` or `.yml` file. The gate
 rejects absolute paths, path traversal, symlinks, YAML aliases, duplicate keys,
 invalid UTF-8, unsafe patterns, and oversized catalogs.
 
-```yaml
+```yaml title="Inline regex catalog"
 gate: regex-body
 pattern_catalog:
   entities:

@@ -10,7 +10,7 @@ agent_markdown: true
 bounded corpus locally through the production `RequestProcessor`. It does not
 start gRPC, attach credentials, contact an upstream, or persist request data.
 
-```bash
+```bash title="Evaluate a request corpus"
 uv run egress-gate evaluate \
   --policy examples/regex-redaction/egress-gate-config.yaml \
   --cases examples/regex-redaction/cases.yaml \
@@ -25,7 +25,7 @@ The service and discovery commands accept the same finalized registry factory.
 The corpus is strict, bounded YAML. The parser rejects aliases, duplicate keys,
 unknown fields, invalid base64, oversized requests, and duplicate case names.
 
-```yaml
+```yaml title="cases.yaml"
 version: 1
 cases:
   - name: ordinary-request
@@ -65,7 +65,7 @@ Each case gets a new `Timeout`. Policy preparation gets a separate timeout.
 The evaluator reuses one prepared processor for all cases. Output is
 content-safe and stable:
 
-```text
+```text title="Evaluation output"
 PASS case="ordinary-request"
 SUMMARY total=1 passed=1 failed=0
 ```

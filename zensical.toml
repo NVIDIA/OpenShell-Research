@@ -55,12 +55,22 @@ generator = false
 
 [project.markdown_extensions.admonition]
 
+[project.markdown_extensions."pymdownx.highlight"]
+anchor_linenums = true
+line_spans = "__span"
+pygments_lang_class = true
+
+[project.markdown_extensions."pymdownx.inlinehilite"]
+
+[project.markdown_extensions."pymdownx.superfences"]
+
 [project.theme]
 custom_dir = "overrides"
 favicon = "assets/brand/favicon.svg"
 logo = "assets/brand/openshell-mark.svg"
 icon.repo = "fontawesome/brands/github"
 features = [
+  "content.code.copy",
   "navigation.sections",
   "navigation.indexes",
   "navigation.path",

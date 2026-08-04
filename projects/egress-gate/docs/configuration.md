@@ -10,7 +10,7 @@ OpenShell embeds the Egress Gate policy in a `network_middlewares` entry. The
 registry validates the complete strict configuration before preparing a
 processor.
 
-```yaml
+```yaml title="OpenShell policy"
 network_middlewares:
   egress_gate:
     name: Inspect provider requests
@@ -57,7 +57,7 @@ registry factory supplies other behavior.
 
 ## Inspect the installed registry
 
-```bash
+```bash title="Inspect the default registry"
 uv run egress-gate gates
 uv run egress-gate configuration-schema
 uv run egress-gate validate --policy path/to/policy.yaml
@@ -65,7 +65,7 @@ uv run egress-gate validate --policy path/to/policy.yaml
 
 Custom registries use the same factory for inspection and serving:
 
-```bash
+```bash title="Inspect a custom registry"
 uv run egress-gate \
   --registry-factory my_gates:create_registry gates
 uv run egress-gate \
