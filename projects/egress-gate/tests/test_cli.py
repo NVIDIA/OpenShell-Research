@@ -17,6 +17,14 @@ from egress_gate.errors import GateRegistryError
 from egress_gate.gates import GateRegistry, create_builtin_registry
 
 
+def test_cli_does_not_offer_request_content_logging() -> None:
+    result = CliRunner().invoke(app, ["--help"])
+
+    assert result.exit_code == 0
+    assert "--debug" in result.stdout
+    assert "--debug-log-content" not in result.stdout
+
+
 def test_cli_gates_describes_the_request_level_builtin() -> None:
     result = CliRunner().invoke(app, ["gates", "list"])
 

@@ -177,7 +177,6 @@ class GateRegistry:
         validated_config: EgressGateConfig[GateConfig],
         *,
         timeout: Timeout,
-        log_request_content: bool = False,
     ) -> RequestProcessor:
         """Prepare one processor from a validated policy configuration.
 
@@ -211,7 +210,6 @@ class GateRegistry:
             validated_config,
             tuple(prepared),
             policy_fingerprint=self.policy_fingerprint(validated_config),
-            log_request_content=log_request_content,
         )
 
     def configuration_json_schema(self) -> dict[str, object]:

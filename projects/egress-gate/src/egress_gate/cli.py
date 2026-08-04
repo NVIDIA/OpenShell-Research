@@ -50,7 +50,7 @@ from egress_gate.gateway_config import (
     update_gateway_config,
     validate_middleware_name,
 )
-from egress_gate.logging import LoggingConfig, configure_logging, get_logger
+from egress_gate.logging import LoggingConfig, configure_logging
 from egress_gate.request import HttpHeader, HttpRequest, HttpTarget, RequestContext
 from egress_gate.result import EgressResult, GateDecisionSource
 from egress_gate.string_validators import BoundedMetadataString
@@ -91,30 +91,10 @@ def configure_cli(
             help="Log content-safe startup and request diagnostics.",
         ),
     ] = False,
-    debug_log_content: Annotated[
-        bool,
-        typer.Option(
-            "--debug-log-content",
-            help=(
-                "DANGEROUS: log original and replacement request bodies. Bodies "
-                "can contain credentials, secrets, or personal data."
-            ),
-        ),
-    ] = False,
 ) -> None:
     """Configure the command application and its gate inventory."""
-    configure_logging(
-        LoggingConfig(level="DEBUG" if debug or debug_log_content else "INFO")
-    )
-    context.obj = _CommandOptions(
-        registry=_load_registry(registry_factory),
-        log_request_content=debug_log_content,
-    )
-    if debug_log_content:
-        _LOGGER.warning(
-            "egress_gate_request_content_logging_enabled "
-            "complete_request_text_may_contain_secrets"
-        )
+    configure_logging(LoggingConfig(level="DEBUG" if debug else "INFO"))
+    context.obj = _CommandOptions(registry=_load_registry(registry_factory))
 
 
 @app.command("serve")
@@ -154,7 +134,6 @@ def serve(
         EgressGateServer(
             options.registry,
             timeout_seconds=validated_timeout_seconds,
-            log_request_content=options.log_request_content,
         ).serve_sync(listen)
     except EgressGateError as error:
         _render_egress_error("Egress Gate could not start", error)
@@ -465,7 +444,6 @@ def evaluate(
         raise typer.Exit(code=1)
 
 
-_LOGGER = get_logger(__name__)
 _CONSOLE = Console()
 _ERROR_CONSOLE = Console(stderr=True)
 
@@ -473,7 +451,6 @@ _ERROR_CONSOLE = Console(stderr=True)
 @dataclass(frozen=True)
 class _CommandOptions:
     registry: GateRegistry
-    log_request_content: bool
 
 
 class _EvaluationCorpusError(Exception):
@@ -787,7 +764,6 @@ def _run_corpus(
     processor = registry.prepare_processor(
         validated_config,
         timeout=Timeout.from_seconds(validated_timeout),
-        log_request_content=False,
     )
     evaluations: list[_CaseEvaluation] = []
     for case in corpus.cases:

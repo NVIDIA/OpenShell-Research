@@ -28,12 +28,10 @@ class EgressGateServer:
         registry: GateRegistry,
         *,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
-        log_request_content: bool = False,
     ) -> None:
         self._middleware = EgressGateMiddleware(
             registry,
             timeout_seconds=timeout_seconds,
-            log_request_content=log_request_content,
         )
 
     def serve_sync(self, listen: str = DEFAULT_LISTEN_ADDRESS) -> None:

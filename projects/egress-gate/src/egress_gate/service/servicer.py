@@ -76,16 +76,12 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         registry: GateRegistry,
         *,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
-        log_request_content: bool = False,
     ) -> None:
         if not registry.is_finalized:
             raise GateRegistryError("middleware requires a finalized gate registry")
         self._registry = registry
         self._timeout_seconds = validate_timeout_seconds(timeout_seconds)
-        self._policy = _ActivePolicy(
-            registry,
-            log_request_content=log_request_content,
-        )
+        self._policy = _ActivePolicy(registry)
         self._processing_slots = asyncio.Semaphore(MAX_CONCURRENT_PROCESSING)
         self._processing_executor = ThreadPoolExecutor(
             max_workers=MAX_CONCURRENT_PROCESSING,
@@ -300,14 +296,8 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
 class _ActivePolicy:
     """Own one active validated policy and its prepared immutable gates."""
 
-    def __init__(
-        self,
-        registry: GateRegistry,
-        *,
-        log_request_content: bool,
-    ) -> None:
+    def __init__(self, registry: GateRegistry) -> None:
         self._registry = registry
-        self._log_request_content = log_request_content
         self._config: EgressGateConfig[GateConfig] | None = None
         self._processor: RequestProcessor | None = None
         self._lock = Lock()
@@ -350,7 +340,6 @@ class _ActivePolicy:
         return self._registry.prepare_processor(
             config,
             timeout=timeout,
-            log_request_content=self._log_request_content,
         )
 
     def clear(self) -> None:

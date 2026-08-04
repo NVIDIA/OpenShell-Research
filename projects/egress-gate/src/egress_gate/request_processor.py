@@ -64,7 +64,6 @@ class RequestProcessor:
         ],
         *,
         policy_fingerprint: str | None = None,
-        log_request_content: bool = False,
     ) -> None:
         gates = tuple(configured_gates)
         configured_names = tuple(name for name, _, _ in gates)
@@ -89,7 +88,6 @@ class RequestProcessor:
         self._config = config
         self._gates = gates
         self._policy_fingerprint = policy_fingerprint
-        self._log_request_content = log_request_content
 
     def process(self, request: HttpRequest, *, timeout: Timeout) -> EgressResult:
         """Evaluate one request and return an atomic final domain result."""
@@ -101,12 +99,6 @@ class RequestProcessor:
         accumulated_patch = RequestPatch()
         sourced_findings: list[SourcedFinding] = []
         traces: list[GateTrace] = []
-
-        if self._log_request_content:
-            _LOGGER.debug(
-                "egress_gate_body_input body=%r",
-                _decode_for_debug(request.body),
-            )
 
         try:
             for gate_name, gate_type, gate in self._gates:
@@ -221,11 +213,6 @@ class RequestProcessor:
                 reason_code=DEFAULT_DENY_REASON_CODE,
                 fingerprint=self._policy_fingerprint,
                 traces=traces,
-            )
-        if self._log_request_content and result.patch.replacement_body is not None:
-            _LOGGER.debug(
-                "egress_gate_body_output body=%r",
-                _decode_for_debug(result.patch.replacement_body),
             )
         return result
 
@@ -370,13 +357,6 @@ def _validate_write_mutation(mutation: WriteHeaderMutation) -> None:
 def _validate_remove_mutation(mutation: RemoveHeaderMutation) -> None:
     if mutation.name.lower() in _PROTECTED_HEADER_NAMES:
         raise GateContractError("protected headers cannot be removed")
-
-
-def _decode_for_debug(body: bytes) -> str:
-    try:
-        return body.decode("utf-8", errors="strict")
-    except UnicodeDecodeError:
-        return "<invalid-utf8>"
 
 
 _PROTECTED_HEADER_NAMES = frozenset(
