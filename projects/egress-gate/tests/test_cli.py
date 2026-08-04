@@ -78,6 +78,27 @@ def test_cli_evaluate_runs_the_builtin_policy_corpus() -> None:
     assert "SUMMARY total=2 passed=2 failed=0" in result.stdout
 
 
+def test_cli_evaluate_runs_the_custom_gate_example() -> None:
+    project_dir = Path(__file__).parents[1]
+    result = CliRunner().invoke(
+        app,
+        [
+            "--registry-factory",
+            "examples.custom_gate.keyword_gate:create_registry",
+            "evaluate",
+            "--policy",
+            str(project_dir / "examples/custom_gate/egress-gate-config.yaml"),
+            "--cases",
+            str(project_dir / "examples/custom_gate/cases.yaml"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert 'PASS case="configured-keyword-is-denied"' in result.stdout
+    assert 'PASS case="other-bodies-proceed-to-the-default"' in result.stdout
+    assert "SUMMARY total=2 passed=2 failed=0" in result.stdout
+
+
 def test_cli_validate_checks_policy_without_preparing_gates(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

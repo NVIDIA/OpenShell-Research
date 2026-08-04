@@ -10,6 +10,19 @@ Custom gates are trusted application code. They target the protobuf-free
 `egress_gate.request` and `egress_gate.result` models and do not import gRPC,
 protobuf, or `RequestProcessor` internals.
 
+The repository includes a runnable
+[minimal custom gate](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/custom_gate)
+that pairs the implementation below with a policy and two offline evaluation
+cases. From `projects/egress-gate/`, run it with:
+
+```bash
+uv run python -m egress_gate.cli \
+  --registry-factory examples.custom_gate.keyword_gate:create_registry \
+  evaluate \
+  --policy examples/custom_gate/egress-gate-config.yaml \
+  --cases examples/custom_gate/cases.yaml
+```
+
 ```python
 from typing import Literal
 
@@ -19,12 +32,12 @@ from egress_gate.result import GateEvaluation
 from egress_gate.timeout import Timeout
 
 
-class KeywordConfig(GateConfig):
+class KeywordDenyConfig(GateConfig):
     gate: Literal["keyword-deny"] = "keyword-deny"
     keyword: str
 
 
-class KeywordGate(Gate[KeywordConfig, None]):
+class KeywordDenyGate(Gate[KeywordDenyConfig, None]):
     capabilities = GateCapabilities(reads_body=True, may_deny=True)
     finding_types = ()
 
@@ -32,14 +45,14 @@ class KeywordGate(Gate[KeywordConfig, None]):
         self, request: HttpRequest, *, timeout: Timeout
     ) -> GateEvaluation:
         timeout.raise_if_expired()
-        if self.config.keyword.encode() in request.body:
-            return GateEvaluation.deny("egress_gate_keyword_denied")
+        if self.config.keyword.encode("utf-8") in request.body:
+            return GateEvaluation.deny("keyword_denied")
         return GateEvaluation.proceed()
 
 
 def create_registry() -> GateRegistry:
     registry = GateRegistry(include_builtin_gates=True)
-    registry.register(KeywordGate)
+    registry.register(KeywordDenyGate)
     return registry.finalize()
 ```
 

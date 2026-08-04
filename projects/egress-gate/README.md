@@ -87,6 +87,7 @@ through slot acquisition, policy preparation, and `RequestProcessor.process`.
 - [Architecture](docs/architecture/index.md)
 - [Limits and failures](docs/reference/limits-and-failures.md)
 - [Regex redaction composition](examples/regex-redaction/README.md)
+- [Minimal custom gate](examples/custom_gate/README.md)
 
 ## Development
 
