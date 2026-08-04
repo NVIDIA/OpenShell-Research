@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -18,11 +19,12 @@ def test_cli_gates_describes_the_request_level_builtin() -> None:
     result = CliRunner().invoke(app, ["gates"])
 
     assert result.exit_code == 0
-    assert result.stdout.startswith("regex-body\tfindings=sensitive_entity\t")
-    assert "capabilities=reads_body,replaces_body,produces_findings,may_deny" in (
-        result.stdout
+    assert result.stdout.startswith("regex\tfindings=regex_match\t")
+    assert (
+        "capabilities=reads_target,reads_headers,reads_body,replaces_body,"
+        "produces_findings,may_deny" in result.stdout
     )
-    assert "resources=-\tconfig=RegexBodyConfig" in result.stdout
+    assert "resources=-\tconfig=RegexConfig" in result.stdout
 
 
 def test_cli_configuration_schema_exposes_pipeline_only() -> None:
@@ -97,6 +99,27 @@ def test_cli_evaluate_runs_the_custom_gate_example() -> None:
     assert 'PASS case="configured-keyword-is-denied"' in result.stdout
     assert 'PASS case="other-bodies-proceed-to-the-default"' in result.stdout
     assert "SUMMARY total=2 passed=2 failed=0" in result.stdout
+
+
+def test_installed_executable_loads_a_registry_from_the_working_directory() -> None:
+    project_dir = Path(__file__).parents[1]
+    executable = Path(sys.executable).with_name("egress-gate")
+
+    result = subprocess.run(
+        [
+            executable,
+            "--registry-factory",
+            "examples.custom_gate.keyword_gate:create_registry",
+            "gates",
+        ],
+        cwd=project_dir,
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "\nkeyword-deny\t" in result.stdout
 
 
 def test_cli_validate_checks_policy_without_preparing_gates(

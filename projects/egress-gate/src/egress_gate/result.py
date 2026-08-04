@@ -8,7 +8,7 @@ serializes only the five fields on ``Finding``.
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated, Self, TypeAlias
+from typing import Annotated, Literal, Self, TypeAlias
 
 from pydantic import (
     Field,
@@ -107,42 +107,30 @@ class SourcedFinding(StrictDomainModel):
     finding: Finding
 
 
-class DecisionSource(StrictDomainModel):
-    """Runtime-owned attribution for a final decision."""
+class GateDecisionSource(StrictDomainModel):
+    """A final decision made by one configured gate."""
 
-    kind: DecisionSourceKind
-    gate_name: GateName | None = None
-    gate_type: GateType | None = None
+    kind: Literal[DecisionSourceKind.GATE]
+    gate_name: GateName
+    gate_type: GateType
 
-    @model_validator(mode="after")
-    def _gate_fields_match_kind(self) -> Self:
-        has_gate = self.gate_name is not None or self.gate_type is not None
-        if self.kind is DecisionSourceKind.GATE and not (
-            self.gate_name is not None and self.gate_type is not None
-        ):
-            raise ValueError("gate decision sources require gate name and type")
-        if self.kind is not DecisionSourceKind.GATE and has_gate:
-            raise ValueError("non-gate decision sources cannot name a gate")
-        return self
 
-    @classmethod
-    def gate(cls, *, name: str, gate_type: str) -> Self:
-        """Create a source attributed to one configured gate."""
-        return cls(
-            kind=DecisionSourceKind.GATE,
-            gate_name=name,
-            gate_type=gate_type,
-        )
+class PipelineDefaultDecisionSource(StrictDomainModel):
+    """A final decision made by the pipeline default."""
 
-    @classmethod
-    def pipeline_default(cls) -> Self:
-        """Create a source attributed to the pipeline default."""
-        return cls(kind=DecisionSourceKind.PIPELINE_DEFAULT)
+    kind: Literal[DecisionSourceKind.PIPELINE_DEFAULT]
 
-    @classmethod
-    def runtime_limit(cls) -> Self:
-        """Create a source attributed to a runtime safety limit."""
-        return cls(kind=DecisionSourceKind.RUNTIME_LIMIT)
+
+class RuntimeLimitDecisionSource(StrictDomainModel):
+    """A fail-closed decision caused by a runtime safety limit."""
+
+    kind: Literal[DecisionSourceKind.RUNTIME_LIMIT]
+
+
+DecisionSource: TypeAlias = Annotated[
+    GateDecisionSource | PipelineDefaultDecisionSource | RuntimeLimitDecisionSource,
+    Field(discriminator="kind"),
+]
 
 
 class GateEvaluation(StrictDomainModel):
@@ -300,12 +288,15 @@ __all__ = [
     "FindingLabel",
     "FindingType",
     "GateControl",
+    "GateDecisionSource",
     "GateEvaluation",
     "GateName",
     "GateTrace",
     "GateType",
     "MutationKind",
+    "PipelineDefaultDecisionSource",
     "ReasonCode",
     "ResultMetadata",
+    "RuntimeLimitDecisionSource",
     "SourcedFinding",
 ]

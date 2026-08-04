@@ -121,7 +121,7 @@ class ExistingHeaderAction(StrEnum):
 class WriteHeaderMutation(StrictDomainModel):
     """One ordered write operation proposed by a gate."""
 
-    operation: Literal["write"] = "write"
+    kind: Literal["write"]
     name: HeaderName
     value: HeaderValue
     on_existing: ExistingHeaderAction
@@ -130,13 +130,13 @@ class WriteHeaderMutation(StrictDomainModel):
 class RemoveHeaderMutation(StrictDomainModel):
     """One ordered removal operation proposed by a gate."""
 
-    operation: Literal["remove"] = "remove"
+    kind: Literal["remove"]
     name: HeaderName
 
 
 HeaderMutation: TypeAlias = Annotated[
     WriteHeaderMutation | RemoveHeaderMutation,
-    Field(discriminator="operation"),
+    Field(discriminator="kind"),
 ]
 
 

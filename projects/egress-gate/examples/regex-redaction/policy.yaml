@@ -42,12 +42,13 @@ network_middlewares:
         gates:
           - name: identifiers
             config:
-              gate: regex-body
+              kind: regex
+              scan:
+                kind: body
+                action:
+                  kind: replace
+                  template: "[{entity}]"
               pattern_catalog: patterns.yaml
-              mode: replace
-              replacement:
-                strategy: template
-                template: "[{entity}]"
         default_decision: allow
     on_error: fail_closed
     endpoints:

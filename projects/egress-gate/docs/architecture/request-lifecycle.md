@@ -30,15 +30,18 @@ candidate only after a final deadline check.
 For each configured gate:
 
 1. Check the shared deadline.
-2. Evaluate the current immutable `HttpRequest`.
+2. Pass the current read-only `HttpRequest` snapshot to the gate.
 3. Reconstruct and validate the returned `GateEvaluation`.
 4. Add a content-safe `GateTrace` and runtime-owned `SourcedFinding` values.
-5. On `proceed`, apply the patch to form the next current request.
+5. On `proceed`, validate the patch and construct the next request snapshot.
 6. On terminal `allow` or `deny`, stop without invoking later gates.
 
-The processor keeps the original request private. The final allowed patch
-combines preceding patches in order. A denied result always has an empty patch.
-Body replacement `None` and `b""` remain distinct.
+The processor never changes a request object in place. It keeps the original
+request private, constructs a new snapshot after each validated patch, and
+passes that snapshot to the next gate. The final allowed patch combines these
+changes in order for the service to return to OpenShell. A denied result always
+has an empty patch. Body replacement `None` and `b""` remain distinct. Header
+mutation variants use the required `kind` values `write` and `remove`.
 
 If every gate proceeds, `default_decision` controls the result. Default deny
 uses `egress_gate_default_deny`. Default allow has no reason code.

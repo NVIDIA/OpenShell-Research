@@ -7,6 +7,7 @@ import binascii
 import importlib
 import ipaddress
 import json
+import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,7 +46,7 @@ from egress_gate.gateway_config import (
 )
 from egress_gate.logging import LoggingConfig, configure_logging, get_logger
 from egress_gate.request import HttpHeader, HttpRequest, HttpTarget, RequestContext
-from egress_gate.result import EgressResult
+from egress_gate.result import EgressResult, GateDecisionSource
 from egress_gate.string_validators import BoundedMetadataString
 from egress_gate.timeout import Timeout, validate_timeout_seconds
 
@@ -790,11 +791,16 @@ def _compare_result(
     expected: _CorpusExpected,
     result: EgressResult,
 ) -> tuple[_FieldDifference, ...]:
+    source = result.decision_source
     actual: dict[str, object] = {
         "decision": result.decision.value,
-        "decision_source_kind": result.decision_source.kind.value,
-        "gate_name": result.decision_source.gate_name,
-        "gate_type": result.decision_source.gate_type,
+        "decision_source_kind": source.kind.value,
+        "gate_name": source.gate_name
+        if isinstance(source, GateDecisionSource)
+        else None,
+        "gate_type": source.gate_type
+        if isinstance(source, GateDecisionSource)
+        else None,
         "finding_types": tuple(item.finding.type for item in result.findings),
     }
     expected_values: dict[str, object] = {"decision": expected.decision}
@@ -851,6 +857,9 @@ def _load_registry(factory_reference: str | None) -> GateRegistry:
             "Use module:factory, for example my_gates:create_registry.",
             param_hint="--registry-factory",
         )
+    working_directory = str(Path.cwd())
+    if working_directory not in sys.path:
+        sys.path.insert(0, working_directory)
     try:
         module = importlib.import_module(module_name)
     except Exception:

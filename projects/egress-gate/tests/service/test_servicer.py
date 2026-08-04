@@ -29,18 +29,24 @@ from egress_gate.constants import (
     MAX_PROTO_TARGET_BYTES,
 )
 from egress_gate.errors import EgressGateError, ErrorCode, GateRegistryError
-from egress_gate.gates import GateConfig, create_builtin_registry
+from egress_gate.gates import (
+    GateConfig,
+    RegexConfig,
+    RegexReplaceAction,
+    create_builtin_registry,
+)
 from egress_gate.request import (
     ExistingHeaderAction,
     RequestPatch,
     WriteHeaderMutation,
 )
 from egress_gate.result import (
-    DecisionSource,
     DecisionSourceKind,
     EgressDecision,
     EgressResult,
     Finding,
+    PipelineDefaultDecisionSource,
+    RuntimeLimitDecisionSource,
     SourcedFinding,
 )
 from egress_gate.service import servicer as servicer_module
@@ -49,10 +55,14 @@ from egress_gate.timeout import Timeout
 
 
 def _values(
-    *, mode: str = "detect", default_decision: str = "allow"
+    *, action_kind: str = "detect", default_decision: str = "allow"
 ) -> dict[str, object]:
+    action: dict[str, object] = {"kind": action_kind}
+    if action_kind == "replace":
+        action["template"] = "[{entity}]"
     config: dict[str, object] = {
-        "gate": "regex-body",
+        "kind": "regex",
+        "scan": {"kind": "body", "action": action},
         "pattern_catalog": {
             "entities": [
                 {
@@ -61,13 +71,7 @@ def _values(
                 }
             ]
         },
-        "mode": mode,
     }
-    if mode == "replace":
-        config["replacement"] = {
-            "strategy": "template",
-            "template": "[{entity}]",
-        }
     return {
         "pipeline": {
             "gates": [{"name": "body", "config": config}],
@@ -217,7 +221,9 @@ def test_result_adapter_serializes_only_five_finding_fields_and_empty_body_inten
     )
     result = EgressResult(
         decision=EgressDecision.ALLOW,
-        decision_source=DecisionSource.pipeline_default(),
+        decision_source=PipelineDefaultDecisionSource(
+            kind=DecisionSourceKind.PIPELINE_DEFAULT
+        ),
         patch=RequestPatch(replacement_body=b""),
         findings=(SourcedFinding(source_gate="body", finding=finding),),
     )
@@ -240,10 +246,13 @@ def test_result_adapter_serializes_only_five_finding_fields_and_empty_body_inten
 def test_result_adapter_preserves_ordered_header_mutations_and_deny_reason() -> None:
     allowed = EgressResult(
         decision=EgressDecision.ALLOW,
-        decision_source=DecisionSource.pipeline_default(),
+        decision_source=PipelineDefaultDecisionSource(
+            kind=DecisionSourceKind.PIPELINE_DEFAULT
+        ),
         patch=RequestPatch(
             header_mutations=(
                 WriteHeaderMutation(
+                    kind="write",
                     name="x-openshell-middleware-reviewed",
                     value="true",
                     on_existing=ExistingHeaderAction.OVERWRITE,
@@ -253,7 +262,9 @@ def test_result_adapter_preserves_ordered_header_mutations_and_deny_reason() -> 
     )
     denied = EgressResult(
         decision=EgressDecision.DENY,
-        decision_source=DecisionSource.runtime_limit(),
+        decision_source=RuntimeLimitDecisionSource(
+            kind=DecisionSourceKind.RUNTIME_LIMIT
+        ),
         reason_code=LIMIT_REASON_CODE,
     )
 
@@ -277,7 +288,7 @@ def test_processor_preparation_reuses_only_the_current_validated_policy() -> Non
             _values(), timeout=Timeout.from_seconds(1)
         )
         changed = middleware._policy.processor_for(
-            _values(mode="replace"), timeout=Timeout.from_seconds(1)
+            _values(action_kind="replace"), timeout=Timeout.from_seconds(1)
         )
     finally:
         asyncio.run(middleware.close())
@@ -346,7 +357,9 @@ def test_failed_candidate_leaves_the_old_policy_active(
         *,
         timeout: Timeout | None = None,
     ) -> object:
-        if getattr(config, "mode", None) == "replace":
+        if isinstance(config, RegexConfig) and isinstance(
+            config.scan.action, RegexReplaceAction
+        ):
             raise GateRegistryError("candidate preparation failed")
         return original_create_gate(config, timeout=timeout)
 
@@ -358,7 +371,7 @@ def test_failed_candidate_leaves_the_old_policy_active(
     try:
         with pytest.raises(EgressGateError) as error:
             middleware._policy.processor_for(
-                _values(mode="replace"),
+                _values(action_kind="replace"),
                 timeout=Timeout.from_seconds(1),
             )
         active = middleware._policy.processor_for(
@@ -375,7 +388,7 @@ def test_invalid_request_cannot_publish_a_changed_policy() -> None:
     middleware = EgressGateMiddleware(create_builtin_registry())
     old = middleware._policy.processor_for(_values(), timeout=Timeout.from_seconds(1))
     invalid = _request()
-    invalid.config.CopyFrom(_proto_config(_values(mode="replace")))
+    invalid.config.CopyFrom(_proto_config(_values(action_kind="replace")))
     invalid.headers[0].name = ""
 
     try:
@@ -395,7 +408,7 @@ def test_in_flight_processor_reference_survives_policy_replacement() -> None:
             _values(), timeout=Timeout.from_seconds(1)
         )
         replacement = middleware._policy.processor_for(
-            _values(mode="replace"), timeout=Timeout.from_seconds(1)
+            _values(action_kind="replace"), timeout=Timeout.from_seconds(1)
         )
         domain_request = servicer_module._request_from_proto(_request())
 
@@ -435,7 +448,7 @@ async def test_cancelled_candidate_keeps_its_slot_and_is_not_published(
 
     monkeypatch.setattr(middleware._policy, "_build_processor", blocked_build)
     changed_request = _request()
-    changed_request.config.CopyFrom(_proto_config(_values(mode="replace")))
+    changed_request.config.CopyFrom(_proto_config(_values(action_kind="replace")))
     task = asyncio.create_task(
         middleware._evaluate_http_request(
             changed_request,
@@ -469,7 +482,9 @@ async def test_result_serialization_is_bracketed_by_the_shared_timeout(
     middleware = EgressGateMiddleware(create_builtin_registry())
     result = EgressResult(
         decision=EgressDecision.ALLOW,
-        decision_source=DecisionSource.pipeline_default(),
+        decision_source=PipelineDefaultDecisionSource(
+            kind=DecisionSourceKind.PIPELINE_DEFAULT
+        ),
     )
     events: list[str] = []
     original_serialize = servicer_module._result_to_proto_with_source
@@ -508,17 +523,17 @@ async def test_result_serialization_is_bracketed_by_the_shared_timeout(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("mode", "expected_source"),
+    ("action_kind", "expected_source"),
     (("detect", "pipeline_default"), ("deny", "gate")),
 )
 async def test_evaluation_log_records_decision_source(
-    mode: str,
+    action_kind: str,
     expected_source: str,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     middleware = EgressGateMiddleware(create_builtin_registry())
     request = _request()
-    request.config.CopyFrom(_proto_config(_values(mode=mode)))
+    request.config.CopyFrom(_proto_config(_values(action_kind=action_kind)))
     try:
         with caplog.at_level(logging.INFO, logger=servicer_module.__name__):
             await middleware._evaluate_rpc(request, _SuccessfulEvaluationContext())
@@ -569,7 +584,9 @@ async def test_evaluation_log_records_runtime_limit_source(
 def test_serialized_limit_result_reports_runtime_limit_source() -> None:
     result = EgressResult(
         decision=EgressDecision.DENY,
-        decision_source=DecisionSource.runtime_limit(),
+        decision_source=RuntimeLimitDecisionSource(
+            kind=DecisionSourceKind.RUNTIME_LIMIT
+        ),
         reason_code=LIMIT_REASON_CODE,
     )
 
@@ -616,7 +633,9 @@ def test_service_request_body_limit_is_checked_before_worker_execution() -> None
 def test_default_deny_reason_is_wire_safe() -> None:
     result = EgressResult(
         decision=EgressDecision.DENY,
-        decision_source=DecisionSource.pipeline_default(),
+        decision_source=PipelineDefaultDecisionSource(
+            kind=DecisionSourceKind.PIPELINE_DEFAULT
+        ),
         reason_code=DEFAULT_DENY_REASON_CODE,
     )
     response = servicer_module._result_to_proto(result)

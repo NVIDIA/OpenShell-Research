@@ -23,7 +23,7 @@ cases:
     expected:
       decision: allow
       decision_source_kind: pipeline_default
-      finding_types: [sensitive_entity]
+      finding_types: [regex_match]
   - name: ordinary-body-is-allowed
     tags: [regex]
     provenance:

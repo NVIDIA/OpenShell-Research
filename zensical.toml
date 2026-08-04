@@ -34,7 +34,7 @@ nav = [
       ]},
       {"Gates" = [
         "documentation/egress-gate/gates/index.md",
-        {"Regex-body gate" = "documentation/egress-gate/gates/regex.md"},
+        {"Regex gate" = "documentation/egress-gate/gates/regex.md"},
         {"Add a custom gate" = "documentation/egress-gate/gates/custom.md"}
       ]},
       {"Architecture" = [

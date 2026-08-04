@@ -34,14 +34,15 @@ From `projects/egress-gate/`:
 
 ```bash title="Install, inspect, validate, and serve"
 uv sync --frozen
-uv run egress-gate gates
-uv run egress-gate configuration-schema
-uv run egress-gate validate \
+source .venv/bin/activate
+egress-gate gates
+egress-gate configuration-schema
+egress-gate validate \
   --policy examples/regex-redaction/egress-gate-config.yaml
-uv run egress-gate serve --listen 127.0.0.1:50051
+egress-gate serve --listen 127.0.0.1:50051
 ```
 
-Use the [regex-body guide](gates/regex.md) for an OpenShell policy and a
+Use the [regex guide](gates/regex.md) for an OpenShell policy and a
 file-backed catalog.
 
 Use [offline policy tests](evaluation.md) to check saved request examples with
@@ -51,9 +52,11 @@ upstream provider.
 ## Core rules
 
 - A policy has one through ten named gates and a required `default_decision`.
-- Each gate sees the request after Egress Gate applies patches from earlier
-  gates.
-- `proceed` applies a patch. Terminal `allow` and `deny` require empty patches.
+- Each gate receives a read-only request snapshot that includes validated
+  patches from earlier gates.
+- A `proceed` result can propose a patch. The runtime validates it and creates
+  the snapshot for the next gate. Terminal `allow` and `deny` require empty
+  patches.
 - `None` body replacement means no replacement. `b""` is an explicit empty
   replacement.
 - When a runtime safety limit occurs, Egress Gate denies the request. The result
@@ -69,7 +72,7 @@ upstream provider.
 - [Test policies offline](evaluation.md)
 - [Operations](operations.md)
 - [Gate authoring](gates/custom.md)
-- [Regex-body](gates/regex.md)
+- [Regex gate](gates/regex.md)
 - [Architecture](architecture/index.md)
 - [Request lifecycle](architecture/request-lifecycle.md)
 - [Service boundary](architecture/service-boundary.md)

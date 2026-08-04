@@ -21,17 +21,18 @@ network_middlewares:
         gates:
           - name: identifiers
             config:
-              gate: regex-body
+              kind: regex
+              scan:
+                kind: body
+                action:
+                  kind: replace
+                  template: '[{entity}]'
               pattern_catalog:
                 entities:
                   - name: email
                     rules:
                       - pattern: '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
                         confidence: high
-              mode: replace
-              replacement:
-                strategy: template
-                template: '[{entity}]'
         default_decision: allow
     on_error: fail_closed
     endpoints:
@@ -43,32 +44,35 @@ The top-level policy has one `pipeline`. The pipeline has two required fields:
 - `gates` contains one through ten named gate configurations.
 - `default_decision` is `allow` or `deny`.
 
-Each gate entry has a unique, bounded `name`. Its literal `gate` field selects
+Each gate entry has a unique, bounded `name`. Its literal `kind` field selects
 the exact configuration type. The registry rejects unknown fields, unknown gate
 types, missing defaults, and duplicate names.
 
 ## Built-in gates
 
-The shipped registry contains only `regex-body`. See
-[Regex-body](gates/regex.md) for catalogs and replacement templates. Its
-`mode` is required and is one of `detect`, `deny`, or `replace`. A replacement
-recipe is required only when the mode is `replace`. A trusted application
-registry factory supplies other behavior.
+The shipped registry contains only `regex`. See
+[Regex gate](gates/regex.md) for scans, actions, catalogs, and replacement
+templates. `scan.kind` selects the body, path, query, or named headers.
+`scan.action.kind` selects `detect` or `deny`; a body scan can also select
+`replace`. The schema does not permit `replace` for another scan kind. A
+trusted application registry factory supplies other behavior.
 
 ## Inspect the installed registry
 
+Run these commands with the Egress Gate environment active:
+
 ```bash title="Inspect the default registry"
-uv run egress-gate gates
-uv run egress-gate configuration-schema
-uv run egress-gate validate --policy path/to/policy.yaml
+egress-gate gates
+egress-gate configuration-schema
+egress-gate validate --policy path/to/policy.yaml
 ```
 
 Custom registries use the same factory for inspection and serving:
 
 ```bash title="Inspect a custom registry"
-uv run egress-gate \
+egress-gate \
   --registry-factory my_gates:create_registry gates
-uv run egress-gate \
+egress-gate \
   --registry-factory my_gates:create_registry configuration-schema
 ```
 

@@ -36,9 +36,10 @@ runs in a worker. The worker owns its slot until it exits.
 ## Wire findings and mutations
 
 The current OpenShell `Finding` contains exactly `type`, `label`, `count`,
-`confidence`, and `severity`. `SourcedFinding.source_gate`, decision source,
-and traces are runtime values and are not serialized. The adapter rechecks
-protobuf finding and header sizes before returning a response.
+`confidence`, and `severity`. `SourcedFinding.source_gate`, decision sources,
+and traces are runtime values and are not serialized. Decision sources use a
+strict `kind`-discriminated union. The adapter rechecks protobuf finding and
+header sizes before returning a response.
 
 `RequestPatch` operations serialize in their validated order. `None` means no
 replacement, while empty bytes are emitted with `has_body=true`.

@@ -14,8 +14,8 @@ from egress_gate.gates import (
     GateCapabilities,
     GateConfig,
     GateResources,
-    RegexBodyConfig,
-    RegexBodyGate,
+    RegexConfig,
+    RegexGate,
 )
 from egress_gate.request import HttpRequest, HttpTarget, RequestContext
 from egress_gate.result import Finding, GateControl, GateEvaluation
@@ -23,7 +23,7 @@ from egress_gate.timeout import Timeout
 
 
 class _RequestConfig(GateConfig):
-    gate: Literal["test-request"]
+    kind: Literal["test-request"]
 
 
 class _RequestGate(Gate[_RequestConfig, None]):
@@ -51,7 +51,7 @@ class _CounterResources(GateResources):
 
 
 class _CounterConfig(GateConfig):
-    gate: Literal["test-counter"]
+    kind: Literal["test-counter"]
 
 
 class _CounterGate(Gate[_CounterConfig, _CounterResources]):
@@ -124,7 +124,7 @@ def _request(*, body: bytes = b"payload", host: str = "example.com") -> HttpRequ
 
 
 def test_gate_uses_exact_config_and_resource_types() -> None:
-    config = _RequestConfig(gate="test-request")
+    config = _RequestConfig(kind="test-request")
     gate = _RequestGate(config, None)
 
     assert gate.config is config
@@ -141,13 +141,13 @@ def test_gate_uses_exact_config_and_resource_types() -> None:
 
 def test_gate_public_wrapper_enforces_declared_output_capabilities() -> None:
     with pytest.raises(GateContractError, match="undeclared finding"):
-        _UndeclaredOutputGate(_RequestConfig(gate="test-request"), None).evaluate(
+        _UndeclaredOutputGate(_RequestConfig(kind="test-request"), None).evaluate(
             _request(), timeout=Timeout.from_seconds(1)
         )
 
     with pytest.raises(GateContractError, match="undeclared finding"):
         _CapabilityBypassGate(
-            _RequestConfig(gate="test-request"),
+            _RequestConfig(kind="test-request"),
             None,
         ).evaluate(_request(), timeout=Timeout.from_seconds(1))
 
@@ -155,15 +155,16 @@ def test_gate_public_wrapper_enforces_declared_output_capabilities() -> None:
 def test_gate_public_wrapper_classifies_invalid_models_as_contract_errors() -> None:
     with pytest.raises(GateContractError, match="gate output is invalid"):
         _InvalidEvaluationGate(
-            _RequestConfig(gate="test-request"),
+            _RequestConfig(kind="test-request"),
             None,
         ).evaluate(_request(), timeout=Timeout.from_seconds(1))
 
 
 def test_gate_rejects_invalid_utf8_as_gate_input() -> None:
-    config = RegexBodyConfig.model_validate(
+    config = RegexConfig.model_validate(
         {
-            "gate": "regex-body",
+            "kind": "regex",
+            "scan": {"kind": "body", "action": {"kind": "detect"}},
             "pattern_catalog": {
                 "entities": [
                     {
@@ -172,19 +173,18 @@ def test_gate_rejects_invalid_utf8_as_gate_input() -> None:
                     }
                 ]
             },
-            "mode": "detect",
         }
     )
 
     with pytest.raises(GateInputError, match="valid UTF-8"):
-        RegexBodyGate(config, None).evaluate(
+        RegexGate(config, None).evaluate(
             _request(body=b"\xff"), timeout=Timeout.from_seconds(1)
         )
 
 
 def test_resource_backed_gate_is_safe_for_concurrent_evaluations() -> None:
     resources = _CounterResources()
-    gate = _CounterGate(_CounterConfig(gate="test-counter"), resources)
+    gate = _CounterGate(_CounterConfig(kind="test-counter"), resources)
 
     def evaluate(_: int) -> GateEvaluation:
         return gate.evaluate(_request(), timeout=Timeout.from_seconds(1))

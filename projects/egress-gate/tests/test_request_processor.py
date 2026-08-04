@@ -43,13 +43,14 @@ from egress_gate.result import (
     EgressDecision,
     Finding,
     FindingTypeDefinition,
+    GateDecisionSource,
     GateEvaluation,
 )
 from egress_gate.timeout import Timeout
 
 
 class _ControlConfig(GateConfig):
-    gate: Literal["test-control"]
+    kind: Literal["test-control"]
     control: Literal["proceed", "allow", "deny"] = "proceed"
     replacement: str | None = None
     expected_body: str | None = None
@@ -103,6 +104,7 @@ class _ControlGate(Gate[_ControlConfig, None]):
             return GateEvaluation.allow(findings=findings)
         mutations: tuple[WriteHeaderMutation, ...] = tuple(
             WriteHeaderMutation(
+                kind="write",
                 name=f"x-openshell-middleware-test-{index}",
                 value=self.config.header_value or "true",
                 on_existing=ExistingHeaderAction.OVERWRITE,
@@ -112,6 +114,7 @@ class _ControlGate(Gate[_ControlConfig, None]):
         if self.config.header_value is not None and not mutations:
             mutations = (
                 WriteHeaderMutation(
+                    kind="write",
                     name="x-openshell-middleware-test",
                     value=self.config.header_value,
                     on_existing=ExistingHeaderAction.OVERWRITE,
@@ -148,9 +151,19 @@ def _request(
     )
 
 
-def _regex_config(mode: str = "detect") -> dict[str, object]:
+def _regex_config(
+    action_kind: str = "detect",
+    *,
+    scan: dict[str, object] | None = None,
+) -> dict[str, object]:
+    scan_values = {"kind": "body"} if scan is None else dict(scan)
+    action: dict[str, object] = {"kind": action_kind}
+    if action_kind == "replace":
+        action["template"] = "[{entity}]"
+    scan_values["action"] = action
     return {
-        "gate": "regex-body",
+        "kind": "regex",
+        "scan": scan_values,
         "pattern_catalog": {
             "entities": [
                 {
@@ -159,12 +172,6 @@ def _regex_config(mode: str = "detect") -> dict[str, object]:
                 }
             ]
         },
-        "mode": mode,
-        **(
-            {"replacement": {"strategy": "template", "template": "[{entity}]"}}
-            if mode == "replace"
-            else {}
-        ),
     }
 
 
@@ -186,7 +193,7 @@ def _processor(
     config = registry.validate_config(values)
     prepared_items = []
     for entry in config.pipeline.gates:
-        gate_type = getattr(entry.config, "gate", None)
+        gate_type = getattr(entry.config, "kind", None)
         if not isinstance(gate_type, str):
             raise AssertionError("test gate config has no discriminator")
         prepared_items.append(
@@ -207,7 +214,7 @@ def test_processor_process_requires_the_service_created_timeout() -> None:
         process_signature.parameters["timeout"].kind is inspect.Parameter.KEYWORD_ONLY
     )
 
-    processor = _processor((("one", {"gate": "test-control", "control": "proceed"}),))
+    processor = _processor((("one", {"kind": "test-control", "control": "proceed"}),))
     result = processor.process(_request(), timeout=Timeout.from_seconds(1))
     assert result.decision is EgressDecision.ALLOW
 
@@ -220,7 +227,7 @@ def test_processor_applies_patches_to_the_current_request_and_preserves_intent()
             (
                 "redact",
                 {
-                    "gate": "test-control",
+                    "kind": "test-control",
                     "replacement": "redacted",
                     "finding_label": "secret",
                 },
@@ -228,7 +235,7 @@ def test_processor_applies_patches_to_the_current_request_and_preserves_intent()
             (
                 "observe",
                 {
-                    "gate": "test-control",
+                    "kind": "test-control",
                     "expected_body": "redacted",
                     "header_value": "true",
                     "finding_label": "observed",
@@ -256,12 +263,44 @@ def test_processor_applies_patches_to_the_current_request_and_preserves_intent()
     assert result.policy_fingerprint == "policy-fingerprint"
 
 
+def test_regex_gate_sees_header_patches_from_an_earlier_gate() -> None:
+    processor = _processor(
+        (
+            (
+                "add-header",
+                {
+                    "kind": "test-control",
+                    "header_value": "contains secret",
+                },
+            ),
+            (
+                "inspect-header",
+                _regex_config(
+                    "deny",
+                    scan={
+                        "kind": "header",
+                        "names": ["x-openshell-middleware-test"],
+                    },
+                ),
+            ),
+        ),
+        include_regex=True,
+    )
+
+    result = processor.process(_request(), timeout=Timeout.from_seconds(1))
+
+    assert result.decision is EgressDecision.DENY
+    assert isinstance(result.decision_source, GateDecisionSource)
+    assert result.decision_source.gate_name == "inspect-header"
+    assert result.patch.is_empty
+
+
 def test_processor_aggregates_equivalent_findings_by_gate_provenance() -> None:
     processor = _processor(
         (
             (
                 "one",
-                {"gate": "test-control", "finding_label": "same", "emit_twice": True},
+                {"kind": "test-control", "finding_label": "same", "emit_twice": True},
             ),
         )
     )
@@ -278,7 +317,7 @@ def test_terminal_decisions_skip_later_gates() -> None:
             (
                 "deny",
                 {
-                    "gate": "test-control",
+                    "kind": "test-control",
                     "control": "deny",
                     "reason_code": "policy_denied",
                 },
@@ -286,7 +325,7 @@ def test_terminal_decisions_skip_later_gates() -> None:
             (
                 "never",
                 {
-                    "gate": "test-control",
+                    "kind": "test-control",
                     "expected_body": "this gate must not run",
                 },
             ),
@@ -294,11 +333,11 @@ def test_terminal_decisions_skip_later_gates() -> None:
     )
     allow = _processor(
         (
-            ("allow", {"gate": "test-control", "control": "allow"}),
+            ("allow", {"kind": "test-control", "control": "allow"}),
             (
                 "never",
                 {
-                    "gate": "test-control",
+                    "kind": "test-control",
                     "expected_body": "this gate must not run",
                 },
             ),
@@ -310,15 +349,17 @@ def test_terminal_decisions_skip_later_gates() -> None:
 
     assert denied.decision is EgressDecision.DENY
     assert denied.decision_source.kind is DecisionSourceKind.GATE
+    assert isinstance(denied.decision_source, GateDecisionSource)
     assert denied.decision_source.gate_name == "deny"
     assert denied.reason_code == "policy_denied"
     assert allowed.decision is EgressDecision.ALLOW
+    assert isinstance(allowed.decision_source, GateDecisionSource)
     assert allowed.decision_source.gate_name == "allow"
 
 
 def test_default_deny_owns_its_reason_and_discards_accumulated_patch() -> None:
     processor = _processor(
-        (("redact", {"gate": "test-control", "replacement": "redacted"}),),
+        (("redact", {"kind": "test-control", "replacement": "redacted"}),),
         default_decision=DefaultDecision.DENY,
     )
 
@@ -331,7 +372,7 @@ def test_default_deny_owns_its_reason_and_discards_accumulated_patch() -> None:
 
 
 def test_expired_shared_timeout_returns_atomic_runtime_limit_result() -> None:
-    processor = _processor((("one", {"gate": "test-control", "control": "proceed"}),))
+    processor = _processor((("one", {"kind": "test-control", "control": "proceed"}),))
 
     result = processor.process(
         _request(),
@@ -350,7 +391,8 @@ def test_regex_finding_group_overflow_is_an_atomic_runtime_limit() -> None:
             (
                 "regex",
                 {
-                    "gate": "regex-body",
+                    "kind": "regex",
+                    "scan": {"kind": "body", "action": {"kind": "detect"}},
                     "pattern_catalog": {
                         "entities": [
                             {
@@ -360,7 +402,6 @@ def test_regex_finding_group_overflow_is_an_atomic_runtime_limit() -> None:
                             for index in range(MAX_PROTO_FINDING_GROUPS + 1)
                         ]
                     },
-                    "mode": "detect",
                 },
             ),
         ),
@@ -384,12 +425,12 @@ def test_composed_header_mutation_overflow_is_an_atomic_runtime_limit() -> None:
         (
             (
                 "first",
-                {"gate": "test-control", "header_count": MAX_HEADER_MUTATIONS // 2},
+                {"kind": "test-control", "header_count": MAX_HEADER_MUTATIONS // 2},
             ),
             (
                 "second",
                 {
-                    "gate": "test-control",
+                    "kind": "test-control",
                     "header_count": MAX_HEADER_MUTATIONS // 2 + 1,
                 },
             ),
@@ -412,7 +453,7 @@ def test_trace_finding_count_overflow_is_an_atomic_runtime_limit() -> None:
             (
                 "observations",
                 {
-                    "gate": "test-control",
+                    "kind": "test-control",
                     "finding_label": "same",
                     "finding_count": MAX_FINDING_COUNT,
                     "emit_twice": True,
@@ -444,7 +485,7 @@ def test_invalid_utf8_is_translated_to_the_stable_input_error() -> None:
 
 
 def test_prepared_gate_type_is_part_of_the_processor_contract() -> None:
-    processor = _processor((("one", {"gate": "test-control", "control": "proceed"}),))
+    processor = _processor((("one", {"kind": "test-control", "control": "proceed"}),))
     config = processor._config
     gate = processor._gates[0][2]
 
@@ -465,21 +506,24 @@ def test_header_patch_operations_are_ordered_and_protected() -> None:
     patch = RequestPatch(
         header_mutations=(
             WriteHeaderMutation(
+                kind="write",
                 name="x-openshell-middleware-test",
                 value="new",
                 on_existing=ExistingHeaderAction.OVERWRITE,
             ),
             WriteHeaderMutation(
+                kind="write",
                 name="x-openshell-middleware-added",
                 value="one",
                 on_existing=ExistingHeaderAction.APPEND,
             ),
             WriteHeaderMutation(
+                kind="write",
                 name="x-openshell-middleware-added",
                 value="two",
                 on_existing=ExistingHeaderAction.SKIP,
             ),
-            RemoveHeaderMutation(name="x-other"),
+            RemoveHeaderMutation(kind="remove", name="x-other"),
         )
     )
     updated = apply_request_patch(original, patch)
@@ -495,6 +539,7 @@ def test_header_patch_operations_are_ordered_and_protected() -> None:
             RequestPatch(
                 header_mutations=(
                     WriteHeaderMutation(
+                        kind="write",
                         name="authorization",
                         value="secret",
                         on_existing=ExistingHeaderAction.APPEND,

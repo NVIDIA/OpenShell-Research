@@ -27,7 +27,7 @@ from egress_gate.timeout import Timeout
 
 
 class GateConfig(StrictDomainModel):
-    """Nominal base for one gate's exact policy configuration."""
+    """Base for an exact gate config with one required literal ``kind``."""
 
 
 class GateResources:

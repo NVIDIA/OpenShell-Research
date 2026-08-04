@@ -15,12 +15,13 @@ Requirements: Python 3.11+ and `uv` 0.11+.
 
 ```bash
 uv sync --frozen
-uv run egress-gate gates
-uv run egress-gate configuration-schema
-uv run egress-gate validate \
+source .venv/bin/activate
+egress-gate gates
+egress-gate configuration-schema
+egress-gate validate \
   --policy examples/regex-redaction/egress-gate-config.yaml
-uv run egress-gate serve --listen 127.0.0.1:50051
-uv run egress-gate evaluate \
+egress-gate serve --listen 127.0.0.1:50051
+egress-gate evaluate \
   --policy examples/regex-redaction/egress-gate-config.yaml \
   --cases examples/regex-redaction/cases.yaml
 ```
@@ -38,23 +39,26 @@ pipeline:
   gates:
     - name: identifiers
       config:
-        gate: regex-body
+        kind: regex
+        scan:
+          kind: body
+          action:
+            kind: replace
+            template: "[{entity}]"
         pattern_catalog: patterns.yaml
-        mode: replace
-        replacement:
-          strategy: template
-          template: "[{entity}]"
   default_decision: allow
 ```
 
-The shipped registry contains exactly `regex-body`. It supports `detect`,
-`deny`, and `replace`. Replacement mode preserves an explicit body-replacement
-intent even when the resulting bytes equal the input. Add custom trusted gates
-through `--registry-factory`.
+The shipped registry contains exactly `regex`. Its `scan` selects the body,
+path, query, or selected request headers. Each scan contains its `action`.
+Every scan supports `detect` and `deny`. A body scan also supports `replace`.
+The typed configuration prevents unsupported combinations. A replace action
+preserves an explicit body-replacement intent even when the resulting bytes
+equal the input. Add custom trusted gates through `--registry-factory`.
 
 ```bash
-uv run egress-gate --registry-factory my_gates:create_registry gates
-uv run egress-gate --registry-factory my_gates:create_registry serve
+egress-gate --registry-factory my_gates:create_registry gates
+egress-gate --registry-factory my_gates:create_registry serve
 ```
 
 OpenShell owns interception, routing, and credential attachment. Egress Gate
@@ -81,7 +85,7 @@ through slot acquisition, policy preparation, and `RequestProcessor.process`.
 - [Test policies offline](docs/evaluation.md)
 - [Operations](docs/operations.md)
 - [Gate authoring](docs/gates/custom.md)
-- [Regex-body](docs/gates/regex.md)
+- [Regex gate](docs/gates/regex.md)
 - [Architecture](docs/architecture/index.md)
 - [Limits and failures](docs/reference/limits-and-failures.md)
 - [Regex redaction composition](examples/regex-redaction/README.md)

@@ -63,7 +63,7 @@ This is a proof-of-concept observation set, not a general benchmark:
 
 - the workload used synthetic, deliberately repeated text
 - prompt size and entity count increased together
-- the run used one host, sandbox, Egress Gate configuration, regex-body gate
+- the run used one host, sandbox, Egress Gate configuration, regex gate
   policy, and Claude Code session
 - baseline and large-context observations span a Egress Gate process restart
 - the linear fit is descriptive and should not be treated as a performance

@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 
 import pytest
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from egress_gate.constants import (
     DEFAULT_DENY_REASON_CODE,
@@ -26,10 +26,13 @@ from egress_gate.result import (
     EgressResult,
     Finding,
     GateControl,
+    GateDecisionSource,
     GateEvaluation,
     GateTrace,
     MutationKind,
+    PipelineDefaultDecisionSource,
     ResultMetadata,
+    RuntimeLimitDecisionSource,
     SourcedFinding,
 )
 
@@ -108,24 +111,37 @@ def test_reason_codes_use_stable_identifier_format(reason_code: str) -> None:
 
 
 def test_decision_source_keeps_gate_provenance_outside_finding() -> None:
-    source = DecisionSource.gate(name="identifiers", gate_type="regex")
+    adapter = TypeAdapter(DecisionSource)
+    discriminator = adapter.json_schema().get("discriminator")
+    assert isinstance(discriminator, dict)
+    assert discriminator.get("propertyName") == "kind"
+    source = adapter.validate_python(
+        {
+            "kind": "gate",
+            "gate_name": "identifiers",
+            "gate_type": "regex",
+        }
+    )
     sourced = SourcedFinding(source_gate="identifiers", finding=_finding())
 
+    assert isinstance(source, GateDecisionSource)
     assert source.kind is DecisionSourceKind.GATE
     assert sourced.finding.model_dump() == _finding().model_dump()
     assert "source_gate" not in sourced.finding.model_dump()
 
     with pytest.raises(ValidationError):
-        DecisionSource(kind=DecisionSourceKind.GATE, gate_name="identifiers")
+        adapter.validate_python({"kind": "gate", "gate_name": "identifiers"})
     with pytest.raises(ValidationError):
-        DecisionSource(kind=DecisionSourceKind.RUNTIME_LIMIT, gate_name="identifiers")
+        adapter.validate_python({"kind": "runtime_limit", "gate_name": "identifiers"})
 
 
 def test_egress_result_suppresses_mutations_on_deny_by_rejecting_them() -> None:
     finding = SourcedFinding(source_gate="identifiers", finding=_finding())
     allowed = EgressResult(
         decision=EgressDecision.ALLOW,
-        decision_source=DecisionSource.gate(name="identifiers", gate_type="regex"),
+        decision_source=GateDecisionSource(
+            kind=DecisionSourceKind.GATE, gate_name="identifiers", gate_type="regex"
+        ),
         patch=RequestPatch(replacement_body=b"redacted"),
         findings=(finding,),
     )
@@ -134,19 +150,25 @@ def test_egress_result_suppresses_mutations_on_deny_by_rejecting_them() -> None:
     with pytest.raises(ValidationError):
         EgressResult(
             decision=EgressDecision.DENY,
-            decision_source=DecisionSource.runtime_limit(),
+            decision_source=RuntimeLimitDecisionSource(
+                kind=DecisionSourceKind.RUNTIME_LIMIT
+            ),
             patch=RequestPatch(replacement_body=b"must-not-leak"),
             reason_code="egress_gate_limit_exceeded",
         )
     with pytest.raises(ValidationError):
         EgressResult(
             decision=EgressDecision.DENY,
-            decision_source=DecisionSource.runtime_limit(),
+            decision_source=RuntimeLimitDecisionSource(
+                kind=DecisionSourceKind.RUNTIME_LIMIT
+            ),
         )
     with pytest.raises(ValidationError):
         EgressResult(
             decision=EgressDecision.ALLOW,
-            decision_source=DecisionSource.pipeline_default(),
+            decision_source=PipelineDefaultDecisionSource(
+                kind=DecisionSourceKind.PIPELINE_DEFAULT
+            ),
             reason_code="not-allowed-on-allow",
         )
 
@@ -161,7 +183,9 @@ def test_egress_result_limits_finding_groups_and_trace_values() -> None:
     )
     result = EgressResult(
         decision=EgressDecision.ALLOW,
-        decision_source=DecisionSource.pipeline_default(),
+        decision_source=PipelineDefaultDecisionSource(
+            kind=DecisionSourceKind.PIPELINE_DEFAULT
+        ),
         findings=findings,
     )
     assert len(result.findings) == MAX_PROTO_FINDING_GROUPS
@@ -170,7 +194,9 @@ def test_egress_result_limits_finding_groups_and_trace_values() -> None:
     with pytest.raises(ValidationError):
         EgressResult(
             decision=EgressDecision.ALLOW,
-            decision_source=DecisionSource.pipeline_default(),
+            decision_source=PipelineDefaultDecisionSource(
+                kind=DecisionSourceKind.PIPELINE_DEFAULT
+            ),
             findings=findings + (finding,),
         )
 
@@ -209,14 +235,18 @@ def test_gate_evaluation_and_result_group_limits_have_exact_boundaries() -> None
     )
     result = EgressResult(
         decision=EgressDecision.ALLOW,
-        decision_source=DecisionSource.pipeline_default(),
+        decision_source=PipelineDefaultDecisionSource(
+            kind=DecisionSourceKind.PIPELINE_DEFAULT
+        ),
         findings=sourced,
     )
     assert len(result.findings) == MAX_PROTO_FINDING_GROUPS
     with pytest.raises(ValidationError):
         EgressResult(
             decision=EgressDecision.ALLOW,
-            decision_source=DecisionSource.pipeline_default(),
+            decision_source=PipelineDefaultDecisionSource(
+                kind=DecisionSourceKind.PIPELINE_DEFAULT
+            ),
             findings=sourced
             + (SourcedFinding(source_gate="over", finding=_finding(label="over")),),
         )
@@ -232,7 +262,9 @@ def test_metadata_count_and_aggregate_byte_limits_have_exact_boundaries() -> Non
     )
     result = EgressResult(
         decision=EgressDecision.ALLOW,
-        decision_source=DecisionSource.pipeline_default(),
+        decision_source=PipelineDefaultDecisionSource(
+            kind=DecisionSourceKind.PIPELINE_DEFAULT
+        ),
         metadata=entries,
     )
     assert len(result.metadata) == MAX_RESULT_METADATA_ENTRIES
@@ -244,7 +276,9 @@ def test_metadata_count_and_aggregate_byte_limits_have_exact_boundaries() -> Non
     with pytest.raises(ValidationError):
         EgressResult(
             decision=EgressDecision.ALLOW,
-            decision_source=DecisionSource.pipeline_default(),
+            decision_source=PipelineDefaultDecisionSource(
+                kind=DecisionSourceKind.PIPELINE_DEFAULT
+            ),
             metadata=entries[:-1]
             + (
                 ResultMetadata(
@@ -256,7 +290,9 @@ def test_metadata_count_and_aggregate_byte_limits_have_exact_boundaries() -> Non
     with pytest.raises(ValidationError):
         EgressResult(
             decision=EgressDecision.ALLOW,
-            decision_source=DecisionSource.pipeline_default(),
+            decision_source=PipelineDefaultDecisionSource(
+                kind=DecisionSourceKind.PIPELINE_DEFAULT
+            ),
             metadata=entries + (ResultMetadata(key="over", value="v"),),
         )
 
@@ -291,14 +327,18 @@ def test_trace_count_and_mutation_kind_limits_have_exact_boundaries() -> None:
     )
     result = EgressResult(
         decision=EgressDecision.ALLOW,
-        decision_source=DecisionSource.pipeline_default(),
+        decision_source=PipelineDefaultDecisionSource(
+            kind=DecisionSourceKind.PIPELINE_DEFAULT
+        ),
         traces=traces,
     )
     assert len(result.traces) == MAX_GATE_TRACES
     with pytest.raises(ValidationError):
         EgressResult(
             decision=EgressDecision.ALLOW,
-            decision_source=DecisionSource.pipeline_default(),
+            decision_source=PipelineDefaultDecisionSource(
+                kind=DecisionSourceKind.PIPELINE_DEFAULT
+            ),
             traces=traces + (trace,),
         )
 
@@ -306,12 +346,16 @@ def test_trace_count_and_mutation_kind_limits_have_exact_boundaries() -> None:
 def test_decision_source_reason_code_ownership_is_strict() -> None:
     default_deny = EgressResult(
         decision=EgressDecision.DENY,
-        decision_source=DecisionSource.pipeline_default(),
+        decision_source=PipelineDefaultDecisionSource(
+            kind=DecisionSourceKind.PIPELINE_DEFAULT
+        ),
         reason_code=DEFAULT_DENY_REASON_CODE,
     )
     runtime_limit = EgressResult(
         decision=EgressDecision.DENY,
-        decision_source=DecisionSource.runtime_limit(),
+        decision_source=RuntimeLimitDecisionSource(
+            kind=DecisionSourceKind.RUNTIME_LIMIT
+        ),
         reason_code=LIMIT_REASON_CODE,
     )
     assert default_deny.reason_code == DEFAULT_DENY_REASON_CODE
@@ -320,17 +364,23 @@ def test_decision_source_reason_code_ownership_is_strict() -> None:
     with pytest.raises(ValidationError):
         EgressResult(
             decision=EgressDecision.ALLOW,
-            decision_source=DecisionSource.runtime_limit(),
+            decision_source=RuntimeLimitDecisionSource(
+                kind=DecisionSourceKind.RUNTIME_LIMIT
+            ),
         )
     with pytest.raises(ValidationError):
         EgressResult(
             decision=EgressDecision.DENY,
-            decision_source=DecisionSource.runtime_limit(),
+            decision_source=RuntimeLimitDecisionSource(
+                kind=DecisionSourceKind.RUNTIME_LIMIT
+            ),
             reason_code=DEFAULT_DENY_REASON_CODE,
         )
     with pytest.raises(ValidationError):
         EgressResult(
             decision=EgressDecision.DENY,
-            decision_source=DecisionSource.pipeline_default(),
+            decision_source=PipelineDefaultDecisionSource(
+                kind=DecisionSourceKind.PIPELINE_DEFAULT
+            ),
             reason_code=LIMIT_REASON_CODE,
         )

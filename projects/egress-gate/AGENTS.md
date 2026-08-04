@@ -36,7 +36,7 @@ Run focused tests while working and `make check` before handoff.
 
 ## Project map
 
-- `src/egress_gate/gates/`: `Gate`, helper bases, registry, and regex-body
+- `src/egress_gate/gates/`: `Gate`, helper bases, registry, and the regex gate
 - `src/egress_gate/config.py`: strict `pipeline.gates` and `default_decision`
   policy models
 - `src/egress_gate/request.py`: protobuf-free request and ordered patch models
@@ -56,11 +56,16 @@ architecture overview and matching topic page under `docs/architecture/`.
 
 ## Gate contract
 
-Every gate declares a strict `GateConfig` with a literal `gate` discriminator,
+Every gate declares a strict `GateConfig` with a literal `kind` discriminator,
 an optional typed `GateResources` bundle, `GateCapabilities`, and its
 `FindingTypeDefinition` declarations. `GateRegistry.finalize()` creates the
 exact discriminated pipeline schema for the installed gates and prepares
 validated gate instances from trusted application-owned resources.
+
+Use a required `kind` field for every serialized discriminated union. Each
+variant must declare one string literal and its exact fields. Use an enum on a
+single model when the selected value does not change the serialized shape; do
+not create a union only to replace an enum.
 
 `Gate.evaluate()` receives the current `HttpRequest` and one shared `Timeout`.
 It returns a validated `GateEvaluation` with explicit `proceed`, terminal
@@ -76,10 +81,11 @@ dependencies and no request state or policy behavior.
 
 ## Current built-ins and boundaries
 
-This slice ships exactly one built-in. `regex-body` preserves bounded catalog
-loading, regex matching, overlap resolution, UTF-8 body handling, and
-detect/deny/replace modes. Deterministic network request policy belongs to
-OpenShell. Do not add more built-ins speculatively.
+This slice ships exactly one built-in. `regex` selects one typed body, path,
+query, or header scan and preserves bounded catalog loading, matching,
+overlap resolution, and detect/deny actions. Body scans also support strict
+UTF-8 replacement. Deterministic network request policy belongs to OpenShell.
+Do not add more built-ins speculatively.
 
 The OpenShell wire `Finding` remains the released five-field contract:
 `type`, `label`, `count`, `confidence`, and `severity`. Gate provenance is
@@ -95,7 +101,7 @@ middleware phase.
 ## Plan boundaries
 
 The current implementation covers the gate contract, strict pipeline
-configuration, finalized registry, regex-body behavior, request processing,
+configuration, finalized registry, regex behavior, request processing,
 single active-policy replacement, and offline evaluation.
 Semantic or LLM judgment is deferred and must not be added as a built-in,
 example implementation, or default dependency. Do not edit `plans/` as part of

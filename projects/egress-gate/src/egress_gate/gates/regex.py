@@ -1,4 +1,4 @@
-"""Bounded regular-expression request-body detection and replacement."""
+"""Typed, bounded regular-expression scans and actions for HTTP requests."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from pathlib import Path
 from stat import S_ISREG
 from string import Formatter
 from threading import RLock
-from typing import Literal, Protocol, Self
+from typing import Annotated, Literal, Protocol, Self, TypeAlias
 
 import regex
 import yaml
@@ -29,6 +29,7 @@ from egress_gate.constants import (
     MAX_DETECTIONS_PER_GATE,
     MAX_DIAGNOSTIC_TEXT_BYTES,
     MAX_PROTO_FINDING_GROUPS,
+    MAX_PROTO_HEADERS,
     MAX_REGEX_CATALOG_FILE_BYTES,
     MAX_REGEX_CATALOG_PATH_BYTES,
     MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES,
@@ -41,19 +42,20 @@ from egress_gate.constants import (
 from egress_gate.errors import (
     GateConfigurationError,
     GateContractError,
+    GateInputError,
     GateLimitExceededError,
     TimeoutExpiredError,
 )
-from egress_gate.gates.base import GateCapabilities, GateConfig, Utf8BodyGate
+from egress_gate.gates.base import Gate, GateCapabilities, GateConfig
 from egress_gate.logging import get_logger
-from egress_gate.request import RequestPatch
+from egress_gate.request import HeaderName, HttpRequest, RequestPatch
 from egress_gate.result import Finding, FindingTypeDefinition, GateEvaluation
 from egress_gate.string_validators import ScalarString, validate_scalar_string
 from egress_gate.timeout import Timeout
 
 
 class ConfidenceLevel(StrEnum):
-    """Categorical certainty reported by the regex-body gate."""
+    """Categorical certainty reported by the regex gate."""
 
     LOW = "low"
     MEDIUM = "medium"
@@ -120,7 +122,7 @@ class RegexEntity(StrictDomainModel):
 
 
 class RegexPatternCatalog(StrictDomainModel):
-    """The complete ordered entity catalog for one regex-body gate."""
+    """The complete ordered entity catalog for one regex gate."""
 
     entities: tuple[RegexEntity, ...] = Field(repr=False)
 
@@ -146,10 +148,22 @@ class RegexPatternCatalog(StrictDomainModel):
         return self
 
 
-class RegexReplacement(StrictDomainModel):
-    """A constrained template replacement recipe."""
+class RegexDetectAction(StrictDomainModel):
+    """Report matches and continue without changing the request."""
 
-    strategy: Literal["template"] = "template"
+    kind: Literal["detect"]
+
+
+class RegexDenyAction(StrictDomainModel):
+    """Deny the request when the scan finds a match."""
+
+    kind: Literal["deny"]
+
+
+class RegexReplaceAction(StrictDomainModel):
+    """Replace body matches with a constrained template."""
+
+    kind: Literal["replace"]
     template: ScalarString = Field(default="[{entity}]", repr=False)
 
     @field_validator("template")
@@ -168,33 +182,76 @@ class RegexReplacement(StrictDomainModel):
         return value
 
 
-class RegexBodyMode(StrEnum):
-    """The disposition applied when the regex-body gate finds a match."""
+RegexReadOnlyAction: TypeAlias = Annotated[
+    RegexDetectAction | RegexDenyAction,
+    Field(discriminator="kind"),
+]
+RegexBodyAction: TypeAlias = Annotated[
+    RegexDetectAction | RegexDenyAction | RegexReplaceAction,
+    Field(discriminator="kind"),
+]
 
-    DETECT = "detect"
-    DENY = "deny"
-    REPLACE = "replace"
+
+class RegexBodyScan(StrictDomainModel):
+    """Scan the UTF-8 request body and apply a body-compatible action."""
+
+    kind: Literal["body"]
+    action: RegexBodyAction
 
 
-class RegexBodyConfig(GateConfig):
-    """Exact policy configuration owned by ``RegexBodyGate``."""
+class RegexPathScan(StrictDomainModel):
+    """Scan the request path and detect or deny matches."""
 
-    gate: Literal["regex-body"]
+    kind: Literal["path"]
+    action: RegexReadOnlyAction
+
+
+class RegexQueryScan(StrictDomainModel):
+    """Scan the raw request query and detect or deny matches."""
+
+    kind: Literal["query"]
+    action: RegexReadOnlyAction
+
+
+class RegexHeaderScan(StrictDomainModel):
+    """Scan values from named request headers and detect or deny matches."""
+
+    kind: Literal["header"]
+    names: tuple[HeaderName, ...] = Field(min_length=1, max_length=MAX_PROTO_HEADERS)
+    action: RegexReadOnlyAction
+
+    @field_validator("names", mode="before")
+    @classmethod
+    def _names_are_a_tuple(cls, value: object) -> object:
+        if isinstance(value, list | tuple):
+            return tuple(value)
+        return value
+
+    @model_validator(mode="after")
+    def _names_are_unique(self) -> Self:
+        normalized = tuple(name.casefold() for name in self.names)
+        if len(normalized) != len(set(normalized)):
+            raise ValueError("header scan names must be unique")
+        return self
+
+
+RegexScan: TypeAlias = Annotated[
+    RegexBodyScan | RegexPathScan | RegexQueryScan | RegexHeaderScan,
+    Field(discriminator="kind"),
+]
+
+
+class RegexConfig(GateConfig):
+    """Exact policy configuration owned by ``RegexGate``."""
+
+    kind: Literal["regex"]
+    scan: RegexScan
     pattern_catalog: RegexPatternCatalog = Field(
         repr=False,
         description=(
             "Complete structured catalog or relative path to a complete YAML catalog."
         ),
     )
-    mode: RegexBodyMode
-    replacement: RegexReplacement | None = None
-
-    @field_validator("mode", mode="before")
-    @classmethod
-    def _parse_mode(cls, value: object) -> RegexBodyMode:
-        if isinstance(value, RegexBodyMode):
-            return value
-        return RegexBodyMode(validate_scalar_string(value))
 
     @field_validator(
         "pattern_catalog",
@@ -211,28 +268,28 @@ class RegexBodyConfig(GateConfig):
         return value
 
     @model_validator(mode="after")
-    def _rules_are_valid(self) -> Self:
+    def _patterns_are_valid(self) -> Self:
         if any(
             _contains_inline_flags(rule.pattern)
             for entity in self.pattern_catalog.entities
             for rule in entity.rules
         ):
             raise ValueError("regex pattern catalog is invalid")
-        if (self.mode is RegexBodyMode.REPLACE) != (self.replacement is not None):
-            raise ValueError("regex replacement is required only when mode is replace")
         return self
 
 
-class RegexBodyGate(Utf8BodyGate[RegexBodyConfig, None]):
-    """Detect every regex match, including matches that share input characters."""
+class RegexGate(Gate[RegexConfig, None]):
+    """Run one typed request scan, including overlapping matches."""
 
     capabilities = GateCapabilities(
+        reads_target=True,
+        reads_headers=True,
         reads_body=True,
         replaces_body=True,
         produces_findings=True,
         may_deny=True,
     )
-    finding_types = (FindingTypeDefinition(type="sensitive_entity"),)
+    finding_types = (FindingTypeDefinition(type="regex_match"),)
 
     def _initialize(self, *, timeout: Timeout | None = None) -> None:
         try:
@@ -242,16 +299,73 @@ class RegexBodyGate(Utf8BodyGate[RegexBodyConfig, None]):
             )
         except (RecursionError, ValueError, regex.error):
             raise GateConfigurationError(
-                "regex-body gate configuration is invalid"
+                "regex gate configuration is invalid"
             ) from None
 
-    def _evaluate_text(
+    def _evaluate(
+        self,
+        request: HttpRequest,
+        *,
+        timeout: Timeout,
+    ) -> GateEvaluation:
+        scan_texts = self._scan_texts(request)
+        detections_with_identity: list[tuple[_RegexDetection, str]] = []
+        for text in scan_texts:
+            detections_with_identity.extend(self._match_text(text, timeout=timeout))
+            if len(detections_with_identity) > MAX_DETECTIONS_PER_GATE:
+                raise GateLimitExceededError("regex detection count exceeds the limit")
+        detections = tuple(item[0] for item in detections_with_identity)
+        findings = _aggregate_findings(detections)
+        if len(findings) > MAX_PROTO_FINDING_GROUPS:
+            raise GateLimitExceededError("regex finding groups exceed the limit")
+        action = self.config.scan.action
+        if isinstance(action, RegexDenyAction) and detections:
+            return GateEvaluation.deny(
+                "egress_gate_regex_denied",
+                findings=findings,
+            )
+        if not isinstance(action, RegexReplaceAction):
+            return GateEvaluation.proceed(findings=findings)
+
+        body_text = scan_texts[0]
+        output_text = body_text
+        if detections:
+            winners = _resolve_overlaps(detections_with_identity)
+            output_text = _render_bounded_replacement(
+                body_text,
+                winners,
+                action.template,
+            )
+        return GateEvaluation.proceed(
+            patch=RequestPatch(replacement_body=output_text.encode("utf-8")),
+            findings=findings,
+        )
+
+    def _scan_texts(self, request: HttpRequest) -> tuple[str, ...]:
+        scan = self.config.scan
+        if isinstance(scan, RegexBodyScan):
+            try:
+                return (request.body.decode("utf-8", errors="strict"),)
+            except UnicodeDecodeError:
+                raise GateInputError("regex body scan is not valid UTF-8") from None
+        if isinstance(scan, RegexPathScan):
+            return (request.target.path,)
+        if isinstance(scan, RegexQueryScan):
+            return (request.target.query,)
+        selected_names = frozenset(name.casefold() for name in scan.names)
+        return tuple(
+            header.value
+            for header in request.headers
+            if header.name.casefold() in selected_names
+        )
+
+    def _match_text(
         self,
         text: str,
         *,
         timeout: Timeout,
-    ) -> GateEvaluation:
-        detections_with_identity: list[tuple[_RegexDetection, str]] = []
+    ) -> list[tuple[_RegexDetection, str]]:
+        detections: list[tuple[_RegexDetection, str]] = []
         for rule in self._rules:
             next_position = 0
             while next_position <= len(text):
@@ -266,26 +380,29 @@ class RegexBodyGate(Utf8BodyGate[RegexBodyConfig, None]):
                 start, end = match.span()
                 if start == end:
                     raise GateConfigurationError(
-                        "regex-body configuration matches an empty span"
+                        "regex configuration matches an empty span"
                     )
                 if match.span(rule.marker) != (end, end):
                     raise GateConfigurationError(
-                        "regex-body configuration marker is invalid"
+                        "regex configuration marker is invalid"
                     )
-                detection = _RegexDetection(
-                    entity=rule.entity,
-                    start=start,
-                    end=end,
-                    confidence=rule.confidence,
+                detections.append(
+                    (
+                        _RegexDetection(
+                            entity=rule.entity,
+                            start=start,
+                            end=end,
+                            confidence=rule.confidence,
+                        ),
+                        rule.rule_identity,
+                    )
                 )
-                detections_with_identity.append((detection, rule.rule_identity))
-                if len(detections_with_identity) > MAX_DETECTIONS_PER_GATE:
+                if len(detections) > MAX_DETECTIONS_PER_GATE:
                     raise GateLimitExceededError(
                         "regex detection count exceeds the limit"
                     )
                 next_position = start + 1
-
-        detections_with_identity.sort(
+        detections.sort(
             key=lambda item: (
                 item[0].start,
                 item[0].end,
@@ -293,32 +410,7 @@ class RegexBodyGate(Utf8BodyGate[RegexBodyConfig, None]):
                 item[1],
             )
         )
-        detections = tuple(item[0] for item in detections_with_identity)
-        findings = _aggregate_findings(detections)
-        if len(findings) > MAX_PROTO_FINDING_GROUPS:
-            raise GateLimitExceededError("regex finding groups exceed the limit")
-        output_text = text
-        if self.config.mode is RegexBodyMode.REPLACE and detections:
-            replacement = self.config.replacement
-            if replacement is None:
-                raise GateConfigurationError("regex replacement is missing")
-            winners = _resolve_overlaps(detections_with_identity)
-            output_text = _render_bounded_replacement(
-                text,
-                winners,
-                replacement.template,
-            )
-        if self.config.mode is RegexBodyMode.DENY and detections:
-            return GateEvaluation.deny(
-                "egress_gate_regex_denied",
-                findings=findings,
-            )
-        if self.config.mode is RegexBodyMode.REPLACE:
-            return GateEvaluation.proceed(
-                patch=RequestPatch(replacement_body=output_text.encode("utf-8")),
-                findings=findings,
-            )
-        return GateEvaluation.proceed(findings=findings)
+        return detections
 
 
 @dataclass(frozen=True)
@@ -347,7 +439,7 @@ def _aggregate_findings(
         counts[key] = counts.get(key, 0) + 1
     return tuple(
         Finding(
-            type="sensitive_entity",
+            type="regex_match",
             label=entity,
             count=count,
             confidence=confidence.value,
@@ -803,11 +895,19 @@ _LOGGER = get_logger(__name__)
 
 __all__ = [
     "ConfidenceLevel",
-    "RegexBodyConfig",
-    "RegexBodyGate",
-    "RegexBodyMode",
+    "RegexBodyAction",
+    "RegexBodyScan",
+    "RegexConfig",
+    "RegexDenyAction",
+    "RegexDetectAction",
     "RegexEntity",
+    "RegexGate",
+    "RegexHeaderScan",
     "RegexPatternCatalog",
-    "RegexReplacement",
+    "RegexPathScan",
+    "RegexQueryScan",
+    "RegexReadOnlyAction",
+    "RegexReplaceAction",
     "RegexRule",
+    "RegexScan",
 ]

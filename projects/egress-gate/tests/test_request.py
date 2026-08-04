@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from egress_gate.constants import (
     MAX_BODY_BYTES,
@@ -16,6 +16,7 @@ from egress_gate.constants import (
 )
 from egress_gate.request import (
     ExistingHeaderAction,
+    HeaderMutation,
     HttpHeader,
     HttpRequest,
     HttpTarget,
@@ -105,23 +106,34 @@ def test_request_patch_distinguishes_no_replacement_from_empty_body() -> None:
 
 
 def test_request_patch_preserves_ordered_discriminated_header_mutations() -> None:
+    adapter = TypeAdapter(HeaderMutation)
+    discriminator = adapter.json_schema().get("discriminator")
+    assert isinstance(discriminator, dict)
+    assert discriminator.get("propertyName") == "kind"
+
     patch = RequestPatch(
         header_mutations=(
             WriteHeaderMutation(
+                kind="write",
                 name="x-test",
                 value="one",
                 on_existing=ExistingHeaderAction.APPEND,
             ),
-            RemoveHeaderMutation(name="x-old"),
+            RemoveHeaderMutation(kind="remove", name="x-old"),
         )
     )
 
-    assert patch.header_mutations[0].operation == "write"
-    assert patch.header_mutations[1].operation == "remove"
+    assert patch.header_mutations[0].kind == "write"
+    assert patch.header_mutations[1].kind == "remove"
+
+    with pytest.raises(ValidationError):
+        adapter.validate_python({"name": "x-test"})
+    with pytest.raises(ValidationError):
+        adapter.validate_python({"operation": "remove", "name": "x-test"})
 
 
 def test_request_patch_rejects_invalid_mutation_bounds() -> None:
-    mutation = RemoveHeaderMutation(name="x-test")
+    mutation = RemoveHeaderMutation(kind="remove", name="x-test")
     with pytest.raises(ValidationError):
         RequestPatch(
             header_mutations=tuple(mutation for _ in range(MAX_HEADER_MUTATIONS + 1))
@@ -131,6 +143,7 @@ def test_request_patch_rejects_invalid_mutation_bounds() -> None:
         RequestPatch(
             header_mutations=(
                 WriteHeaderMutation(
+                    kind="write",
                     name="x",
                     value="x" * MAX_HEADER_MUTATION_DATA_BYTES,
                     on_existing=ExistingHeaderAction.OVERWRITE,

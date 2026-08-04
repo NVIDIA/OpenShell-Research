@@ -1,4 +1,4 @@
-"""Behavior, safety, cache, file-loading, and concurrency tests for regex-body."""
+"""Behavior, scans, actions, safety, caching, and concurrency tests for regex."""
 
 from __future__ import annotations
 
@@ -10,14 +10,14 @@ from threading import Barrier
 import pytest
 from pydantic import ValidationError
 
-import egress_gate.gates.regex_body as regex_module
+import egress_gate.gates.regex as regex_module
 from egress_gate.errors import (
     GateConfigurationError,
     GateLimitExceededError,
     TimeoutExpiredError,
 )
-from egress_gate.gates import RegexBodyConfig, RegexBodyGate, RegexPatternCatalog
-from egress_gate.request import HttpRequest, HttpTarget, RequestContext
+from egress_gate.gates import RegexConfig, RegexGate, RegexPatternCatalog
+from egress_gate.request import HttpHeader, HttpRequest, HttpTarget, RequestContext
 from egress_gate.result import GateControl, GateEvaluation
 from egress_gate.timeout import Timeout
 
@@ -25,22 +25,32 @@ from egress_gate.timeout import Timeout
 def _config(
     rules: list[dict[str, object]],
     *,
-    mode: str = "detect",
-    replacement: dict[str, object] | None = None,
-) -> RegexBodyConfig:
+    action_kind: str = "detect",
+    template: object | None = None,
+    scan: dict[str, object] | None = None,
+) -> RegexConfig:
+    scan_values = {"kind": "body"} if scan is None else dict(scan)
+    action: dict[str, object] = {"kind": action_kind}
+    if template is not None:
+        action["template"] = template
+    scan_values["action"] = action
     values: dict[str, object] = {
-        "gate": "regex-body",
+        "kind": "regex",
+        "scan": scan_values,
         "pattern_catalog": {
             "entities": [{"name": "token", "rules": rules}],
         },
-        "mode": mode,
     }
-    if replacement is not None:
-        values["replacement"] = replacement
-    return RegexBodyConfig.model_validate(values)
+    return RegexConfig.model_validate(values)
 
 
-def _request(body: bytes) -> HttpRequest:
+def _request(
+    body: bytes,
+    *,
+    path: str = "/",
+    query: str = "",
+    headers: tuple[HttpHeader, ...] = (),
+) -> HttpRequest:
     return HttpRequest(
         context=RequestContext(request_id="request-1", sandbox_id="sandbox-1"),
         target=HttpTarget(
@@ -48,16 +58,16 @@ def _request(body: bytes) -> HttpRequest:
             host="example.com",
             port=443,
             method="POST",
-            path="/",
-            query="",
+            path=path,
+            query=query,
         ),
-        headers=(),
+        headers=headers,
         body=body,
     )
 
 
-def _run(config: RegexBodyConfig, text: str) -> GateEvaluation:
-    return RegexBodyGate(config, None).evaluate(
+def _run(config: RegexConfig, text: str) -> GateEvaluation:
+    return RegexGate(config, None).evaluate(
         _request(text.encode("utf-8")), timeout=Timeout.from_seconds(1)
     )
 
@@ -75,7 +85,7 @@ def _catalog(pattern: str) -> RegexPatternCatalog:
     )
 
 
-def test_detect_mode_reports_overlaps_without_mutating_the_body() -> None:
+def test_detect_action_reports_overlaps_without_mutating_the_body() -> None:
     evaluation = _run(
         _config(
             [
@@ -101,7 +111,7 @@ def test_equivalent_detections_are_aggregated_before_evaluation_bounds() -> None
 
     assert evaluation.findings == (
         regex_module.Finding(
-            type="sensitive_entity",
+            type="regex_match",
             label="token",
             count=33,
             confidence="high",
@@ -109,9 +119,12 @@ def test_equivalent_detections_are_aggregated_before_evaluation_bounds() -> None
     )
 
 
-def test_deny_mode_is_terminal_and_uses_the_stable_gate_reason() -> None:
+def test_deny_action_is_terminal_and_uses_the_stable_gate_reason() -> None:
     evaluation = _run(
-        _config([{"pattern": "secret", "confidence": "high"}], mode="deny"),
+        _config(
+            [{"pattern": "secret", "confidence": "high"}],
+            action_kind="deny",
+        ),
         "contains secret",
     )
 
@@ -121,11 +134,11 @@ def test_deny_mode_is_terminal_and_uses_the_stable_gate_reason() -> None:
     assert len(evaluation.findings) == 1
 
 
-def test_replace_mode_preserves_explicit_replacement_intent() -> None:
+def test_replace_action_preserves_explicit_replacement_intent() -> None:
     config = _config(
         [{"pattern": "secret", "confidence": "high"}],
-        mode="replace",
-        replacement={"strategy": "template", "template": "[{entity}]"},
+        action_kind="replace",
+        template="[{entity}]",
     )
 
     changed = _run(config, "contains secret")
@@ -136,15 +149,138 @@ def test_replace_mode_preserves_explicit_replacement_intent() -> None:
     assert not unchanged.patch.is_empty
 
 
-def test_replacement_recipe_is_required_only_for_replace_mode() -> None:
+@pytest.mark.parametrize(
+    ("scan", "http_request"),
+    [
+        ({"kind": "path"}, _request(b"", path="/contains-secret")),
+        ({"kind": "query"}, _request(b"", query="value=secret")),
+        (
+            {"kind": "header", "names": ["x-note"]},
+            _request(
+                b"",
+                headers=(
+                    HttpHeader(name="X-Note", value="contains secret"),
+                    HttpHeader(name="x-other", value="secret"),
+                ),
+            ),
+        ),
+    ],
+)
+def test_detect_action_matches_the_configured_request_scan(
+    scan: dict[str, object],
+    http_request: HttpRequest,
+) -> None:
+    config = _config(
+        [{"pattern": "secret", "confidence": "high"}],
+        scan=scan,
+    )
+
+    evaluation = RegexGate(config, None).evaluate(
+        http_request,
+        timeout=Timeout.from_seconds(1),
+    )
+
+    assert evaluation.control is GateControl.PROCEED
+    assert len(evaluation.findings) == 1
+    assert evaluation.patch.is_empty
+
+
+def test_header_scan_matches_each_selected_repeated_value() -> None:
+    config = _config(
+        [{"pattern": "secret", "confidence": "high"}],
+        scan={"kind": "header", "names": ["x-note"]},
+    )
+    request = _request(
+        b"secret in ignored body",
+        headers=(
+            HttpHeader(name="X-Note", value="first secret"),
+            HttpHeader(name="x-note", value="second secret"),
+        ),
+    )
+
+    evaluation = RegexGate(config, None).evaluate(
+        request,
+        timeout=Timeout.from_seconds(1),
+    )
+
+    assert evaluation.findings[0].count == 2
+
+
+def test_non_body_scan_can_make_a_terminal_deny_decision() -> None:
+    config = _config(
+        [{"pattern": "admin", "confidence": "high"}],
+        scan={"kind": "path"},
+        action_kind="deny",
+    )
+
+    evaluation = RegexGate(config, None).evaluate(
+        _request(b"", path="/admin/settings"),
+        timeout=Timeout.from_seconds(1),
+    )
+
+    assert evaluation.control is GateControl.DENY
+    assert evaluation.reason_code == "egress_gate_regex_denied"
+
+
+@pytest.mark.parametrize("kind", ["path", "query", "header"])
+def test_replace_action_is_structurally_unavailable_for_non_body_scans(
+    kind: str,
+) -> None:
+    scan: dict[str, object] = {"kind": kind}
+    if kind == "header":
+        scan["names"] = ["x-note"]
+
     with pytest.raises(ValidationError):
-        _config([{"pattern": "x", "confidence": "high"}], mode="replace")
+        _config(
+            [{"pattern": "secret", "confidence": "high"}],
+            scan=scan,
+            action_kind="replace",
+            template="[{entity}]",
+        )
+
+
+def test_scan_and_action_kinds_and_unique_header_names_are_required() -> None:
+    with pytest.raises(ValidationError):
+        _config([{"pattern": "secret", "confidence": "high"}], scan={})
+    with pytest.raises(ValidationError):
+        _config(
+            [{"pattern": "secret", "confidence": "high"}],
+            scan={"type": "body"},
+        )
+    with pytest.raises(ValidationError, match="unique"):
+        _config(
+            [{"pattern": "secret", "confidence": "high"}],
+            scan={"kind": "header", "names": ["X-Note", "x-note"]},
+        )
+
+
+def test_action_shape_rejects_missing_kinds_and_unrelated_template_fields() -> None:
+    with pytest.raises(ValidationError):
+        RegexConfig.model_validate(
+            {
+                "kind": "regex",
+                "scan": {"kind": "body", "action": {}},
+                "pattern_catalog": _catalog("x"),
+            }
+        )
 
     with pytest.raises(ValidationError):
         _config(
             [{"pattern": "x", "confidence": "high"}],
-            mode="detect",
-            replacement={"strategy": "template", "template": "[{entity}]"},
+            action_kind="detect",
+            template="[{entity}]",
+        )
+
+
+def test_retired_flat_source_and_mode_shape_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        RegexConfig.model_validate(
+            {
+                "kind": "regex",
+                "source": {"kind": "body"},
+                "pattern_catalog": _catalog("x"),
+                "mode": "detect",
+            }
         )
 
 
@@ -191,7 +327,7 @@ def test_compile_dependent_pattern_errors_are_rejected_during_preparation(
     config = _config([{"pattern": pattern, "confidence": "high"}])
 
     with pytest.raises(GateConfigurationError) as exception_info:
-        RegexBodyGate(config, None, timeout=Timeout.from_seconds(1))
+        RegexGate(config, None, timeout=Timeout.from_seconds(1))
 
     assert pattern not in str(exception_info.value)
 
@@ -214,7 +350,7 @@ def test_contextual_zero_width_matches_fail_during_evaluation(
 
     with pytest.raises(
         GateConfigurationError,
-        match="regex-body configuration matches an empty span",
+        match="regex configuration matches an empty span",
     ) as exception_info:
         _run(config, text)
 
@@ -269,8 +405,8 @@ def test_replacement_selects_ranked_non_overlapping_winners() -> None:
                 {"name": "long-low", "pattern": "abc", "confidence": "low"},
                 {"name": "short-high", "pattern": "bc", "confidence": "high"},
             ],
-            mode="replace",
-            replacement={"strategy": "template", "template": "<{entity}>"},
+            action_kind="replace",
+            template="<{entity}>",
         ),
         "abc",
     )
@@ -280,23 +416,23 @@ def test_replacement_selects_ranked_non_overlapping_winners() -> None:
 
 
 @pytest.mark.parametrize(
-    "replacement",
+    "template",
     [
-        {"strategy": "template", "template": "{unknown}"},
-        {"strategy": "template", "template": "{entity.attr}"},
-        {"strategy": "template", "template": "{entity!r}"},
-        {"strategy": "template", "template": "{entity:>10}"},
-        {"strategy": "template", "template": "{"},
+        "{unknown}",
+        "{entity.attr}",
+        "{entity!r}",
+        "{entity:>10}",
+        "{",
     ],
 )
 def test_replacement_template_language_is_constrained(
-    replacement: dict[str, object],
+    template: str,
 ) -> None:
     with pytest.raises(ValidationError):
         _config(
             [{"pattern": "x", "confidence": "high"}],
-            mode="replace",
-            replacement=replacement,
+            action_kind="replace",
+            template=template,
         )
 
 
@@ -306,8 +442,8 @@ def test_replacement_size_is_projected_before_rendering(
     monkeypatch.setattr(regex_module, "MAX_BODY_BYTES", 4)
     config = _config(
         [{"pattern": "x", "confidence": "high"}],
-        mode="replace",
-        replacement={"strategy": "template", "template": "[{entity}]"},
+        action_kind="replace",
+        template="[{entity}]",
     )
 
     with pytest.raises(GateLimitExceededError):
@@ -318,7 +454,7 @@ def test_pattern_search_has_an_enforceable_timeout() -> None:
     config = _config([{"pattern": "(a+)+$", "confidence": "high"}])
 
     with pytest.raises(TimeoutExpiredError):
-        RegexBodyGate(config, None).evaluate(
+        RegexGate(config, None).evaluate(
             _request((b"a" * 100_000) + b"!"),
             timeout=Timeout.from_seconds(0.001),
         )
@@ -339,7 +475,7 @@ def test_patterns_compile_during_preparation_not_validation_or_each_run(
     monkeypatch.setattr(regex_module.regex, "compile", recording_compile)
     config = _config([{"pattern": "x", "confidence": "high"}])
     assert compile_count == 0
-    RegexBodyGate(config, None, timeout=Timeout.from_seconds(1))
+    RegexGate(config, None, timeout=Timeout.from_seconds(1))
     prepared_count = compile_count
 
     _run(config, "x")
@@ -353,7 +489,7 @@ def test_gate_preparation_honors_an_expired_timeout() -> None:
     config = _config([{"pattern": "x", "confidence": "high"}])
 
     with pytest.raises(TimeoutExpiredError):
-        RegexBodyGate(config, None, timeout=Timeout(deadline=0))
+        RegexGate(config, None, timeout=Timeout(deadline=0))
 
 
 def test_compiled_catalog_cache_wait_honors_preparation_timeout() -> None:
@@ -391,7 +527,7 @@ def test_compiled_catalog_cache_evicts_least_recently_used_entry(
         )
         with caplog.at_level(
             logging.DEBUG,
-            logger="egress_gate.gates.regex_body",
+            logger="egress_gate.gates.regex",
         ):
             regex_module._compile_pattern_catalog(catalogs[1])
             assert regex_module._compile_pattern_catalog(catalogs[0]) is first_rules
@@ -423,7 +559,7 @@ def test_compiled_catalog_cache_skips_oversized_valid_entry(
     try:
         with caplog.at_level(
             logging.DEBUG,
-            logger="egress_gate.gates.regex_body",
+            logger="egress_gate.gates.regex",
         ):
             first = regex_module._compile_pattern_catalog(catalog)
             second = regex_module._compile_pattern_catalog(catalog)
@@ -507,8 +643,8 @@ def test_compiled_catalog_same_key_race_accounts_once(
         regex_module._clear_compiled_pattern_cache()
 
 
-def test_regex_body_gate_is_safe_for_concurrent_runs() -> None:
-    gate = RegexBodyGate(
+def test_regex_gate_is_safe_for_concurrent_runs() -> None:
+    gate = RegexGate(
         _config([{"pattern": "x", "confidence": "high"}]),
         None,
     )
@@ -540,17 +676,21 @@ def test_relative_yaml_catalog_loading_rejects_aliases_and_traversal(
         "        confidence: high\n"
     )
 
-    config = RegexBodyConfig.model_validate(
-        {"gate": "regex-body", "pattern_catalog": "patterns.yaml", "mode": "detect"}
+    config = RegexConfig.model_validate(
+        {
+            "kind": "regex",
+            "scan": {"kind": "body", "action": {"kind": "detect"}},
+            "pattern_catalog": "patterns.yaml",
+        }
     )
     assert len(_run(config, "secret").findings) == 1
 
     with pytest.raises(ValidationError):
-        RegexBodyConfig.model_validate(
+        RegexConfig.model_validate(
             {
-                "gate": "regex-body",
+                "kind": "regex",
+                "scan": {"kind": "body", "action": {"kind": "detect"}},
                 "pattern_catalog": "../patterns.yaml",
-                "mode": "detect",
             }
         )
     (directory / "aliases.yaml").write_text(
@@ -563,10 +703,10 @@ def test_relative_yaml_catalog_loading_rejects_aliases_and_traversal(
         "  - *shared\n"
     )
     with pytest.raises(ValidationError):
-        RegexBodyConfig.model_validate(
+        RegexConfig.model_validate(
             {
-                "gate": "regex-body",
+                "kind": "regex",
+                "scan": {"kind": "body", "action": {"kind": "detect"}},
                 "pattern_catalog": "aliases.yaml",
-                "mode": "detect",
             }
         )

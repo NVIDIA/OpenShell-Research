@@ -2,6 +2,6 @@ pipeline:
   gates:
     - name: block-secret-keyword
       config:
-        gate: keyword-deny
+        kind: keyword-deny
         keyword: SECRET
   default_decision: allow

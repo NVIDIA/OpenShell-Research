@@ -17,14 +17,18 @@ from egress_gate.gates import create_builtin_registry
 from egress_gate.service.servicer import EgressGateMiddleware
 
 
-def _config(*, mode: str = "replace") -> Message:
+def _config(*, action_kind: str = "replace") -> Message:
+    action: dict[str, object] = {"kind": action_kind}
+    if action_kind == "replace":
+        action["template"] = "[{entity}]"
     values: dict[str, object] = {
         "pipeline": {
             "gates": [
                 {
                     "name": "identifiers",
                     "config": {
-                        "gate": "regex-body",
+                        "kind": "regex",
+                        "scan": {"kind": "body", "action": action},
                         "pattern_catalog": {
                             "entities": [
                                 {
@@ -38,17 +42,6 @@ def _config(*, mode: str = "replace") -> Message:
                                 }
                             ]
                         },
-                        "mode": mode,
-                        **(
-                            {
-                                "replacement": {
-                                    "strategy": "template",
-                                    "template": "[{entity}]",
-                                }
-                            }
-                            if mode == "replace"
-                            else {}
-                        ),
                     },
                 }
             ],
@@ -63,12 +56,12 @@ def _config(*, mode: str = "replace") -> Message:
 def _evaluation(
     body: bytes,
     *,
-    mode: str = "replace",
+    action_kind: str = "replace",
 ) -> pb2.HttpRequestEvaluation:
     return pb2.HttpRequestEvaluation(
         phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS,
         context=pb2.RequestContext(request_id="grpc-integration", sandbox_id="sandbox"),
-        config=_config(mode=mode),
+        config=_config(action_kind=action_kind),
         target=pb2.HttpRequestTarget(
             scheme="https",
             host="example.com",
@@ -100,7 +93,7 @@ async def _running_stub(
 
 
 @pytest.mark.asyncio
-async def test_generated_stub_round_trip_covers_manifest_and_gate_modes() -> None:
+async def test_generated_stub_round_trip_covers_manifest_and_gate_actions() -> None:
     middleware = EgressGateMiddleware(create_builtin_registry())
     async with _running_stub(middleware) as stub:
         empty_message_type = message_factory.GetMessageClass(
@@ -110,10 +103,10 @@ async def test_generated_stub_round_trip_covers_manifest_and_gate_modes() -> Non
         manifest = await stub.Describe(empty_message)
         replaced = await stub.EvaluateHttpRequest(_evaluation(b"contact a@b.com"))
         detected = await stub.EvaluateHttpRequest(
-            _evaluation(b"contact a@b.com", mode="detect")
+            _evaluation(b"contact a@b.com", action_kind="detect")
         )
-        denied_config = _config(mode="deny")
-        denied_request = _evaluation(b"contact a@b.com", mode="deny")
+        denied_config = _config(action_kind="deny")
+        denied_request = _evaluation(b"contact a@b.com", action_kind="deny")
         denied_request.config.CopyFrom(denied_config)
         denied = await stub.EvaluateHttpRequest(denied_request)
 

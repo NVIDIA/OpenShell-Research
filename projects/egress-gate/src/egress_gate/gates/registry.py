@@ -34,7 +34,7 @@ from egress_gate.gates.base import (
     GateConfig,
     GateResources,
 )
-from egress_gate.gates.regex_body import RegexBodyGate
+from egress_gate.gates.regex import RegexGate
 from egress_gate.result import FindingTypeDefinition
 from egress_gate.timeout import Timeout
 
@@ -62,7 +62,7 @@ class GateRegistry:
         self._registrations: dict[str, _Registration] = {}
         self._config_adapter: TypeAdapter[object] | None = None
         if include_builtin_gates:
-            self.register(RegexBodyGate)
+            self.register(RegexGate)
 
     @property
     def is_finalized(self) -> bool:
@@ -97,9 +97,9 @@ class GateRegistry:
             raise GateRegistryError("gate generic declaration is invalid") from None
         if not isinstance(config_type, type) or not issubclass(config_type, GateConfig):
             raise GateRegistryError("gate config type is invalid")
-        gate_name = _gate_discriminator(config_type)
-        if gate_name in self._registrations:
-            raise GateRegistryError("gate discriminator is already registered")
+        gate_kind = _gate_kind(config_type)
+        if gate_kind in self._registrations:
+            raise GateRegistryError("gate kind is already registered")
         if any(
             registration.config_type is config_type
             for registration in self._registrations.values()
@@ -112,7 +112,7 @@ class GateRegistry:
         elif resources is None or not isinstance(resources, resources_type):
             raise GateRegistryError("gate resources do not match their declared type")
 
-        self._registrations[gate_name] = _Registration(
+        self._registrations[gate_kind] = _Registration(
             gate_type=gate_type,
             config_type=config_type,
             resources=resources,
@@ -196,7 +196,7 @@ class GateRegistry:
         prepared: list[tuple[str, str, Gate[GateConfig, GateResources | None]]] = []
         for configured_gate in validated_config.pipeline.gates:
             timeout.raise_if_expired()
-            gate_type = getattr(configured_gate.config, "gate", None)
+            gate_type = getattr(configured_gate.config, "kind", None)
             if not isinstance(gate_type, str):
                 raise GateRegistryError("gate config discriminator is invalid")
             prepared.append(
@@ -222,7 +222,7 @@ class GateRegistry:
         """Return safe gate metadata without constructing runtime gates."""
         return tuple(
             GateDescription(
-                gate_type=gate_name,
+                gate_type=gate_kind,
                 description=_gate_description(registration.gate_type),
                 capabilities=registration.gate_type.capabilities,
                 finding_types=registration.gate_type.finding_types,
@@ -234,7 +234,7 @@ class GateRegistry:
                 ),
                 config_type=registration.config_type.__name__,
             )
-            for gate_name, registration in self._registrations.items()
+            for gate_kind, registration in self._registrations.items()
         )
 
     @staticmethod
@@ -253,10 +253,10 @@ class GateRegistry:
         if not self.is_finalized:
             raise GateRegistryError("gate registry is not finalized")
         try:
-            gate_name = getattr(config, "gate")
-            if not isinstance(gate_name, str):
+            gate_kind = getattr(config, "kind")
+            if not isinstance(gate_kind, str):
                 raise AttributeError
-            return self._registrations[gate_name]
+            return self._registrations[gate_kind]
         except (AttributeError, KeyError):
             raise GateRegistryError("gate config is not registered") from None
 
@@ -288,7 +288,7 @@ def _build_egress_gate_config_type(
     registered_union = reduce(or_, config_types)
     registered_config = getitem(
         Annotated,
-        (registered_union, Field(discriminator="gate")),
+        (registered_union, Field(discriminator="kind")),
     )
     pipeline_type: object = getattr(EgressGateConfig, "__class_getitem__")(
         registered_config
@@ -320,21 +320,21 @@ def _is_egress_gate_config_type(
     return isinstance(value, type) and issubclass(value, EgressGateConfig)
 
 
-def _gate_discriminator(config_type: type[GateConfig]) -> str:
-    field = config_type.model_fields.get("gate")
+def _gate_kind(config_type: type[GateConfig]) -> str:
+    field = config_type.model_fields.get("kind")
     if field is None:
-        raise GateRegistryError("gate config lacks a gate discriminator")
+        raise GateRegistryError("gate config lacks a kind discriminator")
     if get_origin(field.annotation) is not Literal:
-        raise GateRegistryError("gate discriminator must be one string Literal")
+        raise GateRegistryError("gate kind must be one string Literal")
     values = get_args(field.annotation)
     if len(values) != 1 or not isinstance(values[0], str):
-        raise GateRegistryError("gate discriminator must be one string Literal")
-    gate_name = values[0]
-    if _GATE_NAME.fullmatch(gate_name) is None:
-        raise GateRegistryError("gate discriminator is invalid")
+        raise GateRegistryError("gate kind must be one string Literal")
+    gate_kind = values[0]
+    if _GATE_KIND_PATTERN.fullmatch(gate_kind) is None:
+        raise GateRegistryError("gate kind is invalid")
     if not field.is_required():
-        raise GateRegistryError("gate discriminator must be required")
-    return gate_name
+        raise GateRegistryError("gate kind must be required")
+    return gate_kind
 
 
 def _gate_description(gate_type: type[object]) -> str:
@@ -345,7 +345,7 @@ def _gate_description(gate_type: type[object]) -> str:
     return first_line
 
 
-_GATE_NAME = re.compile(r"[a-z][a-z0-9-]{0,127}\Z")
+_GATE_KIND_PATTERN = re.compile(r"[a-z][a-z0-9-]{0,127}\Z")
 
 
 __all__ = [

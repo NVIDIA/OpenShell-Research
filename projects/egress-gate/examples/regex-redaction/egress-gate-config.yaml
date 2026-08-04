@@ -2,15 +2,16 @@ pipeline:
   gates:
     - name: identifiers
       config:
-        gate: regex-body
+        kind: regex
+        scan:
+          kind: body
+          action:
+            kind: replace
+            template: "[{entity}]"
         pattern_catalog:
           entities:
             - name: email
               rules:
                 - pattern: '(?<![\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])'
                   confidence: high
-        mode: replace
-        replacement:
-          strategy: template
-          template: "[{entity}]"
   default_decision: allow

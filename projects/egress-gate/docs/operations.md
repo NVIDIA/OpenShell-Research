@@ -11,9 +11,10 @@ Install and run the service from `projects/egress-gate`:
 
 ```bash title="Start Egress Gate"
 uv sync --frozen
-uv run egress-gate gates
-uv run egress-gate configuration-schema
-uv run egress-gate serve --listen 0.0.0.0:50051 --timeout-seconds 4
+source .venv/bin/activate
+egress-gate gates
+egress-gate configuration-schema
+egress-gate serve --listen 0.0.0.0:50051 --timeout-seconds 4
 ```
 
 Use a reachable non-loopback address only when the supervisor is outside the
@@ -23,7 +24,7 @@ trusted network. Do not expose the port to an untrusted network.
 ## OpenShell registration
 
 ```bash title="Register Egress Gate"
-uv run egress-gate add-gateway-registration \
+egress-gate add-gateway-registration \
   --host-ip YOUR_HOST_IPV4 --name egress-gate --port 50051
 ```
 
@@ -33,7 +34,7 @@ The command updates `OPENSHELL_GATEWAY_CONFIG`, then
 Restart the OpenShell gateway after changing registrations. Remove one with:
 
 ```bash title="Remove the registration"
-uv run egress-gate remove-gateway-registration --name egress-gate
+egress-gate remove-gateway-registration --name egress-gate
 ```
 
 The generated OpenShell middleware timeout is five seconds. Keep the Egress

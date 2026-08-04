@@ -11,12 +11,13 @@ from egress_gate.config import (
     EgressGateConfig,
 )
 from egress_gate.constants import MAX_PIPELINE_GATES
-from egress_gate.gates import RegexBodyConfig
+from egress_gate.gates import RegexConfig
 
 
 def _regex_config() -> dict[str, object]:
     return {
-        "gate": "regex-body",
+        "kind": "regex",
+        "scan": {"kind": "body", "action": {"kind": "detect"}},
         "pattern_catalog": {
             "entities": [
                 {
@@ -25,7 +26,6 @@ def _regex_config() -> dict[str, object]:
                 }
             ]
         },
-        "mode": "detect",
     }
 
 
@@ -38,16 +38,16 @@ def _values(*, default_decision: str = "allow") -> dict[str, object]:
 
 
 def test_pipeline_uses_required_default_and_exact_gate_entries() -> None:
-    config = EgressGateConfig[RegexBodyConfig].model_validate(_values())
+    config = EgressGateConfig[RegexConfig].model_validate(_values())
 
     assert config.pipeline.default_decision is DefaultDecision.ALLOW
     assert config.pipeline.gates[0].name == "body"
-    assert type(config.pipeline.gates[0].config) is RegexBodyConfig
+    assert type(config.pipeline.gates[0].config) is RegexConfig
     assert ConfiguredGate.model_fields["config"].is_required()
 
 
 def test_pipeline_default_deny_is_explicit() -> None:
-    config = EgressGateConfig[RegexBodyConfig].model_validate(
+    config = EgressGateConfig[RegexConfig].model_validate(
         _values(default_decision="deny")
     )
     assert config.pipeline.default_decision is DefaultDecision.DENY
@@ -58,7 +58,7 @@ def test_pipeline_default_deny_is_explicit() -> None:
         }
     }
     with pytest.raises(ValidationError):
-        EgressGateConfig[RegexBodyConfig].model_validate(missing_default)
+        EgressGateConfig[RegexConfig].model_validate(missing_default)
 
 
 def test_pipeline_rejects_unknown_fields_and_duplicate_names() -> None:
@@ -70,7 +70,7 @@ def test_pipeline_rejects_unknown_fields_and_duplicate_names() -> None:
         }
     }
     with pytest.raises(ValidationError):
-        EgressGateConfig[RegexBodyConfig].model_validate(unknown)
+        EgressGateConfig[RegexConfig].model_validate(unknown)
 
     duplicate = {
         "pipeline": {
@@ -82,7 +82,7 @@ def test_pipeline_rejects_unknown_fields_and_duplicate_names() -> None:
         }
     }
     with pytest.raises(ValidationError):
-        EgressGateConfig[RegexBodyConfig].model_validate(duplicate)
+        EgressGateConfig[RegexConfig].model_validate(duplicate)
 
 
 def test_pipeline_gate_count_has_an_exact_boundary() -> None:
@@ -96,7 +96,7 @@ def test_pipeline_gate_count_has_an_exact_boundary() -> None:
             "default_decision": "allow",
         }
     }
-    config = EgressGateConfig[RegexBodyConfig].model_validate(exact)
+    config = EgressGateConfig[RegexConfig].model_validate(exact)
     assert len(config.pipeline.gates) == MAX_PIPELINE_GATES
 
     too_many_gates = [
@@ -110,17 +110,21 @@ def test_pipeline_gate_count_has_an_exact_boundary() -> None:
         }
     }
     with pytest.raises(ValidationError):
-        EgressGateConfig[RegexBodyConfig].model_validate(too_many)
+        EgressGateConfig[RegexConfig].model_validate(too_many)
 
 
-def test_regex_mode_requires_replacement_only_when_replacing() -> None:
-    replace = _regex_config()
-    replace["mode"] = "replace"
+def test_regex_scan_structurally_restricts_header_actions() -> None:
+    invalid = _regex_config()
+    invalid["scan"] = {
+        "kind": "header",
+        "names": ["x-note"],
+        "action": {"kind": "replace", "template": "[{entity}]"},
+    }
     with pytest.raises(ValidationError):
-        EgressGateConfig[RegexBodyConfig].model_validate(
+        EgressGateConfig[RegexConfig].model_validate(
             {
                 "pipeline": {
-                    "gates": [{"name": "body", "config": replace}],
+                    "gates": [{"name": "header", "config": invalid}],
                     "default_decision": "allow",
                 }
             }

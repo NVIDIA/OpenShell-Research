@@ -37,12 +37,16 @@ from egress_gate.request import (
 )
 from egress_gate.result import (
     DecisionSource,
+    DecisionSourceKind,
     EgressDecision,
     EgressResult,
     Finding,
     GateControl,
+    GateDecisionSource,
     GateTrace,
     MutationKind,
+    PipelineDefaultDecisionSource,
+    RuntimeLimitDecisionSource,
     SourcedFinding,
 )
 from egress_gate.string_validators import validate_scalar_string
@@ -67,7 +71,7 @@ class RequestProcessor:
         configured_types = tuple(gate_type for _, gate_type, _ in gates)
         policy_names = tuple(item.name for item in config.pipeline.gates)
         policy_types = tuple(
-            getattr(item.config, "gate", None) for item in config.pipeline.gates
+            getattr(item.config, "kind", None) for item in config.pipeline.gates
         )
         if configured_names != policy_names or configured_types != policy_types:
             raise ValueError("configured gates do not match the policy")
@@ -140,8 +144,9 @@ class RequestProcessor:
                 if evaluation.control is GateControl.DENY:
                     return _result(
                         decision=EgressDecision.DENY,
-                        source=DecisionSource.gate(
-                            name=gate_name,
+                        source=GateDecisionSource(
+                            kind=DecisionSourceKind.GATE,
+                            gate_name=gate_name,
                             gate_type=gate_type,
                         ),
                         findings=sourced_findings,
@@ -152,8 +157,9 @@ class RequestProcessor:
                 if evaluation.control is GateControl.ALLOW:
                     return _result(
                         decision=EgressDecision.ALLOW,
-                        source=DecisionSource.gate(
-                            name=gate_name,
+                        source=GateDecisionSource(
+                            kind=DecisionSourceKind.GATE,
+                            gate_name=gate_name,
                             gate_type=gate_type,
                         ),
                         patch=accumulated_patch,
@@ -197,7 +203,9 @@ class RequestProcessor:
         if self._config.pipeline.default_decision is DefaultDecision.ALLOW:
             result = _result(
                 decision=EgressDecision.ALLOW,
-                source=DecisionSource.pipeline_default(),
+                source=PipelineDefaultDecisionSource(
+                    kind=DecisionSourceKind.PIPELINE_DEFAULT
+                ),
                 patch=accumulated_patch,
                 findings=sourced_findings,
                 fingerprint=self._policy_fingerprint,
@@ -206,7 +214,9 @@ class RequestProcessor:
         else:
             result = _result(
                 decision=EgressDecision.DENY,
-                source=DecisionSource.pipeline_default(),
+                source=PipelineDefaultDecisionSource(
+                    kind=DecisionSourceKind.PIPELINE_DEFAULT
+                ),
                 findings=sourced_findings,
                 reason_code=DEFAULT_DENY_REASON_CODE,
                 fingerprint=self._policy_fingerprint,
@@ -339,7 +349,7 @@ def _result(
 def _runtime_limit_result(fingerprint: str | None) -> EgressResult:
     return _result(
         decision=EgressDecision.DENY,
-        source=DecisionSource.runtime_limit(),
+        source=RuntimeLimitDecisionSource(kind=DecisionSourceKind.RUNTIME_LIMIT),
         reason_code=LIMIT_REASON_CODE,
         fingerprint=fingerprint,
     )
