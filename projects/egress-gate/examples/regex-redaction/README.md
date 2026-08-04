@@ -1,8 +1,10 @@
 # Regex redaction composition
 
-This example runs the built-in `regex-body` gate in `replace` mode. Its
-relative `patterns.yaml` catalog replaces email addresses and customer IDs
-with stable labels while keeping request-derived content out of findings.
+This example runs the built-in `regex-body` gate in `replace` mode. The
+standalone configuration embeds a small email catalog so it can be validated
+or evaluated from any working directory. The OpenShell `policy.yaml` shows the
+equivalent file-backed catalog with email and customer-ID patterns. Both keep
+request-derived content out of findings.
 
 Inspect the installed gate and exact policy schema:
 

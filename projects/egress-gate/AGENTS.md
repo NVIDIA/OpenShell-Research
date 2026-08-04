@@ -31,8 +31,7 @@ Run focused tests while working and `make check` before handoff.
 
 ## Project map
 
-- `src/egress_gate/gates/`: `Gate`, helper bases, registry, regex-body, and
-  request-rules
+- `src/egress_gate/gates/`: `Gate`, helper bases, registry, and regex-body
 - `src/egress_gate/config.py`: strict `pipeline.gates` and `default_decision`
   policy models
 - `src/egress_gate/request.py`: protobuf-free request and ordered patch models
@@ -72,11 +71,10 @@ dependencies and no request state or policy behavior.
 
 ## Current built-ins and boundaries
 
-This slice ships exactly two built-ins. `regex-body` preserves bounded catalog
+This slice ships exactly one built-in. `regex-body` preserves bounded catalog
 loading, regex matching, overlap resolution, UTF-8 body handling, and
-detect/deny/replace modes. `request-rules` owns deterministic matching over
-normalized request facts, deny precedence, and terminal rule decisions. Do not
-add more built-ins speculatively.
+detect/deny/replace modes. Deterministic network request policy belongs to
+OpenShell. Do not add more built-ins speculatively.
 
 The OpenShell wire `Finding` remains the released five-field contract:
 `type`, `label`, `count`, `confidence`, and `severity`. Gate provenance is
@@ -92,8 +90,8 @@ middleware phase.
 ## Plan boundaries
 
 The current implementation covers the gate contract, strict pipeline
-configuration, finalized registry, regex-body and request-rules behavior,
-request processing, single active-policy replacement, and offline evaluation.
+configuration, finalized registry, regex-body behavior, request processing,
+single active-policy replacement, and offline evaluation.
 Semantic or LLM judgment is deferred and must not be added as a built-in,
 example implementation, or default dependency. Do not edit `plans/` as part of
 implementation work.

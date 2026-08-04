@@ -23,7 +23,6 @@ def test_cli_gates_describes_the_request_level_builtin() -> None:
         result.stdout
     )
     assert "resources=-\tconfig=RegexBodyConfig" in result.stdout
-    assert "request-rules\tfindings=request_rule_match\t" in result.stdout
 
 
 def test_cli_configuration_schema_exposes_pipeline_only() -> None:
@@ -68,14 +67,14 @@ def test_cli_evaluate_runs_the_builtin_policy_corpus() -> None:
         [
             "evaluate",
             "--policy",
-            str(project_dir / "examples/deterministic-gate/egress-gate-config.yaml"),
+            str(project_dir / "examples/regex-redaction/egress-gate-config.yaml"),
             "--cases",
-            str(project_dir / "examples/deterministic-gate/cases.yaml"),
+            str(project_dir / "examples/regex-redaction/cases.yaml"),
         ],
     )
 
     assert result.exit_code == 0, result.output
-    assert 'PASS case="known-read-is-allowed"' in result.stdout
+    assert 'PASS case="email-is-detected-and-request-is-allowed"' in result.stdout
     assert "SUMMARY total=2 passed=2 failed=0" in result.stdout
 
 
@@ -94,7 +93,7 @@ def test_cli_validate_checks_policy_without_preparing_gates(
         [
             "validate",
             "--policy",
-            str(project_dir / "examples/deterministic-gate/egress-gate-config.yaml"),
+            str(project_dir / "examples/regex-redaction/egress-gate-config.yaml"),
         ],
     )
 
@@ -118,7 +117,7 @@ def test_cli_validate_rejects_invalid_policy(tmp_path: Path) -> None:
 def test_cli_evaluate_reports_content_safe_mismatch_status(tmp_path: Path) -> None:
     project_dir = Path(__file__).parents[1]
     cases = tmp_path / "cases.yaml"
-    original = (project_dir / "examples/deterministic-gate/cases.yaml").read_text()
+    original = (project_dir / "examples/regex-redaction/cases.yaml").read_text()
     cases.write_text(original.replace("decision: allow", "decision: deny", 1))
 
     result = CliRunner().invoke(
@@ -126,14 +125,17 @@ def test_cli_evaluate_reports_content_safe_mismatch_status(tmp_path: Path) -> No
         [
             "evaluate",
             "--policy",
-            str(project_dir / "examples/deterministic-gate/egress-gate-config.yaml"),
+            str(project_dir / "examples/regex-redaction/egress-gate-config.yaml"),
             "--cases",
             str(cases),
         ],
     )
 
     assert result.exit_code == 1
-    assert 'FAIL case="known-read-is-allowed" field=decision' in result.stdout
+    assert (
+        'FAIL case="email-is-detected-and-request-is-allowed" field=decision'
+        in result.stdout
+    )
     assert "SUMMARY total=2 passed=1 failed=1" in result.stdout
     assert "{}" not in result.stdout
 
@@ -158,7 +160,7 @@ def test_cli_evaluate_rejects_non_strict_corpus_yaml(
         [
             "evaluate",
             "--policy",
-            str(project_dir / "examples/deterministic-gate/egress-gate-config.yaml"),
+            str(project_dir / "examples/regex-redaction/egress-gate-config.yaml"),
             "--cases",
             str(cases),
         ],

@@ -19,11 +19,11 @@ uv sync --frozen
 uv run egress-gate gates
 uv run egress-gate configuration-schema
 uv run egress-gate validate \
-  --policy examples/deterministic-gate/egress-gate-config.yaml
+  --policy examples/regex-redaction/egress-gate-config.yaml
 uv run egress-gate serve --listen 127.0.0.1:50051
 uv run egress-gate evaluate \
-  --policy examples/deterministic-gate/egress-gate-config.yaml \
-  --cases examples/deterministic-gate/cases.yaml
+  --policy examples/regex-redaction/egress-gate-config.yaml \
+  --cases examples/regex-redaction/cases.yaml
 ```
 
 Use `0.0.0.0` only when the OpenShell supervisor must reach the service across
@@ -48,11 +48,11 @@ pipeline:
   default_decision: allow
 ```
 
-The shipped registry contains exactly `regex-body` and `request-rules`.
-`regex-body` supports `detect`, `deny`, and `replace`; replacement mode
+The shipped registry contains exactly `regex-body`. It supports `detect`,
+`deny`, and `replace`; replacement mode
 preserves an explicit body-replacement intent even when the resulting bytes
-equal the input. `request-rules` provides deterministic matching over request
-facts. Custom trusted gates can be added through `--registry-factory`.
+equal the input. Custom trusted gates can be added through
+`--registry-factory`.
 
 ```bash
 uv run egress-gate --registry-factory my_gates:create_registry gates
@@ -84,11 +84,9 @@ through slot acquisition, policy preparation, and `RequestProcessor.process`.
 - [Operations](docs/operations.md)
 - [Gate authoring](docs/gates/custom.md)
 - [Regex-body](docs/gates/regex.md)
-- [Request-rules](docs/gates/request-rules.md)
 - [Architecture](docs/architecture/index.md)
 - [Limits and failures](docs/reference/limits-and-failures.md)
 - [Regex redaction composition](examples/regex-redaction/README.md)
-- [Deterministic request-rules example](examples/deterministic-gate/README.md)
 
 ## Development
 

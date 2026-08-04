@@ -65,7 +65,7 @@
   <text x="268" y="581" text-anchor="middle" class="implementation">regex-body</text>
   <text x="268" y="601" text-anchor="middle" class="subtitle">built-in implementation</text>
   <rect x="516" y="560" width="372" height="50" rx="10" class="layer"/>
-  <text x="702" y="581" text-anchor="middle" class="implementation">request-rules + custom</text>
+  <text x="702" y="581" text-anchor="middle" class="implementation">Custom gates</text>
   <text x="702" y="601" text-anchor="middle" class="subtitle">trusted integrations</text>
 
   <path d="M636 132v18c0 8-6 14-14 14H262c-8 0-14 6-14 14v47" class="arrow"/>

@@ -12,8 +12,8 @@ start gRPC, attach credentials, contact an upstream, or persist request data.
 
 ```bash
 uv run egress-gate evaluate \
-  --policy examples/deterministic-gate/egress-gate-config.yaml \
-  --cases examples/deterministic-gate/cases.yaml \
+  --policy examples/regex-redaction/egress-gate-config.yaml \
+  --cases examples/regex-redaction/cases.yaml \
   --timeout-seconds 1
 ```
 

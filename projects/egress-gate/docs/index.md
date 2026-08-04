@@ -39,7 +39,7 @@ uv sync --frozen
 uv run egress-gate gates
 uv run egress-gate configuration-schema
 uv run egress-gate validate \
-  --policy examples/deterministic-gate/egress-gate-config.yaml
+  --policy examples/regex-redaction/egress-gate-config.yaml
 uv run egress-gate serve --listen 127.0.0.1:50051
 ```
 

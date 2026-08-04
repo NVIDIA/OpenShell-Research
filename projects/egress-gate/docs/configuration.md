@@ -53,13 +53,10 @@ There is no compatibility acceptance for legacy policy keys.
 
 ## Built-in gates
 
-The shipped registry contains `regex-body` and `request-rules`. See
-[Regex-body](gates/regex.md) for catalogs and replacement templates. Its `mode`
-is required and is one of `detect`, `deny`, or `replace`; a replacement recipe
-is required exactly when the mode is `replace`.
-
-See [Request-rules](gates/request-rules.md) for deterministic matching over
-request target, visible headers, and process ancestry. Other behavior is
+The shipped registry contains only `regex-body`. See
+[Regex-body](gates/regex.md) for catalogs and replacement templates. Its
+`mode` is required and is one of `detect`, `deny`, or `replace`; a replacement
+recipe is required exactly when the mode is `replace`. Other behavior is
 supplied by a trusted application registry factory, not by configuration.
 
 ## Inspect the installed registry

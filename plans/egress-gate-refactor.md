@@ -31,10 +31,10 @@ pre-credentials HTTP request contract, with:
 - a protobuf-free processing core behind the OpenShell gRPC service boundary
 
 Body inspection and redaction are a first-party configuration of the built-in
-regex gate, not a separate compatibility layer. Deterministic request control
-is a first-party configuration of the built-in request-rules gate. The generic
-registry remains available for organization-specific gates without shipping
-another concrete integration.
+regex gate, not a separate compatibility layer. The generic registry remains
+available for organization-specific gates without shipping another concrete
+integration. Deterministic destination and request constraints remain in
+OpenShell policy, which already owns egress enforcement.
 
 The refactor does **not** implement an HTTP/HTTPS MITM proxy. OpenShell owns
 request interception, routing, egress enforcement, and credential attachment;
@@ -66,21 +66,20 @@ configuration schema as every other Egress Gate policy.
 
 1. Preserve and strengthen customization as a first-class feature.
 2. Make regex-based detect, deny, and replace setups concise.
-3. Make deterministic HTTP request control concise with request rules.
-4. Let custom gates reason about the complete bounded request rather than only
+3. Let custom gates reason about the complete bounded request rather than only
    one decoded text body.
-5. Retain strict typed configuration generated from the exact installed gate
+4. Retain strict typed configuration generated from the exact installed gate
    registry.
-6. Keep policy behavior in policy configuration and operational dependencies
+5. Keep policy behavior in policy configuration and operational dependencies
    in application-owned resources.
-7. Make gate order, mutation visibility, terminal decisions, defaults, and
+6. Make gate order, mutation visibility, terminal decisions, defaults, and
    failures explicit and mechanically testable.
-8. Preserve content-safe findings, errors, and logs by default.
-9. Reuse one prepared active policy and make policy changes atomic without
+7. Preserve content-safe findings, errors, and logs by default.
+8. Reuse one prepared active policy and make policy changes atomic without
    restarting Egress Gate.
-10. Keep OpenShell protobuf and gRPC details inside `service/` while modeling
+9. Keep OpenShell protobuf and gRPC details inside `service/` while modeling
     the processing domain directly on OpenShell's request semantics.
-11. Provide offline policy evaluation and shadow operation without requiring a
+10. Provide offline policy evaluation and shadow operation without requiring a
     raw production-traffic database.
 
 ## Project non-goals
@@ -94,8 +93,11 @@ configuration schema as every other Egress Gate policy.
 - Acting as a WAF, network firewall, identity provider, credential broker, or
   general authorization server.
 - Providing vendor-specific LLM SDKs or implementing semantic/LLM judgment,
-  including as a runnable example. The only concrete gates are regex body and
-  request rules.
+  including as a runnable example. The only built-in gate is regex body.
+- Duplicating deterministic host, port, method, path, query, or process rules
+  already owned by OpenShell policy. Organization-specific request logic may
+  still be implemented through the custom-gate API when OpenShell policy is
+  insufficient.
 - Persisting request bodies, headers, query strings, or response content by
   default.
 - Automatically publishing policies inferred from observed traffic.
@@ -270,7 +272,6 @@ RequestProcessor
   - terminal decision handling
   - finding aggregation
         |
-        +--> request-rules gate
         +--> regex body gate
         +--> custom organization gate
         |
@@ -484,7 +485,6 @@ Example finding categories include:
 | Gate | `type` | Example `label` | Optional scalar vocabulary |
 | --- | --- | --- | --- |
 | Regex privacy | `sensitive_entity` | `email` | `confidence=high` |
-| Request rules | `request_rule_match` | `deny-delete` | `severity=deny` |
 | Custom JSON validation | `body_schema_violation` | `required_field_missing` | `severity=error` |
 | Custom gate | Custom stable type | Custom stable label | Gate-defined confidence/severity |
 
@@ -506,7 +506,7 @@ Each gate class declares the finding types it may emit:
 ```python
 finding_types = (
     FindingTypeDefinition(
-        type="request_rule_match",
+        type="body_schema_violation",
     ),
 )
 ```
@@ -597,7 +597,6 @@ Use this complete v0 deny-code ownership table:
 | Denial source | Reason code |
 | --- | --- |
 | `regex-body` match | `egress_gate_regex_denied` |
-| `request-rules` match | The winning rule's required policy-owned `reason_code` |
 | Custom gate | A validated gate- or policy-owned code |
 | Pipeline default | `egress_gate_default_deny` |
 | Runtime safety limit | `egress_gate_limit_exceeded` |
@@ -616,8 +615,8 @@ messages, or gate-defined free-form metadata.
 The reframed product has three intentionally separate customization levels:
 
 1. **Policy composition:** operators assemble installed gates without writing
-   Python. This is how most regex-redaction and deterministic request-control
-   deployments should be built.
+   Python. This is how regex inspection and redaction deployments should be
+   built.
 2. **Gate authoring:** developers add one focused request behavior through a
    typed config and `Gate` implementation.
 3. **Application assembly:** deployers register trusted gates and inject typed
@@ -875,15 +874,16 @@ Requirements:
 - no backwards-compatible acceptance of `entity_processing`
 
 Gate configuration owns the relationship between its observations and its
-control result. This permits a regex gate to detect, replace, or deny while a
-request-rules gate makes terminal request decisions.
+control result. This permits the regex gate and installed custom gates to
+detect, replace, allow, or deny as their explicit contracts define.
 
 ## Built-in gates
 
-The default registry ships exactly two concrete gates: `regex-body` and
-`request-rules`. Organization-specific behavior may use the custom-gate
-registry surface. Semantic judgment and other proposed built-ins are deferred;
-do not add a third concrete gate or example implementation in this refactor.
+The default registry ships exactly one concrete gate: `regex-body`.
+Organization-specific behavior may use the custom-gate registry surface.
+Deterministic egress constraints belong in OpenShell policy. Semantic judgment
+and other proposed built-ins are deferred; do not add another concrete gate or
+example implementation in this refactor.
 
 ### Regex body gate
 
@@ -912,57 +912,6 @@ The gate reads the current body as strict UTF-8. Later gates see the replaced
 body. Preserve the current safety bounds and atomic failure behavior, but adopt
 new names and APIs without aliases.
 
-### Request-rules gate
-
-Implement deterministic matching over bounded normalized request facts.
-
-Initial match fields:
-
-- scheme
-- host
-- port
-- method
-- path using exact, prefix, or glob matching
-- optional header-presence conditions over visible pre-credentials headers
-- originating process binary and ancestor binary
-
-Do not initially add a general expression language, arbitrary regular
-expressions over the complete request, or body selectors. Add structured JSON
-or form selectors later only after their normalization and ambiguity rules are
-designed explicitly.
-
-Proposed configuration:
-
-```yaml
-gate: request-rules
-rules:
-  - name: deny-destructive-github
-    match:
-      hosts: [api.github.com]
-      methods: [DELETE]
-    decision: deny
-    reason_code: destructive_method_denied
-  - name: allow-known-read
-    match:
-      hosts: [api.github.com]
-      methods: [GET, HEAD]
-      path:
-        type: glob
-        value: /repos/acme/*
-    decision: allow
-```
-
-Within one gate, deny rules have priority regardless of where allow rules
-appear in the list. The winner is the first matching deny in configuration
-order; if no deny matches, it is the first matching allow in configuration
-order; otherwise the gate returns `proceed`. No configurable `no_match` field
-exists in v0. The gate emits exactly one
-`request_rule_match` finding for the winning rule and no findings for other
-matches. A winning deny uses that rule's required `reason_code`; a winning
-allow is terminal and has no reason code. `GateTrace` remains runtime-owned and
-does not gain gate-specific fields. Documentation must state that a winning
-allow prevents subsequent gates from running.
-
 ## Reference compositions
 
 ### Regex redaction composition
@@ -990,39 +939,6 @@ pipeline:
 
 Provide equally concise detect and deny variants. This example is the
 acceptance baseline for preserving regex-body usability and customization.
-
-### Deterministic request-gate composition
-
-Ship a separate example using only the built-in request-rules gate:
-
-```yaml
-pipeline:
-  gates:
-    - name: request-policy
-      config:
-        gate: request-rules
-        rules:
-          - name: deny-delete
-            match:
-              methods: [DELETE]
-            decision: deny
-            reason_code: destructive_method_denied
-          - name: allow-known-read
-            match:
-              hosts: [api.github.com]
-              methods: [GET, HEAD]
-            decision: allow
-  default_decision: deny
-```
-
-The example must explain that:
-
-- matching deny rules take priority over matching allow rules
-- a matching allow is terminal and skips every later gate
-- unmatched requests reach the explicit deny default
-- path matching uses documented raw component semantics
-- OpenShell network policy remains responsible for admitted destinations and
-  direct-egress enforcement
 
 ## Active policy preparation and replacement
 
@@ -1251,16 +1167,14 @@ projects/egress-gate/
 │   │   ├── __init__.py
 │   │   ├── base.py
 │   │   ├── registry.py
-│   │   ├── regex_body.py
-│   │   └── request_rules.py
+│   │   └── regex_body.py
 │   └── service/
 │       ├── __init__.py
 │       ├── server.py
 │       └── servicer.py
 ├── tests/
 ├── examples/
-│   ├── regex-redaction/
-│   └── deterministic-gate/
+│   └── regex-redaction/
 ├── docs/
 └── analysis/
 ```
@@ -1277,14 +1191,13 @@ not to make the refactor look architecturally different.
 
 ### Net-new source files
 
-Relative to the superseded implementation, only three handwritten source files
+Relative to the superseded implementation, only two handwritten source files
 are genuinely new:
 
 | File | Why it is separate |
 | --- | --- |
 | `request.py` | Owns the immutable request, header, and patch vocabulary shared by every gate and the service boundary. Keeping it out of `request_processor.py` prevents extension authors from importing orchestration internals. |
 | `result.py` | Owns gate evaluations, findings, provenance, traces, and final results. These contracts are consumed by gates, the processor, CLI evaluation, and the service, so none of those existing modules is an appropriate sole owner. |
-| `gates/request_rules.py` | Implements the one genuinely new built-in behavior: deterministic matching over OpenShell request facts. |
 
 Everything else maps to an existing file or directory: `engines/` becomes
 `gates/`, `engines/regex.py` becomes `gates/regex_body.py`, and the existing
@@ -1429,30 +1342,7 @@ Acceptance criteria:
   is visible to later gates
 - logs and findings remain content-safe by default
 
-### Phase 4: Add deterministic HTTP request rules
-
-1. Define canonical matching rules for scheme, authority, method, path, visible
-   header presence, and process ancestry.
-2. Implement exact, prefix, and bounded glob matching over the raw path field;
-   do not percent-decode, Unicode-normalize, collapse dot segments or slashes,
-   or include the query.
-3. Define and test case sensitivity, default ports, percent encoding, Unicode,
-   repeated headers, IPv4/IPv6 authority forms, and malformed inputs.
-4. Implement deny precedence and explicit terminal allows.
-5. Add deterministic-gate examples and adversarial matching tests.
-
-Acceptance criteria:
-
-- matching behavior is documented precisely enough to reproduce independently
-- raw component semantics cannot make a rule appear to cover a different
-  authority
-- matched deny wins over matched allow within the gate
-- static allow visibly prevents later gates from running
-- rule IDs, not request content, appear in declared request-rule findings
-- the default registry and generated default schema contain exactly
-  `regex-body` and `request-rules`
-
-### Phase 5: Harden active policy reuse and replacement
+### Phase 4: Harden active policy reuse and replacement
 
 1. Implement deterministic policy fingerprinting for diagnostics and results.
 2. Implement one active prepared pipeline and a serialized candidate-replacement
@@ -1484,7 +1374,7 @@ Acceptance criteria:
   instances
 - no request content is retained between evaluations
 
-### Phase 6: Complete the OpenShell middleware service
+### Phase 5: Complete the OpenShell middleware service
 
 1. Convert every bounded OpenShell request field into the new domain model.
 2. Serialize final body and header mutations relative to the original request.
@@ -1510,30 +1400,31 @@ Acceptance criteria:
   exact size limits, ordered repeated-header mutations, and every row of the
   normative outcome mapping
 
-### Phase 7: Add offline evaluation tooling
+### Phase 6: Add offline evaluation tooling
 
 1. Implement the versioned evaluation corpus and `evaluate` CLI.
-2. Exercise the deterministic request-rules example through the production
-   registry and processor.
+2. Exercise the regex-redaction example through the production registry and
+   processor.
 3. Keep semantic judgment and additional runnable custom gate examples out of
    this phase.
 
 Acceptance criteria:
 
-- the installed built-in set remains exactly `regex-body` and `request-rules`
+- the installed built-in set remains exactly `regex-body`
 - no semantic-specific client, config, implementation, policy, corpus, or test
   exists in the project
 - no vendor SDK is required by the package or default installation
 - evaluation uses the production runtime rather than a parallel reimplementation
 
-### Phase 8: Observability, documentation, and cleanup
+### Phase 7: Observability, documentation, and cleanup
 
 1. Complete content-safe structured operational logging through the existing
    logging, processor, and service ownership points.
 2. Rewrite canonical project documentation around Egress Gate.
-3. Document gate authoring, resource injection, policy composition, request
-   rules, privacy use cases, active-policy replacement, operations, limits,
-   and failures.
+3. Document gate authoring, resource injection, policy composition, regex
+   inspection and redaction, active-policy replacement, operations, limits,
+   and failures. State explicitly that deterministic egress constraints belong
+   in OpenShell policy.
 4. Replace examples and documentation mirrors through the documented staging
    workflow.
 5. Remove obsolete predecessor assets, analyses, scripts, tests, navigation,
@@ -1547,8 +1438,8 @@ Acceptance criteria:
 Acceptance criteria:
 
 - the public documentation leads with modular policy composition
-- Regex redaction and deterministic request-control setups are both first-class
-  quickstarts
+- regex redaction is the first-party quickstart and custom gates remain a
+  first-class extension surface
 - no default log or finding contains request content
 - repository search finds no obsolete compatibility surface
 - the scoped `stage` audit finds no remaining gate synonyms
@@ -1606,13 +1497,6 @@ Exercise real gRPC requests through the OpenShell middleware service with:
 
 ### Security-focused tests
 
-- authority confusion and userinfo in URLs
-- default ports and host case normalization
-- percent-encoding and double-encoding cases
-- path/query separation
-- IPv4, IPv6, and bracketed authorities
-- duplicate and conflicting request rules
-- early allow bypass behavior
 - mutation of protected headers
 - findings or errors attempting to contain request content
 - undeclared finding types and invalid finding scalar values
@@ -1625,7 +1509,6 @@ Measure separately:
 
 - fixed runtime overhead with one minimal benchmark-only no-op gate, preserving
   the production requirement that every pipeline contains at least one gate
-- request-rules latency
 - regex-body latency by body size and rule count
 - pipeline overhead by gate count
 - active-policy reuse and replacement-preparation latency
@@ -1663,10 +1546,8 @@ The final documentation set should include:
 - product overview and explicit boundary
 - OpenShell request-path quickstart
 - regex redaction quickstart
-- deterministic HTTP gate quickstart
 - full pipeline configuration reference
-- request-rules normalization and precedence reference
-- built-in gate reference covering only regex body and request rules
+- built-in regex-body gate reference
 - custom gate and resource authoring guide
 - custom finding types, internal provenance, and safety guide
 - runtime architecture and request lifecycle
@@ -1739,11 +1620,11 @@ The refactor is complete when:
    canonical OpenShell fields; runtime-owned gate provenance is retained for
    internal traces and offline evaluation and intentionally omitted on the
    wire.
-5. The default registry contains exactly the `regex-body` and `request-rules`
-   built-ins.
+5. The default registry contains exactly the `regex-body` built-in.
 6. The regex redaction composition detects, denies, and replaces with
    the current hardened regex behavior.
-7. A deterministic request gate is expressible entirely in policy.
+7. Deterministic egress constraints are documented as OpenShell policy's
+   responsibility rather than duplicated in Egress Gate.
 8. One active policy is reused across requests and can be replaced atomically
    without restarting the service or disrupting in-flight evaluations.
 9. Allow, deny, proceed, mutation, failure, and default behavior are explicit
@@ -1753,8 +1634,8 @@ The refactor is complete when:
 12. The OpenShell middleware service passes all exact-boundary and concurrency
     tests.
 13. Project and repository documentation validation passes.
-14. Public documentation presents regex redaction and deterministic request
-    control as documented policy compositions using the built-in gates; it
-    does not imply that semantic judgment is implemented.
+14. Public documentation presents regex redaction as the built-in composition,
+    the generic custom-gate surface as the extension path, and does not imply
+    that deterministic request rules or semantic judgment are implemented.
 15. No standalone proxy or non-OpenShell transport exists or is implied to be
     part of this project.

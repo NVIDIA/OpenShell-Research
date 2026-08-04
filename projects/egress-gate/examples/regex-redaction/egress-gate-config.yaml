@@ -3,7 +3,12 @@ pipeline:
     - name: identifiers
       config:
         gate: regex-body
-        pattern_catalog: patterns.yaml
+        pattern_catalog:
+          entities:
+            - name: email
+              rules:
+                - pattern: '(?<![\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])'
+                  confidence: high
         mode: replace
         replacement:
           strategy: template
