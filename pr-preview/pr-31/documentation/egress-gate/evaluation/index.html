@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Run bounded request corpora through the production processor.">
+        <meta name="description" content="Test policy decisions and findings before deployment.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
@@ -27,7 +27,7 @@
     
     
       
-        <title>Offline policy evaluation - OpenShell Research</title>
+        <title>Test policies offline - OpenShell Research</title>
       
     
     
@@ -92,7 +92,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#offline-policy-evaluation" class="md-skip">
+        <a href="#test-policies-offline" class="md-skip">
           Skip to content
         </a>
       
@@ -127,7 +127,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Offline policy evaluation
+              Test policies offline
             
           </span>
         </div>
@@ -646,7 +646,7 @@
   <span class="md-ellipsis">
     
   
-  Offline policy evaluation
+  Test policies offline
 
     
   </span>
@@ -663,7 +663,7 @@
   <span class="md-ellipsis">
     
   
-  Offline policy evaluation
+  Test policies offline
 
     
   </span>
@@ -689,10 +689,43 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#corpus-v1" class="md-nav__link">
+  <a href="#try-the-included-example" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Corpus v1
+        Try the included example
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#write-one-test-case" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Write one test case
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grow-the-suite-with-the-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Grow the suite with the policy
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-the-result-in-automation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Use the result in automation
       </span>
     </span>
   </a>
@@ -1141,10 +1174,43 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#corpus-v1" class="md-nav__link">
+  <a href="#try-the-included-example" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Corpus v1
+        Try the included example
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#write-one-test-case" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Write one test case
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grow-the-suite-with-the-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Grow the suite with the policy
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-the-result-in-automation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Use the result in automation
       </span>
     </span>
   </a>
@@ -1303,63 +1369,154 @@
   </a>
 
 
-<h1 id="offline-policy-evaluation">Offline policy evaluation</h1>
-<p><code>egress-gate evaluate</code> prepares a validated pipeline once and evaluates a
-bounded corpus locally through the production <code>RequestProcessor</code>. It does not
-start gRPC, attach credentials, contact an upstream, or persist request data.</p>
-<div class="language-bash highlight"><span class="filename">Evaluate a request corpus</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>evaluate<span class="w"> </span><span class="se">\</span>
+<h1 id="test-policies-offline">Test policies offline</h1>
+<p>A policy can be valid and still do the wrong thing. It might allow a request
+that you meant to deny, invoke the wrong gate, or stop reporting a finding
+after a rule changes.</p>
+<p><code>egress-gate evaluate</code> lets you catch these problems before the policy handles
+live traffic. You give it a policy and a set of request examples. Each example
+states the result that you expect. Egress Gate runs every request through the
+same prepared <code>RequestProcessor</code> that the service uses and reports any
+difference.</p>
+<p>This is useful when you want to:</p>
+<ul>
+<li>check a new policy before rollout</li>
+<li>turn a fixed bug into a permanent regression test</li>
+<li>test a custom gate without starting the gRPC service</li>
+<li>compare the behavior of two policy revisions</li>
+<li>build a repeatable request set for a separate performance benchmark</li>
+</ul>
+<p>The command tests correctness. It does not report latency or throughput. Use a
+benchmark harness around the same request set when you need performance data.</p>
+<h2 id="try-the-included-example">Try the included example</h2>
+<p>The repository includes a regex policy and two request cases. Run them from
+<code>projects/egress-gate/</code>:</p>
+<div class="language-bash highlight"><span class="filename">Run the example policy tests</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>evaluate<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--policy<span class="w"> </span>examples/regex-redaction/egress-gate-config.yaml<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--cases<span class="w"> </span>examples/regex-redaction/cases.yaml<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--timeout-seconds<span class="w"> </span><span class="m">1</span>
 </span></code></pre></div>
-<p>Use the global <code>--registry-factory</code> option for trusted application-owned gates.
-The service and discovery commands accept the same finalized registry factory.</p>
-<h2 id="corpus-v1">Corpus v1</h2>
-<p>The corpus is strict, bounded YAML. The parser rejects aliases, duplicate keys,
-unknown fields, invalid base64, oversized requests, and duplicate case names.</p>
-<div class="language-yaml highlight"><span class="filename">cases.yaml</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">cases</span><span class="p">:</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ordinary-request</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">tags</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">smoke</span><span class="p p-Indicator">]</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="nt">provenance</span><span class="p">:</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">      </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">synthetic</span><span class="w">       </span><span class="c1"># synthetic or captured</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">      </span><span class="nt">redacted</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="nt">request</span><span class="p">:</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">      </span><span class="nt">context</span><span class="p">:</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">        </span><span class="nt">request_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">corpus-1</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">        </span><span class="nt">sandbox_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sandbox-1</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">      </span><span class="nt">target</span><span class="p">:</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">        </span><span class="nt">scheme</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">        </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api.example.com</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">        </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">        </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POST</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">        </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/v1/items</span>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">        </span><span class="nt">query</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">      </span><span class="nt">headers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">      </span><span class="nt">body</span><span class="p">:</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">        </span><span class="nt">encoding</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">utf8</span><span class="w">       </span><span class="c1"># utf8 or base64</span>
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;{&quot;item&quot;:&quot;ordinary&quot;}&#39;</span>
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">    </span><span class="nt">expected</span><span class="p">:</span>
-</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="w">      </span><span class="nt">decision</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">allow</span>
-</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="w">      </span><span class="nt">decision_source_kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pipeline_default</span>
-</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="w">      </span><span class="nt">finding_types</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+<p>The command prepares the policy once, runs each case with a fresh timeout, and
+prints a short result:</p>
+<div class="language-text highlight"><span class="filename">Evaluation output</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>PASS case=&quot;email-is-detected-and-request-is-allowed&quot;
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>PASS case=&quot;ordinary-body-is-allowed&quot;
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>SUMMARY total=2 passed=2 failed=0
 </span></code></pre></div>
-<p><code>request.context</code>, <code>request.target</code>, and <code>request.headers</code> use the existing
-protobuf-free domain fields. The evaluator decodes <code>request.body</code> into the
-bounded <code>HttpRequest</code> model that the service uses. <code>expected.decision</code> is
-required. Source kind, gate name, gate type, and ordered finding types are
-optional projections. Gate name and gate type require a <code>gate</code> source kind.
-The evaluator does not compare omitted projections.</p>
-<p>Each case gets a new <code>Timeout</code>. Policy preparation gets a separate timeout.
-The evaluator reuses one prepared processor for all cases. Output is
-content-safe and stable:</p>
-<div class="language-text highlight"><span class="filename">Evaluation output</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>PASS case=&quot;ordinary-request&quot;
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>SUMMARY total=1 passed=1 failed=0
+<p>No request goes to an upstream service. The command does not start gRPC,
+attach credentials, or persist request data.</p>
+<h2 id="write-one-test-case">Write one test case</h2>
+<p>The CLI calls the cases file a <em>corpus</em>. In plain terms, it is a versioned YAML
+test suite. <code>version: 1</code> selects the current file format. You do not need to
+manage multiple versions.</p>
+<p>This example checks that the regex policy reports an email finding and then
+allows the request through its default decision:</p>
+<div class="language-yaml highlight"><span class="filename">cases.yaml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">cases</span><span class="p">:</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email-is-detected</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">provenance</span><span class="p">:</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">synthetic</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="nt">redacted</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">request</span><span class="p">:</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">      </span><span class="nt">context</span><span class="p">:</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">        </span><span class="nt">request_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test-email</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">        </span><span class="nt">sandbox_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test-sandbox</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">      </span><span class="nt">target</span><span class="p">:</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">        </span><span class="nt">scheme</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">        </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api.example.com</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">        </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">        </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POST</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">        </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/v1/messages</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">        </span><span class="nt">query</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">      </span><span class="nt">headers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">      </span><span class="nt">body</span><span class="p">:</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">        </span><span class="nt">encoding</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">utf8</span>
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;send</span><span class="nv"> </span><span class="s">alice@example.com&quot;</span>
+</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="w">    </span><span class="nt">expected</span><span class="p">:</span>
+</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="w">      </span><span class="nt">decision</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">allow</span>
+</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="w">      </span><span class="nt">finding_types</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">sensitive_entity</span><span class="p p-Indicator">]</span>
 </span></code></pre></div>
-<p>Exit status <code>0</code> means that every case matches. Status <code>1</code> means that one or
-more cases do not match. Status <code>2</code> means that input, preparation, or execution
-failed. Mismatch lines contain only decision metadata and finding types. The
-command does not print request bodies or raw exception text.</p>
+<p>Each case has three parts:</p>
+<ul>
+<li><code>provenance</code> records whether the request is synthetic or captured and
+  whether its content is redacted.</li>
+<li><code>request</code> contains the immutable HTTP request that the gates will evaluate.</li>
+<li><code>expected</code> contains the result fields that must match.</li>
+</ul>
+<p>Only <code>expected.decision</code> is required. Add more expected fields when they make
+the test more useful:</p>
+<table>
+<thead>
+<tr>
+<th>Expected field</th>
+<th>What it checks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>decision_source_kind</code></td>
+<td>Whether a gate, the pipeline default, or a runtime limit made the decision</td>
+</tr>
+<tr>
+<td><code>gate_name</code></td>
+<td>Which configured gate made a terminal decision</td>
+</tr>
+<tr>
+<td><code>gate_type</code></td>
+<td>Which gate implementation made a terminal decision</td>
+</tr>
+<tr>
+<td><code>finding_types</code></td>
+<td>The ordered finding types returned by the pipeline</td>
+</tr>
+</tbody>
+</table>
+<p>Gate name and gate type apply only when <code>decision_source_kind</code> is <code>gate</code>.
+Omitted fields are not compared. The current evaluator does not compare the
+contents of a request patch.</p>
+<h2 id="grow-the-suite-with-the-policy">Grow the suite with the policy</h2>
+<p>Start with one normal request and one request for each important deny or
+finding rule. Add a case whenever you fix a policy bug. Keep captured requests
+small, deliberate, and redacted when possible.</p>
+<p>Case names must be unique. Optional tags can group cases for external tooling.
+The parser also rejects aliases, duplicate keys, unknown fields, invalid
+base64, and values that exceed runtime limits. These checks keep tests
+repeatable and ensure that test requests follow the same bounds as service
+requests.</p>
+<p>Use <code>--registry-factory</code> when the policy contains application-owned custom
+gates:</p>
+<div class="language-bash highlight"><span class="filename">Test a custom gate</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--registry-factory<span class="w"> </span>examples.custom_gate.keyword_gate:create_registry<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>evaluate<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--policy<span class="w"> </span>examples/custom_gate/egress-gate-config.yaml<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span>--cases<span class="w"> </span>examples/custom_gate/cases.yaml
+</span></code></pre></div>
+<h2 id="use-the-result-in-automation">Use the result in automation</h2>
+<p>The command uses stable exit statuses:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><code>0</code></td>
+<td>Every case matched</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>1</code></td>
+<td>One or more cases did not match</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>2</code></td>
+<td>The policy, cases, preparation, or execution failed</td>
+</tr>
+</tbody>
+</table>
+<p>Failure output contains decision metadata and finding types. It does not print
+request bodies or raw exception text. This makes the command suitable for CI
+logs while keeping request content out of normal output.</p>
 
 
 

@@ -85,4 +85,4 @@ size of the OpenShell configuration.
 For repeatable request-level checks, the `evaluate` command accepts a pipeline
 policy and a strict version-one corpus. It uses the registry's prepared
 processor path and does not start the gRPC service. See
-[Offline evaluation](evaluation.md).
+[Test policies offline](evaluation.md).

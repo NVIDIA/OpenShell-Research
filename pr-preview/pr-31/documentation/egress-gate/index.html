@@ -635,7 +635,7 @@
   <span class="md-ellipsis">
     
   
-  Offline policy evaluation
+  Test policies offline
 
     
   </span>
@@ -1275,9 +1275,9 @@ protobuf-free and can be evaluated offline.</p>
 </span></code></pre></div>
 <p>Use the <a href="gates/regex/">regex-body guide</a> for an OpenShell policy and a
 file-backed catalog.</p>
-<p>Use <a href="evaluation/">offline evaluation</a> to run bounded request corpora through
-the same prepared <code>RequestProcessor</code> used by the service, without starting
-gRPC or contacting an upstream provider.</p>
+<p>Use <a href="evaluation/">offline policy tests</a> to check saved request examples with
+the same prepared <code>RequestProcessor</code> used by the service. No request goes to an
+upstream provider.</p>
 <h2 id="core-rules">Core rules</h2>
 <ul>
 <li>A policy has one through ten named gates and a required <code>default_decision</code>.</li>
@@ -1296,7 +1296,7 @@ gRPC or contacting an upstream provider.</p>
 <h2 id="further-reading">Further reading</h2>
 <ul>
 <li><a href="configuration/">Configuration</a></li>
-<li><a href="evaluation/">Offline evaluation</a></li>
+<li><a href="evaluation/">Test policies offline</a></li>
 <li><a href="operations/">Operations</a></li>
 <li><a href="gates/custom/">Gate authoring</a></li>
 <li><a href="gates/regex/">Regex-body</a></li>
