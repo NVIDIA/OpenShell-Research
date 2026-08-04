@@ -18,17 +18,12 @@ It is not a forward proxy, TLS interceptor, or response filter. It does not
 protect content that a harness already wrote to disk. Configure storage and
 retention controls separately.
 
-## Runtime shape
+## Request path
 
-```text
-OpenShell protobuf/gRPC
-        -> service adapter
-        -> HttpRequest + strict pipeline config
-        -> RequestProcessor + shared Timeout
-        -> GateEvaluation sequence
-        -> EgressResult
-        -> OpenShell protobuf/gRPC
-```
+<figure class="documentation-figure documentation-figure--portrait">
+  <img src="assets/diagrams/request-path.svg" alt="A provider-bound request moves from a sandbox application through OpenShell and Egress Gate before it reaches the provider.">
+  <figcaption>OpenShell calls Egress Gate before it attaches provider credentials.</figcaption>
+</figure>
 
 Only `service/` imports generated bindings. Gate and processor code is
 protobuf-free and can be evaluated offline.

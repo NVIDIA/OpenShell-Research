@@ -1081,10 +1081,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#runtime-shape" class="md-nav__link">
+  <a href="#request-path" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Runtime shape
+        Request path
       </span>
     </span>
   </a>
@@ -1256,15 +1256,12 @@ configuration type and an explicit control result.</p>
 <p>It is not a forward proxy, TLS interceptor, or response filter. It does not
 protect content that a harness already wrote to disk. Configure storage and
 retention controls separately.</p>
-<h2 id="runtime-shape">Runtime shape</h2>
-<p><code>text
-OpenShell protobuf/gRPC
-        -&gt; service adapter
-        -&gt; HttpRequest + strict pipeline config
-        -&gt; RequestProcessor + shared Timeout
-        -&gt; GateEvaluation sequence
-        -&gt; EgressResult
-        -&gt; OpenShell protobuf/gRPC</code></p>
+<h2 id="request-path">Request path</h2>
+<figure class="documentation-figure documentation-figure--portrait">
+  <img src="assets/diagrams/request-path.svg" alt="A provider-bound request moves from a sandbox application through OpenShell and Egress Gate before it reaches the provider.">
+  <figcaption>OpenShell calls Egress Gate before it attaches provider credentials.</figcaption>
+</figure>
+
 <p>Only <code>service/</code> imports generated bindings. Gate and processor code is
 protobuf-free and can be evaluated offline.</p>
 <h2 id="quickstart">Quickstart</h2>

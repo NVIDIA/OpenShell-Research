@@ -1094,6 +1094,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#pipeline-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pipeline execution
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#trust-and-state" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1259,15 +1270,12 @@
 
 
 <h1 id="system-architecture">System architecture</h1>
-<p>Egress Gate has one transport adapter and one protobuf-free runtime:</p>
-<p><code>text
-OpenShell SupervisorMiddleware
-        -&gt; service/servicer.py
-        -&gt; HttpRequest + EgressGateConfig
-        -&gt; RequestProcessor
-        -&gt; GateRegistry-prepared Gate instances
-        -&gt; EgressResult
-        -&gt; service/servicer.py</code></p>
+<p>Egress Gate has one transport adapter and one protobuf-free runtime.</p>
+<figure class="documentation-figure documentation-figure--wide">
+  <img src="../assets/diagrams/component-architecture.svg" alt="Egress Gate has separate transport, policy, request-processing, and request-gate layers.">
+  <figcaption>Transport code stays outside the protobuf-free runtime and gate contract.</figcaption>
+</figure>
+
 <h2 id="component-ownership">Component ownership</h2>
 <table>
 <thead>
@@ -1316,6 +1324,12 @@ OpenShell SupervisorMiddleware
 does not add a second execution path or import the transport adapter.</p>
 <p>Only <code>service/</code> imports generated protobuf/gRPC bindings. The processor and
 gates receive domain values and can be tested offline.</p>
+<h2 id="pipeline-execution">Pipeline execution</h2>
+<figure class="documentation-figure documentation-figure--wide">
+  <img src="../assets/diagrams/processing-pipeline.svg" alt="A request moves through runtime controls and an ordered gate pipeline before Egress Gate returns a result.">
+  <figcaption>Each gate sees the current request. A <code>proceed</code> result makes a validated patch visible to the next gate.</figcaption>
+</figure>
+
 <h2 id="trust-and-state">Trust and state</h2>
 <p>Registry factories and custom gate modules are trusted deployment code.
 Capabilities mechanically constrain outputs but do not sandbox Python reads.

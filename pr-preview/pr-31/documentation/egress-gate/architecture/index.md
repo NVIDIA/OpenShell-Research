@@ -6,17 +6,12 @@ agent_markdown: true
 
 # System architecture
 
-Egress Gate has one transport adapter and one protobuf-free runtime:
+Egress Gate has one transport adapter and one protobuf-free runtime.
 
-```text
-OpenShell SupervisorMiddleware
-        -> service/servicer.py
-        -> HttpRequest + EgressGateConfig
-        -> RequestProcessor
-        -> GateRegistry-prepared Gate instances
-        -> EgressResult
-        -> service/servicer.py
-```
+<figure class="documentation-figure documentation-figure--wide">
+  <img src="../assets/diagrams/component-architecture.svg" alt="Egress Gate has separate transport, policy, request-processing, and request-gate layers.">
+  <figcaption>Transport code stays outside the protobuf-free runtime and gate contract.</figcaption>
+</figure>
 
 ## Component ownership
 
@@ -37,6 +32,13 @@ does not add a second execution path or import the transport adapter.
 
 Only `service/` imports generated protobuf/gRPC bindings. The processor and
 gates receive domain values and can be tested offline.
+
+## Pipeline execution
+
+<figure class="documentation-figure documentation-figure--wide">
+  <img src="../assets/diagrams/processing-pipeline.svg" alt="A request moves through runtime controls and an ordered gate pipeline before Egress Gate returns a result.">
+  <figcaption>Each gate sees the current request. A <code>proceed</code> result makes a validated patch visible to the next gate.</figcaption>
+</figure>
 
 ## Trust and state
 
