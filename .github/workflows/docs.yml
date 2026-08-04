@@ -50,6 +50,9 @@ jobs:
       - name: Check navigation JavaScript syntax
         run: node --check docs/javascripts/navigation-drawer.js
 
+      - name: Test navigation JavaScript behavior
+        run: node tests/navigation-drawer.test.js
+
       - name: Build documentation
         run: scripts/build-docs.sh
 

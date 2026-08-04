@@ -74,6 +74,7 @@ features = [
   "navigation.sections",
   "navigation.indexes",
   "navigation.path",
+  "navigation.footer",
   "navigation.top",
   "search.highlight",
   "toc.follow"
