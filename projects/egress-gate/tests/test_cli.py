@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from types import ModuleType
 
 import pytest
@@ -57,3 +58,75 @@ def test_registry_factory_loader_rejects_invalid_references(reference: str) -> N
 def test_unfinalized_registry_cannot_be_used_by_the_middleware() -> None:
     with pytest.raises(GateRegistryError):
         create_builtin_registry().register(object)
+
+
+def test_cli_evaluate_runs_the_builtin_policy_corpus() -> None:
+    project_dir = Path(__file__).parents[1]
+    result = CliRunner().invoke(
+        app,
+        [
+            "evaluate",
+            "--policy",
+            str(project_dir / "examples/deterministic-gate/egress-gate-config.yaml"),
+            "--cases",
+            str(project_dir / "examples/deterministic-gate/cases.yaml"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert 'PASS case="known-read-is-allowed"' in result.stdout
+    assert "SUMMARY total=2 passed=2 failed=0" in result.stdout
+
+
+def test_cli_evaluate_reports_content_safe_mismatch_status(tmp_path: Path) -> None:
+    project_dir = Path(__file__).parents[1]
+    cases = tmp_path / "cases.yaml"
+    original = (project_dir / "examples/deterministic-gate/cases.yaml").read_text()
+    cases.write_text(original.replace("decision: allow", "decision: deny", 1))
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "evaluate",
+            "--policy",
+            str(project_dir / "examples/deterministic-gate/egress-gate-config.yaml"),
+            "--cases",
+            str(cases),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert 'FAIL case="known-read-is-allowed" field=decision' in result.stdout
+    assert "SUMMARY total=2 passed=1 failed=1" in result.stdout
+    assert "{}" not in result.stdout
+
+
+@pytest.mark.parametrize(
+    "invalid_yaml",
+    [
+        "version: 1\ncases: &cases []\n",
+        "version: 1\ncases:\n  - name: one\n    name: two\n",
+    ],
+)
+def test_cli_evaluate_rejects_non_strict_corpus_yaml(
+    tmp_path: Path,
+    invalid_yaml: str,
+) -> None:
+    project_dir = Path(__file__).parents[1]
+    cases = tmp_path / "cases.yaml"
+    cases.write_text(invalid_yaml)
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "evaluate",
+            "--policy",
+            str(project_dir / "examples/deterministic-gate/egress-gate-config.yaml"),
+            "--cases",
+            str(cases),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "EVALUATE_ERROR invalid_input" in result.stderr
+    assert "YAML aliases" not in result.output

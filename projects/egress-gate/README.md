@@ -19,6 +19,9 @@ uv sync --frozen
 uv run egress-gate gates
 uv run egress-gate configuration-schema
 uv run egress-gate serve --listen 127.0.0.1:50051
+uv run egress-gate evaluate \
+  --policy examples/deterministic-gate/egress-gate-config.yaml \
+  --cases examples/deterministic-gate/cases.yaml
 ```
 
 Use `0.0.0.0` only when the OpenShell supervisor must reach the service across
@@ -75,6 +78,7 @@ through slot acquisition, policy preparation, and `RequestProcessor.process`.
 
 - [Overview](docs/index.md)
 - [Configuration](docs/configuration.md)
+- [Offline evaluation](docs/evaluation.md)
 - [Operations](docs/operations.md)
 - [Gate authoring](docs/gates/custom.md)
 - [Regex-body](docs/gates/regex.md)
@@ -84,6 +88,7 @@ through slot acquisition, policy preparation, and `RequestProcessor.process`.
 - [Regex-body example](examples/regex-engine/README.md)
 - [Deterministic request-rules example](examples/deterministic-gate/README.md)
 - [Custom gate example](examples/custom-engine/README.md)
+- [Custom semantic gate example](examples/custom-semantic-gate/README.md)
 
 ## Development
 

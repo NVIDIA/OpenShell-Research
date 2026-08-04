@@ -16,6 +16,7 @@ from egress_gate.gates import (
     create_builtin_registry,
 )
 from egress_gate.request import HttpRequest
+from egress_gate.request_processor import RequestProcessor
 from egress_gate.result import GateEvaluation
 from egress_gate.timeout import Timeout
 
@@ -123,6 +124,22 @@ def test_registry_forwards_the_shared_preparation_timeout() -> None:
 
     assert isinstance(gate, _RegistryGate)
     assert gate.preparation_timeout is timeout
+
+
+def test_registry_prepares_the_production_processor_from_validated_config() -> None:
+    registry = GateRegistry()
+    registry.register(_RegistryGate)
+    registry.finalize()
+    config = registry.validate_config(
+        _pipeline({"gate": "registry-test", "answer": 42})
+    )
+
+    processor = registry.prepare_processor(
+        config,
+        timeout=Timeout.from_seconds(1),
+    )
+
+    assert isinstance(processor, RequestProcessor)
 
 
 def test_registry_injects_typed_application_resources() -> None:

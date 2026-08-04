@@ -81,3 +81,7 @@ uv run egress-gate \
 The factory must return a finalized `GateRegistry`. It owns trusted gate
 classes and typed `GateResources`; policy configuration cannot import Python,
 choose a resource implementation, or provide credentials.
+
+For repeatable request-level checks, the `evaluate` command accepts a pipeline
+policy and a strict version-one corpus. It uses the registry's prepared
+processor seam and does not start the gRPC service; see [Offline evaluation](evaluation.md).

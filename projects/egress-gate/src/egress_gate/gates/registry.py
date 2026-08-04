@@ -42,6 +42,7 @@ from egress_gate.timeout import Timeout
 
 if TYPE_CHECKING:
     from egress_gate.config import EgressGateConfig
+    from egress_gate.request_processor import RequestProcessor
 
 
 @dataclass(frozen=True)
@@ -170,6 +171,48 @@ class GateRegistry:
             config,
             registration.resources,
             timeout=timeout,
+        )
+
+    def prepare_processor(
+        self,
+        validated_config: EgressGateConfig[GateConfig],
+        *,
+        timeout: Timeout,
+        log_request_content: bool = False,
+    ) -> RequestProcessor:
+        """Prepare one processor from a validated policy configuration.
+
+        This is the production preparation seam shared by the service and
+        offline evaluation. Registration, policy validation, and resource
+        ownership remain registry responsibilities; the returned processor
+        owns only the prepared gates and immutable policy metadata.
+        """
+        from egress_gate.request_processor import RequestProcessor
+
+        if not _is_egress_gate_config(validated_config):
+            raise GateRegistryError("processor configuration is invalid")
+        if not isinstance(timeout, Timeout):
+            raise GateRegistryError("processor preparation timeout is invalid")
+
+        prepared: list[tuple[str, str, Gate[GateConfig, GateResources | None]]] = []
+        for configured_gate in validated_config.pipeline.gates:
+            timeout.raise_if_expired()
+            gate_type = getattr(configured_gate.config, "gate", None)
+            if not isinstance(gate_type, str):
+                raise GateRegistryError("gate config discriminator is invalid")
+            prepared.append(
+                (
+                    configured_gate.name,
+                    gate_type,
+                    self.create_gate(configured_gate.config, timeout=timeout),
+                )
+            )
+        timeout.raise_if_expired()
+        return RequestProcessor(
+            validated_config,
+            tuple(prepared),
+            policy_fingerprint=self.policy_fingerprint(validated_config),
+            log_request_content=log_request_content,
         )
 
     def configuration_json_schema(self) -> dict[str, object]:

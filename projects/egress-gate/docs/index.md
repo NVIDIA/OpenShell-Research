@@ -44,6 +44,10 @@ uv run egress-gate serve --listen 127.0.0.1:50051
 Use the [regex-body guide](gates/regex.md) for an OpenShell policy and a
 file-backed catalog.
 
+Use [offline evaluation](evaluation.md) to run bounded request corpora through
+the same prepared `RequestProcessor` used by the service, without starting
+gRPC or contacting an upstream provider.
+
 ## Core rules
 
 - A policy has one through ten named gates and a required `default_decision`.
@@ -61,6 +65,7 @@ file-backed catalog.
 ## Further reading
 
 - [Configuration](configuration.md)
+- [Offline evaluation](evaluation.md)
 - [Operations](operations.md)
 - [Gate authoring](gates/custom.md)
 - [Regex-body](gates/regex.md)

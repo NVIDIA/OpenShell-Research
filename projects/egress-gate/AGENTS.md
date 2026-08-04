@@ -40,6 +40,7 @@ Run focused tests while working and `make check` before handoff.
   traces, metadata, and final results
 - `src/egress_gate/request_processor.py`: shared deadline, current-request
   mutation flow, terminal controls, aggregation, and default decisions
+- `src/egress_gate/cli.py`: content-safe offline policy-corpus evaluation
 - `src/egress_gate/service/`: gRPC lifecycle and the only protobuf adapter
 - `src/egress_gate/timeout.py`: monotonic shared request deadline
 - `src/egress_gate/errors.py`: stable content-safe error catalog
@@ -90,8 +91,9 @@ middleware phase.
 
 ## Plan boundaries
 
-The current implementation slice covers the gate contract, strict pipeline
-configuration, finalized registry, regex-body and request-rules behavior, and
-request processor. Active-policy fingerprint replacement hardening, evaluation
-tooling, custom semantic examples, and broader documentation remain separate
-planned slices. Do not edit `plans/` as part of implementation work.
+The current implementation covers the gate contract, strict pipeline
+configuration, finalized registry, regex-body and request-rules behavior,
+request processing, single active-policy replacement, and offline evaluation.
+The custom semantic gate remains example-owned; semantic types are not part of
+the core package or default registry. Do not edit `plans/` as part of
+implementation work.

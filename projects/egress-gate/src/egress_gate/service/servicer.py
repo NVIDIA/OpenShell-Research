@@ -44,7 +44,7 @@ from egress_gate.errors import (
     GateRegistryError,
     TimeoutExpiredError,
 )
-from egress_gate.gates.base import Gate, GateConfig, GateResources
+from egress_gate.gates.base import GateConfig
 from egress_gate.gates.registry import GateRegistry
 from egress_gate.logging import get_logger
 from egress_gate.request import (
@@ -346,27 +346,10 @@ class _ActivePolicy:
         *,
         timeout: Timeout,
     ) -> RequestProcessor:
-        prepared: list[tuple[str, str, Gate[GateConfig, GateResources | None]]] = []
-        for configured_gate in config.pipeline.gates:
-            timeout.raise_if_expired()
-            gate_type = getattr(configured_gate.config, "gate", None)
-            if not isinstance(gate_type, str):
-                raise GateRegistryError("gate config discriminator is invalid")
-            prepared.append(
-                (
-                    configured_gate.name,
-                    gate_type,
-                    self._registry.create_gate(
-                        configured_gate.config,
-                        timeout=timeout,
-                    ),
-                )
-            )
-        fingerprint = self._registry.policy_fingerprint(config)
-        return RequestProcessor(
+        """Delegate production preparation to the finalized registry."""
+        return self._registry.prepare_processor(
             config,
-            tuple(prepared),
-            policy_fingerprint=fingerprint,
+            timeout=timeout,
             log_request_content=self._log_request_content,
         )
 
