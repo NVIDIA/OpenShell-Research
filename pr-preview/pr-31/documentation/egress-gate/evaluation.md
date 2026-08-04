@@ -30,7 +30,7 @@ benchmark harness around the same request set when you need performance data.
 ## Try the included example
 
 The repository includes a regex policy and two request cases. Run them from
-`projects/egress-gate/`; `uv` prepares the locked environment automatically:
+`projects/egress-gate/`; `uv` prepares the project environment automatically:
 
 ```bash title="Run the example policy tests"
 uv run egress-gate evaluate \

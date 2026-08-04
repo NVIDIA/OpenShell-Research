@@ -13,7 +13,7 @@ protobuf, or `RequestProcessor` internals.
 The repository includes a runnable
 [minimal custom gate](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/custom-gate)
 that pairs the implementation below with a policy and two offline evaluation
-cases. Run it from `projects/egress-gate/`; `uv` prepares the locked environment
+cases. Run it from `projects/egress-gate/`; `uv` prepares the project environment
 automatically:
 
 ```bash title="Run the custom-gate example"

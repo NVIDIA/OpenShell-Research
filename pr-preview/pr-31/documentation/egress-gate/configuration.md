@@ -59,7 +59,7 @@ trusted application registry factory supplies other behavior.
 
 ## Inspect the installed registry
 
-Run these commands from `projects/egress-gate/`. `uv` prepares the locked
+Run these commands from `projects/egress-gate/`. `uv` prepares the project
 environment automatically:
 
 ```bash title="Inspect the default registry"
