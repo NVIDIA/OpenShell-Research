@@ -9,7 +9,7 @@ agent_markdown: true
 The OpenShell gateway and sandbox supervisors call Egress Gate through gRPC.
 Install and run the service from `projects/egress-gate`:
 
-```bash
+```bash title="Start Egress Gate"
 uv sync --frozen
 uv run egress-gate gates
 uv run egress-gate configuration-schema
@@ -22,7 +22,7 @@ trusted network. Do not expose the port to an untrusted network.
 
 ## OpenShell registration
 
-```bash
+```bash title="Register Egress Gate"
 uv run egress-gate add-gateway-registration \
   --host-ip YOUR_HOST_IPV4 --name egress-gate --port 50051
 ```
@@ -32,7 +32,7 @@ The command updates `OPENSHELL_GATEWAY_CONFIG`, then
 `~/.config/openshell/gateway.toml`. Use `--config PATH` for another file.
 Restart the OpenShell gateway after changing registrations. Remove one with:
 
-```bash
+```bash title="Remove the registration"
 uv run egress-gate remove-gateway-registration --name egress-gate
 ```
 
@@ -72,7 +72,7 @@ time.
 
 Inspect a finite OpenShell log window:
 
-```bash
+```bash title="Inspect recent sandbox logs"
 openshell status
 openshell logs SANDBOX_NAME -n 100 --source sandbox
 ```

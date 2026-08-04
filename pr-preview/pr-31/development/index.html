@@ -1202,8 +1202,8 @@ instead of generated artwork. Hero images must live under <code>docs/</code>.</p
 <li><code># dev-notes:nav:start</code> / <code># dev-notes:nav:end</code> in <code>zensical.toml</code></li>
 </ul>
 <p>After changing posts or author metadata, run:</p>
-<p><code>sh
-python3 scripts/render-dev-notes.py</code></p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python3<span class="w"> </span>scripts/render-dev-notes.py
+</span></code></pre></div>
 <p>Commit any generated changes with the source change.</p>
 <h2 id="theme-and-brand-assets">Theme and brand assets</h2>
 <p>Keep shared brand assets in <code>docs/assets/brand/</code>. Use the compact SVG mark for
@@ -1219,9 +1219,9 @@ for arbitrary paths where root-relative theme assets do not resolve beneath the
 project site prefix.</p>
 <h2 id="validate-and-preview">Validate and preview</h2>
 <p>Run the renderer tests and the same clean build used by CI:</p>
-<p><code>sh
-python3 tests/test_render_dev_notes.py
-scripts/build-docs.sh</code></p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python3<span class="w"> </span>tests/test_render_dev_notes.py
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>scripts/build-docs.sh
+</span></code></pre></div>
 <p><code>scripts/build-docs.sh</code> recreates <code>.venv-docs</code>, installs the pinned toolchain,
 stages canonical Egress Gate documentation from
 <code>projects/egress-gate/docs/</code>, renders Dev Notes metadata, and runs
@@ -1229,8 +1229,8 @@ stages canonical Egress Gate documentation from
 without issues.</p>
 <p>For documentation-site changes, serve the complete built artifact before
 handing the task back:</p>
-<p><code>sh
-python3 -m http.server 8000 --directory site</code></p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>http.server<span class="w"> </span><span class="m">8000</span><span class="w"> </span>--directory<span class="w"> </span>site
+</span></code></pre></div>
 <p>Confirm <a href="http://localhost:8000">http://localhost:8000</a> is reachable and report the URL and command being
 served. Plain <code>zensical serve</code> does not run the post-build Markdown publisher,
 so it is not an artifact-faithful preview. Pull requests from branches in this
@@ -1310,7 +1310,7 @@ roll back to a revision before preview support, leave the Pages source set to
     
       
       
-      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["navigation.sections","navigation.indexes","navigation.path","navigation.top","search.highlight","toc.follow"],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.top","search.highlight","toc.follow"],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
       <script src="../assets/javascripts/bundle.6e5f0216.min.js"></script>
