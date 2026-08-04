@@ -14,6 +14,7 @@
       .implementation{font-size:18px;font-weight:700}
       .subtitle{font-size:15px;fill:#5f6b76}
       .arrow{fill:none;stroke:#718096;stroke-width:2.4;marker-end:url(#arrow)}
+      .arrow-head{fill:#718096}
       .dependency{fill:none;stroke:#a0aec0;stroke-width:2;stroke-dasharray:7 6;marker-end:url(#arrow)}
       .arrow-label{font-size:14px;fill:#5f6b76}
       @media(prefers-color-scheme:dark){
@@ -25,11 +26,12 @@
         .gate{fill:#2d203a;stroke:#b794d4}
         .layer-label,.subtitle,.arrow-label{fill:#aeb8c5}
         .arrow{stroke:#8b98a5}
+        .arrow-head{fill:#8b98a5}
         .dependency{stroke:#71808e}
       }
     </style>
     <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0 10 5 0 10Z" fill="#718096"/>
+      <path d="M0 0 10 5 0 10Z" class="arrow-head"/>
     </marker>
   </defs>
 

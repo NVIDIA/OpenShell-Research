@@ -6,6 +6,11 @@ agent_markdown: true
 
 # Request lifecycle
 
+<figure class="documentation-figure documentation-figure--wide">
+  <img src="../assets/diagrams/request-lifecycle.svg" alt="The request lifecycle validates the transport and policy, runs the gate pipeline, and returns either a result or an RPC failure.">
+  <figcaption>Input failures end the RPC. Policy decisions and runtime-limit denials return normal middleware results.</figcaption>
+</figure>
+
 ## 1. Validate the transport
 
 The service checks the pre-credentials phase, exact protobuf configuration,
