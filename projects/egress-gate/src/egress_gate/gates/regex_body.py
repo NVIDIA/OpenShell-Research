@@ -28,6 +28,7 @@ from egress_gate.constants import (
     MAX_BODY_BYTES,
     MAX_DETECTIONS_PER_GATE,
     MAX_DIAGNOSTIC_TEXT_BYTES,
+    MAX_PROTO_FINDING_GROUPS,
     MAX_REGEX_CATALOG_FILE_BYTES,
     MAX_REGEX_CATALOG_PATH_BYTES,
     MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES,
@@ -178,7 +179,7 @@ class RegexBodyMode(StrEnum):
 class RegexBodyConfig(GateConfig):
     """Exact policy configuration owned by ``RegexBodyGate``."""
 
-    gate: Literal["regex-body"] = "regex-body"
+    gate: Literal["regex-body"]
     pattern_catalog: RegexPatternCatalog = Field(
         repr=False,
         description=(
@@ -294,6 +295,8 @@ class RegexBodyGate(Utf8BodyGate[RegexBodyConfig, None]):
         )
         detections = tuple(item[0] for item in detections_with_identity)
         findings = _aggregate_findings(detections)
+        if len(findings) > MAX_PROTO_FINDING_GROUPS:
+            raise GateLimitExceededError("regex finding groups exceed the limit")
         output_text = text
         if self.config.mode is RegexBodyMode.REPLACE and detections:
             replacement = self.config.replacement

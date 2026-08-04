@@ -136,9 +136,16 @@ class Gate(ABC, Generic[GateConfigT, GateResourcesT]):
             raw_result = self._evaluate(request, timeout=timeout)
             if not isinstance(raw_result, GateEvaluation):
                 raise GateContractError("gate output is invalid")
-            result = GateEvaluation.model_validate(raw_result.model_dump())
+            try:
+                result = GateEvaluation.model_validate(raw_result.model_dump())
+            except ValidationError:
+                raise GateContractError("gate output is invalid") from None
             timeout.raise_if_expired()
-            self._validate_output(result)
+            _validate_gate_output(
+                type(self).capabilities,
+                type(self).finding_types,
+                result,
+            )
             return result
         except (GateError, TimeoutExpiredError):
             raise
@@ -191,22 +198,6 @@ class Gate(ABC, Generic[GateConfigT, GateResourcesT]):
         """Return one explicit control result for the current request."""
         raise NotImplementedError
 
-    def _validate_output(self, result: GateEvaluation) -> None:
-        capabilities = type(self).capabilities
-        if result.patch.replacement_body is not None and not capabilities.replaces_body:
-            raise GateContractError("gate returned an undeclared body replacement")
-        if result.patch.header_mutations and not capabilities.mutates_headers:
-            raise GateContractError("gate returned undeclared header mutations")
-        if result.findings and not capabilities.produces_findings:
-            raise GateContractError("gate returned undeclared findings")
-        if result.control.value == "allow" and not capabilities.may_allow:
-            raise GateContractError("gate returned an undeclared terminal allow")
-        if result.control.value == "deny" and not capabilities.may_deny:
-            raise GateContractError("gate returned an undeclared deny")
-        declared_types = frozenset(item.type for item in type(self).finding_types)
-        if any(finding.type not in declared_types for finding in result.findings):
-            raise GateContractError("gate returned an undeclared finding type")
-
 
 class Utf8BodyGate(
     Gate[GateConfigT, GateResourcesT], Generic[GateConfigT, GateResourcesT]
@@ -248,6 +239,26 @@ class Utf8BodyGate(
     ) -> GateEvaluation:
         """Evaluate the decoded body and preserve explicit replacement intent."""
         raise NotImplementedError
+
+
+def _validate_gate_output(
+    capabilities: GateCapabilities,
+    finding_types: tuple[FindingTypeDefinition, ...],
+    result: GateEvaluation,
+) -> None:
+    if result.patch.replacement_body is not None and not capabilities.replaces_body:
+        raise GateContractError("gate returned an undeclared body replacement")
+    if result.patch.header_mutations and not capabilities.mutates_headers:
+        raise GateContractError("gate returned undeclared header mutations")
+    if result.findings and not capabilities.produces_findings:
+        raise GateContractError("gate returned undeclared findings")
+    if result.control.value == "allow" and not capabilities.may_allow:
+        raise GateContractError("gate returned an undeclared terminal allow")
+    if result.control.value == "deny" and not capabilities.may_deny:
+        raise GateContractError("gate returned an undeclared deny")
+    declared_types = frozenset(item.type for item in finding_types)
+    if any(finding.type not in declared_types for finding in result.findings):
+        raise GateContractError("gate returned an undeclared finding type")
 
 
 def _declared_gate_types(

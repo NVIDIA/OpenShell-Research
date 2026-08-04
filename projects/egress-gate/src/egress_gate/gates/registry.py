@@ -333,8 +333,8 @@ def _gate_discriminator(config_type: type[GateConfig]) -> str:
     gate_name = values[0]
     if _GATE_NAME.fullmatch(gate_name) is None:
         raise GateRegistryError("gate discriminator is invalid")
-    if field.default is not PydanticUndefined and field.default != gate_name:
-        raise GateRegistryError("gate discriminator default is inconsistent")
+    if field.default is not PydanticUndefined:
+        raise GateRegistryError("gate discriminator must be required")
     return gate_name
 
 

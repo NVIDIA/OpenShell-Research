@@ -11,7 +11,7 @@ from egress_gate.timeout import Timeout
 class KeywordDenyConfig(GateConfig):
     """Policy fields accepted by the custom gate."""
 
-    gate: Literal["keyword-deny"] = "keyword-deny"
+    gate: Literal["keyword-deny"]
     keyword: str
 
 

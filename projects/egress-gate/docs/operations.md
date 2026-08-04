@@ -59,6 +59,13 @@ Successful policy outcomes are distinct from gRPC failures:
 Runtime limit results contain no partial patch or findings. The active policy
 is not replaced by a failed candidate. See [Limits and failures](reference/limits-and-failures.md).
 
+## Policy rollout
+
+Each Egress Gate service keeps one active prepared policy. During a policy
+change, stop admitting the old configuration before sending the new one so the
+service performs one serialized cutover. Run separate service instances when
+distinct policies must remain active concurrently.
+
 ## Troubleshooting
 
 Inspect a finite OpenShell log window:

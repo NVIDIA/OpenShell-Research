@@ -717,7 +717,7 @@ gate with approximately this shape:
 
 ```python
 class KeywordDenyConfig(GateConfig):
-    gate: Literal["keyword-deny"] = "keyword-deny"
+    gate: Literal["keyword-deny"]
     keyword: str
     reason_code: ReasonCode
 
@@ -763,7 +763,7 @@ literal `gate` discriminator:
 
 ```python
 class KeywordDenyConfig(GateConfig):
-    gate: Literal["keyword-deny"] = "keyword-deny"
+    gate: Literal["keyword-deny"]
     keyword: str
 ```
 

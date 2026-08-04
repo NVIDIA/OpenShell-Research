@@ -14,6 +14,7 @@ from egress_gate.constants import (
     LIMIT_REASON_CODE,
     MAX_FINDING_COUNT,
     MAX_HEADER_MUTATIONS,
+    MAX_PROTO_FINDING_GROUPS,
 )
 from egress_gate.errors import (
     EgressGateError,
@@ -48,7 +49,7 @@ from egress_gate.timeout import Timeout
 
 
 class _ControlConfig(GateConfig):
-    gate: Literal["test-control"] = "test-control"
+    gate: Literal["test-control"]
     control: Literal["proceed", "allow", "deny"] = "proceed"
     replacement: str | None = None
     expected_body: str | None = None
@@ -340,6 +341,41 @@ def test_expired_shared_timeout_returns_atomic_runtime_limit_result() -> None:
     assert result.decision is EgressDecision.DENY
     assert result.decision_source.kind is DecisionSourceKind.RUNTIME_LIMIT
     assert result.reason_code == LIMIT_REASON_CODE
+    assert result.patch.is_empty
+
+
+def test_regex_finding_group_overflow_is_an_atomic_runtime_limit() -> None:
+    processor = _processor(
+        (
+            (
+                "regex",
+                {
+                    "gate": "regex-body",
+                    "pattern_catalog": {
+                        "entities": [
+                            {
+                                "name": f"entity-{index}",
+                                "rules": [{"pattern": "x", "confidence": "high"}],
+                            }
+                            for index in range(MAX_PROTO_FINDING_GROUPS + 1)
+                        ]
+                    },
+                    "mode": "detect",
+                },
+            ),
+        ),
+        include_regex=True,
+    )
+
+    result = processor.process(
+        _request(body=b"x"),
+        timeout=Timeout.from_seconds(1),
+    )
+
+    assert result.decision is EgressDecision.DENY
+    assert result.decision_source.kind is DecisionSourceKind.RUNTIME_LIMIT
+    assert result.reason_code == LIMIT_REASON_CODE
+    assert not result.findings
     assert result.patch.is_empty
 
 

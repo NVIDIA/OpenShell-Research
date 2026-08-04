@@ -29,6 +29,7 @@ def _config(
     replacement: dict[str, object] | None = None,
 ) -> RegexBodyConfig:
     values: dict[str, object] = {
+        "gate": "regex-body",
         "pattern_catalog": {
             "entities": [{"name": "token", "rules": rules}],
         },
@@ -540,13 +541,17 @@ def test_relative_yaml_catalog_loading_rejects_aliases_and_traversal(
     )
 
     config = RegexBodyConfig.model_validate(
-        {"pattern_catalog": "patterns.yaml", "mode": "detect"}
+        {"gate": "regex-body", "pattern_catalog": "patterns.yaml", "mode": "detect"}
     )
     assert len(_run(config, "secret").findings) == 1
 
     with pytest.raises(ValidationError):
         RegexBodyConfig.model_validate(
-            {"pattern_catalog": "../patterns.yaml", "mode": "detect"}
+            {
+                "gate": "regex-body",
+                "pattern_catalog": "../patterns.yaml",
+                "mode": "detect",
+            }
         )
     (directory / "aliases.yaml").write_text(
         "shared: &shared\n"
@@ -559,5 +564,9 @@ def test_relative_yaml_catalog_loading_rejects_aliases_and_traversal(
     )
     with pytest.raises(ValidationError):
         RegexBodyConfig.model_validate(
-            {"pattern_catalog": "aliases.yaml", "mode": "detect"}
+            {
+                "gate": "regex-body",
+                "pattern_catalog": "aliases.yaml",
+                "mode": "detect",
+            }
         )

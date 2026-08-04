@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Literal
 
 import pytest
@@ -22,7 +23,7 @@ from egress_gate.timeout import Timeout
 
 
 class _RegistryConfig(GateConfig):
-    gate: Literal["registry-test"] = "registry-test"
+    gate: Literal["registry-test"]
     answer: int
 
 
@@ -47,7 +48,7 @@ class _RegistryGate(Gate[_RegistryConfig, None]):
 
 
 class _ResourceConfig(GateConfig):
-    gate: Literal["resource-test"] = "resource-test"
+    gate: Literal["resource-test"]
 
 
 class _ResourceBundle(GateResources):
@@ -90,6 +91,32 @@ def test_builtin_registry_is_finalized_and_contains_only_regex_body() -> None:
     )
     schema = registry.configuration_json_schema()
     assert "pipeline" in str(schema.get("properties"))
+    definitions = schema["$defs"]
+    assert isinstance(definitions, Mapping)
+    regex_schema = next(
+        value for key, value in definitions.items() if key == "RegexBodyConfig"
+    )
+    assert isinstance(regex_schema, Mapping)
+    required = next(value for key, value in regex_schema.items() if key == "required")
+    assert isinstance(required, list)
+    assert "gate" in required
+
+    with pytest.raises(EgressGateError):
+        registry.validate_config(
+            _pipeline(
+                {
+                    "pattern_catalog": {
+                        "entities": [
+                            {
+                                "name": "token",
+                                "rules": [{"pattern": "secret", "confidence": "high"}],
+                            }
+                        ]
+                    },
+                    "mode": "detect",
+                }
+            )
+        )
 
 
 def test_registry_validates_exact_pipeline_and_gate_config() -> None:
@@ -106,6 +133,27 @@ def test_registry_validates_exact_pipeline_and_gate_config() -> None:
     gate = registry.create_gate(config.pipeline.gates[0].config)
     assert type(gate) is _RegistryGate
     assert gate.config.answer == 42
+
+
+def test_registry_requires_an_explicit_gate_discriminator() -> None:
+    class DefaultedConfig(GateConfig):
+        gate: Literal["defaulted"] = "defaulted"
+
+    class DefaultedGate(Gate[DefaultedConfig, None]):
+        capabilities = GateCapabilities()
+        finding_types = ()
+
+        def _evaluate(
+            self,
+            request: HttpRequest,
+            *,
+            timeout: Timeout,
+        ) -> GateEvaluation:
+            del request, timeout
+            return GateEvaluation.proceed()
+
+    with pytest.raises(GateRegistryError, match="discriminator must be required"):
+        GateRegistry().register(DefaultedGate)
 
 
 def test_registry_forwards_the_shared_preparation_timeout() -> None:
