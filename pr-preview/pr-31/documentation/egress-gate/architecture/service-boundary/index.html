@@ -777,7 +777,7 @@
   <span class="md-ellipsis">
     
   
-  Regex-body gate
+  Regex gate
 
     
   </span>
@@ -1425,9 +1425,10 @@ sixteen concurrent RPCs. Cancellation does not stop Python code that already
 runs in a worker. The worker owns its slot until it exits.</p>
 <h2 id="wire-findings-and-mutations">Wire findings and mutations</h2>
 <p>The current OpenShell <code>Finding</code> contains exactly <code>type</code>, <code>label</code>, <code>count</code>,
-<code>confidence</code>, and <code>severity</code>. <code>SourcedFinding.source_gate</code>, decision source,
-and traces are runtime values and are not serialized. The adapter rechecks
-protobuf finding and header sizes before returning a response.</p>
+<code>confidence</code>, and <code>severity</code>. <code>SourcedFinding.source_gate</code>, decision sources,
+and traces are runtime values and are not serialized. Decision sources use a
+strict <code>kind</code>-discriminated union. The adapter rechecks protobuf finding and
+header sizes before returning a response.</p>
 <p><code>RequestPatch</code> operations serialize in their validated order. <code>None</code> means no
 replacement, while empty bytes are emitted with <code>has_body=true</code>.</p>
 <h2 id="lifecycle-and-errors">Lifecycle and errors</h2>

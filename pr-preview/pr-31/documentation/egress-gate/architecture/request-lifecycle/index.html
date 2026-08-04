@@ -777,7 +777,7 @@
   <span class="md-ellipsis">
     
   
-  Regex-body gate
+  Regex gate
 
     
   </span>
@@ -1427,15 +1427,18 @@ candidate only after a final deadline check.</p>
 <p>For each configured gate:</p>
 <ol>
 <li>Check the shared deadline.</li>
-<li>Evaluate the current immutable <code>HttpRequest</code>.</li>
+<li>Pass the current read-only <code>HttpRequest</code> snapshot to the gate.</li>
 <li>Reconstruct and validate the returned <code>GateEvaluation</code>.</li>
 <li>Add a content-safe <code>GateTrace</code> and runtime-owned <code>SourcedFinding</code> values.</li>
-<li>On <code>proceed</code>, apply the patch to form the next current request.</li>
+<li>On <code>proceed</code>, validate the patch and construct the next request snapshot.</li>
 <li>On terminal <code>allow</code> or <code>deny</code>, stop without invoking later gates.</li>
 </ol>
-<p>The processor keeps the original request private. The final allowed patch
-combines preceding patches in order. A denied result always has an empty patch.
-Body replacement <code>None</code> and <code>b""</code> remain distinct.</p>
+<p>The processor never changes a request object in place. It keeps the original
+request private, constructs a new snapshot after each validated patch, and
+passes that snapshot to the next gate. The final allowed patch combines these
+changes in order for the service to return to OpenShell. A denied result always
+has an empty patch. Body replacement <code>None</code> and <code>b""</code> remain distinct. Header
+mutation variants use the required <code>kind</code> values <code>write</code> and <code>remove</code>.</p>
 <p>If every gate proceeds, <code>default_decision</code> controls the result. Default deny
 uses <code>egress_gate_default_deny</code>. Default allow has no reason code.</p>
 <h2 id="4-handle-runtime-limits">4. Handle runtime limits</h2>

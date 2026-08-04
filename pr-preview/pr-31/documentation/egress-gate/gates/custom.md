@@ -13,15 +13,21 @@ protobuf, or `RequestProcessor` internals.
 The repository includes a runnable
 [minimal custom gate](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/custom_gate)
 that pairs the implementation below with a policy and two offline evaluation
-cases. From `projects/egress-gate/`, run it with:
+cases. From `projects/egress-gate/`, activate the installed project environment
+and run it with:
 
 ```bash title="Run the custom-gate example"
-uv run python -m egress_gate.cli \
+source .venv/bin/activate
+egress-gate \
   --registry-factory examples.custom_gate.keyword_gate:create_registry \
   evaluate \
   --policy examples/custom_gate/egress-gate-config.yaml \
   --cases examples/custom_gate/cases.yaml
 ```
+
+The executable resolves the explicit `module:factory` reference from the
+working directory. A packaged deployment can resolve the same reference from
+an installed custom-gate package.
 
 ```python title="examples/custom_gate/keyword_gate.py"
 from typing import Literal
@@ -33,7 +39,7 @@ from egress_gate.timeout import Timeout
 
 
 class KeywordDenyConfig(GateConfig):
-    gate: Literal["keyword-deny"]
+    kind: Literal["keyword-deny"]
     keyword: str
 
 
@@ -60,6 +66,10 @@ def create_registry() -> GateRegistry:
 schema from the registered config types. Registry factories supply typed
 `GateResources` objects for deployment-owned clients or profiles. Policy
 configuration cannot construct or replace those resources.
+
+Every serialized variant uses a required `kind` field. A gate config declares
+one literal gate kind. Nested unions follow the same rule. This gives policy
+parsers and generated schemas one consistent way to select an exact model.
 
 Declare output capabilities and finding types accurately. The public wrapper
 rejects undeclared body replacements, header mutations, terminal decisions,

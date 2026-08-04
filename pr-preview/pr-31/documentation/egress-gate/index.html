@@ -777,7 +777,7 @@
   <span class="md-ellipsis">
     
   
-  Regex-body gate
+  Regex gate
 
     
   </span>
@@ -1281,13 +1281,14 @@ protobuf-free and can be evaluated offline.</p>
 <h2 id="quickstart">Quickstart</h2>
 <p>From <code>projects/egress-gate/</code>:</p>
 <div class="language-bash highlight"><span class="filename">Install, inspect, validate, and serve</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>sync<span class="w"> </span>--frozen
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>gates
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>configuration-schema
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>validate<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span>--policy<span class="w"> </span>examples/regex-redaction/egress-gate-config.yaml
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>serve<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:50051
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">source</span><span class="w"> </span>.venv/bin/activate
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>egress-gate<span class="w"> </span>gates
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>egress-gate<span class="w"> </span>configuration-schema
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>egress-gate<span class="w"> </span>validate<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span>--policy<span class="w"> </span>examples/regex-redaction/egress-gate-config.yaml
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>egress-gate<span class="w"> </span>serve<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:50051
 </span></code></pre></div>
-<p>Use the <a href="gates/regex/">regex-body guide</a> for an OpenShell policy and a
+<p>Use the <a href="gates/regex/">regex guide</a> for an OpenShell policy and a
 file-backed catalog.</p>
 <p>Use <a href="evaluation/">offline policy tests</a> to check saved request examples with
 the same prepared <code>RequestProcessor</code> used by the service. No request goes to an
@@ -1295,9 +1296,11 @@ upstream provider.</p>
 <h2 id="core-rules">Core rules</h2>
 <ul>
 <li>A policy has one through ten named gates and a required <code>default_decision</code>.</li>
-<li>Each gate sees the request after Egress Gate applies patches from earlier
-  gates.</li>
-<li><code>proceed</code> applies a patch. Terminal <code>allow</code> and <code>deny</code> require empty patches.</li>
+<li>Each gate receives a read-only request snapshot that includes validated
+  patches from earlier gates.</li>
+<li>A <code>proceed</code> result can propose a patch. The runtime validates it and creates
+  the snapshot for the next gate. Terminal <code>allow</code> and <code>deny</code> require empty
+  patches.</li>
 <li><code>None</code> body replacement means no replacement. <code>b""</code> is an explicit empty
   replacement.</li>
 <li>When a runtime safety limit occurs, Egress Gate denies the request. The result
@@ -1313,7 +1316,7 @@ upstream provider.</p>
 <li><a href="evaluation/">Test policies offline</a></li>
 <li><a href="operations/">Operations</a></li>
 <li><a href="gates/custom/">Gate authoring</a></li>
-<li><a href="gates/regex/">Regex-body</a></li>
+<li><a href="gates/regex/">Regex gate</a></li>
 <li><a href="architecture/">Architecture</a></li>
 <li><a href="architecture/request-lifecycle/">Request lifecycle</a></li>
 <li><a href="architecture/service-boundary/">Service boundary</a></li>

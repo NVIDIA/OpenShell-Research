@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Configure bounded regex matching, denial, and replacement.">
+        <meta name="description" content="Scan one configured part of a request with bounded regular expressions.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
@@ -27,7 +27,7 @@
     
     
       
-        <title>Regex-body gate - OpenShell Research</title>
+        <title>Regex gate - OpenShell Research</title>
       
     
     
@@ -102,7 +102,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#regex-body-gate" class="md-skip">
+        <a href="#regex-gate" class="md-skip">
           Skip to content
         </a>
       
@@ -141,7 +141,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Regex-body gate
+              Regex gate
             
           </span>
         </div>
@@ -788,7 +788,7 @@
   <span class="md-ellipsis">
     
   
-  Regex-body gate
+  Regex gate
 
     
   </span>
@@ -805,7 +805,7 @@
   <span class="md-ellipsis">
     
   
-  Regex-body gate
+  Regex gate
 
     
   </span>
@@ -831,10 +831,21 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#modes" class="md-nav__link">
+  <a href="#actions" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Modes
+        Actions
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scan-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Scan reference
       </span>
     </span>
   </a>
@@ -1155,10 +1166,21 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#modes" class="md-nav__link">
+  <a href="#actions" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Modes
+        Actions
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scan-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Scan reference
       </span>
     </span>
   </a>
@@ -1319,42 +1341,63 @@
   </a>
 
 
-<h1 id="regex-body-gate">Regex-body gate</h1>
-<p><code>regex-body</code> strictly decodes the current request body as UTF-8. It matches a
-bounded catalog and returns audit-safe findings with type <code>sensitive_entity</code>.
-A catalog can be inline or in a relative <code>.yaml</code> or <code>.yml</code> file. The gate
-rejects absolute paths, path traversal, symlinks, YAML aliases, duplicate keys,
-invalid UTF-8, unsafe patterns, and oversized catalogs.</p>
-<div class="language-yaml highlight"><span class="filename">Inline regex catalog</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">gate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex-body</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">pattern_catalog</span><span class="p">:</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">entities</span><span class="p">:</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer-id</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">rules</span><span class="p">:</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer-id-rule</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">          </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;\bCUST-[0-9]{8}\b&#39;</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">          </span><span class="nt">confidence</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">high</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="nt">replacement</span><span class="p">:</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="nt">strategy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">template</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">  </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;[{entity}]&#39;</span>
+<h1 id="regex-gate">Regex gate</h1>
+<p>The <code>regex</code> gate matches one configured part of the current request. It can
+inspect the body, path, query, or selected header values. It returns audit-safe
+findings with type <code>regex_match</code>.</p>
+<p>Choose what to scan with <code>scan.kind</code>, then choose what to do with
+<code>scan.action.kind</code>. This example replaces matches in the request body:</p>
+<div class="language-yaml highlight"><span class="filename">Inline regex catalog</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">scan</span><span class="p">:</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">body</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">action</span><span class="p">:</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;[{entity}]&#39;</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="nt">pattern_catalog</span><span class="p">:</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="nt">entities</span><span class="p">:</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer-id</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">      </span><span class="nt">rules</span><span class="p">:</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer-id-rule</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">          </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;\bCUST-[0-9]{8}\b&#39;</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">          </span><span class="nt">confidence</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">high</span>
 </span></code></pre></div>
+<p>The body is decoded as strict UTF-8. Path and query scans use the exact text in
+the request model. A header scan matches each selected header value on its own;
+a match cannot span two values. Header names are case-insensitive:</p>
+<div class="language-yaml highlight"><span class="filename">Selected request headers</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">scan</span><span class="p">:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">header</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">names</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">x-customer-note</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">x-request-label</span><span class="p p-Indicator">]</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">action</span><span class="p">:</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deny</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nt">pattern_catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">patterns.yaml</span>
+</span></code></pre></div>
+<p>The header scan sees the current request snapshot, including validated header
+patches from earlier gates. The regex gate does not return header mutations.
+OpenShell permits writes only in the <code>x-openshell-middleware-</code> namespace, so a
+general regex replacement cannot rewrite arbitrary selected headers. A custom
+gate can return supported header writes or removals when it declares the
+<code>mutates_headers</code> capability.</p>
+<p>A catalog can be inline or in a relative <code>.yaml</code> or <code>.yml</code> file. The gate
+rejects absolute paths, path traversal, symlinks, YAML aliases, duplicate keys,
+invalid body UTF-8, unsafe patterns, and oversized catalogs.</p>
 <p>Each entity has a stable, bounded name and one or more rules. Rule confidence
 is <code>low</code>, <code>medium</code>, or <code>high</code>. Optional flags are <code>ignore_case</code>, <code>multiline</code>,
 <code>dot_all</code>, and <code>ascii</code>. Do not use named capture groups or inline flags.
 Patterns must produce non-empty matches. Findings include overlapping
 detections. Replacement uses deterministic, non-overlapping matches.</p>
-<h2 id="modes">Modes</h2>
+<h2 id="actions">Actions</h2>
 <table>
 <thead>
 <tr>
-<th>Mode</th>
+<th><code>scan.action.kind</code></th>
 <th>Match result</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>detect</code></td>
-<td><code>proceed</code>, findings, no body replacement</td>
+<td><code>proceed</code>, findings, no request mutation</td>
 </tr>
 <tr>
 <td><code>deny</code></td>
@@ -1362,17 +1405,57 @@ detections. Replacement uses deterministic, non-overlapping matches.</p>
 </tr>
 <tr>
 <td><code>replace</code></td>
-<td><code>proceed</code>, findings, explicit replacement bytes</td>
+<td><code>proceed</code>, findings, explicit body replacement</td>
 </tr>
 </tbody>
 </table>
-<p>The replacement recipe is required exactly for <code>replace</code>. In replacement mode
-the gate returns a replacement even when there is no match, preserving the
-operator's intent to replace the current body. Invalid input UTF-8 is a stable
-<code>body_encoding_invalid</code> service failure.</p>
+<p><code>detect</code> and <code>deny</code> work with every scan kind. <code>replace</code> exists only in the
+body scan schema. It cannot be configured for a path, query, or header scan.
+This structure keeps unsupported combinations out of generated schemas and
+editor suggestions. OpenShell middleware results cannot rewrite a request path
+or query. Header replacement is not part of the built-in gate.</p>
+<p>The replace action owns its template. It returns a body replacement even when
+there is no match. This preserves the operator's explicit intent to replace the
+current body. Invalid body UTF-8 is a stable <code>body_encoding_invalid</code> service
+failure.</p>
 <p>Replacement templates contain literal text and the <code>{entity}</code> field only.
 Output size is projected before rendering and is bounded by the advertised
 OpenShell body limit.</p>
+<h2 id="scan-reference">Scan reference</h2>
+<table>
+<thead>
+<tr>
+<th><code>scan.kind</code></th>
+<th>Additional fields</th>
+<th>Supported <code>action.kind</code> values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>body</code></td>
+<td>none</td>
+<td><code>detect</code>, <code>deny</code>, <code>replace</code></td>
+</tr>
+<tr>
+<td><code>path</code></td>
+<td>none</td>
+<td><code>detect</code>, <code>deny</code></td>
+</tr>
+<tr>
+<td><code>query</code></td>
+<td>none</td>
+<td><code>detect</code>, <code>deny</code></td>
+</tr>
+<tr>
+<td><code>header</code></td>
+<td>non-empty <code>names</code> list</td>
+<td><code>detect</code>, <code>deny</code></td>
+</tr>
+</tbody>
+</table>
+<p>Configure another regex gate when different request parts need different
+catalogs or actions. Keeping one scan per gate makes matches, findings, and
+replacement offsets unambiguous.</p>
 
 
 

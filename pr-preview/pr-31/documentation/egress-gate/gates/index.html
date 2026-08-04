@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Built-in body inspection and trusted custom gates.">
+        <meta name="description" content="Built-in request matching and trusted custom gates.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
@@ -779,7 +779,7 @@
   <span class="md-ellipsis">
     
   
-  Regex-body gate
+  Regex gate
 
     
   </span>
@@ -1238,13 +1238,17 @@
 
 
 <h1 id="gates">Gates</h1>
-<p>A gate receives the current immutable <code>HttpRequest</code>, one shared <code>Timeout</code>, and
-its exact typed configuration. It returns a <code>GateEvaluation</code> with <code>proceed</code>,
-terminal <code>allow</code>, or terminal <code>deny</code> control.</p>
-<p>The default registry ships exactly <code>regex-body</code>. Application registries can add
+<p>A gate receives a read-only <code>HttpRequest</code> snapshot, one shared <code>Timeout</code>, and
+its exact typed configuration. It cannot change that request object in place.
+To change the request, the gate returns <code>proceed</code> with a <code>RequestPatch</code>.</p>
+<p>The runtime validates the patch and constructs a new read-only snapshot for the
+next gate. It also accumulates the patch that the service will return to
+OpenShell. A gate can instead return terminal <code>allow</code> or terminal <code>deny</code> to stop
+the pipeline.</p>
+<p>The default registry ships exactly <code>regex</code>. Application registries can add
 trusted custom gates. The runtime does not isolate trusted Python gate code.</p>
 <ul>
-<li><a href="regex/">Regex-body</a></li>
+<li><a href="regex/">Regex gate</a></li>
 <li><a href="custom/">Custom gates</a></li>
 </ul>
 
@@ -1301,10 +1305,10 @@ trusted custom gates. The runtime does not isolate trusted Python gate code.</p>
         
         
           
-          <a href="./regex/" class="md-footer__link md-footer__link--next" aria-label="Next: Regex-body gate">
+          <a href="./regex/" class="md-footer__link md-footer__link--next" aria-label="Next: Regex gate">
             <div class="md-footer__title">
               <span class="md-footer__direction">Next</span>
-              <div class="md-ellipsis">Regex-body gate</div>
+              <div class="md-ellipsis">Regex gate</div>
             </div>
             <div class="md-footer__button md-icon">
               

@@ -21,7 +21,7 @@ Egress Gate has one transport adapter and one protobuf-free runtime.
 | `result.py` | Gate evaluations, five-field findings, provenance, traces, and result invariants |
 | `gates/base.py` | Gate lifecycle, capabilities, output validation, and UTF-8 helper |
 | `gates/registry.py` | Trusted registration, exact pipeline schema, resources, discovery, and processor preparation |
-| `gates/regex_body.py` | Bounded catalog loading, matching, overlap handling, caching, and replacement |
+| `gates/regex.py` | Typed scan and action selection, bounded matching, overlap handling, caching, and body replacement |
 | `config.py` | Strict `pipeline.gates` and required default decision |
 | `request_processor.py` | Shared deadline, current-request mutation, control flow, aggregation, and provenance |
 | `service/` | Protobuf validation/conversion, worker slots, lifecycle, and wire serialization |

@@ -29,11 +29,11 @@ benchmark harness around the same request set when you need performance data.
 
 ## Try the included example
 
-The repository includes a regex policy and two request cases. Run them from
-`projects/egress-gate/`:
+The repository includes a regex policy and two request cases. Activate the
+installed project environment, then run them from `projects/egress-gate/`:
 
 ```bash title="Run the example policy tests"
-uv run egress-gate evaluate \
+egress-gate evaluate \
   --policy examples/regex-redaction/egress-gate-config.yaml \
   --cases examples/regex-redaction/cases.yaml \
   --timeout-seconds 1
@@ -84,14 +84,15 @@ cases:
         value: "send alice@example.com"
     expected:
       decision: allow
-      finding_types: [sensitive_entity]
+      finding_types: [regex_match]
 ```
 
 Each case has three parts:
 
 - `provenance` records whether the request is synthetic or captured and
   whether its content is redacted.
-- `request` contains the immutable HTTP request that the gates will evaluate.
+- `request` contains the first read-only HTTP request snapshot that the gates
+  will evaluate.
 - `expected` contains the result fields that must match.
 
 Only `expected.decision` is required. Add more expected fields when they make
@@ -124,7 +125,7 @@ Use `--registry-factory` when the policy contains application-owned custom
 gates:
 
 ```bash title="Test a custom gate"
-uv run egress-gate \
+egress-gate \
   --registry-factory examples.custom_gate.keyword_gate:create_registry \
   evaluate \
   --policy examples/custom_gate/egress-gate-config.yaml \

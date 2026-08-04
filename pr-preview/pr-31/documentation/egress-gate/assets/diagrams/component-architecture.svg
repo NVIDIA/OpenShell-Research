@@ -64,8 +64,8 @@
   <rect x="48" y="526" width="864" height="92" rx="13" class="gate"/>
   <text x="490" y="551" text-anchor="middle" class="title">Gate wrapper · contract and bounds</text>
   <rect x="72" y="560" width="392" height="50" rx="10" class="layer"/>
-  <text x="268" y="581" text-anchor="middle" class="implementation">regex-body</text>
-  <text x="268" y="601" text-anchor="middle" class="subtitle">built-in implementation</text>
+  <text x="268" y="581" text-anchor="middle" class="implementation">regex</text>
+  <text x="268" y="601" text-anchor="middle" class="subtitle">typed scan · explicit action</text>
   <rect x="516" y="560" width="372" height="50" rx="10" class="layer"/>
   <text x="702" y="581" text-anchor="middle" class="implementation">Custom gates</text>
   <text x="702" y="601" text-anchor="middle" class="subtitle">trusted integrations</text>
