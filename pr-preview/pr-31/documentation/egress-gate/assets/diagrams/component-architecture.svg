@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 660" role="img" aria-labelledby="title description">
+  <title id="title">Egress Gate component architecture</title>
+  <desc id="description">Four architecture layers show transport and startup adapters, typed configuration and registry, request processing, and request-level gates. Downward arrows show configuration flowing into the request processor and the processor invoking concrete gates through their shared wrapper.</desc>
+  <defs>
+    <style>
+      text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#1f2933}
+      .layer{fill:#f8fafc;stroke:#d7dee5;stroke-width:2}
+      .transport{fill:#eef6ff;stroke:#3973ad;stroke-width:2}
+      .policy{fill:#fff5eb;stroke:#c86622;stroke-width:2}
+      .process{fill:#eef9f1;stroke:#2f855a;stroke-width:2.5}
+      .gate{fill:#f7f1ff;stroke:#8056a8;stroke-width:2}
+      .layer-label{font-size:15px;font-weight:700;fill:#5f6b76;letter-spacing:.08em}
+      .title{font-size:21px;font-weight:700}
+      .implementation{font-size:18px;font-weight:700}
+      .subtitle{font-size:15px;fill:#5f6b76}
+      .arrow{fill:none;stroke:#718096;stroke-width:2.4;marker-end:url(#arrow)}
+      .dependency{fill:none;stroke:#a0aec0;stroke-width:2;stroke-dasharray:7 6;marker-end:url(#arrow)}
+      .arrow-label{font-size:14px;fill:#5f6b76}
+      @media(prefers-color-scheme:dark){
+        text{fill:#edf2f7}
+        .layer{fill:#141b1f;stroke:#3d4852}
+        .transport{fill:#162b3f;stroke:#7db6e8}
+        .policy{fill:#3a2819;stroke:#f6ad55}
+        .process{fill:#143126;stroke:#68d391}
+        .gate{fill:#2d203a;stroke:#b794d4}
+        .layer-label,.subtitle,.arrow-label{fill:#aeb8c5}
+        .arrow{stroke:#8b98a5}
+        .dependency{stroke:#71808e}
+      }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 10 5 0 10Z" fill="#718096"/>
+    </marker>
+  </defs>
+
+  <rect x="20" y="20" width="940" height="135" rx="20" class="layer"/>
+  <text x="48" y="49" class="layer-label">TRANSPORT AND STARTUP</text>
+  <rect x="48" y="70" width="260" height="62" rx="13" class="transport"/>
+  <text x="178" y="96" text-anchor="middle" class="title">CLI and gateway config</text>
+  <text x="178" y="119" text-anchor="middle" class="subtitle">cli.py · gateway_config.py</text>
+  <rect x="360" y="70" width="552" height="62" rx="13" class="transport"/>
+  <text x="636" y="96" text-anchor="middle" class="title">OpenShell gRPC adapter</text>
+  <text x="636" y="119" text-anchor="middle" class="subtitle">service/ · protobuf validation · result serialization</text>
+
+  <rect x="20" y="175" width="940" height="135" rx="20" class="layer"/>
+  <text x="48" y="204" class="layer-label">TYPED POLICY AND RUNTIME INVENTORY</text>
+  <rect x="48" y="225" width="400" height="62" rx="13" class="policy"/>
+  <text x="248" y="251" text-anchor="middle" class="title">Policy configuration</text>
+  <text x="248" y="274" text-anchor="middle" class="subtitle">config.py · ordered gates · default decision</text>
+  <rect x="500" y="225" width="412" height="62" rx="13" class="policy"/>
+  <text x="706" y="251" text-anchor="middle" class="title">Gate registry</text>
+  <text x="706" y="274" text-anchor="middle" class="subtitle">config union · resources · gate construction</text>
+
+  <rect x="20" y="330" width="940" height="135" rx="20" class="layer"/>
+  <text x="48" y="359" class="layer-label">REQUEST PROCESSING</text>
+  <rect x="156" y="380" width="668" height="62" rx="13" class="process"/>
+  <text x="490" y="406" text-anchor="middle" class="title">RequestProcessor</text>
+  <text x="490" y="429" text-anchor="middle" class="subtitle">gate order · one timeout · aggregation · allow or deny</text>
+
+  <rect x="20" y="485" width="940" height="155" rx="20" class="layer"/>
+  <text x="48" y="514" class="layer-label">REQUEST GATES</text>
+  <rect x="48" y="526" width="864" height="92" rx="13" class="gate"/>
+  <text x="490" y="551" text-anchor="middle" class="title">Gate wrapper · contract and bounds</text>
+  <rect x="72" y="560" width="392" height="50" rx="10" class="layer"/>
+  <text x="268" y="581" text-anchor="middle" class="implementation">regex-body</text>
+  <text x="268" y="601" text-anchor="middle" class="subtitle">built-in implementation</text>
+  <rect x="516" y="560" width="372" height="50" rx="10" class="layer"/>
+  <text x="702" y="581" text-anchor="middle" class="implementation">Custom gates</text>
+  <text x="702" y="601" text-anchor="middle" class="subtitle">trusted integrations</text>
+
+  <path d="M636 132v18c0 8-6 14-14 14H262c-8 0-14 6-14 14v47" class="arrow"/>
+  <text x="452" y="157" text-anchor="middle" class="arrow-label">validate config</text>
+  <path d="M248 287v93" class="arrow"/>
+  <text x="268" y="342" class="arrow-label">validated policy</text>
+  <path d="M706 287v93" class="dependency"/>
+  <text x="726" y="342" class="arrow-label">construct gates</text>
+  <text x="510" y="485" class="arrow-label">run gates</text>
+  <path d="M448 256h52" class="dependency"/>
+  <path d="M490 442v84" class="arrow"/>
+</svg>
