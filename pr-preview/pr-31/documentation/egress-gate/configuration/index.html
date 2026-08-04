@@ -16,7 +16,7 @@
         <link rel="prev" href="../">
       
       
-        <link rel="next" href="../operations/">
+        <link rel="next" href="../evaluation/">
       
       
         
@@ -554,6 +554,8 @@
       
         
       
+        
+      
     
     
     
@@ -685,6 +687,33 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Offline policy evaluation
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1258,6 +1287,8 @@
       
         
       
+        
+      
     
     
     
@@ -1324,21 +1355,20 @@ network_middlewares:
     on_error: fail_closed
     endpoints:
       include: [api.anthropic.com]</code></p>
-<p>The top-level policy is exactly:</p>
-<p><code>yaml
-pipeline:
-  gates: []             # one through ten named entries
-  default_decision: allow  # allow or deny; required</code></p>
-<p>Each entry has a unique bounded <code>name</code> and a gate-specific <code>config</code> selected
-by its literal <code>gate</code> discriminator. Unknown fields, unknown gate types,
-missing defaults, duplicate names, and more than ten entries are rejected.
-There is no compatibility acceptance for legacy policy keys.</p>
+<p>The top-level policy has one <code>pipeline</code>. The pipeline has two required fields:</p>
+<ul>
+<li><code>gates</code> contains one through ten named gate configurations.</li>
+<li><code>default_decision</code> is <code>allow</code> or <code>deny</code>.</li>
+</ul>
+<p>Each gate entry has a unique, bounded <code>name</code>. Its literal <code>gate</code> field selects
+the exact configuration type. The registry rejects unknown fields, unknown gate
+types, missing defaults, and duplicate names.</p>
 <h2 id="built-in-gates">Built-in gates</h2>
 <p>The shipped registry contains only <code>regex-body</code>. See
 <a href="../gates/regex/">Regex-body</a> for catalogs and replacement templates. Its
-<code>mode</code> is required and is one of <code>detect</code>, <code>deny</code>, or <code>replace</code>; a replacement
-recipe is required exactly when the mode is <code>replace</code>. Other behavior is
-supplied by a trusted application registry factory, not by configuration.</p>
+<code>mode</code> is required and is one of <code>detect</code>, <code>deny</code>, or <code>replace</code>. A replacement
+recipe is required only when the mode is <code>replace</code>. A trusted application
+registry factory supplies other behavior.</p>
 <h2 id="inspect-the-installed-registry">Inspect the installed registry</h2>
 <p><code>bash
 uv run egress-gate gates
@@ -1351,16 +1381,17 @@ uv run egress-gate \
 uv run egress-gate \
   --registry-factory my_gates:create_registry configuration-schema</code></p>
 <p>The factory must return a finalized <code>GateRegistry</code>. It owns trusted gate
-classes and typed <code>GateResources</code>; policy configuration cannot import Python,
+classes and typed <code>GateResources</code>. Policy configuration cannot import Python,
 choose a resource implementation, or provide credentials.</p>
-<p><code>validate</code> performs the same strict policy and registered-resource validation
-used by the processing domain, without constructing gates, loading catalogs,
-preparing a processor, or changing the running service's active policy. Use
-<code>evaluate</code> to exercise preparation-time artifacts. Exact encoded OpenShell
-configuration size remains a gRPC service-boundary check.</p>
+<p><code>validate</code> checks the policy and registered resources. It also reads and checks
+a file-backed pattern catalog. It does not construct gates, prepare a
+processor, or change the active policy. Use <code>evaluate</code> to check artifacts that
+the gate creates during preparation. The gRPC service checks the exact encoded
+size of the OpenShell configuration.</p>
 <p>For repeatable request-level checks, the <code>evaluate</code> command accepts a pipeline
 policy and a strict version-one corpus. It uses the registry's prepared
-processor seam and does not start the gRPC service; see <a href="../evaluation/">Offline evaluation</a>.</p>
+processor path and does not start the gRPC service. See
+<a href="../evaluation/">Offline evaluation</a>.</p>
 
 
 

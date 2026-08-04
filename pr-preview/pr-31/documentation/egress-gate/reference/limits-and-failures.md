@@ -6,8 +6,9 @@ agent_markdown: true
 
 # Limits and failure behavior
 
-Limits are fail-closed and content-safe. Exact encoded protobuf checks belong
-to `service/`; scalar, aggregate, and result-model checks belong to the domain.
+Limits are fail-closed and content-safe. The `service/` package checks exact
+encoded protobuf sizes. Domain models check scalar, aggregate, and result
+limits.
 
 | Area | Limit |
 | --- | ---: |

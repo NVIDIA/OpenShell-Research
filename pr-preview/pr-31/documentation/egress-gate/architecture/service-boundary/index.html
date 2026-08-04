@@ -552,6 +552,8 @@
       
         
       
+        
+      
     
     
     
@@ -607,6 +609,33 @@
     
   
   Configure policies
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Offline policy evaluation
 
     
   </span>
@@ -1343,9 +1372,9 @@
 
 
 <h1 id="service-boundary">Service boundary</h1>
-<p>The <code>service/</code> package is the only handwritten package allowed to import
-OpenShell protobuf/gRPC bindings. It owns exact encoded wire limits and
-transport status mapping; domain models own protobuf-free invariants.</p>
+<p>The <code>service/</code> package is the only handwritten package that imports OpenShell
+protobuf/gRPC bindings. It owns exact encoded wire limits and transport status
+mapping. Domain models own protobuf-free invariants.</p>
 <h2 id="rpcs">RPCs</h2>
 <table>
 <thead>
@@ -1377,9 +1406,9 @@ encoded configuration before registry parsing.</p>
 used for semaphore acquisition, policy preparation, replacement-lock waits,
 gate execution, and final result checks. <code>RequestProcessor.process</code> accepts the
 caller-owned timeout and never creates or stores one.</p>
-<p>Synchronous work runs in a bounded four-slot executor while the gRPC server
-limits concurrent RPCs to sixteen. Cancellation does not stop Python code
-already running in a worker; the slot remains owned until the worker exits.</p>
+<p>Synchronous work runs in a bounded four-slot executor. The gRPC server permits
+sixteen concurrent RPCs. Cancellation does not stop Python code that already
+runs in a worker. The worker owns its slot until it exits.</p>
 <h2 id="wire-findings-and-mutations">Wire findings and mutations</h2>
 <p>The current OpenShell <code>Finding</code> contains exactly <code>type</code>, <code>label</code>, <code>count</code>,
 <code>confidence</code>, and <code>severity</code>. <code>SourcedFinding.source_gate</code>, decision source,
@@ -1388,11 +1417,12 @@ protobuf finding and header sizes before returning a response.</p>
 <p><code>RequestPatch</code> operations serialize in their validated order. <code>None</code> means no
 replacement, while empty bytes are emitted with <code>has_body=true</code>.</p>
 <h2 id="lifecycle-and-errors">Lifecycle and errors</h2>
-<p>The active policy is one validated config plus one prepared processor. Equal
-configs reuse it; changed candidates are prepared completely before atomic
-publication. Invalid candidates do not replace the active pair.</p>
-<p>Invalid input maps to <code>INVALID_ARGUMENT</code>; internal gate or service failures map
-to <code>INTERNAL</code>. A successful runtime-limit deny is not a gRPC failure and uses
+<p>The active policy contains one validated configuration and one prepared
+processor. An equal configuration reuses the active processor. The service
+prepares a changed candidate before it publishes that candidate. An invalid
+candidate does not replace the active policy.</p>
+<p>Invalid input maps to <code>INVALID_ARGUMENT</code>. Internal gate or service failures map
+to <code>INTERNAL</code>. A runtime-limit deny is not a gRPC failure. It uses
 <code>egress_gate_limit_exceeded</code>.</p>
 
 

@@ -552,6 +552,8 @@
       
         
       
+        
+      
     
     
     
@@ -607,6 +609,33 @@
     
   
   Configure policies
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Offline policy evaluation
 
     
   </span>
@@ -1277,11 +1306,11 @@
 
 
 <h1 id="regex-body-gate">Regex-body gate</h1>
-<p><code>regex-body</code> strictly decodes the current request body as UTF-8, matches a
-bounded catalog, and returns audit-safe five-field findings with type
-<code>sensitive_entity</code>. Catalogs may be inline or a relative <code>.yaml</code>/<code>.yml</code> path.
-Absolute paths, traversal, symlinks, aliases, duplicate YAML keys, invalid
-UTF-8, unsafe patterns, and oversized catalogs are rejected.</p>
+<p><code>regex-body</code> strictly decodes the current request body as UTF-8. It matches a
+bounded catalog and returns audit-safe findings with type <code>sensitive_entity</code>.
+A catalog can be inline or in a relative <code>.yaml</code> or <code>.yml</code> file. The gate
+rejects absolute paths, path traversal, symlinks, YAML aliases, duplicate keys,
+invalid UTF-8, unsafe patterns, and oversized catalogs.</p>
 <p><code>yaml
 gate: regex-body
 pattern_catalog:
@@ -1295,11 +1324,11 @@ mode: replace
 replacement:
   strategy: template
   template: '[{entity}]'</code></p>
-<p>Each entity has a stable bounded name and one or more rules. Rule confidence
-is <code>low</code>, <code>medium</code>, or <code>high</code>; optional flags are <code>ignore_case</code>, <code>multiline</code>,
-<code>dot_all</code>, and <code>ascii</code>. Named capture groups and inline flags are reserved.
-Patterns must produce non-empty matches. Overlapping detections are retained
-for findings and replacement chooses deterministic non-overlapping winners.</p>
+<p>Each entity has a stable, bounded name and one or more rules. Rule confidence
+is <code>low</code>, <code>medium</code>, or <code>high</code>. Optional flags are <code>ignore_case</code>, <code>multiline</code>,
+<code>dot_all</code>, and <code>ascii</code>. Do not use named capture groups or inline flags.
+Patterns must produce non-empty matches. Findings include overlapping
+detections. Replacement uses deterministic, non-overlapping matches.</p>
 <h2 id="modes">Modes</h2>
 <table>
 <thead>

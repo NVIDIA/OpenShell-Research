@@ -552,6 +552,8 @@
       
         
       
+        
+      
     
     
     
@@ -607,6 +609,33 @@
     
   
   Configure policies
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Offline policy evaluation
 
     
   </span>
@@ -1370,11 +1399,11 @@
 context, target, header, and body bounds. Domain models then enforce bounded
 scalar and aggregate values. Invalid input produces a cataloged gRPC failure.</p>
 <h2 id="2-validate-and-prepare-the-policy">2. Validate and prepare the policy</h2>
-<p>The service converts the protobuf <code>Struct</code> to a mapping and asks the finalized
-<code>GateRegistry</code> for an exact <code>EgressGateConfig</code>. It prepares every configured
-gate and passes the policy fingerprint to a <code>RequestProcessor</code>. Preparation is
-under one replacement lock and uses the same <code>Timeout</code> as the request's later
-execution. The candidate is published only after a final deadline check.</p>
+<p>The service converts the protobuf <code>Struct</code> to a mapping. The finalized
+<code>GateRegistry</code> validates it as an exact <code>EgressGateConfig</code>. The registry then
+prepares each configured gate and creates a <code>RequestProcessor</code>. Preparation
+uses one replacement lock and the request <code>Timeout</code>. The service publishes the
+candidate only after a final deadline check.</p>
 <h2 id="3-execute-the-pipeline">3. Execute the pipeline</h2>
 <p>For each configured gate:</p>
 <ol>
@@ -1385,11 +1414,11 @@ execution. The candidate is published only after a final deadline check.</p>
 <li>On <code>proceed</code>, apply the patch to form the next current request.</li>
 <li>On terminal <code>allow</code> or <code>deny</code>, stop without invoking later gates.</li>
 </ol>
-<p>The original request remains private to the processor. The final allowed patch
-is the ordered composition of preceding patches; a denied result always has an
-empty patch. Body replacement <code>None</code> and <code>b""</code> remain distinct.</p>
-<p>If every gate proceeds, <code>default_decision</code> owns the result. Default deny uses
-<code>egress_gate_default_deny</code>; default allow carries no reason code.</p>
+<p>The processor keeps the original request private. The final allowed patch
+combines preceding patches in order. A denied result always has an empty patch.
+Body replacement <code>None</code> and <code>b""</code> remain distinct.</p>
+<p>If every gate proceeds, <code>default_decision</code> controls the result. Default deny
+uses <code>egress_gate_default_deny</code>. Default allow has no reason code.</p>
 <h2 id="4-handle-runtime-limits">4. Handle runtime limits</h2>
 <p>Deadline expiry, worker-slot exhaustion, mutation bounds, finding limits, and
 encoded output limits return an atomic deny with source <code>runtime_limit</code> and

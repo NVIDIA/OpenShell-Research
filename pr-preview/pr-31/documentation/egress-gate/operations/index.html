@@ -13,7 +13,7 @@
       
       
       
-        <link rel="prev" href="../configuration/">
+        <link rel="prev" href="../evaluation/">
       
       
         <link rel="next" href="../gates/">
@@ -554,6 +554,8 @@
       
         
       
+        
+      
     
     
     
@@ -609,6 +611,33 @@
     
   
   Configure policies
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Offline policy evaluation
 
     
   </span>
@@ -1302,6 +1331,8 @@
       
         
       
+        
+      
     
     
     
@@ -1339,16 +1370,16 @@
 
 
 <h1 id="run-and-operate-egress-gate">Run and operate Egress Gate</h1>
-<p>Egress Gate is a gRPC service reached by the OpenShell gateway and sandbox
-supervisors. Install and run it from <code>projects/egress-gate</code>:</p>
+<p>The OpenShell gateway and sandbox supervisors call Egress Gate through gRPC.
+Install and run the service from <code>projects/egress-gate</code>:</p>
 <p><code>bash
 uv sync --frozen
 uv run egress-gate gates
 uv run egress-gate configuration-schema
 uv run egress-gate serve --listen 0.0.0.0:50051 --timeout-seconds 4</code></p>
 <p>Use a reachable non-loopback address only when the supervisor is outside the
-service's host network namespace. Plaintext gRPC is intended for a restricted
-trusted network; do not expose the port broadly.</p>
+host network namespace of the service. Plaintext gRPC is for a restricted,
+trusted network. Do not expose the port to an untrusted network.</p>
 <h2 id="openshell-registration">OpenShell registration</h2>
 <p><code>bash
 uv run egress-gate add-gateway-registration \
@@ -1397,14 +1428,15 @@ body content.</p>
 </tr>
 </tbody>
 </table>
-<p>Runtime limit results contain no partial patch or findings. The active policy
-is not replaced by a failed candidate. See <a href="../reference/limits-and-failures/">Limits and failures</a>.</p>
+<p>Runtime limit results contain no partial patch or findings. A failed candidate
+does not replace the active policy. See
+<a href="../reference/limits-and-failures/">Limits and failures</a>.</p>
 <h2 id="policy-rollout">Policy rollout</h2>
-<p>Each Egress Gate service keeps one active prepared policy. During a policy
-change, stop admitting the old configuration and let already-admitted requests
-finish before sending the new one. This gives the service one serialized
-cutover. Run separate service instances when distinct policies must remain
-active concurrently.</p>
+<p>Each Egress Gate service keeps one active prepared policy. To change the
+policy, first stop requests that use the old configuration. Let all admitted
+requests finish. Then, send a request that uses the new configuration. Use
+separate service instances when different policies must be active at the same
+time.</p>
 <h2 id="troubleshooting">Troubleshooting</h2>
 <p>Inspect a finite OpenShell log window:</p>
 <p><code>bash

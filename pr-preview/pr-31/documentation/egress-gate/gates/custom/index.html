@@ -552,6 +552,8 @@
       
         
       
+        
+      
     
     
     
@@ -607,6 +609,33 @@
     
   
   Configure policies
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Offline policy evaluation
 
     
   </span>
@@ -1245,18 +1274,18 @@ from egress_gate.timeout import Timeout</p>
 ```</p>
 <p><code>GateRegistry.finalize()</code> constructs the exact discriminated <code>pipeline.gates</code>
 schema from the registered config types. Registry factories supply typed
-<code>GateResources</code> objects for deployment-owned clients or profiles; policy
+<code>GateResources</code> objects for deployment-owned clients or profiles. Policy
 configuration cannot construct or replace those resources.</p>
 <p>Declare output capabilities and finding types accurately. The public wrapper
-rejects undeclared body replacements, header mutations, terminal allows,
-denies, and finding types. Read capabilities are discovery metadata, not field
-isolation. Implementations must keep request state local and be safe for
-concurrent calls; no Python deep-immutability guarantee is made.</p>
-<p>For a resource-backed gate, define a typed <code>GateResources</code> bundle and pass it
-to <code>registry.register(..., resources=resources)</code>. Resources are trusted,
-application-owned, concurrency-safe dependencies; policy configuration may
-select behavior but cannot construct clients, provide credentials, or replace
-the registered resource implementation.</p>
+rejects undeclared body replacements, header mutations, terminal decisions,
+and finding types. Read capabilities are discovery metadata. They do not limit
+which request fields trusted Python code can read. Keep request state local so
+the gate is safe for concurrent calls.</p>
+<p>For a resource-backed gate, define a typed <code>GateResources</code> bundle. Pass the
+bundle to <code>registry.register(..., resources=resources)</code>. Resources are trusted,
+application-owned dependencies that must be safe for concurrent use. Policy
+configuration can select behavior. It cannot construct clients, provide
+credentials, or replace the registered resource implementation.</p>
 
 
 

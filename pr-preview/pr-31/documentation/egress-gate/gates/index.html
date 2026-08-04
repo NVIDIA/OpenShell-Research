@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Built-in request matching, body inspection, and trusted extensions.">
+        <meta name="description" content="Built-in body inspection and trusted custom gates.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
@@ -552,6 +552,8 @@
       
         
       
+        
+      
     
     
     
@@ -607,6 +609,33 @@
     
   
   Configure policies
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Offline policy evaluation
 
     
   </span>
@@ -1198,9 +1227,8 @@
 <p>A gate receives the current immutable <code>HttpRequest</code>, one shared <code>Timeout</code>, and
 its exact typed configuration. It returns a <code>GateEvaluation</code> with <code>proceed</code>,
 terminal <code>allow</code>, or terminal <code>deny</code> control.</p>
-<p>The default registry ships exactly <code>regex-body</code>. Application
-registries may add trusted custom gates; the runtime does not treat Python gate
-code as hostile or deeply immutable.</p>
+<p>The default registry ships exactly <code>regex-body</code>. Application registries can add
+trusted custom gates. The runtime does not isolate trusted Python gate code.</p>
 <ul>
 <li><a href="regex/">Regex-body</a></li>
 <li><a href="custom/">Custom gates</a></li>

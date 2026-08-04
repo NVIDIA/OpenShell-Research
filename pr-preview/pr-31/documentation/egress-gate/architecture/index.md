@@ -31,8 +31,8 @@ OpenShell SupervisorMiddleware
 | `request_processor.py` | Shared deadline, current-request mutation, control flow, aggregation, and provenance |
 | `service/` | Protobuf validation/conversion, worker slots, lifecycle, and wire serialization |
 
-The CLI's offline evaluator parses bounded YAML and calls
-`GateRegistry.prepare_processor()` plus the production `RequestProcessor`; it
+The CLI's offline evaluator parses bounded YAML. It uses
+`GateRegistry.prepare_processor()` and the production `RequestProcessor`. It
 does not add a second execution path or import the transport adapter.
 
 Only `service/` imports generated protobuf/gRPC bindings. The processor and
@@ -42,8 +42,8 @@ gates receive domain values and can be tested offline.
 
 Registry factories and custom gate modules are trusted deployment code.
 Capabilities mechanically constrain outputs but do not sandbox Python reads.
-Prepared gates may borrow application-owned concurrency-safe resources; Egress
-Gate does not close them.
+Prepared gates can use application-owned resources that are safe for concurrent
+use. Egress Gate does not close these resources.
 
 One validated policy and one prepared `RequestProcessor` are active at a time.
 Preparation is serialized and a complete candidate is published only after

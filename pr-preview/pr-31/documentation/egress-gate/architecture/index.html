@@ -552,6 +552,8 @@
       
         
       
+        
+      
     
     
     
@@ -607,6 +609,33 @@
     
   
   Configure policies
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Offline policy evaluation
 
     
   </span>
@@ -1282,16 +1311,16 @@ OpenShell SupervisorMiddleware
 </tr>
 </tbody>
 </table>
-<p>The CLI's offline evaluator parses bounded YAML and calls
-<code>GateRegistry.prepare_processor()</code> plus the production <code>RequestProcessor</code>; it
+<p>The CLI's offline evaluator parses bounded YAML. It uses
+<code>GateRegistry.prepare_processor()</code> and the production <code>RequestProcessor</code>. It
 does not add a second execution path or import the transport adapter.</p>
 <p>Only <code>service/</code> imports generated protobuf/gRPC bindings. The processor and
 gates receive domain values and can be tested offline.</p>
 <h2 id="trust-and-state">Trust and state</h2>
 <p>Registry factories and custom gate modules are trusted deployment code.
 Capabilities mechanically constrain outputs but do not sandbox Python reads.
-Prepared gates may borrow application-owned concurrency-safe resources; Egress
-Gate does not close them.</p>
+Prepared gates can use application-owned resources that are safe for concurrent
+use. Egress Gate does not close these resources.</p>
 <p>One validated policy and one prepared <code>RequestProcessor</code> are active at a time.
 Preparation is serialized and a complete candidate is published only after
 the shared deadline checks. A failed candidate leaves the existing policy

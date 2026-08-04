@@ -550,6 +550,8 @@
       
         
       
+        
+      
     
     
     
@@ -605,6 +607,33 @@
     
   
   Configure policies
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Offline policy evaluation
 
     
   </span>
@@ -1291,8 +1320,9 @@
 
 
 <h1 id="limits-and-failure-behavior">Limits and failure behavior</h1>
-<p>Limits are fail-closed and content-safe. Exact encoded protobuf checks belong
-to <code>service/</code>; scalar, aggregate, and result-model checks belong to the domain.</p>
+<p>Limits are fail-closed and content-safe. The <code>service/</code> package checks exact
+encoded protobuf sizes. Domain models check scalar, aggregate, and result
+limits.</p>
 <table>
 <thead>
 <tr>

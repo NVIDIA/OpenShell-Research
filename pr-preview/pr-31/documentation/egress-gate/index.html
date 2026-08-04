@@ -552,6 +552,8 @@
       
         
       
+        
+      
     
     
     
@@ -607,6 +609,33 @@
     
   
   Configure policies
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Offline policy evaluation
 
     
   </span>
@@ -1218,13 +1247,15 @@
 
 
 <h1 id="egress-gate">Egress Gate</h1>
-<p>Egress Gate is an OpenShell supervisor middleware for the pre-credentials HTTP
-request phase. OpenShell owns interception, routing, and credential
-attachment; Egress Gate evaluates one immutable byte-oriented <code>HttpRequest</code>
-and returns an explicit domain result.</p>
-<p>It is not a forward proxy, TLS interceptor, response filter, or protection for
-content already persisted by a harness. Configure storage and retention
-controls separately.</p>
+<p>Egress Gate is an extensible OpenShell supervisor middleware service for the
+pre-credentials HTTP request phase. OpenShell owns interception, routing, and
+credential attachment. Egress Gate evaluates one immutable byte-oriented
+<code>HttpRequest</code> and returns an explicit result.</p>
+<p>An application can install trusted custom gates. Each gate has a strict
+configuration type and an explicit control result.</p>
+<p>It is not a forward proxy, TLS interceptor, or response filter. It does not
+protect content that a harness already wrote to disk. Configure storage and
+retention controls separately.</p>
 <h2 id="runtime-shape">Runtime shape</h2>
 <p><code>text
 OpenShell protobuf/gRPC
@@ -1253,13 +1284,14 @@ gRPC or contacting an upstream provider.</p>
 <h2 id="core-rules">Core rules</h2>
 <ul>
 <li>A policy has one through ten named gates and a required <code>default_decision</code>.</li>
-<li>Each gate sees the current request after preceding proceeding patches.</li>
-<li><code>proceed</code> applies a patch; terminal <code>allow</code> and <code>deny</code> require empty patches.</li>
-<li><code>None</code> body replacement means no replacement; <code>b""</code> is an explicit empty
+<li>Each gate sees the request after Egress Gate applies patches from earlier
+  gates.</li>
+<li><code>proceed</code> applies a patch. Terminal <code>allow</code> and <code>deny</code> require empty patches.</li>
+<li><code>None</code> body replacement means no replacement. <code>b""</code> is an explicit empty
   replacement.</li>
-<li>Runtime safety limits deny with source <code>runtime_limit</code> and
-  <code>egress_gate_limit_exceeded</code>.</li>
-<li>Pipeline default deny uses source <code>pipeline_default</code> and
+<li>When a runtime safety limit occurs, Egress Gate denies the request. The result
+  uses source <code>runtime_limit</code> and code <code>egress_gate_limit_exceeded</code>.</li>
+<li>Pipeline default deny uses source <code>pipeline_default</code> and code
   <code>egress_gate_default_deny</code>.</li>
 <li>The released Finding wire contract has only five fields. Gate source and
   decision provenance remain runtime-internal.</li>

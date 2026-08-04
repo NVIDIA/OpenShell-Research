@@ -6,8 +6,8 @@ agent_markdown: true
 
 # Run and operate Egress Gate
 
-Egress Gate is a gRPC service reached by the OpenShell gateway and sandbox
-supervisors. Install and run it from `projects/egress-gate`:
+The OpenShell gateway and sandbox supervisors call Egress Gate through gRPC.
+Install and run the service from `projects/egress-gate`:
 
 ```bash
 uv sync --frozen
@@ -17,8 +17,8 @@ uv run egress-gate serve --listen 0.0.0.0:50051 --timeout-seconds 4
 ```
 
 Use a reachable non-loopback address only when the supervisor is outside the
-service's host network namespace. Plaintext gRPC is intended for a restricted
-trusted network; do not expose the port broadly.
+host network namespace of the service. Plaintext gRPC is for a restricted,
+trusted network. Do not expose the port to an untrusted network.
 
 ## OpenShell registration
 
@@ -56,16 +56,17 @@ Successful policy outcomes are distinct from gRPC failures:
 | Invalid request or config | gRPC `INVALID_ARGUMENT` |
 | Gate or service failure | gRPC `INTERNAL` |
 
-Runtime limit results contain no partial patch or findings. The active policy
-is not replaced by a failed candidate. See [Limits and failures](reference/limits-and-failures.md).
+Runtime limit results contain no partial patch or findings. A failed candidate
+does not replace the active policy. See
+[Limits and failures](reference/limits-and-failures.md).
 
 ## Policy rollout
 
-Each Egress Gate service keeps one active prepared policy. During a policy
-change, stop admitting the old configuration and let already-admitted requests
-finish before sending the new one. This gives the service one serialized
-cutover. Run separate service instances when distinct policies must remain
-active concurrently.
+Each Egress Gate service keeps one active prepared policy. To change the
+policy, first stop requests that use the old configuration. Let all admitted
+requests finish. Then, send a request that uses the new configuration. Use
+separate service instances when different policies must be active at the same
+time.
 
 ## Troubleshooting
 

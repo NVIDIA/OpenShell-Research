@@ -6,11 +6,11 @@ agent_markdown: true
 
 # Regex-body gate
 
-`regex-body` strictly decodes the current request body as UTF-8, matches a
-bounded catalog, and returns audit-safe five-field findings with type
-`sensitive_entity`. Catalogs may be inline or a relative `.yaml`/`.yml` path.
-Absolute paths, traversal, symlinks, aliases, duplicate YAML keys, invalid
-UTF-8, unsafe patterns, and oversized catalogs are rejected.
+`regex-body` strictly decodes the current request body as UTF-8. It matches a
+bounded catalog and returns audit-safe findings with type `sensitive_entity`.
+A catalog can be inline or in a relative `.yaml` or `.yml` file. The gate
+rejects absolute paths, path traversal, symlinks, YAML aliases, duplicate keys,
+invalid UTF-8, unsafe patterns, and oversized catalogs.
 
 ```yaml
 gate: regex-body
@@ -27,11 +27,11 @@ replacement:
   template: '[{entity}]'
 ```
 
-Each entity has a stable bounded name and one or more rules. Rule confidence
-is `low`, `medium`, or `high`; optional flags are `ignore_case`, `multiline`,
-`dot_all`, and `ascii`. Named capture groups and inline flags are reserved.
-Patterns must produce non-empty matches. Overlapping detections are retained
-for findings and replacement chooses deterministic non-overlapping winners.
+Each entity has a stable, bounded name and one or more rules. Rule confidence
+is `low`, `medium`, or `high`. Optional flags are `ignore_case`, `multiline`,
+`dot_all`, and `ascii`. Do not use named capture groups or inline flags.
+Patterns must produce non-empty matches. Findings include overlapping
+detections. Replacement uses deterministic, non-overlapping matches.
 
 ## Modes
 

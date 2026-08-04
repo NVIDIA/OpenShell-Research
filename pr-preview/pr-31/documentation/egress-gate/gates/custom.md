@@ -58,17 +58,17 @@ def create_registry() -> GateRegistry:
 
 `GateRegistry.finalize()` constructs the exact discriminated `pipeline.gates`
 schema from the registered config types. Registry factories supply typed
-`GateResources` objects for deployment-owned clients or profiles; policy
+`GateResources` objects for deployment-owned clients or profiles. Policy
 configuration cannot construct or replace those resources.
 
 Declare output capabilities and finding types accurately. The public wrapper
-rejects undeclared body replacements, header mutations, terminal allows,
-denies, and finding types. Read capabilities are discovery metadata, not field
-isolation. Implementations must keep request state local and be safe for
-concurrent calls; no Python deep-immutability guarantee is made.
+rejects undeclared body replacements, header mutations, terminal decisions,
+and finding types. Read capabilities are discovery metadata. They do not limit
+which request fields trusted Python code can read. Keep request state local so
+the gate is safe for concurrent calls.
 
-For a resource-backed gate, define a typed `GateResources` bundle and pass it
-to `registry.register(..., resources=resources)`. Resources are trusted,
-application-owned, concurrency-safe dependencies; policy configuration may
-select behavior but cannot construct clients, provide credentials, or replace
-the registered resource implementation.
+For a resource-backed gate, define a typed `GateResources` bundle. Pass the
+bundle to `registry.register(..., resources=resources)`. Resources are trusted,
+application-owned dependencies that must be safe for concurrent use. Policy
+configuration can select behavior. It cannot construct clients, provide
+credentials, or replace the registered resource implementation.

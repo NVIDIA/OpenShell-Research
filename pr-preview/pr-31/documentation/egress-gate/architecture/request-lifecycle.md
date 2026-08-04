@@ -14,11 +14,11 @@ scalar and aggregate values. Invalid input produces a cataloged gRPC failure.
 
 ## 2. Validate and prepare the policy
 
-The service converts the protobuf `Struct` to a mapping and asks the finalized
-`GateRegistry` for an exact `EgressGateConfig`. It prepares every configured
-gate and passes the policy fingerprint to a `RequestProcessor`. Preparation is
-under one replacement lock and uses the same `Timeout` as the request's later
-execution. The candidate is published only after a final deadline check.
+The service converts the protobuf `Struct` to a mapping. The finalized
+`GateRegistry` validates it as an exact `EgressGateConfig`. The registry then
+prepares each configured gate and creates a `RequestProcessor`. Preparation
+uses one replacement lock and the request `Timeout`. The service publishes the
+candidate only after a final deadline check.
 
 ## 3. Execute the pipeline
 
@@ -31,12 +31,12 @@ For each configured gate:
 5. On `proceed`, apply the patch to form the next current request.
 6. On terminal `allow` or `deny`, stop without invoking later gates.
 
-The original request remains private to the processor. The final allowed patch
-is the ordered composition of preceding patches; a denied result always has an
-empty patch. Body replacement `None` and `b""` remain distinct.
+The processor keeps the original request private. The final allowed patch
+combines preceding patches in order. A denied result always has an empty patch.
+Body replacement `None` and `b""` remain distinct.
 
-If every gate proceeds, `default_decision` owns the result. Default deny uses
-`egress_gate_default_deny`; default allow carries no reason code.
+If every gate proceeds, `default_decision` controls the result. Default deny
+uses `egress_gate_default_deny`. Default allow has no reason code.
 
 ## 4. Handle runtime limits
 
