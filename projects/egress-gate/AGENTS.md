@@ -94,6 +94,6 @@ middleware phase.
 The current implementation covers the gate contract, strict pipeline
 configuration, finalized registry, regex-body and request-rules behavior,
 request processing, single active-policy replacement, and offline evaluation.
-The custom semantic gate remains example-owned; semantic types are not part of
-the core package or default registry. Do not edit `plans/` as part of
+Semantic or LLM judgment is deferred and must not be added as a built-in,
+example implementation, or default dependency. Do not edit `plans/` as part of
 implementation work.

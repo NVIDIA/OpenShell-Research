@@ -54,9 +54,8 @@ denies, and finding types. Read capabilities are discovery metadata, not field
 isolation. Implementations must keep request state local and be safe for
 concurrent calls; no Python deep-immutability guarantee is made.
 
-The `examples/custom-semantic-gate/` example shows how an application-owned
-`GateResources` bundle can provide a provider-neutral judge client. Semantic
-gate types stay in the example module; they are not part of the core package
-or default registry. Its selected-field bounds and observation mode are
-application policy, and structured serialization does not prevent prompt
-injection.
+For a resource-backed gate, define a typed `GateResources` bundle and pass it
+to `registry.register(..., resources=resources)`. Resources are trusted,
+application-owned, concurrency-safe dependencies; policy configuration may
+select behavior but cannot construct clients, provide credentials, or replace
+the registered resource implementation.

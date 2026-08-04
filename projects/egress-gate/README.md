@@ -89,7 +89,6 @@ through slot acquisition, policy preparation, and `RequestProcessor.process`.
 - [Limits and failures](docs/reference/limits-and-failures.md)
 - [Privacy Guard composition](examples/privacy-guard/README.md)
 - [Deterministic request-rules example](examples/deterministic-gate/README.md)
-- [Custom semantic gate example](examples/custom-semantic-gate/README.md)
 
 ## Development
 

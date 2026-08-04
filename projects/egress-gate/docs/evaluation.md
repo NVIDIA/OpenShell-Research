@@ -18,9 +18,8 @@ uv run egress-gate evaluate \
 ```
 
 The command's `--registry-factory` global option is available for trusted
-application-owned gates. For example, the
-`examples/custom-semantic-gate/README.md` guide loads its registry from
-`PYTHONPATH=examples/custom-semantic-gate`.
+application-owned gates, using the same finalized registry factory accepted by
+the service and discovery commands.
 
 ## Corpus v1
 

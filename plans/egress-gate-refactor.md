@@ -32,9 +32,10 @@ pre-credentials HTTP request contract, with:
 - a protobuf-free processing core behind the OpenShell gRPC service boundary
 
 Privacy Guard becomes a first-party configuration of the built-in regex gate,
-not a separate compatibility layer. A deterministic-plus-custom-semantic
-composition starts with the built-in request-rules gate and may add a
-separately registered custom semantic gate with deny-by-default final behavior.
+not a separate compatibility layer. Deterministic request control is a
+first-party configuration of the built-in request-rules gate. The generic
+registry remains available for organization-specific gates without shipping
+another concrete integration.
 
 The refactor does **not** implement an HTTP/HTTPS MITM proxy. OpenShell owns
 request interception, routing, egress enforcement, and credential attachment;
@@ -67,8 +68,7 @@ binary, service, import path, or configuration schema.
 
 1. Preserve and strengthen customization as a first-class feature.
 2. Make a Privacy-Guard-like detect, deny, and replace setup concise.
-3. Make a deterministic-plus-custom-semantic composition concise without
-   making semantic judgment a built-in.
+3. Make deterministic HTTP request control concise with request rules.
 4. Let custom gates reason about the complete bounded request rather than only
    one decoded text body.
 5. Retain strict typed configuration generated from the exact installed gate
@@ -95,10 +95,9 @@ binary, service, import path, or configuration schema.
 - Inspecting files, transcripts, tool calls, or harness persistence.
 - Acting as a WAF, network firewall, identity provider, credential broker, or
   general authorization server.
-- Providing vendor-specific LLM SDKs in the core package.
-- Shipping a built-in semantic, LLM, JSON-schema, or other third gate in the
-  initial product; the only built-ins are regex body and request rules.
-- Treating an LLM decision as a security proof.
+- Providing vendor-specific LLM SDKs or implementing semantic/LLM judgment,
+  including as a runnable example. The only concrete gates are regex body and
+  request rules.
 - Persisting request bodies, headers, query strings, or response content by
   default.
 - Automatically publishing policies inferred from observed traffic.
@@ -208,8 +207,8 @@ If every gate proceeds, the policy's required `default_decision` determines
 the result. There is no implicit allow and no hidden fallback.
 
 An early terminal allow intentionally skips later gates. Configuration and
-documentation must make this visible because it is the equivalent of
-static allow rules bypassing a later custom semantic gate.
+documentation must make this visible because it bypasses every later custom or
+built-in gate.
 
 ### Failures are not decisions
 
@@ -247,13 +246,12 @@ Findings and logs exclude request content by default. Any traffic-discovery or
 content-capture mode must be separately named, opt-in, bounded, and documented
 as expanding the trust boundary.
 
-### Serialization is not prompt-injection prevention
+### Semantic judgment is deferred
 
-Any custom semantic-gate input must use a deterministic structured
-representation, but documentation must not claim that JSON escaping prevents
-semantic prompt injection. Such custom gates are probabilistic policy
-components and require evaluation, minimization, and deterministic boundaries
-around their authority.
+Do not implement or document a concrete semantic/LLM gate in this refactor,
+including under `examples/`. A later proposal must define its own data
+minimization, failure, evaluation, and prompt-injection boundaries before any
+implementation is added.
 
 ## Target architecture
 
@@ -277,7 +275,6 @@ RequestProcessor
         +--> request-rules gate
         +--> regex body gate
         +--> custom organization gate
-        +--> custom semantic gate (when application-registered)
         |
         v
 EgressResult
@@ -490,7 +487,6 @@ Example finding categories include:
 | --- | --- | --- | --- |
 | Regex privacy | `sensitive_entity` | `email` | `confidence=high` |
 | Request rules | `request_rule_match` | `deny-delete` | `severity=deny` |
-| Custom semantic gate | `semantic_assessment` | `organization-default-deny` | `confidence=medium` |
 | Custom JSON validation | `body_schema_violation` | `required_field_missing` | `severity=error` |
 | Custom gate | Custom stable type | Custom stable label | Gate-defined confidence/severity |
 
@@ -753,11 +749,11 @@ pattern. Export the complete supported authoring surface from
 `egress_gate.gates` so examples do not import private modules.
 
 Registration is equally direct: `registry.register(KeywordDenyGate)` for a
-resource-free gate, and `registry.register(SemanticGate, resources=resources)`
-for a resource-backed gate. The registry, not policy configuration, supplies
-the constructor argument; it passes `None` explicitly for resource-free gates,
-while a missing or wrong resource for a resource-backed gate is a registration
-error.
+resource-free gate, and `registry.register(OrganizationGate,
+resources=resources)` for a resource-backed gate. The registry, not policy
+configuration, supplies the constructor argument; it passes `None` explicitly
+for resource-free gates, while a missing or wrong resource for a
+resource-backed gate is a registration error.
 
 Document the gate contract and test the example custom gate directly. Add a
 reusable external contract-test package only after a concrete second consumer
@@ -780,9 +776,9 @@ installed gate types. Unknown fields and unknown gates are rejected.
 ### Operational resources
 
 Retain the existing distinction between policy behavior and deployment-owned
-resources. Resource bundles contain concurrency-safe clients, approved model
-profiles, endpoints, or credential providers. They contain no per-request
-state and cannot override policy configuration.
+resources. Resource bundles contain concurrency-safe clients, approved
+endpoints, or credential providers. They contain no per-request state and
+cannot override policy configuration.
 
 Prepared gates borrow these application-owned resources; policy replacement
 never closes them. In v0, `_initialize` may create only immutable, ordinarily
@@ -791,10 +787,9 @@ shutdown the server stops admitting RPCs and waits for synchronous workers to
 exit; only then may the assembling application close its resources. Egress
 Gate itself never closes a borrowed resource.
 
-A custom semantic gate, for example, can receive an operator-provided judge
-client selected from an allowlisted resource profile. Policy configuration may
-select the profile but may not provide arbitrary provider URLs, credentials,
-Python imports, or model client implementations.
+A custom resource-backed gate may select an operator-approved resource profile,
+but policy configuration may not provide arbitrary provider URLs, credentials,
+Python imports, or client implementations.
 
 ### Capability declarations
 
@@ -888,9 +883,9 @@ request-rules gate makes terminal request decisions.
 ## Built-in gates
 
 The default registry ships exactly two concrete gates: `regex-body` and
-`request-rules`. Semantic judgment, structured-body validation, organization
-policy, and other behaviors must be supplied through the custom-gate registry
-surface. Do not add a third built-in as part of this refactor.
+`request-rules`. Organization-specific behavior may use the custom-gate
+registry surface. Semantic judgment and other proposed built-ins are deferred;
+do not add a third concrete gate or example implementation in this refactor.
 
 ### Regex body gate
 
@@ -999,17 +994,14 @@ Provide equally concise detect and deny variants. This example is the
 acceptance baseline for preserving Privacy Guard's usability and customization
 story.
 
-### Deterministic-plus-custom-semantic composition
+### Deterministic request-gate composition
 
-Ship a separate extension example using deterministic rules and a custom,
-deployment-provided semantic gate. The example module registers
-`semantic-judge`; it is not part of the default registry or distribution's
-built-in gate set:
+Ship a separate example using only the built-in request-rules gate:
 
 ```yaml
 pipeline:
   gates:
-    - name: known-traffic
+    - name: request-policy
       config:
         gate: request-rules
         rules:
@@ -1023,48 +1015,17 @@ pipeline:
               hosts: [api.github.com]
               methods: [GET, HEAD]
             decision: allow
-    - name: long-tail-policy
-      config:
-        gate: semantic-judge
-        profile: organization-default
-        policy: |
-          This agent may inspect repositories and create pull requests.
-          It must not delete resources or change repository settings.
-        include:
-          method: true
-          target: true
-          headers: [content-type]
-          body_max_bytes: 16384
-        mode: enforce
-        on_allow: allow
   default_decision: deny
 ```
 
 The example must explain that:
 
-- `semantic-judge` is example custom code, not a built-in
-- static allow rules skip the judge
-- deterministic denies should constrain semantic authority
-- the judge sees only configured bounded fields
-- body truncation creates an intentional blind spot
-- structured encoding does not eliminate semantic prompt injection
+- matching deny rules take priority over matching allow rules
+- a matching allow is terminal and skips every later gate
+- unmatched requests reach the explicit deny default
+- path matching uses documented raw component semantics
 - OpenShell network policy remains responsible for admitted destinations and
   direct-egress enforcement
-
-### Privacy-before-custom-semantics composition
-
-In the same `custom-semantic-gate` example directory, add a second policy that
-demonstrates the main composability advantage:
-
-1. a `regex-body` gate replaces sensitive values
-2. the example's custom `semantic-judge` gate evaluates the redacted current
-   request
-3. the final request sent upstream retains the validated replacement
-
-The example reuses the same custom gate implementation and README. It proves
-that gates share one current request and that the broader reframing strengthens
-rather than weakens Privacy Guard's purpose without creating a duplicate
-example tree.
 
 ## Active policy preparation and replacement
 
@@ -1176,7 +1137,6 @@ Exclude:
 - raw paths and queries by default
 - credentials and model endpoints
 - natural-language policies
-- raw judge output
 - arbitrary exception messages
 
 ### Initial observability boundary
@@ -1303,8 +1263,7 @@ projects/egress-gate/
 ├── tests/
 ├── examples/
 │   ├── privacy-guard/
-│   ├── deterministic-gate/
-│   └── custom-semantic-gate/
+│   └── deterministic-gate/
 ├── docs/
 └── analysis/
 ```
@@ -1557,34 +1516,21 @@ Acceptance criteria:
   exact size limits, ordered repeated-header mutations, and every row of the
   normative outcome mapping
 
-### Phase 7: Add evaluation tooling and prove the custom-gate path
+### Phase 7: Add offline evaluation tooling
 
 1. Implement the versioned evaluation corpus and `evaluate` CLI.
-2. Add a self-contained example `semantic-judge` custom gate with its own
-   strict config, typed resources, provider-neutral client protocol, and fake
-   judge. Keep all semantic-specific implementation outside the built-in gate
-   package and default registry.
-3. In that example, demonstrate deterministic request serialization,
-   configured field minimization, per-field bounds, strict output parsing, and
-   observation-only behavior.
-4. Add one `custom-semantic-gate` example with separate
-   `deterministic-plus-semantics` and `privacy-before-semantics` policies that
-   reuse its implementation and README.
-5. Run direct contract-focused tests against the example custom gate.
+2. Exercise the deterministic request-rules example through the production
+   registry and processor.
+3. Keep semantic judgment and additional runnable custom gate examples out of
+   this phase.
 
 Acceptance criteria:
 
 - the installed built-in set remains exactly `regex-body` and `request-rules`
-- no semantic-specific client, config, or implementation is exported by the
-  core package
-- no vendor SDK is required by the core package or default installation
-- unavailable or malformed judges fail rather than pass through
-- a prior privacy gate can redact the exact body seen by the judge
-- an observation-only evaluation always returns `proceed`, carries no
-  mutation, and cannot directly determine the pipeline's final decision
+- no semantic-specific client, config, implementation, policy, corpus, or test
+  exists in the project
+- no vendor SDK is required by the package or default installation
 - evaluation uses the production runtime rather than a parallel reimplementation
-- tests include semantic prompt-injection strings as adversarial data and make
-  no claim that serialization neutralizes them
 
 ### Phase 8: Observability, documentation, and cleanup
 
@@ -1592,8 +1538,8 @@ Acceptance criteria:
    logging, processor, and service ownership points.
 2. Rewrite canonical project documentation around Egress Gate.
 3. Document gate authoring, resource injection, policy composition, request
-   rules, privacy use cases, the custom semantic example and its limitations,
-   active-policy replacement, operations, limits, and failures.
+   rules, privacy use cases, active-policy replacement, operations, limits,
+   and failures.
 4. Replace examples and documentation mirrors through the documented staging
    workflow.
 5. Remove obsolete Privacy Guard assets, analyses, scripts, tests, navigation,
@@ -1607,8 +1553,8 @@ Acceptance criteria:
 Acceptance criteria:
 
 - the public documentation leads with modular policy composition
-- Privacy Guard and deterministic-plus-custom-semantic setups are both
-  first-class quickstarts
+- Privacy Guard and deterministic request-control setups are both first-class
+  quickstarts
 - no default log or finding contains request content
 - repository search finds no obsolete compatibility surface
 - the scoped `stage` audit finds no remaining gate synonyms
@@ -1636,10 +1582,11 @@ Acceptance criteria:
 
 ### Contract tests for extensions
 
-Test the example custom gate directly for concurrent-call safety, content-safe
-errors, deadline handling, declared capabilities and finding types, and invalid
-output rejection. Keep generic wrapper contract coverage in the core gate
-tests; do not add a public testing framework without another consumer.
+Test representative custom gate classes inside the core gate and registry test
+suites for concurrent-call safety, content-safe errors, deadline handling,
+declared capabilities and finding types, and invalid output rejection. Do not
+add a separate runnable custom integration or public testing framework without
+a concrete consumer.
 
 ### Service integration tests
 
@@ -1676,8 +1623,6 @@ Exercise real gRPC requests through the OpenShell middleware service with:
 - findings or errors attempting to contain request content
 - undeclared finding types and invalid finding scalar values
 - attempts to spoof runtime-owned finding provenance
-- custom example gate input truncation and omitted-field behavior
-- malicious instruction strings inside the custom semantic-gate request data
 - failed or concurrent policy replacement without cross-policy state leakage
 
 ### Performance tests
@@ -1725,9 +1670,6 @@ The final documentation set should include:
 - OpenShell request-path quickstart
 - Privacy Guard quickstart
 - deterministic HTTP gate quickstart
-- custom semantic gate extension example
-- privacy-before-custom-semantics walkthrough within the custom semantic-gate
-  example
 - full pipeline configuration reference
 - request-rules normalization and precedence reference
 - built-in gate reference covering only regex body and request rules
@@ -1738,7 +1680,6 @@ The final documentation set should include:
 - limits, failures, cancellation, and concurrency
 - content-safe structured logging behavior
 - offline evaluation guide
-- custom semantic-gate example threat model and limitations
 - OpenShell ownership boundaries and explicit proxy/non-OpenShell non-goals
 
 Architecture diagrams should show the OpenShell gRPC service boundary around
@@ -1765,14 +1706,6 @@ skipped. Do not add a separate policy linter in v0.
 Mitigation: keep the regex-body gate's full accepted-body processing, strict
 UTF-8 contract, atomic replacement, deadlines, and resource limits. Binary
 support in the request model must not imply partial inspection by a text gate.
-
-### A custom semantic integration expands the privacy boundary
-
-Mitigation: make inclusion explicit and minimal, run privacy gates first,
-keep the example and provider clients deployment-owned, exclude credentials at
-the OpenShell phase, avoid raw output persistence, and provide
-observation/evaluation modes. Do not move semantic-specific behavior into the
-built-in package to make the example shorter.
 
 ### Policy replacement races activate the wrong configuration
 
@@ -1806,8 +1739,8 @@ The refactor is complete when:
    schema-generating, bounded, protobuf-free, and explicitly aligned with the
    OpenShell supervisor-middleware request contract.
 3. Policy composition, gate authoring, and application assembly are documented
-   as separate clean extension levels with runnable examples and contract-test
-   support.
+   as separate clean extension levels with runnable built-in compositions and
+   core contract-test coverage.
 4. Built-in and custom gates can emit declared bounded findings using the five
    canonical OpenShell fields; runtime-owned gate provenance is retained for
    internal traces and offline evaluation and intentionally omitted on the
@@ -1817,20 +1750,17 @@ The refactor is complete when:
 6. The Privacy Guard reference composition detects, denies, and replaces with
    the current hardened regex behavior.
 7. A deterministic request gate is expressible entirely in policy.
-8. A static-plus-semantic composition is demonstrated by combining the
-   request-rules built-in with a separately registered example custom gate.
-9. A privacy gate can redact the current request before a custom gate sees it.
-10. One active policy is reused across requests and can be replaced atomically
-    without restarting the service or disrupting in-flight evaluations.
-11. Allow, deny, proceed, mutation, failure, and default behavior are explicit
+8. One active policy is reused across requests and can be replaced atomically
+   without restarting the service or disrupting in-flight evaluations.
+9. Allow, deny, proceed, mutation, failure, and default behavior are explicit
    and exhaustively tested.
-12. Default logs, findings, and traces remain content-safe.
-13. Offline evaluation uses the production registry and runtime.
-14. The OpenShell middleware service passes all exact-boundary and concurrency
+10. Default logs, findings, and traces remain content-safe.
+11. Offline evaluation uses the production registry and runtime.
+12. The OpenShell middleware service passes all exact-boundary and concurrency
     tests.
-15. Project and repository documentation validation passes.
-16. Public documentation presents Privacy Guard and deterministic request
-    control as documented policy compositions using the built-in gates, and
-    semantic egress control as a clean custom extension.
-17. No standalone proxy or non-OpenShell transport exists or is implied to be
+13. Project and repository documentation validation passes.
+14. Public documentation presents Privacy Guard and deterministic request
+    control as documented policy compositions using the built-in gates; it
+    does not imply that semantic judgment is implemented.
+15. No standalone proxy or non-OpenShell transport exists or is implied to be
     part of this project.
