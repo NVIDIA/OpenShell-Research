@@ -42,9 +42,8 @@ headroom.
 
 ## Logging and decisions
 
-`--debug` enables content-safe diagnostics. `--debug-log-content` is an
-explicit development-only option that logs complete request and replacement
-body content.
+`--debug` enables content-safe diagnostics. Egress Gate does not log request or
+replacement bodies.
 
 Successful policy outcomes are distinct from gRPC failures:
 

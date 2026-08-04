@@ -1408,9 +1408,8 @@ Restart the OpenShell gateway after changing registrations. Remove one with:</p>
 Gate <code>--timeout-seconds</code> below it so queueing, preparation, and transport have
 headroom.</p>
 <h2 id="logging-and-decisions">Logging and decisions</h2>
-<p><code>--debug</code> enables content-safe diagnostics. <code>--debug-log-content</code> is an
-explicit development-only option that logs complete request and replacement
-body content.</p>
+<p><code>--debug</code> enables content-safe diagnostics. Egress Gate does not log request or
+replacement bodies.</p>
 <p>Successful policy outcomes are distinct from gRPC failures:</p>
 <table>
 <thead>
