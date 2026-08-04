@@ -9,6 +9,7 @@ from pathlib import Path
 from types import ModuleType
 
 import pytest
+from rich.text import Text
 from typer.testing import CliRunner
 
 from egress_gate.cli import _load_registry, app
@@ -264,8 +265,10 @@ def test_cli_evaluate_explains_an_invalid_timeout() -> None:
             "--timeout-seconds",
             "0",
         ],
+        color=True,
     )
 
     assert result.exit_code == 2
-    assert "--timeout-seconds" in result.stderr
-    assert "greater than 0" in result.stderr
+    error_output = Text.from_ansi(result.stderr).plain
+    assert "Invalid value for --timeout-seconds" in error_output
+    assert "greater than 0" in error_output
