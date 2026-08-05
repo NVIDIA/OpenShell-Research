@@ -12,13 +12,15 @@ protobuf, or `RequestProcessor` internals. Use the function helper for a small,
 stateless gate. Use the class-based API when a gate needs initialization,
 helper-base behavior, or operational resources.
 
-The repository includes a runnable
-[minimal custom gate](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/custom-gate)
-that pairs the implementation below with a policy and two offline evaluation
-cases. Run it from `projects/egress-gate/`; `uv` prepares the project environment
-automatically:
+The repository includes runnable examples for both extension styles:
 
-```bash title="Run the custom-gate example"
+- [Function-based custom gate](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/custom-gate)
+- [Class-based custom gate](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/class-based-gate)
+
+Each example pairs one implementation with a policy and two offline evaluation
+cases. Run the function example from `projects/egress-gate/`:
+
+```bash title="Run the function-based example"
 uv run egress-gate \
   --registry examples.custom-gate.keyword_gate:registry \
   evaluate \
@@ -109,8 +111,18 @@ The function helper does not replace the class-based extension API. Implement
 helper base such as `Utf8BodyGate`, or typed `GateResources`. Resource-free
 class-based gates use `registry.register(GateType)`.
 
-```python title="Equivalent class-based gate"
-from egress_gate.gates import Gate, GateCapability
+```python title="examples/class-based-gate/keyword_gate.py"
+from typing import Literal
+
+from egress_gate.gates import Gate, GateCapability, GateConfig, GateRegistry
+from egress_gate.request import HttpRequest
+from egress_gate.result import GateEvaluation
+from egress_gate.timeout import Timeout
+
+
+class KeywordDenyConfig(GateConfig):
+    kind: Literal["keyword-deny"]
+    keyword: str
 
 
 class KeywordDenyGate(Gate[KeywordDenyConfig, None]):
@@ -129,6 +141,20 @@ class KeywordDenyGate(Gate[KeywordDenyConfig, None]):
         if self.config.keyword.encode("utf-8") in request.body:
             return GateEvaluation.deny("keyword_denied")
         return GateEvaluation.proceed()
+
+
+registry = GateRegistry(include_builtin_gates=True)
+registry.register(KeywordDenyGate)
+```
+
+Run the complete class-based example with:
+
+```bash title="Run the class-based example"
+uv run egress-gate \
+  --registry examples.class-based-gate.keyword_gate:registry \
+  evaluate \
+  --policy examples/class-based-gate/egress-gate-config.yaml \
+  --cases examples/class-based-gate/cases.yaml
 ```
 
 For a resource-backed gate, define a typed `GateResources` bundle. Pass the
