@@ -10,6 +10,7 @@
 
 :root {
   --openshell-sidebar-width: 15.25rem;
+  --openshell-header-height: 3.7rem;
   --openshell-header-control-size: 2.4rem;
   --openshell-header-icon-size: 1.2rem;
   --openshell-green: #76b900;
@@ -95,7 +96,7 @@ body {
 }
 
 .md-header__inner {
-  height: 3.7rem;
+  height: var(--openshell-header-height);
 }
 
 .md-header__inner > [for="__drawer"],
@@ -272,7 +273,7 @@ body {
   .md-header__inner > .openshell-drawer-button {
     position: fixed;
     z-index: 7;
-    top: 0.65rem;
+    top: calc((var(--openshell-header-height) - var(--openshell-header-control-size)) / 2);
     left: 0.85rem;
     color: var(--openshell-ink);
     background: transparent;
@@ -306,10 +307,10 @@ body {
   }
 
   .md-sidebar--primary {
-    top: 3.7rem !important;
+    top: var(--openshell-header-height) !important;
     bottom: 0 !important;
     left: 0 !important;
-    height: calc(100vh - 3.7rem) !important;
+    height: calc(100vh - var(--openshell-header-height)) !important;
     border-width: 0 1px 0 0;
     border-radius: 0;
     box-shadow: none;
@@ -628,7 +629,7 @@ body:has(.openshell-home-page) .md-path {
 }
 
 .research-masthead {
-  min-height: min(30rem, calc(100vh - 3.7rem));
+  min-height: min(30rem, calc(100vh - var(--openshell-header-height)));
   padding: clamp(3.5rem, 9vw, 7.5rem) 0 clamp(3.2rem, 7vw, 5.8rem);
   border-bottom: 1px solid var(--openshell-rule-strong);
 }
@@ -1381,6 +1382,18 @@ body[data-md-color-scheme="slate"] .openshell-home-brand__dark {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+
+  .openshell-drawer-button,
+  .md-overlay,
+  .md-sidebar--primary,
+  .md-main,
+  .md-footer,
+  .dev-note-card__visual::before,
+  .dev-note-card__visual::after,
+  .dev-note-card__visual-image,
+  .dev-note-card__read::after {
+    transition: none !important;
   }
 }
 
