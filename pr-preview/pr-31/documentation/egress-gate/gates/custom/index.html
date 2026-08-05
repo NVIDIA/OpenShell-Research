@@ -1296,13 +1296,15 @@ an installed custom-gate package.</p>
 </span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>    <span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">KeywordDenyGate</span><span class="p">)</span>
 </span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>    <span class="k">return</span> <span class="n">registry</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
 </span></code></pre></div>
-<p><code>GateRegistry.finalize()</code> constructs the exact discriminated <code>pipeline.gates</code>
-schema from the registered config types. Registry factories supply typed
+<p><code>GateRegistry.finalize()</code> constructs the exact discriminated <code>gates</code> schema
+from the registered config types. Registry factories supply typed
 <code>GateResources</code> objects for deployment-owned clients or profiles. Policy
 configuration cannot construct or replace those resources.</p>
-<p>Every serialized variant uses a required <code>kind</code> field. A gate config declares
-one literal gate kind. Nested unions follow the same rule. This gives policy
-parsers and generated schemas one consistent way to select an exact model.</p>
+<p><code>GateConfig</code> supplies the common required <code>name</code> field. Custom config classes
+inherit it and do not redefine or alias it. Each config declares one required
+literal <code>kind</code> and keeps that serialized field name. Nested unions follow the
+same discriminator rule. This gives policy parsers and generated schemas one
+consistent way to select an exact configuration shape.</p>
 <p>Declare output capabilities and finding types accurately. The public wrapper
 rejects undeclared body replacements, header mutations, terminal decisions,
 and finding types. Read capabilities are discovery metadata. They do not limit

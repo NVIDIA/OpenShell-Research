@@ -17,36 +17,29 @@ network_middlewares:
     middleware: egress-gate
     order: 0
     config:
-      pipeline:
-        gates:
-          - name: identifiers
-            config:
-              kind: regex
-              scan:
-                kind: body
-                action:
-                  kind: replace
-                  template: '[{entity}]'
-              pattern_catalog:
-                entities:
-                  - name: email
-                    rules:
-                      - pattern: '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'
-                        confidence: high
-        default_decision: allow
+      gates:
+        - name: identifiers
+          kind: regex
+          scan:
+            kind: body
+            action:
+              kind: replace
+              template: '[{entity}]'
+          pattern_catalog: patterns.yaml
+      default_decision: allow
     on_error: fail_closed
     endpoints:
       include: [api.anthropic.com]
 ```
 
-The top-level policy has one `pipeline`. The pipeline has two required fields:
+The Egress Gate policy has two required fields:
 
 - `gates` contains one through ten named gate configurations.
 - `default_decision` is `allow` or `deny`.
 
 Each gate entry has a unique, bounded `name`. Its literal `kind` field selects
-the exact configuration type. The registry rejects unknown fields, unknown gate
-types, missing defaults, and duplicate names.
+the exact gate type and its remaining fields. The registry rejects unknown
+fields, unknown gate types, missing defaults, and duplicate names.
 
 ## Built-in gates
 
@@ -59,8 +52,9 @@ trusted application registry factory supplies other behavior.
 
 ## Inspect the installed registry
 
-Run these commands from `projects/egress-gate/`. `uv` prepares the project
-environment automatically:
+Run these commands from the
+[`projects/egress-gate/`](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate)
+directory in a source checkout:
 
 ```bash title="Inspect the default registry"
 uv run egress-gate gates list

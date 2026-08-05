@@ -9,5 +9,5 @@ agent_markdown: true
 Technical documentation and references for installing, using, and extending
 OpenShell Research projects.
 
-- [Egress Gate](egress-gate/index.md): extensible middleware for provider-bound
-  HTTP requests.
+- [Egress Gate](egress-gate/index.md): extensible middleware for applying gates
+  to outgoing HTTP requests.

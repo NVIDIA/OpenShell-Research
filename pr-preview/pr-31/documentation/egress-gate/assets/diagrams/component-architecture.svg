@@ -51,7 +51,7 @@
   <text x="248" y="274" text-anchor="middle" class="subtitle">config.py · ordered gates · default decision</text>
   <rect x="500" y="225" width="412" height="62" rx="13" class="policy"/>
   <text x="706" y="251" text-anchor="middle" class="title">Gate registry</text>
-  <text x="706" y="274" text-anchor="middle" class="subtitle">config union · resources · gate construction</text>
+  <text x="706" y="274" text-anchor="middle" class="subtitle">gate union · resources · gate construction</text>
 
   <rect x="20" y="330" width="940" height="135" rx="20" class="layer"/>
   <text x="48" y="359" class="layer-label">PIPELINE PROCESSOR</text>

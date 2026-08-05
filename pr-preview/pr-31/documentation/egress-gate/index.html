@@ -1095,32 +1095,21 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#request-mutation-flow" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Request mutation flow
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#request-path" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Request path
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#quickstart" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Quickstart
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-a-request-moves-through-the-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        How a request moves through the pipeline
       </span>
     </span>
   </a>
@@ -1272,57 +1261,68 @@
 
 
 <h1 id="egress-gate">Egress Gate</h1>
-<p>Egress Gate is an extensible OpenShell supervisor middleware service for the
-pre-credentials HTTP request phase. OpenShell owns interception, routing, and
-credential attachment. Egress Gate evaluates one immutable byte-oriented
-<code>HttpRequest</code> and returns an explicit result.</p>
-<p>An application can install trusted custom gates. Each gate has a strict
-configuration type and an explicit control result.</p>
-<p>It is not a forward proxy, TLS interceptor, or response filter. It does not
-protect content that a harness already wrote to disk. Configure storage and
-retention controls separately.</p>
-<h2 id="request-mutation-flow">Request mutation flow</h2>
+<p>Egress Gate is extensible OpenShell middleware for applying an ordered pipeline
+of gates to outgoing HTTP requests from sandboxes. A gate can inspect a
+request, report findings, rewrite supported content, allow it, or deny it. Use
+the built-in regex gate or install trusted custom gates for application-specific
+checks.</p>
+<p>Egress Gate provides one typed, configurable place for request-level controls.
+You can combine gates, test policies offline, and add new gate types without
+changing OpenShell.</p>
+<p>OpenShell still owns interception, routing, network policy, and credential
+attachment. Egress Gate is not a forward proxy, TLS interceptor, response
+filter, or storage control.</p>
+<h2 id="quickstart">Quickstart</h2>
+<p>From the
+<a href="https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate"><code>projects/egress-gate/</code></a>
+directory in a source checkout:</p>
+<p>First, inspect the installed gates and their configuration schema:</p>
+<div class="language-bash highlight"><span class="filename">Explore available gates</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>gates<span class="w"> </span>list
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>gates<span class="w"> </span>schema
+</span></code></pre></div>
+<p>Then validate a policy before you use it:</p>
+<div class="language-bash highlight"><span class="filename">Validate a policy</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>validate<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--policy<span class="w"> </span>examples/regex-redaction/egress-gate-config.yaml
+</span></code></pre></div>
+<p>Start Egress Gate in the foreground when the policy is ready:</p>
+<div class="language-bash highlight"><span class="filename">Start the server</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>serve<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:50051
+</span></code></pre></div>
+<p>Use the <a href="gates/regex/">regex guide</a> for an OpenShell policy and a
+regex-pattern "catalog".</p>
+<p>Use <a href="evaluation/">offline policy tests</a> to check saved request examples with
+the same prepared <code>RequestProcessor</code> used by the service. No request goes to an
+upstream provider.</p>
+<h2 id="how-a-request-moves-through-the-pipeline">How a request moves through the pipeline</h2>
 <ol>
 <li>The OpenShell supervisor sends the intercepted request to Egress Gate.</li>
-<li>Each gate reads the current immutable <code>HttpRequest</code> snapshot and can propose
+<li>Each gate reads the current read-only <code>HttpRequest</code> and can propose
    <code>RequestMutations</code>. A gate does not modify its input in place.</li>
-<li>The Egress Gate pipeline processor validates and applies those mutations to
-   a new local <code>HttpRequest</code> snapshot.</li>
-<li>The next gate sees the updated snapshot.</li>
+<li>The Egress Gate pipeline processor validates and applies the requested
+   mutations by creating a new local <code>HttpRequest</code>.</li>
+<li>The next gate receives the updated request.</li>
 <li>If the pipeline allows the request, the service adapter maps the accumulated
    mutations to OpenShell's <code>HttpRequestResult</code>.</li>
 <li>The OpenShell supervisor applies the returned mutations to the intercepted
    request before it attaches credentials.</li>
 </ol>
 <p>A denial returns no request mutations.</p>
-<h2 id="request-path">Request path</h2>
 <figure class="documentation-figure documentation-figure--portrait">
   <img src="assets/diagrams/request-path.svg" alt="The OpenShell supervisor sends an intercepted request to Egress Gate, receives the final decision and mutations, and applies allowed mutations before it attaches credentials.">
-  <figcaption>Egress Gate builds local request snapshots. The OpenShell supervisor owns and updates the intercepted request.</figcaption>
+  <figcaption>Egress Gate evaluates the request. The OpenShell supervisor owns and updates the intercepted request.</figcaption>
 </figure>
 
-<p>Only <code>service/</code> imports generated bindings. Gate and pipeline processor code is
-protobuf-free and can be evaluated offline.</p>
-<h2 id="quickstart">Quickstart</h2>
-<p>From <code>projects/egress-gate/</code>:</p>
-<p><code>uv run</code> prepares the project environment before each command.</p>
-<div class="language-bash highlight"><span class="filename">Inspect, validate, and serve</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>gates<span class="w"> </span>list
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>gates<span class="w"> </span>schema
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>validate<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--policy<span class="w"> </span>examples/regex-redaction/egress-gate-config.yaml
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>serve<span class="w"> </span>--listen<span class="w"> </span><span class="m">127</span>.0.0.1:50051
-</span></code></pre></div>
-<p>Use the <a href="gates/regex/">regex guide</a> for an OpenShell policy and a
-file-backed catalog.</p>
-<p>Use <a href="evaluation/">offline policy tests</a> to check saved request examples with
-the same prepared <code>RequestProcessor</code> used by the service. No request goes to an
-upstream provider.</p>
+<p>Within Egress Gate, the
+<a href="https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/src/egress_gate/service">gRPC service adapter</a>
+is the only code that imports OpenShell's generated protobuf bindings. Gates
+and the pipeline processor do not depend on protobuf or gRPC, so the same
+policy pipeline can run in offline tests.</p>
 <h2 id="core-rules">Core rules</h2>
 <ul>
 <li>A policy has one through ten named gates and a required <code>default_decision</code>.</li>
-<li>Each gate receives the current read-only request snapshot.</li>
-<li>Only <code>proceed</code> can propose request mutations. Terminal <code>allow</code> and <code>deny</code>
-  require an empty mutation set.</li>
+<li>Each gate receives the current read-only request.</li>
+<li>Each gate returns one control result. <code>proceed</code> continues to the next gate;
+  <code>allow</code> and <code>deny</code> stop the pipeline. Only <code>proceed</code> can include request
+  mutations.</li>
 <li><code>None</code> body replacement means no replacement. <code>b""</code> is an explicit empty
   replacement.</li>
 <li>When the pipeline processor reaches a safety limit, Egress Gate denies the
