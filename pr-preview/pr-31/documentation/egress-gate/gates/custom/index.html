@@ -1308,6 +1308,9 @@ rejects undeclared body replacements, header mutations, terminal decisions,
 and finding types. Read capabilities are discovery metadata. They do not limit
 which request fields trusted Python code can read. Keep request state local so
 the gate is safe for concurrent calls.</p>
+<p>A custom gate must not edit its <code>HttpRequest</code> input. To propose a change, return
+<code>GateEvaluation.proceed(request_mutations=RequestMutations(...))</code>. The pipeline
+processor validates the mutations and creates the next immutable snapshot.</p>
 <p>For a resource-backed gate, define a typed <code>GateResources</code> bundle. Pass the
 bundle to <code>registry.register(..., resources=resources)</code>. Resources are trusted,
 application-owned dependencies that must be safe for concurrent use. Policy

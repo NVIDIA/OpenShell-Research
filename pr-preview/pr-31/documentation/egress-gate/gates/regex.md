@@ -44,7 +44,8 @@ pattern_catalog: patterns.yaml
 ```
 
 The header scan sees the current request snapshot, including validated header
-patches from earlier gates. The regex gate does not return header mutations.
+mutations from earlier gates. The regex gate does not return header mutations
+itself.
 OpenShell permits writes only in the `x-openshell-middleware-` namespace, so a
 general regex replacement cannot rewrite arbitrary selected headers. A custom
 gate can return supported header writes or removals when it declares the
@@ -78,6 +79,11 @@ The replace action owns its template. It returns a body replacement even when
 there is no match. This preserves the operator's explicit intent to replace the
 current body. Invalid body UTF-8 is a stable `body_encoding_invalid` service
 failure.
+
+The regex gate does not edit the body in place. It returns the replacement in
+`RequestMutations`. The pipeline processor uses it to build the next immutable
+`HttpRequest` snapshot. If the pipeline allows the request, Egress Gate includes
+the replacement in the final mutations returned to the OpenShell supervisor.
 
 Replacement templates contain literal text and the `{entity}` field only.
 Output size is projected before rendering and is bounded by the advertised

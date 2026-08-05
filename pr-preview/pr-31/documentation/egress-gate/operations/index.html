@@ -1428,7 +1428,7 @@ replacement bodies.</p>
 <td>deny, <code>egress_gate_default_deny</code></td>
 </tr>
 <tr>
-<td>Runtime safety limit</td>
+<td>Pipeline processor reaches a safety limit</td>
 <td>deny, <code>egress_gate_limit_exceeded</code></td>
 </tr>
 <tr>
@@ -1441,8 +1441,8 @@ replacement bodies.</p>
 </tr>
 </tbody>
 </table>
-<p>Runtime limit results contain no partial patch or findings. A failed candidate
-does not replace the active policy. See
+<p>Results caused by pipeline processor limits contain no partial mutations or
+findings. A failed candidate does not replace the active policy. See
 <a href="../reference/limits-and-failures/">Limits and failures</a>.</p>
 <h2 id="policy-rollout">Policy rollout</h2>
 <p>Each Egress Gate service keeps one active prepared policy. To change the

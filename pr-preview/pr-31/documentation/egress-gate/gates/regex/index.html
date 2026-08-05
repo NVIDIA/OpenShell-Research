@@ -1373,7 +1373,8 @@ a match cannot span two values. Header names are case-insensitive:</p>
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nt">pattern_catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">patterns.yaml</span>
 </span></code></pre></div>
 <p>The header scan sees the current request snapshot, including validated header
-patches from earlier gates. The regex gate does not return header mutations.
+mutations from earlier gates. The regex gate does not return header mutations
+itself.
 OpenShell permits writes only in the <code>x-openshell-middleware-</code> namespace, so a
 general regex replacement cannot rewrite arbitrary selected headers. A custom
 gate can return supported header writes or removals when it declares the
@@ -1418,6 +1419,10 @@ or query. Header replacement is not part of the built-in gate.</p>
 there is no match. This preserves the operator's explicit intent to replace the
 current body. Invalid body UTF-8 is a stable <code>body_encoding_invalid</code> service
 failure.</p>
+<p>The regex gate does not edit the body in place. It returns the replacement in
+<code>RequestMutations</code>. The pipeline processor uses it to build the next immutable
+<code>HttpRequest</code> snapshot. If the pipeline allows the request, Egress Gate includes
+the replacement in the final mutations returned to the OpenShell supervisor.</p>
 <p>Replacement templates contain literal text and the <code>{entity}</code> field only.
 Output size is projected before rendering and is bounded by the advertised
 OpenShell body limit.</p>

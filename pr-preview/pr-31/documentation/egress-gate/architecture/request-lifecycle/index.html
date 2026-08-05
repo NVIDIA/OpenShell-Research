@@ -992,10 +992,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#4-handle-runtime-limits" class="md-nav__link">
+  <a href="#4-handle-pipeline-processor-limits" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        4. Handle runtime limits
+        4. Handle pipeline processor limits
       </span>
     </span>
   </a>
@@ -1232,10 +1232,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#4-handle-runtime-limits" class="md-nav__link">
+  <a href="#4-handle-pipeline-processor-limits" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        4. Handle runtime limits
+        4. Handle pipeline processor limits
       </span>
     </span>
   </a>
@@ -1409,8 +1409,8 @@
 
 <h1 id="request-lifecycle">Request lifecycle</h1>
 <figure class="documentation-figure documentation-figure--wide">
-  <img src="../../assets/diagrams/request-lifecycle.svg" alt="The request lifecycle validates the transport and policy, runs the gate pipeline, and returns either a result or an RPC failure.">
-  <figcaption>Input failures end the RPC. Policy decisions and runtime-limit denials return normal middleware results.</figcaption>
+  <img src="../../assets/diagrams/request-lifecycle.svg" alt="The Egress Gate service validates an OpenShell request, prepares the policy, creates immutable snapshots for the gate pipeline, and maps the result back to OpenShell.">
+  <figcaption>The pipeline processor updates local snapshots. The OpenShell supervisor applies final mutations to the intercepted request.</figcaption>
 </figure>
 
 <h2 id="1-validate-the-transport">1. Validate the transport</h2>
@@ -1424,33 +1424,36 @@ prepares each configured gate and creates a <code>RequestProcessor</code>. Prepa
 uses one replacement lock and the request <code>Timeout</code>. The service publishes the
 candidate only after a final deadline check.</p>
 <h2 id="3-execute-the-pipeline">3. Execute the pipeline</h2>
-<p>For each configured gate:</p>
+<p>For each configured gate, the Egress Gate pipeline processor:</p>
 <ol>
 <li>Check the shared deadline.</li>
 <li>Pass the current read-only <code>HttpRequest</code> snapshot to the gate.</li>
 <li>Reconstruct and validate the returned <code>GateEvaluation</code>.</li>
-<li>Add a content-safe <code>GateTrace</code> and runtime-owned <code>SourcedFinding</code> values.</li>
-<li>On <code>proceed</code>, validate the patch and construct the next request snapshot.</li>
+<li>Add a content-safe <code>GateTrace</code> and <code>SourcedFinding</code> values owned by the
+   pipeline processor.</li>
+<li>On <code>proceed</code>, validate the request mutations and construct the next request
+   snapshot.</li>
 <li>On terminal <code>allow</code> or <code>deny</code>, stop without invoking later gates.</li>
 </ol>
-<p>The processor never changes a request object in place. It keeps the original
-request private, constructs a new snapshot after each validated patch, and
-passes that snapshot to the next gate. The final allowed patch combines these
-changes in order for the service to return to OpenShell. A denied result always
-has an empty patch. Body replacement <code>None</code> and <code>b""</code> remain distinct. Header
-mutation variants use the required <code>kind</code> values <code>write</code> and <code>remove</code>.</p>
+<p>The pipeline processor never changes a request object in place. It keeps the
+first snapshot private, constructs a new snapshot after each validated mutation
+set, and passes that snapshot to the next gate. The final allowed result
+combines these mutations in order. A denied result always has an empty mutation
+set. Body replacement <code>None</code> and <code>b""</code> remain distinct. Header mutation variants
+use the required <code>kind</code> values <code>write</code> and <code>remove</code>.</p>
 <p>If every gate proceeds, <code>default_decision</code> controls the result. Default deny
 uses <code>egress_gate_default_deny</code>. Default allow has no reason code.</p>
-<h2 id="4-handle-runtime-limits">4. Handle runtime limits</h2>
+<h2 id="4-handle-pipeline-processor-limits">4. Handle pipeline processor limits</h2>
 <p>Deadline expiry, worker-slot exhaustion, mutation bounds, finding limits, and
 encoded output limits return an atomic deny with source <code>runtime_limit</code> and
 <code>egress_gate_limit_exceeded</code>. No partial mutations or findings are returned.
 Gate contract and execution failures remain gRPC failures.</p>
 <h2 id="5-serialize-the-result">5. Serialize the result</h2>
-<p>The service converts the protobuf-free <code>EgressResult</code> to the current OpenShell
-wire contract. It serializes exactly five finding fields and never puts source
-or attributes into labels or result metadata. An explicit empty replacement
-sets <code>has_body=true</code> with an empty body.</p>
+<p>The Egress Gate service adapter maps the protobuf-free <code>EgressResult</code> to
+OpenShell's <code>HttpRequestResult</code>. It serializes the final body and header
+mutations, exactly five finding fields, and no internal provenance. An explicit
+empty replacement sets <code>has_body=true</code> with an empty body. After an allow, the
+OpenShell supervisor applies these mutations to the intercepted request.</p>
 
 
 

@@ -1284,10 +1284,10 @@
 
 
 <h1 id="system-architecture">System architecture</h1>
-<p>Egress Gate has one transport adapter and one protobuf-free runtime.</p>
+<p>Egress Gate has one transport adapter and one protobuf-free pipeline processor.</p>
 <figure class="documentation-figure documentation-figure--wide">
-  <img src="../assets/diagrams/component-architecture.svg" alt="Egress Gate has separate transport, policy, request-processing, and request-gate layers.">
-  <figcaption>Transport code stays outside the protobuf-free runtime and gate contract.</figcaption>
+  <img src="../assets/diagrams/component-architecture.svg" alt="Inside Egress Gate, the gRPC service adapter is separate from the protobuf-free pipeline processor and request gates.">
+  <figcaption>The external OpenShell supervisor talks only to the Egress Gate service adapter. The pipeline processor and gates use local domain models.</figcaption>
 </figure>
 
 <h2 id="component-ownership">Component ownership</h2>
@@ -1301,7 +1301,7 @@
 <tbody>
 <tr>
 <td><code>request.py</code></td>
-<td>Immutable request, headers, and ordered <code>RequestPatch</code></td>
+<td>Immutable request, headers, and <code>RequestMutations</code></td>
 </tr>
 <tr>
 <td><code>result.py</code></td>
@@ -1325,7 +1325,7 @@
 </tr>
 <tr>
 <td><code>request_processor.py</code></td>
-<td>Shared deadline, current-request mutation, control flow, aggregation, and provenance</td>
+<td>Shared deadline, immutable snapshot construction, control flow, aggregation, and provenance</td>
 </tr>
 <tr>
 <td><code>service/</code></td>
@@ -1336,12 +1336,12 @@
 <p>The CLI's offline evaluator parses bounded YAML. It uses
 <code>GateRegistry.prepare_processor()</code> and the production <code>RequestProcessor</code>. It
 does not add a second execution path or import the transport adapter.</p>
-<p>Only <code>service/</code> imports generated protobuf/gRPC bindings. The processor and
-gates receive domain values and can be tested offline.</p>
+<p>Only <code>service/</code> imports generated protobuf/gRPC bindings. The pipeline processor
+and gates receive domain values and can be tested offline.</p>
 <h2 id="pipeline-execution">Pipeline execution</h2>
 <figure class="documentation-figure documentation-figure--wide">
-  <img src="../assets/diagrams/processing-pipeline.svg" alt="A request moves through runtime controls and an ordered gate pipeline before Egress Gate returns a result.">
-  <figcaption>Each gate sees the current request. A <code>proceed</code> result makes a validated patch visible to the next gate.</figcaption>
+  <img src="../assets/diagrams/processing-pipeline.svg" alt="A request moves through pipeline processor controls and an ordered gate pipeline before Egress Gate returns a result.">
+  <figcaption>Each gate proposes changes to its current snapshot. The pipeline processor builds the next snapshot, the service adapter maps the final mutations, and the OpenShell supervisor applies them.</figcaption>
 </figure>
 
 <h2 id="trust-and-state">Trust and state</h2>
@@ -1349,7 +1349,8 @@ gates receive domain values and can be tested offline.</p>
 Capabilities mechanically constrain outputs but do not sandbox Python reads.
 Prepared gates can use application-owned resources that are safe for concurrent
 use. Egress Gate does not close these resources.</p>
-<p>One validated policy and one prepared <code>RequestProcessor</code> are active at a time.
+<p>One validated policy and one prepared pipeline processor (<code>RequestProcessor</code>)
+are active at a time.
 Preparation is serialized and a complete candidate is published only after
 the shared deadline checks. A failed candidate leaves the existing policy
 unchanged. Gate instances are reused across worker threads, so per-request

@@ -1389,6 +1389,10 @@
 <p>The <code>service/</code> package is the only handwritten package that imports OpenShell
 protobuf/gRPC bindings. It owns exact encoded wire limits and transport status
 mapping. Domain models own protobuf-free invariants.</p>
+<p>The OpenShell supervisor owns the intercepted request. Egress Gate receives its
+request data over gRPC and works with local immutable <code>HttpRequest</code> snapshots.
+The Egress Gate service adapter returns a decision and final mutations; the
+supervisor applies allowed mutations to the intercepted request.</p>
 <h2 id="rpcs">RPCs</h2>
 <table>
 <thead>
@@ -1426,18 +1430,25 @@ runs in a worker. The worker owns its slot until it exits.</p>
 <h2 id="wire-findings-and-mutations">Wire findings and mutations</h2>
 <p>The current OpenShell <code>Finding</code> contains exactly <code>type</code>, <code>label</code>, <code>count</code>,
 <code>confidence</code>, and <code>severity</code>. <code>SourcedFinding.source_gate</code>, decision sources,
-and traces are runtime values and are not serialized. Decision sources use a
-strict <code>kind</code>-discriminated union. The adapter rechecks protobuf finding and
-header sizes before returning a response.</p>
-<p><code>RequestPatch</code> operations serialize in their validated order. <code>None</code> means no
-replacement, while empty bytes are emitted with <code>has_body=true</code>.</p>
+and traces belong to the pipeline processor and are not serialized. Decision
+sources use a strict <code>kind</code>-discriminated union. The adapter rechecks protobuf
+finding and header sizes before returning a response.</p>
+<p><code>RequestMutations</code> is Egress Gate's internal aggregate. A gate returns it with
+<code>proceed</code> instead of modifying its input. The pipeline processor validates and
+applies it to a new local <code>HttpRequest</code> snapshot for the next gate.</p>
+<p>At the service boundary, the adapter maps the accumulated
+<code>RequestMutations.replacement_body</code> to <code>HttpRequestResult.body</code> and <code>has_body</code>.
+It maps each ordered header operation to
+<code>HttpRequestResult.header_mutations</code>. <code>None</code> means no body replacement, while
+empty bytes are emitted with <code>has_body=true</code>. The OpenShell supervisor applies
+these wire mutations after an allow.</p>
 <h2 id="lifecycle-and-errors">Lifecycle and errors</h2>
 <p>The active policy contains one validated configuration and one prepared
-processor. An equal configuration reuses the active processor. The service
-prepares a changed candidate before it publishes that candidate. An invalid
-candidate does not replace the active policy.</p>
+pipeline processor. An equal configuration reuses the active pipeline
+processor. The service prepares a changed candidate before it publishes that
+candidate. An invalid candidate does not replace the active policy.</p>
 <p>Invalid input maps to <code>INVALID_ARGUMENT</code>. Internal gate or service failures map
-to <code>INTERNAL</code>. A runtime-limit deny is not a gRPC failure. It uses
+to <code>INTERNAL</code>. A pipeline processor limit denial is not a gRPC failure. It uses
 <code>egress_gate_limit_exceeded</code>.</p>
 
 

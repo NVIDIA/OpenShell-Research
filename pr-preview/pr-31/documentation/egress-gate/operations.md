@@ -51,12 +51,12 @@ Successful policy outcomes are distinct from gRPC failures:
 | --- | --- |
 | Gate deny | deny, gate-owned reason code |
 | Pipeline default deny | deny, `egress_gate_default_deny` |
-| Runtime safety limit | deny, `egress_gate_limit_exceeded` |
+| Pipeline processor reaches a safety limit | deny, `egress_gate_limit_exceeded` |
 | Invalid request or config | gRPC `INVALID_ARGUMENT` |
 | Gate or service failure | gRPC `INTERNAL` |
 
-Runtime limit results contain no partial patch or findings. A failed candidate
-does not replace the active policy. See
+Results caused by pipeline processor limits contain no partial mutations or
+findings. A failed candidate does not replace the active policy. See
 [Limits and failures](reference/limits-and-failures.md).
 
 ## Policy rollout

@@ -1374,7 +1374,7 @@ limits.</p>
 <td style="text-align: right;">10</td>
 </tr>
 <tr>
-<td>Header mutations per patch</td>
+<td>Header mutations per gate evaluation</td>
 <td style="text-align: right;">64</td>
 </tr>
 <tr>
@@ -1409,7 +1409,7 @@ the first rejected value.</p>
 <td>gRPC <code>INTERNAL</code></td>
 </tr>
 <tr>
-<td>Deadline or runtime limit</td>
+<td>Deadline or pipeline processor limit</td>
 <td>deny, source <code>runtime_limit</code>, code <code>egress_gate_limit_exceeded</code></td>
 </tr>
 <tr>
@@ -1426,12 +1426,12 @@ the first rejected value.</p>
 </tr>
 </tbody>
 </table>
-<p>Runtime-limit results contain no partial patch, findings, or trace details.
-Failed policy preparation leaves the active policy unchanged. Stable error
-catalogs and reason codes never include request content or arbitrary exception
-text.</p>
+<p>Pipeline processor limit results contain no partial mutations, findings, or
+trace details. Failed policy preparation leaves the active policy unchanged.
+Stable error catalogs and reason codes never include request content or
+arbitrary exception text.</p>
 <h2 id="finding-contract">Finding contract</h2>
-<p>The released OpenShell wire contract has five fields. The runtime's
+<p>The released OpenShell wire contract has five fields. The pipeline processor's
 <code>SourcedFinding</code> and <code>DecisionSource</code> preserve provenance for internal tests,
 traces, and logging only. Do not encode source or attributes into labels or
 metadata while the canonical protocol remains five-field.</p>

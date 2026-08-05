@@ -10,6 +10,11 @@ The `service/` package is the only handwritten package that imports OpenShell
 protobuf/gRPC bindings. It owns exact encoded wire limits and transport status
 mapping. Domain models own protobuf-free invariants.
 
+The OpenShell supervisor owns the intercepted request. Egress Gate receives its
+request data over gRPC and works with local immutable `HttpRequest` snapshots.
+The Egress Gate service adapter returns a decision and final mutations; the
+supervisor applies allowed mutations to the intercepted request.
+
 ## RPCs
 
 | RPC | Behavior |
@@ -37,20 +42,28 @@ runs in a worker. The worker owns its slot until it exits.
 
 The current OpenShell `Finding` contains exactly `type`, `label`, `count`,
 `confidence`, and `severity`. `SourcedFinding.source_gate`, decision sources,
-and traces are runtime values and are not serialized. Decision sources use a
-strict `kind`-discriminated union. The adapter rechecks protobuf finding and
-header sizes before returning a response.
+and traces belong to the pipeline processor and are not serialized. Decision
+sources use a strict `kind`-discriminated union. The adapter rechecks protobuf
+finding and header sizes before returning a response.
 
-`RequestPatch` operations serialize in their validated order. `None` means no
-replacement, while empty bytes are emitted with `has_body=true`.
+`RequestMutations` is Egress Gate's internal aggregate. A gate returns it with
+`proceed` instead of modifying its input. The pipeline processor validates and
+applies it to a new local `HttpRequest` snapshot for the next gate.
+
+At the service boundary, the adapter maps the accumulated
+`RequestMutations.replacement_body` to `HttpRequestResult.body` and `has_body`.
+It maps each ordered header operation to
+`HttpRequestResult.header_mutations`. `None` means no body replacement, while
+empty bytes are emitted with `has_body=true`. The OpenShell supervisor applies
+these wire mutations after an allow.
 
 ## Lifecycle and errors
 
 The active policy contains one validated configuration and one prepared
-processor. An equal configuration reuses the active processor. The service
-prepares a changed candidate before it publishes that candidate. An invalid
-candidate does not replace the active policy.
+pipeline processor. An equal configuration reuses the active pipeline
+processor. The service prepares a changed candidate before it publishes that
+candidate. An invalid candidate does not replace the active policy.
 
 Invalid input maps to `INVALID_ARGUMENT`. Internal gate or service failures map
-to `INTERNAL`. A runtime-limit deny is not a gRPC failure. It uses
+to `INTERNAL`. A pipeline processor limit denial is not a gRPC failure. It uses
 `egress_gate_limit_exceeded`.

@@ -8,7 +8,7 @@ agent_markdown: true
 
 OpenShell embeds the Egress Gate policy in a `network_middlewares` entry. The
 registry validates the complete strict configuration before preparing a
-processor.
+pipeline processor.
 
 ```yaml title="OpenShell policy"
 network_middlewares:
@@ -83,11 +83,11 @@ choose a resource implementation, or provide credentials.
 
 `validate` checks the policy and registered resources. It also reads and checks
 a file-backed pattern catalog. It does not construct gates, prepare a
-processor, or change the active policy. Use `evaluate` to check artifacts that
-the gate creates during preparation. The gRPC service checks the exact encoded
-size of the OpenShell configuration.
+pipeline processor, or change the active policy. Use `evaluate` to check
+artifacts that the gate creates during preparation. The gRPC service checks the
+exact encoded size of the OpenShell configuration.
 
 For repeatable request-level checks, the `evaluate` command accepts a pipeline
 policy and a strict version-one corpus. It uses the registry's prepared
-processor path and does not start the gRPC service. See
+pipeline processor path and does not start the gRPC service. See
 [Test policies offline](evaluation.md).

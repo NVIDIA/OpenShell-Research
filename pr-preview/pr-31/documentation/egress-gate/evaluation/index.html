@@ -1474,7 +1474,7 @@ the test more useful:</p>
 <tbody>
 <tr>
 <td><code>decision_source_kind</code></td>
-<td>Whether a gate, the pipeline default, or a runtime limit made the decision</td>
+<td>Whether a gate, the pipeline default, or a pipeline processor limit made the decision</td>
 </tr>
 <tr>
 <td><code>gate_name</code></td>
@@ -1492,14 +1492,14 @@ the test more useful:</p>
 </table>
 <p>Gate name and gate type apply only when <code>decision_source_kind</code> is <code>gate</code>.
 Omitted fields are not compared. The current evaluator does not compare the
-contents of a request patch.</p>
+contents of request mutations.</p>
 <h2 id="grow-the-suite-with-the-policy">Grow the suite with the policy</h2>
 <p>Start with one normal request and one request for each important deny or
 finding rule. Add a case whenever you fix a policy bug. Keep captured requests
 small, deliberate, and redacted when possible.</p>
 <p>Case names must be unique. Optional tags can group cases for external tooling.
 The parser also rejects aliases, duplicate keys, unknown fields, invalid
-base64, and values that exceed runtime limits. These checks keep tests
+base64, and values that exceed pipeline processor limits. These checks keep tests
 repeatable and ensure that test requests follow the same bounds as service
 requests.</p>
 <p>Use <code>--registry-factory</code> when the policy contains application-owned custom

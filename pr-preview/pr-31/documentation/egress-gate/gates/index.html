@@ -1240,13 +1240,16 @@
 <h1 id="gates">Gates</h1>
 <p>A gate receives a read-only <code>HttpRequest</code> snapshot, one shared <code>Timeout</code>, and
 its exact typed configuration. It cannot change that request object in place.
-To change the request, the gate returns <code>proceed</code> with a <code>RequestPatch</code>.</p>
-<p>The runtime validates the patch and constructs a new read-only snapshot for the
-next gate. It also accumulates the patch that the service will return to
-OpenShell. A gate can instead return terminal <code>allow</code> or terminal <code>deny</code> to stop
-the pipeline.</p>
+To change the request, the gate returns <code>proceed</code> with a <code>RequestMutations</code>
+value.</p>
+<p>The pipeline processor validates the mutations and constructs a new read-only
+snapshot for the next gate. It also accumulates the mutations that the Egress
+Gate service adapter will map to <code>HttpRequestResult</code> if the pipeline allows the
+request. The OpenShell supervisor then applies those final mutations to the
+intercepted request. A gate can instead return terminal <code>allow</code> or terminal
+<code>deny</code> to stop the pipeline.</p>
 <p>The default registry ships exactly <code>regex</code>. Application registries can add
-trusted custom gates. The runtime does not isolate trusted Python gate code.</p>
+trusted custom gates. Egress Gate does not isolate trusted Python gate code.</p>
 <ul>
 <li><a href="regex/">Regex gate</a></li>
 <li><a href="custom/">Custom gates</a></li>

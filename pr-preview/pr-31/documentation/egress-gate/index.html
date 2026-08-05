@@ -1095,6 +1095,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#request-mutation-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Request mutation flow
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#request-path" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1270,13 +1281,27 @@ configuration type and an explicit control result.</p>
 <p>It is not a forward proxy, TLS interceptor, or response filter. It does not
 protect content that a harness already wrote to disk. Configure storage and
 retention controls separately.</p>
+<h2 id="request-mutation-flow">Request mutation flow</h2>
+<ol>
+<li>The OpenShell supervisor sends the intercepted request to Egress Gate.</li>
+<li>Each gate reads the current immutable <code>HttpRequest</code> snapshot and can propose
+   <code>RequestMutations</code>. A gate does not modify its input in place.</li>
+<li>The Egress Gate pipeline processor validates and applies those mutations to
+   a new local <code>HttpRequest</code> snapshot.</li>
+<li>The next gate sees the updated snapshot.</li>
+<li>If the pipeline allows the request, the service adapter maps the accumulated
+   mutations to OpenShell's <code>HttpRequestResult</code>.</li>
+<li>The OpenShell supervisor applies the returned mutations to the intercepted
+   request before it attaches credentials.</li>
+</ol>
+<p>A denial returns no request mutations.</p>
 <h2 id="request-path">Request path</h2>
 <figure class="documentation-figure documentation-figure--portrait">
-  <img src="assets/diagrams/request-path.svg" alt="A provider-bound request moves from a sandbox application through OpenShell and Egress Gate before it reaches the provider.">
-  <figcaption>OpenShell calls Egress Gate before it attaches provider credentials.</figcaption>
+  <img src="assets/diagrams/request-path.svg" alt="The OpenShell supervisor sends an intercepted request to Egress Gate, receives the final decision and mutations, and applies allowed mutations before it attaches credentials.">
+  <figcaption>Egress Gate builds local request snapshots. The OpenShell supervisor owns and updates the intercepted request.</figcaption>
 </figure>
 
-<p>Only <code>service/</code> imports generated bindings. Gate and processor code is
+<p>Only <code>service/</code> imports generated bindings. Gate and pipeline processor code is
 protobuf-free and can be evaluated offline.</p>
 <h2 id="quickstart">Quickstart</h2>
 <p>From <code>projects/egress-gate/</code>:</p>
@@ -1295,19 +1320,18 @@ upstream provider.</p>
 <h2 id="core-rules">Core rules</h2>
 <ul>
 <li>A policy has one through ten named gates and a required <code>default_decision</code>.</li>
-<li>Each gate receives a read-only request snapshot that includes validated
-  patches from earlier gates.</li>
-<li>A <code>proceed</code> result can propose a patch. The runtime validates it and creates
-  the snapshot for the next gate. Terminal <code>allow</code> and <code>deny</code> require empty
-  patches.</li>
+<li>Each gate receives the current read-only request snapshot.</li>
+<li>Only <code>proceed</code> can propose request mutations. Terminal <code>allow</code> and <code>deny</code>
+  require an empty mutation set.</li>
 <li><code>None</code> body replacement means no replacement. <code>b""</code> is an explicit empty
   replacement.</li>
-<li>When a runtime safety limit occurs, Egress Gate denies the request. The result
-  uses source <code>runtime_limit</code> and code <code>egress_gate_limit_exceeded</code>.</li>
+<li>When the pipeline processor reaches a safety limit, Egress Gate denies the
+  request. The result uses source <code>runtime_limit</code> and code
+  <code>egress_gate_limit_exceeded</code>.</li>
 <li>Pipeline default deny uses source <code>pipeline_default</code> and code
   <code>egress_gate_default_deny</code>.</li>
 <li>The released Finding wire contract has only five fields. Gate source and
-  decision provenance remain runtime-internal.</li>
+  decision provenance remain internal to the pipeline processor.</li>
 </ul>
 <h2 id="further-reading">Further reading</h2>
 <ul>
