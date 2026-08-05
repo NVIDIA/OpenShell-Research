@@ -26,6 +26,36 @@ def test_cli_does_not_offer_request_content_logging() -> None:
     assert "--debug-log-content" not in help_output
 
 
+def test_cli_bare_command_is_successful_help() -> None:
+    result = CliRunner().invoke(app, [])
+
+    assert result.exit_code == 0
+    assert "Usage: egress-gate" in result.stdout
+    assert "Register Egress Gate with OpenShell." in result.stdout
+    assert "Inspect installed gates and policy schema." in result.stdout
+
+
+def test_cli_reports_the_installed_version() -> None:
+    result = CliRunner().invoke(app, ["--version"])
+
+    assert result.exit_code == 0
+    assert result.stdout == "egress-gate 0.1.0\n"
+
+
+def test_cli_narrow_help_preserves_complete_option_names() -> None:
+    result = CliRunner().invoke(
+        app,
+        ["add-gateway-registration", "--help"],
+        env={"COLUMNS": "40"},
+    )
+
+    assert result.exit_code == 0
+    assert "--host-ip" in result.stdout
+    assert "--config" in result.stdout
+    assert "--host…" not in result.stdout
+    assert "--conf…" not in result.stdout
+
+
 def test_cli_gates_describes_the_request_level_builtin() -> None:
     result = CliRunner().invoke(app, ["gates", "list"])
 
@@ -175,8 +205,105 @@ def test_cli_validate_rejects_invalid_policy(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "Policy validation failed [config_invalid]" in result.stderr
-    assert "does not match the schema for the installed gates" in result.stderr
+    assert "Policy field pipeline: required field is missing" in result.stderr
     assert "egress-gate gates schema" in result.stderr
+
+
+def test_cli_validate_reports_a_safe_structural_path(tmp_path: Path) -> None:
+    sentinel = "scna-sensitive-sentinel"
+    policy = tmp_path / "invalid.yaml"
+    policy.write_text(
+        """pipeline:
+  gates:
+    - name: one
+      config:
+        kind: regex
+        scna-sensitive-sentinel: {}
+        pattern_catalog: {}
+  default_decision: allow
+"""
+    )
+
+    result = CliRunner().invoke(app, ["validate", "--policy", str(policy)])
+
+    assert result.exit_code == 1
+    assert (
+        "Policy field pipeline.gates[0].config.scan: required field is missing"
+        in result.stderr
+    )
+    assert sentinel not in result.output
+
+
+def test_cli_evaluate_catalogs_regex_preparation_failures(tmp_path: Path) -> None:
+    project_dir = Path(__file__).parents[1]
+    policy = tmp_path / "named-group.yaml"
+    policy.write_text(
+        """pipeline:
+  gates:
+    - name: identifiers
+      config:
+        kind: regex
+        scan:
+          kind: body
+          action: {kind: detect}
+        pattern_catalog:
+          entities:
+            - name: token
+              rules:
+                - pattern: '(?P<sensitive_name>secret)'
+                  confidence: high
+  default_decision: allow
+"""
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "evaluate",
+            "--policy",
+            str(policy),
+            "--cases",
+            str(project_dir / "examples/regex-redaction/cases.yaml"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "Evaluation failed [config_preparation_failed]" in result.stderr
+    assert "remove named groups" in result.stderr
+    assert "sensitive_name" not in result.output
+    assert "custom gate and application-owned resource setup" not in result.output
+
+
+def test_cli_evaluate_names_a_failing_case_and_keeps_completed_results(
+    tmp_path: Path,
+) -> None:
+    project_dir = Path(__file__).parents[1]
+    original = (project_dir / "examples/regex-redaction/cases.yaml").read_text()
+    cases = tmp_path / "invalid-utf8.yaml"
+    cases.write_text(
+        original.replace(
+            'encoding: utf8\n        value: "ordinary text"',
+            'encoding: base64\n        value: "/w=="',
+        )
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "evaluate",
+            "--policy",
+            str(project_dir / "examples/regex-redaction/egress-gate-config.yaml"),
+            "--cases",
+            str(cases),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "Completed before failure" in result.stdout
+    assert "email-is-detected-and-request-is-allowed" in result.stdout
+    assert "Evaluation failed for case ordinary-body-is-allowed" in result.stderr
+    assert "[body_encoding_invalid]" in result.stderr
+    assert '"/w=="' not in result.output
 
 
 def test_cli_add_gateway_registration_reports_the_result(tmp_path: Path) -> None:

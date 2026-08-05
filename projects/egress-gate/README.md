@@ -15,11 +15,24 @@ The current released OpenShell `Finding` contract has five fields:
 inside the pipeline processor. Egress Gate does not add provenance to findings
 or labels.
 
-## Quickstart
+## Installed quickstart
 
-Requirements: Python 3.11+ and `uv` 0.11+.
+After installing the package with your deployment's Python 3.11+ tooling, these
+commands work from any directory and do not depend on repository-only files:
 
-`uv run` prepares the project environment before it starts the command.
+```bash
+egress-gate gates list
+egress-gate gates schema
+egress-gate validate --policy /absolute/path/to/your-policy.yaml
+egress-gate serve --listen 127.0.0.1:50051
+```
+
+## Source-checkout quickstart
+
+The example policies, cases, and extended documentation are repository assets;
+they are not installed with the Python distribution. From
+`projects/egress-gate/` in a source checkout, `uv` 0.11+ prepares the project
+environment before it starts each command:
 
 ```bash
 uv run egress-gate gates list
@@ -86,16 +99,16 @@ through slot acquisition, policy preparation, and `RequestProcessor.process`.
 
 ## Documentation and examples
 
-- [Overview](docs/index.md)
-- [Configuration](docs/configuration.md)
-- [Test policies offline](docs/evaluation.md)
-- [Operations](docs/operations.md)
-- [Gate authoring](docs/gates/custom.md)
-- [Regex gate](docs/gates/regex.md)
-- [Architecture](docs/architecture/index.md)
-- [Limits and failures](docs/reference/limits-and-failures.md)
-- [Regex redaction composition](examples/regex-redaction/README.md)
-- [Minimal custom gate](examples/custom-gate/README.md)
+- [Overview](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/index.md)
+- [Configuration](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/configuration.md)
+- [Test policies offline](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/evaluation.md)
+- [Operations](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/operations.md)
+- [Gate authoring](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/gates/custom.md)
+- [Regex gate](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/gates/regex.md)
+- [Architecture](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/architecture/index.md)
+- [Limits and failures](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/reference/limits-and-failures.md)
+- [Regex redaction composition](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/regex-redaction)
+- [Minimal custom gate](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/custom-gate)
 
 ## Development
 

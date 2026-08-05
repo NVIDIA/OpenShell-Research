@@ -14,6 +14,7 @@ from egress_gate.bindings import supervisor_middleware_pb2 as pb2
 from egress_gate.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
 from egress_gate.errors import EgressGateError, ErrorCode
 from egress_gate.gates import create_builtin_registry
+from egress_gate.service import server as server_module
 from egress_gate.service.servicer import EgressGateMiddleware
 
 
@@ -77,15 +78,14 @@ def _evaluation(
 @asynccontextmanager
 async def _running_stub(
     middleware: EgressGateMiddleware,
-) -> AsyncIterator[pb2_grpc.SupervisorMiddlewareStub]:
-    server = grpc.aio.server()
-    pb2_grpc.add_SupervisorMiddlewareServicer_to_server(middleware, server)
+) -> AsyncIterator[tuple[pb2_grpc.SupervisorMiddlewareStub, grpc.aio.Channel]]:
+    server = server_module._create_grpc_server(middleware)
     port = server.add_insecure_port("127.0.0.1:0")
     assert port > 0
     await server.start()
     channel = grpc.aio.insecure_channel(f"127.0.0.1:{port}")
     try:
-        yield pb2_grpc.SupervisorMiddlewareStub(channel)
+        yield pb2_grpc.SupervisorMiddlewareStub(channel), channel
     finally:
         await channel.close()
         await server.stop(grace=0)
@@ -95,7 +95,7 @@ async def _running_stub(
 @pytest.mark.asyncio
 async def test_generated_stub_round_trip_covers_manifest_and_gate_actions() -> None:
     middleware = EgressGateMiddleware(create_builtin_registry())
-    async with _running_stub(middleware) as stub:
+    async with _running_stub(middleware) as (stub, _):
         empty_message_type = message_factory.GetMessageClass(
             empty_pb2.DESCRIPTOR.message_types_by_name["Empty"]
         )
@@ -125,7 +125,7 @@ async def test_generated_stub_round_trip_covers_manifest_and_gate_actions() -> N
 @pytest.mark.asyncio
 async def test_generated_stub_maps_invalid_phase_to_invalid_argument() -> None:
     middleware = EgressGateMiddleware(create_builtin_registry())
-    async with _running_stub(middleware) as stub:
+    async with _running_stub(middleware) as (stub, _):
         request = _evaluation(b"body")
         request.phase = pb2.SUPERVISOR_MIDDLEWARE_PHASE_UNSPECIFIED
 
@@ -134,6 +134,28 @@ async def test_generated_stub_maps_invalid_phase_to_invalid_argument() -> None:
 
     assert error.value.code() is grpc.StatusCode.INVALID_ARGUMENT
     assert "request_phase_invalid" in (error.value.details() or "")
+
+
+@pytest.mark.asyncio
+async def test_malformed_protobuf_maps_to_content_safe_invalid_argument() -> None:
+    middleware = EgressGateMiddleware(create_builtin_registry())
+    async with _running_stub(middleware) as (stub, channel):
+        raw_evaluate = channel.unary_unary(
+            "/openshell.middleware.v1.SupervisorMiddleware/EvaluateHttpRequest",
+            request_serializer=lambda value: value,
+            response_deserializer=lambda value: value,
+        )
+        with pytest.raises(grpc.aio.AioRpcError) as error:
+            await raw_evaluate(b"\x12\x02\x0a\xff")
+
+        recovered = await stub.EvaluateHttpRequest(_evaluation(b"body"))
+
+    details = error.value.details() or ""
+    assert error.value.code() is grpc.StatusCode.INVALID_ARGUMENT
+    assert details == str(EgressGateError(ErrorCode.REQUEST_PROTOBUF_INVALID))
+    assert "DecodeError" not in details
+    assert "HttpRequestEvaluation" not in details
+    assert recovered.decision == pb2.DECISION_ALLOW
 
 
 @pytest.mark.asyncio
@@ -147,7 +169,7 @@ async def test_generated_stub_maps_gate_failure_to_internal(
         raise EgressGateError(ErrorCode.GATE_EXECUTION_FAILED)
 
     monkeypatch.setattr(middleware, "_prepare_and_process", fail_processing)
-    async with _running_stub(middleware) as stub:
+    async with _running_stub(middleware) as (stub, _):
         with pytest.raises(grpc.aio.AioRpcError) as error:
             await stub.EvaluateHttpRequest(_evaluation(b"body"))
 

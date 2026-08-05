@@ -53,7 +53,10 @@ def test_default_logging_config_uses_info_and_terminal_aware_colors() -> None:
     )
 
 
-def test_configure_logging_colors_interactive_output() -> None:
+def test_configure_logging_colors_interactive_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("NO_COLOR", raising=False)
     stream = _TerminalStream()
     configure_logging(LoggingConfig(stream=stream))
 
@@ -65,6 +68,20 @@ def test_configure_logging_colors_interactive_output() -> None:
     assert output.endswith(" | resource_pressure\n")
 
 
+@pytest.mark.parametrize("no_color", ["", "1"])
+def test_configure_logging_honors_no_color_for_interactive_output(
+    monkeypatch: pytest.MonkeyPatch,
+    no_color: str,
+) -> None:
+    monkeypatch.setenv("NO_COLOR", no_color)
+    stream = _TerminalStream()
+    configure_logging(LoggingConfig(stream=stream))
+
+    logging.getLogger("egress_gate.service").warning("resource_pressure")
+
+    assert "\033[" not in stream.getvalue()
+
+
 def test_configure_logging_can_disable_terminal_colors() -> None:
     stream = _TerminalStream()
     configure_logging(LoggingConfig(stream=stream, color_mode=ColorMode.NEVER))
@@ -74,7 +91,10 @@ def test_configure_logging_can_disable_terminal_colors() -> None:
     assert "\033[" not in stream.getvalue()
 
 
-def test_configure_logging_can_force_colors_for_redirected_output() -> None:
+def test_configure_logging_can_force_colors_for_redirected_output(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("NO_COLOR", "1")
     stream = StringIO()
     configure_logging(LoggingConfig(stream=stream, color_mode=ColorMode.ALWAYS))
 

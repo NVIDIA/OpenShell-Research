@@ -29,6 +29,8 @@ class ErrorCode(StrEnum):
     """Stable identifiers for cataloged production failures."""
 
     CONFIG_INVALID = "config_invalid"
+    CONFIG_PREPARATION_FAILED = "config_preparation_failed"
+    REQUEST_PROTOBUF_INVALID = "request_protobuf_invalid"
     REQUEST_PHASE_INVALID = "request_phase_invalid"
     REQUEST_ENVELOPE_INVALID = "request_envelope_invalid"
     REQUEST_BODY_TOO_LARGE = "request_body_too_large"
@@ -134,6 +136,23 @@ _ERROR_SPECS: dict[ErrorCode, _ErrorSpec] = {
         f"{MAX_PROTO_CONFIG_BYTES // 1024} KiB, compare it with "
         "`egress-gate gates schema`, then check the pipeline, gates, "
         "pattern catalogs, replacements, and default decision.",
+    ),
+    ErrorCode.CONFIG_PREPARATION_FAILED: _ErrorSpec(
+        ErrorKind.INVALID_INPUT,
+        ErrorComponent.CONFIG,
+        "prepare",
+        "A configured gate could not be prepared.",
+        "Check the configured gate's rules and resources. For the built-in regex "
+        "gate, remove named groups, inline flags, invalid expressions, and patterns "
+        "that can match empty input, then retry.",
+    ),
+    ErrorCode.REQUEST_PROTOBUF_INVALID: _ErrorSpec(
+        ErrorKind.INVALID_INPUT,
+        ErrorComponent.SERVICE,
+        "decode_protobuf",
+        "Request protobuf encoding is invalid.",
+        "Encode a complete request with the published OpenShell middleware "
+        "protobuf contract, then retry.",
     ),
     ErrorCode.REQUEST_PHASE_INVALID: _ErrorSpec(
         ErrorKind.INVALID_INPUT,

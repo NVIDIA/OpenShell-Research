@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import os
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import TextIO
@@ -51,10 +52,10 @@ def configure_logging(
             handler.close()
 
     handler = _EgressGateStreamHandler(config.stream)
-    use_colors = (
-        handler.stream.isatty()
-        if config.color_mode is ColorMode.AUTO
-        else config.color_mode is ColorMode.ALWAYS
+    use_colors = config.color_mode is ColorMode.ALWAYS or (
+        config.color_mode is ColorMode.AUTO
+        and "NO_COLOR" not in os.environ
+        and handler.stream.isatty()
     )
     handler.setFormatter(_EgressGateFormatter(use_colors=use_colors))
     package_logger.addHandler(handler)

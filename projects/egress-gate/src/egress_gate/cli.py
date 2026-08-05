@@ -10,6 +10,7 @@ import json
 import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Annotated, Literal, Self
 
@@ -38,7 +39,11 @@ from egress_gate.constants import (
     MAX_TIMEOUT_SECONDS,
 )
 from egress_gate.errors import EgressGateError
-from egress_gate.gates.registry import GateRegistry, create_builtin_registry
+from egress_gate.gates.registry import (
+    GateRegistry,
+    PolicyValidationError,
+    create_builtin_registry,
+)
 from egress_gate.gateway_config import (
     MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES,
     GatewayConfigError,
@@ -61,19 +66,34 @@ app = typer.Typer(
         "Run the OpenShell middleware, test policies offline, manage the OpenShell "
         "gateway registration, and inspect installed gates."
     ),
-    no_args_is_help=True,
+    invoke_without_command=True,
+    no_args_is_help=False,
     add_completion=False,
+    rich_markup_mode=None,
 )
 gates_app = typer.Typer(
     help="Inspect installed gates and the policy schema they accept.",
     no_args_is_help=True,
+    rich_markup_mode=None,
 )
-app.add_typer(gates_app, name="gates")
+app.add_typer(
+    gates_app,
+    name="gates",
+    short_help="Inspect installed gates and policy schema.",
+)
 
 
 @app.callback()
 def configure_cli(
     context: typer.Context,
+    version_requested: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            help="Show the installed Egress Gate version and exit.",
+            is_eager=True,
+        ),
+    ] = False,
     registry_factory: Annotated[
         str | None,
         typer.Option(
@@ -92,11 +112,17 @@ def configure_cli(
     ] = False,
 ) -> None:
     """Configure the command application and its gate inventory."""
+    if version_requested:
+        _CONSOLE.print(f"egress-gate {_package_version()}")
+        raise typer.Exit
     configure_logging(LoggingConfig(level="DEBUG" if debug else "INFO"))
     context.obj = _CommandOptions(registry=_load_registry(registry_factory))
+    if context.invoked_subcommand is None:
+        _CONSOLE.print(context.get_help())
+        raise typer.Exit
 
 
-@app.command("serve")
+@app.command("serve", short_help="Start the Egress Gate gRPC service.")
 def serve(
     context: typer.Context,
     listen: Annotated[
@@ -139,7 +165,10 @@ def serve(
         raise typer.Exit(code=1) from None
 
 
-@app.command("add-gateway-registration")
+@app.command(
+    "add-gateway-registration",
+    short_help="Register Egress Gate with OpenShell.",
+)
 def add_gateway_registration(
     host_ip: Annotated[
         str,
@@ -238,7 +267,10 @@ def add_gateway_registration(
     )
 
 
-@app.command("remove-gateway-registration")
+@app.command(
+    "remove-gateway-registration",
+    short_help="Remove an OpenShell registration.",
+)
 def remove_gateway_registration(
     name: Annotated[
         str,
@@ -324,7 +356,7 @@ def gate_schema(context: typer.Context) -> None:
     )
 
 
-@app.command("validate")
+@app.command("validate", short_help="Check a policy against installed gates.")
 def validate_policy(
     context: typer.Context,
     policy: Annotated[
@@ -347,6 +379,14 @@ def validate_policy(
             message="The policy file could not be read as a supported YAML policy.",
         )
         raise typer.Exit(code=1) from None
+    except PolicyValidationError as error:
+        _render_cli_error(
+            "Policy validation failed",
+            code=error.code.value,
+            message=(f"Policy field {error.formatted_path}: {error.category.value}."),
+            hint="Run egress-gate gates schema and correct that field.",
+        )
+        raise typer.Exit(code=1) from None
     except EgressGateError:
         _render_cli_error(
             "Policy validation failed",
@@ -361,7 +401,7 @@ def validate_policy(
     _CONSOLE.print("[bold green]✓[/bold green] Policy is valid")
 
 
-@app.command("evaluate")
+@app.command("evaluate", short_help="Test policy cases without starting the service.")
 def evaluate(
     context: typer.Context,
     policy: Annotated[
@@ -424,6 +464,23 @@ def evaluate(
             corpus,
             timeout_seconds=validated_timeout_seconds,
         )
+    except _CaseExecutionError as error:
+        if error.completed:
+            _render_evaluation(
+                _EvaluationSummary(cases=error.completed),
+                title="Completed before failure",
+            )
+        failure_title = f"Evaluation failed for case {error.case_name}"
+        if isinstance(error.cause, EgressGateError):
+            _render_egress_error(failure_title, error.cause)
+        else:
+            _render_cli_error(
+                failure_title,
+                code="execution_failed",
+                message="An unexpected error stopped the evaluation.",
+                hint="Check the configured gate and its resources, then retry.",
+            )
+        raise typer.Exit(code=2) from None
     except EgressGateError as error:
         _render_egress_error("Evaluation failed", error)
         raise typer.Exit(code=2) from None
@@ -454,6 +511,22 @@ class _CommandOptions:
 
 class _EvaluationCorpusError(Exception):
     """A content-safe offline policy or corpus input failure."""
+
+
+class _CaseExecutionError(Exception):
+    """One case failure plus safe results completed before it."""
+
+    def __init__(
+        self,
+        *,
+        case_name: str,
+        completed: tuple[_CaseEvaluation, ...],
+        cause: Exception,
+    ) -> None:
+        self.case_name = case_name
+        self.completed = completed
+        self.cause = cause
+        super().__init__("corpus case execution failed")
 
 
 class _CorpusProvenance(StrictDomainModel):
@@ -766,10 +839,17 @@ def _run_corpus(
     )
     evaluations: list[_CaseEvaluation] = []
     for case in corpus.cases:
-        result = processor.process(
-            case.request.to_http_request(),
-            timeout=Timeout.from_seconds(validated_timeout),
-        )
+        try:
+            result = processor.process(
+                case.request.to_http_request(),
+                timeout=Timeout.from_seconds(validated_timeout),
+            )
+        except Exception as error:
+            raise _CaseExecutionError(
+                case_name=case.name,
+                completed=tuple(evaluations),
+                cause=error,
+            ) from None
         evaluations.append(
             _CaseEvaluation(
                 name=case.name,
@@ -779,10 +859,14 @@ def _run_corpus(
     return _EvaluationSummary(cases=tuple(evaluations))
 
 
-def _render_evaluation(summary: _EvaluationSummary) -> None:
+def _render_evaluation(
+    summary: _EvaluationSummary,
+    *,
+    title: str = "Policy evaluation",
+) -> None:
     """Render content-safe case results and their aggregate."""
     table = Table(
-        title="Policy evaluation",
+        title=title,
         box=None,
         pad_edge=False,
         padding=(0, 2),
@@ -1066,6 +1150,13 @@ def _load_registry(factory_reference: str | None) -> GateRegistry:
             param_hint="--registry-factory",
         )
     return registry
+
+
+def _package_version() -> str:
+    try:
+        return version("egress-gate")
+    except PackageNotFoundError:
+        return "unknown"
 
 
 def _command_options(context: typer.Context) -> _CommandOptions:

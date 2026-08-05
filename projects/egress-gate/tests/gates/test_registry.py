@@ -93,6 +93,12 @@ def test_builtin_registry_is_finalized_and_contains_only_regex() -> None:
     assert "pipeline" in str(schema.get("properties"))
     definitions = schema["$defs"]
     assert isinstance(definitions, dict)
+    assert "ConfiguredGate" in definitions
+    assert "PipelineConfig" in definitions
+    assert all(isinstance(key, str) for key in definitions)
+    definition_names = [key for key in definitions if isinstance(key, str)]
+    assert not any(key.startswith("ConfiguredGate_") for key in definition_names)
+    assert not any(key.startswith("PipelineConfig_") for key in definition_names)
     regex_schema = next(
         value for key, value in definitions.items() if key == "RegexConfig"
     )

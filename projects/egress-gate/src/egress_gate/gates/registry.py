@@ -8,6 +8,7 @@ import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 from functools import reduce
 from operator import getitem, or_
 from typing import (
@@ -53,6 +54,68 @@ class GateDescription:
     finding_types: tuple[FindingTypeDefinition, ...]
     resource_type: str | None
     config_type: str
+
+
+class PolicyValidationCategory(StrEnum):
+    """Content-safe category for one policy schema failure."""
+
+    REQUIRED_FIELD_MISSING = "required field is missing"
+    UNKNOWN_FIELD = "unknown field is not allowed"
+    UNKNOWN_VARIANT = "kind does not identify an installed variant"
+    INVALID_VALUE = "value has the wrong type, shape, or constraints"
+
+
+class PolicyValidationError(EgressGateError):
+    """Cataloged policy failure with a trusted structural location."""
+
+    def __init__(
+        self,
+        *,
+        path: tuple[str | int, ...],
+        category: PolicyValidationCategory,
+    ) -> None:
+        super().__init__(ErrorCode.CONFIG_INVALID)
+        self.path = path
+        self.category = category
+
+    @property
+    def formatted_path(self) -> str:
+        """Render the trusted field path without submitted values."""
+        rendered = ""
+        for component in self.path:
+            if isinstance(component, int):
+                rendered += f"[{component}]"
+            elif rendered:
+                rendered += f".{component}"
+            else:
+                rendered = component
+        return rendered or "policy"
+
+    @classmethod
+    def from_validation_error(
+        cls,
+        error: ValidationError,
+        *,
+        schema: Mapping[str, object],
+    ) -> PolicyValidationError:
+        """Reduce Pydantic diagnostics to one bounded, content-safe issue."""
+        known_fields = _schema_property_names(schema)
+        issues = error.errors(
+            include_url=False,
+            include_context=False,
+            include_input=False,
+        )
+        issue = min(issues, key=lambda item: _validation_error_priority(item["type"]))
+        path = tuple(
+            component
+            for component in issue["loc"]
+            if isinstance(component, int)
+            or (isinstance(component, str) and component in known_fields)
+        )
+        return cls(
+            path=path,
+            category=_validation_error_category(issue["type"]),
+        )
 
 
 class GateRegistry:
@@ -140,12 +203,17 @@ class GateRegistry:
             raise EgressGateError(ErrorCode.CONFIG_INVALID)
         try:
             config_value = self._require_config_adapter().validate_python(dict(values))
-        except (TypeError, ValueError, ValidationError):
+        except ValidationError as error:
+            raise PolicyValidationError.from_validation_error(
+                error,
+                schema=self.configuration_json_schema(),
+            ) from None
+        except (TypeError, ValueError):
             raise EgressGateError(ErrorCode.CONFIG_INVALID) from None
         if not _is_egress_gate_config(config_value):
             raise EgressGateError(ErrorCode.CONFIG_INVALID)
         config = config_value
-        for configured_gate in config.pipeline.gates:
+        for gate_index, configured_gate in enumerate(config.pipeline.gates):
             registration = self._resolve_registration(configured_gate.config)
             try:
                 registration.gate_type.validate_config(
@@ -153,7 +221,10 @@ class GateRegistry:
                     registration.resources,
                 )
             except GateConfigurationError:
-                raise EgressGateError(ErrorCode.CONFIG_INVALID) from None
+                raise PolicyValidationError(
+                    path=("pipeline", "gates", gate_index, "config"),
+                    category=PolicyValidationCategory.INVALID_VALUE,
+                ) from None
         return config
 
     def create_gate(
@@ -198,13 +269,11 @@ class GateRegistry:
             gate_type = getattr(configured_gate.config, "kind", None)
             if not isinstance(gate_type, str):
                 raise GateRegistryError("gate config discriminator is invalid")
-            prepared.append(
-                (
-                    configured_gate.name,
-                    gate_type,
-                    self.create_gate(configured_gate.config, timeout=timeout),
-                )
-            )
+            try:
+                gate = self.create_gate(configured_gate.config, timeout=timeout)
+            except GateConfigurationError:
+                raise EgressGateError(ErrorCode.CONFIG_PREPARATION_FAILED) from None
+            prepared.append((configured_gate.name, gate_type, gate))
         timeout.raise_if_expired()
         return RequestProcessor(
             validated_config,
@@ -214,7 +283,9 @@ class GateRegistry:
 
     def configuration_json_schema(self) -> dict[str, object]:
         """Return the finalized complete pipeline JSON Schema."""
-        return self._require_config_adapter().json_schema()
+        return _humanize_schema_definition_names(
+            self._require_config_adapter().json_schema()
+        )
 
     def describe_gates(self) -> tuple[GateDescription, ...]:
         """Return safe gate metadata without constructing runtime gates."""
@@ -343,11 +414,100 @@ def _gate_description(gate_type: type[object]) -> str:
     return first_line
 
 
+def _schema_property_names(value: object) -> frozenset[str]:
+    names: set[str] = set()
+    if isinstance(value, Mapping):
+        properties = value.get("properties")
+        if isinstance(properties, Mapping):
+            names.update(key for key in properties if isinstance(key, str))
+        for nested in value.values():
+            names.update(_schema_property_names(nested))
+    elif isinstance(value, list):
+        for nested in value:
+            names.update(_schema_property_names(nested))
+    return frozenset(names)
+
+
+def _validation_error_priority(error_type: object) -> int:
+    return {
+        "missing": 0,
+        "extra_forbidden": 1,
+        "union_tag_invalid": 2,
+        "union_tag_not_found": 2,
+    }.get(error_type, 3)
+
+
+def _validation_error_category(error_type: object) -> PolicyValidationCategory:
+    return {
+        "missing": PolicyValidationCategory.REQUIRED_FIELD_MISSING,
+        "extra_forbidden": PolicyValidationCategory.UNKNOWN_FIELD,
+        "union_tag_invalid": PolicyValidationCategory.UNKNOWN_VARIANT,
+        "union_tag_not_found": PolicyValidationCategory.UNKNOWN_VARIANT,
+    }.get(error_type, PolicyValidationCategory.INVALID_VALUE)
+
+
+def _humanize_schema_definition_names(
+    schema: dict[str, object],
+) -> dict[str, object]:
+    definitions = schema.get("$defs")
+    if not isinstance(definitions, Mapping):
+        return schema
+
+    definition_names = tuple(key for key in definitions if isinstance(key, str))
+    replacements: dict[str, str] = {}
+    used_names = set(definition_names)
+    for original in definition_names:
+        prefix = next(
+            (
+                candidate
+                for candidate in ("ConfiguredGate", "PipelineConfig")
+                if original.startswith(f"{candidate}_")
+            ),
+            None,
+        )
+        if prefix is None:
+            continue
+        candidate = prefix
+        suffix = 2
+        while candidate in used_names:
+            candidate = f"{prefix}{suffix}"
+            suffix += 1
+        replacements[original] = candidate
+        used_names.add(candidate)
+
+    def replace(value: object) -> object:
+        if isinstance(value, Mapping):
+            replaced_mapping: dict[str, object] = {}
+            for key, nested in value.items():
+                if not isinstance(key, str):
+                    raise TypeError("JSON Schema keys must be strings")
+                replaced_mapping[replacements.get(key, key)] = replace(nested)
+            return replaced_mapping
+        if isinstance(value, list):
+            return [replace(nested) for nested in value]
+        if isinstance(value, str) and value.startswith("#/$defs/"):
+            name = value.removeprefix("#/$defs/")
+            return f"#/$defs/{replacements.get(name, name)}"
+        return value
+
+    replaced = replace(schema)
+    if not isinstance(replaced, dict):
+        raise TypeError("JSON Schema root must be an object")
+    result: dict[str, object] = {}
+    for key, value in replaced.items():
+        if not isinstance(key, str):
+            raise TypeError("JSON Schema keys must be strings")
+        result[key] = value
+    return result
+
+
 _GATE_KIND_PATTERN = re.compile(r"[a-z][a-z0-9-]{0,127}\Z")
 
 
 __all__ = [
     "GateDescription",
     "GateRegistry",
+    "PolicyValidationCategory",
+    "PolicyValidationError",
     "create_builtin_registry",
 ]

@@ -69,9 +69,12 @@ def test_server_sets_transport_limits_and_registers_middleware(
 
     def fake_factory(
         *,
+        interceptors: tuple[grpc.aio.ServerInterceptor, ...],
         maximum_concurrent_rpcs: int,
         options: tuple[tuple[str, int], ...],
     ) -> object:
+        assert len(interceptors) == 1
+        assert isinstance(interceptors[0], server_module._MalformedProtobufInterceptor)
         transport_options.append((maximum_concurrent_rpcs, options))
         return fake_server
 
