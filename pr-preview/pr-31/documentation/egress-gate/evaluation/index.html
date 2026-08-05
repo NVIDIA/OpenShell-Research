@@ -1502,10 +1502,9 @@ The parser also rejects aliases, duplicate keys, unknown fields, invalid
 base64, and values that exceed pipeline processor limits. These checks keep tests
 repeatable and ensure that test requests follow the same bounds as service
 requests.</p>
-<p>Use <code>--registry-factory</code> when the policy contains application-owned custom
-gates:</p>
+<p>Use <code>--registry</code> when the policy contains application-owned custom gates:</p>
 <div class="language-bash highlight"><span class="filename">Test a custom gate</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--registry-factory<span class="w"> </span>examples.custom-gate.keyword_gate:create_registry<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--registry<span class="w"> </span>examples.custom-gate.keyword_gate:registry<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>evaluate<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--policy<span class="w"> </span>examples/custom-gate/egress-gate-config.yaml<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span>--cases<span class="w"> </span>examples/custom-gate/cases.yaml

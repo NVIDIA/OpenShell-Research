@@ -51,7 +51,7 @@ itself.
 OpenShell permits writes only in the `x-openshell-middleware-` namespace, so a
 general regex replacement cannot rewrite arbitrary selected headers. A custom
 gate can return supported header writes or removals when it declares the
-`mutates_headers` capability.
+`GateCapability.MUTATE_HEADERS` capability.
 
 A catalog can be inline or in a relative `.yaml` or `.yml` file. The gate
 rejects absolute paths, path traversal, symlinks, YAML aliases, duplicate keys,

@@ -1377,7 +1377,7 @@ fields, unknown gate types, missing defaults, and duplicate names.</p>
 templates. <code>scan.kind</code> selects the body, path, query, or named headers.
 <code>scan.action.kind</code> selects <code>detect</code> or <code>deny</code>; a body scan can also select
 <code>replace</code>. The schema does not permit <code>replace</code> for another scan kind. A
-trusted application registry factory supplies other behavior.</p>
+trusted application registry supplies other behavior.</p>
 <h2 id="inspect-the-installed-registry">Inspect the installed registry</h2>
 <p>Run these commands from the
 <a href="https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate"><code>projects/egress-gate/</code></a>
@@ -1386,15 +1386,16 @@ directory in a source checkout:</p>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>gates<span class="w"> </span>schema
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>validate<span class="w"> </span>--policy<span class="w"> </span>path/to/policy.yaml
 </span></code></pre></div>
-<p>Custom registries use the same factory for inspection and serving:</p>
+<p>Custom registries use the same module attribute for inspection and serving:</p>
 <div class="language-bash highlight"><span class="filename">Inspect a custom registry</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_gates:create_registry<span class="w"> </span>gates<span class="w"> </span>list
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>--registry<span class="w"> </span>my_gates:registry<span class="w"> </span>gates<span class="w"> </span>list
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>--registry-factory<span class="w"> </span>my_gates:create_registry<span class="w"> </span>gates<span class="w"> </span>schema
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>--registry<span class="w"> </span>my_gates:registry<span class="w"> </span>gates<span class="w"> </span>schema
 </span></code></pre></div>
-<p>The factory must return a finalized <code>GateRegistry</code>. It owns trusted gate
-classes and typed <code>GateResources</code>. Policy configuration cannot import Python,
-choose a resource implementation, or provide credentials.</p>
+<p>The attribute can contain a <code>GateRegistry</code> or a zero-argument factory that
+returns one. A factory is useful when a deployment must construct typed
+<code>GateResources</code> dynamically. Policy configuration cannot import Python, choose
+a resource implementation, or provide credentials.</p>
 <p><code>validate</code> checks the policy and registered resources. It also reads and checks
 a file-backed pattern catalog. It does not construct gates, prepare a
 pipeline processor, or change the active policy. Use <code>evaluate</code> to check

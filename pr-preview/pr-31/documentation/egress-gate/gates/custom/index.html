@@ -808,6 +808,23 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Add a custom gate
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="././" class="md-nav__link md-nav__link--active">
         
   
@@ -823,6 +840,37 @@
   
 
       </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#class-based-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Class-based gates
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -1083,6 +1131,11 @@
                       
                     
                     
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
                   
                   <div class="md-sidebar__inner">
                     
@@ -1094,6 +1147,25 @@
   
     
   
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#class-based-gates" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Class-based gates
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -1250,69 +1322,110 @@
 <h1 id="custom-gates">Custom gates</h1>
 <p>Custom gates are trusted application code. They target the protobuf-free
 <code>egress_gate.request</code> and <code>egress_gate.result</code> models and do not import gRPC,
-protobuf, or <code>RequestProcessor</code> internals.</p>
+protobuf, or <code>RequestProcessor</code> internals. Use the function helper for a small,
+stateless gate. Use the class-based API when a gate needs initialization,
+helper-base behavior, or operational resources.</p>
 <p>The repository includes a runnable
 <a href="https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/custom-gate">minimal custom gate</a>
 that pairs the implementation below with a policy and two offline evaluation
 cases. Run it from <code>projects/egress-gate/</code>; <code>uv</code> prepares the project environment
 automatically:</p>
 <div class="language-bash highlight"><span class="filename">Run the custom-gate example</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--registry-factory<span class="w"> </span>examples.custom-gate.keyword_gate:create_registry<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--registry<span class="w"> </span>examples.custom-gate.keyword_gate:registry<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>evaluate<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--policy<span class="w"> </span>examples/custom-gate/egress-gate-config.yaml<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span>--cases<span class="w"> </span>examples/custom-gate/cases.yaml
 </span></code></pre></div>
-<p>The executable resolves the explicit <code>module:factory</code> reference from the
-working directory. A packaged deployment can resolve the same reference from
-an installed custom-gate package.</p>
+<p>The executable resolves the explicit <code>module:attribute</code> reference from the
+working directory. The attribute can contain a registry or a zero-argument
+registry factory. A packaged deployment can resolve the same reference from an
+installed custom-gate package.</p>
 <div class="language-python highlight"><span class="filename">examples/custom-gate/keyword_gate.py</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Literal</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">egress_gate.gates</span><span class="w"> </span><span class="kn">import</span> <span class="n">Gate</span><span class="p">,</span> <span class="n">GateCapabilities</span><span class="p">,</span> <span class="n">GateConfig</span><span class="p">,</span> <span class="n">GateRegistry</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">egress_gate.request</span><span class="w"> </span><span class="kn">import</span> <span class="n">HttpRequest</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">egress_gate.result</span><span class="w"> </span><span class="kn">import</span> <span class="n">GateEvaluation</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">egress_gate.timeout</span><span class="w"> </span><span class="kn">import</span> <span class="n">Timeout</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="k">class</span><span class="w"> </span><span class="nc">KeywordDenyConfig</span><span class="p">(</span><span class="n">GateConfig</span><span class="p">):</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">kind</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;keyword-deny&quot;</span><span class="p">]</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="n">keyword</span><span class="p">:</span> <span class="nb">str</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">egress_gate.gates</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">GateCapability</span><span class="p">,</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">GateConfig</span><span class="p">,</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">GateRegistry</span><span class="p">,</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="p">)</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="kn">from</span><span class="w"> </span><span class="nn">egress_gate.request</span><span class="w"> </span><span class="kn">import</span> <span class="n">HttpRequest</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="kn">from</span><span class="w"> </span><span class="nn">egress_gate.result</span><span class="w"> </span><span class="kn">import</span> <span class="n">GateEvaluation</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="kn">from</span><span class="w"> </span><span class="nn">egress_gate.timeout</span><span class="w"> </span><span class="kn">import</span> <span class="n">Timeout</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="k">class</span><span class="w"> </span><span class="nc">KeywordDenyGate</span><span class="p">(</span><span class="n">Gate</span><span class="p">[</span><span class="n">KeywordDenyConfig</span><span class="p">,</span> <span class="kc">None</span><span class="p">]):</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="n">capabilities</span> <span class="o">=</span> <span class="n">GateCapabilities</span><span class="p">(</span><span class="n">reads_body</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">may_deny</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="n">finding_types</span> <span class="o">=</span> <span class="p">()</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="k">class</span><span class="w"> </span><span class="nc">KeywordDenyConfig</span><span class="p">(</span><span class="n">GateConfig</span><span class="p">):</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="n">kind</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;keyword-deny&quot;</span><span class="p">]</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="n">keyword</span><span class="p">:</span> <span class="nb">str</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>
 </span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate</span><span class="p">(</span>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>        <span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">timeout</span><span class="p">:</span> <span class="n">Timeout</span>
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GateEvaluation</span><span class="p">:</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>        <span class="n">timeout</span><span class="o">.</span><span class="n">raise_if_expired</span><span class="p">()</span>
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">keyword</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="ow">in</span> <span class="n">request</span><span class="o">.</span><span class="n">body</span><span class="p">:</span>
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>            <span class="k">return</span> <span class="n">GateEvaluation</span><span class="o">.</span><span class="n">deny</span><span class="p">(</span><span class="s2">&quot;keyword_denied&quot;</span><span class="p">)</span>
-</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>        <span class="k">return</span> <span class="n">GateEvaluation</span><span class="o">.</span><span class="n">proceed</span><span class="p">()</span>
-</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>
-</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>
-</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_registry</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">GateRegistry</span><span class="p">:</span>
-</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>    <span class="n">registry</span> <span class="o">=</span> <span class="n">GateRegistry</span><span class="p">(</span><span class="n">include_builtin_gates</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>    <span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">KeywordDenyGate</span><span class="p">)</span>
-</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>    <span class="k">return</span> <span class="n">registry</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="n">registry</span> <span class="o">=</span> <span class="n">GateRegistry</span><span class="p">(</span><span class="n">include_builtin_gates</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="nd">@registry</span><span class="o">.</span><span class="n">gate</span><span class="p">(</span>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>    <span class="n">config</span><span class="o">=</span><span class="n">KeywordDenyConfig</span><span class="p">,</span>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>    <span class="n">capabilities</span><span class="o">=</span><span class="nb">frozenset</span><span class="p">({</span><span class="n">GateCapability</span><span class="o">.</span><span class="n">READ_BODY</span><span class="p">,</span> <span class="n">GateCapability</span><span class="o">.</span><span class="n">DENY</span><span class="p">}),</span>
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="p">)</span>
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="k">def</span><span class="w"> </span><span class="nf">keyword_deny</span><span class="p">(</span>
+</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>    <span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span>
+</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>    <span class="n">config</span><span class="p">:</span> <span class="n">KeywordDenyConfig</span><span class="p">,</span>
+</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>    <span class="n">timeout</span><span class="p">:</span> <span class="n">Timeout</span><span class="p">,</span>
+</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GateEvaluation</span><span class="p">:</span>
+</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>    <span class="n">timeout</span><span class="o">.</span><span class="n">raise_if_expired</span><span class="p">()</span>
+</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>    <span class="k">if</span> <span class="n">config</span><span class="o">.</span><span class="n">keyword</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="ow">in</span> <span class="n">request</span><span class="o">.</span><span class="n">body</span><span class="p">:</span>
+</span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>        <span class="k">return</span> <span class="n">GateEvaluation</span><span class="o">.</span><span class="n">deny</span><span class="p">(</span><span class="s2">&quot;keyword_denied&quot;</span><span class="p">)</span>
+</span><span id="__span-1-34"><a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>    <span class="k">return</span> <span class="n">GateEvaluation</span><span class="o">.</span><span class="n">proceed</span><span class="p">()</span>
 </span></code></pre></div>
-<p><code>GateRegistry.finalize()</code> constructs the exact discriminated <code>gates</code> schema
-from the registered config types. Registry factories supply typed
-<code>GateResources</code> objects for deployment-owned clients or profiles. Policy
+<p><code>registry.gate</code> creates an ordinary resource-free <code>Gate</code> type and adds it to
+the application-owned registry. The existing public wrapper still validates
+configuration, capabilities, findings, mutations, timeouts, and errors. The
+registry stays open while the module declares gates. The CLI or service seals
+it automatically on first use.</p>
+<p>On first use, <code>GateRegistry</code> constructs the exact discriminated <code>gates</code> schema
+from the registered config types. A registry factory remains available when a
+deployment must construct typed <code>GateResources</code> dynamically. Policy
 configuration cannot construct or replace those resources.</p>
 <p><code>GateConfig</code> supplies the common required <code>name</code> field. Custom config classes
 inherit it and do not redefine or alias it. Each config declares one required
 literal <code>kind</code> and keeps that serialized field name. Nested unions follow the
 same discriminator rule. This gives policy parsers and generated schemas one
 consistent way to select an exact configuration shape.</p>
-<p>Declare output capabilities and finding types accurately. The public wrapper
+<p>Declare capabilities and finding types accurately. The public wrapper
 rejects undeclared body replacements, header mutations, terminal decisions,
 and finding types. Read capabilities are discovery metadata. They do not limit
 which request fields trusted Python code can read. Keep request state local so
 the gate is safe for concurrent calls.</p>
+<p>Declare capabilities as a <code>frozenset</code> of <code>GateCapability</code> values. Read access,
+body replacement, header mutation, terminal allow, and deny are explicit.
+Resource use comes from the gate's <code>GateResources</code> type, and finding support
+comes from <code>finding_types</code>, so a gate does not declare either fact twice.</p>
 <p>A custom gate must not edit its <code>HttpRequest</code> input. To propose a change, return
 <code>GateEvaluation.proceed(request_mutations=RequestMutations(...))</code>. The pipeline
 processor validates the mutations and creates the next immutable snapshot.</p>
+<h2 id="class-based-gates">Class-based gates</h2>
+<p>The function helper does not replace the class-based extension API. Implement
+<code>Gate[ConfigType, ResourcesType]</code> directly when a gate needs <code>_initialize</code>, a
+helper base such as <code>Utf8BodyGate</code>, or typed <code>GateResources</code>. Resource-free
+class-based gates use <code>registry.register(GateType)</code>.</p>
+<div class="language-python highlight"><span class="filename">Equivalent class-based gate</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">egress_gate.gates</span><span class="w"> </span><span class="kn">import</span> <span class="n">Gate</span><span class="p">,</span> <span class="n">GateCapability</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">class</span><span class="w"> </span><span class="nc">KeywordDenyGate</span><span class="p">(</span><span class="n">Gate</span><span class="p">[</span><span class="n">KeywordDenyConfig</span><span class="p">,</span> <span class="kc">None</span><span class="p">]):</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">capabilities</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="p">{</span><span class="n">GateCapability</span><span class="o">.</span><span class="n">READ_BODY</span><span class="p">,</span> <span class="n">GateCapability</span><span class="o">.</span><span class="n">DENY</span><span class="p">}</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="p">)</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">finding_types</span> <span class="o">=</span> <span class="p">()</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate</span><span class="p">(</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>        <span class="bp">self</span><span class="p">,</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>        <span class="n">request</span><span class="p">:</span> <span class="n">HttpRequest</span><span class="p">,</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>        <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>        <span class="n">timeout</span><span class="p">:</span> <span class="n">Timeout</span><span class="p">,</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GateEvaluation</span><span class="p">:</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a>        <span class="n">timeout</span><span class="o">.</span><span class="n">raise_if_expired</span><span class="p">()</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">keyword</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="ow">in</span> <span class="n">request</span><span class="o">.</span><span class="n">body</span><span class="p">:</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>            <span class="k">return</span> <span class="n">GateEvaluation</span><span class="o">.</span><span class="n">deny</span><span class="p">(</span><span class="s2">&quot;keyword_denied&quot;</span><span class="p">)</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a>        <span class="k">return</span> <span class="n">GateEvaluation</span><span class="o">.</span><span class="n">proceed</span><span class="p">()</span>
+</span></code></pre></div>
 <p>For a resource-backed gate, define a typed <code>GateResources</code> bundle. Pass the
 bundle to <code>registry.register(..., resources=resources)</code>. Resources are trusted,
 application-owned dependencies that must be safe for concurrent use. Policy
