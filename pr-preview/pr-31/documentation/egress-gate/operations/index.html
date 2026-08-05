@@ -741,6 +741,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#verify-readiness" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Verify readiness
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#logging-and-decisions" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -756,6 +767,17 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         Policy rollout
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shutdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Shutdown
       </span>
     </span>
   </a>
@@ -1199,6 +1221,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#verify-readiness" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Verify readiness
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#logging-and-decisions" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1214,6 +1247,17 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         Policy rollout
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shutdown" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Shutdown
       </span>
     </span>
   </a>
@@ -1407,9 +1451,52 @@ Restart the OpenShell gateway after changing registrations. Remove one with:</p>
 <p>The generated OpenShell middleware timeout is five seconds. Keep the Egress
 Gate <code>--timeout-seconds</code> below it so queueing, preparation, and transport have
 headroom.</p>
+<p>If the middleware RPC returns gRPC <code>RESOURCE_EXHAUSTED</code>, capacity may remain
+accounted for briefly while completed RPCs are torn down. The OpenShell gateway
+or supervisor should retry the middleware RPC with short, bounded exponential
+backoff, for example 5, 10, then 20 milliseconds, while staying inside its
+middleware deadline. Do not turn this into an unbounded application-level
+retry or replay an outbound request unless its request semantics permit that.</p>
+<h2 id="verify-readiness">Verify readiness</h2>
+<p>Egress Gate does not expose a separate gRPC health service. Verify readiness at
+the policy, transport, and end-to-end layers instead. The commands below use an
+installed <code>egress-gate</code> executable; prefix them with <code>uv run</code> in a source
+checkout.</p>
+<ol>
+<li>Validate and evaluate the exact deployment policy before starting the
+   service:</li>
+</ol>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>egress-gate<span class="w"> </span>validate<span class="w"> </span>--policy<span class="w"> </span>/absolute/path/to/policy.yaml
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>egress-gate<span class="w"> </span>evaluate<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--policy<span class="w"> </span>/absolute/path/to/policy.yaml<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--cases<span class="w"> </span>/absolute/path/to/cases.yaml
+</span></code></pre></div>
+<ol>
+<li>Start Egress Gate and wait for the content-safe
+   <code>egress_gate_server_bound</code> log entry. From the OpenShell gateway host or
+   network namespace, confirm the registered address accepts a TCP connection:</li>
+</ol>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import socket; socket.create_connection((&quot;EGRESS_GATE_HOST&quot;, 50051), timeout=2).close()&#39;</span>
+</span></code></pre></div>
+<p>This proves transport reachability only; it does not exercise the gRPC
+   contract or a policy.</p>
+<ol>
+<li>After restarting the OpenShell gateway, send one harmless request from a
+   sandbox whose policy uses the registration. Choose an endpoint explicitly
+   allowed by that policy:</li>
+</ol>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>openshell<span class="w"> </span>sandbox<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>--name<span class="w"> </span>SANDBOX_NAME<span class="w"> </span>--no-tty<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>curl<span class="w"> </span>--fail<span class="w"> </span>--silent<span class="w"> </span>--show-error<span class="w"> </span>https://ALLOWED_TEST_ENDPOINT/health
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>openshell<span class="w"> </span>logs<span class="w"> </span>SANDBOX_NAME<span class="w"> </span>-n<span class="w"> </span><span class="m">100</span><span class="w"> </span>--source<span class="w"> </span>sandbox
+</span></code></pre></div>
+<p>Readiness requires the request to receive its expected allow or deny result
+   without a middleware connection, timeout, or configuration error. A TCP
+   check alone is not sufficient.</p>
 <h2 id="logging-and-decisions">Logging and decisions</h2>
 <p><code>--debug</code> enables content-safe diagnostics. Egress Gate does not log request or
-replacement bodies.</p>
+replacement bodies. Set <code>NO_COLOR</code> to any value to suppress ANSI styling when
+default logging writes to an interactive terminal. Application code can still
+request colors explicitly with <code>LoggingConfig(color_mode=ColorMode.ALWAYS)</code>.</p>
 <p>Successful policy outcomes are distinct from gRPC failures:</p>
 <table>
 <thead>
@@ -1450,10 +1537,20 @@ policy, first stop requests that use the old configuration. Let all admitted
 requests finish. Then, send a request that uses the new configuration. Use
 separate service instances when different policies must be active at the same
 time.</p>
+<h2 id="shutdown">Shutdown</h2>
+<p>Use Ctrl-C for an interactive process or send <code>SIGINT</code> through the service
+manager, then wait for the process to exit before replacing it. Egress Gate
+stops the gRPC server with zero transport grace and closes its worker resources;
+callers with an active RPC may observe cancellation or unavailability and
+should follow the bounded retry guidance above. grpcio messages such as
+<code>Got goaway</code> or <code>Cancelling all calls</code> are expected during a planned shutdown
+when the process exits normally. Investigate them when they occur outside a
+deployment or shutdown window, accompany lost work, or the process does not
+exit.</p>
 <h2 id="troubleshooting">Troubleshooting</h2>
 <p>Inspect a finite OpenShell log window:</p>
-<div class="language-bash highlight"><span class="filename">Inspect recent sandbox logs</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>openshell<span class="w"> </span>status
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>openshell<span class="w"> </span>logs<span class="w"> </span>SANDBOX_NAME<span class="w"> </span>-n<span class="w"> </span><span class="m">100</span><span class="w"> </span>--source<span class="w"> </span>sandbox
+<div class="language-bash highlight"><span class="filename">Inspect recent sandbox logs</span><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>openshell<span class="w"> </span>status
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>openshell<span class="w"> </span>logs<span class="w"> </span>SANDBOX_NAME<span class="w"> </span>-n<span class="w"> </span><span class="m">100</span><span class="w"> </span>--source<span class="w"> </span>sandbox
 </span></code></pre></div>
 <p>Check the request ID and stable error code in content-safe Egress Gate logs.
 Reduce request, header, finding, metadata, or regex catalog size when the
