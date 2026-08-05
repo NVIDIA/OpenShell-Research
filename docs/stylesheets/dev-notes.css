@@ -590,8 +590,12 @@ body {
 
 /* Landing page ------------------------------------------------------------ */
 
-body:has(.dev-notes-page) .md-grid,
-body:has(.openshell-home-page) .md-grid {
+body:has(.dev-notes-page) .md-main__inner.md-grid,
+body:has(.dev-notes-page) .md-footer__inner.md-grid,
+body:has(.dev-notes-page) .md-footer-meta__inner.md-grid,
+body:has(.openshell-home-page) .md-main__inner.md-grid,
+body:has(.openshell-home-page) .md-footer__inner.md-grid,
+body:has(.openshell-home-page) .md-footer-meta__inner.md-grid {
   max-width: 66rem;
 }
 
