@@ -1446,7 +1446,12 @@ trusted network. Do not expose the port to an untrusted network.</p>
 <code>$XDG_CONFIG_HOME/openshell/gateway.toml</code>, then
 <code>~/.config/openshell/gateway.toml</code>. Use <code>--config PATH</code> for another file.
 Restart the OpenShell gateway after changing registrations. Remove one with:</p>
-<div class="language-bash highlight"><span class="filename">Remove the registration</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>remove-gateway-registration<span class="w"> </span>--name<span class="w"> </span>egress-gate
+<div class="language-bash highlight"><span class="filename">List middleware registrations</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>list-gateway-registrations
+</span></code></pre></div>
+<p>The gateway config does not identify which service owns a registration. The
+command therefore lists all external middleware. Use its exact name to remove
+the registration you no longer need:</p>
+<div class="language-bash highlight"><span class="filename">Remove the registration</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>remove-gateway-registration<span class="w"> </span>--name<span class="w"> </span>egress-gate
 </span></code></pre></div>
 <p>The generated OpenShell middleware timeout is five seconds. Keep the Egress
 Gate <code>--timeout-seconds</code> below it so queueing, preparation, and transport have
@@ -1466,17 +1471,17 @@ checkout.</p>
 <li>Validate and evaluate the exact deployment policy before starting the
    service:</li>
 </ol>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>egress-gate<span class="w"> </span>validate<span class="w"> </span>--policy<span class="w"> </span>/absolute/path/to/policy.yaml
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>egress-gate<span class="w"> </span>evaluate<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--policy<span class="w"> </span>/absolute/path/to/policy.yaml<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--cases<span class="w"> </span>/absolute/path/to/cases.yaml
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>egress-gate<span class="w"> </span>validate<span class="w"> </span>--policy<span class="w"> </span>/absolute/path/to/policy.yaml
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>egress-gate<span class="w"> </span>evaluate<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--policy<span class="w"> </span>/absolute/path/to/policy.yaml<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>--cases<span class="w"> </span>/absolute/path/to/cases.yaml
 </span></code></pre></div>
 <ol>
 <li>Start Egress Gate and wait for the content-safe
    <code>egress_gate_server_bound</code> log entry. From the OpenShell gateway host or
    network namespace, confirm the registered address accepts a TCP connection:</li>
 </ol>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import socket; socket.create_connection((&quot;EGRESS_GATE_HOST&quot;, 50051), timeout=2).close()&#39;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import socket; socket.create_connection((&quot;EGRESS_GATE_HOST&quot;, 50051), timeout=2).close()&#39;</span>
 </span></code></pre></div>
 <p>This proves transport reachability only; it does not exercise the gRPC
    contract or a policy.</p>
@@ -1485,9 +1490,9 @@ checkout.</p>
    sandbox whose policy uses the registration. Choose an endpoint explicitly
    allowed by that policy:</li>
 </ol>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>openshell<span class="w"> </span>sandbox<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>--name<span class="w"> </span>SANDBOX_NAME<span class="w"> </span>--no-tty<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>curl<span class="w"> </span>--fail<span class="w"> </span>--silent<span class="w"> </span>--show-error<span class="w"> </span>https://ALLOWED_TEST_ENDPOINT/health
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>openshell<span class="w"> </span>logs<span class="w"> </span>SANDBOX_NAME<span class="w"> </span>-n<span class="w"> </span><span class="m">100</span><span class="w"> </span>--source<span class="w"> </span>sandbox
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>openshell<span class="w"> </span>sandbox<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>--name<span class="w"> </span>SANDBOX_NAME<span class="w"> </span>--no-tty<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span>curl<span class="w"> </span>--fail<span class="w"> </span>--silent<span class="w"> </span>--show-error<span class="w"> </span>https://ALLOWED_TEST_ENDPOINT/health
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>openshell<span class="w"> </span>logs<span class="w"> </span>SANDBOX_NAME<span class="w"> </span>-n<span class="w"> </span><span class="m">100</span><span class="w"> </span>--source<span class="w"> </span>sandbox
 </span></code></pre></div>
 <p>Readiness requires the request to receive its expected allow or deny result
    without a middleware connection, timeout, or configuration error. A TCP
@@ -1549,8 +1554,8 @@ deployment or shutdown window, accompany lost work, or the process does not
 exit.</p>
 <h2 id="troubleshooting">Troubleshooting</h2>
 <p>Inspect a finite OpenShell log window:</p>
-<div class="language-bash highlight"><span class="filename">Inspect recent sandbox logs</span><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>openshell<span class="w"> </span>status
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>openshell<span class="w"> </span>logs<span class="w"> </span>SANDBOX_NAME<span class="w"> </span>-n<span class="w"> </span><span class="m">100</span><span class="w"> </span>--source<span class="w"> </span>sandbox
+<div class="language-bash highlight"><span class="filename">Inspect recent sandbox logs</span><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>openshell<span class="w"> </span>status
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>openshell<span class="w"> </span>logs<span class="w"> </span>SANDBOX_NAME<span class="w"> </span>-n<span class="w"> </span><span class="m">100</span><span class="w"> </span>--source<span class="w"> </span>sandbox
 </span></code></pre></div>
 <p>Check the request ID and stable error code in content-safe Egress Gate logs.
 Reduce request, header, finding, metadata, or regex catalog size when the
