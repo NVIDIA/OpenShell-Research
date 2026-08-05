@@ -1,0 +1,53 @@
+version: 1
+cases:
+  - name: configured-keyword-is-denied
+    tags: [class-based-gate]
+    provenance:
+      kind: synthetic
+      redacted: true
+    request:
+      context:
+        request_id: class-gate-deny
+        sandbox_id: sandbox-example
+      target:
+        scheme: https
+        host: api.example.com
+        port: 443
+        method: POST
+        path: /messages
+        query: ""
+      headers: []
+      body:
+        encoding: utf8
+        value: "do not send this SECRET"
+    expected:
+      decision: deny
+      decision_source_kind: gate
+      gate_name: block-secret-keyword
+      gate_type: keyword-deny
+      finding_types: []
+
+  - name: other-bodies-proceed-to-the-default
+    tags: [class-based-gate]
+    provenance:
+      kind: synthetic
+      redacted: true
+    request:
+      context:
+        request_id: class-gate-allow
+        sandbox_id: sandbox-example
+      target:
+        scheme: https
+        host: api.example.com
+        port: 443
+        method: POST
+        path: /messages
+        query: ""
+      headers: []
+      body:
+        encoding: utf8
+        value: "ordinary text"
+    expected:
+      decision: allow
+      decision_source_kind: pipeline_default
+      finding_types: []

@@ -131,18 +131,28 @@ def test_cli_evaluate_runs_the_builtin_policy_corpus() -> None:
     assert "2 passed · 0 failed · 2 total" in result.stdout
 
 
-def test_cli_evaluate_runs_the_custom_gate_example() -> None:
+@pytest.mark.parametrize(
+    ("registry_reference", "example_directory"),
+    [
+        ("examples.custom-gate.keyword_gate:registry", "custom-gate"),
+        ("examples.class-based-gate.keyword_gate:registry", "class-based-gate"),
+    ],
+)
+def test_cli_evaluate_runs_the_custom_gate_examples(
+    registry_reference: str,
+    example_directory: str,
+) -> None:
     project_dir = Path(__file__).parents[1]
     result = CliRunner().invoke(
         app,
         [
             "--registry",
-            "examples.custom-gate.keyword_gate:registry",
+            registry_reference,
             "evaluate",
             "--policy",
-            str(project_dir / "examples/custom-gate/egress-gate-config.yaml"),
+            str(project_dir / f"examples/{example_directory}/egress-gate-config.yaml"),
             "--cases",
-            str(project_dir / "examples/custom-gate/cases.yaml"),
+            str(project_dir / f"examples/{example_directory}/cases.yaml"),
         ],
     )
 

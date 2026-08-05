@@ -110,7 +110,8 @@ through slot acquisition, policy preparation, and `RequestProcessor.process`.
 - [Architecture](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/architecture/index.md)
 - [Limits and failures](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/reference/limits-and-failures.md)
 - [Regex redaction composition](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/regex-redaction)
-- [Minimal custom gate](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/custom-gate)
+- [Function-based custom gate](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/custom-gate)
+- [Class-based custom gate](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/class-based-gate)
 
 ## Development
 

@@ -1,33 +1,59 @@
-# Regex redaction composition
+# Regex redaction
 
-This example runs the built-in `regex` gate with a body scan and a replace
-action. The standalone configuration contains a small email catalog. You can
-validate or evaluate it from any working directory. The OpenShell `policy.yaml`
-shows the equivalent file-backed catalog with email and customer-ID patterns.
-Both keep request-derived content out of findings.
+This example replaces email addresses and customer IDs in request bodies. The
+OpenShell policy applies the built-in `regex` gate to requests for one provider
+endpoint.
 
-Inspect the installed gate and exact policy schema:
+Run these commands from `projects/egress-gate/examples/regex-redaction/`.
+
+## Test the gate
+
+Inspect the installed gates, then test the standalone policy against two saved
+requests:
 
 ```bash
-cd projects/egress-gate
 uv run egress-gate gates list
-uv run egress-gate gates schema
+uv run egress-gate evaluate \
+  --policy egress-gate-config.yaml \
+  --cases cases.yaml
 ```
 
-Start the middleware:
+## Run it with OpenShell
+
+Start Egress Gate in one terminal. The working directory contains the pattern
+catalog referenced by `policy.yaml`.
 
 ```bash
-cd projects/egress-gate/examples/regex-redaction
 uv run egress-gate serve --listen 0.0.0.0:50051 --timeout-seconds 4
 ```
 
-Register that address with the OpenShell gateway using a reachable host IPv4
-address, then create a sandbox with `policy.yaml`. The policy embeds the
-flat `gates` configuration and uses `egress-gate-redaction` as the
-middleware registration name.
+In another terminal, add the registration to your default OpenShell gateway
+configuration. Replace `YOUR_HOST_IPV4` with a non-loopback address that the
+gateway and sandbox supervisors can reach.
 
-This composition selects `scan.kind: body` and
-`scan.action.kind: replace`. The gate strictly decodes the body bytes as UTF-8
-before it finds and replaces matches. A body scan also supports `detect` and
-`deny` actions. The same built-in can detect or deny matches in a path, query,
-or selected header values.
+```bash
+uv run egress-gate add-gateway-registration \
+  --host-ip YOUR_HOST_IPV4 \
+  --name egress-gate-redaction \
+  --port 50051
+```
+
+Restart the OpenShell gateway, then create a sandbox with `policy.yaml`. The
+policy refers to the same `egress-gate-redaction` registration name.
+
+To remove the example registration from the default gateway configuration,
+run this command and restart the gateway:
+
+```bash
+uv run egress-gate remove-gateway-registration \
+  --name egress-gate-redaction
+```
+
+## What the policy does
+
+The gate uses `scan.kind: body` with `action.kind: replace`. It strictly
+decodes the body as UTF-8, finds catalog matches, and requests a body
+replacement. Egress Gate applies that mutation before the request continues.
+
+Body scans also support `detect` and `deny`. The same gate can detect or deny
+matches in the path, query, or selected header values.
