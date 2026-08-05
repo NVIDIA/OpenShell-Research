@@ -160,6 +160,7 @@ class GateRegistry:
             raise GateRegistryError("gate generic declaration is invalid") from None
         if not isinstance(config_type, type) or not issubclass(config_type, GateConfig):
             raise GateRegistryError("gate config type is invalid")
+        _validate_common_gate_config_fields(config_type)
         gate_kind = _gate_kind(config_type)
         if gate_kind in self._registrations:
             raise GateRegistryError("gate kind is already registered")
@@ -182,7 +183,7 @@ class GateRegistry:
         )
 
     def finalize(self) -> Self:
-        """Freeze registration and build the exact pipeline config union."""
+        """Freeze registration and build the exact policy gate union."""
         if self.is_finalized:
             return self
         try:
@@ -213,16 +214,16 @@ class GateRegistry:
         if not _is_egress_gate_config(config_value):
             raise EgressGateError(ErrorCode.CONFIG_INVALID)
         config = config_value
-        for gate_index, configured_gate in enumerate(config.pipeline.gates):
-            registration = self._resolve_registration(configured_gate.config)
+        for gate_index, configured_gate in enumerate(config.gates):
+            registration = self._resolve_registration(configured_gate)
             try:
                 registration.gate_type.validate_config(
-                    configured_gate.config,
+                    configured_gate,
                     registration.resources,
                 )
             except GateConfigurationError:
                 raise PolicyValidationError(
-                    path=("pipeline", "gates", gate_index, "config"),
+                    path=("gates", gate_index),
                     category=PolicyValidationCategory.INVALID_VALUE,
                 ) from None
         return config
@@ -264,13 +265,13 @@ class GateRegistry:
             raise GateRegistryError("processor preparation timeout is invalid")
 
         prepared: list[tuple[str, str, Gate[GateConfig, GateResources | None]]] = []
-        for configured_gate in validated_config.pipeline.gates:
+        for configured_gate in validated_config.gates:
             timeout.raise_if_expired()
-            gate_type = getattr(configured_gate.config, "kind", None)
+            gate_type = getattr(configured_gate, "kind", None)
             if not isinstance(gate_type, str):
                 raise GateRegistryError("gate config discriminator is invalid")
             try:
-                gate = self.create_gate(configured_gate.config, timeout=timeout)
+                gate = self.create_gate(configured_gate, timeout=timeout)
             except GateConfigurationError:
                 raise EgressGateError(ErrorCode.CONFIG_PREPARATION_FAILED) from None
             prepared.append((configured_gate.name, gate_type, gate))
@@ -282,13 +283,16 @@ class GateRegistry:
         )
 
     def configuration_json_schema(self) -> dict[str, object]:
-        """Return the finalized complete pipeline JSON Schema."""
-        return _humanize_schema_definition_names(
-            self._require_config_adapter().json_schema()
+        """Return the finalized complete policy JSON Schema."""
+        schema = self._require_config_adapter().json_schema()
+        schema["title"] = "EgressGateConfig"
+        schema["description"] = (
+            "Flat policy for Egress Gate with ordered gates and a default decision."
         )
+        return schema
 
     def describe_gates(self) -> tuple[GateDescription, ...]:
-        """Return safe gate metadata without constructing runtime gates."""
+        """Return safe gate metadata without constructing gate instances."""
         return tuple(
             GateDescription(
                 gate_type=gate_kind,
@@ -359,12 +363,12 @@ def _build_egress_gate_config_type(
         Annotated,
         (registered_union, Field(discriminator="kind")),
     )
-    pipeline_type: object = getattr(EgressGateConfig, "__class_getitem__")(
+    config_type: object = getattr(EgressGateConfig, "__class_getitem__")(
         registered_config
     )
-    if not _is_egress_gate_config_type(pipeline_type):
-        raise TypeError("Pydantic did not construct a pipeline config type")
-    return pipeline_type
+    if not _is_egress_gate_config_type(config_type):
+        raise TypeError("Pydantic did not construct an Egress Gate config type")
+    return config_type
 
 
 def _is_gate_type(
@@ -406,6 +410,28 @@ def _gate_kind(config_type: type[GateConfig]) -> str:
     return gate_kind
 
 
+def _validate_common_gate_config_fields(config_type: type[GateConfig]) -> None:
+    for ancestor in config_type.__mro__:
+        if ancestor is GateConfig:
+            break
+        if "name" in ancestor.__dict__.get("__annotations__", {}):
+            raise GateRegistryError(
+                "gate config must inherit name without redefining it"
+            )
+    else:
+        raise GateRegistryError("gate config type is invalid")
+
+    for field_name in ("name", "kind"):
+        field = config_type.model_fields.get(field_name)
+        if field is None:
+            continue
+        aliases = (field.alias, field.validation_alias, field.serialization_alias)
+        if any(alias not in (None, field_name) for alias in aliases):
+            raise GateRegistryError(
+                "gate config name and kind must use their canonical field names"
+            )
+
+
 def _gate_description(gate_type: type[object]) -> str:
     description = inspect.getdoc(gate_type) or ""
     first_line = description.splitlines()[0] if description else ""
@@ -444,61 +470,6 @@ def _validation_error_category(error_type: object) -> PolicyValidationCategory:
         "union_tag_invalid": PolicyValidationCategory.UNKNOWN_VARIANT,
         "union_tag_not_found": PolicyValidationCategory.UNKNOWN_VARIANT,
     }.get(error_type, PolicyValidationCategory.INVALID_VALUE)
-
-
-def _humanize_schema_definition_names(
-    schema: dict[str, object],
-) -> dict[str, object]:
-    definitions = schema.get("$defs")
-    if not isinstance(definitions, Mapping):
-        return schema
-
-    definition_names = tuple(key for key in definitions if isinstance(key, str))
-    replacements: dict[str, str] = {}
-    used_names = set(definition_names)
-    for original in definition_names:
-        prefix = next(
-            (
-                candidate
-                for candidate in ("ConfiguredGate", "PipelineConfig")
-                if original.startswith(f"{candidate}_")
-            ),
-            None,
-        )
-        if prefix is None:
-            continue
-        candidate = prefix
-        suffix = 2
-        while candidate in used_names:
-            candidate = f"{prefix}{suffix}"
-            suffix += 1
-        replacements[original] = candidate
-        used_names.add(candidate)
-
-    def replace(value: object) -> object:
-        if isinstance(value, Mapping):
-            replaced_mapping: dict[str, object] = {}
-            for key, nested in value.items():
-                if not isinstance(key, str):
-                    raise TypeError("JSON Schema keys must be strings")
-                replaced_mapping[replacements.get(key, key)] = replace(nested)
-            return replaced_mapping
-        if isinstance(value, list):
-            return [replace(nested) for nested in value]
-        if isinstance(value, str) and value.startswith("#/$defs/"):
-            name = value.removeprefix("#/$defs/")
-            return f"#/$defs/{replacements.get(name, name)}"
-        return value
-
-    replaced = replace(schema)
-    if not isinstance(replaced, dict):
-        raise TypeError("JSON Schema root must be an object")
-    result: dict[str, object] = {}
-    for key, value in replaced.items():
-        if not isinstance(key, str):
-            raise TypeError("JSON Schema keys must be strings")
-        result[key] = value
-    return result
 
 
 _GATE_KIND_PATTERN = re.compile(r"[a-z][a-z0-9-]{0,127}\Z")

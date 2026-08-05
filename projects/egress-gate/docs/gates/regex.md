@@ -14,6 +14,7 @@ Choose what to scan with `scan.kind`, then choose what to do with
 `scan.action.kind`. This example replaces matches in the request body:
 
 ```yaml title="Inline regex catalog"
+name: customer-identifiers
 kind: regex
 scan:
   kind: body
@@ -34,6 +35,7 @@ the request model. A header scan matches each selected header value on its own;
 a match cannot span two values. Header names are case-insensitive:
 
 ```yaml title="Selected request headers"
+name: labeled-headers
 kind: regex
 scan:
   kind: header

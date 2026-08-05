@@ -23,31 +23,27 @@ def _config(*, action_kind: str = "replace") -> Message:
     if action_kind == "replace":
         action["template"] = "[{entity}]"
     values: dict[str, object] = {
-        "pipeline": {
-            "gates": [
-                {
-                    "name": "identifiers",
-                    "config": {
-                        "kind": "regex",
-                        "scan": {"kind": "body", "action": action},
-                        "pattern_catalog": {
-                            "entities": [
+        "gates": [
+            {
+                "name": "identifiers",
+                "kind": "regex",
+                "scan": {"kind": "body", "action": action},
+                "pattern_catalog": {
+                    "entities": [
+                        {
+                            "name": "email",
+                            "rules": [
                                 {
-                                    "name": "email",
-                                    "rules": [
-                                        {
-                                            "pattern": r"[a-z]+@[a-z]+\.[a-z]+",
-                                            "confidence": "high",
-                                        }
-                                    ],
+                                    "pattern": r"[a-z]+@[a-z]+\.[a-z]+",
+                                    "confidence": "high",
                                 }
-                            ]
-                        },
-                    },
-                }
-            ],
-            "default_decision": "allow",
-        }
+                            ],
+                        }
+                    ]
+                },
+            }
+        ],
+        "default_decision": "allow",
     }
     request = pb2.ValidateConfigRequest()
     json_format.ParseDict(values, request.config)

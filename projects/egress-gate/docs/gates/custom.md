@@ -61,14 +61,16 @@ def create_registry() -> GateRegistry:
     return registry.finalize()
 ```
 
-`GateRegistry.finalize()` constructs the exact discriminated `pipeline.gates`
-schema from the registered config types. Registry factories supply typed
+`GateRegistry.finalize()` constructs the exact discriminated `gates` schema
+from the registered config types. Registry factories supply typed
 `GateResources` objects for deployment-owned clients or profiles. Policy
 configuration cannot construct or replace those resources.
 
-Every serialized variant uses a required `kind` field. A gate config declares
-one literal gate kind. Nested unions follow the same rule. This gives policy
-parsers and generated schemas one consistent way to select an exact model.
+`GateConfig` supplies the common required `name` field. Custom config classes
+inherit it and do not redefine or alias it. Each config declares one required
+literal `kind` and keeps that serialized field name. Nested unions follow the
+same discriminator rule. This gives policy parsers and generated schemas one
+consistent way to select an exact configuration shape.
 
 Declare output capabilities and finding types accurately. The public wrapper
 rejects undeclared body replacements, header mutations, terminal decisions,

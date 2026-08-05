@@ -35,6 +35,7 @@ def _config(
         action["template"] = template
     scan_values["action"] = action
     values: dict[str, object] = {
+        "name": "regex",
         "kind": "regex",
         "scan": scan_values,
         "pattern_catalog": {
@@ -258,6 +259,7 @@ def test_action_shape_rejects_missing_kinds_and_unrelated_template_fields() -> N
     with pytest.raises(ValidationError):
         RegexConfig.model_validate(
             {
+                "name": "regex",
                 "kind": "regex",
                 "scan": {"kind": "body", "action": {}},
                 "pattern_catalog": _catalog("x"),
@@ -276,6 +278,7 @@ def test_retired_flat_source_and_mode_shape_is_rejected() -> None:
     with pytest.raises(ValidationError):
         RegexConfig.model_validate(
             {
+                "name": "regex",
                 "kind": "regex",
                 "source": {"kind": "body"},
                 "pattern_catalog": _catalog("x"),
@@ -678,6 +681,7 @@ def test_relative_yaml_catalog_loading_rejects_aliases_and_traversal(
 
     config = RegexConfig.model_validate(
         {
+            "name": "regex",
             "kind": "regex",
             "scan": {"kind": "body", "action": {"kind": "detect"}},
             "pattern_catalog": "patterns.yaml",
@@ -688,6 +692,7 @@ def test_relative_yaml_catalog_loading_rejects_aliases_and_traversal(
     with pytest.raises(ValidationError):
         RegexConfig.model_validate(
             {
+                "name": "regex",
                 "kind": "regex",
                 "scan": {"kind": "body", "action": {"kind": "detect"}},
                 "pattern_catalog": "../patterns.yaml",
@@ -705,6 +710,7 @@ def test_relative_yaml_catalog_loading_rejects_aliases_and_traversal(
     with pytest.raises(ValidationError):
         RegexConfig.model_validate(
             {
+                "name": "regex",
                 "kind": "regex",
                 "scan": {"kind": "body", "action": {"kind": "detect"}},
                 "pattern_catalog": "aliases.yaml",

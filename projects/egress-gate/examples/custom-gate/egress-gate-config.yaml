@@ -1,7 +1,5 @@
-pipeline:
-  gates:
-    - name: block-secret-keyword
-      config:
-        kind: keyword-deny
-        keyword: SECRET
-  default_decision: allow
+gates:
+  - name: block-secret-keyword
+    kind: keyword-deny
+    keyword: SECRET
+default_decision: allow

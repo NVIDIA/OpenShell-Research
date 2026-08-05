@@ -6,8 +6,9 @@ from collections.abc import Mapping
 from typing import Literal
 
 import pytest
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
+from egress_gate.constants import MAX_PIPELINE_GATES
 from egress_gate.errors import EgressGateError, GateRegistryError
 from egress_gate.gates import (
     Gate,
@@ -76,10 +77,8 @@ class _ResourceGate(Gate[_ResourceConfig, _ResourceBundle]):
 
 def _pipeline(config: dict[str, object]) -> dict[str, object]:
     return {
-        "pipeline": {
-            "gates": [{"name": "one", "config": config}],
-            "default_decision": "allow",
-        }
+        "gates": [{"name": "one", **config}],
+        "default_decision": "allow",
     }
 
 
@@ -90,23 +89,30 @@ def test_builtin_registry_is_finalized_and_contains_only_regex() -> None:
     assert tuple(item.gate_type for item in registry.describe_gates()) == ("regex",)
     schema = registry.configuration_json_schema()
     assert _discriminator_names(schema) == {"kind"}
-    assert "pipeline" in str(schema.get("properties"))
+    properties = _object_dict(schema.get("properties"))
+    assert set(properties) == {"gates", "default_decision"}
+    gates_schema = _object_dict(properties["gates"])
+    assert gates_schema["minItems"] == 1
+    assert gates_schema["maxItems"] == MAX_PIPELINE_GATES
+    assert "Ordered gate configurations" in str(gates_schema["description"])
+    assert "Flat policy" in str(schema["description"])
+    default_schema = _object_dict(properties["default_decision"])
+    assert "every configured gate proceeds" in str(default_schema["description"])
     definitions = schema["$defs"]
     assert isinstance(definitions, dict)
-    assert "ConfiguredGate" in definitions
-    assert "PipelineConfig" in definitions
     assert all(isinstance(key, str) for key in definitions)
-    definition_names = [key for key in definitions if isinstance(key, str)]
-    assert not any(key.startswith("ConfiguredGate_") for key in definition_names)
-    assert not any(key.startswith("PipelineConfig_") for key in definition_names)
     regex_schema = next(
         value for key, value in definitions.items() if key == "RegexConfig"
     )
-    assert isinstance(regex_schema, Mapping)
+    regex_schema = _object_dict(regex_schema)
     required = next(value for key, value in regex_schema.items() if key == "required")
     assert isinstance(required, list)
+    assert "name" in required
     assert "kind" in required
     assert "scan" in required
+    regex_properties = _object_dict(regex_schema["properties"])
+    name_schema = _object_dict(regex_properties["name"])
+    assert "Unique diagnostic name" in str(name_schema["description"])
     body_scan_schema = next(
         value for key, value in definitions.items() if key == "RegexBodyScan"
     )
@@ -143,9 +149,9 @@ def test_registry_validates_exact_pipeline_and_gate_config() -> None:
         _pipeline({"kind": "registry-test", "answer": 42})
     )
 
-    assert config.pipeline.default_decision.value == "allow"
-    assert type(config.pipeline.gates[0].config) is _RegistryConfig
-    gate = registry.create_gate(config.pipeline.gates[0].config)
+    assert config.default_decision.value == "allow"
+    assert type(config.gates[0]) is _RegistryConfig
+    gate = registry.create_gate(config.gates[0])
     assert type(gate) is _RegistryGate
     assert gate.config.answer == 42
 
@@ -192,6 +198,87 @@ def test_registry_requires_an_explicit_gate_discriminator() -> None:
         GateRegistry().register(FactoryDefaultedGate)
 
 
+def test_registry_requires_gate_configs_to_inherit_the_common_name() -> None:
+    class DefaultNameConfig(GateConfig):
+        name: str = "implicit"
+        kind: Literal["default-name"]
+
+    class DefaultNameGate(Gate[DefaultNameConfig, None]):
+        capabilities = GateCapabilities()
+        finding_types = ()
+
+        def _evaluate(
+            self,
+            request: HttpRequest,
+            *,
+            timeout: Timeout,
+        ) -> GateEvaluation:
+            del request, timeout
+            return GateEvaluation.proceed()
+
+    class IntegerNameConfig(GateConfig):
+        name: int
+        kind: Literal["integer-name"]
+
+    class IntegerNameGate(Gate[IntegerNameConfig, None]):
+        capabilities = GateCapabilities()
+        finding_types = ()
+
+        def _evaluate(
+            self,
+            request: HttpRequest,
+            *,
+            timeout: Timeout,
+        ) -> GateEvaluation:
+            del request, timeout
+            return GateEvaluation.proceed()
+
+    class UnboundedNameConfig(GateConfig):
+        name: str
+        kind: Literal["unbounded-name"]
+
+    class UnboundedNameGate(Gate[UnboundedNameConfig, None]):
+        capabilities = GateCapabilities()
+        finding_types = ()
+
+        def _evaluate(
+            self,
+            request: HttpRequest,
+            *,
+            timeout: Timeout,
+        ) -> GateEvaluation:
+            del request, timeout
+            return GateEvaluation.proceed()
+
+    for gate_type in (DefaultNameGate, IntegerNameGate, UnboundedNameGate):
+        with pytest.raises(GateRegistryError, match="inherit name"):
+            GateRegistry().register(gate_type)
+
+
+def test_registry_requires_canonical_common_field_names() -> None:
+    class AliasedConfig(GateConfig):
+        model_config = ConfigDict(alias_generator=str.upper)
+
+        kind: Literal["aliased"]
+        value: str
+
+    class AliasedGate(Gate[AliasedConfig, None]):
+        capabilities = GateCapabilities()
+        finding_types = ()
+
+        def _evaluate(
+            self,
+            request: HttpRequest,
+            *,
+            timeout: Timeout,
+        ) -> GateEvaluation:
+            del request, timeout
+            return GateEvaluation.proceed()
+
+    with pytest.raises(GateRegistryError, match="canonical field names"):
+        GateRegistry().register(AliasedGate)
+
+
 def test_registry_forwards_the_shared_preparation_timeout() -> None:
     registry = GateRegistry()
     registry.register(_RegistryGate)
@@ -201,7 +288,7 @@ def test_registry_forwards_the_shared_preparation_timeout() -> None:
     )
     timeout = Timeout.from_seconds(1)
 
-    gate = registry.create_gate(config.pipeline.gates[0].config, timeout=timeout)
+    gate = registry.create_gate(config.gates[0], timeout=timeout)
 
     assert isinstance(gate, _RegistryGate)
     assert gate.preparation_timeout is timeout
@@ -230,7 +317,7 @@ def test_registry_injects_typed_application_resources() -> None:
     registry.finalize()
 
     config = registry.validate_config(_pipeline({"kind": "resource-test"}))
-    gate = registry.create_gate(config.pipeline.gates[0].config)
+    gate = registry.create_gate(config.gates[0])
 
     assert gate.resources is resources
 
@@ -251,11 +338,7 @@ def test_registry_rejects_unknown_policy_shapes() -> None:
         _pipeline({"kind": "missing", "answer": 1}),
         _pipeline({"kind": "registry-test", "answer": 1, "extra": True}),
         {
-            "pipeline": {
-                "gates": [
-                    {"name": "one", "config": {"kind": "registry-test", "answer": 1}}
-                ],
-            }
+            "gates": [{"name": "one", "kind": "registry-test", "answer": 1}],
         },
     ):
         with pytest.raises(EgressGateError):
@@ -283,13 +366,11 @@ def test_registry_rejects_duplicate_gate_names_before_preparation() -> None:
     registry.register(_RegistryGate)
     registry.finalize()
     values = {
-        "pipeline": {
-            "gates": [
-                {"name": "same", "config": {"kind": "registry-test", "answer": 1}},
-                {"name": "same", "config": {"kind": "registry-test", "answer": 2}},
-            ],
-            "default_decision": "allow",
-        }
+        "gates": [
+            {"name": "same", "kind": "registry-test", "answer": 1},
+            {"name": "same", "kind": "registry-test", "answer": 2},
+        ],
+        "default_decision": "allow",
     }
 
     with pytest.raises(EgressGateError):
@@ -312,3 +393,9 @@ def _discriminator_names(value: object) -> set[object]:
             names.update(_discriminator_names(nested))
         return names
     return set()
+
+
+def _object_dict(value: object) -> dict[str, object]:
+    assert isinstance(value, dict)
+    assert all(isinstance(key, str) for key in value)
+    return {key: nested for key, nested in value.items() if isinstance(key, str)}

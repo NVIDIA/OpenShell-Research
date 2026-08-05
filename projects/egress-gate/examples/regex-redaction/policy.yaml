@@ -38,18 +38,16 @@ network_middlewares:
     middleware: egress-gate-redaction
     order: 0
     config:
-      pipeline:
-        gates:
-          - name: identifiers
-            config:
-              kind: regex
-              scan:
-                kind: body
-                action:
-                  kind: replace
-                  template: "[{entity}]"
-              pattern_catalog: patterns.yaml
-        default_decision: allow
+      gates:
+        - name: identifiers
+          kind: regex
+          scan:
+            kind: body
+            action:
+              kind: replace
+              template: "[{entity}]"
+          pattern_catalog: patterns.yaml
+      default_decision: allow
     on_error: fail_closed
     endpoints:
       include:

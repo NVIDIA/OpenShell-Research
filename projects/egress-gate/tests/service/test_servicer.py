@@ -73,10 +73,8 @@ def _values(
         },
     }
     return {
-        "pipeline": {
-            "gates": [{"name": "body", "config": config}],
-            "default_decision": default_decision,
-        }
+        "gates": [{"name": "body", **config}],
+        "default_decision": default_decision,
     }
 
 

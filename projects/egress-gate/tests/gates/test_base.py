@@ -124,7 +124,7 @@ def _request(*, body: bytes = b"payload", host: str = "example.com") -> HttpRequ
 
 
 def test_gate_uses_exact_config_and_resource_types() -> None:
-    config = _RequestConfig(kind="test-request")
+    config = _RequestConfig(name="test", kind="test-request")
     gate = _RequestGate(config, None)
 
     assert gate.config is config
@@ -141,13 +141,13 @@ def test_gate_uses_exact_config_and_resource_types() -> None:
 
 def test_gate_public_wrapper_enforces_declared_output_capabilities() -> None:
     with pytest.raises(GateContractError, match="undeclared finding"):
-        _UndeclaredOutputGate(_RequestConfig(kind="test-request"), None).evaluate(
-            _request(), timeout=Timeout.from_seconds(1)
-        )
+        _UndeclaredOutputGate(
+            _RequestConfig(name="test", kind="test-request"), None
+        ).evaluate(_request(), timeout=Timeout.from_seconds(1))
 
     with pytest.raises(GateContractError, match="undeclared finding"):
         _CapabilityBypassGate(
-            _RequestConfig(kind="test-request"),
+            _RequestConfig(name="test", kind="test-request"),
             None,
         ).evaluate(_request(), timeout=Timeout.from_seconds(1))
 
@@ -155,7 +155,7 @@ def test_gate_public_wrapper_enforces_declared_output_capabilities() -> None:
 def test_gate_public_wrapper_classifies_invalid_models_as_contract_errors() -> None:
     with pytest.raises(GateContractError, match="gate output is invalid"):
         _InvalidEvaluationGate(
-            _RequestConfig(kind="test-request"),
+            _RequestConfig(name="test", kind="test-request"),
             None,
         ).evaluate(_request(), timeout=Timeout.from_seconds(1))
 
@@ -163,6 +163,7 @@ def test_gate_public_wrapper_classifies_invalid_models_as_contract_errors() -> N
 def test_gate_rejects_invalid_utf8_as_gate_input() -> None:
     config = RegexConfig.model_validate(
         {
+            "name": "regex",
             "kind": "regex",
             "scan": {"kind": "body", "action": {"kind": "detect"}},
             "pattern_catalog": {
@@ -184,7 +185,7 @@ def test_gate_rejects_invalid_utf8_as_gate_input() -> None:
 
 def test_resource_backed_gate_is_safe_for_concurrent_evaluations() -> None:
     resources = _CounterResources()
-    gate = _CounterGate(_CounterConfig(kind="test-counter"), resources)
+    gate = _CounterGate(_CounterConfig(name="counter", kind="test-counter"), resources)
 
     def evaluate(_: int) -> GateEvaluation:
         return gate.evaluate(_request(), timeout=Timeout.from_seconds(1))

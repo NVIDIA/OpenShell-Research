@@ -393,7 +393,7 @@ def validate_policy(
             code="config_invalid",
             message="The policy does not match the schema for the installed gates.",
             hint=(
-                "Run egress-gate gates schema, then check the pipeline, gate kinds, "
+                "Run egress-gate gates schema, then check the gate names, kinds, "
                 "required fields, and pattern catalog."
             ),
         )
@@ -802,7 +802,7 @@ _StrictEvaluationLoader.add_constructor(
 
 
 def _load_policy(path: Path) -> Mapping[str, object]:
-    """Load one bounded strict YAML pipeline policy."""
+    """Load one bounded strict YAML policy."""
     values = _load_yaml(path)
     if not isinstance(values, Mapping):
         raise _EvaluationCorpusError

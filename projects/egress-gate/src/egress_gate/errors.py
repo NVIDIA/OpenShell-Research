@@ -134,7 +134,7 @@ _ERROR_SPECS: dict[ErrorCode, _ErrorSpec] = {
         "Policy configuration is invalid.",
         "Keep the encoded configuration at or below "
         f"{MAX_PROTO_CONFIG_BYTES // 1024} KiB, compare it with "
-        "`egress-gate gates schema`, then check the pipeline, gates, "
+        "`egress-gate gates schema`, then check the gates, "
         "pattern catalogs, replacements, and default decision.",
     ),
     ErrorCode.CONFIG_PREPARATION_FAILED: _ErrorSpec(

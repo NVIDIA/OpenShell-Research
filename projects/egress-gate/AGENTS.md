@@ -38,7 +38,7 @@ Run focused tests while working and `make check` before handoff.
 ## Project map
 
 - `src/egress_gate/gates/`: `Gate`, helper bases, registry, and the regex gate
-- `src/egress_gate/config.py`: strict `pipeline.gates` and `default_decision`
+- `src/egress_gate/config.py`: strict ordered `gates` and `default_decision`
   policy models
 - `src/egress_gate/request.py`: protobuf-free request and request-mutation models
 - `src/egress_gate/result.py`: gate evaluations, five-field findings, provenance,
@@ -62,6 +62,10 @@ an optional typed `GateResources` bundle, `GateCapabilities`, and its
 `FindingTypeDefinition` declarations. `GateRegistry.finalize()` creates the
 exact discriminated pipeline schema for the installed gates and prepares
 validated gate instances from trusted application-owned resources.
+
+`GateConfig` owns the required bounded `name` field. Concrete config classes
+inherit it without redefining or aliasing it. Keep `kind` under its canonical
+serialized field name.
 
 Use a required `kind` field for every serialized discriminated union. Each
 variant must declare one string literal and its exact fields. Use an enum on a

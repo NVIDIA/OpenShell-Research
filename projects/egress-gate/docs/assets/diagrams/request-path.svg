@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 720" role="img" aria-labelledby="title description">
   <title id="title">Egress Gate request path</title>
-  <desc id="description">The OpenShell supervisor sends an intercepted request to Egress Gate. The Egress Gate pipeline processor runs gates on local immutable snapshots and returns an allow with final mutations or a deny. The supervisor applies allowed mutations, attaches credentials, and sends the request to the provider.</desc>
+  <desc id="description">The OpenShell supervisor sends an intercepted request and policy to Egress Gate. Egress Gate runs gates that inspect the request and propose mutations, then returns an allow with final mutations or a deny. The supervisor applies allowed mutations, attaches credentials, and sends the request to the provider.</desc>
   <defs>
     <style>
       text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#1f2933}
@@ -67,7 +67,7 @@
   <path d="M148 370 164 378v12c0 13-8 21-16 25-8-4-16-12-16-25v-12z" class="egress-icon-stroke" stroke-width="2.5" stroke-linejoin="round"/>
   <path d="m141 389 5 5 10-12" class="egress-icon-stroke" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
   <text x="188" y="380" class="title">Egress Gate</text>
-  <text x="188" y="406" class="subtitle">Pipeline processor builds local snapshots</text>
+  <text x="188" y="410" class="subtitle">Runs gates that inspect requests and propose mutations</text>
 
   <path d="M380 444v58" class="arrow"/>
   <text x="400" y="478" class="arrow-label">allow + final mutations, or deny</text>

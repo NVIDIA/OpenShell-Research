@@ -39,8 +39,9 @@ The `block-secret-keyword` gate denies the first corpus case. The second gate
 evaluation proceeds. The explicit `default_decision: allow` then determines
 the result.
 
-This is a teaching example, not a robust content classifier. The runtime
-already checks the `HttpRequest` limits. Do not check those limits again.
+This is a teaching example, not a robust content classifier. The pipeline
+processor already checks the `HttpRequest` limits. Do not check those limits
+again.
 
 A production gate must define its text-decoding and matching behavior. Add
 limits only for work that belongs to the gate. Do not put request content in

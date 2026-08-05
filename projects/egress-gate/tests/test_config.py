@@ -5,11 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from egress_gate.config import (
-    ConfiguredGate,
-    DefaultDecision,
-    EgressGateConfig,
-)
+from egress_gate.config import DefaultDecision, EgressGateConfig
 from egress_gate.constants import MAX_PIPELINE_GATES
 from egress_gate.gates import RegexConfig
 
@@ -30,32 +26,28 @@ def _regex_config() -> dict[str, object]:
 
 
 def _values(*, default_decision: str = "allow") -> dict[str, object]:
-    pipeline: dict[str, object] = {
-        "gates": [{"name": "body", "config": _regex_config()}],
+    return {
+        "gates": [{"name": "body", **_regex_config()}],
         "default_decision": default_decision,
     }
-    return {"pipeline": pipeline}
 
 
 def test_pipeline_uses_required_default_and_exact_gate_entries() -> None:
     config = EgressGateConfig[RegexConfig].model_validate(_values())
 
-    assert config.pipeline.default_decision is DefaultDecision.ALLOW
-    assert config.pipeline.gates[0].name == "body"
-    assert type(config.pipeline.gates[0].config) is RegexConfig
-    assert ConfiguredGate.model_fields["config"].is_required()
+    assert config.default_decision is DefaultDecision.ALLOW
+    assert config.gates[0].name == "body"
+    assert type(config.gates[0]) is RegexConfig
 
 
 def test_pipeline_default_deny_is_explicit() -> None:
     config = EgressGateConfig[RegexConfig].model_validate(
         _values(default_decision="deny")
     )
-    assert config.pipeline.default_decision is DefaultDecision.DENY
+    assert config.default_decision is DefaultDecision.DENY
 
     missing_default = {
-        "pipeline": {
-            "gates": [{"name": "body", "config": _regex_config()}],
-        }
+        "gates": [{"name": "body", **_regex_config()}],
     }
     with pytest.raises(ValidationError):
         EgressGateConfig[RegexConfig].model_validate(missing_default)
@@ -63,51 +55,57 @@ def test_pipeline_default_deny_is_explicit() -> None:
 
 def test_pipeline_rejects_unknown_fields_and_duplicate_names() -> None:
     unknown = {
-        "pipeline": {
-            "gates": [{"name": "body", "config": _regex_config()}],
-            "default_decision": "allow",
-            "unexpected": True,
-        }
+        "gates": [{"name": "body", **_regex_config()}],
+        "default_decision": "allow",
+        "unexpected": True,
     }
     with pytest.raises(ValidationError):
         EgressGateConfig[RegexConfig].model_validate(unknown)
 
     duplicate = {
-        "pipeline": {
-            "gates": [
-                {"name": "body", "config": _regex_config()},
-                {"name": "body", "config": _regex_config()},
-            ],
-            "default_decision": "allow",
-        }
+        "gates": [
+            {"name": "body", **_regex_config()},
+            {"name": "body", **_regex_config()},
+        ],
+        "default_decision": "allow",
+    }
+    with pytest.raises(ValidationError) as duplicate_error:
+        EgressGateConfig[RegexConfig].model_validate(duplicate)
+    assert duplicate_error.value.errors()[0]["loc"] == ("gates",)
+
+
+def test_removed_policy_wrappers_are_rejected() -> None:
+    nested_policy = {"pipeline": _values()}
+    with pytest.raises(ValidationError):
+        EgressGateConfig[RegexConfig].model_validate(nested_policy)
+
+    nested_gate = {
+        "gates": [{"name": "body", "config": _regex_config()}],
+        "default_decision": "allow",
     }
     with pytest.raises(ValidationError):
-        EgressGateConfig[RegexConfig].model_validate(duplicate)
+        EgressGateConfig[RegexConfig].model_validate(nested_gate)
 
 
 def test_pipeline_gate_count_has_an_exact_boundary() -> None:
     exact_gates = [
-        {"name": f"body-{index}", "config": _regex_config()}
+        {"name": f"body-{index}", **_regex_config()}
         for index in range(MAX_PIPELINE_GATES)
     ]
     exact = {
-        "pipeline": {
-            "gates": exact_gates,
-            "default_decision": "allow",
-        }
+        "gates": exact_gates,
+        "default_decision": "allow",
     }
     config = EgressGateConfig[RegexConfig].model_validate(exact)
-    assert len(config.pipeline.gates) == MAX_PIPELINE_GATES
+    assert len(config.gates) == MAX_PIPELINE_GATES
 
     too_many_gates = [
         *exact_gates,
-        {"name": "body-over", "config": _regex_config()},
+        {"name": "body-over", **_regex_config()},
     ]
     too_many = {
-        "pipeline": {
-            "gates": too_many_gates,
-            "default_decision": "allow",
-        }
+        "gates": too_many_gates,
+        "default_decision": "allow",
     }
     with pytest.raises(ValidationError):
         EgressGateConfig[RegexConfig].model_validate(too_many)
@@ -123,9 +121,7 @@ def test_regex_scan_structurally_restricts_header_actions() -> None:
     with pytest.raises(ValidationError):
         EgressGateConfig[RegexConfig].model_validate(
             {
-                "pipeline": {
-                    "gates": [{"name": "header", "config": invalid}],
-                    "default_decision": "allow",
-                }
+                "gates": [{"name": "header", **invalid}],
+                "default_decision": "allow",
             }
         )

@@ -71,13 +71,15 @@ def test_cli_gates_describes_the_request_level_builtin() -> None:
     assert "Python resources" not in result.stdout
 
 
-def test_cli_configuration_schema_exposes_pipeline_only() -> None:
+def test_cli_configuration_schema_exposes_flat_policy() -> None:
     result = CliRunner().invoke(app, ["gates", "schema"])
 
     assert result.exit_code == 0
     schema = json.loads(result.stdout)
-    assert "pipeline" in schema["properties"]
-    assert "default_decision" in str(schema)
+    assert schema["title"] == "EgressGateConfig"
+    assert set(schema["properties"]) == {"gates", "default_decision"}
+    assert schema["properties"]["gates"]["minItems"] == 1
+    assert schema["properties"]["gates"]["maxItems"] == 10
 
 
 def test_registry_factory_loader_requires_a_finalized_gate_registry(
@@ -205,7 +207,7 @@ def test_cli_validate_rejects_invalid_policy(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "Policy validation failed [config_invalid]" in result.stderr
-    assert "Policy field pipeline: required field is missing" in result.stderr
+    assert "Policy field gates: required field is missing" in result.stderr
     assert "egress-gate gates schema" in result.stderr
 
 
@@ -213,24 +215,19 @@ def test_cli_validate_reports_a_safe_structural_path(tmp_path: Path) -> None:
     sentinel = "scna-sensitive-sentinel"
     policy = tmp_path / "invalid.yaml"
     policy.write_text(
-        """pipeline:
-  gates:
-    - name: one
-      config:
-        kind: regex
-        scna-sensitive-sentinel: {}
-        pattern_catalog: {}
-  default_decision: allow
+        """gates:
+  - name: one
+    kind: regex
+    scna-sensitive-sentinel: {}
+    pattern_catalog: {}
+default_decision: allow
 """
     )
 
     result = CliRunner().invoke(app, ["validate", "--policy", str(policy)])
 
     assert result.exit_code == 1
-    assert (
-        "Policy field pipeline.gates[0].config.scan: required field is missing"
-        in result.stderr
-    )
+    assert "Policy field gates[0].scan: required field is missing" in result.stderr
     assert sentinel not in result.output
 
 
@@ -238,21 +235,19 @@ def test_cli_evaluate_catalogs_regex_preparation_failures(tmp_path: Path) -> Non
     project_dir = Path(__file__).parents[1]
     policy = tmp_path / "named-group.yaml"
     policy.write_text(
-        """pipeline:
-  gates:
-    - name: identifiers
-      config:
-        kind: regex
-        scan:
-          kind: body
-          action: {kind: detect}
-        pattern_catalog:
-          entities:
-            - name: token
-              rules:
-                - pattern: '(?P<sensitive_name>secret)'
-                  confidence: high
-  default_decision: allow
+        """gates:
+  - name: identifiers
+    kind: regex
+    scan:
+      kind: body
+      action: {kind: detect}
+    pattern_catalog:
+      entities:
+        - name: token
+          rules:
+            - pattern: '(?P<sensitive_name>secret)'
+              confidence: high
+default_decision: allow
 """
     )
 

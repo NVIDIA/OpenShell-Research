@@ -185,20 +185,16 @@ def _processor(
     registry.register(_ControlGate)
     registry.finalize()
     values = {
-        "pipeline": {
-            "gates": [{"name": name, "config": config} for name, config in gate_values],
-            "default_decision": default_decision.value,
-        }
+        "gates": [{"name": name, **config} for name, config in gate_values],
+        "default_decision": default_decision.value,
     }
     config = registry.validate_config(values)
     prepared_items = []
-    for entry in config.pipeline.gates:
-        gate_type = getattr(entry.config, "kind", None)
+    for entry in config.gates:
+        gate_type = getattr(entry, "kind", None)
         if not isinstance(gate_type, str):
             raise AssertionError("test gate config has no discriminator")
-        prepared_items.append(
-            (entry.name, gate_type, registry.create_gate(entry.config))
-        )
+        prepared_items.append((entry.name, gate_type, registry.create_gate(entry)))
     prepared = tuple(prepared_items)
     return RequestProcessor(
         config,

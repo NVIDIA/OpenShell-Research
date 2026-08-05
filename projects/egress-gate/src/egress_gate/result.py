@@ -1,8 +1,8 @@
 """Immutable gate evaluations and Egress Gate result models.
 
 These models deliberately contain no protobuf or gRPC types. ``SourcedFinding``
-keeps gate provenance inside the runtime; the current OpenShell wire contract
-serializes only the five fields on ``Finding``.
+keeps gate provenance inside the pipeline processor; the current OpenShell wire
+contract serializes only the five fields on ``Finding``.
 """
 
 from __future__ import annotations
@@ -95,7 +95,7 @@ class Finding(StrictDomainModel):
 
 
 class FindingTypeDefinition(StrictDomainModel):
-    """A runtime-owned declaration for one possible finding type."""
+    """A processor-owned declaration for one possible finding type."""
 
     type: FindingType
 
@@ -122,7 +122,7 @@ class PipelineDefaultDecisionSource(StrictDomainModel):
 
 
 class RuntimeLimitDecisionSource(StrictDomainModel):
-    """A fail-closed decision caused by a runtime safety limit."""
+    """A fail-closed decision caused by a pipeline processor safety limit."""
 
     kind: Literal[DecisionSourceKind.RUNTIME_LIMIT]
 
@@ -195,7 +195,7 @@ class GateEvaluation(StrictDomainModel):
 
 
 class GateTrace(StrictDomainModel):
-    """Content-safe runtime trace data for one configured gate."""
+    """Content-safe processor trace data for one configured gate."""
 
     gate_name: GateName
     gate_type: GateType
@@ -209,7 +209,7 @@ class GateTrace(StrictDomainModel):
 
 
 class ResultMetadata(StrictDomainModel):
-    """One bounded runtime-owned result metadata entry."""
+    """One bounded processor-owned result metadata entry."""
 
     key: BoundedMetadataString
     value: BoundedMetadataString

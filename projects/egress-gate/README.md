@@ -54,18 +54,16 @@ listen port to trusted networks.
 The registry builds an exact strict schema from installed gate types:
 
 ```yaml
-pipeline:
-  gates:
-    - name: identifiers
-      config:
-        kind: regex
-        scan:
-          kind: body
-          action:
-            kind: replace
-            template: "[{entity}]"
-        pattern_catalog: patterns.yaml
-  default_decision: allow
+gates:
+  - name: identifiers
+    kind: regex
+    scan:
+      kind: body
+      action:
+        kind: replace
+        template: "[{entity}]"
+    pattern_catalog: patterns.yaml
+default_decision: allow
 ```
 
 The shipped registry contains exactly `regex`. Its `scan` selects the body,

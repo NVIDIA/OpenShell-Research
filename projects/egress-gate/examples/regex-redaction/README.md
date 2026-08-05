@@ -23,7 +23,7 @@ uv run egress-gate serve --listen 0.0.0.0:50051 --timeout-seconds 4
 
 Register that address with the OpenShell gateway using a reachable host IPv4
 address, then create a sandbox with `policy.yaml`. The policy embeds the
-`pipeline.gates` configuration and uses `egress-gate-redaction` as the
+flat `gates` configuration and uses `egress-gate-redaction` as the
 middleware registration name.
 
 This composition selects `scan.kind: body` and

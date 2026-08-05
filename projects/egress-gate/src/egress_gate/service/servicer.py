@@ -1,4 +1,4 @@
-"""gRPC boundary for the protobuf-free Egress Gate pipeline runtime."""
+"""gRPC boundary for the protobuf-free Egress Gate pipeline processor."""
 
 from __future__ import annotations
 
@@ -119,7 +119,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
             pb2.ValidateConfigResponse,
         ],
     ) -> pb2.ValidateConfigResponse:
-        """Validate expanded configuration without preparing runtime state."""
+        """Validate expanded configuration without preparing processor state."""
         return await self._run_in_worker(lambda: self._validate_config(request))
 
     async def EvaluateHttpRequest(

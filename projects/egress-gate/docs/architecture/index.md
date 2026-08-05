@@ -22,7 +22,7 @@ Egress Gate has one transport adapter and one protobuf-free pipeline processor.
 | `gates/base.py` | Gate lifecycle, capabilities, output validation, and UTF-8 helper |
 | `gates/registry.py` | Trusted registration, exact pipeline schema, resources, discovery, and processor preparation |
 | `gates/regex.py` | Typed scan and action selection, bounded matching, overlap handling, caching, and body replacement |
-| `config.py` | Strict `pipeline.gates` and required default decision |
+| `config.py` | Strict ordered gates and required default decision |
 | `request_processor.py` | Shared deadline, immutable snapshot construction, control flow, aggregation, and provenance |
 | `service/` | Protobuf validation/conversion, worker slots, lifecycle, and wire serialization |
 

@@ -68,10 +68,8 @@ class RequestProcessor:
         gates = tuple(configured_gates)
         configured_names = tuple(name for name, _, _ in gates)
         configured_types = tuple(gate_type for _, gate_type, _ in gates)
-        policy_names = tuple(item.name for item in config.pipeline.gates)
-        policy_types = tuple(
-            getattr(item.config, "kind", None) for item in config.pipeline.gates
-        )
+        policy_names = tuple(item.name for item in config.gates)
+        policy_types = tuple(getattr(item, "kind", None) for item in config.gates)
         if configured_names != policy_names or configured_types != policy_types:
             raise ValueError("configured gates do not match the policy")
         if not gates:
@@ -192,7 +190,7 @@ class RequestProcessor:
         except Exception:
             raise EgressGateError(ErrorCode.GATE_EXECUTION_FAILED) from None
 
-        if self._config.pipeline.default_decision is DefaultDecision.ALLOW:
+        if self._config.default_decision is DefaultDecision.ALLOW:
             result = _result(
                 decision=EgressDecision.ALLOW,
                 source=PipelineDefaultDecisionSource(
@@ -311,7 +309,7 @@ def _compose_request_mutations(
         )
     except (TypeError, ValueError, ValidationError):
         raise GateLimitExceededError(
-            "composed request mutations exceed a runtime limit"
+            "composed request mutations exceed a pipeline processor limit"
         ) from None
 
 

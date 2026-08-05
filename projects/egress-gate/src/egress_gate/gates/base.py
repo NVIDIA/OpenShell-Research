@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from types import NoneType
 from typing import ClassVar, Generic, TypeGuard, final, get_args, get_origin
 
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 from typing_extensions import TypeVar
 
 from egress_gate.base import StrictDomainModel
@@ -22,12 +22,17 @@ from egress_gate.request import HttpRequest
 from egress_gate.result import (
     FindingTypeDefinition,
     GateEvaluation,
+    GateName,
 )
 from egress_gate.timeout import Timeout
 
 
 class GateConfig(StrictDomainModel):
-    """Base for an exact gate config with one required literal ``kind``."""
+    """Base for one named gate with a required literal ``kind``."""
+
+    name: GateName = Field(
+        description="Unique diagnostic name for this gate in the policy."
+    )
 
 
 class GateResources:
@@ -107,7 +112,7 @@ class Gate(ABC, Generic[GateConfigT, GateResourcesT]):
 
     @classmethod
     def get_resources_type(cls) -> type[GateResources] | None:
-        """Return the concrete runtime-resource type, if any."""
+        """Return the concrete operational-resource type, if any."""
         _, resources_type = _declared_gate_types(cls)
         return resources_type
 
