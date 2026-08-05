@@ -8,8 +8,8 @@ Current projects:
 
 - `openshell-middleware-manager`: `omm` CLI that creates and updates version-matched
   Python and Rust OpenShell supervisor middleware projects.
-- `egress-gate`: Extensible OpenShell supervisor middleware that evaluates
-  provider-bound HTTP requests before OpenShell attaches credentials.
+- `egress-gate`: Extensible OpenShell middleware for provider-bound HTTP
+  requests.
 - `python-project-template`: Minimal, production-ready Python project scaffold
   managed with uv.
 - `reachy-mini-openshell`: Reachy Mini conversation demo for OpenShell.

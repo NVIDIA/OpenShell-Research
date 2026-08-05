@@ -16,7 +16,6 @@ from typing import Annotated, Literal, Self
 import typer
 import yaml
 from pydantic import ValidationError, field_validator, model_validator
-from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
@@ -784,10 +783,12 @@ def _render_evaluation(summary: _EvaluationSummary) -> None:
     """Render content-safe case results and their aggregate."""
     table = Table(
         title="Policy evaluation",
-        box=box.ROUNDED,
+        box=None,
+        pad_edge=False,
+        padding=(0, 2),
         header_style="bold cyan",
         title_style="bold",
-        show_lines=True,
+        title_justify="left",
     )
     table.add_column("Status", no_wrap=True)
     table.add_column("Case", ratio=2)
