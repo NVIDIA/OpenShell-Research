@@ -301,7 +301,7 @@ class GateRegistry:
         )
 
     def configuration_json_schema(self) -> dict[str, object]:
-        """Return the finalized complete policy JSON Schema."""
+        """Return the complete policy JSON Schema."""
         schema = self._require_config_adapter().json_schema()
         schema["title"] = "EgressGateConfig"
         schema["description"] = (

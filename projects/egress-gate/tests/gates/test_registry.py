@@ -1,4 +1,4 @@
-"""Registry finalization and exact pipeline-schema tests."""
+"""Registry sealing and exact pipeline-schema tests."""
 
 from __future__ import annotations
 

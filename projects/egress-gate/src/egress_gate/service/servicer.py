@@ -97,7 +97,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         request: object,
         context: grpc.aio.ServicerContext[object, pb2.MiddlewareManifest],
     ) -> pb2.MiddlewareManifest:
-        """Advertise the binding and its finalized policy schema."""
+        """Advertise the binding and its complete policy schema."""
         return pb2.MiddlewareManifest(
             name=SERVICE_NAME,
             service_version=SERVICE_VERSION,
