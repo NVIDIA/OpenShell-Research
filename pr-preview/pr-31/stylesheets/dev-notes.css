@@ -10,6 +10,8 @@
 
 :root {
   --openshell-sidebar-width: 15.25rem;
+  --openshell-header-control-size: 2.4rem;
+  --openshell-header-icon-size: 1.2rem;
   --openshell-green: #76b900;
   --openshell-green-soft: #8dc63f;
   --openshell-accent: #3c626b;
@@ -101,7 +103,30 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: var(--openshell-header-control-size);
+  height: var(--openshell-header-control-size);
+  margin: 0;
+  padding: 0.6rem;
   order: -2;
+}
+
+.md-header__option .md-header__button,
+.md-header__inner > [for="__search"],
+.md-header__source .md-source {
+  box-sizing: border-box;
+  width: var(--openshell-header-control-size);
+  height: var(--openshell-header-control-size);
+  margin: 0;
+  padding: 0.6rem;
+}
+
+.md-header__option .md-header__button svg,
+.md-header__inner > [for="__search"] svg,
+.openshell-drawer-button svg,
+.md-header__source .md-source__icon,
+.md-header__source .md-source__icon svg {
+  width: var(--openshell-header-icon-size);
+  height: var(--openshell-header-icon-size);
 }
 
 .openshell-drawer-button:focus-visible {
@@ -111,8 +136,6 @@ body {
 }
 
 .openshell-drawer-button svg {
-  width: 1.35rem;
-  height: 1.35rem;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.7;
@@ -174,6 +197,7 @@ body {
 .md-header__source .md-source {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   color: var(--openshell-ink);
 }
 
@@ -187,13 +211,9 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.8rem;
-  height: 1.8rem;
 }
 
 .md-header__source .md-source__icon svg {
-  width: 1.1rem;
-  height: 1.1rem;
   margin: 0;
 }
 
@@ -252,21 +272,13 @@ body {
   .md-header__inner > .openshell-drawer-button {
     position: fixed;
     z-index: 7;
-    top: 0.675rem;
+    top: 0.65rem;
     left: 0.85rem;
-    width: 2.35rem;
-    height: 2.35rem;
-    margin: 0;
-    color: var(--md-default-fg-color--light);
+    color: var(--openshell-ink);
     background: transparent;
     border: 0;
     border-radius: 0.35rem;
     transition: color 120ms ease, background-color 120ms ease;
-  }
-
-  .md-header__inner > .openshell-drawer-button svg {
-    width: 1.1rem;
-    height: 1.1rem;
   }
 
   .md-header__inner > .openshell-drawer-button:hover {
