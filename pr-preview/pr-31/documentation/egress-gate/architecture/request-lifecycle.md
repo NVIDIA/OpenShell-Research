@@ -19,7 +19,7 @@ scalar and aggregate values. Invalid input produces a cataloged gRPC failure.
 
 ## 2. Validate and prepare the policy
 
-The service converts the protobuf `Struct` to a mapping. The finalized
+The service converts the protobuf `Struct` to a mapping. The sealed
 `GateRegistry` validates it as an exact `EgressGateConfig`. The registry then
 prepares each configured gate and creates a `RequestProcessor`. Preparation
 uses one replacement lock and the request `Timeout`. The service publishes the

@@ -1418,7 +1418,7 @@
 context, target, header, and body bounds. Domain models then enforce bounded
 scalar and aggregate values. Invalid input produces a cataloged gRPC failure.</p>
 <h2 id="2-validate-and-prepare-the-policy">2. Validate and prepare the policy</h2>
-<p>The service converts the protobuf <code>Struct</code> to a mapping. The finalized
+<p>The service converts the protobuf <code>Struct</code> to a mapping. The sealed
 <code>GateRegistry</code> validates it as an exact <code>EgressGateConfig</code>. The registry then
 prepares each configured gate and creates a <code>RequestProcessor</code>. Preparation
 uses one replacement lock and the request <code>Timeout</code>. The service publishes the
