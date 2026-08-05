@@ -18,6 +18,16 @@ CONFIGURATION_GUIDE = (
 
 
 class PageNavigationTests(unittest.TestCase):
+    def test_landing_page_width_does_not_change_the_shared_header(self) -> None:
+        styles = STYLES.read_text(encoding="utf-8")
+
+        self.assertNotIn("body:has(.dev-notes-page) .md-grid", styles)
+        self.assertNotIn("body:has(.openshell-home-page) .md-grid", styles)
+        self.assertIn(
+            "body:has(.openshell-home-page) .md-main__inner.md-grid",
+            styles,
+        )
+
     def test_footer_navigation_is_enabled(self) -> None:
         config = CONFIG.read_text(encoding="utf-8")
         styles = STYLES.read_text(encoding="utf-8")
