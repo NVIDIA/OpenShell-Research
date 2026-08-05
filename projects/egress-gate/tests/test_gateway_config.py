@@ -12,7 +12,9 @@ from egress_gate.gateway_config import (
     GatewayConfigError,
     GatewayConfigRemoval,
     GatewayConfigUpdate,
+    GatewayMiddlewareRegistration,
     default_gateway_config_path,
+    list_gateway_registrations,
     remove_gateway_config,
     update_gateway_config,
     validate_middleware_name,
@@ -55,6 +57,7 @@ def test_default_gateway_config_path_honors_openshell_override(
 
 
 def test_middleware_name_validation_matches_openshell_constraints() -> None:
+    assert MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES == 19
     longest_name = "a" * MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES
 
     assert validate_middleware_name(longest_name) == longest_name
@@ -99,6 +102,35 @@ def test_update_gateway_config_creates_minimal_default_config(
             },
         }
     }
+
+
+def test_list_gateway_registrations_returns_names_and_endpoints(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "gateway.toml"
+    path.write_text(
+        "[openshell]\n"
+        "version = 1\n\n"
+        "[[openshell.supervisor.middleware]]\n"
+        'name = "eg-regex"\n'
+        'grpc_endpoint = "http://10.0.0.3:50051"\n\n'
+        "[[openshell.supervisor.middleware]]\n"
+        'name = "other-service"\n'
+    )
+
+    assert list_gateway_registrations(path) == (
+        GatewayMiddlewareRegistration(
+            name="eg-regex",
+            endpoint="http://10.0.0.3:50051",
+        ),
+        GatewayMiddlewareRegistration(name="other-service", endpoint=None),
+    )
+
+
+def test_list_gateway_registrations_returns_empty_for_missing_file(
+    tmp_path: Path,
+) -> None:
+    assert list_gateway_registrations(tmp_path / "missing.toml") == ()
 
 
 def test_update_gateway_config_appends_without_rewriting_existing_settings(
@@ -236,6 +268,25 @@ def test_remove_gateway_config_removes_only_the_named_registration(
             "timeout": "1s",
         }
     ]
+
+
+def test_remove_gateway_config_can_remove_a_legacy_long_name(tmp_path: Path) -> None:
+    path = tmp_path / "gateway.toml"
+    path.write_text(
+        "[openshell]\n"
+        "version = 1\n\n"
+        "[[openshell.supervisor.middleware]]\n"
+        'name = "legacy-registration-name"\n'
+        'grpc_endpoint = "http://10.0.0.3:50051"\n'
+    )
+
+    result = remove_gateway_config(
+        path,
+        middleware_name="legacy-registration-name",
+    )
+
+    assert result is GatewayConfigRemoval.REMOVED
+    assert "legacy-registration-name" not in path.read_text()
 
 
 @pytest.mark.parametrize("create_file", [False, True])

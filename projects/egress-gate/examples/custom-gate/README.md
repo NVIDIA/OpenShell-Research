@@ -38,6 +38,75 @@ registry factory. An installed custom-gate package works the same way.
 The first case contains the configured keyword and is denied. The second gate
 evaluation proceeds, so `default_decision: allow` determines its result.
 
+## Run it with OpenShell
+
+Start Egress Gate with this example registry and content-safe debug diagnostics:
+
+```bash
+uv run egress-gate \
+  --debug \
+  --registry examples.custom-gate.keyword_gate:registry \
+  serve --listen 0.0.0.0:50051 --timeout-seconds 4
+```
+
+In another terminal, register the service in your default OpenShell gateway
+configuration. Replace `YOUR_HOST_IPV4` with a non-loopback address that the
+gateway and sandbox supervisors can reach.
+
+```bash
+uv run egress-gate add-gateway-registration \
+  --host-ip YOUR_HOST_IPV4 \
+  --name egress-function \
+  --port 50051
+```
+
+Restart the OpenShell gateway, then create a sandbox and launch Claude Code:
+
+```bash
+openshell sandbox create \
+  --name egress-function \
+  --from base \
+  --no-auto-providers \
+  --policy examples/custom-gate/policy.yaml \
+  -- env CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 claude
+```
+
+This command uses the base sandbox image, prevents OpenShell from creating or
+attaching a provider, and starts Claude Code with nonessential traffic disabled.
+The policy can therefore omit telemetry and error-reporting endpoints.
+
+On the first run, complete Claude Code's browser sign-in from inside the
+sandbox. The session uses your Claude subscription directly; OpenShell does not
+attach an Anthropic API-key provider.
+
+At the Claude prompt, enter a normal request:
+
+```text
+Reply with only the word OK.
+```
+
+Claude should reply normally, and the Egress Gate terminal should record an
+allow decision. Then enter a request that contains the configured keyword:
+
+```text
+Reply with only the word SECRET.
+```
+
+The request must fail before Claude answers. The Egress Gate terminal must
+record `action=deny` and `decision_source_kind=gate`. Together, the normal
+response and denied request confirm that the custom gate is active.
+
+Exit Claude Code. Clean up the sandbox and registration, then restart the
+gateway:
+
+```bash
+openshell sandbox delete egress-function
+uv run egress-gate remove-gateway-registration --name egress-function
+```
+
+OpenShell names used by this example have a 19-character limit. The chosen
+names stay within that limit.
+
 This teaching gate searches the body bytes for the UTF-8 encoding of the
 configured keyword. It is not a robust content classifier. The pipeline
 processor already checks the `HttpRequest` limits; the gate does not repeat

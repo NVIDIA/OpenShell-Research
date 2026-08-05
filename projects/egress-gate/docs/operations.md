@@ -32,6 +32,14 @@ The command updates `OPENSHELL_GATEWAY_CONFIG`, then
 `~/.config/openshell/gateway.toml`. Use `--config PATH` for another file.
 Restart the OpenShell gateway after changing registrations. Remove one with:
 
+```bash title="List middleware registrations"
+uv run egress-gate list-gateway-registrations
+```
+
+The gateway config does not identify which service owns a registration. The
+command therefore lists all external middleware. Use its exact name to remove
+the registration you no longer need:
+
 ```bash title="Remove the registration"
 uv run egress-gate remove-gateway-registration --name egress-gate
 ```

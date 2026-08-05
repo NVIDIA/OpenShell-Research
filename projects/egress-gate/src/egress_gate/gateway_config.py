@@ -8,6 +8,7 @@ import re
 import stat
 import tempfile
 import tomllib
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
@@ -32,9 +33,17 @@ class GatewayConfigError(ValueError):
     """A safe, actionable gateway registration management error."""
 
 
+@dataclass(frozen=True)
+class GatewayMiddlewareRegistration:
+    """One external middleware registration in an OpenShell gateway config."""
+
+    name: str
+    endpoint: str | None
+
+
 # Mirrors OpenShell's stable-identifier byte limit for external middleware
 # registrations.
-MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES = 128
+MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES = 19
 
 
 def default_gateway_config_path() -> Path:
@@ -48,6 +57,41 @@ def default_gateway_config_path() -> Path:
     if config_home:
         return Path(config_home) / "openshell" / "gateway.toml"
     return Path.home() / ".config" / "openshell" / "gateway.toml"
+
+
+def list_gateway_registrations(
+    path: Path,
+) -> tuple[GatewayMiddlewareRegistration, ...]:
+    """List the external middleware registrations in an OpenShell gateway config."""
+    try:
+        contents = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return ()
+    except (OSError, UnicodeError) as error:
+        raise GatewayConfigError(
+            f"Could not read {path}. Check that the file is readable UTF-8 TOML."
+        ) from error
+
+    if not contents.strip():
+        return ()
+
+    registrations: list[GatewayMiddlewareRegistration] = []
+    for entry in _middleware_entries(_load_gateway_config(contents, path), path):
+        name = entry.get("name")
+        endpoint = entry.get("grpc_endpoint")
+        if not isinstance(name, str) or not name:
+            raise GatewayConfigError(
+                f"{path} contains a middleware registration without a valid name."
+            )
+        if endpoint is not None and not isinstance(endpoint, str):
+            raise GatewayConfigError(
+                f"The middleware registration {name!r} in {path} has an invalid "
+                "grpc_endpoint."
+            )
+        registrations.append(
+            GatewayMiddlewareRegistration(name=name, endpoint=endpoint)
+        )
+    return tuple(registrations)
 
 
 def update_gateway_config(
@@ -131,7 +175,6 @@ def remove_gateway_config(
     middleware_name: str,
 ) -> GatewayConfigRemoval:
     """Remove one named Egress Gate middleware registration."""
-    validate_middleware_name(middleware_name)
     try:
         original = path.read_text(encoding="utf-8")
     except FileNotFoundError:
@@ -385,10 +428,12 @@ _MIDDLEWARE_NAME_CHARACTERS = frozenset(
 
 __all__ = [
     "GatewayConfigError",
+    "GatewayMiddlewareRegistration",
     "GatewayConfigRemoval",
     "GatewayConfigUpdate",
     "MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES",
     "default_gateway_config_path",
+    "list_gateway_registrations",
     "remove_gateway_config",
     "update_gateway_config",
     "validate_middleware_name",

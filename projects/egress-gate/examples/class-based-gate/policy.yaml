@@ -31,20 +31,15 @@ network_policies:
       - { path: /usr/bin/node }
 
 network_middlewares:
-  egress_gate_regex:
-    name: Replace email addresses and customer IDs
-    middleware: eg-regex
+  egress_gate_class:
+    name: Deny the configured keyword
+    middleware: egress-class
     order: 0
     config:
       gates:
-        - name: identifiers
-          kind: regex
-          scan:
-            kind: body
-            action:
-              kind: replace
-              template: "[{entity}]"
-          pattern_catalog: patterns.yaml
+        - name: block-secret-keyword
+          kind: keyword-deny
+          keyword: SECRET
       default_decision: allow
     on_error: fail_closed
     endpoints:

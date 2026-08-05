@@ -50,7 +50,9 @@ from egress_gate.gateway_config import (
     GatewayConfigError,
     GatewayConfigRemoval,
     GatewayConfigUpdate,
+    GatewayMiddlewareRegistration,
     default_gateway_config_path,
+    list_gateway_registrations,
     remove_gateway_config,
     update_gateway_config,
     validate_middleware_name,
@@ -270,6 +272,36 @@ def add_gateway_registration(
 
 
 @app.command(
+    "list-gateway-registrations",
+    short_help="List OpenShell middleware registrations.",
+)
+def list_gateway_registrations_command(
+    config: Annotated[
+        Path | None,
+        typer.Option(
+            help=(
+                "OpenShell gateway TOML file to inspect. By default, use "
+                "OPENSHELL_GATEWAY_CONFIG, then the standard per-user file."
+            ),
+        ),
+    ] = None,
+) -> None:
+    """List the names and endpoints of registered OpenShell middleware."""
+    config_path = config or default_gateway_config_path()
+    try:
+        registrations = list_gateway_registrations(config_path)
+    except GatewayConfigError as error:
+        _render_cli_error(
+            "Gateway registrations could not be listed",
+            code="gateway_config_error",
+            message=str(error),
+        )
+        raise typer.Exit(code=1) from None
+
+    _render_gateway_registrations(config_path, registrations)
+
+
+@app.command(
     "remove-gateway-registration",
     short_help="Remove an OpenShell registration.",
 )
@@ -277,10 +309,7 @@ def remove_gateway_registration(
     name: Annotated[
         str,
         typer.Option(
-            help=(
-                "Registration name to remove. OpenShell allows "
-                f"1-{MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES} ASCII bytes."
-            ),
+            help="Exact registration name to remove from the gateway config.",
         ),
     ],
     config: Annotated[
@@ -294,19 +323,11 @@ def remove_gateway_registration(
     ] = None,
 ) -> None:
     """Remove a named registration from an OpenShell gateway TOML file."""
-    try:
-        validated_name = validate_middleware_name(name)
-    except GatewayConfigError as error:
-        raise typer.BadParameter(
-            str(error),
-            param_hint="--name",
-        ) from None
-
     config_path = config or default_gateway_config_path()
     try:
         result = remove_gateway_config(
             config_path,
-            middleware_name=validated_name,
+            middleware_name=name,
         )
     except GatewayConfigError as error:
         _render_cli_error(
@@ -320,14 +341,14 @@ def remove_gateway_registration(
         _render_registration(
             title="Gateway registration was removed",
             config_path=config_path,
-            name=validated_name,
+            name=name,
             next_step=("Restart the OpenShell gateway to unload this registration."),
         )
     else:
         _render_registration(
             title="Gateway registration was not found",
             config_path=config_path,
-            name=validated_name,
+            name=name,
             status_style="bold yellow",
         )
 
@@ -985,6 +1006,31 @@ def _render_registration(
     _CONSOLE.print(details)
     if next_step is not None:
         _CONSOLE.print(Text.assemble(("Next: ", "bold"), next_step))
+
+
+def _render_gateway_registrations(
+    config_path: Path,
+    registrations: tuple[GatewayMiddlewareRegistration, ...],
+) -> None:
+    """Render the middleware names that can be passed to the remove command."""
+    _CONSOLE.print("[bold]OpenShell middleware registrations[/bold]")
+    _CONSOLE.print(Text.assemble(("Gateway file: ", "bold cyan"), str(config_path)))
+    if not registrations:
+        _CONSOLE.print("No middleware registrations found.")
+        return
+
+    table = Table(box=None, pad_edge=False, padding=(0, 2), header_style="bold cyan")
+    table.add_column("Name", style="bold", no_wrap=True)
+    table.add_column("Endpoint", overflow="fold")
+    for registration in registrations:
+        table.add_row(registration.name, registration.endpoint or "Not set")
+    _CONSOLE.print(table)
+    _CONSOLE.print(
+        Text.assemble(
+            ("Remove one: ", "bold"),
+            "egress-gate remove-gateway-registration --name NAME",
+        )
+    )
 
 
 def _render_egress_error(title: str, error: EgressGateError) -> None:

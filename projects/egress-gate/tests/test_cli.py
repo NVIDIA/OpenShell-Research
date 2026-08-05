@@ -9,12 +9,14 @@ from pathlib import Path
 from types import ModuleType
 
 import pytest
+import yaml
 from rich.text import Text
 from typer.testing import CliRunner
 
 from egress_gate.cli import _load_registry, app
 from egress_gate.errors import GateRegistryError
 from egress_gate.gates import GateRegistry, create_builtin_registry
+from egress_gate.gateway_config import MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES
 
 
 def test_cli_does_not_offer_request_content_logging() -> None:
@@ -160,6 +162,74 @@ def test_cli_evaluate_runs_the_custom_gate_examples(
     assert "configured-keyword-is-denied" in result.stdout
     assert "other-bodies-proceed-to-the-default" in result.stdout
     assert "2 passed · 0 failed · 2 total" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("registry_reference", "example_directory", "registration_name"),
+    [
+        (None, "regex-redaction", "eg-regex"),
+        (
+            "examples.custom-gate.keyword_gate:registry",
+            "custom-gate",
+            "egress-function",
+        ),
+        (
+            "examples.class-based-gate.keyword_gate:registry",
+            "class-based-gate",
+            "egress-class",
+        ),
+    ],
+)
+def test_openshell_example_policies_use_valid_gate_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+    registry_reference: str | None,
+    example_directory: str,
+    registration_name: str,
+) -> None:
+    project_dir = Path(__file__).parents[1]
+    policy_path = project_dir / f"examples/{example_directory}/policy.yaml"
+    policy = yaml.safe_load(policy_path.read_text())
+    middleware = next(iter(policy["network_middlewares"].values()))
+    standalone_config = yaml.safe_load(
+        (policy_path.parent / "egress-gate-config.yaml").read_text()
+    )
+    assert middleware["middleware"] == registration_name
+    assert len(registration_name) <= MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES
+    if example_directory == "regex-redaction":
+        monkeypatch.chdir(policy_path.parent)
+    _load_registry(registry_reference).validate_config(middleware["config"])
+
+    embedded_config = middleware["config"]
+    for gate in embedded_config["gates"]:
+        pattern_catalog = gate.get("pattern_catalog")
+        if isinstance(pattern_catalog, str):
+            gate["pattern_catalog"] = yaml.safe_load(
+                (policy_path.parent / pattern_catalog).read_text()
+            )
+
+    assert embedded_config == standalone_config
+
+
+@pytest.mark.parametrize(
+    ("example_directory", "name"),
+    [
+        ("regex-redaction", "eg-regex"),
+        ("custom-gate", "egress-function"),
+        ("class-based-gate", "egress-class"),
+    ],
+)
+def test_example_workflows_use_one_registration_and_sandbox_name(
+    example_directory: str,
+    name: str,
+) -> None:
+    project_dir = Path(__file__).parents[1]
+    readme = (project_dir / f"examples/{example_directory}/README.md").read_text()
+    normalized_readme = " ".join(readme.replace("\\\n", " ").split())
+
+    assert f"--host-ip YOUR_HOST_IPV4 --name {name} --port 50051" in normalized_readme
+    assert f"openshell sandbox create --name {name}" in normalized_readme
+    assert f"openshell sandbox delete {name}" in readme
+    assert f"remove-gateway-registration --name {name}" in normalized_readme
 
 
 def test_installed_executable_loads_a_registry_from_the_working_directory() -> None:
@@ -334,6 +404,48 @@ def test_cli_add_gateway_registration_reports_the_result(tmp_path: Path) -> None
     assert "Endpoint      http://192.0.2.10:50051" in result.stdout
     assert "Created the gateway configuration file" in result.stdout
     assert "Next: Start Egress Gate" in result.stdout
+
+
+def test_cli_lists_gateway_registration_names_for_removal(tmp_path: Path) -> None:
+    config = tmp_path / "gateway.toml"
+    config.write_text(
+        "[openshell]\n"
+        "version = 1\n\n"
+        "[[openshell.supervisor.middleware]]\n"
+        'name = "eg-regex"\n'
+        'grpc_endpoint = "http://192.0.2.10:50051"\n\n'
+        "[[openshell.supervisor.middleware]]\n"
+        'name = "other-service"\n'
+        'grpc_endpoint = "http://192.0.2.20:9000"\n'
+    )
+
+    result = CliRunner().invoke(
+        app,
+        ["list-gateway-registrations", "--config", str(config)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "OpenShell middleware registrations" in result.stdout
+    assert "eg-regex" in result.stdout
+    assert "http://192.0.2.10:50051" in result.stdout
+    assert "other-service" in result.stdout
+    assert "remove-gateway-registration --name NAME" in result.stdout
+
+
+def test_cli_lists_no_registrations_when_gateway_config_is_missing(
+    tmp_path: Path,
+) -> None:
+    result = CliRunner().invoke(
+        app,
+        [
+            "list-gateway-registrations",
+            "--config",
+            str(tmp_path / "missing.toml"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "No middleware registrations found." in result.stdout
 
 
 def test_cli_evaluate_reports_content_safe_mismatch_status(tmp_path: Path) -> None:

@@ -10,6 +10,12 @@ gates:
       entities:
         - name: email
           rules:
-            - pattern: '(?<![\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])'
+            - name: conventional-email
+              pattern: '(?<![\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])'
+              confidence: high
+        - name: customer-id
+          rules:
+            - name: prefixed-eight-digit-id
+              pattern: '\bCUST-[0-9]{8}\b'
               confidence: high
 default_decision: allow
