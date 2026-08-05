@@ -32,7 +32,7 @@ from egress_gate.request import (
     HttpHeader,
     HttpRequest,
     RemoveHeaderMutation,
-    RequestPatch,
+    RequestMutations,
     WriteHeaderMutation,
 )
 from egress_gate.result import (
@@ -96,7 +96,7 @@ class RequestProcessor:
         if not isinstance(timeout, Timeout):
             raise EgressGateError(ErrorCode.GATE_OUTPUT_INVALID)
         current_request = request
-        accumulated_patch = RequestPatch()
+        accumulated_mutations = RequestMutations()
         sourced_findings: list[SourcedFinding] = []
         traces: list[GateTrace] = []
 
@@ -105,7 +105,7 @@ class RequestProcessor:
                 timeout.raise_if_expired()
                 started = monotonic()
                 evaluation = gate.evaluate(current_request, timeout=timeout)
-                mutation_kinds = _mutation_kinds(evaluation.patch)
+                mutation_kinds = _mutation_kinds(evaluation.request_mutations)
                 trace_finding_count = sum(
                     finding.count for finding in evaluation.findings
                 )
@@ -154,19 +154,19 @@ class RequestProcessor:
                             gate_name=gate_name,
                             gate_type=gate_type,
                         ),
-                        patch=accumulated_patch,
+                        request_mutations=accumulated_mutations,
                         findings=sourced_findings,
                         fingerprint=self._policy_fingerprint,
                         traces=traces,
                     )
-                if not evaluation.patch.is_empty:
-                    current_request = apply_request_patch(
+                if not evaluation.request_mutations.is_empty:
+                    current_request = apply_request_mutations(
                         current_request,
-                        evaluation.patch,
+                        evaluation.request_mutations,
                     )
-                    accumulated_patch = _compose_patches(
-                        accumulated_patch,
-                        evaluation.patch,
+                    accumulated_mutations = _compose_request_mutations(
+                        accumulated_mutations,
+                        evaluation.request_mutations,
                     )
             timeout.raise_if_expired()
         except TimeoutExpiredError:
@@ -198,7 +198,7 @@ class RequestProcessor:
                 source=PipelineDefaultDecisionSource(
                     kind=DecisionSourceKind.PIPELINE_DEFAULT
                 ),
-                patch=accumulated_patch,
+                request_mutations=accumulated_mutations,
                 findings=sourced_findings,
                 fingerprint=self._policy_fingerprint,
                 traces=traces,
@@ -217,13 +217,22 @@ class RequestProcessor:
         return result
 
 
-def apply_request_patch(request: HttpRequest, patch: RequestPatch) -> HttpRequest:
-    """Apply one validated patch to the current request in operation order."""
-    if not isinstance(request, HttpRequest) or not isinstance(patch, RequestPatch):
-        raise GateContractError("request patch input is invalid")
-    body = request.body if patch.replacement_body is None else patch.replacement_body
+def apply_request_mutations(
+    request: HttpRequest,
+    request_mutations: RequestMutations,
+) -> HttpRequest:
+    """Apply validated mutations to the current request in operation order."""
+    if not isinstance(request, HttpRequest) or not isinstance(
+        request_mutations, RequestMutations
+    ):
+        raise GateContractError("request mutation input is invalid")
+    body = (
+        request.body
+        if request_mutations.replacement_body is None
+        else request_mutations.replacement_body
+    )
     headers = list(request.headers)
-    for mutation in patch.header_mutations:
+    for mutation in request_mutations.header_mutations:
         if isinstance(mutation, WriteHeaderMutation):
             _validate_write_mutation(mutation)
             matching = _header_indexes(headers, mutation.name)
@@ -245,7 +254,7 @@ def apply_request_patch(request: HttpRequest, patch: RequestPatch) -> HttpReques
                 header for index, header in enumerate(headers) if index not in matching
             ]
         else:
-            raise GateContractError("request patch mutation is invalid")
+            raise GateContractError("request mutation is invalid")
     try:
         return HttpRequest(
             context=request.context,
@@ -287,9 +296,12 @@ def _append_findings(
             output.append(SourcedFinding(source_gate=gate_name, finding=finding))
 
 
-def _compose_patches(first: RequestPatch, second: RequestPatch) -> RequestPatch:
+def _compose_request_mutations(
+    first: RequestMutations,
+    second: RequestMutations,
+) -> RequestMutations:
     try:
-        return RequestPatch(
+        return RequestMutations(
             replacement_body=(
                 second.replacement_body
                 if second.replacement_body is not None
@@ -299,15 +311,15 @@ def _compose_patches(first: RequestPatch, second: RequestPatch) -> RequestPatch:
         )
     except (TypeError, ValueError, ValidationError):
         raise GateLimitExceededError(
-            "composed request patch exceeds a runtime limit"
+            "composed request mutations exceed a runtime limit"
         ) from None
 
 
-def _mutation_kinds(patch: RequestPatch) -> tuple[MutationKind, ...]:
+def _mutation_kinds(request_mutations: RequestMutations) -> tuple[MutationKind, ...]:
     kinds: list[MutationKind] = []
-    if patch.replacement_body is not None:
+    if request_mutations.replacement_body is not None:
         kinds.append(MutationKind.BODY)
-    if patch.header_mutations:
+    if request_mutations.header_mutations:
         kinds.append(MutationKind.HEADERS)
     return tuple(kinds)
 
@@ -316,7 +328,7 @@ def _result(
     *,
     decision: EgressDecision,
     source: DecisionSource,
-    patch: RequestPatch | None = None,
+    request_mutations: RequestMutations | None = None,
     findings: Sequence[SourcedFinding] = (),
     reason_code: str | None = None,
     fingerprint: str | None,
@@ -325,7 +337,9 @@ def _result(
     return EgressResult(
         decision=decision,
         decision_source=source,
-        patch=RequestPatch() if patch is None else patch,
+        request_mutations=(
+            RequestMutations() if request_mutations is None else request_mutations
+        ),
         findings=tuple(findings),
         reason_code=reason_code,
         policy_fingerprint=fingerprint,
@@ -380,5 +394,5 @@ _LOGGER = get_logger(__name__)
 
 __all__ = [
     "RequestProcessor",
-    "apply_request_patch",
+    "apply_request_mutations",
 ]

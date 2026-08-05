@@ -34,10 +34,10 @@ from egress_gate.request import (
     HttpTarget,
     RemoveHeaderMutation,
     RequestContext,
-    RequestPatch,
+    RequestMutations,
     WriteHeaderMutation,
 )
-from egress_gate.request_processor import RequestProcessor, apply_request_patch
+from egress_gate.request_processor import RequestProcessor, apply_request_mutations
 from egress_gate.result import (
     DecisionSourceKind,
     EgressDecision,
@@ -121,7 +121,7 @@ class _ControlGate(Gate[_ControlConfig, None]):
                 ),
             )
         return GateEvaluation.proceed(
-            patch=RequestPatch(
+            request_mutations=RequestMutations(
                 replacement_body=(
                     None
                     if self.config.replacement is None
@@ -219,7 +219,7 @@ def test_processor_process_requires_the_service_created_timeout() -> None:
     assert result.decision is EgressDecision.ALLOW
 
 
-def test_processor_applies_patches_to_the_current_request_and_preserves_intent() -> (
+def test_processor_applies_mutations_to_the_current_request_and_preserves_intent() -> (
     None
 ):
     processor = _processor(
@@ -248,8 +248,8 @@ def test_processor_applies_patches_to_the_current_request_and_preserves_intent()
 
     assert result.decision is EgressDecision.ALLOW
     assert result.decision_source.kind is DecisionSourceKind.PIPELINE_DEFAULT
-    assert result.patch.replacement_body == b"redacted"
-    mutation = result.patch.header_mutations[0]
+    assert result.request_mutations.replacement_body == b"redacted"
+    mutation = result.request_mutations.header_mutations[0]
     assert isinstance(mutation, WriteHeaderMutation)
     assert mutation.value == "true"
     assert [(item.source_gate, item.finding.label) for item in result.findings] == [
@@ -263,7 +263,7 @@ def test_processor_applies_patches_to_the_current_request_and_preserves_intent()
     assert result.policy_fingerprint == "policy-fingerprint"
 
 
-def test_regex_gate_sees_header_patches_from_an_earlier_gate() -> None:
+def test_regex_gate_sees_header_mutations_from_an_earlier_gate() -> None:
     processor = _processor(
         (
             (
@@ -292,7 +292,7 @@ def test_regex_gate_sees_header_patches_from_an_earlier_gate() -> None:
     assert result.decision is EgressDecision.DENY
     assert isinstance(result.decision_source, GateDecisionSource)
     assert result.decision_source.gate_name == "inspect-header"
-    assert result.patch.is_empty
+    assert result.request_mutations.is_empty
 
 
 def test_processor_aggregates_equivalent_findings_by_gate_provenance() -> None:
@@ -357,7 +357,7 @@ def test_terminal_decisions_skip_later_gates() -> None:
     assert allowed.decision_source.gate_name == "allow"
 
 
-def test_default_deny_owns_its_reason_and_discards_accumulated_patch() -> None:
+def test_default_deny_owns_its_reason_and_discards_accumulated_mutations() -> None:
     processor = _processor(
         (("redact", {"kind": "test-control", "replacement": "redacted"}),),
         default_decision=DefaultDecision.DENY,
@@ -368,7 +368,7 @@ def test_default_deny_owns_its_reason_and_discards_accumulated_patch() -> None:
     assert result.decision is EgressDecision.DENY
     assert result.decision_source.kind is DecisionSourceKind.PIPELINE_DEFAULT
     assert result.reason_code == DEFAULT_DENY_REASON_CODE
-    assert result.patch.is_empty
+    assert result.request_mutations.is_empty
 
 
 def test_expired_shared_timeout_returns_atomic_runtime_limit_result() -> None:
@@ -382,7 +382,7 @@ def test_expired_shared_timeout_returns_atomic_runtime_limit_result() -> None:
     assert result.decision is EgressDecision.DENY
     assert result.decision_source.kind is DecisionSourceKind.RUNTIME_LIMIT
     assert result.reason_code == LIMIT_REASON_CODE
-    assert result.patch.is_empty
+    assert result.request_mutations.is_empty
 
 
 def test_regex_finding_group_overflow_is_an_atomic_runtime_limit() -> None:
@@ -417,7 +417,7 @@ def test_regex_finding_group_overflow_is_an_atomic_runtime_limit() -> None:
     assert result.decision_source.kind is DecisionSourceKind.RUNTIME_LIMIT
     assert result.reason_code == LIMIT_REASON_CODE
     assert not result.findings
-    assert result.patch.is_empty
+    assert result.request_mutations.is_empty
 
 
 def test_composed_header_mutation_overflow_is_an_atomic_runtime_limit() -> None:
@@ -442,7 +442,7 @@ def test_composed_header_mutation_overflow_is_an_atomic_runtime_limit() -> None:
     assert result.decision is EgressDecision.DENY
     assert result.decision_source.kind is DecisionSourceKind.RUNTIME_LIMIT
     assert result.reason_code == LIMIT_REASON_CODE
-    assert result.patch.is_empty
+    assert result.request_mutations.is_empty
     assert result.findings == ()
     assert result.traces == ()
 
@@ -467,7 +467,7 @@ def test_trace_finding_count_overflow_is_an_atomic_runtime_limit() -> None:
     assert result.decision is EgressDecision.DENY
     assert result.decision_source.kind is DecisionSourceKind.RUNTIME_LIMIT
     assert result.reason_code == LIMIT_REASON_CODE
-    assert result.patch.is_empty
+    assert result.request_mutations.is_empty
     assert result.findings == ()
     assert result.traces == ()
 
@@ -496,14 +496,14 @@ def test_prepared_gate_type_is_part_of_the_processor_contract() -> None:
         )
 
 
-def test_header_patch_operations_are_ordered_and_protected() -> None:
+def test_header_mutations_are_ordered_and_protected() -> None:
     original = _request(
         headers=(
             HttpHeader(name="x-openshell-middleware-test", value="old"),
             HttpHeader(name="x-other", value="keep"),
         )
     )
-    patch = RequestPatch(
+    request_mutations = RequestMutations(
         header_mutations=(
             WriteHeaderMutation(
                 kind="write",
@@ -526,7 +526,7 @@ def test_header_patch_operations_are_ordered_and_protected() -> None:
             RemoveHeaderMutation(kind="remove", name="x-other"),
         )
     )
-    updated = apply_request_patch(original, patch)
+    updated = apply_request_mutations(original, request_mutations)
 
     assert updated.headers == (
         HttpHeader(name="x-openshell-middleware-test", value="new"),
@@ -534,9 +534,9 @@ def test_header_patch_operations_are_ordered_and_protected() -> None:
     )
 
     with pytest.raises(GateContractError):
-        apply_request_patch(
+        apply_request_mutations(
             original,
-            RequestPatch(
+            RequestMutations(
                 header_mutations=(
                     WriteHeaderMutation(
                         kind="write",

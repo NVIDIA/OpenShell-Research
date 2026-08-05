@@ -221,9 +221,11 @@ class Utf8BodyGate(
         result = self._evaluate_text(text, timeout=timeout)
         if not isinstance(result, GateEvaluation):
             raise GateContractError("UTF-8 body gate output is invalid")
-        if result.patch.replacement_body is not None:
+        if result.request_mutations.replacement_body is not None:
             try:
-                result.patch.replacement_body.decode("utf-8", errors="strict")
+                result.request_mutations.replacement_body.decode(
+                    "utf-8", errors="strict"
+                )
             except UnicodeDecodeError:
                 raise GateContractError(
                     "UTF-8 body gate returned a non-UTF-8 replacement"
@@ -246,9 +248,12 @@ def _validate_gate_output(
     finding_types: tuple[FindingTypeDefinition, ...],
     result: GateEvaluation,
 ) -> None:
-    if result.patch.replacement_body is not None and not capabilities.replaces_body:
+    if (
+        result.request_mutations.replacement_body is not None
+        and not capabilities.replaces_body
+    ):
         raise GateContractError("gate returned an undeclared body replacement")
-    if result.patch.header_mutations and not capabilities.mutates_headers:
+    if result.request_mutations.header_mutations and not capabilities.mutates_headers:
         raise GateContractError("gate returned undeclared header mutations")
     if result.findings and not capabilities.produces_findings:
         raise GateContractError("gate returned undeclared findings")

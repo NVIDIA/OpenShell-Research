@@ -23,7 +23,7 @@ from egress_gate.request import (
     Process,
     RemoveHeaderMutation,
     RequestContext,
-    RequestPatch,
+    RequestMutations,
     WriteHeaderMutation,
 )
 
@@ -97,21 +97,21 @@ def test_header_count_and_data_boundaries() -> None:
         _request(headers=(HttpHeader(name="x", value="x" * MAX_PROTO_HEADERS_BYTES),))
 
 
-def test_request_patch_distinguishes_no_replacement_from_empty_body() -> None:
-    no_replacement = RequestPatch()
-    empty_replacement = RequestPatch(replacement_body=b"")
+def test_request_mutations_distinguish_no_replacement_from_empty_body() -> None:
+    no_replacement = RequestMutations()
+    empty_replacement = RequestMutations(replacement_body=b"")
 
     assert no_replacement.is_empty
     assert not empty_replacement.is_empty
 
 
-def test_request_patch_preserves_ordered_discriminated_header_mutations() -> None:
+def test_request_mutations_preserve_ordered_discriminated_header_mutations() -> None:
     adapter = TypeAdapter(HeaderMutation)
     discriminator = adapter.json_schema().get("discriminator")
     assert isinstance(discriminator, dict)
     assert discriminator.get("propertyName") == "kind"
 
-    patch = RequestPatch(
+    request_mutations = RequestMutations(
         header_mutations=(
             WriteHeaderMutation(
                 kind="write",
@@ -123,8 +123,8 @@ def test_request_patch_preserves_ordered_discriminated_header_mutations() -> Non
         )
     )
 
-    assert patch.header_mutations[0].kind == "write"
-    assert patch.header_mutations[1].kind == "remove"
+    assert request_mutations.header_mutations[0].kind == "write"
+    assert request_mutations.header_mutations[1].kind == "remove"
 
     with pytest.raises(ValidationError):
         adapter.validate_python({"name": "x-test"})
@@ -132,15 +132,15 @@ def test_request_patch_preserves_ordered_discriminated_header_mutations() -> Non
         adapter.validate_python({"operation": "remove", "name": "x-test"})
 
 
-def test_request_patch_rejects_invalid_mutation_bounds() -> None:
+def test_request_mutations_reject_invalid_bounds() -> None:
     mutation = RemoveHeaderMutation(kind="remove", name="x-test")
     with pytest.raises(ValidationError):
-        RequestPatch(
+        RequestMutations(
             header_mutations=tuple(mutation for _ in range(MAX_HEADER_MUTATIONS + 1))
         )
 
     with pytest.raises(ValidationError):
-        RequestPatch(
+        RequestMutations(
             header_mutations=(
                 WriteHeaderMutation(
                     kind="write",

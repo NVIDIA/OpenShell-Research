@@ -37,7 +37,7 @@ from egress_gate.gates import (
 )
 from egress_gate.request import (
     ExistingHeaderAction,
-    RequestPatch,
+    RequestMutations,
     WriteHeaderMutation,
 )
 from egress_gate.result import (
@@ -224,7 +224,7 @@ def test_result_adapter_serializes_only_five_finding_fields_and_empty_body_inten
         decision_source=PipelineDefaultDecisionSource(
             kind=DecisionSourceKind.PIPELINE_DEFAULT
         ),
-        patch=RequestPatch(replacement_body=b""),
+        request_mutations=RequestMutations(replacement_body=b""),
         findings=(SourcedFinding(source_gate="body", finding=finding),),
     )
 
@@ -249,7 +249,7 @@ def test_result_adapter_preserves_ordered_header_mutations_and_deny_reason() -> 
         decision_source=PipelineDefaultDecisionSource(
             kind=DecisionSourceKind.PIPELINE_DEFAULT
         ),
-        patch=RequestPatch(
+        request_mutations=RequestMutations(
             header_mutations=(
                 WriteHeaderMutation(
                     kind="write",
@@ -420,8 +420,8 @@ def test_in_flight_processor_reference_survives_policy_replacement() -> None:
     finally:
         asyncio.run(middleware.close())
 
-    assert old_result.patch.replacement_body is None
-    assert replacement_result.patch.replacement_body == b"[token]"
+    assert old_result.request_mutations.replacement_body is None
+    assert replacement_result.request_mutations.replacement_body == b"[token]"
 
 
 @pytest.mark.asyncio

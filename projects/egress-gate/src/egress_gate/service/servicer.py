@@ -528,12 +528,12 @@ def _serialize_result(result: EgressResult) -> pb2.HttpRequestResult:
         if len(response.findings) > MAX_PROTO_FINDING_GROUPS:
             return _limit_deny()
         if result.decision is EgressDecision.ALLOW:
-            if result.patch.replacement_body is not None:
-                if len(result.patch.replacement_body) > MAX_BODY_BYTES:
+            if result.request_mutations.replacement_body is not None:
+                if len(result.request_mutations.replacement_body) > MAX_BODY_BYTES:
                     return _limit_deny()
-                response.body = result.patch.replacement_body
+                response.body = result.request_mutations.replacement_body
                 response.has_body = True
-            for mutation in result.patch.header_mutations:
+            for mutation in result.request_mutations.header_mutations:
                 _append_header_mutation(response, mutation)
             response.metadata.update(
                 {entry.key: entry.value for entry in result.metadata}

@@ -3,11 +3,17 @@
 Egress Gate is an extensible OpenShell supervisor middleware service. It
 evaluates provider-bound HTTP requests during the pre-credentials phase. Each
 request moves through an ordered pipeline of trusted gates. A gate can allow
-the request, deny it, or return a validated mutation.
+the request, deny it, or propose validated request mutations.
+
+Gates do not modify request objects in place. The pipeline processor applies
+proposed mutations to new local request snapshots. The service returns the
+final mutations to the OpenShell supervisor, which applies them to the
+intercepted request.
 
 The current released OpenShell `Finding` contract has five fields:
 `type`, `label`, `count`, `confidence`, and `severity`. Gate provenance stays
-inside the runtime. Egress Gate does not add provenance to findings or labels.
+inside the pipeline processor. Egress Gate does not add provenance to findings
+or labels.
 
 ## Quickstart
 

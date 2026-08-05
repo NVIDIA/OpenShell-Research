@@ -28,7 +28,7 @@ from egress_gate.constants import (
     MAX_TRACE_MUTATION_KINDS,
     REASON_CODE_PATTERN,
 )
-from egress_gate.request import RequestPatch
+from egress_gate.request import RequestMutations
 from egress_gate.string_validators import BoundedMetadataString
 
 ReasonCode = Annotated[str, Field(pattern=REASON_CODE_PATTERN)]
@@ -137,7 +137,7 @@ class GateEvaluation(StrictDomainModel):
     """Validated output of one gate invocation."""
 
     control: GateControl
-    patch: RequestPatch = Field(default_factory=RequestPatch)
+    request_mutations: RequestMutations = Field(default_factory=RequestMutations)
     findings: tuple[Finding, ...] = Field(
         default=(),
         max_length=MAX_PROTO_FINDING_GROUPS,
@@ -150,8 +150,8 @@ class GateEvaluation(StrictDomainModel):
             if self.reason_code is not None:
                 raise ValueError("proceed evaluations cannot carry a reason code")
             return self
-        if not self.patch.is_empty:
-            raise ValueError("terminal evaluations cannot carry a patch")
+        if not self.request_mutations.is_empty:
+            raise ValueError("terminal evaluations cannot carry request mutations")
         if self.control is GateControl.ALLOW and self.reason_code is not None:
             raise ValueError("allow evaluations cannot carry a reason code")
         if self.control is GateControl.DENY and self.reason_code is None:
@@ -162,13 +162,15 @@ class GateEvaluation(StrictDomainModel):
     def proceed(
         cls,
         *,
-        patch: RequestPatch | None = None,
+        request_mutations: RequestMutations | None = None,
         findings: tuple[Finding, ...] = (),
     ) -> Self:
         """Create a non-terminal evaluation."""
         return cls(
             control=GateControl.PROCEED,
-            patch=RequestPatch() if patch is None else patch,
+            request_mutations=(
+                RequestMutations() if request_mutations is None else request_mutations
+            ),
             findings=findings,
         )
 
@@ -218,7 +220,7 @@ class EgressResult(StrictDomainModel):
 
     decision: EgressDecision
     decision_source: DecisionSource
-    patch: RequestPatch = Field(default_factory=RequestPatch)
+    request_mutations: RequestMutations = Field(default_factory=RequestMutations)
     findings: tuple[SourcedFinding, ...] = Field(
         default=(),
         max_length=MAX_PROTO_FINDING_GROUPS,
@@ -244,8 +246,8 @@ class EgressResult(StrictDomainModel):
             raise ValueError("result metadata exceeds the size limit")
         source_kind = self.decision_source.kind
         if self.decision is EgressDecision.DENY:
-            if not self.patch.is_empty:
-                raise ValueError("denied results cannot carry a patch")
+            if not self.request_mutations.is_empty:
+                raise ValueError("denied results cannot carry request mutations")
             if self.reason_code is None:
                 raise ValueError("denied results require a reason code")
         elif self.reason_code is not None:

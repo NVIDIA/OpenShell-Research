@@ -48,7 +48,7 @@ from egress_gate.errors import (
 )
 from egress_gate.gates.base import Gate, GateCapabilities, GateConfig
 from egress_gate.logging import get_logger
-from egress_gate.request import HeaderName, HttpRequest, RequestPatch
+from egress_gate.request import HeaderName, HttpRequest, RequestMutations
 from egress_gate.result import Finding, FindingTypeDefinition, GateEvaluation
 from egress_gate.string_validators import ScalarString, validate_scalar_string
 from egress_gate.timeout import Timeout
@@ -337,7 +337,9 @@ class RegexGate(Gate[RegexConfig, None]):
                 action.template,
             )
         return GateEvaluation.proceed(
-            patch=RequestPatch(replacement_body=output_text.encode("utf-8")),
+            request_mutations=RequestMutations(
+                replacement_body=output_text.encode("utf-8")
+            ),
             findings=findings,
         )
 

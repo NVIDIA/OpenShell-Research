@@ -140,7 +140,7 @@ HeaderMutation: TypeAlias = Annotated[
 ]
 
 
-class RequestPatch(StrictDomainModel):
+class RequestMutations(StrictDomainModel):
     """Validated body and header mutations proposed by one gate."""
 
     replacement_body: bytes | None = Field(
@@ -154,7 +154,7 @@ class RequestPatch(StrictDomainModel):
     )
 
     @model_validator(mode="after")
-    def _mutations_are_bounded(self) -> RequestPatch:
+    def _mutations_are_bounded(self) -> RequestMutations:
         data_size = sum(
             len(mutation.name.encode("utf-8"))
             + (
@@ -165,12 +165,12 @@ class RequestPatch(StrictDomainModel):
             for mutation in self.header_mutations
         )
         if data_size > MAX_HEADER_MUTATION_DATA_BYTES:
-            raise ValueError("request patch header data exceeds the size limit")
+            raise ValueError("request mutation header data exceeds the size limit")
         return self
 
     @property
     def is_empty(self) -> bool:
-        """Whether this patch proposes no mutation."""
+        """Whether this set proposes no request mutation."""
         return self.replacement_body is None and not self.header_mutations
 
 
@@ -185,6 +185,6 @@ __all__ = [
     "Process",
     "RemoveHeaderMutation",
     "RequestContext",
-    "RequestPatch",
+    "RequestMutations",
     "WriteHeaderMutation",
 ]

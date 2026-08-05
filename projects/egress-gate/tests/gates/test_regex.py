@@ -97,7 +97,7 @@ def test_detect_action_reports_overlaps_without_mutating_the_body() -> None:
     )
 
     assert evaluation.control is GateControl.PROCEED
-    assert evaluation.patch.replacement_body is None
+    assert evaluation.request_mutations.replacement_body is None
     assert len(evaluation.findings) == 2
     assert sum(finding.count for finding in evaluation.findings) == 3
     assert {finding.label for finding in evaluation.findings} == {"token"}
@@ -130,7 +130,7 @@ def test_deny_action_is_terminal_and_uses_the_stable_gate_reason() -> None:
 
     assert evaluation.control is GateControl.DENY
     assert evaluation.reason_code == "egress_gate_regex_denied"
-    assert evaluation.patch.is_empty
+    assert evaluation.request_mutations.is_empty
     assert len(evaluation.findings) == 1
 
 
@@ -144,9 +144,9 @@ def test_replace_action_preserves_explicit_replacement_intent() -> None:
     changed = _run(config, "contains secret")
     unchanged = _run(config, "no match")
 
-    assert changed.patch.replacement_body == b"contains [token]"
-    assert unchanged.patch.replacement_body == b"no match"
-    assert not unchanged.patch.is_empty
+    assert changed.request_mutations.replacement_body == b"contains [token]"
+    assert unchanged.request_mutations.replacement_body == b"no match"
+    assert not unchanged.request_mutations.is_empty
 
 
 @pytest.mark.parametrize(
@@ -182,7 +182,7 @@ def test_detect_action_matches_the_configured_request_scan(
 
     assert evaluation.control is GateControl.PROCEED
     assert len(evaluation.findings) == 1
-    assert evaluation.patch.is_empty
+    assert evaluation.request_mutations.is_empty
 
 
 def test_header_scan_matches_each_selected_repeated_value() -> None:
@@ -411,7 +411,7 @@ def test_replacement_selects_ranked_non_overlapping_winners() -> None:
         "abc",
     )
 
-    assert evaluation.patch.replacement_body == b"a<token>"
+    assert evaluation.request_mutations.replacement_body == b"a<token>"
     assert len(evaluation.findings) == 2
 
 

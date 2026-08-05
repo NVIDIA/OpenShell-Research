@@ -76,6 +76,10 @@ and finding types. Read capabilities are discovery metadata. They do not limit
 which request fields trusted Python code can read. Keep request state local so
 the gate is safe for concurrent calls.
 
+A custom gate must not edit its `HttpRequest` input. To propose a change, return
+`GateEvaluation.proceed(request_mutations=RequestMutations(...))`. The pipeline
+processor validates the mutations and creates the next immutable snapshot.
+
 For a resource-backed gate, define a typed `GateResources` bundle. Pass the
 bundle to `registry.register(..., resources=resources)`. Resources are trusted,
 application-owned dependencies that must be safe for concurrent use. Policy

@@ -2,7 +2,8 @@
 
 Egress Gate is OpenShell pre-credentials middleware. It receives one bounded,
 immutable byte-oriented `HttpRequest`, runs an ordered pipeline of trusted
-request-level gates, and returns an explicit allow, deny, or mutation result.
+request-level gates, and returns an explicit allow or deny result with optional
+request mutations.
 
 ## Development commands
 
@@ -39,7 +40,7 @@ Run focused tests while working and `make check` before handoff.
 - `src/egress_gate/gates/`: `Gate`, helper bases, registry, and the regex gate
 - `src/egress_gate/config.py`: strict `pipeline.gates` and `default_decision`
   policy models
-- `src/egress_gate/request.py`: protobuf-free request and ordered patch models
+- `src/egress_gate/request.py`: protobuf-free request and request-mutation models
 - `src/egress_gate/result.py`: gate evaluations, five-field findings, provenance,
   traces, metadata, and final results
 - `src/egress_gate/request_processor.py`: shared deadline, current-request
@@ -69,10 +70,11 @@ not create a union only to replace an enum.
 
 `Gate.evaluate()` receives the current `HttpRequest` and one shared `Timeout`.
 It returns a validated `GateEvaluation` with explicit `proceed`, terminal
-`allow`, or terminal `deny` control. A proceeding patch is applied before the
-next gate; body replacement intent is preserved even when replacement bytes are
-equal to the input. Runtime provenance is added by `RequestProcessor`, never by
-gate configuration or gate-produced findings.
+`allow`, or terminal `deny` control. Request mutations from a `proceed` result
+are applied before the next gate; body replacement intent is preserved even
+when replacement bytes are equal to the input. The pipeline processor adds
+provenance through `RequestProcessor`, never through gate configuration or
+gate-produced findings.
 
 Custom gates are trusted and must be safe for concurrent calls. Tests should
 exercise concurrent evaluation, but the Python implementation is not claimed to
@@ -88,9 +90,10 @@ UTF-8 replacement. Deterministic network request policy belongs to OpenShell.
 Do not add more built-ins speculatively.
 
 The OpenShell wire `Finding` remains the released five-field contract:
-`type`, `label`, `count`, `confidence`, and `severity`. Gate provenance is
-runtime-internal in `SourcedFinding` and `DecisionSource`; do not serialize
-source or attributes or encode them into labels or result metadata.
+`type`, `label`, `count`, `confidence`, and `severity`. Gate provenance stays
+internal to the pipeline processor in `SourcedFinding` and `DecisionSource`;
+do not serialize source or attributes or encode them into labels or result
+metadata.
 
 The service adapts protobuf messages to `HttpRequest`, validates exact encoded
 transport boundaries, and serializes `EgressResult`. Core domain and gate code

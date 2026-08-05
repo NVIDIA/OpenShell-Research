@@ -106,14 +106,14 @@ the test more useful:
 
 | Expected field | What it checks |
 | --- | --- |
-| `decision_source_kind` | Whether a gate, the pipeline default, or a runtime limit made the decision |
+| `decision_source_kind` | Whether a gate, the pipeline default, or a pipeline processor limit made the decision |
 | `gate_name` | Which configured gate made a terminal decision |
 | `gate_type` | Which gate implementation made a terminal decision |
 | `finding_types` | The ordered finding types returned by the pipeline |
 
 Gate name and gate type apply only when `decision_source_kind` is `gate`.
 Omitted fields are not compared. The current evaluator does not compare the
-contents of a request patch.
+contents of request mutations.
 
 ## Grow the suite with the policy
 
@@ -123,7 +123,7 @@ small, deliberate, and redacted when possible.
 
 Case names must be unique. Optional tags can group cases for external tooling.
 The parser also rejects aliases, duplicate keys, unknown fields, invalid
-base64, and values that exceed runtime limits. These checks keep tests
+base64, and values that exceed pipeline processor limits. These checks keep tests
 repeatable and ensure that test requests follow the same bounds as service
 requests.
 

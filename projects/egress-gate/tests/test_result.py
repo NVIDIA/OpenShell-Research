@@ -18,7 +18,7 @@ from egress_gate.constants import (
     MAX_RESULT_METADATA_ENTRIES,
     MAX_TRACE_MUTATION_KINDS,
 )
-from egress_gate.request import RequestPatch
+from egress_gate.request import RequestMutations
 from egress_gate.result import (
     DecisionSource,
     DecisionSourceKind,
@@ -89,14 +89,15 @@ def test_finding_encoded_size_has_an_exact_four_kibibyte_boundary() -> None:
 def test_gate_evaluation_helpers_and_control_invariants() -> None:
     finding = _finding()
     assert GateEvaluation.proceed(findings=(finding,)).control is GateControl.PROCEED
-    assert GateEvaluation.allow().patch.is_empty
+    assert GateEvaluation.allow().request_mutations.is_empty
     assert GateEvaluation.deny("egress_gate_blocked").reason_code == (
         "egress_gate_blocked"
     )
 
     with pytest.raises(ValidationError):
         GateEvaluation(
-            control=GateControl.ALLOW, patch=RequestPatch(replacement_body=b"x")
+            control=GateControl.ALLOW,
+            request_mutations=RequestMutations(replacement_body=b"x"),
         )
     with pytest.raises(ValidationError):
         GateEvaluation(control=GateControl.DENY)
@@ -142,10 +143,10 @@ def test_egress_result_suppresses_mutations_on_deny_by_rejecting_them() -> None:
         decision_source=GateDecisionSource(
             kind=DecisionSourceKind.GATE, gate_name="identifiers", gate_type="regex"
         ),
-        patch=RequestPatch(replacement_body=b"redacted"),
+        request_mutations=RequestMutations(replacement_body=b"redacted"),
         findings=(finding,),
     )
-    assert allowed.patch.replacement_body == b"redacted"
+    assert allowed.request_mutations.replacement_body == b"redacted"
 
     with pytest.raises(ValidationError):
         EgressResult(
@@ -153,7 +154,7 @@ def test_egress_result_suppresses_mutations_on_deny_by_rejecting_them() -> None:
             decision_source=RuntimeLimitDecisionSource(
                 kind=DecisionSourceKind.RUNTIME_LIMIT
             ),
-            patch=RequestPatch(replacement_body=b"must-not-leak"),
+            request_mutations=RequestMutations(replacement_body=b"must-not-leak"),
             reason_code="egress_gate_limit_exceeded",
         )
     with pytest.raises(ValidationError):
