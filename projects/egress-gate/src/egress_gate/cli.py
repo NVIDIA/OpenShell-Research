@@ -38,7 +38,8 @@ from egress_gate.constants import (
     MAX_PROTO_FINDING_GROUPS,
     MAX_TIMEOUT_SECONDS,
 )
-from egress_gate.errors import EgressGateError
+from egress_gate.errors import EgressGateError, GateRegistryError
+from egress_gate.gates.base import GateCapability
 from egress_gate.gates.registry import (
     GateRegistry,
     PolicyValidationError,
@@ -94,12 +95,13 @@ def configure_cli(
             is_eager=True,
         ),
     ] = False,
-    registry_factory: Annotated[
+    registry: Annotated[
         str | None,
         typer.Option(
+            "--registry",
             help=(
-                "Load a trusted MODULE:FACTORY callable that returns a finalized "
-                "GateRegistry. This option applies to every command."
+                "Load a trusted MODULE:ATTRIBUTE containing a GateRegistry or a "
+                "zero-argument registry factory. This option applies to every command."
             ),
         ),
     ] = None,
@@ -116,7 +118,7 @@ def configure_cli(
         _CONSOLE.print(f"egress-gate {_package_version()}")
         raise typer.Exit
     configure_logging(LoggingConfig(level="DEBUG" if debug else "INFO"))
-    context.obj = _CommandOptions(registry=_load_registry(registry_factory))
+    context.obj = _CommandOptions(registry=_load_registry(registry))
     if context.invoked_subcommand is None:
         _CONSOLE.print(context.get_help())
         raise typer.Exit
@@ -918,17 +920,24 @@ def _render_gates(registry: GateRegistry) -> None:
             ", ".join(item.type for item in description.finding_types)
             or "None declared"
         )
-        capability_values = description.capabilities.model_dump()
         request_access = ", ".join(
             label
-            for name, label in _REQUEST_ACCESS_LABELS.items()
-            if capability_values[name]
+            for capability, label in _REQUEST_ACCESS_LABELS.items()
+            if capability in description.capabilities
         )
-        possible_results = ", ".join(
+        possible_result_labels = [
             label
-            for name, label in _RESULT_CAPABILITY_LABELS.items()
-            if capability_values[name]
+            for capability, label in _MUTATION_CAPABILITY_LABELS.items()
+            if capability in description.capabilities
+        ]
+        if description.finding_types:
+            possible_result_labels.append("findings")
+        possible_result_labels.extend(
+            label
+            for capability, label in _DECISION_CAPABILITY_LABELS.items()
+            if capability in description.capabilities
         )
+        possible_results = ", ".join(possible_result_labels)
         details = Table.grid(padding=(0, 2))
         details.add_column(style="bold cyan", no_wrap=True)
         details.add_column()
@@ -1005,17 +1014,18 @@ def _render_cli_error(
 
 
 _REQUEST_ACCESS_LABELS = {
-    "reads_target": "target",
-    "reads_context": "request context",
-    "reads_headers": "headers",
-    "reads_body": "body",
+    GateCapability.READ_TARGET: "target",
+    GateCapability.READ_CONTEXT: "request context",
+    GateCapability.READ_HEADERS: "headers",
+    GateCapability.READ_BODY: "body",
 }
-_RESULT_CAPABILITY_LABELS = {
-    "replaces_body": "body replacement",
-    "mutates_headers": "header changes",
-    "produces_findings": "findings",
-    "may_allow": "allow decision",
-    "may_deny": "deny decision",
+_MUTATION_CAPABILITY_LABELS = {
+    GateCapability.REPLACE_BODY: "body replacement",
+    GateCapability.MUTATE_HEADERS: "header changes",
+}
+_DECISION_CAPABILITY_LABELS = {
+    GateCapability.ALLOW: "allow decision",
+    GateCapability.DENY: "deny decision",
 }
 
 
@@ -1098,14 +1108,16 @@ def _format_value(value: object) -> str:
     )
 
 
-def _load_registry(factory_reference: str | None) -> GateRegistry:
-    if factory_reference is None:
-        return create_builtin_registry()
-    module_name, separator, factory_name = factory_reference.partition(":")
-    if not separator or not module_name or not factory_name:
+def _load_registry(reference: str | None) -> GateRegistry:
+    if reference is None:
+        registry = create_builtin_registry()
+        registry.configuration_json_schema()
+        return registry
+    module_name, separator, attribute_name = reference.partition(":")
+    if not separator or not module_name or not attribute_name:
         raise typer.BadParameter(
-            "Use MODULE:FACTORY, for example my_gates:create_registry.",
-            param_hint="--registry-factory",
+            "Use MODULE:ATTRIBUTE, for example my_gates:registry.",
+            param_hint="--registry",
         )
     working_directory = str(Path.cwd())
     if working_directory not in sys.path:
@@ -1114,41 +1126,47 @@ def _load_registry(factory_reference: str | None) -> GateRegistry:
         module = importlib.import_module(module_name)
     except Exception:
         raise typer.BadParameter(
-            "Could not import the registry module. Check MODULE:FACTORY and the "
+            "Could not import the registry module. Check MODULE:ATTRIBUTE and the "
             "module's dependencies.",
-            param_hint="--registry-factory",
+            param_hint="--registry",
         ) from None
     try:
-        factory = getattr(module, factory_name)
+        candidate = getattr(module, attribute_name)
     except Exception:
         raise typer.BadParameter(
-            "Could not find the registry factory. Check the callable name in "
-            "MODULE:FACTORY.",
-            param_hint="--registry-factory",
+            "Could not find the registry attribute. Check the attribute name in "
+            "MODULE:ATTRIBUTE.",
+            param_hint="--registry",
         ) from None
-    if not callable(factory):
+    if isinstance(candidate, GateRegistry):
+        registry = candidate
+    elif callable(candidate):
+        try:
+            registry = candidate()
+        except Exception:
+            raise typer.BadParameter(
+                "The registry factory raised an exception. Run it directly to inspect "
+                "the startup failure.",
+                param_hint="--registry",
+            ) from None
+    else:
         raise typer.BadParameter(
-            "The registry factory must be callable.",
-            param_hint="--registry-factory",
+            "The registry attribute must be a GateRegistry or a zero-argument factory.",
+            param_hint="--registry",
         )
-    try:
-        registry = factory()
-    except Exception:
-        raise typer.BadParameter(
-            "The registry factory raised an exception. Run it directly to inspect "
-            "the startup failure.",
-            param_hint="--registry-factory",
-        ) from None
     if not isinstance(registry, GateRegistry):
         raise typer.BadParameter(
             "The registry factory must return a GateRegistry.",
-            param_hint="--registry-factory",
+            param_hint="--registry",
         )
-    if not registry.is_finalized:
+    try:
+        registry.configuration_json_schema()
+    except GateRegistryError:
         raise typer.BadParameter(
-            "The registry factory must call finalize() before returning.",
-            param_hint="--registry-factory",
-        )
+            "The registry could not prepare its policy schema. Register at least one "
+            "valid gate before loading it.",
+            param_hint="--registry",
+        ) from None
     return registry
 
 

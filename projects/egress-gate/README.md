@@ -71,11 +71,15 @@ path, query, or selected request headers. Each scan contains its `action`.
 Every scan supports `detect` and `deny`. A body scan also supports `replace`.
 The typed configuration prevents unsupported combinations. A replace action
 preserves an explicit body-replacement intent even when the resulting bytes
-equal the input. Add custom trusted gates through `--registry-factory`.
+equal the input. Add custom trusted gates through `--registry`.
+
+Small stateless gates can use the optional `registry.gate` helper. Gates that
+need initialization, helper bases, or typed resources use the full class-based
+`Gate` API.
 
 ```bash
-uv run egress-gate --registry-factory my_gates:create_registry gates list
-uv run egress-gate --registry-factory my_gates:create_registry serve
+uv run egress-gate --registry my_gates:registry gates list
+uv run egress-gate --registry my_gates:registry serve
 ```
 
 OpenShell owns interception, routing, and credential attachment. Egress Gate

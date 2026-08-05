@@ -127,12 +127,11 @@ base64, and values that exceed pipeline processor limits. These checks keep test
 repeatable and ensure that test requests follow the same bounds as service
 requests.
 
-Use `--registry-factory` when the policy contains application-owned custom
-gates:
+Use `--registry` when the policy contains application-owned custom gates:
 
 ```bash title="Test a custom gate"
 uv run egress-gate \
-  --registry-factory examples.custom-gate.keyword_gate:create_registry \
+  --registry examples.custom-gate.keyword_gate:registry \
   evaluate \
   --policy examples/custom-gate/egress-gate-config.yaml \
   --cases examples/custom-gate/cases.yaml

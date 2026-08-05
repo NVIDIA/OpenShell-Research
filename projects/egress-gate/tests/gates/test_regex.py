@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import logging
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from threading import Barrier
+from unittest.mock import Mock
 
 import pytest
 from pydantic import ValidationError
@@ -466,184 +465,26 @@ def test_pattern_search_has_an_enforceable_timeout() -> None:
 def test_patterns_compile_during_preparation_not_validation_or_each_run(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    regex_module._clear_compiled_pattern_cache()
-    compile_count = 0
     original_compile = regex_module.regex.compile
-
-    def recording_compile(pattern: str, flags: int = 0) -> object:
-        nonlocal compile_count
-        compile_count += 1
-        return original_compile(pattern, flags)
-
+    recording_compile = Mock(wraps=original_compile)
     monkeypatch.setattr(regex_module.regex, "compile", recording_compile)
     config = _config([{"pattern": "x", "confidence": "high"}])
-    assert compile_count == 0
-    RegexGate(config, None, timeout=Timeout.from_seconds(1))
-    prepared_count = compile_count
+    assert recording_compile.call_count == 0
+    gate = RegexGate(config, None, timeout=Timeout.from_seconds(1))
+    prepared_count = recording_compile.call_count
 
-    _run(config, "x")
+    gate.evaluate(_request(b"x"), timeout=Timeout.from_seconds(1))
+    gate.evaluate(_request(b"x"), timeout=Timeout.from_seconds(1))
 
     assert prepared_count > 0
-    assert compile_count == prepared_count
+    assert recording_compile.call_count == prepared_count
 
 
 def test_gate_preparation_honors_an_expired_timeout() -> None:
-    regex_module._clear_compiled_pattern_cache()
     config = _config([{"pattern": "x", "confidence": "high"}])
 
     with pytest.raises(TimeoutExpiredError):
         RegexGate(config, None, timeout=Timeout(deadline=0))
-
-
-def test_compiled_catalog_cache_wait_honors_preparation_timeout() -> None:
-    regex_module._clear_compiled_pattern_cache()
-    catalog = _catalog("cache-contention")
-    regex_module._COMPILED_PATTERN_CACHE_LOCK.acquire()
-    try:
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(
-                regex_module._compile_pattern_catalog,
-                catalog,
-                timeout=Timeout.from_seconds(0.01),
-            )
-            with pytest.raises(TimeoutExpiredError):
-                future.result(timeout=1)
-    finally:
-        regex_module._COMPILED_PATTERN_CACHE_LOCK.release()
-        regex_module._clear_compiled_pattern_cache()
-
-
-def test_compiled_catalog_cache_evicts_least_recently_used_entry(
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    regex_module._clear_compiled_pattern_cache()
-    catalogs = tuple(_catalog(f"sensitive-pattern-{suffix}") for suffix in "abc")
-
-    try:
-        first_rules = regex_module._compile_pattern_catalog(catalogs[0])
-        entry_weight = regex_module._COMPILED_PATTERN_CACHE[catalogs[0]][1]
-        monkeypatch.setattr(
-            regex_module,
-            "MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES",
-            entry_weight * 2,
-        )
-        with caplog.at_level(
-            logging.DEBUG,
-            logger="egress_gate.gates.regex",
-        ):
-            regex_module._compile_pattern_catalog(catalogs[1])
-            assert regex_module._compile_pattern_catalog(catalogs[0]) is first_rules
-            regex_module._compile_pattern_catalog(catalogs[2])
-
-        assert tuple(regex_module._COMPILED_PATTERN_CACHE) == (
-            catalogs[0],
-            catalogs[2],
-        )
-        assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES == sum(
-            entry[1] for entry in regex_module._COMPILED_PATTERN_CACHE.values()
-        )
-        assert (
-            "egress_gate_cache_eviction cache=regex_compiled entries=1" in caplog.text
-        )
-        assert "sensitive-pattern" not in caplog.text
-    finally:
-        regex_module._clear_compiled_pattern_cache()
-
-
-def test_compiled_catalog_cache_skips_oversized_valid_entry(
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    regex_module._clear_compiled_pattern_cache()
-    monkeypatch.setattr(regex_module, "MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES", 1)
-    catalog = _catalog("sensitive-oversized-pattern")
-
-    try:
-        with caplog.at_level(
-            logging.DEBUG,
-            logger="egress_gate.gates.regex",
-        ):
-            first = regex_module._compile_pattern_catalog(catalog)
-            second = regex_module._compile_pattern_catalog(catalog)
-
-        assert first is not second
-        assert regex_module._COMPILED_PATTERN_CACHE == {}
-        assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES == 0
-        assert caplog.text.count("egress_gate_cache_skip cache=regex_compiled") == 2
-        assert "sensitive-oversized-pattern" not in caplog.text
-    finally:
-        regex_module._clear_compiled_pattern_cache()
-
-
-def test_compiled_catalog_failure_preserves_existing_weight(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    regex_module._clear_compiled_pattern_cache()
-    retained_catalog = _catalog("retained")
-    regex_module._compile_pattern_catalog(retained_catalog)
-    retained_weight = regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES
-    retained_entries = tuple(regex_module._COMPILED_PATTERN_CACHE)
-
-    def fail_compile(*args: object, **kwargs: object) -> object:
-        del args, kwargs
-        raise ValueError("expected test failure")
-
-    monkeypatch.setattr(regex_module, "_compile_rule", fail_compile)
-    try:
-        with pytest.raises(ValueError, match="expected test failure"):
-            regex_module._compile_pattern_catalog(_catalog("failing"))
-
-        assert tuple(regex_module._COMPILED_PATTERN_CACHE) == retained_entries
-        assert regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES == retained_weight
-    finally:
-        regex_module._clear_compiled_pattern_cache()
-
-
-def test_compiled_catalog_same_key_race_accounts_once(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    regex_module._clear_compiled_pattern_cache()
-    worker_count = 4
-    workers_ready = Barrier(worker_count)
-    catalog = _catalog("same-key")
-    original_compile_rule = regex_module._compile_rule
-
-    def synchronized_compile(
-        entity: regex_module.RegexEntity,
-        rule: regex_module.RegexRule,
-        catalog_index: int,
-        entity_rule_index: int,
-        *,
-        timeout: Timeout | None = None,
-    ) -> regex_module._CompiledRule:
-        workers_ready.wait(timeout=5)
-        return original_compile_rule(
-            entity,
-            rule,
-            catalog_index,
-            entity_rule_index,
-            timeout=timeout,
-        )
-
-    monkeypatch.setattr(regex_module, "_compile_rule", synchronized_compile)
-    try:
-        with ThreadPoolExecutor(max_workers=worker_count) as executor:
-            results = tuple(
-                executor.map(
-                    lambda _: regex_module._compile_pattern_catalog(catalog),
-                    range(worker_count),
-                )
-            )
-
-        assert all(result is results[0] for result in results)
-        assert len(regex_module._COMPILED_PATTERN_CACHE) == 1
-        assert (
-            regex_module._COMPILED_PATTERN_CACHE_WEIGHT_BYTES
-            == next(iter(regex_module._COMPILED_PATTERN_CACHE.values()))[1]
-        )
-    finally:
-        regex_module._clear_compiled_pattern_cache()
 
 
 def test_regex_gate_is_safe_for_concurrent_runs() -> None:

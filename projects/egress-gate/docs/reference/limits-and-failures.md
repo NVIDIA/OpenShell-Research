@@ -24,9 +24,9 @@ limits.
 | Concurrent processing slots | 4 |
 
 Request context and target aggregates, headers, replacement bodies, regex
-catalogs, compiled cache weight, and diagnostic strings have additional
-bounded limits in `constants.py`. Tests cover exact accepted boundaries and
-the first rejected value.
+catalogs, individual patterns, and diagnostic strings have additional bounded
+limits in `constants.py`. Tests cover exact accepted boundaries and the first
+rejected value.
 
 ## Outcomes
 

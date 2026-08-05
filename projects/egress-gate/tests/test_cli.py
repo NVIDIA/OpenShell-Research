@@ -82,31 +82,33 @@ def test_cli_configuration_schema_exposes_flat_policy() -> None:
     assert schema["properties"]["gates"]["maxItems"] == 10
 
 
-def test_registry_factory_loader_requires_a_finalized_gate_registry(
+def test_registry_loader_accepts_a_singleton_or_factory_and_seals_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    module = ModuleType("test_registry_factory")
+    module = ModuleType("test_registry_source")
+    singleton = create_builtin_registry()
+    module.__dict__["registry"] = singleton
     module.__dict__["create_registry"] = create_builtin_registry
-    module.__dict__["unfinished"] = lambda: GateRegistry()
+    module.__dict__["empty"] = GateRegistry()
     monkeypatch.setitem(sys.modules, module.__name__, module)
 
-    assert _load_registry("test_registry_factory:create_registry").is_finalized
-    with pytest.raises(Exception, match=r"call finalize\(\)"):
-        _load_registry("test_registry_factory:unfinished")
+    assert _load_registry("test_registry_source:registry") is singleton
+    factory_registry = _load_registry("test_registry_source:create_registry")
+    with pytest.raises(GateRegistryError, match="registry is in use"):
+        singleton.register(object)
+    with pytest.raises(GateRegistryError, match="registry is in use"):
+        factory_registry.register(object)
+    with pytest.raises(Exception, match="at least one valid gate"):
+        _load_registry("test_registry_source:empty")
 
 
 @pytest.mark.parametrize(
     "reference",
-    ["missing-separator", "test_registry_factory:missing"],
+    ["missing-separator", "test_registry_source:missing"],
 )
-def test_registry_factory_loader_rejects_invalid_references(reference: str) -> None:
+def test_registry_loader_rejects_invalid_references(reference: str) -> None:
     with pytest.raises(Exception):
         _load_registry(reference)
-
-
-def test_unfinalized_registry_cannot_be_used_by_the_middleware() -> None:
-    with pytest.raises(GateRegistryError):
-        create_builtin_registry().register(object)
 
 
 def test_cli_evaluate_runs_the_builtin_policy_corpus() -> None:
@@ -134,8 +136,8 @@ def test_cli_evaluate_runs_the_custom_gate_example() -> None:
     result = CliRunner().invoke(
         app,
         [
-            "--registry-factory",
-            "examples.custom-gate.keyword_gate:create_registry",
+            "--registry",
+            "examples.custom-gate.keyword_gate:registry",
             "evaluate",
             "--policy",
             str(project_dir / "examples/custom-gate/egress-gate-config.yaml"),
@@ -157,8 +159,8 @@ def test_installed_executable_loads_a_registry_from_the_working_directory() -> N
     result = subprocess.run(
         [
             executable,
-            "--registry-factory",
-            "examples.custom-gate.keyword_gate:create_registry",
+            "--registry",
+            "examples.custom-gate.keyword_gate:registry",
             "gates",
             "list",
         ],

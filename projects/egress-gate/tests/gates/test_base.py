@@ -11,7 +11,7 @@ import pytest
 from egress_gate.errors import GateContractError, GateInputError
 from egress_gate.gates import (
     Gate,
-    GateCapabilities,
+    GateCapability,
     GateConfig,
     GateResources,
     RegexConfig,
@@ -27,7 +27,7 @@ class _RequestConfig(GateConfig):
 
 
 class _RequestGate(Gate[_RequestConfig, None]):
-    capabilities = GateCapabilities(reads_target=True, may_deny=True)
+    capabilities = frozenset({GateCapability.READ_TARGET, GateCapability.DENY})
     finding_types = ()
 
     def _evaluate(
@@ -55,7 +55,7 @@ class _CounterConfig(GateConfig):
 
 
 class _CounterGate(Gate[_CounterConfig, _CounterResources]):
-    capabilities = GateCapabilities(uses_resources=True, reads_body=True)
+    capabilities = frozenset({GateCapability.READ_BODY})
     finding_types = ()
 
     def _evaluate(
@@ -73,7 +73,7 @@ class _CounterGate(Gate[_CounterConfig, _CounterResources]):
 
 
 class _UndeclaredOutputGate(Gate[_RequestConfig, None]):
-    capabilities = GateCapabilities()
+    capabilities = frozenset()
     finding_types = ()
 
     def _evaluate(
@@ -94,7 +94,7 @@ class _CapabilityBypassGate(_UndeclaredOutputGate):
 
 
 class _InvalidEvaluationGate(Gate[_RequestConfig, None]):
-    capabilities = GateCapabilities(may_deny=True)
+    capabilities = frozenset({GateCapability.DENY})
     finding_types = ()
 
     def _evaluate(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from enum import StrEnum
 from types import NoneType
 from typing import ClassVar, Generic, TypeGuard, final, get_args, get_origin
 
@@ -41,19 +42,17 @@ class GateResources:
     __slots__ = ()
 
 
-class GateCapabilities(StrictDomainModel):
-    """Declarative gate reads and mechanically enforced output capabilities."""
+class GateCapability(StrEnum):
+    """One declared request access or permitted gate result."""
 
-    reads_target: bool = False
-    reads_context: bool = False
-    reads_headers: bool = False
-    reads_body: bool = False
-    replaces_body: bool = False
-    mutates_headers: bool = False
-    produces_findings: bool = False
-    may_allow: bool = False
-    may_deny: bool = False
-    uses_resources: bool = False
+    READ_TARGET = "read_target"
+    READ_CONTEXT = "read_context"
+    READ_HEADERS = "read_headers"
+    READ_BODY = "read_body"
+    REPLACE_BODY = "replace_body"
+    MUTATE_HEADERS = "mutate_headers"
+    ALLOW = "allow"
+    DENY = "deny"
 
 
 GateConfigT = TypeVar("GateConfigT", bound=GateConfig)
@@ -67,7 +66,7 @@ GateResourcesT = TypeVar(
 class Gate(ABC, Generic[GateConfigT, GateResourcesT]):
     """Typed request-level gate with a validated public evaluation wrapper."""
 
-    capabilities: ClassVar[GateCapabilities]
+    capabilities: ClassVar[frozenset[GateCapability]]
     finding_types: ClassVar[tuple[FindingTypeDefinition, ...]]
 
     @final
@@ -160,7 +159,9 @@ class Gate(ABC, Generic[GateConfigT, GateResourcesT]):
     @classmethod
     def _validate_class_contract(cls) -> None:
         capabilities = getattr(cls, "capabilities", None)
-        if not isinstance(capabilities, GateCapabilities):
+        if not isinstance(capabilities, frozenset) or any(
+            not isinstance(capability, GateCapability) for capability in capabilities
+        ):
             raise GateConfigurationError("gate capabilities are invalid")
         finding_types = getattr(cls, "finding_types", None)
         if not isinstance(finding_types, tuple) or any(
@@ -170,17 +171,9 @@ class Gate(ABC, Generic[GateConfigT, GateResourcesT]):
         names = tuple(item.type for item in finding_types)
         if len(names) != len(set(names)):
             raise GateConfigurationError("gate finding types must be unique")
-        config_type, resources_type = _declared_gate_types(cls)
+        config_type, _ = _declared_gate_types(cls)
         if config_type is GateConfig:
             raise GateConfigurationError("gate config type is not concrete")
-        if capabilities.uses_resources is not (resources_type is not None):
-            raise GateConfigurationError(
-                "gate resource capability does not match its generic resource type"
-            )
-        if capabilities.produces_findings != bool(finding_types):
-            raise GateConfigurationError(
-                "gate finding capability does not match its declarations"
-            )
 
     @classmethod
     def _validate_config(
@@ -209,7 +202,7 @@ class Utf8BodyGate(
 ):
     """Gate helper that exposes one strict UTF-8 body to an implementation."""
 
-    capabilities = GateCapabilities(reads_body=True)
+    capabilities = frozenset({GateCapability.READ_BODY})
     finding_types: ClassVar[tuple[FindingTypeDefinition, ...]] = ()
 
     @final
@@ -249,22 +242,23 @@ class Utf8BodyGate(
 
 
 def _validate_gate_output(
-    capabilities: GateCapabilities,
+    capabilities: frozenset[GateCapability],
     finding_types: tuple[FindingTypeDefinition, ...],
     result: GateEvaluation,
 ) -> None:
     if (
         result.request_mutations.replacement_body is not None
-        and not capabilities.replaces_body
+        and GateCapability.REPLACE_BODY not in capabilities
     ):
         raise GateContractError("gate returned an undeclared body replacement")
-    if result.request_mutations.header_mutations and not capabilities.mutates_headers:
+    if (
+        result.request_mutations.header_mutations
+        and GateCapability.MUTATE_HEADERS not in capabilities
+    ):
         raise GateContractError("gate returned undeclared header mutations")
-    if result.findings and not capabilities.produces_findings:
-        raise GateContractError("gate returned undeclared findings")
-    if result.control.value == "allow" and not capabilities.may_allow:
+    if result.control.value == "allow" and GateCapability.ALLOW not in capabilities:
         raise GateContractError("gate returned an undeclared terminal allow")
-    if result.control.value == "deny" and not capabilities.may_deny:
+    if result.control.value == "deny" and GateCapability.DENY not in capabilities:
         raise GateContractError("gate returned an undeclared deny")
     declared_types = frozenset(item.type for item in finding_types)
     if any(finding.type not in declared_types for finding in result.findings):
@@ -274,6 +268,9 @@ def _validate_gate_output(
 def _declared_gate_types(
     gate_type: type[object],
 ) -> tuple[type[GateConfig], type[GateResources] | None]:
+    decorated_config_type = getattr(gate_type, "_decorated_config_type", None)
+    if _is_gate_config_type(decorated_config_type):
+        return decorated_config_type, None
     for candidate in gate_type.__mro__:
         for base in getattr(candidate, "__orig_bases__", ()):
             origin = get_origin(base)
@@ -366,7 +363,7 @@ def _is_valid_resources(
 
 __all__ = [
     "Gate",
-    "GateCapabilities",
+    "GateCapability",
     "GateConfig",
     "GateConfigT",
     "GateResources",

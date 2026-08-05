@@ -1,4 +1,4 @@
-"""Gate registration and finalized pipeline-schema construction."""
+"""Gate registration and lazy policy-schema construction."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import hashlib
 import inspect
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import reduce
@@ -15,13 +15,14 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Literal,
-    Self,
+    Protocol,
     TypeGuard,
     get_args,
     get_origin,
 )
 
 from pydantic import Field, TypeAdapter, ValidationError
+from typing_extensions import TypeVar
 
 from egress_gate.errors import (
     EgressGateError,
@@ -31,12 +32,14 @@ from egress_gate.errors import (
 )
 from egress_gate.gates.base import (
     Gate,
-    GateCapabilities,
+    GateCapability,
     GateConfig,
+    GateConfigT,
     GateResources,
 )
 from egress_gate.gates.regex import RegexGate
-from egress_gate.result import FindingTypeDefinition
+from egress_gate.request import HttpRequest
+from egress_gate.result import FindingTypeDefinition, GateEvaluation
 from egress_gate.timeout import Timeout
 
 if TYPE_CHECKING:
@@ -50,7 +53,7 @@ class GateDescription:
 
     gate_type: str
     description: str
-    capabilities: GateCapabilities
+    capabilities: frozenset[GateCapability]
     finding_types: tuple[FindingTypeDefinition, ...]
     resource_type: str | None
     config_type: str
@@ -119,18 +122,13 @@ class PolicyValidationError(EgressGateError):
 
 
 class GateRegistry:
-    """Register trusted gates and finalize their exact pipeline union."""
+    """Collect trusted gates and seal their exact policy union on first use."""
 
     def __init__(self, *, include_builtin_gates: bool = False) -> None:
         self._registrations: dict[str, _Registration] = {}
         self._config_adapter: TypeAdapter[object] | None = None
         if include_builtin_gates:
             self.register(RegexGate)
-
-    @property
-    def is_finalized(self) -> bool:
-        """Whether registration is closed and the policy schema is ready."""
-        return self._config_adapter is not None
 
     def register(
         self,
@@ -139,8 +137,8 @@ class GateRegistry:
         resources: object = None,
     ) -> None:
         """Register one gate and its application-owned resources."""
-        if self.is_finalized:
-            raise GateRegistryError("cannot register after finalization")
+        if self._config_adapter is not None:
+            raise GateRegistryError("cannot register after the registry is in use")
         if not _is_gate_type(gate_type):
             raise GateRegistryError("registered gate type is invalid")
         if gate_type.__init__ is not Gate.__init__:
@@ -182,21 +180,40 @@ class GateRegistry:
             resources=resources,
         )
 
-    def finalize(self) -> Self:
-        """Freeze registration and build the exact policy gate union."""
-        if self.is_finalized:
-            return self
-        try:
-            config_type = _build_egress_gate_config_type(
-                tuple(
-                    registration.config_type
-                    for registration in self._registrations.values()
-                )
-            )
-        except (TypeError, ValueError):
-            raise GateRegistryError("cannot finalize an empty gate registry") from None
-        self._config_adapter = TypeAdapter[object](config_type)
-        return self
+    def gate(
+        self,
+        *,
+        config: type[GateConfigT],
+        capabilities: frozenset[GateCapability],
+        finding_types: tuple[FindingTypeDefinition, ...] = (),
+    ) -> Callable[[_GateFunction[GateConfigT]], type[Gate[GateConfig, None]]]:
+        """Register a typed function as one resource-free gate."""
+        config_type = config
+        declared_capabilities = capabilities
+        declared_finding_types = finding_types
+
+        def decorate(
+            evaluate: _GateFunction[GateConfigT],
+        ) -> type[Gate[GateConfig, None]]:
+            class FunctionGate(Gate[GateConfig, None]):
+                _decorated_config_type = config_type
+                capabilities = declared_capabilities
+                finding_types = declared_finding_types
+
+                def _evaluate(
+                    self,
+                    request: HttpRequest,
+                    *,
+                    timeout: Timeout,
+                ) -> GateEvaluation:
+                    assert isinstance(self.config, config_type)
+                    return evaluate(request, self.config, timeout=timeout)
+
+            FunctionGate.__doc__ = inspect.getdoc(evaluate) or ""
+            self.register(FunctionGate)
+            return FunctionGate
+
+        return decorate
 
     def validate_config(self, values: object) -> EgressGateConfig[GateConfig]:
         """Parse and validate one complete pipeline without preparing gates."""
@@ -259,6 +276,7 @@ class GateRegistry:
         """
         from egress_gate.request_processor import RequestProcessor
 
+        self._require_config_adapter()
         if not _is_egress_gate_config(validated_config):
             raise GateRegistryError("processor configuration is invalid")
         if not isinstance(timeout, Timeout):
@@ -293,6 +311,7 @@ class GateRegistry:
 
     def describe_gates(self) -> tuple[GateDescription, ...]:
         """Return safe gate metadata without constructing gate instances."""
+        self._require_config_adapter()
         return tuple(
             GateDescription(
                 gate_type=gate_kind,
@@ -323,8 +342,7 @@ class GateRegistry:
         return hashlib.sha256(canonical).hexdigest()
 
     def _resolve_registration(self, config: GateConfig) -> _Registration:
-        if not self.is_finalized:
-            raise GateRegistryError("gate registry is not finalized")
+        self._require_config_adapter()
         try:
             gate_kind = getattr(config, "kind")
             if not isinstance(gate_kind, str):
@@ -335,13 +353,24 @@ class GateRegistry:
 
     def _require_config_adapter(self) -> TypeAdapter[object]:
         if self._config_adapter is None:
-            raise GateRegistryError("gate registry is not finalized")
+            try:
+                config_type = _build_egress_gate_config_type(
+                    tuple(
+                        registration.config_type
+                        for registration in self._registrations.values()
+                    )
+                )
+            except (TypeError, ValueError):
+                raise GateRegistryError(
+                    "gate registry has no registered gates"
+                ) from None
+            self._config_adapter = TypeAdapter[object](config_type)
         return self._config_adapter
 
 
 def create_builtin_registry() -> GateRegistry:
-    """Build the finalized registry shipped by the base package."""
-    return GateRegistry(include_builtin_gates=True).finalize()
+    """Build the registry shipped by the base package."""
+    return GateRegistry(include_builtin_gates=True)
 
 
 @dataclass(frozen=True)
@@ -349,6 +378,23 @@ class _Registration:
     gate_type: type[Gate[GateConfig, GateResources | None]]
     config_type: type[GateConfig]
     resources: GateResources | None
+
+
+_FunctionConfigT = TypeVar(
+    "_FunctionConfigT",
+    bound=GateConfig,
+    contravariant=True,
+)
+
+
+class _GateFunction(Protocol[_FunctionConfigT]):
+    def __call__(
+        self,
+        request: HttpRequest,
+        config: _FunctionConfigT,
+        *,
+        timeout: Timeout,
+    ) -> GateEvaluation: ...
 
 
 def _build_egress_gate_config_type(
@@ -363,12 +409,7 @@ def _build_egress_gate_config_type(
         Annotated,
         (registered_union, Field(discriminator="kind")),
     )
-    config_type: object = getattr(EgressGateConfig, "__class_getitem__")(
-        registered_config
-    )
-    if not _is_egress_gate_config_type(config_type):
-        raise TypeError("Pydantic did not construct an Egress Gate config type")
-    return config_type
+    return getattr(EgressGateConfig, "__class_getitem__")(registered_config)
 
 
 def _is_gate_type(
@@ -383,14 +424,6 @@ def _is_egress_gate_config(
     from egress_gate.config import EgressGateConfig
 
     return isinstance(value, EgressGateConfig)
-
-
-def _is_egress_gate_config_type(
-    value: object,
-) -> TypeGuard[type[EgressGateConfig[GateConfig]]]:
-    from egress_gate.config import EgressGateConfig
-
-    return isinstance(value, type) and issubclass(value, EgressGateConfig)
 
 
 def _gate_kind(config_type: type[GateConfig]) -> str:

@@ -77,8 +77,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         *,
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> None:
-        if not registry.is_finalized:
-            raise GateRegistryError("middleware requires a finalized gate registry")
+        registry.configuration_json_schema()
         self._registry = registry
         self._timeout_seconds = validate_timeout_seconds(timeout_seconds)
         self._policy = _ActivePolicy(registry)
@@ -161,7 +160,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         source_kind = "none"
         try:
             timeout = Timeout.from_seconds(self._timeout_seconds)
-            response, source_kind = await self._evaluate_http_request_with_source(
+            response, source_kind = await self._evaluate_http_request(
                 request,
                 timeout,
             )
@@ -208,14 +207,6 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         self,
         request: pb2.HttpRequestEvaluation,
         timeout: Timeout,
-    ) -> pb2.HttpRequestResult:
-        response, _ = await self._evaluate_http_request_with_source(request, timeout)
-        return response
-
-    async def _evaluate_http_request_with_source(
-        self,
-        request: pb2.HttpRequestEvaluation,
-        timeout: Timeout,
     ) -> tuple[pb2.HttpRequestResult, str]:
         if request.phase != pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS:
             raise EgressGateError(ErrorCode.REQUEST_PHASE_INVALID)
@@ -233,7 +224,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
             on_cancel=publication_cancelled.set,
         )
         timeout.raise_if_expired()
-        response, source_kind = _result_to_proto_with_source(result)
+        response, source_kind = _result_to_proto(result)
         timeout.raise_if_expired()
         return response, source_kind
 
@@ -318,7 +309,7 @@ class _ActivePolicy:
             timeout.raise_if_expired()
             if config == self._config and self._processor is not None:
                 return self._processor
-            processor = self._build_processor(config, timeout=timeout)
+            processor = self._registry.prepare_processor(config, timeout=timeout)
             timeout.raise_if_expired()
             if publication_cancelled is not None and publication_cancelled.is_set():
                 raise _PolicyPublicationCancelled
@@ -329,18 +320,6 @@ class _ActivePolicy:
             raise EgressGateError(ErrorCode.CONFIG_INVALID) from None
         finally:
             self._lock.release()
-
-    def _build_processor(
-        self,
-        config: EgressGateConfig[GateConfig],
-        *,
-        timeout: Timeout,
-    ) -> RequestProcessor:
-        """Delegate production preparation to the finalized registry."""
-        return self._registry.prepare_processor(
-            config,
-            timeout=timeout,
-        )
 
     def clear(self) -> None:
         """Release the active policy."""
@@ -493,12 +472,7 @@ def _varint_size(value: int) -> int:
     return size
 
 
-def _result_to_proto(result: EgressResult) -> pb2.HttpRequestResult:
-    response, _ = _result_to_proto_with_source(result)
-    return response
-
-
-def _result_to_proto_with_source(
+def _result_to_proto(
     result: EgressResult,
 ) -> tuple[pb2.HttpRequestResult, str]:
     response = _serialize_result(result)

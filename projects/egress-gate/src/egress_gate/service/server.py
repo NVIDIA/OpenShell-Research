@@ -24,7 +24,7 @@ DEFAULT_LISTEN_ADDRESS = "127.0.0.1:50051"
 
 
 class EgressGateServer:
-    """One-shot programmatic server for a finalized gate registry."""
+    """One-shot programmatic server for an application gate registry."""
 
     def __init__(
         self,

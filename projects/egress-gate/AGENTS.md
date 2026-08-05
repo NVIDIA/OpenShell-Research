@@ -58,10 +58,11 @@ architecture overview and matching topic page under `docs/architecture/`.
 ## Gate contract
 
 Every gate declares a strict `GateConfig` with a literal `kind` discriminator,
-an optional typed `GateResources` bundle, `GateCapabilities`, and its
-`FindingTypeDefinition` declarations. `GateRegistry.finalize()` creates the
-exact discriminated pipeline schema for the installed gates and prepares
-validated gate instances from trusted application-owned resources.
+an optional typed `GateResources` bundle, an immutable set of `GateCapability`
+values, and its
+`FindingTypeDefinition` declarations. `GateRegistry` creates the exact
+discriminated pipeline schema on first use and prepares validated gate
+instances from trusted application-owned resources.
 
 `GateConfig` owns the required bounded `name` field. Concrete config classes
 inherit it without redefining or aliasing it. Keep `kind` under its canonical
@@ -84,6 +85,11 @@ Custom gates are trusted and must be safe for concurrent calls. Tests should
 exercise concurrent evaluation, but the Python implementation is not claimed to
 be deeply immutable. Resource bundles contain operator-owned, concurrency-safe
 dependencies and no request state or policy behavior.
+
+`registry.gate` is a convenience helper for stateless, resource-free gates. It
+must compile into the same `Gate` contract. It does not replace the class-based
+API. Registries belong to application modules; do not add package-global
+registration state.
 
 ## Current built-ins and boundaries
 
@@ -108,7 +114,7 @@ middleware phase.
 ## Plan boundaries
 
 The current implementation covers the gate contract, strict pipeline
-configuration, finalized registry, regex behavior, request processing,
+configuration, automatically sealed registry, regex behavior, request processing,
 single active-policy replacement, and offline evaluation.
 Semantic or LLM judgment is deferred and must not be added as a built-in,
 example implementation, or default dependency. Do not edit `plans/` as part of

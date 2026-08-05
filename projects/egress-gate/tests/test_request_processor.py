@@ -23,7 +23,7 @@ from egress_gate.errors import (
 )
 from egress_gate.gates import (
     Gate,
-    GateCapabilities,
+    GateCapability,
     GateConfig,
     GateRegistry,
 )
@@ -63,13 +63,14 @@ class _ControlConfig(GateConfig):
 
 
 class _ControlGate(Gate[_ControlConfig, None]):
-    capabilities = GateCapabilities(
-        reads_body=True,
-        replaces_body=True,
-        mutates_headers=True,
-        produces_findings=True,
-        may_allow=True,
-        may_deny=True,
+    capabilities = frozenset(
+        {
+            GateCapability.READ_BODY,
+            GateCapability.REPLACE_BODY,
+            GateCapability.MUTATE_HEADERS,
+            GateCapability.ALLOW,
+            GateCapability.DENY,
+        }
     )
     finding_types = (FindingTypeDefinition(type="test_observation"),)
 
@@ -183,7 +184,6 @@ def _processor(
 ) -> RequestProcessor:
     registry = GateRegistry(include_builtin_gates=include_regex)
     registry.register(_ControlGate)
-    registry.finalize()
     values = {
         "gates": [{"name": name, **config} for name, config in gate_values],
         "default_decision": default_decision.value,
@@ -481,9 +481,15 @@ def test_invalid_utf8_is_translated_to_the_stable_input_error() -> None:
 
 
 def test_prepared_gate_type_is_part_of_the_processor_contract() -> None:
-    processor = _processor((("one", {"kind": "test-control", "control": "proceed"}),))
-    config = processor._config
-    gate = processor._gates[0][2]
+    registry = GateRegistry()
+    registry.register(_ControlGate)
+    config = registry.validate_config(
+        {
+            "gates": [{"name": "one", "kind": "test-control", "control": "proceed"}],
+            "default_decision": "allow",
+        }
+    )
+    gate = registry.create_gate(config.gates[0])
 
     with pytest.raises(ValueError):
         RequestProcessor(

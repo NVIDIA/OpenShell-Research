@@ -40,8 +40,8 @@ class _FakeServer:
         self.stop_graces.append(grace)
 
 
-def test_server_requires_a_finalized_gate_registry() -> None:
-    with pytest.raises(GateRegistryError, match="finalized"):
+def test_server_rejects_a_registry_without_gates() -> None:
+    with pytest.raises(GateRegistryError, match="no registered gates"):
         EgressGateServer(GateRegistry())
 
 
@@ -56,6 +56,16 @@ def test_server_keeps_timeout_ownership_at_the_service_boundary() -> None:
     try:
         assert server._middleware._timeout_seconds == 4.5
         assert not hasattr(server._middleware._policy, "_timeout_seconds")
+    finally:
+        asyncio.run(server._middleware.close())
+
+
+def test_server_seals_the_registry_during_initialization() -> None:
+    registry = create_builtin_registry()
+    server = EgressGateServer(registry)
+    try:
+        with pytest.raises(GateRegistryError, match="registry is in use"):
+            registry.register(object)
     finally:
         asyncio.run(server._middleware.close())
 

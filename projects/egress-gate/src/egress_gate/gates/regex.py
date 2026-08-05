@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-import json
 import os
 from collections import OrderedDict
 from collections.abc import Iterator, Mapping
-from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from stat import S_ISREG
 from string import Formatter
-from threading import RLock
 from typing import Annotated, Literal, Protocol, Self, TypeAlias
 
 import regex
@@ -32,22 +29,18 @@ from egress_gate.constants import (
     MAX_PROTO_HEADERS,
     MAX_REGEX_CATALOG_FILE_BYTES,
     MAX_REGEX_CATALOG_PATH_BYTES,
-    MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES,
     MAX_REGEX_ENTITIES_PER_CATALOG,
     MAX_REGEX_NAME_BYTES,
     MAX_REGEX_PATTERN_BYTES,
     MAX_REGEX_RULES_PER_CATALOG,
-    REGEX_COMPILED_RULE_WEIGHT_BYTES,
 )
 from egress_gate.errors import (
     GateConfigurationError,
     GateContractError,
     GateInputError,
     GateLimitExceededError,
-    TimeoutExpiredError,
 )
-from egress_gate.gates.base import Gate, GateCapabilities, GateConfig
-from egress_gate.logging import get_logger
+from egress_gate.gates.base import Gate, GateCapability, GateConfig
 from egress_gate.request import HeaderName, HttpRequest, RequestMutations
 from egress_gate.result import Finding, FindingTypeDefinition, GateEvaluation
 from egress_gate.string_validators import ScalarString, validate_scalar_string
@@ -281,13 +274,14 @@ class RegexConfig(GateConfig):
 class RegexGate(Gate[RegexConfig, None]):
     """Scan the request body, path, query, or selected headers with regex rules."""
 
-    capabilities = GateCapabilities(
-        reads_target=True,
-        reads_headers=True,
-        reads_body=True,
-        replaces_body=True,
-        produces_findings=True,
-        may_deny=True,
+    capabilities = frozenset(
+        {
+            GateCapability.READ_TARGET,
+            GateCapability.READ_HEADERS,
+            GateCapability.READ_BODY,
+            GateCapability.REPLACE_BODY,
+            GateCapability.DENY,
+        }
     )
     finding_types = (FindingTypeDefinition(type="regex_match"),)
 
@@ -624,12 +618,6 @@ def _compile_pattern_catalog(
     timeout: Timeout | None = None,
 ) -> tuple[_CompiledRule, ...]:
     _raise_if_expired(timeout)
-    with _compiled_pattern_cache_lock(timeout):
-        cached = _COMPILED_PATTERN_CACHE.get(catalog)
-        if cached is not None:
-            _COMPILED_PATTERN_CACHE.move_to_end(catalog)
-            return cached[0]
-
     rules_list: list[_CompiledRule] = []
     for global_index, (entity, rule_index, rule) in enumerate(
         _iter_catalog_rules(catalog)
@@ -644,88 +632,13 @@ def _compile_pattern_catalog(
                 timeout=timeout,
             )
         )
-    rules = tuple(rules_list)
     _raise_if_expired(timeout)
-    weight_bytes = _compiled_pattern_weight(catalog, len(rules))
-    if weight_bytes > MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES:
-        _LOGGER.debug(
-            "egress_gate_cache_skip cache=regex_compiled "
-            "weight_bytes=%d budget_bytes=%d",
-            weight_bytes,
-            MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES,
-        )
-        return rules
-
-    evicted_entries = 0
-    evicted_weight_bytes = 0
-    with _compiled_pattern_cache_lock(timeout):
-        cached = _COMPILED_PATTERN_CACHE.get(catalog)
-        if cached is not None:
-            _COMPILED_PATTERN_CACHE.move_to_end(catalog)
-            return cached[0]
-
-        global _COMPILED_PATTERN_CACHE_WEIGHT_BYTES
-        _COMPILED_PATTERN_CACHE[catalog] = (rules, weight_bytes)
-        _COMPILED_PATTERN_CACHE_WEIGHT_BYTES += weight_bytes
-        while (
-            len(_COMPILED_PATTERN_CACHE) > _MAX_CACHED_COMPILED_CATALOGS
-            or _COMPILED_PATTERN_CACHE_WEIGHT_BYTES
-            > MAX_REGEX_COMPILED_CACHE_WEIGHT_BYTES
-        ):
-            _, (_, evicted_weight) = _COMPILED_PATTERN_CACHE.popitem(last=False)
-            _COMPILED_PATTERN_CACHE_WEIGHT_BYTES -= evicted_weight
-            evicted_weight_bytes += evicted_weight
-            evicted_entries += 1
-    if evicted_entries:
-        _LOGGER.debug(
-            "egress_gate_cache_eviction cache=regex_compiled "
-            "entries=%d weight_bytes=%d",
-            evicted_entries,
-            evicted_weight_bytes,
-        )
-    return rules
-
-
-@contextmanager
-def _compiled_pattern_cache_lock(timeout: Timeout | None) -> Iterator[None]:
-    if timeout is None:
-        _COMPILED_PATTERN_CACHE_LOCK.acquire()
-    elif not _COMPILED_PATTERN_CACHE_LOCK.acquire(timeout=timeout.remaining_seconds()):
-        raise TimeoutExpiredError
-    try:
-        _raise_if_expired(timeout)
-        yield
-        _raise_if_expired(timeout)
-    finally:
-        _COMPILED_PATTERN_CACHE_LOCK.release()
+    return tuple(rules_list)
 
 
 def _raise_if_expired(timeout: Timeout | None) -> None:
     if timeout is not None:
         timeout.raise_if_expired()
-
-
-def _compiled_pattern_weight(
-    catalog: RegexPatternCatalog,
-    rule_count: int,
-) -> int:
-    catalog_bytes = len(
-        json.dumps(
-            catalog.model_dump(mode="json"),
-            allow_nan=False,
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode("utf-8")
-    )
-    return catalog_bytes + rule_count * REGEX_COMPILED_RULE_WEIGHT_BYTES
-
-
-def _clear_compiled_pattern_cache() -> None:
-    global _COMPILED_PATTERN_CACHE_WEIGHT_BYTES
-    with _COMPILED_PATTERN_CACHE_LOCK:
-        _COMPILED_PATTERN_CACHE.clear()
-        _COMPILED_PATTERN_CACHE_WEIGHT_BYTES = 0
 
 
 def _compile_rule(
@@ -883,18 +796,6 @@ _CONFIDENCE_RANK = {
     ConfidenceLevel.MEDIUM: 1,
     ConfidenceLevel.HIGH: 2,
 }
-_MAX_CACHED_COMPILED_CATALOGS = 128
-# Python dict preserves insertion order, but this LRU must move cache hits to the
-# newest position and efficiently evict the oldest entry.
-_COMPILED_PATTERN_CACHE: OrderedDict[
-    RegexPatternCatalog,
-    tuple[tuple[_CompiledRule, ...], int],
-] = OrderedDict()
-_COMPILED_PATTERN_CACHE_WEIGHT_BYTES = 0
-_COMPILED_PATTERN_CACHE_LOCK = RLock()
-_LOGGER = get_logger(__name__)
-
-
 __all__ = [
     "ConfidenceLevel",
     "RegexBodyAction",

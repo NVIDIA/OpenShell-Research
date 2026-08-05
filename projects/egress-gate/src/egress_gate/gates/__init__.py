@@ -2,7 +2,7 @@
 
 from egress_gate.gates.base import (
     Gate,
-    GateCapabilities,
+    GateCapability,
     GateConfig,
     GateResources,
     Utf8BodyGate,
@@ -35,7 +35,7 @@ from egress_gate.result import FindingTypeDefinition
 __all__ = [
     "ConfidenceLevel",
     "Gate",
-    "GateCapabilities",
+    "GateCapability",
     "GateConfig",
     "GateDescription",
     "GateRegistry",

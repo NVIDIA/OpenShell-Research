@@ -7,6 +7,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Event
 from typing import Never
+from unittest.mock import Mock
 
 import grpc
 import pytest
@@ -226,7 +227,7 @@ def test_result_adapter_serializes_only_five_finding_fields_and_empty_body_inten
         findings=(SourcedFinding(source_gate="body", finding=finding),),
     )
 
-    response = servicer_module._result_to_proto(result)
+    response, _ = servicer_module._result_to_proto(result)
 
     assert response.decision == pb2.DECISION_ALLOW
     assert response.has_body is True
@@ -266,8 +267,8 @@ def test_result_adapter_preserves_ordered_header_mutations_and_deny_reason() -> 
         reason_code=LIMIT_REASON_CODE,
     )
 
-    allowed_response = servicer_module._result_to_proto(allowed)
-    denied_response = servicer_module._result_to_proto(denied)
+    allowed_response, _ = servicer_module._result_to_proto(allowed)
+    denied_response, _ = servicer_module._result_to_proto(denied)
 
     assert allowed_response.header_mutations[0].write.name == (
         "x-openshell-middleware-reviewed"
@@ -303,20 +304,18 @@ def test_concurrent_same_candidate_is_prepared_once(
     workers_ready = Barrier(2)
     build_started = Event()
     release_build = Event()
-    create_count = 0
 
-    def counted_create_gate(
+    def blocked_create_gate(
         config: GateConfig,
         *,
         timeout: Timeout | None = None,
     ) -> object:
-        nonlocal create_count
-        create_count += 1
         build_started.set()
         assert release_build.wait(2)
         return original_create_gate(config, timeout=timeout)
 
-    monkeypatch.setattr(middleware._registry, "create_gate", counted_create_gate)
+    create_gate = Mock(side_effect=blocked_create_gate)
+    monkeypatch.setattr(middleware._registry, "create_gate", create_gate)
 
     def resolve_candidate() -> object:
         workers_ready.wait(timeout=2)
@@ -340,7 +339,7 @@ def test_concurrent_same_candidate_is_prepared_once(
         asyncio.run(middleware.close())
 
     assert second is first
-    assert create_count == 1
+    assert create_gate.call_count == 1
 
 
 def test_failed_candidate_leaves_the_old_policy_active(
@@ -433,7 +432,7 @@ async def test_cancelled_candidate_keeps_its_slot_and_is_not_published(
     old = middleware._policy.processor_for(_values(), timeout=Timeout.from_seconds(1))
     started = Event()
     release = Event()
-    original_build = middleware._policy._build_processor
+    original_build = middleware._registry.prepare_processor
 
     def blocked_build(
         config: EgressGateConfig[GateConfig],
@@ -444,7 +443,7 @@ async def test_cancelled_candidate_keeps_its_slot_and_is_not_published(
         assert release.wait(2)
         return original_build(config, timeout=timeout)
 
-    monkeypatch.setattr(middleware._policy, "_build_processor", blocked_build)
+    monkeypatch.setattr(middleware._registry, "prepare_processor", blocked_build)
     changed_request = _request()
     changed_request.config.CopyFrom(_proto_config(_values(action_kind="replace")))
     task = asyncio.create_task(
@@ -485,7 +484,7 @@ async def test_result_serialization_is_bracketed_by_the_shared_timeout(
         ),
     )
     events: list[str] = []
-    original_serialize = servicer_module._result_to_proto_with_source
+    original_serialize = servicer_module._result_to_proto
 
     async def return_result(*args: object, **kwargs: object) -> EgressResult:
         del args, kwargs
@@ -505,7 +504,7 @@ async def test_result_serialization_is_bracketed_by_the_shared_timeout(
     monkeypatch.setattr(Timeout, "raise_if_expired", record_deadline_check)
     monkeypatch.setattr(
         servicer_module,
-        "_result_to_proto_with_source",
+        "_result_to_proto",
         record_serialization,
     )
     try:
@@ -562,7 +561,7 @@ async def test_evaluation_log_records_runtime_limit_source(
 
     monkeypatch.setattr(
         middleware,
-        "_evaluate_http_request_with_source",
+        "_evaluate_http_request",
         return_limit,
     )
     try:
@@ -588,7 +587,7 @@ def test_serialized_limit_result_reports_runtime_limit_source() -> None:
         reason_code=LIMIT_REASON_CODE,
     )
 
-    response, source_kind = servicer_module._result_to_proto_with_source(result)
+    response, source_kind = servicer_module._result_to_proto(result)
 
     assert response.reason_code == LIMIT_REASON_CODE
     assert source_kind == DecisionSourceKind.RUNTIME_LIMIT.value
@@ -636,6 +635,6 @@ def test_default_deny_reason_is_wire_safe() -> None:
         ),
         reason_code=DEFAULT_DENY_REASON_CODE,
     )
-    response = servicer_module._result_to_proto(result)
+    response, _ = servicer_module._result_to_proto(result)
     assert response.reason == BLOCK_REASON
     assert response.reason_code == DEFAULT_DENY_REASON_CODE

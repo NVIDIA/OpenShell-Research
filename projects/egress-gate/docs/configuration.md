@@ -48,7 +48,7 @@ The shipped registry contains only `regex`. See
 templates. `scan.kind` selects the body, path, query, or named headers.
 `scan.action.kind` selects `detect` or `deny`; a body scan can also select
 `replace`. The schema does not permit `replace` for another scan kind. A
-trusted application registry factory supplies other behavior.
+trusted application registry supplies other behavior.
 
 ## Inspect the installed registry
 
@@ -62,18 +62,19 @@ uv run egress-gate gates schema
 uv run egress-gate validate --policy path/to/policy.yaml
 ```
 
-Custom registries use the same factory for inspection and serving:
+Custom registries use the same module attribute for inspection and serving:
 
 ```bash title="Inspect a custom registry"
 uv run egress-gate \
-  --registry-factory my_gates:create_registry gates list
+  --registry my_gates:registry gates list
 uv run egress-gate \
-  --registry-factory my_gates:create_registry gates schema
+  --registry my_gates:registry gates schema
 ```
 
-The factory must return a finalized `GateRegistry`. It owns trusted gate
-classes and typed `GateResources`. Policy configuration cannot import Python,
-choose a resource implementation, or provide credentials.
+The attribute can contain a `GateRegistry` or a zero-argument factory that
+returns one. A factory is useful when a deployment must construct typed
+`GateResources` dynamically. Policy configuration cannot import Python, choose
+a resource implementation, or provide credentials.
 
 `validate` checks the policy and registered resources. It also reads and checks
 a file-backed pattern catalog. It does not construct gates, prepare a

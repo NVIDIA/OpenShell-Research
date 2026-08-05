@@ -12,7 +12,7 @@ from egress_gate.constants import MAX_PIPELINE_GATES
 from egress_gate.errors import EgressGateError, GateRegistryError
 from egress_gate.gates import (
     Gate,
-    GateCapabilities,
+    GateCapability,
     GateConfig,
     GateRegistry,
     GateResources,
@@ -32,7 +32,7 @@ class _RegistryConfig(GateConfig):
 class _RegistryGate(Gate[_RegistryConfig, None]):
     """A small resource-free gate used to exercise registry assembly."""
 
-    capabilities = GateCapabilities(reads_context=True)
+    capabilities = frozenset({GateCapability.READ_CONTEXT})
     finding_types = ()
 
     def _initialize(self, *, timeout: Timeout | None = None) -> None:
@@ -61,7 +61,7 @@ class _ResourceBundle(GateResources):
 
 
 class _ResourceGate(Gate[_ResourceConfig, _ResourceBundle]):
-    capabilities = GateCapabilities(uses_resources=True)
+    capabilities = frozenset()
     finding_types = ()
 
     def _evaluate(
@@ -82,10 +82,9 @@ def _pipeline(config: dict[str, object]) -> dict[str, object]:
     }
 
 
-def test_builtin_registry_is_finalized_and_contains_only_regex() -> None:
+def test_builtin_registry_seals_on_first_use_and_contains_only_regex() -> None:
     registry = create_builtin_registry()
 
-    assert registry.is_finalized
     assert tuple(item.gate_type for item in registry.describe_gates()) == ("regex",)
     schema = registry.configuration_json_schema()
     assert _discriminator_names(schema) == {"kind"}
@@ -138,12 +137,13 @@ def test_builtin_registry_is_finalized_and_contains_only_regex() -> None:
                 }
             )
         )
+    with pytest.raises(GateRegistryError, match="registry is in use"):
+        registry.register(_RegistryGate)
 
 
 def test_registry_validates_exact_pipeline_and_gate_config() -> None:
     registry = GateRegistry()
     registry.register(_RegistryGate)
-    registry.finalize()
 
     config = registry.validate_config(
         _pipeline({"kind": "registry-test", "answer": 42})
@@ -161,7 +161,7 @@ def test_registry_requires_an_explicit_gate_discriminator() -> None:
         kind: Literal["defaulted"] = "defaulted"
 
     class DefaultedGate(Gate[DefaultedConfig, None]):
-        capabilities = GateCapabilities()
+        capabilities = frozenset()
         finding_types = ()
 
         def _evaluate(
@@ -182,7 +182,7 @@ def test_registry_requires_an_explicit_gate_discriminator() -> None:
         )
 
     class FactoryDefaultedGate(Gate[FactoryDefaultedConfig, None]):
-        capabilities = GateCapabilities()
+        capabilities = frozenset()
         finding_types = ()
 
         def _evaluate(
@@ -204,7 +204,7 @@ def test_registry_requires_gate_configs_to_inherit_the_common_name() -> None:
         kind: Literal["default-name"]
 
     class DefaultNameGate(Gate[DefaultNameConfig, None]):
-        capabilities = GateCapabilities()
+        capabilities = frozenset()
         finding_types = ()
 
         def _evaluate(
@@ -221,7 +221,7 @@ def test_registry_requires_gate_configs_to_inherit_the_common_name() -> None:
         kind: Literal["integer-name"]
 
     class IntegerNameGate(Gate[IntegerNameConfig, None]):
-        capabilities = GateCapabilities()
+        capabilities = frozenset()
         finding_types = ()
 
         def _evaluate(
@@ -238,7 +238,7 @@ def test_registry_requires_gate_configs_to_inherit_the_common_name() -> None:
         kind: Literal["unbounded-name"]
 
     class UnboundedNameGate(Gate[UnboundedNameConfig, None]):
-        capabilities = GateCapabilities()
+        capabilities = frozenset()
         finding_types = ()
 
         def _evaluate(
@@ -263,7 +263,7 @@ def test_registry_requires_canonical_common_field_names() -> None:
         value: str
 
     class AliasedGate(Gate[AliasedConfig, None]):
-        capabilities = GateCapabilities()
+        capabilities = frozenset()
         finding_types = ()
 
         def _evaluate(
@@ -282,7 +282,6 @@ def test_registry_requires_canonical_common_field_names() -> None:
 def test_registry_forwards_the_shared_preparation_timeout() -> None:
     registry = GateRegistry()
     registry.register(_RegistryGate)
-    registry.finalize()
     config = registry.validate_config(
         _pipeline({"kind": "registry-test", "answer": 42})
     )
@@ -297,7 +296,6 @@ def test_registry_forwards_the_shared_preparation_timeout() -> None:
 def test_registry_prepares_the_production_processor_from_validated_config() -> None:
     registry = GateRegistry()
     registry.register(_RegistryGate)
-    registry.finalize()
     config = registry.validate_config(
         _pipeline({"kind": "registry-test", "answer": 42})
     )
@@ -314,7 +312,6 @@ def test_registry_injects_typed_application_resources() -> None:
     resources = _ResourceBundle("shared-client")
     registry = GateRegistry()
     registry.register(_ResourceGate, resources=resources)
-    registry.finalize()
 
     config = registry.validate_config(_pipeline({"kind": "resource-test"}))
     gate = registry.create_gate(config.gates[0])
@@ -330,7 +327,6 @@ def test_registry_injects_typed_application_resources() -> None:
 def test_registry_rejects_unknown_policy_shapes() -> None:
     registry = GateRegistry()
     registry.register(_RegistryGate)
-    registry.finalize()
 
     for values in (
         {"unexpected": {}},
@@ -347,16 +343,15 @@ def test_registry_rejects_unknown_policy_shapes() -> None:
 
 def test_registry_lifecycle_and_fingerprint_are_deterministic() -> None:
     registry = GateRegistry()
-    with pytest.raises(GateRegistryError):
-        registry.finalize()
+    with pytest.raises(GateRegistryError, match="no registered gates"):
+        registry.configuration_json_schema()
 
     registry.register(_RegistryGate)
-    registry.finalize()
-    with pytest.raises(GateRegistryError):
-        registry.register(_ResourceGate)
-
     first = registry.validate_config(_pipeline({"kind": "registry-test", "answer": 1}))
     second = registry.validate_config(_pipeline({"kind": "registry-test", "answer": 2}))
+    with pytest.raises(GateRegistryError, match="registry is in use"):
+        registry.register(_ResourceGate)
+
     assert registry.policy_fingerprint(first) != registry.policy_fingerprint(second)
     assert registry.policy_fingerprint(first) == registry.policy_fingerprint(first)
 
@@ -364,7 +359,6 @@ def test_registry_lifecycle_and_fingerprint_are_deterministic() -> None:
 def test_registry_rejects_duplicate_gate_names_before_preparation() -> None:
     registry = GateRegistry()
     registry.register(_RegistryGate)
-    registry.finalize()
     values = {
         "gates": [
             {"name": "same", "kind": "registry-test", "answer": 1},
