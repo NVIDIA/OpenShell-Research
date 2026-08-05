@@ -43,14 +43,10 @@ The command prepares the policy once, runs each case with a fresh timeout, and
 shows whether each request produced its expected result:
 
 ```text title="Evaluation output"
-                            Policy evaluation
-╭────────┬──────────────────────────────────────────┬────────────────────╮
-│ Status │ Case                                     │ Details            │
-├────────┼──────────────────────────────────────────┼────────────────────┤
-│ PASS   │ email-is-detected-and-request-is-allowed │ All checks matched │
-├────────┼──────────────────────────────────────────┼────────────────────┤
-│ PASS   │ ordinary-body-is-allowed                 │ All checks matched │
-╰────────┴──────────────────────────────────────────┴────────────────────╯
+Policy evaluation
+Status    Case                                        Details
+PASS      email-is-detected-and-request-is-allowed    All checks matched
+PASS      ordinary-body-is-allowed                    All checks matched
 2 passed · 0 failed · 2 total
 ```
 
