@@ -29,7 +29,11 @@ uv run egress-gate --debug serve \
   --timeout-seconds 4
 ```
 
-In another terminal, add the registration to your default OpenShell gateway
+Before you change the gateway configuration, stop any running OpenShell
+gateways that use it. A running gateway does not reload middleware
+registrations.
+
+In another terminal, add the registration to your default gateway
 configuration. Replace `YOUR_HOST_IPV4` with a non-loopback address that the
 gateway and sandbox supervisors can reach.
 
@@ -40,7 +44,8 @@ uv run egress-gate add-gateway-registration \
   --port 50051
 ```
 
-Restart the OpenShell gateway, then create a sandbox and launch Claude Code:
+Start the OpenShell gateway again with the same command or service manager that
+you normally use. Then create a sandbox and launch Claude Code:
 
 ```bash
 openshell sandbox create \
@@ -77,8 +82,8 @@ Exit Claude Code, then delete the sandbox when the test is complete:
 openshell sandbox delete eg-regex
 ```
 
-To remove the example registration from the default gateway configuration,
-run this command and restart the gateway:
+To remove the example registration, first stop any running OpenShell gateways
+that use the configuration. Run this command, then start the gateways again:
 
 ```bash
 uv run egress-gate remove-gateway-registration \

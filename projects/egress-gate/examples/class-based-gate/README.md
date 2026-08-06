@@ -42,7 +42,11 @@ uv run egress-gate \
   serve --listen 0.0.0.0:50051 --timeout-seconds 4
 ```
 
-In another terminal, register the service in your default OpenShell gateway
+Before you change the gateway configuration, stop any running OpenShell
+gateways that use it. A running gateway does not reload middleware
+registrations.
+
+In another terminal, register the service in your default gateway
 configuration. Replace `YOUR_HOST_IPV4` with a non-loopback address that the
 gateway and sandbox supervisors can reach.
 
@@ -53,7 +57,8 @@ uv run egress-gate add-gateway-registration \
   --port 50051
 ```
 
-Restart the OpenShell gateway, then create a sandbox and launch Claude Code:
+Start the OpenShell gateway again with the same command or service manager that
+you normally use. Then create a sandbox and launch Claude Code:
 
 ```bash
 openshell sandbox create \
@@ -89,8 +94,8 @@ The request must fail before Claude answers. The Egress Gate terminal must
 record `action=deny` and `decision_source_kind=gate`. Together, the normal
 response and denied request confirm that the class-based gate is active.
 
-Exit Claude Code. Clean up the sandbox and registration, then restart the
-gateway:
+Exit Claude Code and delete the sandbox. Stop any running OpenShell gateways
+before you remove the registration. Then start the gateways again:
 
 ```bash
 openshell sandbox delete egress-class

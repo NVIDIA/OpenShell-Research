@@ -230,6 +230,11 @@ def test_example_workflows_use_one_registration_and_sandbox_name(
     assert f"openshell sandbox create --name {name}" in normalized_readme
     assert f"openshell sandbox delete {name}" in readme
     assert f"remove-gateway-registration --name {name}" in normalized_readme
+    assert "stop any running OpenShell gateways" in normalized_readme
+    assert (
+        "A running gateway does not reload middleware registrations"
+        in normalized_readme
+    )
 
 
 def test_installed_executable_loads_a_registry_from_the_working_directory() -> None:
