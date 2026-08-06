@@ -1,0 +1,73 @@
+# Egress Gate latency analysis
+
+This directory contains the source data, deterministic renderer, and generated
+Egress Gate latency-versus-prompt-size figure. It is the reusable starting
+point for future documentation and a Dev Note about the proof-of-concept stress
+test.
+
+## Recreate the figure
+
+Run from `projects/egress-gate/`:
+
+```sh
+uv run python analysis/render_latency_plot.py
+```
+
+The command writes the documentation asset:
+
+```text
+docs/assets/analysis/egress-gate-latency-vs-prompt-size.svg
+```
+
+Verify that the committed figure matches the data and renderer:
+
+```sh
+uv run python analysis/render_latency_plot.py --check
+```
+
+The renderer uses only the Python standard library and does not add a project
+dependency.
+
+## Data
+
+`egress-gate-latency.csv` contains 96 joined observations from the synthetic
+Claude Code context-growth experiment run on July 27–28, 2026.
+
+| Column | Meaning |
+| --- | --- |
+| `observed_at_utc` | Timestamp used to correlate the request across available logs |
+| `prompt_tokens` | Claude Code session token accounting for the provider request |
+| `egress_gate_latency_ms` | `duration_ms` emitted by the `egress_gate_evaluation` service log |
+| `entity_count` | Aggregate Egress Gate finding count |
+| `phase` | Baseline, pre-compaction, compaction-trigger, or context-rebuild phase |
+| `openshell_observed_ms` | OpenShell L7 request event to middleware-result event |
+| `first_output_elapsed_ms` | OpenShell L7 request event to the first Claude response output |
+| `turn_elapsed_ms` | OpenShell L7 request event to the last Claude response output |
+
+The baseline observations have only the service-side measurement, token count,
+and entity count. Thirteen large-context observations also have the
+OpenShell-observed middleware interval. Twelve of those completed turns have
+first- and last-output timing; the compaction-triggering request does not.
+
+The figure's 0.56% annotation is the arithmetic mean of
+`egress_gate_latency_ms / turn_elapsed_ms` across those 12 completed turns.
+It is not Egress Gate's share of the short OpenShell middleware interval.
+Point color uses a continuous scale for `entity_count`; each SVG point also
+contains an accessible tooltip with its token, latency, and entity values. The
+SVG adapts its text, grid, threshold, and point-outline colors to the viewer's
+light or dark color scheme.
+
+## Interpretation limits
+
+This is a proof-of-concept observation set, not a general benchmark:
+
+- the workload used synthetic, deliberately repeated text
+- prompt size and entity count increased together
+- the run used one host, sandbox, Egress Gate configuration, regex gate
+  policy, and Claude Code session
+- baseline and large-context observations span a Egress Gate process restart
+- the linear fit is descriptive and should not be treated as a performance
+  guarantee
+
+The CSV contains operational timing and aggregate counts only. It contains no
+request text or detected entity values.

@@ -9,4 +9,5 @@ agent_markdown: true
 Technical documentation and references for installing, using, and extending
 OpenShell Research projects.
 
-- [Privacy Guard](privacy-guard/index.md): middleware for protecting sensitive data in OpenShell.
+- [Egress Gate](egress-gate/index.md): extensible middleware for applying gates
+  to outgoing HTTP requests.

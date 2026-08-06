@@ -25,24 +25,25 @@ nav = [
   ]},
   {"Documentation" = [
     "documentation/index.md",
-    {"Privacy Guard" = [
-      "documentation/privacy-guard/index.md",
+    {"Egress Gate" = [
+      "documentation/egress-gate/index.md",
       {"Guides" = [
-        {"Configure policies" = "documentation/privacy-guard/configuration.md"},
-        {"Run and operate Privacy Guard" = "documentation/privacy-guard/operations.md"}
+        {"Configure policies" = "documentation/egress-gate/configuration.md"},
+        {"Test policies offline" = "documentation/egress-gate/evaluation.md"},
+        {"Run and operate Egress Gate" = "documentation/egress-gate/operations.md"}
       ]},
-      {"Engines" = [
-        "documentation/privacy-guard/engines/index.md",
-        {"RegexEngine" = "documentation/privacy-guard/engines/regex.md"},
-        {"Add a custom engine" = "documentation/privacy-guard/engines/custom.md"}
+      {"Gates" = [
+        "documentation/egress-gate/gates/index.md",
+        {"Regex gate" = "documentation/egress-gate/gates/regex.md"},
+        {"Add a custom gate" = "documentation/egress-gate/gates/custom.md"}
       ]},
       {"Architecture" = [
-        "documentation/privacy-guard/architecture/index.md",
-        {"Request lifecycle" = "documentation/privacy-guard/architecture/request-lifecycle.md"},
-        {"Service boundary" = "documentation/privacy-guard/architecture/service-boundary.md"}
+        "documentation/egress-gate/architecture/index.md",
+        {"Request lifecycle" = "documentation/egress-gate/architecture/request-lifecycle.md"},
+        {"Service boundary" = "documentation/egress-gate/architecture/service-boundary.md"}
       ]},
       {"Reference" = [
-        {"Limits and failure behavior" = "documentation/privacy-guard/reference/limits-and-failures.md"}
+        {"Limits and failure behavior" = "documentation/egress-gate/reference/limits-and-failures.md"}
       ]}
     ]}
   ]}
@@ -54,15 +55,26 @@ generator = false
 
 [project.markdown_extensions.admonition]
 
+[project.markdown_extensions."pymdownx.highlight"]
+anchor_linenums = true
+line_spans = "__span"
+pygments_lang_class = true
+
+[project.markdown_extensions."pymdownx.inlinehilite"]
+
+[project.markdown_extensions."pymdownx.superfences"]
+
 [project.theme]
 custom_dir = "overrides"
 favicon = "assets/brand/favicon.svg"
 logo = "assets/brand/openshell-mark.svg"
 icon.repo = "fontawesome/brands/github"
 features = [
+  "content.code.copy",
   "navigation.sections",
   "navigation.indexes",
   "navigation.path",
+  "navigation.footer",
   "navigation.top",
   "search.highlight",
   "toc.follow"

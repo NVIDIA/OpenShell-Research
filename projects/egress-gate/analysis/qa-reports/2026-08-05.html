@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>EgressGate comprehensive QA and remediation report — 2026-08-05</title>
+  <style>
+    :root {
+      --bg: #f4f7f6;
+      --surface: #ffffff;
+      --surface-alt: #edf3f1;
+      --text: #17211e;
+      --muted: #52645f;
+      --line: #cbd8d4;
+      --accent: #087f5b;
+      --accent-soft: #dff5ec;
+      --medium: #a14f00;
+      --medium-soft: #fff0d8;
+      --low: #365f91;
+      --low-soft: #e8f1fb;
+      --pass: #14734f;
+      --fail: #a1392e;
+      --code: #13201c;
+      --code-text: #e7f4ef;
+      --shadow: 0 10px 28px rgba(18, 52, 43, 0.08);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1513;
+        --surface: #15201d;
+        --surface-alt: #1b2a26;
+        --text: #e8f0ed;
+        --muted: #a9bbb5;
+        --line: #334741;
+        --accent: #58d0a6;
+        --accent-soft: #17392e;
+        --medium: #ffb665;
+        --medium-soft: #3a2a18;
+        --low: #9bc5f2;
+        --low-soft: #1b3047;
+        --pass: #67d3a9;
+        --fail: #ff9187;
+        --code: #08100e;
+        --code-text: #dcebe6;
+        --shadow: none;
+      }
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    a { color: var(--accent); }
+    a:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    .skip-link { position: absolute; left: -9999px; }
+    .skip-link:focus { left: 1rem; top: 1rem; z-index: 2; background: var(--surface); padding: .75rem; }
+    header { background: linear-gradient(135deg, #073f33, #087f5b); color: #fff; padding: 3.5rem 1.25rem 3rem; }
+    header .wrap, main, footer { max-width: 1120px; margin: 0 auto; }
+    .eyebrow { margin: 0 0 .6rem; font-size: .82rem; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; opacity: .82; }
+    h1 { margin: 0; max-width: 850px; font-size: clamp(2.1rem, 5vw, 4.25rem); line-height: 1.05; letter-spacing: -.035em; }
+    .dek { max-width: 780px; margin: 1.2rem 0 0; font-size: 1.15rem; opacity: .9; }
+    .meta { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: 1.4rem; }
+    .meta span { border: 1px solid rgba(255,255,255,.3); border-radius: 999px; padding: .25rem .65rem; font-size: .85rem; }
+    main { padding: 2rem 1.25rem 4rem; }
+    nav { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.5rem; }
+    nav a { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: .42rem .72rem; text-decoration: none; box-shadow: var(--shadow); }
+    section { margin-top: 2.4rem; scroll-margin-top: 1rem; }
+    h2 { margin: 0 0 1rem; font-size: 1.65rem; letter-spacing: -.02em; }
+    h3 { margin: 1.5rem 0 .55rem; font-size: 1.12rem; }
+    p { margin: .5rem 0 1rem; }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .9rem; }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 1rem; box-shadow: var(--shadow); }
+    .metric { font-size: 2rem; font-weight: 780; line-height: 1; }
+    .metric-label { display: block; margin-top: .45rem; color: var(--muted); font-size: .9rem; }
+    .verdict { border-left: 6px solid var(--medium); }
+    .pill { display: inline-block; border-radius: 999px; padding: .15rem .55rem; font-size: .78rem; font-weight: 760; white-space: nowrap; }
+    .pill.medium { background: var(--medium-soft); color: var(--medium); }
+    .pill.low { background: var(--low-soft); color: var(--low); }
+    .pill.pass { background: var(--accent-soft); color: var(--pass); }
+    .callout { padding: 1rem 1.1rem; border-left: 4px solid var(--accent); background: var(--accent-soft); border-radius: 4px 12px 12px 4px; }
+    .finding { margin: 1rem 0; }
+    .finding header { display: flex; align-items: center; gap: .65rem; padding: 0; background: none; color: var(--text); }
+    .finding h3 { margin: 0; }
+    .finding dl { display: grid; grid-template-columns: 9rem 1fr; gap: .4rem .8rem; margin: .9rem 0 0; }
+    dt { color: var(--muted); font-weight: 700; }
+    dd { margin: 0; }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); }
+    th, td { padding: .7rem .8rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+    th { background: var(--surface-alt); font-size: .82rem; letter-spacing: .03em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+    .table-wrap { overflow-x: auto; border-radius: 12px; box-shadow: var(--shadow); }
+    code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .9em; }
+    p code, li code, td code, dd code { background: var(--surface-alt); border: 1px solid var(--line); border-radius: 4px; padding: .08rem .28rem; }
+    pre { overflow-x: auto; margin: .7rem 0; padding: 1rem; border-radius: 10px; background: var(--code); color: var(--code-text); font-size: .84rem; line-height: 1.5; }
+    pre code { background: transparent; border: 0; padding: 0; }
+    details { margin: .8rem 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: .7rem .9rem; }
+    summary { cursor: pointer; font-weight: 700; }
+    ul, ol { padding-left: 1.35rem; }
+    li + li { margin-top: .3rem; }
+    .status-pass { color: var(--pass); font-weight: 750; }
+    .status-fail { color: var(--fail); font-weight: 750; }
+    footer { padding: 0 1.25rem 3rem; color: var(--muted); font-size: .88rem; }
+    @media (max-width: 780px) {
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .finding dl { grid-template-columns: 1fr; }
+      dd { margin-bottom: .4rem; }
+    }
+    @media (max-width: 470px) { .grid { grid-template-columns: 1fr; } }
+    @media print {
+      body { background: #fff; color: #111; font-size: 10pt; }
+      header { padding: 1.5rem 0; color: #111; background: #fff; border-bottom: 2px solid #087f5b; }
+      main, footer { padding-left: 0; padding-right: 0; }
+      nav { display: none; }
+      .card, table { box-shadow: none; break-inside: avoid; }
+      details { break-inside: avoid; }
+      details > * { display: block !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to report</a>
+  <header>
+    <div class="wrap">
+      <p class="eyebrow">Independent battle test</p>
+      <h1>EgressGate comprehensive QA and remediation report</h1>
+      <p class="dek">Functional, extension, service, resilience, content-safety, packaging, and operator-experience validation followed by verified remediation of every finding.</p>
+      <div class="meta" aria-label="Report metadata">
+        <span>2026-08-05 UTC</span>
+        <span>commit aa74572</span>
+        <span>branch johnny/egress-gate-refactor</span>
+        <span>EgressGate 0.1.0</span>
+        <span>13 of 13 findings addressed</span>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <nav aria-label="Report sections">
+      <a href="#summary">Summary</a>
+      <a href="#remediation">Remediation</a>
+      <a href="#findings">Findings</a>
+      <a href="#custom-gates">Custom gates</a>
+      <a href="#matrix">Test matrix</a>
+      <a href="#evidence">Evidence</a>
+      <a href="#recommendations">Recommendations</a>
+      <a href="#limits">Limits</a>
+    </nav>
+
+    <section id="summary">
+      <h2>Executive summary</h2>
+      <div class="grid" aria-label="QA summary metrics">
+        <div class="card verdict"><div class="metric">Verified</div><span class="metric-label">Remediation assessment</span></div>
+        <div class="card"><div class="metric">217 / 217</div><span class="metric-label">Authoritative tests passed on 3.11 and 3.14</span></div>
+        <div class="card"><div class="metric">0</div><span class="metric-label">Critical or high findings</span></div>
+        <div class="card"><div class="metric">0 open</div><span class="metric-label">5 medium + 8 low findings addressed</span></div>
+      </div>
+      <p class="callout"><strong>Bottom line:</strong> EgressGate's core decision pipeline, regex behavior, custom-gate contract, content safety, limits, concurrency, policy replacement, packaging, and shutdown behavior remain strong. All 13 QA findings have now been addressed through code, tests, or explicit operator guidance, and the integrated project and documentation checks pass.</p>
+      <p>No request-content disclosure was found. Adversarial failures were generally fail-closed, bounded, and recoverable. The one implementation-detail disclosure contains Python/protobuf type information, not user request data.</p>
+
+      <h3>Release gate</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Area</th><th>Assessment</th><th>Rationale</th></tr></thead>
+          <tbody>
+            <tr><td>Core correctness</td><td><span class="pill pass">Pass</span></td><td>All 217 repository tests pass on Python 3.11 and 3.14; additional regex and service battle suites passed.</td></tr>
+            <tr><td>Custom gates</td><td><span class="pill pass">Pass</span></td><td>Two novel gates and the bundled example worked through schema, validation, offline evaluation, downstream mutation, and live gRPC.</td></tr>
+            <tr><td>Security/content safety</td><td><span class="pill pass">Pass</span></td><td>Sentinel request/config values stay secret; malformed protobuf now returns cataloged <code>INVALID_ARGUMENT</code> without implementation details.</td></tr>
+            <tr><td>Resilience</td><td><span class="pill pass">Pass</span></td><td>Deadlines, cancellation, worker and RPC saturation, invalid policy replacement, oversize input, and close/restart behavior recovered.</td></tr>
+            <tr><td>Operator UX</td><td><span class="pill pass">Pass</span></td><td>Validation, preparation, and corpus failures now provide bounded actionable context; command discovery and narrow-terminal help are verified.</td></tr>
+            <tr><td>Packaging</td><td><span class="pill pass">Pass</span></td><td>sdist and wheel build and install cleanly on Python 3.11; packaged guidance now separates installed and source-checkout workflows and uses durable links.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="remediation">
+      <h2>Verified remediation status</h2>
+      <p>The original QA session found five medium- and eight low-severity issues. Eleven new regression tests were added during remediation. Transport behaviors owned by grpcio were resolved with explicit bounded operational guidance instead of weakening EgressGate's admission controls or hiding HTTP/2 faults.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Finding</th><th>Resolution</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>EG-QA-01</td><td>A server interceptor now catches protobuf decode failures before dispatch and returns cataloged <code>request_protobuf_invalid</code> with gRPC <code>INVALID_ARGUMENT</code>. Raw-wire recovery is regression-tested.</td><td><span class="pill pass">Verified</span></td></tr>
+            <tr><td>EG-QA-02</td><td>Gate preparation failures map to <code>config_preparation_failed</code> with safe built-in regex remediation rather than custom-resource guidance.</td><td><span class="pill pass">Verified</span></td></tr>
+            <tr><td>EG-QA-03</td><td>Policy errors now report one trusted schema path and safe category while excluding submitted values, Pydantic inputs, context, and URLs.</td><td><span class="pill pass">Verified</span></td></tr>
+            <tr><td>EG-QA-04</td><td>The README separates installed and source-checkout workflows, states that examples/docs are repository assets, and uses durable absolute links. Wheel metadata was inspected after a clean build.</td><td><span class="pill pass">Verified</span></td></tr>
+            <tr><td>EG-QA-05</td><td>Automatic logging color honors the presence of <code>NO_COLOR</code>; explicit application-owned <code>ALWAYS</code> remains an override. Empty and non-empty values are tested.</td><td><span class="pill pass">Verified</span></td></tr>
+            <tr><td>EG-QA-06</td><td>Execution failures identify the validated case name and render safe results completed before the failure without exposing request content.</td><td><span class="pill pass">Verified</span></td></tr>
+            <tr><td>EG-QA-07</td><td>Bare invocation now renders help and exits 0.</td><td><span class="pill pass">Verified</span></td></tr>
+            <tr><td>EG-QA-08</td><td>Operations guidance now specifies short bounded 5/10/20 ms backoff within the middleware deadline. EgressGate retains grpcio's 16-RPC transport guard.</td><td><span class="pill pass">Documented</span></td></tr>
+            <tr><td>EG-QA-09</td><td>Operations guidance distinguishes expected HTTP/2 GOAWAY/cancellation during zero-grace planned shutdown from actionable out-of-window transport faults.</td><td><span class="pill pass">Documented</span></td></tr>
+            <tr><td>EG-QA-10</td><td>Generated schemas rewrite Pydantic generic definition names and references to stable <code>ConfiguredGate</code> and <code>PipelineConfig</code> names.</td><td><span class="pill pass">Verified</span></td></tr>
+            <tr><td>EG-QA-11</td><td><code>egress-gate --version</code> reports the installed distribution version and exits 0.</td><td><span class="pill pass">Verified</span></td></tr>
+            <tr><td>EG-QA-12</td><td>Plain help preserves complete option identifiers at 40 columns; concise command summaries remain complete at standard widths.</td><td><span class="pill pass">Verified</span></td></tr>
+            <tr><td>EG-QA-13</td><td>Operations documentation now gives policy, transport, and controlled sandbox end-to-end readiness checks and explains the limits of each layer.</td><td><span class="pill pass">Verified</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="findings">
+      <h2>Original QA findings</h2>
+
+      <article class="card finding">
+        <header><span class="pill medium">Medium</span><h3>EG-QA-01 — Malformed protobuf returns <code>UNKNOWN</code> with implementation details</h3></header>
+        <dl>
+          <dt>Observed</dt><dd>A malformed nested protobuf returned <code>UNKNOWN</code> and named <code>google.protobuf.message.DecodeError</code> plus the generated message type.</dd>
+          <dt>Expected</dt><dd>A stable, content-safe <code>INVALID_ARGUMENT</code> response consistent with the documented invalid-request contract.</dd>
+          <dt>Impact</dt><dd>Clients cannot classify all bad input consistently, and the response exposes runtime implementation detail. The server did recover immediately.</dd>
+          <dt>Likely seam</dt><dd>The failure occurs before the servicer method, so handling probably belongs at the gRPC deserialization or interceptor boundary.</dd>
+        </dl>
+        <details><summary>Reproduction and evidence</summary>
+          <pre><code>raw = channel.unary_unary(
+    "/openshell.middleware.v1.SupervisorMiddleware/EvaluateHttpRequest",
+    request_serializer=lambda value: value,
+    response_deserializer=lambda value: value,
+)
+await raw(b"\x12\x02\x0a\xff")
+
+status=UNKNOWN
+details="Unexpected &lt;class 'google.protobuf.message.DecodeError'&gt;:
+Error parsing message with type
+'openshell.middleware.v1.HttpRequestEvaluation'"</code></pre>
+        </details>
+      </article>
+
+      <article class="card finding">
+        <header><span class="pill medium">Medium</span><h3>EG-QA-02 — Built-in regex preparation failure gives custom-gate guidance</h3></header>
+        <dl>
+          <dt>Observed</dt><dd>A structurally valid policy with a forbidden named capture group passes <code>validate</code>, then <code>evaluate</code> reports generic <code>execution_failed</code> and tells the user to inspect custom resources.</dd>
+          <dt>Expected</dt><dd>A cataloged configuration/preparation error that identifies the regex-policy remediation without echoing pattern content.</dd>
+          <dt>Impact</dt><dd>The error is safe but sends operators to the wrong subsystem, increasing time to diagnose a built-in configuration issue.</dd>
+        </dl>
+        <details><summary>Reproduction and evidence</summary>
+          <pre><code>$ egress-gate validate --policy qa_policy_named_group.yaml
+✓ Policy is valid
+
+$ egress-gate evaluate --policy qa_policy_named_group.yaml --cases qa_cases.yaml
+Evaluation failed [execution_failed]
+An unexpected error stopped the evaluation.
+Next: Check custom gate and application-owned resource setup, then retry.
+[exit 2]</code></pre>
+        </details>
+      </article>
+
+      <article class="card finding">
+        <header><span class="pill medium">Medium</span><h3>EG-QA-03 — Policy validation diagnostics lack a field path</h3></header>
+        <dl>
+          <dt>Observed</dt><dd>A typo such as <code>scna</code> is reduced to a generic schema mismatch; the CLI does not identify the gate, YAML path, unknown key, or missing <code>scan</code> field. Missing and malformed files also share the same <code>invalid_input</code> text.</dd>
+          <dt>Expected</dt><dd>A bounded structural location and reason, while continuing to suppress submitted values and raw exception text.</dd>
+          <dt>Impact</dt><dd>Safe but slow troubleshooting, especially in a large multi-gate policy.</dd>
+        </dl>
+        <details><summary>Observed output</summary>
+          <pre><code>Policy validation failed [config_invalid]
+The policy does not match the schema for the installed gates.
+Next: Run egress-gate gates schema, then check the pipeline, gate kinds,
+required fields, and pattern catalog.
+[exit 1]</code></pre>
+        </details>
+      </article>
+
+      <article class="card finding">
+        <header><span class="pill medium">Medium</span><h3>EG-QA-04 — Packaged README quickstart depends on files that are not shipped</h3></header>
+        <dl>
+          <dt>Observed</dt><dd>The wheel and sdist include sources, license, and README but omit <code>examples/</code>, <code>docs/</code>, and <code>uv.lock</code>. The embedded README tells users to validate <code>examples/regex-redaction/egress-gate-config.yaml</code> and links to relative documentation files.</dd>
+          <dt>Expected</dt><dd>An installed-package quickstart that works from a neutral directory, or an explicit “from a source checkout” label with absolute repository/documentation links.</dd>
+          <dt>Impact</dt><dd>A successful clean installation leads directly to a failing advertised first workflow and broken local documentation links.</dd>
+        </dl>
+        <details><summary>Distribution evidence</summary>
+          <pre><code>$ egress-gate validate \
+    --policy examples/regex-redaction/egress-gate-config.yaml
+Policy validation failed [invalid_input]
+[exit 1]</code></pre>
+        </details>
+      </article>
+
+      <article class="card finding">
+        <header><span class="pill medium">Medium</span><h3>EG-QA-05 — <code>NO_COLOR</code> is ignored by interactive service logging</h3></header>
+        <dl>
+          <dt>Observed</dt><dd>In a pseudo-TTY, <code>NO_COLOR=1 egress-gate --debug serve</code> still emitted ANSI sequences for timestamp, level, and logger name.</dd>
+          <dt>Expected</dt><dd>The standard opt-out should disable styling in logging as well as command output.</dd>
+          <dt>Impact</dt><dd>Accessibility preferences are not honored and captured terminal logs may contain unwanted escape codes.</dd>
+        </dl>
+      </article>
+
+      <article class="card finding">
+        <header><span class="pill low">Low</span><h3>EG-QA-06 — Execution failure omits the failing corpus case</h3></header>
+        <p>An invalid-UTF-8 case aborts with <code>body_encoding_invalid</code> but does not print its bounded case name or already completed results. In a large corpus this forces manual bisection. Include the validated case name without rendering request fields.</p>
+      </article>
+
+      <article class="card finding">
+        <header><span class="pill low">Low</span><h3>EG-QA-07 — Bare command prints help but exits 2</h3></header>
+        <p>Running <code>egress-gate</code> with no arguments renders useful top-level help but returns usage-error status 2. This is common CLI-framework behavior, but exit 0 would better match a discovery-oriented first run.</p>
+      </article>
+
+      <article class="card finding">
+        <header><span class="pill low">Low</span><h3>EG-QA-08 — Immediate retry can briefly remain saturated</h3></header>
+        <p>After 20 concurrent calls produced 16 allows and four expected <code>RESOURCE_EXHAUSTED</code> results, one immediate retry was also rejected. A retry 5 ms later succeeded. This may be grpcio accounting teardown rather than EgressGate logic; document retry/backoff or smooth the recovery if practical.</p>
+      </article>
+
+      <article class="card finding">
+        <header><span class="pill low">Low</span><h3>EG-QA-09 — Successful shutdown can emit confusing GOAWAY noise</h3></header>
+        <p>Normal live-server teardown emitted grpcio core messages including <code>Got goaway</code> and <code>Cancelling all calls</code>. No work was lost. Consider logging guidance or filtering so expected shutdown does not resemble an incident.</p>
+      </article>
+
+      <article class="card finding">
+        <header><span class="pill low">Low</span><h3>EG-QA-10 — Generated schema definition names are unwieldy</h3></header>
+        <p>The JSON is valid, but custom-gate definitions can receive long Pydantic-derived names such as <code>ConfiguredGate_Annotated_Union_RegexConfig__PathPrefixDenyConfig...</code>. Stable human-oriented titles or a concise YAML schema summary would make diagnostics and discussion easier.</p>
+      </article>
+
+      <article class="card finding">
+        <header><span class="pill low">Low</span><h3>EG-QA-11 — No <code>--version</code> command</h3></header>
+        <p><code>egress-gate --version</code> returns “No such option” with exit 2. Operators lack a direct way to correlate a running CLI with package and protocol versions.</p>
+      </article>
+
+      <article class="card finding">
+        <header><span class="pill low">Low</span><h3>EG-QA-12 — Very narrow help truncates option names</h3></header>
+        <p>At a 40-column pseudo-TTY, required registration options render as <code>--host…</code> and <code>--conf…</code>. Prefer a stacked/plain layout at narrow widths so identifiers remain copyable.</p>
+      </article>
+
+      <article class="card finding">
+        <header><span class="pill low">Low</span><h3>EG-QA-13 — Readiness verification is under-documented</h3></header>
+        <p>Operations guidance covers binding, registration, restart, and logs but no explicit health or end-to-end gateway reachability check. Add a concrete readiness verification workflow.</p>
+      </article>
+    </section>
+
+    <section id="custom-gates">
+      <h2>Custom-gate release-critical track</h2>
+      <p>QA did not rely only on the bundled keyword example. Two disposable gates were independently authored in isolated copies using the documented public API.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Gate</th><th>Purpose</th><th>Path exercised</th><th>Result</th></tr></thead>
+          <tbody>
+            <tr><td><code>stamp-or-deny</code></td><td>Write a header unless a body token requires denial.</td><td><code>--registry-factory</code>, list, schema, validate, offline evaluate, downstream regex observation.</td><td><span class="status-pass">Pass</span></td></tr>
+            <tr><td><code>qa-probe</code></td><td>Resource-backed keyword deny, controlled delay, counters, and deliberate exception.</td><td>Real <code>grpc.aio</code> server, Describe, ValidateConfig, EvaluateHttpRequest, concurrency, policy replacement, failure redaction.</td><td><span class="status-pass">Pass</span></td></tr>
+            <tr><td>Deliberately invalid gate</td><td>Return an undeclared terminal deny.</td><td>Public capability enforcement and content-safe CLI failure.</td><td><span class="status-pass">Rejected correctly</span></td></tr>
+            <tr><td>Bundled <code>keyword-deny</code></td><td>Documentation smoke test.</td><td>Discovery, policy validation, two-case offline corpus.</td><td><span class="status-pass">Pass</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>What the authored gates proved</h3>
+      <ul>
+        <li>The exact registry schema includes custom discriminators and capabilities.</li>
+        <li>Custom configuration is strict; malformed configuration is rejected without echoing sentinel values.</li>
+        <li>Header mutations are applied to a new request snapshot and are visible to a downstream built-in regex gate.</li>
+        <li>Terminal custom decisions preserve gate name, gate type, and decision-source provenance.</li>
+        <li>Undeclared deny output fails closed as <code>gate_output_invalid</code>; the sensitive body sentinel is absent.</li>
+        <li>Application-owned resources are reused safely under live concurrency and never exceed four active workers.</li>
+        <li>A custom exception containing the request body becomes cataloged <code>gate_execution_failed</code>; the body is not returned.</li>
+        <li>An invalid policy candidate does not replace the last valid active processor.</li>
+      </ul>
+      <pre><code>$ egress-gate --registry-factory qa_custom_gate:create_registry evaluate \
+    --policy qa_custom_policy.yaml --cases qa_custom_cases.yaml
+2 passed · 0 failed · 2 total
+[exit 0]
+
+$ egress-gate --registry-factory qa_bad_gate:create_registry evaluate \
+    --policy qa_bad_policy.yaml --cases qa_bad_cases.yaml
+Evaluation failed [gate_output_invalid]
+A gate returned an invalid result.
+[exit 2]</code></pre>
+    </section>
+
+    <section id="matrix">
+      <h2>Battle-test matrix</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Area</th><th>Scenarios</th><th>Result</th></tr></thead>
+          <tbody>
+            <tr><td>Repository checks</td><td>Tests, formatting, Ruff, ty, import smoke test, dependency audit on Python 3.11.15 and 3.14.4.</td><td><span class="status-pass">Pass</span></td></tr>
+            <tr><td>Regex gate</td><td>Body, path, raw query, selected/repeated/case-insensitive headers, detect, deny, replace, overlap ranking, downstream mutation, ordering.</td><td><span class="status-pass">Pass</span></td></tr>
+            <tr><td>Policy/corpus strictness</td><td>Duplicate keys/cases, YAML aliases, unknown fields, noncanonical base64, unsupported replacements, absolute/traversal/symlink catalogs, missing files.</td><td><span class="status-pass">Rejected safely</span>; diagnostics finding</td></tr>
+            <tr><td>CLI</td><td>Help, gate list/schema, validation, evaluation, stable exits 0/1/2, timeout bounds, registry reference errors, non-TTY and 40-column pseudo-TTY output.</td><td><span class="status-pass">Pass</span>; UX findings</td></tr>
+            <tr><td>Packaging</td><td>Locked sync, sdist/wheel build, clean wheel install on Python 3.11, Python 3.10 rejection, installed console script, embedded README workflow.</td><td>Runtime <span class="status-pass">pass</span>; packaged quickstart finding</td></tr>
+            <tr><td>Live gRPC</td><td>Describe, ValidateConfig, EvaluateHttpRequest, custom resource gate, active-policy changes, invalid candidate rollback.</td><td><span class="status-pass">Pass</span></td></tr>
+            <tr><td>Deadlines/queueing</td><td>12 calls, four workers, 90 ms work, 40 ms service timeout; atomic limit denials; post-drain recovery.</td><td><span class="status-pass">Pass</span></td></tr>
+            <tr><td>Cancellation</td><td>Eight calls with 15 ms client deadline and 100 ms work; slot retention, worker bound, recovery.</td><td><span class="status-pass">Pass</span></td></tr>
+            <tr><td>Saturation</td><td>20 calls against 16-RPC bound.</td><td>16 allowed, 4 expected exhausted; one transient retry finding</td></tr>
+            <tr><td>Boundaries</td><td>5,242,881-byte frame, 4 MiB + 1 body, NaN configuration, malformed protobuf.</td><td>Limits enforced; malformed-wire finding</td></tr>
+            <tr><td>Content safety</td><td>Sentinels in bodies, policies, paths, templates, malformed configs, and raised exceptions.</td><td><span class="status-pass">No request-content leak found</span></td></tr>
+            <tr><td>Lifecycle</td><td>Close during in-flight gate, active processor cleanup, repeated start/stop.</td><td><span class="status-pass">Pass</span></td></tr>
+            <tr><td>Gateway registration</td><td>Input rejection, XDG creation, mode 0600, idempotent add/update, removal, operator next steps.</td><td><span class="status-pass">Pass</span></td></tr>
+            <tr><td>Accessibility</td><td>Normal and narrow terminal rendering, piped schema, <code>NO_COLOR</code> service logging.</td><td>Readable overall; color and narrow-help findings</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="evidence">
+      <h2>Evidence and environments</h2>
+      <p>Each specialist copied the project to a unique temporary directory and selected a distinct <code>UV_PROJECT_ENVIRONMENT</code>. Disposable gates, policies, corpora, and battle tests existed only in those copies. The shared worktree was used read-only until this report was added.</p>
+
+      <h3>Authoritative validation</h3>
+      <pre><code>$ UV_PROJECT_ENVIRONMENT=/tmp/egress-gate-remediation-py311 make check-py311
+Using CPython 3.11.15
+217 passed in 1.68s
+41 files already formatted
+All checks passed!  # Ruff
+All checks passed!  # ty
+No known vulnerabilities found
+
+$ UV_PROJECT_ENVIRONMENT=/tmp/egress-gate-remediation-qa make check
+Using CPython 3.14.4
+217 passed in 1.61s
+41 files already formatted
+All checks passed!  # Ruff
+All checks passed!  # ty
+No known vulnerabilities found</code></pre>
+      <p>The audit skipped only local unpublished <code>egress-gate 0.1.0</code>, as expected. Repeated <code>cachecontrol</code> cache-deserialization warnings were environment/tooling noise and did not affect the result.</p>
+
+      <h3>Additional suites and measurements</h3>
+      <ul>
+        <li>Service/timeout/processor focus: <strong>63 passed in 1.08s</strong>.</li>
+        <li>Disposable live-service battle suite: <strong>9 passed in 1.72s</strong>.</li>
+        <li>Five-case adversarial regex corpus: <strong>5 passed</strong>.</li>
+        <li>Authored <code>stamp-or-deny</code> corpus: <strong>2 passed</strong>.</li>
+        <li>Bundled regex corpus: <strong>2 passed</strong>.</li>
+        <li>Bundled custom-gate corpus: <strong>2 passed</strong>.</li>
+        <li>Custom live concurrency: 16 RPCs × 25 ms work, <strong>109.5 ms elapsed</strong>, <strong>max_active=4</strong>.</li>
+        <li>Saturation recovery: <strong>7.4 ms</strong> to successful retry, with one transient rejection.</li>
+      </ul>
+
+      <details><summary>Representative commands</summary>
+        <pre><code># Baselines
+UV_PROJECT_ENVIRONMENT=/tmp/egress-gate-root-qa-venv make check
+UV_PROJECT_ENVIRONMENT=/tmp/egress-gate-root-qa-py311 make check-py311
+
+# Built-in workflow
+uv run --frozen egress-gate gates list
+uv run --frozen egress-gate validate \
+  --policy examples/regex-redaction/egress-gate-config.yaml
+uv run --frozen egress-gate evaluate \
+  --policy examples/regex-redaction/egress-gate-config.yaml \
+  --cases examples/regex-redaction/cases.yaml
+
+# Bundled custom gate
+uv run --frozen egress-gate \
+  --registry-factory examples.custom-gate.keyword_gate:create_registry \
+  evaluate --policy examples/custom-gate/egress-gate-config.yaml \
+  --cases examples/custom-gate/cases.yaml
+
+# Packaging in a disposable source copy
+uv build
+uv venv /tmp/egress-gate-package-qa/install-venv --python 3.11
+uv pip install --python /tmp/egress-gate-package-qa/install-venv/bin/python \
+  dist/egress_gate-0.1.0-py3-none-any.whl
+/tmp/egress-gate-package-qa/install-venv/bin/egress-gate gates list</code></pre>
+      </details>
+    </section>
+
+    <section id="recommendations">
+      <h2>Implemented actions and guardrails</h2>
+      <ol>
+        <li><strong>Normalized malformed protobuf errors.</strong> Decode failures now return stable, content-safe <code>INVALID_ARGUMENT</code>; a raw-wire regression protects the boundary.</li>
+        <li><strong>Repaired the installed-package journey.</strong> Source-checkout commands are labeled, the installed quickstart is standalone, and documentation links are absolute.</li>
+        <li><strong>Translated preparation errors precisely.</strong> Built-in <code>GateConfigurationError</code> failures map to a cataloged preparation response with relevant next steps.</li>
+        <li><strong>Added safe structural diagnostics.</strong> Bounded locations such as <code>pipeline.gates[2].config.scan</code> and safe categories replace generic schema errors.</li>
+        <li><strong>Honored color preferences.</strong> <code>NO_COLOR</code> applies to automatic service logging and has regression coverage.</li>
+        <li><strong>Added case context to evaluator failures.</strong> The validated case name and already completed safe projections are retained.</li>
+        <li><strong>Documented overload retry and readiness behavior.</strong> Operations guidance defines bounded <code>RESOURCE_EXHAUSTED</code> backoff and layered readiness checks.</li>
+        <li><strong>Polished command discovery.</strong> <code>--version</code>, exit-0 bare help, complete narrow-width option identifiers, concise command summaries, and stable schema titles are verified.</li>
+      </ol>
+      <p class="callout"><strong>Release stance after remediation:</strong> no open QA finding blocks controlled trusted-network deployment. Keep the new raw-wire, content-safety, CLI, schema, logging, and documentation checks in the release gate.</p>
+    </section>
+
+    <section id="limits">
+      <h2>Scope and limitations</h2>
+      <ul>
+        <li>No upstream provider traffic or credential attachment was tested; those are outside EgressGate's documented pre-credentials boundary.</li>
+        <li>Live tests used a real <code>grpc.aio</code> server and generated stub, but did not launch the long-running CLI <code>serve</code> process on a production port.</li>
+        <li>TLS was not tested because this version intentionally documents plaintext gRPC on a restricted trusted network.</li>
+        <li>Cancellation cannot forcibly terminate already-running trusted synchronous Python code; QA verified bounded slot ownership and later recovery.</li>
+        <li>Offline evaluator mutation bodies are intentionally not directly assertable; downstream gates were used to prove mutation flow.</li>
+        <li>The existing latency CSV was not rerun as a performance benchmark; this session measured only targeted concurrency and recovery scenarios.</li>
+        <li>Dependency auditing covers published dependencies; the local unpublished EgressGate package cannot be resolved by <code>pip-audit</code>.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>Prepared from isolated QA sessions against commit <code>aa74572</code> and updated after integrated remediation. This report is self-contained, responsive, printable, and uses no external assets or scripts.</p>
+  </footer>
+</body>
+</html>

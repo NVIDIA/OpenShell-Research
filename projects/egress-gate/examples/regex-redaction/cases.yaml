@@ -1,0 +1,50 @@
+version: 1
+cases:
+  - name: email-is-detected-and-request-is-allowed
+    tags: [regex, redaction]
+    provenance:
+      kind: synthetic
+      redacted: false
+    request:
+      context:
+        request_id: corpus-email
+        sandbox_id: sandbox-example
+      target:
+        scheme: https
+        host: api.example.com
+        port: 443
+        method: POST
+        path: /v1/messages
+        query: ""
+      headers: []
+      body:
+        encoding: utf8
+        value: "send alice@example.com"
+    expected:
+      decision: allow
+      decision_source_kind: pipeline_default
+      finding_types: [regex_match]
+  - name: ordinary-body-is-allowed
+    tags: [regex]
+    provenance:
+      kind: synthetic
+      redacted: true
+    request:
+      context:
+        request_id: corpus-ordinary
+        sandbox_id: sandbox-example
+      target:
+        scheme: https
+        host: api.example.com
+        port: 443
+        method: POST
+        path: /v1/messages
+        query: ""
+      headers: []
+      body:
+        encoding: utf8
+        value: "ordinary text"
+    expected:
+      decision: allow
+      decision_source_kind: pipeline_default
+      finding_types: []

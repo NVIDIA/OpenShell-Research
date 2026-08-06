@@ -30,9 +30,11 @@ fi
 python -m pip install --upgrade pip
 python -m pip install -r requirements-docs.txt
 
-python scripts/stage-privacy-guard-docs.py
+python scripts/stage-egress-gate-docs.py
 python scripts/render-dev-notes.py
 zensical build --clean --strict
 python scripts/publish-agent-markdown.py
 REQUIRE_RENDERED_AGENT_MARKDOWN=1 python tests/test_agent_markdown.py
 REQUIRE_RENDERED_404=1 python tests/test_docs_404.py
+REQUIRE_RENDERED_NAVIGATION=1 python tests/test_navigation_drawer.py
+REQUIRE_RENDERED_PAGE_NAVIGATION=1 python tests/test_page_navigation.py

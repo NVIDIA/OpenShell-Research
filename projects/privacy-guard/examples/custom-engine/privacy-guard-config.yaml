@@ -1,9 +1,0 @@
-entity_processing:
-  stages:
-    - name: project-names
-      config:
-        engine: keyword-tool
-        entity: confidential-project
-        keyword: Project Cobalt
-on_detection:
-  action: detect

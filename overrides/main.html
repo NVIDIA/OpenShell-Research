@@ -3,6 +3,16 @@
 
 {% block extrahead %}
   {{ super() }}
+  <script>
+    try {
+      document.documentElement.dataset.navigationDrawer =
+        window.sessionStorage.getItem("openshell.navigationDrawerOpen") === "true"
+          ? "open"
+          : "closed";
+    } catch {
+      document.documentElement.dataset.navigationDrawer = "closed";
+    }
+  </script>
   {% if page.meta and page.meta.agent_markdown %}
     <link rel="alternate" type="text/markdown" href="{{ agent_markdown.href(page) }}" title="Markdown source">
   {% endif %}
