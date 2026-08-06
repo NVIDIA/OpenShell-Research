@@ -418,6 +418,71 @@ def test_replacement_selects_ranked_non_overlapping_winners() -> None:
 
 
 @pytest.mark.parametrize(
+    ("rules", "text", "expected"),
+    [
+        (
+            [
+                {"name": "short", "pattern": "ab", "confidence": "high"},
+                {"name": "long", "pattern": "abc", "confidence": "high"},
+            ],
+            "abc",
+            b"<token>",
+        ),
+        (
+            [
+                {"name": "earlier", "pattern": "ab", "confidence": "high"},
+                {"name": "later", "pattern": "ba", "confidence": "high"},
+            ],
+            "aba",
+            b"<token>a",
+        ),
+    ],
+)
+def test_equal_confidence_overlap_prefers_length_then_start(
+    rules: list[dict[str, object]],
+    text: str,
+    expected: bytes,
+) -> None:
+    evaluation = _run(
+        _config(rules, action_kind="replace", template="<{entity}>"),
+        text,
+    )
+
+    assert evaluation.request_mutations.replacement_body == expected
+    assert evaluation.findings[0].count == 2
+
+
+def test_identical_overlap_uses_entity_name_as_a_stable_tie_breaker() -> None:
+    config = RegexConfig.model_validate(
+        {
+            "name": "regex",
+            "kind": "regex",
+            "scan": {
+                "kind": "body",
+                "action": {"kind": "replace", "template": "<{entity}>"},
+            },
+            "pattern_catalog": {
+                "entities": [
+                    {
+                        "name": "zeta",
+                        "rules": [{"pattern": "abc", "confidence": "high"}],
+                    },
+                    {
+                        "name": "alpha",
+                        "rules": [{"pattern": "abc", "confidence": "high"}],
+                    },
+                ]
+            },
+        }
+    )
+
+    evaluation = _run(config, "abc")
+
+    assert evaluation.request_mutations.replacement_body == b"<alpha>"
+    assert [finding.label for finding in evaluation.findings] == ["alpha", "zeta"]
+
+
+@pytest.mark.parametrize(
     "template",
     [
         "{unknown}",

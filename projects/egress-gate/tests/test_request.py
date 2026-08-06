@@ -134,11 +134,30 @@ def test_request_mutations_preserve_ordered_discriminated_header_mutations() -> 
 
 def test_request_mutations_reject_invalid_bounds() -> None:
     mutation = RemoveHeaderMutation(kind="remove", name="x-test")
+    assert (
+        len(
+            RequestMutations(
+                header_mutations=tuple(mutation for _ in range(MAX_HEADER_MUTATIONS))
+            ).header_mutations
+        )
+        == MAX_HEADER_MUTATIONS
+    )
     with pytest.raises(ValidationError):
         RequestMutations(
             header_mutations=tuple(mutation for _ in range(MAX_HEADER_MUTATIONS + 1))
         )
 
+    exact_data = RequestMutations(
+        header_mutations=(
+            WriteHeaderMutation(
+                kind="write",
+                name="x",
+                value="x" * (MAX_HEADER_MUTATION_DATA_BYTES - 1),
+                on_existing=ExistingHeaderAction.OVERWRITE,
+            ),
+        )
+    )
+    assert exact_data.header_mutations
     with pytest.raises(ValidationError):
         RequestMutations(
             header_mutations=(
@@ -150,6 +169,16 @@ def test_request_mutations_reject_invalid_bounds() -> None:
                 ),
             )
         )
+
+    assert (
+        len(
+            RequestMutations(replacement_body=b"x" * MAX_BODY_BYTES).replacement_body
+            or b""
+        )
+        == MAX_BODY_BYTES
+    )
+    with pytest.raises(ValidationError):
+        RequestMutations(replacement_body=b"x" * (MAX_BODY_BYTES + 1))
 
 
 def test_request_models_reject_non_tuple_sequences_and_extra_fields() -> None:
