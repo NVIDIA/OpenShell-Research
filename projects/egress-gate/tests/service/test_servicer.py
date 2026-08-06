@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier, Event
 from typing import Never
@@ -458,6 +459,59 @@ async def test_cancelled_candidate_keeps_its_slot_and_is_not_published(
         with pytest.raises(asyncio.CancelledError):
             await task
         assert middleware._processing_slots._value == 3
+
+        release.set()
+        for _ in range(100):
+            if middleware._processing_slots._value == 4:
+                break
+            await asyncio.sleep(0.01)
+
+        assert middleware._processing_slots._value == 4
+        assert middleware._policy._processor is old
+    finally:
+        release.set()
+        await middleware.close()
+
+
+@pytest.mark.asyncio
+async def test_cancellation_at_publication_boundary_keeps_the_active_policy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    middleware = EgressGateMiddleware(
+        create_builtin_registry(),
+        timeout_seconds=5,
+    )
+    old = middleware._policy.processor_for(_values(), timeout=Timeout.from_seconds(1))
+    started = Event()
+    release = Event()
+    original_publish = servicer_module._PolicyPublicationGuard.publish
+
+    def blocked_publish(
+        publication: servicer_module._PolicyPublicationGuard,
+        operation: Callable[[], None],
+    ) -> None:
+        started.set()
+        assert release.wait(2)
+        original_publish(publication, operation)
+
+    monkeypatch.setattr(
+        servicer_module._PolicyPublicationGuard,
+        "publish",
+        blocked_publish,
+    )
+    changed_request = _request()
+    changed_request.config.CopyFrom(_proto_config(_values(action_kind="replace")))
+    task = asyncio.create_task(
+        middleware._evaluate_http_request(
+            changed_request,
+            Timeout.from_seconds(5),
+        )
+    )
+    try:
+        assert await asyncio.to_thread(started.wait, 1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
 
         release.set()
         for _ in range(100):

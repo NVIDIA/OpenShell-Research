@@ -8,7 +8,7 @@ import math
 import time
 from collections.abc import Callable, Iterable
 from concurrent.futures import Future, ThreadPoolExecutor
-from threading import Event, Lock
+from threading import Lock
 from typing import Never, Protocol, TypedDict, TypeVar
 
 import grpc
@@ -213,15 +213,15 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         if len(request.body) > MAX_BODY_BYTES:
             raise EgressGateError(ErrorCode.REQUEST_BODY_TOO_LARGE)
         _validate_evaluation_envelope(request)
-        publication_cancelled = Event()
+        publication = _PolicyPublicationGuard()
         result = await self._run_in_worker(
             lambda: self._prepare_and_process(
                 request,
                 timeout,
-                publication_cancelled=publication_cancelled,
+                publication=publication,
             ),
             timeout=timeout,
-            on_cancel=publication_cancelled.set,
+            on_cancel=publication.cancel,
         )
         timeout.raise_if_expired()
         response, source_kind = _result_to_proto(result)
@@ -233,14 +233,14 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         request: pb2.HttpRequestEvaluation,
         timeout: Timeout,
         *,
-        publication_cancelled: Event | None = None,
+        publication: _PolicyPublicationGuard | None = None,
     ) -> EgressResult:
         domain_request = _request_from_proto(request)
         values = _mapping_from_proto(request.config)
         processor = self._policy.processor_for(
             values,
             timeout=timeout,
-            publication_cancelled=publication_cancelled,
+            publication=publication,
         )
         return processor.process(domain_request, timeout=timeout)
 
@@ -298,7 +298,7 @@ class _ActivePolicy:
         values: object,
         *,
         timeout: Timeout,
-        publication_cancelled: Event | None = None,
+        publication: _PolicyPublicationGuard | None = None,
     ) -> RequestProcessor:
         """Validate and activate a complete candidate under the shared deadline."""
         config = self._registry.validate_config(values)
@@ -311,10 +311,15 @@ class _ActivePolicy:
                 return self._processor
             processor = self._registry.prepare_processor(config, timeout=timeout)
             timeout.raise_if_expired()
-            if publication_cancelled is not None and publication_cancelled.is_set():
-                raise _PolicyPublicationCancelled
-            self._config = config
-            self._processor = processor
+
+            def activate() -> None:
+                self._config = config
+                self._processor = processor
+
+            if publication is None:
+                activate()
+            else:
+                publication.publish(activate)
             return processor
         except (GateConfigurationError, GateRegistryError):
             raise EgressGateError(ErrorCode.CONFIG_INVALID) from None
@@ -340,6 +345,24 @@ async def _await_worker(worker: Future[_WorkerResultT]) -> _WorkerResultT:
 
 class _AbortContext(Protocol):
     async def abort(self, code: grpc.StatusCode, details: str) -> Never: ...
+
+
+class _PolicyPublicationGuard:
+    """Order RPC cancellation and active-policy publication atomically."""
+
+    def __init__(self) -> None:
+        self._lock = Lock()
+        self._cancelled = False
+
+    def cancel(self) -> None:
+        with self._lock:
+            self._cancelled = True
+
+    def publish(self, operation: Callable[[], None]) -> None:
+        with self._lock:
+            if self._cancelled:
+                raise _PolicyPublicationCancelled
+            operation()
 
 
 class _EvaluationLogExtra(TypedDict):

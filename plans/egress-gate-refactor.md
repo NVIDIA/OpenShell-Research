@@ -2,9 +2,11 @@
 
 ## Status
 
-Implemented design specification. The phased sequence below records the
-intended construction and acceptance boundaries; it is not a remaining-work
-checklist and must not be replayed against the completed refactor.
+Historical implementation plan. The public contract evolved while the refactor
+was implemented, so names and configuration examples below may be superseded.
+Use the project documentation and source as the canonical references. The
+phased sequence records the original construction and acceptance boundaries;
+it is not a remaining-work checklist and must not be replayed.
 
 This plan intentionally makes no provision for backwards compatibility. The
 superseded package name, Python imports, CLI, policy schema, public classes,

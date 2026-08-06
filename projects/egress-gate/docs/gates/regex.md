@@ -53,9 +53,12 @@ general regex replacement cannot rewrite arbitrary selected headers. A custom
 gate can return supported header writes or removals when it declares the
 `GateCapability.MUTATE_HEADERS` capability.
 
-A catalog can be inline or in a relative `.yaml` or `.yml` file. The gate
-rejects absolute paths, path traversal, symlinks, YAML aliases, duplicate keys,
-invalid body UTF-8, unsafe patterns, and oversized catalogs.
+A catalog can be inline or in a relative `.yaml` or `.yml` file. Relative paths
+resolve from the Egress Gate process working directory, not from the policy
+file. Use an inline catalog when the process does not have a stable working
+directory. The gate rejects absolute paths, path traversal, symlinks, YAML
+aliases, duplicate keys, invalid body UTF-8, unsafe patterns, and oversized
+catalogs.
 
 Each entity has a stable, bounded name and one or more rules. Rule confidence
 is `low`, `medium`, or `high`. Optional flags are `ignore_case`, `multiline`,

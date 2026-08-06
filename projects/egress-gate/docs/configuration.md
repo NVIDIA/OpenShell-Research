@@ -32,6 +32,10 @@ network_middlewares:
       include: [api.anthropic.com]
 ```
 
+Relative catalog paths resolve from the Egress Gate process working directory,
+not from the policy file. Use an inline catalog when the process does not have a
+stable working directory.
+
 The Egress Gate policy has two required fields:
 
 - `gates` contains one through ten named gate configurations.

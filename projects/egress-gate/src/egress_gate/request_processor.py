@@ -285,9 +285,21 @@ def _append_findings(
             total = sourced.finding.count + finding.count
             if total > MAX_FINDING_COUNT:
                 raise GateLimitExceededError("finding count exceeds the limit")
+            try:
+                combined_finding = Finding(
+                    type=finding.type,
+                    label=finding.label,
+                    count=total,
+                    confidence=finding.confidence,
+                    severity=finding.severity,
+                )
+            except ValidationError:
+                raise GateLimitExceededError(
+                    "aggregated finding exceeds the encoded size limit"
+                ) from None
             output[index] = SourcedFinding(
                 source_gate=gate_name,
-                finding=sourced.finding.model_copy(update={"count": total}),
+                finding=combined_finding,
             )
             break
         else:

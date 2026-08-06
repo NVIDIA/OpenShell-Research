@@ -48,6 +48,8 @@ from egress_gate.result import (
 )
 from egress_gate.timeout import Timeout
 
+_BOUNDARY_FINDING_TYPE = "t" * 1024
+
 
 class _ControlConfig(GateConfig):
     kind: Literal["test-control"]
@@ -59,6 +61,7 @@ class _ControlConfig(GateConfig):
     finding_label: str | None = None
     finding_count: int = 1
     emit_twice: bool = False
+    boundary_finding: bool = False
     reason_code: str | None = None
 
 
@@ -72,7 +75,10 @@ class _ControlGate(Gate[_ControlConfig, None]):
             GateCapability.DENY,
         }
     )
-    finding_types = (FindingTypeDefinition(type="test_observation"),)
+    finding_types = (
+        FindingTypeDefinition(type="test_observation"),
+        FindingTypeDefinition(type=_BOUNDARY_FINDING_TYPE),
+    )
 
     def _evaluate(
         self,
@@ -87,7 +93,16 @@ class _ControlGate(Gate[_ControlConfig, None]):
         ):
             raise AssertionError("later gate did not see the current request")
         findings: tuple[Finding, ...] = ()
-        if self.config.finding_label is not None:
+        if self.config.boundary_finding:
+            finding = Finding(
+                type=_BOUNDARY_FINDING_TYPE,
+                label="x" * 1024,
+                count=64,
+                confidence="c" * 1024,
+                severity="s" * 1010,
+            )
+            findings = (finding, finding)
+        elif self.config.finding_label is not None:
             finding = Finding(
                 type="test_observation",
                 label=self.config.finding_label,
@@ -305,6 +320,27 @@ def test_processor_aggregates_equivalent_findings_by_gate_provenance() -> None:
     assert len(result.findings) == 1
     assert result.findings[0].source_gate == "one"
     assert result.findings[0].finding.count == 2
+
+
+def test_aggregated_finding_size_exhaustion_returns_a_runtime_limit() -> None:
+    processor = _processor(
+        (
+            (
+                "one",
+                {
+                    "kind": "test-control",
+                    "boundary_finding": True,
+                },
+            ),
+        )
+    )
+
+    result = processor.process(_request(), timeout=Timeout.from_seconds(1))
+
+    assert result.decision is EgressDecision.DENY
+    assert result.decision_source.kind is DecisionSourceKind.RUNTIME_LIMIT
+    assert result.reason_code == LIMIT_REASON_CODE
+    assert result.findings == ()
 
 
 def test_terminal_decisions_skip_later_gates() -> None:

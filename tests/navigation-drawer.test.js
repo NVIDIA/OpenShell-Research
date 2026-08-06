@@ -255,7 +255,11 @@ test("keyboard control, Escape, and visible focus endpoints work", () => {
   fixture.button.focus();
 
   fixture.document.dispatchEvent(new TestEvent("keydown", { key: "Enter" }));
-  assert.equal(fixture.toggle.checked, false, "Zensical owns Enter activation");
+  assert.equal(fixture.toggle.checked, true);
+
+  fixture.button.focus();
+  fixture.document.dispatchEvent(new TestEvent("keydown", { key: "Enter" }));
+  assert.equal(fixture.toggle.checked, false);
 
   fixture.document.dispatchEvent(new TestEvent("keydown", { key: " " }));
   assert.equal(fixture.toggle.checked, true);

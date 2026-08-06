@@ -279,6 +279,41 @@ def test_registry_requires_canonical_common_field_names() -> None:
         GateRegistry().register(AliasedGate)
 
 
+@pytest.mark.parametrize(
+    "override",
+    (
+        ConfigDict(extra="allow"),
+        ConfigDict(strict=False),
+        ConfigDict(frozen=False),
+        ConfigDict(hide_input_in_errors=False),
+        ConfigDict(validate_default=False),
+    ),
+)
+def test_registry_requires_the_strict_immutable_gate_config_contract(
+    override: ConfigDict,
+) -> None:
+    class LoosenedConfig(GateConfig):
+        model_config = override
+
+        kind: Literal["loosened"]
+
+    class LoosenedGate(Gate[LoosenedConfig, None]):
+        capabilities = frozenset()
+        finding_types = ()
+
+        def _evaluate(
+            self,
+            request: HttpRequest,
+            *,
+            timeout: Timeout,
+        ) -> GateEvaluation:
+            del request, timeout
+            return GateEvaluation.proceed()
+
+    with pytest.raises(GateRegistryError, match="strict immutable"):
+        GateRegistry().register(LoosenedGate)
+
+
 def test_registry_forwards_the_shared_preparation_timeout() -> None:
     registry = GateRegistry()
     registry.register(_RegistryGate)

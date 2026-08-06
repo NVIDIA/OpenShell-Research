@@ -444,6 +444,21 @@ def _gate_kind(config_type: type[GateConfig]) -> str:
 
 
 def _validate_common_gate_config_fields(config_type: type[GateConfig]) -> None:
+    required_model_config = {
+        "extra": "forbid",
+        "strict": True,
+        "frozen": True,
+        "hide_input_in_errors": True,
+        "validate_default": True,
+    }
+    if any(
+        config_type.model_config.get(setting) != value
+        for setting, value in required_model_config.items()
+    ):
+        raise GateRegistryError(
+            "gate config must retain the strict immutable model configuration"
+        )
+
     for ancestor in config_type.__mro__:
         if ancestor is GateConfig:
             break
