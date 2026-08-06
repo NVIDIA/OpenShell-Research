@@ -16,8 +16,16 @@ from egress_gate.gates import (
     GateResources,
     RegexConfig,
     RegexGate,
+    Utf8BodyGate,
 )
-from egress_gate.request import HttpRequest, HttpTarget, RequestContext
+from egress_gate.request import (
+    ExistingHeaderAction,
+    HttpRequest,
+    HttpTarget,
+    RequestContext,
+    RequestMutations,
+    WriteHeaderMutation,
+)
 from egress_gate.result import Finding, GateControl, GateEvaluation
 from egress_gate.timeout import Timeout
 
@@ -107,6 +115,63 @@ class _InvalidEvaluationGate(Gate[_RequestConfig, None]):
         return GateEvaluation.proceed().model_copy(update={"control": GateControl.DENY})
 
 
+class _UndeclaredBodyMutationGate(Gate[_RequestConfig, None]):
+    capabilities = frozenset()
+    finding_types = ()
+
+    def _evaluate(
+        self,
+        request: HttpRequest,
+        *,
+        timeout: Timeout,
+    ) -> GateEvaluation:
+        del request, timeout
+        return GateEvaluation.proceed(
+            request_mutations=RequestMutations(replacement_body=b"changed")
+        )
+
+
+class _UndeclaredHeaderMutationGate(Gate[_RequestConfig, None]):
+    capabilities = frozenset()
+    finding_types = ()
+
+    def _evaluate(
+        self,
+        request: HttpRequest,
+        *,
+        timeout: Timeout,
+    ) -> GateEvaluation:
+        del request, timeout
+        return GateEvaluation.proceed(
+            request_mutations=RequestMutations(
+                header_mutations=(
+                    WriteHeaderMutation(
+                        kind="write",
+                        name="x-openshell-middleware-test",
+                        value="changed",
+                        on_existing=ExistingHeaderAction.OVERWRITE,
+                    ),
+                )
+            )
+        )
+
+
+class _InvalidUtf8ReplacementGate(Utf8BodyGate[_RequestConfig, None]):
+    capabilities = frozenset({GateCapability.READ_BODY, GateCapability.REPLACE_BODY})
+    finding_types = ()
+
+    def _evaluate_text(
+        self,
+        text: str,
+        *,
+        timeout: Timeout,
+    ) -> GateEvaluation:
+        del text, timeout
+        return GateEvaluation.proceed(
+            request_mutations=RequestMutations(replacement_body=b"\xff")
+        )
+
+
 def _request(*, body: bytes = b"payload", host: str = "example.com") -> HttpRequest:
     return HttpRequest(
         context=RequestContext(request_id="request-1", sandbox_id="sandbox-1"),
@@ -145,11 +210,30 @@ def test_gate_public_wrapper_enforces_declared_output_capabilities() -> None:
             _RequestConfig(name="test", kind="test-request"), None
         ).evaluate(_request(), timeout=Timeout.from_seconds(1))
 
+    with pytest.raises(GateContractError, match="undeclared body replacement"):
+        _UndeclaredBodyMutationGate(
+            _RequestConfig(name="test", kind="test-request"), None
+        ).evaluate(_request(), timeout=Timeout.from_seconds(1))
+
+    with pytest.raises(GateContractError, match="undeclared header mutations"):
+        _UndeclaredHeaderMutationGate(
+            _RequestConfig(name="test", kind="test-request"), None
+        ).evaluate(_request(), timeout=Timeout.from_seconds(1))
+
     with pytest.raises(GateContractError, match="undeclared finding"):
         _CapabilityBypassGate(
             _RequestConfig(name="test", kind="test-request"),
             None,
         ).evaluate(_request(), timeout=Timeout.from_seconds(1))
+
+
+def test_utf8_body_gate_rejects_a_non_utf8_replacement() -> None:
+    gate = _InvalidUtf8ReplacementGate(
+        _RequestConfig(name="test", kind="test-request"), None
+    )
+
+    with pytest.raises(GateContractError, match="non-UTF-8 replacement"):
+        gate.evaluate(_request(), timeout=Timeout.from_seconds(1))
 
 
 def test_gate_public_wrapper_classifies_invalid_models_as_contract_errors() -> None:

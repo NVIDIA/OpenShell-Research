@@ -13,8 +13,11 @@ from egress_gate.constants import (
     DEFAULT_DENY_REASON_CODE,
     LIMIT_REASON_CODE,
     MAX_FINDING_COUNT,
+    MAX_HEADER_MUTATION_DATA_BYTES,
     MAX_HEADER_MUTATIONS,
     MAX_PROTO_FINDING_GROUPS,
+    MAX_PROTO_HEADERS,
+    MAX_PROTO_HEADERS_BYTES,
 )
 from egress_gate.errors import (
     EgressGateError,
@@ -835,6 +838,112 @@ def test_composed_header_mutation_overflow_is_an_atomic_runtime_limit() -> None:
     assert result.traces == ()
 
 
+def test_composed_header_mutation_data_overflow_is_an_atomic_runtime_limit() -> None:
+    half_limit = MAX_HEADER_MUTATION_DATA_BYTES // 2
+    processor = _processor(
+        (
+            (
+                "first",
+                {
+                    "kind": "test-control",
+                    "header_name": "x-openshell-middleware-first",
+                    "header_value": "a" * half_limit,
+                },
+            ),
+            (
+                "second",
+                {
+                    "kind": "test-control",
+                    "header_name": "x-openshell-middleware-second",
+                    "header_value": "b" * half_limit,
+                },
+            ),
+        )
+    )
+
+    result = processor.process(_request(), timeout=Timeout.from_seconds(1))
+
+    assert result.decision is EgressDecision.DENY
+    assert result.decision_source.kind is DecisionSourceKind.RUNTIME_LIMIT
+    assert result.reason_code == LIMIT_REASON_CODE
+    assert result.request_mutations.is_empty
+    assert result.findings == ()
+    assert result.traces == ()
+
+
+@pytest.mark.parametrize(
+    "current_request",
+    [
+        _request(
+            headers=tuple(
+                HttpHeader(name=f"x-{index}", value="value")
+                for index in range(MAX_PROTO_HEADERS)
+            )
+        ),
+        _request(
+            headers=(
+                HttpHeader(
+                    name="x-existing",
+                    value="x" * (MAX_PROTO_HEADERS_BYTES - len("x-existing")),
+                ),
+            )
+        ),
+    ],
+    ids=("header-count", "header-bytes"),
+)
+def test_mutation_that_overflows_the_current_request_is_an_atomic_runtime_limit(
+    current_request: HttpRequest,
+) -> None:
+    processor = _processor(
+        (
+            (
+                "append",
+                {
+                    "kind": "test-control",
+                    "header_name": "x-openshell-middleware-added",
+                    "header_value": "value",
+                    "header_action": "append",
+                },
+            ),
+        )
+    )
+
+    result = processor.process(current_request, timeout=Timeout.from_seconds(1))
+
+    assert result.decision is EgressDecision.DENY
+    assert result.decision_source.kind is DecisionSourceKind.RUNTIME_LIMIT
+    assert result.reason_code == LIMIT_REASON_CODE
+    assert result.request_mutations.is_empty
+    assert result.findings == ()
+    assert result.traces == ()
+
+
+@pytest.mark.parametrize(
+    "gate_config",
+    [
+        {
+            "kind": "test-control",
+            "header_name": "authorization",
+            "header_value": "secret",
+        },
+        {
+            "kind": "test-control",
+            "remove_header": "Host",
+        },
+    ],
+    ids=("write-outside-namespace", "remove-protected-header"),
+)
+def test_processor_translates_disallowed_header_mutations_to_a_stable_error(
+    gate_config: dict[str, object],
+) -> None:
+    processor = _processor((("invalid", gate_config),))
+
+    with pytest.raises(EgressGateError) as error:
+        processor.process(_request(), timeout=Timeout.from_seconds(1))
+
+    assert error.value.code is ErrorCode.GATE_OUTPUT_INVALID
+
+
 def test_trace_finding_count_overflow_is_an_atomic_runtime_limit() -> None:
     processor = _processor(
         (
@@ -925,6 +1034,23 @@ def test_header_mutations_are_ordered_and_protected() -> None:
     assert updated.headers == (
         HttpHeader(name="x-openshell-middleware-test", value="new"),
         HttpHeader(name="x-openshell-middleware-added", value="one"),
+    )
+
+    skip_absent = apply_request_mutations(
+        _request(),
+        RequestMutations(
+            header_mutations=(
+                WriteHeaderMutation(
+                    kind="write",
+                    name="x-openshell-middleware-added",
+                    value="created",
+                    on_existing=ExistingHeaderAction.SKIP,
+                ),
+            )
+        ),
+    )
+    assert skip_absent.headers == (
+        HttpHeader(name="x-openshell-middleware-added", value="created"),
     )
 
     with pytest.raises(GateContractError):
