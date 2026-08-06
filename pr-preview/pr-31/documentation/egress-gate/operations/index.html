@@ -1439,13 +1439,19 @@ environment as needed.</p>
 host network namespace of the service. Plaintext gRPC is for a restricted,
 trusted network. Do not expose the port to an untrusted network.</p>
 <h2 id="openshell-registration">OpenShell registration</h2>
+<p>Before you change the gateway configuration, stop any running OpenShell
+gateways that use it. A running gateway does not reload middleware
+registrations.</p>
 <div class="language-bash highlight"><span class="filename">Register Egress Gate</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>add-gateway-registration<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--host-ip<span class="w"> </span>YOUR_HOST_IPV4<span class="w"> </span>--name<span class="w"> </span>egress-gate<span class="w"> </span>--port<span class="w"> </span><span class="m">50051</span>
 </span></code></pre></div>
 <p>The command updates <code>OPENSHELL_GATEWAY_CONFIG</code>, then
 <code>$XDG_CONFIG_HOME/openshell/gateway.toml</code>, then
 <code>~/.config/openshell/gateway.toml</code>. Use <code>--config PATH</code> for another file.
-Restart the OpenShell gateway after changing registrations. Remove one with:</p>
+Start the gateways again with the same commands or service managers that you
+normally use.</p>
+<p>To remove a registration, stop any running gateways that use the configuration
+again. List the available names with:</p>
 <div class="language-bash highlight"><span class="filename">List middleware registrations</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>list-gateway-registrations
 </span></code></pre></div>
 <p>The gateway config does not identify which service owns a registration. The
@@ -1453,6 +1459,7 @@ command therefore lists all external middleware. Use its exact name to remove
 the registration you no longer need:</p>
 <div class="language-bash highlight"><span class="filename">Remove the registration</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>remove-gateway-registration<span class="w"> </span>--name<span class="w"> </span>egress-gate
 </span></code></pre></div>
+<p>Start the gateways again after the command completes.</p>
 <p>The generated OpenShell middleware timeout is five seconds. Keep the Egress
 Gate <code>--timeout-seconds</code> below it so queueing, preparation, and transport have
 headroom.</p>

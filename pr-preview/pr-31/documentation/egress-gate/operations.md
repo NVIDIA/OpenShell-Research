@@ -22,6 +22,10 @@ trusted network. Do not expose the port to an untrusted network.
 
 ## OpenShell registration
 
+Before you change the gateway configuration, stop any running OpenShell
+gateways that use it. A running gateway does not reload middleware
+registrations.
+
 ```bash title="Register Egress Gate"
 uv run egress-gate add-gateway-registration \
   --host-ip YOUR_HOST_IPV4 --name egress-gate --port 50051
@@ -30,7 +34,11 @@ uv run egress-gate add-gateway-registration \
 The command updates `OPENSHELL_GATEWAY_CONFIG`, then
 `$XDG_CONFIG_HOME/openshell/gateway.toml`, then
 `~/.config/openshell/gateway.toml`. Use `--config PATH` for another file.
-Restart the OpenShell gateway after changing registrations. Remove one with:
+Start the gateways again with the same commands or service managers that you
+normally use.
+
+To remove a registration, stop any running gateways that use the configuration
+again. List the available names with:
 
 ```bash title="List middleware registrations"
 uv run egress-gate list-gateway-registrations
@@ -43,6 +51,8 @@ the registration you no longer need:
 ```bash title="Remove the registration"
 uv run egress-gate remove-gateway-registration --name egress-gate
 ```
+
+Start the gateways again after the command completes.
 
 The generated OpenShell middleware timeout is five seconds. Keep the Egress
 Gate `--timeout-seconds` below it so queueing, preparation, and transport have
