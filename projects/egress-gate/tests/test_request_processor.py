@@ -193,11 +193,14 @@ def _regex_config(
     action_kind: str = "detect",
     *,
     scan: dict[str, object] | None = None,
+    entity: str = "token",
+    pattern: str = "secret",
+    template: str = "[{entity}]",
 ) -> dict[str, object]:
     scan_values = {"kind": "body"} if scan is None else dict(scan)
     action: dict[str, object] = {"kind": action_kind}
     if action_kind == "replace":
-        action["template"] = "[{entity}]"
+        action["template"] = template
     scan_values["action"] = action
     return {
         "kind": "regex",
@@ -205,8 +208,8 @@ def _regex_config(
         "pattern_catalog": {
             "entities": [
                 {
-                    "name": "token",
-                    "rules": [{"pattern": "secret", "confidence": "high"}],
+                    "name": entity,
+                    "rules": [{"pattern": pattern, "confidence": "high"}],
                 }
             ]
         },
@@ -408,6 +411,61 @@ def test_three_gates_aggregate_interacting_body_and_header_mutations() -> None:
         HttpHeader(name="x-openshell-middleware-chain", value="stage-two"),
         HttpHeader(name="x-openshell-middleware-state", value="stage-three"),
     )
+
+
+def test_three_regex_gates_progressively_redact_the_current_body() -> None:
+    original = _request(
+        body=(
+            b"Customer record\n"
+            b"email: alice@example.com\n"
+            b"api key: sk-123456\n"
+            b"phone: 555-0100\n"
+        )
+    )
+    processor = _processor(
+        (
+            (
+                "redact-email",
+                _regex_config(
+                    "replace",
+                    entity="email",
+                    pattern=r"alice@example\.com",
+                ),
+            ),
+            (
+                "redact-api-key",
+                _regex_config(
+                    "replace",
+                    entity="api_key",
+                    pattern=r"sk-[0-9]+",
+                ),
+            ),
+            (
+                "redact-phone",
+                _regex_config(
+                    "replace",
+                    entity="phone",
+                    pattern=r"555-[0-9]{4}",
+                ),
+            ),
+        ),
+        include_regex=True,
+    )
+
+    result = processor.process(original, timeout=Timeout.from_seconds(1))
+    final_request = apply_request_mutations(original, result.request_mutations)
+
+    expected_body = (
+        b"Customer record\nemail: [email]\napi key: [api_key]\nphone: [phone]\n"
+    )
+    assert result.decision is EgressDecision.ALLOW
+    assert result.request_mutations.replacement_body == expected_body
+    assert final_request.body == expected_body
+    assert [(item.source_gate, item.finding.type) for item in result.findings] == [
+        ("redact-email", "regex_match"),
+        ("redact-api-key", "regex_match"),
+        ("redact-phone", "regex_match"),
+    ]
 
 
 def test_final_empty_body_replacement_is_preserved_across_gates() -> None:
