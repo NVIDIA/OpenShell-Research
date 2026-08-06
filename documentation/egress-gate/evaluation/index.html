@@ -6,40 +6,40 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Technical guides for projects featured in OpenShell Dev Notes.">
+        <meta name="description" content="Test policy decisions and findings before deployment.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
       
       
       
-        <link rel="prev" href="../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/">
+        <link rel="prev" href="../configuration/">
       
       
-        <link rel="next" href="./egress-gate/">
+        <link rel="next" href="../operations/">
       
       
         
       
       
-      <link rel="icon" href="../assets/brand/favicon.svg">
+      <link rel="icon" href="../../../assets/brand/favicon.svg">
       <meta name="generator" content="zensical-0.0.44">
     
     
       
-        <title>Documentation - OpenShell Research</title>
+        <title>Test policies offline - OpenShell Research</title>
       
     
     
       
         
       
-      <link rel="stylesheet" href="../assets/stylesheets/modern/main.fba56155.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/modern/main.fba56155.min.css">
       
         
           
         
-        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.dfe2e883.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/modern/palette.dfe2e883.min.css">
       
       
 
@@ -58,11 +58,11 @@
       
     
     
-      <link rel="stylesheet" href="../stylesheets/dev-notes.css">
+      <link rel="stylesheet" href="../../../stylesheets/dev-notes.css">
     
-      <link rel="stylesheet" href="../stylesheets/documentation.css">
+      <link rel="stylesheet" href="../../../stylesheets/documentation.css">
     
-    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    <script>__md_scope=new URL("../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
     
       
 
@@ -80,7 +80,7 @@
     }
   </script>
   
-    <link rel="alternate" type="text/markdown" href="index.md" title="Markdown source">
+    <link rel="alternate" type="text/markdown" href="../evaluation.md" title="Markdown source">
   
 
   </head>
@@ -102,7 +102,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#documentation" class="md-skip">
+        <a href="#test-policies-offline" class="md-skip">
           Skip to content
         </a>
       
@@ -118,9 +118,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="./.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../../.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     <label class="md-header__button md-icon openshell-drawer-button" for="__drawer" role="button" tabindex="0" aria-label="Open navigation" aria-controls="primary-navigation" aria-expanded="false">
@@ -141,7 +141,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Documentation
+              Test policies offline
             
           </span>
         </div>
@@ -230,9 +230,9 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="./.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../../.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     OpenShell Research
@@ -284,7 +284,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../dev-notes/" class="md-nav__link ">
+            <a href="../../../dev-notes/" class="md-nav__link ">
               
   
   
@@ -377,7 +377,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
+      <a href="../../../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
         
   
   
@@ -446,7 +446,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="././" class="md-nav__link md-nav__link--active">
+            <a href="../../" class="md-nav__link ">
               
   
   
@@ -463,7 +463,7 @@
             </a>
             
               
-              <label class="md-nav__link md-nav__link--active" for="__nav_2" id="__nav_2_label" tabindex="">
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -485,6 +485,8 @@
                 
   
   
+    
+  
   
   
     
@@ -508,15 +510,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="./egress-gate/" class="md-nav__link ">
+            <a href="../" class="md-nav__link ">
               
   
   
@@ -539,7 +541,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -555,8 +557,10 @@
                 
   
   
+    
   
   
+  
     
     
       
@@ -572,11 +576,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2_2" checked>
         
           
           <label class="md-nav__link" for="__nav_2_2_2" id="__nav_2_2_2_label" tabindex="0">
@@ -596,7 +600,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_2_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_2_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_2_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -613,7 +617,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/configuration/" class="md-nav__link">
+      <a href="../configuration/" class="md-nav__link">
         
   
   
@@ -637,10 +641,36 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="./egress-gate/evaluation/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Test policies offline
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
         
   
   
@@ -655,6 +685,71 @@
   
 
       </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#try-the-included-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Try the included example
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#write-one-test-case" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Write one test case
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grow-the-suite-with-the-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Grow the suite with the policy
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-the-result-in-automation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Use the result in automation
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -667,7 +762,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/operations/" class="md-nav__link">
+      <a href="../operations/" class="md-nav__link">
         
   
   
@@ -726,7 +821,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="./egress-gate/gates/" class="md-nav__link ">
+            <a href="../gates/" class="md-nav__link ">
               
   
   
@@ -768,7 +863,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/gates/regex/" class="md-nav__link">
+      <a href="../gates/regex/" class="md-nav__link">
         
   
   
@@ -795,7 +890,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/gates/custom/" class="md-nav__link">
+      <a href="../gates/custom/" class="md-nav__link">
         
   
   
@@ -854,7 +949,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="./egress-gate/architecture/" class="md-nav__link ">
+            <a href="../architecture/" class="md-nav__link ">
               
   
   
@@ -896,7 +991,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/architecture/request-lifecycle/" class="md-nav__link">
+      <a href="../architecture/request-lifecycle/" class="md-nav__link">
         
   
   
@@ -923,7 +1018,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/architecture/service-boundary/" class="md-nav__link">
+      <a href="../architecture/service-boundary/" class="md-nav__link">
         
   
   
@@ -1009,7 +1104,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/reference/limits-and-failures/" class="md-nav__link">
+      <a href="../reference/limits-and-failures/" class="md-nav__link">
         
   
   
@@ -1069,6 +1164,11 @@
                       
                     
                     
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
                   
                   <div class="md-sidebar__inner">
                     
@@ -1080,6 +1180,58 @@
   
     
   
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#try-the-included-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Try the included example
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#write-one-test-case" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Write one test case
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#grow-the-suite-with-the-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Grow the suite with the policy
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-the-result-in-automation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Use the result in automation
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -1104,7 +1256,7 @@
   
   
     <li class="md-path__item">
-      <a href="./.." class="md-path__link">
+      <a href="../../.." class="md-path__link">
         
   
   <span class="md-ellipsis">
@@ -1134,11 +1286,77 @@
     
     
       <li class="md-path__item">
-        <a href="././" class="md-path__link">
+        <a href="../../" class="md-path__link">
           
   
   <span class="md-ellipsis">
     Documentation
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Egress Gate
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../configuration/" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Guides
   </span>
 
         </a>
@@ -1160,18 +1378,164 @@
 
 
   
-  <a href="index.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
+  <a href="../evaluation.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.56 18H3.44C2.65 18 2 17.37 2 16.59V7.41C2 6.63 2.65 6 3.44 6h17.12c.79 0 1.44.63 1.44 1.41v9.18c0 .78-.65 1.41-1.44 1.41M3.44 6.94c-.26 0-.48.21-.48.47v9.19c0 .25.22.46.48.46h17.12c.26 0 .48-.21.48-.46V7.41c0-.26-.22-.47-.48-.47zm1.45 8.25V8.81h1.92l1.92 2.35 1.92-2.35h1.93v6.38h-1.93v-3.66l-1.92 2.35-1.92-2.35v3.66zm12.01 0-2.9-3.1h1.94V8.81h1.92v3.28h1.93z"/></svg>
   </a>
 
 
-<h1 id="documentation">Documentation</h1>
-<p>Technical documentation and references for installing, using, and extending
-OpenShell Research projects.</p>
+<h1 id="test-policies-offline">Test policies offline</h1>
+<p>A policy can be valid and still do the wrong thing. It might allow a request
+that you meant to deny, invoke the wrong gate, or stop reporting a finding
+after a rule changes.</p>
+<p><code>egress-gate evaluate</code> lets you catch these problems before the policy handles
+live traffic. You give it a policy and a set of request examples. Each example
+states the result that you expect. Egress Gate runs every request through the
+same prepared <code>RequestProcessor</code> that the service uses and reports any
+difference.</p>
+<p>This is useful when you want to:</p>
 <ul>
-<li><a href="egress-gate/">Egress Gate</a>: extensible middleware for applying gates
-  to outgoing HTTP requests.</li>
+<li>check a new policy before rollout</li>
+<li>turn a fixed bug into a permanent regression test</li>
+<li>test a custom gate without starting the gRPC service</li>
+<li>compare the behavior of two policy revisions</li>
+<li>build a repeatable request set for a separate performance benchmark</li>
 </ul>
+<p>The command tests correctness. It does not report latency or throughput. Use a
+benchmark harness around the same request set when you need performance data.</p>
+<h2 id="try-the-included-example">Try the included example</h2>
+<p>The repository includes a regex policy and two request cases. Run them from
+<code>projects/egress-gate/</code>; <code>uv</code> prepares the project environment automatically:</p>
+<div class="language-bash highlight"><span class="filename">Run the example policy tests</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>evaluate<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--policy<span class="w"> </span>examples/regex-redaction/egress-gate-config.yaml<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--cases<span class="w"> </span>examples/regex-redaction/cases.yaml<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--timeout-seconds<span class="w"> </span><span class="m">1</span>
+</span></code></pre></div>
+<p>The command prepares the policy once, runs each case with a fresh timeout, and
+shows whether each request produced its expected result:</p>
+<div class="language-text highlight"><span class="filename">Evaluation output</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Policy evaluation
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Status    Case                                        Details
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>PASS      email-is-detected-and-request-is-allowed    All checks matched
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>PASS      ordinary-body-is-allowed                    All checks matched
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>2 passed · 0 failed · 2 total
+</span></code></pre></div>
+<p>If a case fails, the Details column shows each field that differed and its
+expected and actual values. The summary and exit status make the same result
+easy to use in CI.</p>
+<p>No request goes to an upstream service. The command does not start gRPC,
+attach credentials, or persist request data.</p>
+<h2 id="write-one-test-case">Write one test case</h2>
+<p>The CLI calls the cases file a <em>corpus</em>. In plain terms, it is a versioned YAML
+test suite. <code>version: 1</code> selects the current file format. You do not need to
+manage multiple versions.</p>
+<p>This example checks that the regex policy reports an email finding and then
+allows the request through its default decision:</p>
+<div class="language-yaml highlight"><span class="filename">cases.yaml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">cases</span><span class="p">:</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email-is-detected</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">provenance</span><span class="p">:</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">synthetic</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="nt">redacted</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">request</span><span class="p">:</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">      </span><span class="nt">context</span><span class="p">:</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">        </span><span class="nt">request_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test-email</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">        </span><span class="nt">sandbox_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test-sandbox</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">      </span><span class="nt">target</span><span class="p">:</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">        </span><span class="nt">scheme</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">        </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api.example.com</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">        </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">        </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POST</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">        </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/v1/messages</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">        </span><span class="nt">query</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">      </span><span class="nt">headers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">      </span><span class="nt">body</span><span class="p">:</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">        </span><span class="nt">encoding</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">utf8</span>
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;send</span><span class="nv"> </span><span class="s">alice@example.com&quot;</span>
+</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="w">    </span><span class="nt">expected</span><span class="p">:</span>
+</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="w">      </span><span class="nt">decision</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">allow</span>
+</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="w">      </span><span class="nt">finding_types</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">regex_match</span><span class="p p-Indicator">]</span>
+</span></code></pre></div>
+<p>Each case has three parts:</p>
+<ul>
+<li><code>provenance</code> records whether the request is synthetic or captured and
+  whether its content is redacted.</li>
+<li><code>request</code> contains the first read-only HTTP request snapshot that the gates
+  will evaluate.</li>
+<li><code>expected</code> contains the result fields that must match.</li>
+</ul>
+<p>Only <code>expected.decision</code> is required. Add more expected fields when they make
+the test more useful:</p>
+<table>
+<thead>
+<tr>
+<th>Expected field</th>
+<th>What it checks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>decision_source_kind</code></td>
+<td>Whether a gate, the pipeline default, or a pipeline processor limit made the decision</td>
+</tr>
+<tr>
+<td><code>gate_name</code></td>
+<td>Which configured gate made a terminal decision</td>
+</tr>
+<tr>
+<td><code>gate_type</code></td>
+<td>Which gate implementation made a terminal decision</td>
+</tr>
+<tr>
+<td><code>finding_types</code></td>
+<td>The ordered finding types returned by the pipeline</td>
+</tr>
+</tbody>
+</table>
+<p>Gate name and gate type apply only when <code>decision_source_kind</code> is <code>gate</code>.
+Omitted fields are not compared. The current evaluator does not compare the
+contents of request mutations.</p>
+<h2 id="grow-the-suite-with-the-policy">Grow the suite with the policy</h2>
+<p>Start with one normal request and one request for each important deny or
+finding rule. Add a case whenever you fix a policy bug. Keep captured requests
+small, deliberate, and redacted when possible.</p>
+<p>Case names must be unique. Optional tags can group cases for external tooling.
+The parser also rejects aliases, duplicate keys, unknown fields, invalid
+base64, and values that exceed pipeline processor limits. These checks keep tests
+repeatable and ensure that test requests follow the same bounds as service
+requests.</p>
+<p>Use <code>--registry</code> when the policy contains application-owned custom gates:</p>
+<div class="language-bash highlight"><span class="filename">Test a custom gate</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--registry<span class="w"> </span>examples.custom-gate.keyword_gate:registry<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>evaluate<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--policy<span class="w"> </span>examples/custom-gate/egress-gate-config.yaml<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span>--cases<span class="w"> </span>examples/custom-gate/cases.yaml
+</span></code></pre></div>
+<h2 id="use-the-result-in-automation">Use the result in automation</h2>
+<p>The command uses stable exit statuses:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Status</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;"><code>0</code></td>
+<td>Every case matched</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>1</code></td>
+<td>One or more cases did not match</td>
+</tr>
+<tr>
+<td style="text-align: right;"><code>2</code></td>
+<td>The policy, cases, preparation, or execution failed</td>
+</tr>
+</tbody>
+</table>
+<p>Failure output contains decision metadata and finding types. It does not print
+request bodies or raw exception text. This makes the command suitable for CI
+logs while keeping request content out of normal output.</p>
 
 
 
@@ -1212,23 +1576,24 @@ OpenShell Research projects.</p>
       
       <nav class="md-footer__inner md-grid" aria-label="Continue reading" >
         
-          <a href="./.." class="md-footer__link md-footer__link--prev" aria-label="Back to OpenShell Research">
+          
+          <a href="../configuration/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Configure policies">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
             </div>
             <div class="md-footer__title">
-              <span class="md-footer__direction">Back</span>
-              <div class="md-ellipsis">OpenShell Research</div>
+              <span class="md-footer__direction">Previous</span>
+              <div class="md-ellipsis">Configure policies</div>
             </div>
           </a>
         
         
           
-          <a href="./egress-gate/" class="md-footer__link md-footer__link--next" aria-label="Next: Egress Gate">
+          <a href="../operations/" class="md-footer__link md-footer__link--next" aria-label="Next: Run and operate Egress Gate">
             <div class="md-footer__title">
               <span class="md-footer__direction">Next</span>
-              <div class="md-ellipsis">Egress Gate</div>
+              <div class="md-ellipsis">Run and operate Egress Gate</div>
             </div>
             <div class="md-footer__button md-icon">
               
@@ -1264,12 +1629,12 @@ OpenShell Research projects.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"search":"../../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
-      <script src="../assets/javascripts/bundle.6e5f0216.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.6e5f0216.min.js"></script>
       
-        <script src="../javascripts/navigation-drawer.js"></script>
+        <script src="../../../javascripts/navigation-drawer.js"></script>
       
     
   </body>

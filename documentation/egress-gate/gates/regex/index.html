@@ -6,36 +6,40 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Research engineering Dev Notes and software documentation from the OpenShell team.">
+        <meta name="description" content="Scan one configured part of a request with bounded regular expressions.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
       
       
       
+        <link rel="prev" href="../">
+      
+      
+        <link rel="next" href="../custom/">
       
       
         
       
       
-      <link rel="icon" href="../assets/brand/favicon.svg">
+      <link rel="icon" href="../../../../assets/brand/favicon.svg">
       <meta name="generator" content="zensical-0.0.44">
     
     
       
-        <title>Research documentation has moved - OpenShell Research</title>
+        <title>Regex gate - OpenShell Research</title>
       
     
     
       
         
       
-      <link rel="stylesheet" href="../assets/stylesheets/modern/main.fba56155.min.css">
+      <link rel="stylesheet" href="../../../../assets/stylesheets/modern/main.fba56155.min.css">
       
         
           
         
-        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.dfe2e883.min.css">
+        <link rel="stylesheet" href="../../../../assets/stylesheets/modern/palette.dfe2e883.min.css">
       
       
 
@@ -54,11 +58,11 @@
       
     
     
-      <link rel="stylesheet" href="../stylesheets/dev-notes.css">
+      <link rel="stylesheet" href="../../../../stylesheets/dev-notes.css">
     
-      <link rel="stylesheet" href="../stylesheets/documentation.css">
+      <link rel="stylesheet" href="../../../../stylesheets/documentation.css">
     
-    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    <script>__md_scope=new URL("../../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
     
       
 
@@ -75,6 +79,8 @@
       document.documentElement.dataset.navigationDrawer = "closed";
     }
   </script>
+  
+    <link rel="alternate" type="text/markdown" href="../regex.md" title="Markdown source">
   
 
   </head>
@@ -96,7 +102,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#research-documentation-has-moved" class="md-skip">
+        <a href="#regex-gate" class="md-skip">
           Skip to content
         </a>
       
@@ -112,9 +118,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="./.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../../../.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     <label class="md-header__button md-icon openshell-drawer-button" for="__drawer" role="button" tabindex="0" aria-label="Open navigation" aria-controls="primary-navigation" aria-expanded="false">
@@ -135,7 +141,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Research documentation has moved
+              Regex gate
             
           </span>
         </div>
@@ -215,8 +221,6 @@
           
             
               
-                
-              
               <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
@@ -226,9 +230,9 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="./.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../../../.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     OpenShell Research
@@ -280,7 +284,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../dev-notes/" class="md-nav__link ">
+            <a href="../../../../dev-notes/" class="md-nav__link ">
               
   
   
@@ -373,7 +377,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
+      <a href="../../../../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
         
   
   
@@ -412,6 +416,8 @@
       
   
   
+    
+  
   
   
     
@@ -432,15 +438,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../documentation/" class="md-nav__link ">
+            <a href="../../../" class="md-nav__link ">
               
   
   
@@ -463,7 +469,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -479,6 +485,8 @@
                 
   
   
+    
+  
   
   
     
@@ -502,15 +510,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../documentation/egress-gate/" class="md-nav__link ">
+            <a href="../../" class="md-nav__link ">
               
   
   
@@ -533,7 +541,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -607,7 +615,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../documentation/egress-gate/configuration/" class="md-nav__link">
+      <a href="../../configuration/" class="md-nav__link">
         
   
   
@@ -634,7 +642,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../documentation/egress-gate/evaluation/" class="md-nav__link">
+      <a href="../../evaluation/" class="md-nav__link">
         
   
   
@@ -661,7 +669,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../documentation/egress-gate/operations/" class="md-nav__link">
+      <a href="../../operations/" class="md-nav__link">
         
   
   
@@ -693,6 +701,8 @@
                 
   
   
+    
+  
   
   
     
@@ -712,15 +722,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2_3" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../documentation/egress-gate/gates/" class="md-nav__link ">
+            <a href="../" class="md-nav__link ">
               
   
   
@@ -743,7 +753,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_2_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_2_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_2_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -759,10 +769,36 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../documentation/egress-gate/gates/regex/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Regex gate
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
         
   
   
@@ -777,6 +813,49 @@
   
 
       </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Actions
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scan-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Scan reference
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -789,7 +868,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../documentation/egress-gate/gates/custom/" class="md-nav__link">
+      <a href="../custom/" class="md-nav__link">
         
   
   
@@ -848,7 +927,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../documentation/egress-gate/architecture/" class="md-nav__link ">
+            <a href="../../architecture/" class="md-nav__link ">
               
   
   
@@ -890,7 +969,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../documentation/egress-gate/architecture/request-lifecycle/" class="md-nav__link">
+      <a href="../../architecture/request-lifecycle/" class="md-nav__link">
         
   
   
@@ -917,7 +996,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../documentation/egress-gate/architecture/service-boundary/" class="md-nav__link">
+      <a href="../../architecture/service-boundary/" class="md-nav__link">
         
   
   
@@ -1003,7 +1082,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../documentation/egress-gate/reference/limits-and-failures/" class="md-nav__link">
+      <a href="../../reference/limits-and-failures/" class="md-nav__link">
         
   
   
@@ -1054,9 +1133,7 @@
             
             
               
-                
-              
-              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" hidden>
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
                 <div class="md-sidebar__scrollwrap">
                   
                     
@@ -1064,6 +1141,11 @@
                     
                       
                     
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
                     
                   
                   <div class="md-sidebar__inner">
@@ -1077,6 +1159,36 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#actions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Actions
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scan-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Scan reference
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1088,12 +1200,131 @@
               
                 
 
+
+
   
 
 
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../../../.." class="md-path__link">
+        
+  
+  <span class="md-ellipsis">
+    OpenShell Research
+  </span>
 
+      </a>
+    </li>
   
 
+      
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../../../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Documentation
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Egress Gate
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Gates
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
 
               
               <article class="md-content__inner md-typeset">
@@ -1104,28 +1335,151 @@
   
 
 
+  
+  <a href="../regex.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.56 18H3.44C2.65 18 2 17.37 2 16.59V7.41C2 6.63 2.65 6 3.44 6h17.12c.79 0 1.44.63 1.44 1.41v9.18c0 .78-.65 1.41-1.44 1.41M3.44 6.94c-.26 0-.48.21-.48.47v9.19c0 .25.22.46.48.46h17.12c.26 0 .48-.21.48-.46V7.41c0-.26-.22-.47-.48-.47zm1.45 8.25V8.81h1.92l1.92 2.35 1.92-2.35h1.93v6.38h-1.93v-3.66l-1.92 2.35-1.92-2.35v3.66zm12.01 0-2.9-3.1h1.94V8.81h1.92v3.28h1.93z"/></svg>
+  </a>
 
-<p><meta http-equiv="refresh" content="0; url=../documentation/"></p>
-<h1 id="research-documentation-has-moved">Research documentation has moved</h1>
-<p>This material now lives in <a href="../documentation/">Documentation</a>.</p>
 
+<h1 id="regex-gate">Regex gate</h1>
+<p>The <code>regex</code> gate matches one configured part of the current request. It can
+inspect the body, path, query, or selected header values. It returns audit-safe
+findings with type <code>regex_match</code>.</p>
+<p>Choose what to scan with <code>scan.kind</code>, then choose what to do with
+<code>scan.action.kind</code>. This example replaces matches in the request body:</p>
+<div class="language-yaml highlight"><span class="filename">Inline regex catalog</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer-identifiers</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nt">scan</span><span class="p">:</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">body</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">action</span><span class="p">:</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;[{entity}]&#39;</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="nt">pattern_catalog</span><span class="p">:</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">entities</span><span class="p">:</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer-id</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">      </span><span class="nt">rules</span><span class="p">:</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer-id-rule</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">          </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;\bCUST-[0-9]{8}\b&#39;</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">          </span><span class="nt">confidence</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">high</span>
+</span></code></pre></div>
+<p>The body is decoded as strict UTF-8. Path and query scans use the exact text in
+the request model. A header scan matches each selected header value on its own;
+a match cannot span two values. Header names are case-insensitive:</p>
+<div class="language-yaml highlight"><span class="filename">Selected request headers</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">labeled-headers</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">scan</span><span class="p">:</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">header</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">names</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">x-customer-note</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">x-request-label</span><span class="p p-Indicator">]</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">action</span><span class="p">:</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deny</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="nt">pattern_catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">patterns.yaml</span>
+</span></code></pre></div>
+<p>The header scan sees the current request snapshot, including validated header
+mutations from earlier gates. The regex gate does not return header mutations
+itself.
+OpenShell permits writes only in the <code>x-openshell-middleware-</code> namespace, so a
+general regex replacement cannot rewrite arbitrary selected headers. A custom
+gate can return supported header writes or removals when it declares the
+<code>GateCapability.MUTATE_HEADERS</code> capability.</p>
+<p>A catalog can be inline or in a relative <code>.yaml</code> or <code>.yml</code> file. Relative paths
+resolve from the Egress Gate process working directory, not from the policy
+file. Use an inline catalog when the process does not have a stable working
+directory. The gate rejects absolute paths, path traversal, symlinks, YAML
+aliases, duplicate keys, invalid body UTF-8, unsafe patterns, and oversized
+catalogs.</p>
+<p>Each entity has a stable, bounded name and one or more rules. Rule confidence
+is <code>low</code>, <code>medium</code>, or <code>high</code>. Optional flags are <code>ignore_case</code>, <code>multiline</code>,
+<code>dot_all</code>, and <code>ascii</code>. Do not use named capture groups or inline flags.
+Patterns must produce non-empty matches. Findings include overlapping
+detections. Replacement uses deterministic, non-overlapping matches.</p>
+<h2 id="actions">Actions</h2>
+<table>
+<thead>
+<tr>
+<th><code>scan.action.kind</code></th>
+<th>Match result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>detect</code></td>
+<td><code>proceed</code>, findings, no request mutation</td>
+</tr>
+<tr>
+<td><code>deny</code></td>
+<td>terminal <code>deny</code>, findings, <code>egress_gate_regex_denied</code></td>
+</tr>
+<tr>
+<td><code>replace</code></td>
+<td><code>proceed</code>, findings, explicit body replacement</td>
+</tr>
+</tbody>
+</table>
+<p><code>detect</code> and <code>deny</code> work with every scan kind. <code>replace</code> exists only in the
+body scan schema. It cannot be configured for a path, query, or header scan.
+This structure keeps unsupported combinations out of generated schemas and
+editor suggestions. OpenShell middleware results cannot rewrite a request path
+or query. Header replacement is not part of the built-in gate.</p>
+<p>The replace action owns its template. It returns a body replacement even when
+there is no match. This preserves the operator's explicit intent to replace the
+current body. Invalid body UTF-8 is a stable <code>body_encoding_invalid</code> service
+failure.</p>
+<p>The regex gate does not edit the body in place. It returns the replacement in
+<code>RequestMutations</code>. The pipeline processor uses it to build the next immutable
+<code>HttpRequest</code> snapshot. If the pipeline allows the request, Egress Gate includes
+the replacement in the final mutations returned to the OpenShell supervisor.</p>
+<p>Replacement templates contain literal text and the <code>{entity}</code> field only.
+Output size is projected before rendering and is bounded by the advertised
+OpenShell body limit.</p>
+<h2 id="scan-reference">Scan reference</h2>
+<table>
+<thead>
+<tr>
+<th><code>scan.kind</code></th>
+<th>Additional fields</th>
+<th>Supported <code>action.kind</code> values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>body</code></td>
+<td>none</td>
+<td><code>detect</code>, <code>deny</code>, <code>replace</code></td>
+</tr>
+<tr>
+<td><code>path</code></td>
+<td>none</td>
+<td><code>detect</code>, <code>deny</code></td>
+</tr>
+<tr>
+<td><code>query</code></td>
+<td>none</td>
+<td><code>detect</code>, <code>deny</code></td>
+</tr>
+<tr>
+<td><code>header</code></td>
+<td>non-empty <code>names</code> list</td>
+<td><code>detect</code>, <code>deny</code></td>
+</tr>
+</tbody>
+</table>
+<p>Configure another regex gate when different request parts need different
+catalogs or actions. Keeping one scan per gate makes matches, findings, and
+replacement offsets unambiguous.</p>
+
+
+
+
+
+
+
+
+
+  
   
 
 
 
-
-
-
-
-
-
-  
-  
-
-
-
-
-  
 
 
 
@@ -1148,6 +1502,36 @@
         
 <footer class="md-footer">
   
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Continue reading" >
+        
+          
+          <a href="../" class="md-footer__link md-footer__link--prev" aria-label="Previous: Gates">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">Previous</span>
+              <div class="md-ellipsis">Gates</div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../custom/" class="md-footer__link md-footer__link--next" aria-label="Next: Add a custom gate">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">Next</span>
+              <div class="md-ellipsis">Add a custom gate</div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
+        
+      </nav>
     
   
   <div class="md-footer-meta md-typeset">
@@ -1175,12 +1559,12 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../../..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"search":"../../../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
-      <script src="../assets/javascripts/bundle.6e5f0216.min.js"></script>
+      <script src="../../../../assets/javascripts/bundle.6e5f0216.min.js"></script>
       
-        <script src="../javascripts/navigation-drawer.js"></script>
+        <script src="../../../../javascripts/navigation-drawer.js"></script>
       
     
   </body>

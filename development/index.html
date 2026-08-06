@@ -65,6 +65,16 @@
     
     
   
+  <script>
+    try {
+      document.documentElement.dataset.navigationDrawer =
+        window.sessionStorage.getItem("openshell.navigationDrawerOpen") === "true"
+          ? "open"
+          : "closed";
+    } catch {
+      document.documentElement.dataset.navigationDrawer = "closed";
+    }
+  </script>
   
 
   </head>
@@ -107,9 +117,13 @@
   <img src="../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
-    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
-      
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    <label class="md-header__button md-icon openshell-drawer-button" for="__drawer" role="button" tabindex="0" aria-label="Open navigation" aria-controls="primary-navigation" aria-expanded="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3.25" y="4" width="17.5" height="16" rx="2"></rect>
+        <path d="M8.25 4v16"></path>
+        <path class="openshell-drawer-icon-expand" d="m12 9 3 3-3 3"></path>
+        <path class="openshell-drawer-icon-collapse" d="m15 9-3 3 3 3"></path>
+      </svg>
     </label>
     <div class="md-header__title" data-md-component="header-title">
       <div class="md-header__ellipsis">
@@ -494,14 +508,14 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../documentation/privacy-guard/" class="md-nav__link ">
+            <a href="../documentation/egress-gate/" class="md-nav__link ">
               
   
   
   <span class="md-ellipsis">
     
   
-  Privacy Guard
+  Egress Gate
 
     
   </span>
@@ -522,7 +536,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-  Privacy Guard
+  Egress Gate
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
@@ -537,6 +551,8 @@
   
     
     
+      
+        
       
         
       
@@ -589,7 +605,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../documentation/privacy-guard/configuration/" class="md-nav__link">
+      <a href="../documentation/egress-gate/configuration/" class="md-nav__link">
         
   
   
@@ -616,14 +632,41 @@
   
   
     <li class="md-nav__item">
-      <a href="../documentation/privacy-guard/operations/" class="md-nav__link">
+      <a href="../documentation/egress-gate/evaluation/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-  Run and operate Privacy Guard
+  Test policies offline
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../documentation/egress-gate/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Run and operate Egress Gate
 
     
   </span>
@@ -675,14 +718,14 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../documentation/privacy-guard/engines/" class="md-nav__link ">
+            <a href="../documentation/egress-gate/gates/" class="md-nav__link ">
               
   
   
   <span class="md-ellipsis">
     
   
-  Engines
+  Gates
 
     
   </span>
@@ -703,7 +746,7 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-  Engines
+  Gates
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
@@ -717,14 +760,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../documentation/privacy-guard/engines/regex/" class="md-nav__link">
+      <a href="../documentation/egress-gate/gates/regex/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-  RegexEngine
+  Regex gate
 
     
   </span>
@@ -744,14 +787,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../documentation/privacy-guard/engines/custom/" class="md-nav__link">
+      <a href="../documentation/egress-gate/gates/custom/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-  Add a custom engine
+  Add a custom gate
 
     
   </span>
@@ -803,7 +846,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../documentation/privacy-guard/architecture/" class="md-nav__link ">
+            <a href="../documentation/egress-gate/architecture/" class="md-nav__link ">
               
   
   
@@ -845,7 +888,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../documentation/privacy-guard/architecture/request-lifecycle/" class="md-nav__link">
+      <a href="../documentation/egress-gate/architecture/request-lifecycle/" class="md-nav__link">
         
   
   
@@ -872,7 +915,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../documentation/privacy-guard/architecture/service-boundary/" class="md-nav__link">
+      <a href="../documentation/egress-gate/architecture/service-boundary/" class="md-nav__link">
         
   
   
@@ -958,7 +1001,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../documentation/privacy-guard/reference/limits-and-failures/" class="md-nav__link">
+      <a href="../documentation/egress-gate/reference/limits-and-failures/" class="md-nav__link">
         
   
   
@@ -1173,8 +1216,8 @@ instead of generated artwork. Hero images must live under <code>docs/</code>.</p
 <li><code># dev-notes:nav:start</code> / <code># dev-notes:nav:end</code> in <code>zensical.toml</code></li>
 </ul>
 <p>After changing posts or author metadata, run:</p>
-<p><code>sh
-python3 scripts/render-dev-notes.py</code></p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python3<span class="w"> </span>scripts/render-dev-notes.py
+</span></code></pre></div>
 <p>Commit any generated changes with the source change.</p>
 <h2 id="theme-and-brand-assets">Theme and brand assets</h2>
 <p>Keep shared brand assets in <code>docs/assets/brand/</code>. Use the compact SVG mark for
@@ -1190,18 +1233,18 @@ for arbitrary paths where root-relative theme assets do not resolve beneath the
 project site prefix.</p>
 <h2 id="validate-and-preview">Validate and preview</h2>
 <p>Run the renderer tests and the same clean build used by CI:</p>
-<p><code>sh
-python3 tests/test_render_dev_notes.py
-scripts/build-docs.sh</code></p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python3<span class="w"> </span>tests/test_render_dev_notes.py
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>scripts/build-docs.sh
+</span></code></pre></div>
 <p><code>scripts/build-docs.sh</code> recreates <code>.venv-docs</code>, installs the pinned toolchain,
-stages canonical Privacy Guard documentation from
-<code>projects/privacy-guard/docs/</code>, renders Dev Notes metadata, and runs
+stages canonical Egress Gate documentation from
+<code>projects/egress-gate/docs/</code>, renders Dev Notes metadata, and runs
 <code>zensical build --clean --strict</code>. Do not report success unless it completes
 without issues.</p>
 <p>For documentation-site changes, serve the complete built artifact before
 handing the task back:</p>
-<p><code>sh
-python3 -m http.server 8000 --directory site</code></p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>python3<span class="w"> </span>-m<span class="w"> </span>http.server<span class="w"> </span><span class="m">8000</span><span class="w"> </span>--directory<span class="w"> </span>site
+</span></code></pre></div>
 <p>Confirm <a href="http://localhost:8000">http://localhost:8000</a> is reachable and report the URL and command being
 served. Plain <code>zensical serve</code> does not run the post-build Markdown publisher,
 so it is not an artifact-faithful preview. Pull requests from branches in this
@@ -1254,7 +1297,10 @@ roll back to a revision before preview support, leave the Pages source set to
         
       </main>
       
-        <footer class="md-footer">
+        
+<footer class="md-footer">
+  
+    
   
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
@@ -1281,7 +1327,7 @@ roll back to a revision before preview support, leave the Pages source set to
     
       
       
-      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["navigation.sections","navigation.indexes","navigation.path","navigation.top","search.highlight","toc.follow"],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
       <script src="../assets/javascripts/bundle.6e5f0216.min.js"></script>
