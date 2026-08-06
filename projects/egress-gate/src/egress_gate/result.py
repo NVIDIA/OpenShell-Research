@@ -77,8 +77,9 @@ class Finding(StrictDomainModel):
     confidence: BoundedMetadataString | None = None
     severity: BoundedMetadataString | None = None
 
-    @model_validator(mode="after")
-    def _wire_size_is_bounded(self) -> Self:
+    @property
+    def encoded_size_bytes(self) -> int:
+        """Return the size of this finding in the OpenShell wire format."""
         encoded_size = (
             _encoded_string_field_size(self.type)
             + _encoded_string_field_size(self.label)
@@ -89,7 +90,11 @@ class Finding(StrictDomainModel):
             encoded_size += _encoded_string_field_size(self.confidence)
         if self.severity is not None:
             encoded_size += _encoded_string_field_size(self.severity)
-        if encoded_size > MAX_PROTO_FINDING_BYTES:
+        return encoded_size
+
+    @model_validator(mode="after")
+    def _wire_size_is_bounded(self) -> Self:
+        if self.encoded_size_bytes > MAX_PROTO_FINDING_BYTES:
             raise ValueError("finding exceeds the encoded size limit")
         return self
 

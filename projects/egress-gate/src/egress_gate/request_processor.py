@@ -12,6 +12,7 @@ from egress_gate.constants import (
     DEFAULT_DENY_REASON_CODE,
     LIMIT_REASON_CODE,
     MAX_FINDING_COUNT,
+    MAX_PROTO_FINDING_BYTES,
     MAX_PROTO_FINDING_GROUPS,
 )
 from egress_gate.errors import (
@@ -285,18 +286,11 @@ def _append_findings(
             total = sourced.finding.count + finding.count
             if total > MAX_FINDING_COUNT:
                 raise GateLimitExceededError("finding count exceeds the limit")
-            try:
-                combined_finding = Finding(
-                    type=finding.type,
-                    label=finding.label,
-                    count=total,
-                    confidence=finding.confidence,
-                    severity=finding.severity,
-                )
-            except ValidationError:
+            combined_finding = sourced.finding.model_copy(update={"count": total})
+            if combined_finding.encoded_size_bytes > MAX_PROTO_FINDING_BYTES:
                 raise GateLimitExceededError(
                     "aggregated finding exceeds the encoded size limit"
-                ) from None
+                )
             output[index] = SourcedFinding(
                 source_gate=gate_name,
                 finding=combined_finding,

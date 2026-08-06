@@ -74,7 +74,7 @@ def test_finding_encoded_size_has_an_exact_four_kibibyte_boundary() -> None:
         confidence="c" * 1024,
         severity="s" * 1010,
     )
-    assert exact.model_dump()
+    assert exact.encoded_size_bytes == MAX_PROTO_FINDING_BYTES
 
     with pytest.raises(ValidationError):
         Finding(

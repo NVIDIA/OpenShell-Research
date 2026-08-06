@@ -213,15 +213,12 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         if len(request.body) > MAX_BODY_BYTES:
             raise EgressGateError(ErrorCode.REQUEST_BODY_TOO_LARGE)
         _validate_evaluation_envelope(request)
-        publication = _PolicyPublicationGuard()
         result = await self._run_in_worker(
             lambda: self._prepare_and_process(
                 request,
                 timeout,
-                publication=publication,
             ),
             timeout=timeout,
-            on_cancel=publication.cancel,
         )
         timeout.raise_if_expired()
         response, source_kind = _result_to_proto(result)
@@ -232,15 +229,12 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         self,
         request: pb2.HttpRequestEvaluation,
         timeout: Timeout,
-        *,
-        publication: _PolicyPublicationGuard | None = None,
     ) -> EgressResult:
         domain_request = _request_from_proto(request)
         values = _mapping_from_proto(request.config)
         processor = self._policy.processor_for(
             values,
             timeout=timeout,
-            publication=publication,
         )
         return processor.process(domain_request, timeout=timeout)
 
@@ -249,7 +243,6 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         operation: Callable[[], _WorkerResultT],
         *,
         timeout: Timeout | None = None,
-        on_cancel: Callable[[], None] | None = None,
     ) -> _WorkerResultT:
         """Run one bounded synchronous operation without blocking the event loop."""
         try:
@@ -271,12 +264,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
             self._processing_slots.release()
             raise
         future.add_done_callback(self._worker_finished)
-        try:
-            return await asyncio.shield(future)
-        except asyncio.CancelledError:
-            if on_cancel is not None:
-                on_cancel()
-            raise
+        return await asyncio.shield(future)
 
     def _worker_finished(self, future: asyncio.Future[object]) -> None:
         self._processing_slots.release()
@@ -298,7 +286,6 @@ class _ActivePolicy:
         values: object,
         *,
         timeout: Timeout,
-        publication: _PolicyPublicationGuard | None = None,
     ) -> RequestProcessor:
         """Validate and activate a complete candidate under the shared deadline."""
         config = self._registry.validate_config(values)
@@ -312,14 +299,8 @@ class _ActivePolicy:
             processor = self._registry.prepare_processor(config, timeout=timeout)
             timeout.raise_if_expired()
 
-            def activate() -> None:
-                self._config = config
-                self._processor = processor
-
-            if publication is None:
-                activate()
-            else:
-                publication.publish(activate)
+            self._config = config
+            self._processor = processor
             return processor
         except (GateConfigurationError, GateRegistryError):
             raise EgressGateError(ErrorCode.CONFIG_INVALID) from None
@@ -345,24 +326,6 @@ async def _await_worker(worker: Future[_WorkerResultT]) -> _WorkerResultT:
 
 class _AbortContext(Protocol):
     async def abort(self, code: grpc.StatusCode, details: str) -> Never: ...
-
-
-class _PolicyPublicationGuard:
-    """Order RPC cancellation and active-policy publication atomically."""
-
-    def __init__(self) -> None:
-        self._lock = Lock()
-        self._cancelled = False
-
-    def cancel(self) -> None:
-        with self._lock:
-            self._cancelled = True
-
-    def publish(self, operation: Callable[[], None]) -> None:
-        with self._lock:
-            if self._cancelled:
-                raise _PolicyPublicationCancelled
-            operation()
 
 
 class _EvaluationLogExtra(TypedDict):
@@ -600,10 +563,6 @@ def _limit_deny() -> pb2.HttpRequestResult:
 _LOGGER = get_logger(__name__)
 _INVALID_REQUEST_ID = "invalid"
 _MAX_PROTO_SAFE_INTEGER = (1 << 53) - 1
-
-
-class _PolicyPublicationCancelled(Exception):
-    """Signal that a disconnected RPC no longer owns candidate publication."""
 
 
 __all__ = ["EgressGateMiddleware"]

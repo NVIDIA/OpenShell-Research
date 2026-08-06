@@ -92,7 +92,7 @@ written by a harness to disk.
 from egress_gate.gates import create_builtin_registry
 from egress_gate.service import EgressGateServer
 
-server = EgressGateServer(create_builtin_registry(), timeout_seconds=4)
+server = EgressGateServer(create_builtin_registry())
 server.serve_sync("127.0.0.1:50051")
 ```
 
