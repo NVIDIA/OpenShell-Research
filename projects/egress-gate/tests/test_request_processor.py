@@ -56,7 +56,12 @@ class _ControlConfig(GateConfig):
     control: Literal["proceed", "allow", "deny"] = "proceed"
     replacement: str | None = None
     expected_body: str | None = None
+    expected_header_name: str | None = None
+    expected_header_value: str | None = None
     header_value: str | None = None
+    header_name: str = "x-openshell-middleware-test"
+    header_action: Literal["append", "overwrite", "skip"] = "overwrite"
+    remove_header: str | None = None
     header_count: int = 0
     finding_label: str | None = None
     finding_count: int = 1
@@ -92,6 +97,19 @@ class _ControlGate(Gate[_ControlConfig, None]):
             and request.body.decode("utf-8") != self.config.expected_body
         ):
             raise AssertionError("later gate did not see the current request")
+        if self.config.expected_header_name is not None:
+            values = tuple(
+                header.value
+                for header in request.headers
+                if header.name.lower() == self.config.expected_header_name.lower()
+            )
+            expected = (
+                ()
+                if self.config.expected_header_value is None
+                else (self.config.expected_header_value,)
+            )
+            if values != expected:
+                raise AssertionError("later gate did not see current request headers")
         findings: tuple[Finding, ...] = ()
         if self.config.boundary_finding:
             finding = Finding(
@@ -118,7 +136,7 @@ class _ControlGate(Gate[_ControlConfig, None]):
             )
         if self.config.control == "allow":
             return GateEvaluation.allow(findings=findings)
-        mutations: tuple[WriteHeaderMutation, ...] = tuple(
+        mutations: tuple[WriteHeaderMutation | RemoveHeaderMutation, ...] = tuple(
             WriteHeaderMutation(
                 kind="write",
                 name=f"x-openshell-middleware-test-{index}",
@@ -131,10 +149,14 @@ class _ControlGate(Gate[_ControlConfig, None]):
             mutations = (
                 WriteHeaderMutation(
                     kind="write",
-                    name="x-openshell-middleware-test",
+                    name=self.config.header_name,
                     value=self.config.header_value,
-                    on_existing=ExistingHeaderAction.OVERWRITE,
+                    on_existing=ExistingHeaderAction(self.config.header_action),
                 ),
+            )
+        if self.config.remove_header is not None:
+            mutations += (
+                RemoveHeaderMutation(kind="remove", name=self.config.remove_header),
             )
         return GateEvaluation.proceed(
             request_mutations=RequestMutations(
@@ -272,6 +294,190 @@ def test_processor_applies_mutations_to_the_current_request_and_preserves_intent
         "test-control",
     ]
     assert result.policy_fingerprint == "policy-fingerprint"
+
+
+def test_three_gates_aggregate_interacting_body_and_header_mutations() -> None:
+    original = _request(
+        body=b"original secret",
+        headers=(
+            HttpHeader(name="X-OpenShell-Middleware-State", value="old-one"),
+            HttpHeader(name="x-openshell-middleware-state", value="old-two"),
+            HttpHeader(name="x-remove", value="discard"),
+            HttpHeader(name="x-keep", value="preserve"),
+        ),
+    )
+    processor = _processor(
+        (
+            (
+                "first",
+                {
+                    "kind": "test-control",
+                    "replacement": "first redaction",
+                    "header_name": "x-openshell-middleware-state",
+                    "header_value": "stage-one",
+                    "header_action": "overwrite",
+                },
+            ),
+            (
+                "second",
+                {
+                    "kind": "test-control",
+                    "expected_body": "first redaction",
+                    "expected_header_name": "x-openshell-middleware-state",
+                    "expected_header_value": "stage-one",
+                    "replacement": "",
+                    "header_name": "x-openshell-middleware-chain",
+                    "header_value": "stage-two",
+                    "header_action": "append",
+                    "remove_header": "x-openshell-middleware-state",
+                },
+            ),
+            (
+                "third",
+                {
+                    "kind": "test-control",
+                    "expected_body": "",
+                    "expected_header_name": "x-openshell-middleware-state",
+                    "replacement": "final body",
+                    "header_name": "x-openshell-middleware-state",
+                    "header_value": "stage-three",
+                    "header_action": "append",
+                    "remove_header": "x-remove",
+                },
+            ),
+        )
+    )
+
+    result = processor.process(original, timeout=Timeout.from_seconds(1))
+    final_request = apply_request_mutations(original, result.request_mutations)
+    first_mutations = RequestMutations(
+        replacement_body=b"first redaction",
+        header_mutations=(
+            WriteHeaderMutation(
+                kind="write",
+                name="x-openshell-middleware-state",
+                value="stage-one",
+                on_existing=ExistingHeaderAction.OVERWRITE,
+            ),
+        ),
+    )
+    second_mutations = RequestMutations(
+        replacement_body=b"",
+        header_mutations=(
+            WriteHeaderMutation(
+                kind="write",
+                name="x-openshell-middleware-chain",
+                value="stage-two",
+                on_existing=ExistingHeaderAction.APPEND,
+            ),
+            RemoveHeaderMutation(
+                kind="remove",
+                name="x-openshell-middleware-state",
+            ),
+        ),
+    )
+    third_mutations = RequestMutations(
+        replacement_body=b"final body",
+        header_mutations=(
+            WriteHeaderMutation(
+                kind="write",
+                name="x-openshell-middleware-state",
+                value="stage-three",
+                on_existing=ExistingHeaderAction.APPEND,
+            ),
+            RemoveHeaderMutation(kind="remove", name="x-remove"),
+        ),
+    )
+    sequential_request = original
+    for mutations in (first_mutations, second_mutations, third_mutations):
+        sequential_request = apply_request_mutations(sequential_request, mutations)
+
+    assert result.decision is EgressDecision.ALLOW
+    assert result.request_mutations == RequestMutations(
+        replacement_body=b"final body",
+        header_mutations=(
+            first_mutations.header_mutations
+            + second_mutations.header_mutations
+            + third_mutations.header_mutations
+        ),
+    )
+    assert final_request == sequential_request
+    assert final_request.body == b"final body"
+    assert final_request.headers == (
+        HttpHeader(name="x-keep", value="preserve"),
+        HttpHeader(name="x-openshell-middleware-chain", value="stage-two"),
+        HttpHeader(name="x-openshell-middleware-state", value="stage-three"),
+    )
+
+
+def test_final_empty_body_replacement_is_preserved_across_gates() -> None:
+    original = _request(body=b"original")
+    processor = _processor(
+        (
+            ("first", {"kind": "test-control", "replacement": "intermediate"}),
+            (
+                "second",
+                {
+                    "kind": "test-control",
+                    "expected_body": "intermediate",
+                    "replacement": "",
+                },
+            ),
+            (
+                "observe",
+                {
+                    "kind": "test-control",
+                    "expected_body": "",
+                },
+            ),
+        )
+    )
+
+    result = processor.process(original, timeout=Timeout.from_seconds(1))
+    final_request = apply_request_mutations(original, result.request_mutations)
+
+    assert result.decision is EgressDecision.ALLOW
+    assert result.request_mutations.replacement_body == b""
+    assert final_request.body == b""
+
+
+def test_terminal_allow_returns_mutations_from_prior_gates() -> None:
+    original = _request(body=b"original")
+    processor = _processor(
+        (
+            ("body", {"kind": "test-control", "replacement": "updated"}),
+            (
+                "header",
+                {
+                    "kind": "test-control",
+                    "expected_body": "updated",
+                    "header_name": "x-openshell-middleware-reviewed",
+                    "header_value": "true",
+                },
+            ),
+            (
+                "allow",
+                {
+                    "kind": "test-control",
+                    "control": "allow",
+                    "expected_body": "updated",
+                    "expected_header_name": "x-openshell-middleware-reviewed",
+                    "expected_header_value": "true",
+                },
+            ),
+        )
+    )
+
+    result = processor.process(original, timeout=Timeout.from_seconds(1))
+    final_request = apply_request_mutations(original, result.request_mutations)
+
+    assert result.decision is EgressDecision.ALLOW
+    assert isinstance(result.decision_source, GateDecisionSource)
+    assert result.decision_source.gate_name == "allow"
+    assert final_request.body == b"updated"
+    assert final_request.headers == (
+        HttpHeader(name="x-openshell-middleware-reviewed", value="true"),
+    )
 
 
 def test_regex_gate_sees_header_mutations_from_an_earlier_gate() -> None:
