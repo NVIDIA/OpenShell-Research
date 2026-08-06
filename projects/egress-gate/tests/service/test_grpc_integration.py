@@ -71,6 +71,38 @@ def _evaluation(
     )
 
 
+def _progressive_redaction_config() -> Message:
+    values = {
+        "gates": [
+            {
+                "name": name,
+                "kind": "regex",
+                "scan": {
+                    "kind": "body",
+                    "action": {"kind": "replace", "template": "[{entity}]"},
+                },
+                "pattern_catalog": {
+                    "entities": [
+                        {
+                            "name": entity,
+                            "rules": [{"pattern": pattern, "confidence": "high"}],
+                        }
+                    ]
+                },
+            }
+            for name, entity, pattern in (
+                ("redact-email", "email", r"alice@example\.com"),
+                ("redact-api-key", "api_key", r"sk-[0-9]+"),
+                ("redact-phone", "phone", r"555-[0-9]{4}"),
+            )
+        ],
+        "default_decision": "allow",
+    }
+    request = pb2.ValidateConfigRequest()
+    json_format.ParseDict(values, request.config)
+    return request.config
+
+
 @asynccontextmanager
 async def _running_stub(
     middleware: EgressGateMiddleware,
@@ -116,6 +148,25 @@ async def test_generated_stub_round_trip_covers_manifest_and_gate_actions() -> N
     assert len(detected.findings) == 1
     assert denied.decision == pb2.DECISION_DENY
     assert denied.reason_code == "egress_gate_regex_denied"
+
+
+@pytest.mark.asyncio
+async def test_generated_stub_returns_three_gate_progressive_redaction() -> None:
+    middleware = EgressGateMiddleware(create_builtin_registry())
+    request = _evaluation(b"email=alice@example.com api_key=sk-123456 phone=555-0100")
+    request.config.CopyFrom(_progressive_redaction_config())
+
+    async with _running_stub(middleware) as (stub, _):
+        response = await stub.EvaluateHttpRequest(request)
+
+    assert response.decision == pb2.DECISION_ALLOW
+    assert response.has_body is True
+    assert response.body == b"email=[email] api_key=[api_key] phone=[phone]"
+    assert [finding.label for finding in response.findings] == [
+        "email",
+        "api_key",
+        "phone",
+    ]
 
 
 @pytest.mark.asyncio

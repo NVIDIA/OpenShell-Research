@@ -468,6 +468,49 @@ def test_three_regex_gates_progressively_redact_the_current_body() -> None:
     ]
 
 
+def test_later_regex_gates_use_the_body_after_overlapping_text_is_redacted() -> None:
+    original = _request(body=b"credential: alice@example.com")
+    processor = _processor(
+        (
+            (
+                "redact-email",
+                _regex_config(
+                    "replace",
+                    entity="email",
+                    pattern=r"alice@example\.com",
+                ),
+            ),
+            (
+                "redact-original-domain",
+                _regex_config(
+                    "replace",
+                    entity="domain",
+                    pattern=r"example\.com",
+                ),
+            ),
+            (
+                "classify-redaction",
+                _regex_config(
+                    "replace",
+                    entity="redacted_email",
+                    pattern=r"\[email\]",
+                    template="<{entity}>",
+                ),
+            ),
+        ),
+        include_regex=True,
+    )
+
+    result = processor.process(original, timeout=Timeout.from_seconds(1))
+    final_request = apply_request_mutations(original, result.request_mutations)
+
+    assert final_request.body == b"credential: <redacted_email>"
+    assert [(item.source_gate, item.finding.label) for item in result.findings] == [
+        ("redact-email", "email"),
+        ("classify-redaction", "redacted_email"),
+    ]
+
+
 def test_final_empty_body_replacement_is_preserved_across_gates() -> None:
     original = _request(body=b"original")
     processor = _processor(
@@ -497,6 +540,55 @@ def test_final_empty_body_replacement_is_preserved_across_gates() -> None:
     assert result.decision is EgressDecision.ALLOW
     assert result.request_mutations.replacement_body == b""
     assert final_request.body == b""
+
+
+def test_header_skip_and_append_remain_ordered_across_gates() -> None:
+    original = _request(
+        headers=(HttpHeader(name="X-OpenShell-Middleware-State", value="original"),)
+    )
+    processor = _processor(
+        (
+            (
+                "overwrite",
+                {
+                    "kind": "test-control",
+                    "header_name": "x-openshell-middleware-state",
+                    "header_value": "first",
+                    "header_action": "overwrite",
+                },
+            ),
+            (
+                "skip",
+                {
+                    "kind": "test-control",
+                    "expected_header_name": "x-openshell-middleware-state",
+                    "expected_header_value": "first",
+                    "header_name": "x-openshell-middleware-state",
+                    "header_value": "ignored",
+                    "header_action": "skip",
+                },
+            ),
+            (
+                "append",
+                {
+                    "kind": "test-control",
+                    "expected_header_name": "x-openshell-middleware-state",
+                    "expected_header_value": "first",
+                    "header_name": "x-openshell-middleware-state",
+                    "header_value": "second",
+                    "header_action": "append",
+                },
+            ),
+        )
+    )
+
+    result = processor.process(original, timeout=Timeout.from_seconds(1))
+    final_request = apply_request_mutations(original, result.request_mutations)
+
+    assert final_request.headers == (
+        HttpHeader(name="x-openshell-middleware-state", value="first"),
+        HttpHeader(name="x-openshell-middleware-state", value="second"),
+    )
 
 
 def test_terminal_allow_returns_mutations_from_prior_gates() -> None:
