@@ -57,7 +57,7 @@
   <text x="48" y="359" class="layer-label">PIPELINE PROCESSOR</text>
   <rect x="156" y="380" width="668" height="62" rx="13" class="process"/>
   <text x="490" y="406" text-anchor="middle" class="title">RequestProcessor</text>
-  <text x="490" y="429" text-anchor="middle" class="subtitle">gate order · one timeout · aggregation · allow or deny</text>
+  <text x="490" y="429" text-anchor="middle" class="subtitle">gate order · one deadline · aggregation · allow or deny</text>
 
   <rect x="20" y="485" width="940" height="155" rx="20" class="layer"/>
   <text x="48" y="514" class="layer-label">REQUEST GATES</text>

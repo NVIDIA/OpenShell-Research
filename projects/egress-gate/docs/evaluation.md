@@ -36,7 +36,7 @@ The repository includes a regex policy and two request cases. Run them from
 uv run egress-gate evaluate \
   --policy examples/regex-redaction/egress-gate-config.yaml \
   --cases examples/regex-redaction/cases.yaml \
-  --timeout-seconds 1
+  --timeout 1s
 ```
 
 The command prepares the policy once, runs each case with a fresh timeout, and

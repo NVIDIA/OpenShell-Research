@@ -39,7 +39,7 @@ Start Egress Gate with this example registry and content-safe debug diagnostics:
 uv run egress-gate \
   --debug \
   --registry examples.class-based-gate.keyword_gate:registry \
-  serve --listen 0.0.0.0:50051 --timeout-seconds 4
+  serve --listen 0.0.0.0:50051 --timeout 4s
 ```
 
 Before you change the gateway configuration, stop any running OpenShell

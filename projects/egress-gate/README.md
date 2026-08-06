@@ -92,12 +92,18 @@ written by a harness to disk.
 from egress_gate.gates import create_builtin_registry
 from egress_gate.service import EgressGateServer
 
-server = EgressGateServer(create_builtin_registry())
+server = EgressGateServer(
+    create_builtin_registry(),
+    timeout_middleware_processing=10,
+)
 server.serve_sync("127.0.0.1:50051")
 ```
 
-The service creates one `Timeout` per evaluation and passes that deadline
+`timeout_middleware_processing` is the actual service setting, in seconds. The
+service turns it into one `Timeout` per evaluation and passes that same deadline
 through slot acquisition, policy preparation, and `RequestProcessor.process`.
+The OpenShell gateway enforces its separately configured
+`timeout_gateway_ceiling` as an upper bound.
 
 ## Documentation and examples
 

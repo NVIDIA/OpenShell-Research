@@ -19,7 +19,7 @@ supervisor applies allowed mutations to the intercepted request.
 
 | RPC | Behavior |
 | --- | --- |
-| `Describe` | Advertise Egress Gate and the pre-credentials HTTP binding |
+| `Describe` | Return Egress Gate's pre-credentials HTTP binding |
 | `ValidateConfig` | Validate a complete registry-backed pipeline without publishing it |
 | `EvaluateHttpRequest` | Adapt one request, prepare/reuse policy, execute, and serialize |
 
@@ -29,10 +29,14 @@ encoded configuration before registry parsing.
 
 ## Shared deadline and workers
 
-`EvaluateHttpRequest` creates one monotonic `Timeout`. That same deadline is
-used for semaphore acquisition, policy preparation, replacement-lock waits,
-gate execution, and final result checks. `RequestProcessor.process` accepts the
-caller-owned timeout and never creates or stores one.
+The service's `timeout_middleware_processing` value is returned in the
+`MiddlewareBinding` from `Describe`. `EvaluateHttpRequest` converts that same
+value into one monotonic `Timeout` used for semaphore acquisition, policy
+preparation, replacement-lock waits, gate execution, and final result checks.
+The gateway's separate `timeout_gateway_ceiling` can shorten, but never extend,
+that processing time.
+`RequestProcessor.process` accepts the caller-owned timeout and never creates or
+stores one.
 
 Synchronous work runs in a bounded four-slot executor. The gRPC server permits
 sixteen concurrent RPCs. Cancellation does not stop Python code that already

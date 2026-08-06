@@ -58,6 +58,42 @@ def test_cli_narrow_help_preserves_complete_option_names() -> None:
     assert "--conf…" not in result.stdout
 
 
+def test_cli_serve_uses_one_concise_processing_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[float, str]] = []
+
+    class FakeServer:
+        def __init__(
+            self,
+            registry: GateRegistry,
+            *,
+            timeout_middleware_processing: float,
+        ) -> None:
+            del registry
+            self.timeout_middleware_processing = timeout_middleware_processing
+
+        def serve_sync(self, listen: str) -> None:
+            calls.append((self.timeout_middleware_processing, listen))
+
+    monkeypatch.setattr(
+        "egress_gate.service.server.EgressGateServer",
+        FakeServer,
+    )
+
+    result = CliRunner().invoke(
+        app,
+        ["serve", "--listen", "127.0.0.1:50055", "--timeout", "4500ms"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls == [(4.5, "127.0.0.1:50055")]
+
+    help_result = CliRunner().invoke(app, ["serve", "--help"])
+    assert "--timeout <str>" in help_result.stdout
+    assert "--timeout-seconds" not in help_result.stdout
+
+
 def test_cli_gates_describes_the_request_level_builtin() -> None:
     result = CliRunner().invoke(app, ["gates", "list"])
 
@@ -405,8 +441,12 @@ def test_cli_add_gateway_registration_reports_the_result(tmp_path: Path) -> None
     assert "Gateway registration is ready" in result.stdout
     assert "Gateway file" in result.stdout
     assert str(config) in "".join(result.stdout.split())
-    assert "Registration  egress-gate" in result.stdout
-    assert "Endpoint      http://192.0.2.10:50051" in result.stdout
+    assert "Registration" in result.stdout
+    assert "egress-gate" in result.stdout
+    assert "Endpoint" in result.stdout
+    assert "http://192.0.2.10:50051" in result.stdout
+    assert "Timeout gateway ceiling" in result.stdout
+    assert "30s" in result.stdout
     assert "Created the gateway configuration file" in result.stdout
     assert "Next: Start Egress Gate" in result.stdout
 
@@ -418,7 +458,8 @@ def test_cli_lists_gateway_registration_names_for_removal(tmp_path: Path) -> Non
         "version = 1\n\n"
         "[[openshell.supervisor.middleware]]\n"
         'name = "eg-regex"\n'
-        'grpc_endpoint = "http://192.0.2.10:50051"\n\n'
+        'grpc_endpoint = "http://192.0.2.10:50051"\n'
+        'timeout = "30s"\n\n'
         "[[openshell.supervisor.middleware]]\n"
         'name = "other-service"\n'
         'grpc_endpoint = "http://192.0.2.20:9000"\n'
@@ -433,6 +474,8 @@ def test_cli_lists_gateway_registration_names_for_removal(tmp_path: Path) -> Non
     assert "OpenShell middleware registrations" in result.stdout
     assert "eg-regex" in result.stdout
     assert "http://192.0.2.10:50051" in result.stdout
+    assert "Timeout gateway ceiling" in result.stdout
+    assert "30s" in result.stdout
     assert "other-service" in result.stdout
     assert "remove-gateway-registration --name NAME" in result.stdout
 
@@ -522,13 +565,13 @@ def test_cli_evaluate_explains_an_invalid_timeout() -> None:
             str(project_dir / "examples/regex-redaction/egress-gate-config.yaml"),
             "--cases",
             str(project_dir / "examples/regex-redaction/cases.yaml"),
-            "--timeout-seconds",
-            "0",
+            "--timeout",
+            "0s",
         ],
         color=True,
     )
 
     assert result.exit_code == 2
     error_output = Text.from_ansi(result.stderr).plain
-    assert "Invalid value for --timeout-seconds" in error_output
-    assert "greater than 0" in error_output
+    assert "Invalid value for --timeout" in error_output
+    assert "between 10ms and 30s" in error_output

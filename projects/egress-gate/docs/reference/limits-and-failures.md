@@ -20,7 +20,9 @@ limits.
 | Result metadata aggregate strings | 32 KiB |
 | Gate traces per result | 10 |
 | Header mutations per gate evaluation | 64 |
-| Processing timeout | 30 seconds maximum |
+| Offline `--timeout` | 30 seconds maximum |
+| `timeout_middleware_processing` | 30 seconds maximum |
+| `timeout_gateway_ceiling` | 30 seconds in registrations created by Egress Gate |
 | Concurrent processing slots | 4 |
 
 Request context and target aggregates, headers, replacement bodies, regex

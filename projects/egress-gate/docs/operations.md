@@ -13,7 +13,7 @@ environment as needed.
 ```bash title="Start Egress Gate"
 uv run egress-gate gates list
 uv run egress-gate gates schema
-uv run egress-gate serve --listen 0.0.0.0:50051 --timeout-seconds 4
+uv run egress-gate serve --listen 0.0.0.0:50051 --timeout 4s
 ```
 
 Use a reachable non-loopback address only when the supervisor is outside the
@@ -37,6 +37,12 @@ The command updates `OPENSHELL_GATEWAY_CONFIG`, then
 Start the gateways again with the same commands or service managers that you
 normally use.
 
+The registration writes `timeout = "30s"` in the gateway TOML. Egress Gate calls
+this setting `timeout_gateway_ceiling`: the maximum time the gateway permits
+for Egress Gate. Set the actual service value with
+`egress-gate serve --timeout DURATION`; Egress Gate calls that setting
+`timeout_middleware_processing`.
+
 To remove a registration, stop any running gateways that use the configuration
 again. List the available names with:
 
@@ -54,9 +60,17 @@ uv run egress-gate remove-gateway-registration --name egress-gate
 
 Start the gateways again after the command completes.
 
-The generated OpenShell middleware timeout is five seconds. Keep the Egress
-Gate `--timeout-seconds` below it so queueing, preparation, and transport have
-headroom.
+Egress Gate uses `timeout_middleware_processing` across queueing, policy
+preparation, and every configured gate. OpenShell applies
+`timeout_gateway_ceiling` as an independent upper bound:
+
+```text
+effective timeout = min(timeout_gateway_ceiling, timeout_middleware_processing)
+```
+
+With the registration command's 30s ceiling, any supported `--timeout` value
+becomes the effective timeout. If an operator lowers the gateway ceiling by
+editing the gateway configuration, that lower value wins.
 
 If the middleware RPC returns gRPC `RESOURCE_EXHAUSTED`, capacity may remain
 accounted for briefly while completed RPCs are torn down. The OpenShell gateway

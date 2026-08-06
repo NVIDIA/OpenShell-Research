@@ -11,7 +11,7 @@ from google.protobuf.message import DecodeError
 
 from egress_gate.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
 from egress_gate.constants import (
-    DEFAULT_TIMEOUT_SECONDS,
+    DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING,
     MAX_CONCURRENT_RPCS,
     MAX_RECEIVE_MESSAGE_BYTES,
 )
@@ -30,11 +30,11 @@ class EgressGateServer:
         self,
         registry: GateRegistry,
         *,
-        timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+        timeout_middleware_processing: float = DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING,
     ) -> None:
         self._middleware = EgressGateMiddleware(
             registry,
-            timeout_seconds=timeout_seconds,
+            timeout_middleware_processing=timeout_middleware_processing,
         )
 
     def serve_sync(self, listen: str = DEFAULT_LISTEN_ADDRESS) -> None:
@@ -53,7 +53,12 @@ class EgressGateServer:
                 bound_port = server.add_insecure_port(listen)
                 if bound_port != requested_port:
                     raise EgressGateError(ErrorCode.SERVER_BIND_FAILED)
-                _LOGGER.info("egress_gate_server_bound listen=%r", listen)
+                _LOGGER.info(
+                    "egress_gate_server_bound listen=%r "
+                    "timeout_middleware_processing=%s",
+                    listen,
+                    self._middleware.timeout_middleware_processing,
+                )
                 await server.start()
             except RuntimeError:
                 raise EgressGateError(ErrorCode.SERVER_BIND_FAILED) from None

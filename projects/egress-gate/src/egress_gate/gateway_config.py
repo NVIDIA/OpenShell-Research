@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from egress_gate.constants import TIMEOUT_GATEWAY_CEILING
+
 
 class GatewayConfigUpdate(Enum):
     """Result of writing one Egress Gate middleware registration."""
@@ -39,6 +41,7 @@ class GatewayMiddlewareRegistration:
 
     name: str
     endpoint: str | None
+    timeout_gateway_ceiling: str | None
 
 
 # Mirrors OpenShell's stable-identifier byte limit for external middleware
@@ -79,6 +82,7 @@ def list_gateway_registrations(
     for entry in _middleware_entries(_load_gateway_config(contents, path), path):
         name = entry.get("name")
         endpoint = entry.get("grpc_endpoint")
+        timeout_gateway_ceiling = entry.get("timeout")
         if not isinstance(name, str) or not name:
             raise GatewayConfigError(
                 f"{path} contains a middleware registration without a valid name."
@@ -88,8 +92,19 @@ def list_gateway_registrations(
                 f"The middleware registration {name!r} in {path} has an invalid "
                 "grpc_endpoint."
             )
+        if timeout_gateway_ceiling is not None and not isinstance(
+            timeout_gateway_ceiling, str
+        ):
+            raise GatewayConfigError(
+                f"The middleware registration {name!r} in {path} has an invalid "
+                "timeout."
+            )
         registrations.append(
-            GatewayMiddlewareRegistration(name=name, endpoint=endpoint)
+            GatewayMiddlewareRegistration(
+                name=name,
+                endpoint=endpoint,
+                timeout_gateway_ceiling=timeout_gateway_ceiling,
+            )
         )
     return tuple(registrations)
 
@@ -255,7 +270,11 @@ def validate_middleware_name(name: str) -> str:
     return name
 
 
-def _new_gateway_config(*, middleware_name: str, endpoint: str) -> str:
+def _new_gateway_config(
+    *,
+    middleware_name: str,
+    endpoint: str,
+) -> str:
     return "[openshell]\nversion = 1\n\n" + _middleware_block(
         middleware_name=middleware_name,
         endpoint=endpoint,
@@ -330,17 +349,25 @@ def _append_middleware_block(
     )
 
 
-def _middleware_block(*, middleware_name: str, endpoint: str) -> str:
+def _middleware_block(
+    *,
+    middleware_name: str,
+    endpoint: str,
+) -> str:
     return (
         "[[openshell.supervisor.middleware]]\n"
         f'name = "{middleware_name}"\n'
         f'grpc_endpoint = "{endpoint}"\n'
         "max_body_bytes = 4194304\n"
-        'timeout = "5s"\n'
+        f'timeout = "{TIMEOUT_GATEWAY_CEILING:g}s"\n'
     )
 
 
-def _update_middleware_block(block: str, *, endpoint: str) -> str:
+def _update_middleware_block(
+    block: str,
+    *,
+    endpoint: str,
+) -> str:
     updated = _replace_or_append_assignment(
         block,
         key="grpc_endpoint",
@@ -354,7 +381,7 @@ def _update_middleware_block(block: str, *, endpoint: str) -> str:
     return _replace_or_append_assignment(
         updated,
         key="timeout",
-        value='"5s"',
+        value=f'"{TIMEOUT_GATEWAY_CEILING:g}s"',
     )
 
 

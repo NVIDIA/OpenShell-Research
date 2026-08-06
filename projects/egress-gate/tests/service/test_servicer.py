@@ -109,6 +109,19 @@ class _SuccessfulEvaluationContext:
         raise AssertionError("successful evaluation unexpectedly aborted")
 
 
+def test_manifest_contains_the_middleware_processing_timeout() -> None:
+    middleware = EgressGateMiddleware(
+        create_builtin_registry(),
+        timeout_middleware_processing=4.5,
+    )
+    try:
+        manifest = asyncio.run(middleware.Describe(object(), Mock()))
+    finally:
+        asyncio.run(middleware.close())
+
+    assert manifest.bindings[0].timeout == "4500ms"
+
+
 def test_copied_proto_remains_the_current_five_field_finding_contract() -> None:
     evaluation = pb2.HttpRequestEvaluation()
     finding = pb2.Finding()
@@ -425,10 +438,7 @@ def test_in_flight_processor_reference_survives_policy_replacement() -> None:
 async def test_cancelled_candidate_keeps_its_slot_until_worker_exits(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    middleware = EgressGateMiddleware(
-        create_builtin_registry(),
-        timeout_seconds=5,
-    )
+    middleware = EgressGateMiddleware(create_builtin_registry())
     started = Event()
     release = Event()
     original_build = middleware._registry.prepare_processor
