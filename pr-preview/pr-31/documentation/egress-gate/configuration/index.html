@@ -1363,6 +1363,9 @@ pipeline processor.</p>
 </span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">    </span><span class="nt">endpoints</span><span class="p">:</span>
 </span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">      </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">api.anthropic.com</span><span class="p p-Indicator">]</span>
 </span></code></pre></div>
+<p>Relative catalog paths resolve from the Egress Gate process working directory,
+not from the policy file. Use an inline catalog when the process does not have a
+stable working directory.</p>
 <p>The Egress Gate policy has two required fields:</p>
 <ul>
 <li><code>gates</code> contains one through ten named gate configurations.</li>

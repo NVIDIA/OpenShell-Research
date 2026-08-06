@@ -126,7 +126,7 @@
     const onKeyDown = (event) => {
       if (
         document.activeElement === button &&
-        event.key === " "
+        (event.key === " " || event.key === "Enter")
       ) {
         event.preventDefault();
         onButtonClick(event);
