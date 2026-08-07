@@ -49,10 +49,10 @@ set. Body replacement `None` and `b""` remain distinct. Header mutation variants
 use the required `kind` values `write` and `remove`.
 
 Structured JSON replacement works through the same complete-body mutation
-contract. The JSON document replaces selected string tokens from the end of the
-source toward the beginning. It preserves every byte outside those tokens and
-returns one bounded complete replacement body. A later gate therefore parses
-the body snapshot produced by earlier structured or raw replacements.
+contract. The JSON document renders selected string-token edits in one bounded
+pass while preserving every byte outside those tokens. It returns one complete
+replacement body. A later gate therefore parses the body snapshot produced by
+earlier structured or raw replacements.
 
 If every gate proceeds, `default_decision` controls the result. Default deny
 uses `egress_gate_default_deny`. Default allow has no reason code.
