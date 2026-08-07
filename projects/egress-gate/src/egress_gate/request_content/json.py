@@ -149,7 +149,10 @@ class JsonDocument:
         timeout: Timeout,
     ) -> tuple[JsonTextNode, ...]:
         """Select unique string nodes from the document root."""
-        return self._text_nodes(self.select_nodes(selectors, timeout=timeout))
+        return self._text_nodes(
+            self.select_nodes(selectors, timeout=timeout),
+            timeout=timeout,
+        )
 
     def select_text_from(
         self,
@@ -159,7 +162,10 @@ class JsonDocument:
         timeout: Timeout,
     ) -> tuple[JsonTextNode, ...]:
         """Select unique string nodes relative to one document node."""
-        return self._text_nodes(self.select_from(node, selectors, timeout=timeout))
+        return self._text_nodes(
+            self.select_from(node, selectors, timeout=timeout),
+            timeout=timeout,
+        )
 
     def array_items(
         self,
@@ -272,10 +278,17 @@ class JsonDocument:
         timeout.raise_if_expired()
         return tuple(self._public_node(node) for node in selected)
 
-    def _text_nodes(self, nodes: tuple[JsonNode, ...]) -> tuple[JsonTextNode, ...]:
+    def _text_nodes(
+        self,
+        nodes: tuple[JsonNode, ...],
+        *,
+        timeout: Timeout,
+    ) -> tuple[JsonTextNode, ...]:
         selected: list[JsonTextNode] = []
         encoded_size = 0
-        for node in nodes:
+        for index, node in enumerate(nodes):
+            if index % _TIMEOUT_CHECK_INTERVAL == 0:
+                timeout.raise_if_expired()
             internal = self._resolve_node(node)
             if internal.kind is not JsonNodeKind.STRING or internal.text is None:
                 continue
@@ -285,6 +298,7 @@ class JsonDocument:
             selected.append(
                 JsonTextNode(id=internal.id, path=internal.path, text=internal.text)
             )
+        timeout.raise_if_expired()
         return tuple(selected)
 
     def _resolve_node(self, node: JsonNode) -> _JsonNode:

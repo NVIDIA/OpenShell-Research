@@ -5,7 +5,13 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from egress_gate.errors import BodyFormatError, GateInputError, GateLimitExceededError
+import egress_gate.request_content.json as json_module
+from egress_gate.errors import (
+    BodyFormatError,
+    GateInputError,
+    GateLimitExceededError,
+    TimeoutExpiredError,
+)
 from egress_gate.request_content import (
     JsonDocument,
     JsonEachSegment,
@@ -189,6 +195,32 @@ def test_array_item_materialization_checks_the_shared_timeout(
     assert checks >= 4
 
 
+def test_text_node_projection_stops_when_the_shared_timeout_expires(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document = _parse(
+        ('{"values":[' + ",".join('"value"' for _ in range(1000)) + "]}").encode()
+    )
+    selector = _selector(
+        JsonKeySegment(kind="key", value="values"),
+        JsonEachSegment(kind="each"),
+    )
+    checks = 0
+
+    def expire_during_projection(_timeout: Timeout) -> None:
+        nonlocal checks
+        checks += 1
+        if checks == 5:
+            raise TimeoutExpiredError
+
+    monkeypatch.setattr(Timeout, "raise_if_expired", expire_during_projection)
+
+    with pytest.raises(TimeoutExpiredError):
+        document.select_text((selector,), timeout=Timeout.from_seconds(1))
+
+    assert checks == 5
+
+
 @pytest.mark.parametrize(
     "body",
     [
@@ -222,7 +254,62 @@ def test_selector_models_are_strict_bounded_and_discriminated() -> None:
 def test_document_depth_is_bounded() -> None:
     from egress_gate.constants import MAX_JSON_DEPTH
 
+    accepted = ("[" * MAX_JSON_DEPTH + "0" + "]" * MAX_JSON_DEPTH).encode()
     body = ("[" * (MAX_JSON_DEPTH + 1) + "0" + "]" * (MAX_JSON_DEPTH + 1)).encode()
 
+    _parse(accepted)
     with pytest.raises(GateLimitExceededError):
         _parse(body)
+
+
+def test_document_node_count_accepts_the_limit_and_rejects_the_next_node(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(json_module, "MAX_JSON_NODES", 3)
+
+    _parse(b'["one","two"]')
+    with pytest.raises(GateLimitExceededError, match="node count"):
+        _parse(b'["one","two","three"]')
+
+
+def test_selector_segment_count_accepts_the_limit_and_rejects_the_next() -> None:
+    from egress_gate.constants import MAX_JSON_SELECTOR_SEGMENTS
+
+    segment = JsonEachSegment(kind="each")
+
+    JsonSelector(segments=(segment,) * MAX_JSON_SELECTOR_SEGMENTS)
+    with pytest.raises(ValidationError):
+        JsonSelector(segments=(segment,) * (MAX_JSON_SELECTOR_SEGMENTS + 1))
+
+
+def test_selector_count_accepts_the_limit_and_rejects_the_next() -> None:
+    from egress_gate.constants import MAX_JSON_SELECTORS
+
+    document = _parse(b'{"value":"one"}')
+    selector = _selector(JsonKeySegment(kind="key", value="value"))
+
+    document.select_nodes(
+        (selector,) * MAX_JSON_SELECTORS,
+        timeout=Timeout.from_seconds(1),
+    )
+    with pytest.raises(GateLimitExceededError, match="selector count"):
+        document.select_nodes(
+            (selector,) * (MAX_JSON_SELECTORS + 1),
+            timeout=Timeout.from_seconds(1),
+        )
+
+
+def test_selected_node_count_accepts_the_limit_and_rejects_the_next(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(json_module, "MAX_JSON_SELECTED_NODES", 2)
+    selector = _selector(
+        JsonKeySegment(kind="key", value="values"),
+        JsonEachSegment(kind="each"),
+    )
+
+    accepted = _parse(b'{"values":["one","two"]}')
+    assert len(accepted.select_nodes((selector,), timeout=Timeout.from_seconds(1))) == 2
+    rejected = _parse(b'{"values":["one","two","three"]}')
+    with pytest.raises(GateLimitExceededError, match="selected node count"):
+        rejected.select_nodes((selector,), timeout=Timeout.from_seconds(1))
