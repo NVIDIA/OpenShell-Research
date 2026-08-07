@@ -276,7 +276,13 @@ class JsonDocument:
                             "JSON selected node count exceeds the limit"
                         )
         timeout.raise_if_expired()
-        return tuple(self._public_node(node) for node in selected)
+        public_nodes: list[JsonNode] = []
+        for index, node in enumerate(selected):
+            if index % _TIMEOUT_CHECK_INTERVAL == 0:
+                timeout.raise_if_expired()
+            public_nodes.append(self._public_node(node))
+        timeout.raise_if_expired()
+        return tuple(public_nodes)
 
     def _text_nodes(
         self,

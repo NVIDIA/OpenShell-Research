@@ -221,6 +221,32 @@ def test_text_node_projection_stops_when_the_shared_timeout_expires(
     assert checks == 5
 
 
+def test_public_node_projection_stops_when_the_shared_timeout_expires(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document = _parse(
+        ('{"values":[' + ",".join("0" for _ in range(1000)) + "]}").encode()
+    )
+    selector = _selector(
+        JsonKeySegment(kind="key", value="values"),
+        JsonEachSegment(kind="each"),
+    )
+    checks = 0
+
+    def expire_during_projection(_timeout: Timeout) -> None:
+        nonlocal checks
+        checks += 1
+        if checks == 5:
+            raise TimeoutExpiredError
+
+    monkeypatch.setattr(Timeout, "raise_if_expired", expire_during_projection)
+
+    with pytest.raises(TimeoutExpiredError):
+        document.select_nodes((selector,), timeout=Timeout.from_seconds(1))
+
+    assert checks == 5
+
+
 @pytest.mark.parametrize(
     "body",
     [
