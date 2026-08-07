@@ -26,7 +26,7 @@ working directory contains the pattern catalog referenced by `policy.yaml`.
 ```bash
 uv run egress-gate --debug serve \
   --listen 0.0.0.0:50051 \
-  --timeout-seconds 4
+  --timeout 4s
 ```
 
 Before you change the gateway configuration, stop any running OpenShell

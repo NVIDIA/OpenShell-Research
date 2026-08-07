@@ -9,9 +9,10 @@ from __future__ import annotations
 import re
 from importlib.metadata import version
 
-# Configurable processing timeout.
-DEFAULT_TIMEOUT_SECONDS = 1.0
-MAX_TIMEOUT_SECONDS = 30.0
+# Timeout defaults. The gateway registration value remains independently
+# configurable by the operator.
+DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING = 1.0
+DEFAULT_GATEWAY_REGISTRATION_TIMEOUT = "30s"
 
 # Middleware identity and stable response values.
 SERVICE_NAME = "egress-gate"
@@ -21,12 +22,8 @@ DEFAULT_DENY_REASON_CODE = "egress_gate_default_deny"
 LIMIT_REASON = (
     "Egress Gate exceeded a processing safety limit. Check Egress Gate logs "
     "for the limit kind. Reduce the request or replacement size, simplify the "
-    "configured gates and rules, or increase the processing timeout with "
-    "--timeout-seconds or "
-    "EgressGateServer(timeout_seconds=...) to at most "
-    f"{MAX_TIMEOUT_SECONDS:g} seconds. If increasing it, give OpenShell's "
-    "middleware timeout additional headroom for queueing and configuration "
-    "preparation, then retry."
+    "configured gates and rules, or increase the middleware processing timeout, "
+    "then retry."
 )
 LIMIT_REASON_CODE = "egress_gate_limit_exceeded"
 # Text input limits.

@@ -44,7 +44,7 @@
   <rect x="358" y="38" width="264" height="96" rx="16" class="control"/>
   <circle cx="390" cy="70" r="17" class="number"/><text x="390" y="76" text-anchor="middle" class="number-text">2</text>
   <text x="423" y="72" class="title">Pipeline processor</text>
-  <text x="390" y="105" class="subtitle">One shared timeout + bounds</text>
+  <text x="390" y="105" class="subtitle">One shared deadline + bounds</text>
 
   <path d="M622 86h66" class="arrow"/>
 

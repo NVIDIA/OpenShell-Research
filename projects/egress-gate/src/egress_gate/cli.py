@@ -29,14 +29,14 @@ from yaml.resolver import BaseResolver
 
 from egress_gate.base import StrictDomainModel
 from egress_gate.constants import (
-    DEFAULT_TIMEOUT_SECONDS,
+    DEFAULT_GATEWAY_REGISTRATION_TIMEOUT,
+    DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING,
     MAX_BODY_BYTES,
     MAX_EVALUATION_CASE_NAME_BYTES,
     MAX_EVALUATION_CASES,
     MAX_EVALUATION_FILE_BYTES,
     MAX_EVALUATION_TAGS,
     MAX_PROTO_FINDING_GROUPS,
-    MAX_TIMEOUT_SECONDS,
 )
 from egress_gate.errors import EgressGateError, GateRegistryError
 from egress_gate.gates.base import GateCapability
@@ -52,16 +52,31 @@ from egress_gate.gateway_config import (
     GatewayConfigUpdate,
     GatewayMiddlewareRegistration,
     default_gateway_config_path,
+    forget_gateway_registration,
     list_gateway_registrations,
+    read_remembered_gateway_timeout,
+    remember_gateway_registration,
     remove_gateway_config,
     update_gateway_config,
+    validate_gateway_timeout,
     validate_middleware_name,
 )
-from egress_gate.logging import LoggingConfig, configure_logging
+from egress_gate.logging import LoggingConfig, configure_logging, get_logger
 from egress_gate.request import HttpHeader, HttpRequest, HttpTarget, RequestContext
 from egress_gate.result import EgressResult, GateDecisionSource
 from egress_gate.string_validators import BoundedMetadataString
-from egress_gate.timeout import Timeout, validate_timeout_seconds
+from egress_gate.timeout import (
+    Timeout,
+    parse_timeout_duration,
+    validate_timeout_middleware_processing,
+)
+
+_DURATION_FORMAT_HELP = (
+    "Use an integer followed by s for seconds or ms for milliseconds, such as "
+    "10s or 500ms."
+)
+_TIMEOUT_DURATION_HELP = f"{_DURATION_FORMAT_HELP} Minimum 10ms."
+_LOG = get_logger(__name__)
 
 app = typer.Typer(
     name="egress-gate",
@@ -138,31 +153,59 @@ def serve(
             ),
         ),
     ] = "127.0.0.1:50051",
-    timeout_seconds: Annotated[
-        float,
+    timeout: Annotated[
+        str,
         typer.Option(
+            "--timeout",
             help=(
-                "Total processing time available to all gates for one request. "
-                f"The value must be greater than 0 and at most {MAX_TIMEOUT_SECONDS:g}."
+                "Internal processing budget for one request. "
+                f"{_TIMEOUT_DURATION_HELP} The OpenShell gateway applies its "
+                "separately configured RPC timeout."
             ),
         ),
-    ] = DEFAULT_TIMEOUT_SECONDS,
+    ] = f"{DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING:g}s",
 ) -> None:
     """Start the Egress Gate gRPC service and run until shutdown."""
     options = _command_options(context)
     from egress_gate.service.server import EgressGateServer
 
     try:
-        validated_timeout_seconds = validate_timeout_seconds(timeout_seconds)
+        timeout_middleware_processing = parse_timeout_duration(timeout)
     except ValueError as error:
         raise typer.BadParameter(
             str(error),
-            param_hint="--timeout-seconds",
+            param_hint="--timeout",
         ) from None
+    try:
+        remembered_timeout = read_remembered_gateway_timeout()
+    except GatewayConfigError as error:
+        _render_cli_error(
+            "Gateway timeout could not be validated",
+            code="gateway_config_error",
+            message=str(error),
+        )
+        raise typer.Exit(code=1) from None
+    if remembered_timeout is not None:
+        remembered, timeout_gateway_ceiling = remembered_timeout
+        if timeout_middleware_processing >= timeout_gateway_ceiling:
+            raise typer.BadParameter(
+                "The middleware processing timeout must be less than the "
+                f"{timeout_gateway_ceiling:g}s gateway timeout configured for "
+                f"{remembered.middleware_name!r} in {remembered.config_path}.",
+                param_hint="--timeout",
+            )
+        _LOG.info(
+            "Validated timeout_middleware_processing=%ss against "
+            "timeout_gateway_ceiling=%ss registration=%s gateway_config=%s",
+            timeout_middleware_processing,
+            timeout_gateway_ceiling,
+            remembered.middleware_name,
+            remembered.config_path,
+        )
     try:
         EgressGateServer(
             options.registry,
-            timeout_seconds=validated_timeout_seconds,
+            timeout_middleware_processing=timeout_middleware_processing,
         ).serve_sync(listen)
     except EgressGateError as error:
         _render_egress_error("Egress Gate could not start", error)
@@ -213,8 +256,18 @@ def add_gateway_registration(
             ),
         ),
     ] = 50051,
+    timeout: Annotated[
+        str,
+        typer.Option(
+            "--timeout",
+            help=(
+                "Gateway RPC timeout to write in the registration. "
+                f"{_DURATION_FORMAT_HELP}"
+            ),
+        ),
+    ] = DEFAULT_GATEWAY_REGISTRATION_TIMEOUT,
 ) -> None:
-    """Add or update Egress Gate in an OpenShell gateway TOML file."""
+    """Add or update Egress Gate with a configurable gateway RPC timeout."""
     try:
         address = ipaddress.IPv4Address(host_ip)
     except ipaddress.AddressValueError:
@@ -235,7 +288,13 @@ def add_gateway_registration(
             str(error),
             param_hint="--name",
         ) from None
-
+    try:
+        validate_gateway_timeout(timeout)
+    except GatewayConfigError as error:
+        raise typer.BadParameter(
+            str(error),
+            param_hint="--timeout",
+        ) from None
     config_path = config or default_gateway_config_path()
     try:
         result = update_gateway_config(
@@ -243,6 +302,11 @@ def add_gateway_registration(
             middleware_name=validated_name,
             host_ip=str(address),
             port=port,
+            timeout_gateway_ceiling=timeout,
+        )
+        remember_gateway_registration(
+            config_path,
+            middleware_name=validated_name,
         )
     except GatewayConfigError as error:
         _render_cli_error(
@@ -263,6 +327,7 @@ def add_gateway_registration(
         config_path=config_path,
         name=validated_name,
         endpoint=f"http://{address}:{port}",
+        timeout_gateway_ceiling=timeout,
         change=change,
         next_step=(
             "Start Egress Gate, then restart the OpenShell gateway to load this "
@@ -326,6 +391,10 @@ def remove_gateway_registration(
     config_path = config or default_gateway_config_path()
     try:
         result = remove_gateway_config(
+            config_path,
+            middleware_name=name,
+        )
+        forget_gateway_registration(
             config_path,
             middleware_name=name,
         )
@@ -441,24 +510,25 @@ def evaluate(
             help="Path to the YAML file of saved request cases and expected results.",
         ),
     ],
-    timeout_seconds: Annotated[
-        float,
+    timeout: Annotated[
+        str,
         typer.Option(
+            "--timeout",
             help=(
-                "Maximum seconds for policy preparation and, separately, each case. "
-                f"The value must be greater than 0 and at most {MAX_TIMEOUT_SECONDS:g}."
+                "Timeout for policy preparation and, separately, each case. "
+                f"{_TIMEOUT_DURATION_HELP}"
             ),
         ),
-    ] = DEFAULT_TIMEOUT_SECONDS,
+    ] = f"{DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING:g}s",
 ) -> None:
     """Test saved requests against a policy without starting the service."""
     options = _command_options(context)
     try:
-        validated_timeout_seconds = validate_timeout_seconds(timeout_seconds)
+        timeout_seconds = parse_timeout_duration(timeout)
     except ValueError as error:
         raise typer.BadParameter(
             str(error),
-            param_hint="--timeout-seconds",
+            param_hint="--timeout",
         ) from None
     try:
         policy_values = _load_policy(policy)
@@ -485,7 +555,7 @@ def evaluate(
             options.registry,
             policy_values,
             corpus,
-            timeout_seconds=validated_timeout_seconds,
+            timeout_seconds=timeout_seconds,
         )
     except _CaseExecutionError as error:
         if error.completed:
@@ -854,7 +924,7 @@ def _run_corpus(
     timeout_seconds: float,
 ) -> _EvaluationSummary:
     """Prepare once, then evaluate every case with a fresh shared timeout."""
-    validated_timeout = validate_timeout_seconds(timeout_seconds)
+    validated_timeout = validate_timeout_middleware_processing(timeout_seconds)
     validated_config = registry.validate_config(policy_values)
     processor = registry.prepare_processor(
         validated_config,
@@ -988,6 +1058,7 @@ def _render_registration(
     config_path: Path,
     name: str,
     endpoint: str | None = None,
+    timeout_gateway_ceiling: str | None = None,
     change: str | None = None,
     next_step: str | None = None,
     status_style: str = "bold green",
@@ -1001,6 +1072,11 @@ def _render_registration(
     details.add_row("Registration", Text(name))
     if endpoint is not None:
         details.add_row("Endpoint", Text(endpoint))
+    if timeout_gateway_ceiling is not None:
+        details.add_row(
+            "Gateway RPC ceiling",
+            Text(timeout_gateway_ceiling),
+        )
     if change is not None:
         details.add_row("Change", Text(change))
     _CONSOLE.print(details)
@@ -1022,8 +1098,13 @@ def _render_gateway_registrations(
     table = Table(box=None, pad_edge=False, padding=(0, 2), header_style="bold cyan")
     table.add_column("Name", style="bold", no_wrap=True)
     table.add_column("Endpoint", overflow="fold")
+    table.add_column("Gateway RPC ceiling", no_wrap=True)
     for registration in registrations:
-        table.add_row(registration.name, registration.endpoint or "Not set")
+        table.add_row(
+            registration.name,
+            registration.endpoint or "Not set",
+            registration.timeout_gateway_ceiling or "Not set",
+        )
     _CONSOLE.print(table)
     _CONSOLE.print(
         Text.assemble(

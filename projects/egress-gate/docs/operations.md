@@ -13,7 +13,7 @@ environment as needed.
 ```bash title="Start Egress Gate"
 uv run egress-gate gates list
 uv run egress-gate gates schema
-uv run egress-gate serve --listen 0.0.0.0:50051 --timeout-seconds 4
+uv run egress-gate serve --listen 0.0.0.0:50051 --timeout 4s
 ```
 
 Use a reachable non-loopback address only when the supervisor is outside the
@@ -28,14 +28,29 @@ registrations.
 
 ```bash title="Register Egress Gate"
 uv run egress-gate add-gateway-registration \
-  --host-ip YOUR_HOST_IPV4 --name egress-gate --port 50051
+  --host-ip YOUR_HOST_IPV4 --name egress-gate --port 50051 --timeout 30s
 ```
 
 The command updates `OPENSHELL_GATEWAY_CONFIG`, then
 `$XDG_CONFIG_HOME/openshell/gateway.toml`, then
 `~/.config/openshell/gateway.toml`. Use `--config PATH` for another file.
+It remembers the absolute gateway file path and registration name in
+`$XDG_CONFIG_HOME/openshell-egress-gate/registration.toml`, or under
+`~/.config` when `XDG_CONFIG_HOME` is unset.
 Start the gateways again with the same commands or service managers that you
 normally use.
+
+The optional registration `--timeout` sets the gateway RPC timeout written to
+the TOML file and defaults to 30 seconds. It accepts whole seconds or
+milliseconds, such as `45s` or `500ms`, and must be greater than 10ms so the
+internal processing budget can remain lower. Rerunning the command writes the
+value passed on that invocation. Set Egress Gate's internal processing budget with
+`egress-gate serve --timeout DURATION`; the Python API calls that setting
+`timeout_middleware_processing`. It must be at least 10ms and resolve to whole
+milliseconds. When a remembered registration exists, `serve` reads its current
+gateway timeout and refuses to start unless the processing timeout is lower. A
+manually managed setup with no remembered registration starts without this
+check.
 
 To remove a registration, stop any running gateways that use the configuration
 again. List the available names with:
@@ -54,9 +69,10 @@ uv run egress-gate remove-gateway-registration --name egress-gate
 
 Start the gateways again after the command completes.
 
-The generated OpenShell middleware timeout is five seconds. Keep the Egress
-Gate `--timeout-seconds` below it so queueing, preparation, and transport have
-headroom.
+`serve --timeout` covers queueing, policy preparation, and every configured
+gate. If the gateway timeout expires first despite the startup check, OpenShell
+applies the policy's `on_error` setting: `fail_closed` denies the request, while
+`fail_open` allows it to continue.
 
 If the middleware RPC returns gRPC `RESOURCE_EXHAUSTED`, capacity may remain
 accounted for briefly while completed RPCs are torn down. The OpenShell gateway

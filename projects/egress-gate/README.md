@@ -92,12 +92,29 @@ written by a harness to disk.
 from egress_gate.gates import create_builtin_registry
 from egress_gate.service import EgressGateServer
 
-server = EgressGateServer(create_builtin_registry())
+server = EgressGateServer(
+    create_builtin_registry(),
+    timeout_middleware_processing=10,
+)
 server.serve_sync("127.0.0.1:50051")
 ```
 
-The service creates one `Timeout` per evaluation and passes that deadline
-through slot acquisition, policy preparation, and `RequestProcessor.process`.
+In this example, `timeout_middleware_processing` gives each evaluation 10
+seconds. Omitting it uses the one-second service default. The value is expressed
+in seconds, must be at least 10 milliseconds, and must resolve to whole
+milliseconds. The service passes one resulting `Timeout` through slot
+acquisition, policy preparation, and `RequestProcessor.process`.
+
+`Describe` leaves the optional binding RPC timeout empty, so OpenShell applies
+the timeout configured on the gateway registration to the complete RPC. The
+registration CLI defaults to 30 seconds and accepts `--timeout` to write a
+different value.
+The helper remembers the gateway file and registration name. On later CLI
+starts, `serve` reads the current gateway timeout and requires the processing
+timeout to be lower. If no registration has been added with the CLI, `serve`
+starts without this check. If the gateway timeout expires, OpenShell applies
+the policy's `on_error` behavior; use `on_error: fail_closed` when middleware
+timeout failures must deny.
 
 ## Documentation and examples
 

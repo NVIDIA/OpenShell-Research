@@ -14,7 +14,11 @@ from egress_gate.gateway_config import (
     GatewayConfigUpdate,
     GatewayMiddlewareRegistration,
     default_gateway_config_path,
+    default_registration_state_path,
     list_gateway_registrations,
+    load_remembered_gateway_registration,
+    read_remembered_gateway_timeout,
+    remember_gateway_registration,
     remove_gateway_config,
     update_gateway_config,
     validate_middleware_name,
@@ -54,6 +58,45 @@ def test_default_gateway_config_path_honors_openshell_override(
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "ignored"))
 
     assert default_gateway_config_path() == configured_path
+
+
+def test_remembered_registration_reads_current_gateway_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "user-config"))
+    gateway_config = tmp_path / "gateway.toml"
+    gateway_config.write_text(
+        "[openshell]\n"
+        "version = 1\n\n"
+        "[[openshell.supervisor.middleware]]\n"
+        'name = "egress-gate"\n'
+        'grpc_endpoint = "http://192.0.2.10:50051"\n'
+        'timeout = "2500ms"\n'
+    )
+
+    remember_gateway_registration(
+        gateway_config,
+        middleware_name="egress-gate",
+    )
+
+    remembered = load_remembered_gateway_registration()
+    assert remembered is not None
+    assert remembered.config_path == gateway_config.resolve()
+    assert remembered.middleware_name == "egress-gate"
+    assert default_registration_state_path().stat().st_mode & 0o777 == 0o600
+    assert read_remembered_gateway_timeout() == (remembered, 2.5)
+    assert read_remembered_gateway_timeout(unit="ms") == (remembered, 2500.0)
+
+
+def test_remembered_registration_is_optional(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+
+    assert load_remembered_gateway_registration() is None
+    assert read_remembered_gateway_timeout() is None
 
 
 def test_middleware_name_validation_matches_openshell_constraints() -> None:
@@ -96,7 +139,7 @@ def test_update_gateway_config_creates_minimal_default_config(
                         "name": "egress-gate",
                         "grpc_endpoint": "http://192.168.1.20:50051",
                         "max_body_bytes": 4_194_304,
-                        "timeout": "5s",
+                        "timeout": "30s",
                     }
                 ]
             },
@@ -113,7 +156,8 @@ def test_list_gateway_registrations_returns_names_and_endpoints(
         "version = 1\n\n"
         "[[openshell.supervisor.middleware]]\n"
         'name = "eg-regex"\n'
-        'grpc_endpoint = "http://10.0.0.3:50051"\n\n'
+        'grpc_endpoint = "http://10.0.0.3:50051"\n'
+        'timeout = "30s"\n\n'
         "[[openshell.supervisor.middleware]]\n"
         'name = "other-service"\n'
     )
@@ -122,8 +166,13 @@ def test_list_gateway_registrations_returns_names_and_endpoints(
         GatewayMiddlewareRegistration(
             name="eg-regex",
             endpoint="http://10.0.0.3:50051",
+            timeout_gateway_ceiling="30s",
         ),
-        GatewayMiddlewareRegistration(name="other-service", endpoint=None),
+        GatewayMiddlewareRegistration(
+            name="other-service",
+            endpoint=None,
+            timeout_gateway_ceiling=None,
+        ),
     )
 
 
@@ -182,6 +231,7 @@ def test_update_gateway_config_updates_only_the_named_registration(
         middleware_name="egress-gate",
         host_ip="10.0.0.4",
         port=50053,
+        timeout_gateway_ceiling="45s",
     )
 
     assert result is GatewayConfigUpdate.UPDATED
@@ -190,16 +240,56 @@ def test_update_gateway_config_updates_only_the_named_registration(
     assert "# Keep this registration comment." in contents
     assert 'grpc_endpoint = "http://10.0.0.4:50053"' in contents
     assert "max_body_bytes = 4194304" in contents
-    assert 'timeout = "5s"' in contents
+    assert 'timeout = "45s"' in contents
 
     repeated = update_gateway_config(
         path,
         middleware_name="egress-gate",
         host_ip="10.0.0.4",
         port=50053,
+        timeout_gateway_ceiling="45s",
     )
 
     assert repeated is GatewayConfigUpdate.UNCHANGED
+
+
+@pytest.mark.parametrize("timeout", ["1m", "10ms"])
+def test_update_gateway_config_rejects_invalid_timeout(
+    tmp_path: Path,
+    timeout: str,
+) -> None:
+    with pytest.raises(GatewayConfigError, match="gateway timeout"):
+        update_gateway_config(
+            tmp_path / "gateway.toml",
+            middleware_name="egress-gate",
+            host_ip="10.0.0.4",
+            port=50053,
+            timeout_gateway_ceiling=timeout,
+        )
+
+
+def test_update_gateway_config_adds_the_operator_timeout_ceiling_when_missing(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "gateway.toml"
+    path.write_text(
+        "[openshell]\n"
+        "version = 1\n\n"
+        "[[openshell.supervisor.middleware]]\n"
+        'name = "egress-gate"\n'
+        'grpc_endpoint = "http://10.0.0.3:50051"\n'
+        "max_body_bytes = 4194304\n"
+    )
+
+    result = update_gateway_config(
+        path,
+        middleware_name="egress-gate",
+        host_ip="10.0.0.3",
+        port=50051,
+    )
+
+    assert result is GatewayConfigUpdate.UPDATED
+    assert 'timeout = "30s"' in path.read_text()
 
 
 @pytest.mark.parametrize(

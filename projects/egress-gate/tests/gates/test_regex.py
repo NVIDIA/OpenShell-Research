@@ -523,7 +523,7 @@ def test_pattern_search_has_an_enforceable_timeout() -> None:
     with pytest.raises(TimeoutExpiredError):
         RegexGate(config, None).evaluate(
             _request((b"a" * 100_000) + b"!"),
-            timeout=Timeout.from_seconds(0.001),
+            timeout=Timeout.from_seconds(0.01),
         )
 
 

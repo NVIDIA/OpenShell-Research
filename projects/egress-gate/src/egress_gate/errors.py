@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from egress_gate.constants import MAX_PROTO_CONFIG_BYTES, MAX_TIMEOUT_SECONDS
+from egress_gate.constants import MAX_PROTO_CONFIG_BYTES
 
 
 class ErrorKind(StrEnum):
@@ -106,8 +106,8 @@ class TimeoutExpiredError(Exception):
     def __init__(self) -> None:
         super().__init__(
             "Egress Gate processing timed out. Reduce the request size or simplify "
-            "the configured gates and rules, or increase the processing timeout "
-            f"to at most {MAX_TIMEOUT_SECONDS:g} seconds, then retry."
+            "the configured gates and rules, or increase the middleware processing "
+            "timeout, then retry."
         )
 
 

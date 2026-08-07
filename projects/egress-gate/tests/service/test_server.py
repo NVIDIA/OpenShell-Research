@@ -45,17 +45,33 @@ def test_server_rejects_a_registry_without_gates() -> None:
         EgressGateServer(GateRegistry())
 
 
-@pytest.mark.parametrize("seconds", [True, 0, 31, float("inf")])
-def test_server_validates_the_service_timeout(seconds: bool | int | float) -> None:
-    with pytest.raises(ValueError, match="finite number greater than 0 and at most 30"):
-        EgressGateServer(create_builtin_registry(), timeout_seconds=seconds)
+@pytest.mark.parametrize(
+    "seconds",
+    [True, 0, 0.001, 1.0001, float("inf")],
+)
+def test_server_validates_timeout_middleware_processing(
+    seconds: bool | int | float,
+) -> None:
+    with pytest.raises(ValueError, match="timeout"):
+        EgressGateServer(
+            create_builtin_registry(),
+            timeout_middleware_processing=seconds,
+        )
 
 
-def test_server_keeps_timeout_ownership_at_the_service_boundary() -> None:
-    server = EgressGateServer(create_builtin_registry(), timeout_seconds=4.5)
+def test_server_uses_timeout_middleware_processing_for_pipeline_and_logs() -> None:
+    server = EgressGateServer(
+        create_builtin_registry(),
+        timeout_middleware_processing=4.5,
+    )
     try:
-        assert server._middleware._timeout_seconds == 4.5
-        assert not hasattr(server._middleware._policy, "_timeout_seconds")
+        assert server._middleware._timeout_middleware_processing_seconds == 4.5
+        assert server._middleware.timeout_middleware_processing == "4500ms"
+        assert not hasattr(server._middleware, "_timeout_middleware_processing")
+        assert not hasattr(
+            server._middleware._policy,
+            "_timeout_middleware_processing_seconds",
+        )
     finally:
         asyncio.run(server._middleware.close())
 

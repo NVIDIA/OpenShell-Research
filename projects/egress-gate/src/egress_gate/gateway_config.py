@@ -11,6 +11,10 @@ import tomllib
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from typing import Literal
+
+from egress_gate.constants import DEFAULT_GATEWAY_REGISTRATION_TIMEOUT
+from egress_gate.timeout import parse_duration
 
 
 class GatewayConfigUpdate(Enum):
@@ -39,6 +43,15 @@ class GatewayMiddlewareRegistration:
 
     name: str
     endpoint: str | None
+    timeout_gateway_ceiling: str | None
+
+
+@dataclass(frozen=True)
+class RememberedGatewayRegistration:
+    """The gateway registration most recently managed by Egress Gate."""
+
+    config_path: Path
+    middleware_name: str
 
 
 # Mirrors OpenShell's stable-identifier byte limit for external middleware
@@ -57,6 +70,124 @@ def default_gateway_config_path() -> Path:
     if config_home:
         return Path(config_home) / "openshell" / "gateway.toml"
     return Path.home() / ".config" / "openshell" / "gateway.toml"
+
+
+def default_registration_state_path() -> Path:
+    """Return the per-user location for the remembered gateway registration."""
+    config_home = os.environ.get("XDG_CONFIG_HOME")
+    root = Path(config_home) if config_home else Path.home() / ".config"
+    return root / "openshell-egress-gate" / "registration.toml"
+
+
+def remember_gateway_registration(
+    config_path: Path,
+    *,
+    middleware_name: str,
+) -> None:
+    """Remember where the CLI most recently managed an Egress Gate registration."""
+    validate_middleware_name(middleware_name)
+    escaped_path = (
+        str(config_path.expanduser().resolve())
+        .replace("\\", "\\\\")
+        .replace('"', '\\"')
+    )
+    escaped_name = middleware_name.replace("\\", "\\\\").replace('"', '\\"')
+    _write_atomically(
+        default_registration_state_path(),
+        f'gateway_config = "{escaped_path}"\nregistration_name = "{escaped_name}"\n',
+    )
+
+
+def forget_gateway_registration(
+    config_path: Path,
+    *,
+    middleware_name: str,
+) -> None:
+    """Forget the registration when it matches the CLI-managed registration."""
+    remembered = load_remembered_gateway_registration()
+    if remembered is None or (
+        remembered.config_path != config_path.expanduser().resolve()
+        or remembered.middleware_name != middleware_name
+    ):
+        return
+    state_path = default_registration_state_path()
+    try:
+        state_path.unlink(missing_ok=True)
+    except OSError as error:
+        raise GatewayConfigError(
+            f"Could not remove {state_path}. Check that its directory is writable."
+        ) from error
+
+
+def load_remembered_gateway_registration() -> RememberedGatewayRegistration | None:
+    """Load the gateway registration most recently managed by the CLI."""
+    state_path = default_registration_state_path()
+    try:
+        contents = state_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeError) as error:
+        raise GatewayConfigError(
+            f"Could not read {state_path}. Check that it is readable UTF-8 TOML."
+        ) from error
+    try:
+        values = tomllib.loads(contents)
+    except tomllib.TOMLDecodeError as error:
+        raise GatewayConfigError(
+            f"Could not parse {state_path}. Remove it and register Egress Gate again."
+        ) from error
+    config_path = values.get("gateway_config")
+    middleware_name = values.get("registration_name")
+    if not isinstance(config_path, str) or not config_path:
+        raise GatewayConfigError(
+            f"{state_path} does not contain a valid gateway_config path. Remove it "
+            "and register Egress Gate again."
+        )
+    if not isinstance(middleware_name, str):
+        raise GatewayConfigError(
+            f"{state_path} does not contain a valid registration_name. Remove it "
+            "and register Egress Gate again."
+        )
+    validate_middleware_name(middleware_name)
+    return RememberedGatewayRegistration(
+        config_path=Path(config_path),
+        middleware_name=middleware_name,
+    )
+
+
+def read_remembered_gateway_timeout(
+    unit: Literal["s", "ms"] = "s",
+) -> tuple[RememberedGatewayRegistration, float] | None:
+    """Read the current timeout for the remembered gateway registration."""
+    remembered = load_remembered_gateway_registration()
+    if remembered is None:
+        return None
+    matches = [
+        registration
+        for registration in list_gateway_registrations(remembered.config_path)
+        if registration.name == remembered.middleware_name
+    ]
+    if not matches:
+        raise GatewayConfigError(
+            f"The remembered registration {remembered.middleware_name!r} is not in "
+            f"{remembered.config_path}. Register Egress Gate again."
+        )
+    duration = matches[0].timeout_gateway_ceiling
+    if duration is None:
+        raise GatewayConfigError(
+            f"The remembered registration {remembered.middleware_name!r} in "
+            f"{remembered.config_path} has no timeout. Add one or register Egress "
+            "Gate again."
+        )
+    try:
+        timeout = parse_duration(duration, unit=unit)
+    except ValueError:
+        raise GatewayConfigError(
+            f"The timeout for the remembered registration "
+            f"{remembered.middleware_name!r} in {remembered.config_path} must use "
+            "whole seconds or milliseconds, such as 30s or 500ms."
+        ) from None
+    return remembered, timeout
 
 
 def list_gateway_registrations(
@@ -79,6 +210,7 @@ def list_gateway_registrations(
     for entry in _middleware_entries(_load_gateway_config(contents, path), path):
         name = entry.get("name")
         endpoint = entry.get("grpc_endpoint")
+        timeout_gateway_ceiling = entry.get("timeout")
         if not isinstance(name, str) or not name:
             raise GatewayConfigError(
                 f"{path} contains a middleware registration without a valid name."
@@ -88,8 +220,19 @@ def list_gateway_registrations(
                 f"The middleware registration {name!r} in {path} has an invalid "
                 "grpc_endpoint."
             )
+        if timeout_gateway_ceiling is not None and not isinstance(
+            timeout_gateway_ceiling, str
+        ):
+            raise GatewayConfigError(
+                f"The middleware registration {name!r} in {path} has an invalid "
+                "timeout."
+            )
         registrations.append(
-            GatewayMiddlewareRegistration(name=name, endpoint=endpoint)
+            GatewayMiddlewareRegistration(
+                name=name,
+                endpoint=endpoint,
+                timeout_gateway_ceiling=timeout_gateway_ceiling,
+            )
         )
     return tuple(registrations)
 
@@ -100,9 +243,11 @@ def update_gateway_config(
     middleware_name: str,
     host_ip: str,
     port: int,
+    timeout_gateway_ceiling: str = DEFAULT_GATEWAY_REGISTRATION_TIMEOUT,
 ) -> GatewayConfigUpdate:
     """Add or update one named Egress Gate middleware registration."""
     validate_middleware_name(middleware_name)
+    validate_gateway_timeout(timeout_gateway_ceiling)
     endpoint = f"http://{host_ip}:{port}"
     try:
         original = path.read_text(encoding="utf-8")
@@ -110,6 +255,7 @@ def update_gateway_config(
         updated = _new_gateway_config(
             middleware_name=middleware_name,
             endpoint=endpoint,
+            timeout_gateway_ceiling=timeout_gateway_ceiling,
         )
         _write_atomically(path, updated)
         return GatewayConfigUpdate.CREATED
@@ -122,6 +268,7 @@ def update_gateway_config(
         updated = _new_gateway_config(
             middleware_name=middleware_name,
             endpoint=endpoint,
+            timeout_gateway_ceiling=timeout_gateway_ceiling,
         )
         _write_atomically(path, updated)
         return GatewayConfigUpdate.CREATED
@@ -151,6 +298,7 @@ def update_gateway_config(
         replacement = _update_middleware_block(
             block.group(0),
             endpoint=endpoint,
+            timeout_gateway_ceiling=timeout_gateway_ceiling,
         )
         updated = original[: block.start()] + replacement + original[block.end() :]
         result = GatewayConfigUpdate.UPDATED
@@ -159,6 +307,7 @@ def update_gateway_config(
             original,
             middleware_name=middleware_name,
             endpoint=endpoint,
+            timeout_gateway_ceiling=timeout_gateway_ceiling,
         )
         result = GatewayConfigUpdate.ADDED
 
@@ -255,10 +404,31 @@ def validate_middleware_name(name: str) -> str:
     return name
 
 
-def _new_gateway_config(*, middleware_name: str, endpoint: str) -> str:
+def validate_gateway_timeout(duration: str) -> float:
+    """Validate a gateway timeout that can exceed the processing minimum."""
+    message = (
+        "The gateway timeout must be greater than 10ms and use whole seconds or "
+        "milliseconds, such as 30s or 500ms."
+    )
+    try:
+        seconds = parse_duration(duration)
+    except ValueError:
+        raise GatewayConfigError(message) from None
+    if seconds <= 0.01:
+        raise GatewayConfigError(message)
+    return seconds
+
+
+def _new_gateway_config(
+    *,
+    middleware_name: str,
+    endpoint: str,
+    timeout_gateway_ceiling: str,
+) -> str:
     return "[openshell]\nversion = 1\n\n" + _middleware_block(
         middleware_name=middleware_name,
         endpoint=endpoint,
+        timeout_gateway_ceiling=timeout_gateway_ceiling,
     )
 
 
@@ -319,6 +489,7 @@ def _append_middleware_block(
     *,
     middleware_name: str,
     endpoint: str,
+    timeout_gateway_ceiling: str,
 ) -> str:
     return (
         contents.rstrip()
@@ -326,21 +497,32 @@ def _append_middleware_block(
         + _middleware_block(
             middleware_name=middleware_name,
             endpoint=endpoint,
+            timeout_gateway_ceiling=timeout_gateway_ceiling,
         )
     )
 
 
-def _middleware_block(*, middleware_name: str, endpoint: str) -> str:
+def _middleware_block(
+    *,
+    middleware_name: str,
+    endpoint: str,
+    timeout_gateway_ceiling: str,
+) -> str:
     return (
         "[[openshell.supervisor.middleware]]\n"
         f'name = "{middleware_name}"\n'
         f'grpc_endpoint = "{endpoint}"\n'
         "max_body_bytes = 4194304\n"
-        'timeout = "5s"\n'
+        f'timeout = "{timeout_gateway_ceiling}"\n'
     )
 
 
-def _update_middleware_block(block: str, *, endpoint: str) -> str:
+def _update_middleware_block(
+    block: str,
+    *,
+    endpoint: str,
+    timeout_gateway_ceiling: str,
+) -> str:
     updated = _replace_or_append_assignment(
         block,
         key="grpc_endpoint",
@@ -354,7 +536,7 @@ def _update_middleware_block(block: str, *, endpoint: str) -> str:
     return _replace_or_append_assignment(
         updated,
         key="timeout",
-        value='"5s"',
+        value=f'"{timeout_gateway_ceiling}"',
     )
 
 
@@ -429,12 +611,19 @@ _MIDDLEWARE_NAME_CHARACTERS = frozenset(
 __all__ = [
     "GatewayConfigError",
     "GatewayMiddlewareRegistration",
+    "RememberedGatewayRegistration",
     "GatewayConfigRemoval",
     "GatewayConfigUpdate",
     "MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES",
     "default_gateway_config_path",
+    "default_registration_state_path",
+    "forget_gateway_registration",
     "list_gateway_registrations",
+    "load_remembered_gateway_registration",
+    "remember_gateway_registration",
+    "read_remembered_gateway_timeout",
     "remove_gateway_config",
     "update_gateway_config",
+    "validate_gateway_timeout",
     "validate_middleware_name",
 ]
