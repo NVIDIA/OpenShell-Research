@@ -42,8 +42,9 @@ normally use.
 
 The optional registration `--timeout` sets the gateway RPC timeout written to
 the TOML file and defaults to 30 seconds. It accepts whole seconds or
-milliseconds, such as `45s` or `500ms`. Rerunning the command writes the value
-passed on that invocation. Set Egress Gate's internal processing budget with
+milliseconds, such as `45s` or `500ms`, and must be greater than 10ms so the
+internal processing budget can remain lower. Rerunning the command writes the
+value passed on that invocation. Set Egress Gate's internal processing budget with
 `egress-gate serve --timeout DURATION`; the Python API calls that setting
 `timeout_middleware_processing`. It must be at least 10ms and resolve to whole
 milliseconds. When a remembered registration exists, `serve` reads its current
