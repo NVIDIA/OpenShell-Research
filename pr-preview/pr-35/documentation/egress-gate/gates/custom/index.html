@@ -1328,12 +1328,13 @@ helper-base behavior, or operational resources.</p>
 <p>Custom gates that inspect request-body text can compose the public
 <code>egress_gate.request_content</code> surface. <code>RequestContentParser</code> implementations
 return independent <code>TextTarget</code> values and own rendering complete target
-replacements back to bounded body bytes. <code>Utf8TextParser</code> handles a complete
-UTF-8 body, <code>JsonFieldsParser</code> selects configured JSON strings, and
-<code>MessageBlocksParser</code> filters normalized message text. The latter composes a
-<code>MessageBodyParser</code>; <code>JsonMessageMapParser</code> is the configurable implementation
-for harness-specific JSON envelopes. Prepared parsers are stateless and safe to
-reuse, while each parsed content result remains local to one <code>evaluate</code> call.</p>
+replacements, expressed as immutable <code>TextReplacement</code> values, back to bounded
+body bytes. <code>Utf8TextParser</code> handles a complete UTF-8 body, <code>JsonFieldsParser</code>
+selects configured JSON strings, and <code>MessageBlocksParser</code> filters normalized
+message text. The latter composes a <code>MessageBodyParser</code>;
+<code>JsonMessageMapParser</code> is the configurable implementation for harness-specific
+JSON envelopes. Prepared parsers are stateless and safe to reuse, while each
+parsed content result remains local to one <code>evaluate</code> call.</p>
 <p>The repository includes runnable examples for both extension styles:</p>
 <ul>
 <li><a href="https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/custom-gate">Function-based custom gate</a></li>

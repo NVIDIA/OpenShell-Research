@@ -44,9 +44,9 @@ cache request state across reusable gate instances.
 Regex scan models remain declarative Pydantic configuration. During gate
 preparation, body-based variants compose a reusable `RequestContentParser`:
 `Utf8TextParser`, `JsonFieldsParser`, or `MessageBlocksParser`. Each parser owns
-text extraction and how complete target replacements become bounded body bytes.
-The regex gate only adapts path, query, and header values itself, then applies
-matching and actions uniformly to the text targets it receives.
+text extraction and how immutable `TextReplacement` values become bounded body
+bytes. The regex gate only adapts path, query, and header values itself, then
+applies matching and actions uniformly to the text targets it receives.
 
 ## Pipeline execution
 
