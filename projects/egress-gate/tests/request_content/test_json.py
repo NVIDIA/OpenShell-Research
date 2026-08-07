@@ -113,6 +113,82 @@ def test_replace_text_rejects_duplicate_or_unknown_node_ids() -> None:
         )
 
 
+def test_replace_text_handles_the_maximum_selected_nodes_in_linear_time() -> None:
+    from egress_gate.constants import MAX_JSON_SELECTED_NODES
+
+    values = ",".join(
+        f'"{index}":"{"x" * 900}"' for index in range(MAX_JSON_SELECTED_NODES)
+    )
+    document = _parse(f"{{{values}}}".encode())
+    nodes = document.select_text(
+        (_selector(JsonEachSegment(kind="each")),),
+        timeout=Timeout.from_seconds(1),
+    )
+
+    replaced = document.replace_text(
+        tuple((node.id, "safe") for node in nodes),
+        timeout=Timeout.from_seconds(1),
+    )
+
+    assert replaced.count(b'"safe"') == MAX_JSON_SELECTED_NODES
+
+
+def test_node_references_are_bound_to_the_document_that_created_them() -> None:
+    first = _parse(b'{"value":"one"}')
+    second = _parse(b'{"value":"one"}')
+    selector = _selector(JsonKeySegment(kind="key", value="value"))
+    first_node = first.select_nodes(
+        (selector,),
+        timeout=Timeout.from_seconds(1),
+    )[0]
+
+    with pytest.raises(ValueError, match="does not belong"):
+        second.select_from(
+            first_node,
+            (selector,),
+            timeout=Timeout.from_seconds(1),
+        )
+
+
+def test_long_strings_and_whitespace_check_the_shared_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checks = 0
+
+    def record_check(_timeout: Timeout) -> None:
+        nonlocal checks
+        checks += 1
+
+    monkeypatch.setattr(Timeout, "raise_if_expired", record_check)
+
+    _parse((" " * 10_000 + '"' + "x" * 10_000 + '"').encode())
+
+    assert checks >= 7
+
+
+def test_array_item_materialization_checks_the_shared_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document = _parse(
+        ('{"items":[' + ",".join("0" for _ in range(1000)) + "]}").encode()
+    )
+    root = document.select_nodes(
+        (_selector(JsonKeySegment(kind="key", value="items")),),
+        timeout=Timeout.from_seconds(1),
+    )[0]
+    checks = 0
+
+    def record_check(_timeout: Timeout) -> None:
+        nonlocal checks
+        checks += 1
+
+    monkeypatch.setattr(Timeout, "raise_if_expired", record_check)
+
+    document.array_items(root, timeout=Timeout.from_seconds(1))
+
+    assert checks >= 4
+
+
 @pytest.mark.parametrize(
     "body",
     [

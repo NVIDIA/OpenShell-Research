@@ -143,7 +143,7 @@ class JsonMessageMapParser:
         for container in containers:
             if container.kind is not JsonNodeKind.ARRAY:
                 continue
-            for message in document.array_items(container):
+            for message in document.array_items(container, timeout=timeout):
                 timeout.raise_if_expired()
                 role = _message_role(document, message, self._config.role_key)
                 default_kind = (

@@ -71,6 +71,24 @@ def test_json_fields_parser_owns_source_preserving_replacement() -> None:
     )
 
 
+def test_json_fields_parser_rejects_replacement_of_an_unselected_node() -> None:
+    parser = JsonFieldsParser(selectors=(_content_selector(),))
+    body = b'{"messages":[{"content":"selected"}],"ignored":"secret"}'
+    content = parser.parse(body, timeout=Timeout.from_seconds(1))
+    ignored_parser = JsonFieldsParser(
+        selectors=(
+            JsonSelector(segments=(JsonKeySegment(kind="key", value="ignored"),)),
+        )
+    )
+    ignored = ignored_parser.parse(body, timeout=Timeout.from_seconds(1)).targets[0]
+
+    with pytest.raises(ValueError, match="was not selected"):
+        content.replace_text(
+            ((ignored.id, "exposed"),),
+            timeout=Timeout.from_seconds(1),
+        )
+
+
 def test_message_blocks_parser_applies_mapping_and_filters() -> None:
     parser = MessageBlocksParser(
         parser=JsonMessageMapParser(

@@ -159,6 +159,12 @@ class _JsonParsedRequestContent:
         *,
         timeout: Timeout,
     ) -> bytes:
+        replacement_ids = tuple(node_id for node_id, _ in replacements)
+        if len(replacement_ids) != len(set(replacement_ids)):
+            raise ValueError("request-content replacement target IDs must be unique")
+        selected_ids = frozenset(target.id for target in self.targets)
+        if any(node_id not in selected_ids for node_id in replacement_ids):
+            raise ValueError("request-content replacement target was not selected")
         return self.document.replace_text(replacements, timeout=timeout)
 
 

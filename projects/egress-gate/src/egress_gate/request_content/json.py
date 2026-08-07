@@ -97,12 +97,13 @@ class JsonTextNode(StrictDomainModel):
 class JsonDocument:
     """One strict JSON body with bounded traversal and source-preserving edits."""
 
-    __slots__ = ("_nodes", "_root", "_source")
+    __slots__ = ("_nodes", "_public_nodes", "_root", "_source")
 
     def __init__(self, source: str, root: _JsonNode, nodes: dict[str, _JsonNode]):
         self._source = source
         self._root = root
         self._nodes = nodes
+        self._public_nodes: dict[str, JsonNode] = {}
 
     @classmethod
     def parse(cls, body: bytes, *, timeout: Timeout) -> JsonDocument:
@@ -160,12 +161,23 @@ class JsonDocument:
         """Select unique string nodes relative to one document node."""
         return self._text_nodes(self.select_from(node, selectors, timeout=timeout))
 
-    def array_items(self, node: JsonNode) -> tuple[JsonNode, ...]:
+    def array_items(
+        self,
+        node: JsonNode,
+        *,
+        timeout: Timeout,
+    ) -> tuple[JsonNode, ...]:
         """Return the ordered immediate items of an array node."""
         internal = self._resolve_node(node)
         if internal.kind is not JsonNodeKind.ARRAY:
             return ()
-        return tuple(_public_node(item) for item in internal.array_items)
+        items: list[JsonNode] = []
+        for index, item in enumerate(internal.array_items):
+            if index % _TIMEOUT_CHECK_INTERVAL == 0:
+                timeout.raise_if_expired()
+            items.append(self._public_node(item))
+        timeout.raise_if_expired()
+        return tuple(items)
 
     def object_member(self, node: JsonNode, key: str) -> JsonNode | None:
         """Return one exact object member without exposing mutable JSON values."""
@@ -174,7 +186,7 @@ class JsonDocument:
             return None
         for member_key, value in internal.object_members:
             if member_key == key:
-                return _public_node(value)
+                return self._public_node(value)
         return None
 
     def text_value(self, node: JsonNode) -> str | None:
@@ -193,26 +205,38 @@ class JsonDocument:
         replacement_ids = tuple(node_id for node_id, _ in replacements)
         if len(replacement_ids) != len(set(replacement_ids)):
             raise ValueError("JSON replacement node IDs must be unique")
-        edits: list[tuple[int, int, str]] = []
+        edits: list[tuple[int, int, bytes]] = []
         for node_id, text in replacements:
             timeout.raise_if_expired()
             node = self._nodes.get(node_id)
             if node is None or node.kind is not JsonNodeKind.STRING:
                 raise ValueError("JSON replacement node ID is unknown")
             try:
-                text.encode("utf-8", errors="strict")
+                rendered = json.dumps(text, ensure_ascii=False).encode(
+                    "utf-8", errors="strict"
+                )
             except UnicodeEncodeError:
                 raise ValueError("JSON replacement text is invalid") from None
-            rendered = json.dumps(text, ensure_ascii=False)
             edits.append((node.token_start, node.token_end, rendered))
-        output = self._source
-        for start, end, rendered in sorted(edits, reverse=True):
-            output = output[:start] + rendered + output[end:]
-        encoded = output.encode("utf-8")
-        if len(encoded) > MAX_BODY_BYTES:
+
+        output_parts: list[bytes] = []
+        output_size = 0
+        source_cursor = 0
+        for start, end, rendered in sorted(edits):
+            timeout.raise_if_expired()
+            unchanged = self._source[source_cursor:start].encode("utf-8")
+            output_size += len(unchanged) + len(rendered)
+            if output_size > MAX_BODY_BYTES:
+                raise GateLimitExceededError("JSON replacement body exceeds the limit")
+            output_parts.extend((unchanged, rendered))
+            source_cursor = end
+        tail = self._source[source_cursor:].encode("utf-8")
+        output_size += len(tail)
+        if output_size > MAX_BODY_BYTES:
             raise GateLimitExceededError("JSON replacement body exceeds the limit")
+        output_parts.append(tail)
         timeout.raise_if_expired()
-        return encoded
+        return b"".join(output_parts)
 
     def _select_from(
         self,
@@ -246,7 +270,7 @@ class JsonDocument:
                             "JSON selected node count exceeds the limit"
                         )
         timeout.raise_if_expired()
-        return tuple(_public_node(node) for node in selected)
+        return tuple(self._public_node(node) for node in selected)
 
     def _text_nodes(self, nodes: tuple[JsonNode, ...]) -> tuple[JsonTextNode, ...]:
         selected: list[JsonTextNode] = []
@@ -265,13 +289,16 @@ class JsonDocument:
 
     def _resolve_node(self, node: JsonNode) -> _JsonNode:
         internal = self._nodes.get(node.id)
-        if (
-            internal is None
-            or internal.path != node.path
-            or internal.kind is not node.kind
-        ):
+        if internal is None or self._public_nodes.get(node.id) is not node:
             raise ValueError("JSON node does not belong to this document")
         return internal
+
+    def _public_node(self, node: _JsonNode) -> JsonNode:
+        public = self._public_nodes.get(node.id)
+        if public is None:
+            public = JsonNode(id=node.id, path=node.path, kind=node.kind)
+            self._public_nodes[node.id] = public
+        return public
 
 
 @dataclass(frozen=True)
@@ -409,7 +436,11 @@ class _JsonParser:
     def _parse_string(self) -> str:
         start = self.index
         self.index += 1
+        next_timeout_check = self.index + _TIMEOUT_CHECK_INTERVAL
         while self.index < len(self.source):
+            if self.index >= next_timeout_check:
+                self.timeout.raise_if_expired()
+                next_timeout_check = self.index + _TIMEOUT_CHECK_INTERVAL
             character = self.source[self.index]
             if character == '"':
                 self.index += 1
@@ -463,8 +494,12 @@ class _JsonParser:
         return node
 
     def _skip_whitespace(self) -> None:
+        next_timeout_check = self.index + _TIMEOUT_CHECK_INTERVAL
         while self.index < len(self.source) and self.source[self.index] in " \t\r\n":
             self.index += 1
+            if self.index >= next_timeout_check:
+                self.timeout.raise_if_expired()
+                next_timeout_check = self.index + _TIMEOUT_CHECK_INTERVAL
 
     def _consume(self, token: str) -> bool:
         if self.source.startswith(token, self.index):
@@ -496,12 +531,9 @@ def _select_segment(
     return ()
 
 
-def _public_node(node: _JsonNode) -> JsonNode:
-    return JsonNode(id=node.id, path=node.path, kind=node.kind)
-
-
 _NUMBER_PATTERN = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?")
 _HEX_PATTERN = re.compile(r"[0-9a-fA-F]{4}")
+_TIMEOUT_CHECK_INTERVAL = 256
 
 
 __all__ = [
