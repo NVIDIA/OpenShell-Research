@@ -9,12 +9,10 @@ from __future__ import annotations
 import re
 from importlib.metadata import version
 
-# Egress Gate's internal maximum leaves headroom under the registration helper's
-# default. This is not a claim about the active gateway configuration: operators
-# can change that timeout outside this service.
+# Timeout defaults. The gateway registration value remains independently
+# configurable by the operator.
 DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING = 1.0
-MAX_TIMEOUT_MIDDLEWARE_PROCESSING = 29.0
-DEFAULT_GATEWAY_REGISTRATION_TIMEOUT = 30.0
+DEFAULT_GATEWAY_REGISTRATION_TIMEOUT = "30s"
 
 # Middleware identity and stable response values.
 SERVICE_NAME = "egress-gate"

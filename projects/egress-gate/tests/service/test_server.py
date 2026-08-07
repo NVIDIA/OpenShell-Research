@@ -47,7 +47,7 @@ def test_server_rejects_a_registry_without_gates() -> None:
 
 @pytest.mark.parametrize(
     "seconds",
-    [True, 0, 0.001, 1.0001, 30, float("inf")],
+    [True, 0, 0.001, 1.0001, float("inf")],
 )
 def test_server_validates_timeout_middleware_processing(
     seconds: bool | int | float,

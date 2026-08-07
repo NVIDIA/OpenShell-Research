@@ -8,27 +8,28 @@ from egress_gate.errors import TimeoutExpiredError
 from egress_gate.timeout import (
     Timeout,
     format_timeout_middleware_processing,
+    parse_duration,
     parse_timeout_duration,
 )
 
 
 @pytest.mark.parametrize(
     "seconds",
-    [True, 0, -1, 0.001, 1.0001, float("inf"), 30],
+    [True, 0, -1, 0.001, 0.0101, 1.0001, float("inf")],
 )
-def test_timeout_duration_is_strict_positive_and_bounded(
+def test_timeout_duration_has_minimum_and_whole_milliseconds(
     seconds: bool | int | float,
 ) -> None:
     with pytest.raises(
         ValueError,
-        match="between 10ms and 29s, using whole milliseconds",
+        match="at least 10ms, using whole milliseconds",
     ):
         Timeout.from_seconds(seconds)
 
 
 @pytest.mark.parametrize(
     ("seconds", "duration"),
-    [(0.01, "10ms"), (1.0, "1s"), (4.5, "4500ms"), (29.0, "29s")],
+    [(0.01, "10ms"), (1.0, "1s"), (4.5, "4500ms"), (45.0, "45s")],
 )
 def test_middleware_timeout_uses_the_contract_duration_format(
     seconds: float,
@@ -39,7 +40,7 @@ def test_middleware_timeout_uses_the_contract_duration_format(
 
 @pytest.mark.parametrize(
     ("duration", "seconds"),
-    [("10ms", 0.01), ("500ms", 0.5), ("1s", 1.0), ("29s", 29.0)],
+    [("10ms", 0.01), ("500ms", 0.5), ("1s", 1.0), ("45s", 45.0)],
 )
 def test_timeout_duration_parser_accepts_concise_cli_values(
     duration: str,
@@ -48,10 +49,18 @@ def test_timeout_duration_parser_accepts_concise_cli_values(
     assert parse_timeout_duration(duration) == seconds
 
 
-@pytest.mark.parametrize("duration", ["", "1", "1.5s", "0s", "30s", "1m"])
+@pytest.mark.parametrize(
+    "duration",
+    ["", "1", "1.5s", "0s", "9ms", "1m", "1000000000s"],
+)
 def test_timeout_duration_parser_rejects_unsupported_values(duration: str) -> None:
     with pytest.raises(ValueError, match="timeout"):
         parse_timeout_duration(duration)
+
+
+def test_shared_duration_parser_supports_gateway_values_and_units() -> None:
+    assert parse_duration("1ms") == 0.001
+    assert parse_duration("45s", unit="ms") == 45_000.0
 
 
 def test_expired_timeout_raises_typed_signal() -> None:

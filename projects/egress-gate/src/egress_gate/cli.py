@@ -37,7 +37,6 @@ from egress_gate.constants import (
     MAX_EVALUATION_FILE_BYTES,
     MAX_EVALUATION_TAGS,
     MAX_PROTO_FINDING_GROUPS,
-    MAX_TIMEOUT_MIDDLEWARE_PROCESSING,
 )
 from egress_gate.errors import EgressGateError, GateRegistryError
 from egress_gate.gates.base import GateCapability
@@ -66,15 +65,16 @@ from egress_gate.result import EgressResult, GateDecisionSource
 from egress_gate.string_validators import BoundedMetadataString
 from egress_gate.timeout import (
     Timeout,
+    parse_duration,
     parse_timeout_duration,
     validate_timeout_middleware_processing,
 )
 
-_TIMEOUT_DURATION_HELP = (
+_DURATION_FORMAT_HELP = (
     "Use an integer followed by s for seconds or ms for milliseconds, such as "
-    f"10s or 500ms. Accepted range: 10ms through "
-    f"{MAX_TIMEOUT_MIDDLEWARE_PROCESSING:g}s."
+    "10s or 500ms."
 )
+_TIMEOUT_DURATION_HELP = f"{_DURATION_FORMAT_HELP} Minimum 10ms."
 _LOG = get_logger(__name__)
 
 app = typer.Typer(
@@ -255,8 +255,18 @@ def add_gateway_registration(
             ),
         ),
     ] = 50051,
+    timeout: Annotated[
+        str,
+        typer.Option(
+            "--timeout",
+            help=(
+                "Gateway RPC timeout to write in the registration. "
+                f"{_DURATION_FORMAT_HELP}"
+            ),
+        ),
+    ] = DEFAULT_GATEWAY_REGISTRATION_TIMEOUT,
 ) -> None:
-    """Add or update Egress Gate with the default gateway RPC timeout."""
+    """Add or update Egress Gate with a configurable gateway RPC timeout."""
     try:
         address = ipaddress.IPv4Address(host_ip)
     except ipaddress.AddressValueError:
@@ -277,6 +287,13 @@ def add_gateway_registration(
             str(error),
             param_hint="--name",
         ) from None
+    try:
+        parse_duration(timeout)
+    except ValueError as error:
+        raise typer.BadParameter(
+            str(error),
+            param_hint="--timeout",
+        ) from None
     config_path = config or default_gateway_config_path()
     try:
         result = update_gateway_config(
@@ -284,6 +301,7 @@ def add_gateway_registration(
             middleware_name=validated_name,
             host_ip=str(address),
             port=port,
+            timeout_gateway_ceiling=timeout,
         )
         remember_gateway_registration(
             config_path,
@@ -308,7 +326,7 @@ def add_gateway_registration(
         config_path=config_path,
         name=validated_name,
         endpoint=f"http://{address}:{port}",
-        timeout_gateway_ceiling=f"{DEFAULT_GATEWAY_REGISTRATION_TIMEOUT:g}s",
+        timeout_gateway_ceiling=timeout,
         change=change,
         next_step=(
             "Start Egress Gate, then restart the OpenShell gateway to load this "

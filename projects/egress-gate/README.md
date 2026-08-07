@@ -99,13 +99,16 @@ server = EgressGateServer(
 server.serve_sync("127.0.0.1:50051")
 ```
 
-`timeout_middleware_processing` is the actual service setting, in seconds. The
-service turns it into one `Timeout` per evaluation and passes that same deadline
-through slot acquisition, policy preparation, and `RequestProcessor.process`.
-It accepts 10 milliseconds through 29 seconds. `Describe` leaves the optional
-binding RPC timeout empty, so OpenShell applies the timeout configured on the
-gateway registration to the complete RPC. The registration helper uses 30
-seconds by default, and operators can change that value in the gateway TOML.
+In this example, `timeout_middleware_processing` gives each evaluation 10
+seconds. Omitting it uses the one-second service default. The value is expressed
+in seconds, must be at least 10 milliseconds, and must resolve to whole
+milliseconds. The service passes one resulting `Timeout` through slot
+acquisition, policy preparation, and `RequestProcessor.process`.
+
+`Describe` leaves the optional binding RPC timeout empty, so OpenShell applies
+the timeout configured on the gateway registration to the complete RPC. The
+registration CLI defaults to 30 seconds and accepts `--timeout` to write a
+different value.
 The helper remembers the gateway file and registration name. On later CLI
 starts, `serve` reads the current gateway timeout and requires the processing
 timeout to be lower. If no registration has been added with the CLI, `serve`

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Literal
 
 from egress_gate.constants import DEFAULT_GATEWAY_REGISTRATION_TIMEOUT
+from egress_gate.timeout import parse_duration
 
 
 class GatewayConfigUpdate(Enum):
@@ -157,16 +158,14 @@ def read_remembered_gateway_timeout(
             f"{remembered.config_path} has no timeout. Add one or register Egress "
             "Gate again."
         )
-    match = re.fullmatch(r"([1-9][0-9]*)(ms|s)", duration)
-    if match is None:
+    try:
+        timeout = parse_duration(duration, unit=unit)
+    except ValueError:
         raise GatewayConfigError(
             f"The timeout for the remembered registration "
             f"{remembered.middleware_name!r} in {remembered.config_path} must use "
             "whole seconds or milliseconds, such as 30s or 500ms."
-        )
-    amount = int(match.group(1))
-    milliseconds = amount if match.group(2) == "ms" else amount * 1000
-    timeout = milliseconds / 1000 if unit == "s" else float(milliseconds)
+        ) from None
     return remembered, timeout
 
 
@@ -223,9 +222,17 @@ def update_gateway_config(
     middleware_name: str,
     host_ip: str,
     port: int,
+    timeout_gateway_ceiling: str = DEFAULT_GATEWAY_REGISTRATION_TIMEOUT,
 ) -> GatewayConfigUpdate:
     """Add or update one named Egress Gate middleware registration."""
     validate_middleware_name(middleware_name)
+    try:
+        parse_duration(timeout_gateway_ceiling)
+    except ValueError:
+        raise GatewayConfigError(
+            "The gateway timeout must use whole seconds or milliseconds, such as "
+            "30s or 500ms."
+        ) from None
     endpoint = f"http://{host_ip}:{port}"
     try:
         original = path.read_text(encoding="utf-8")
@@ -233,6 +240,7 @@ def update_gateway_config(
         updated = _new_gateway_config(
             middleware_name=middleware_name,
             endpoint=endpoint,
+            timeout_gateway_ceiling=timeout_gateway_ceiling,
         )
         _write_atomically(path, updated)
         return GatewayConfigUpdate.CREATED
@@ -245,6 +253,7 @@ def update_gateway_config(
         updated = _new_gateway_config(
             middleware_name=middleware_name,
             endpoint=endpoint,
+            timeout_gateway_ceiling=timeout_gateway_ceiling,
         )
         _write_atomically(path, updated)
         return GatewayConfigUpdate.CREATED
@@ -274,6 +283,7 @@ def update_gateway_config(
         replacement = _update_middleware_block(
             block.group(0),
             endpoint=endpoint,
+            timeout_gateway_ceiling=timeout_gateway_ceiling,
         )
         updated = original[: block.start()] + replacement + original[block.end() :]
         result = GatewayConfigUpdate.UPDATED
@@ -282,6 +292,7 @@ def update_gateway_config(
             original,
             middleware_name=middleware_name,
             endpoint=endpoint,
+            timeout_gateway_ceiling=timeout_gateway_ceiling,
         )
         result = GatewayConfigUpdate.ADDED
 
@@ -382,10 +393,12 @@ def _new_gateway_config(
     *,
     middleware_name: str,
     endpoint: str,
+    timeout_gateway_ceiling: str,
 ) -> str:
     return "[openshell]\nversion = 1\n\n" + _middleware_block(
         middleware_name=middleware_name,
         endpoint=endpoint,
+        timeout_gateway_ceiling=timeout_gateway_ceiling,
     )
 
 
@@ -446,6 +459,7 @@ def _append_middleware_block(
     *,
     middleware_name: str,
     endpoint: str,
+    timeout_gateway_ceiling: str,
 ) -> str:
     return (
         contents.rstrip()
@@ -453,6 +467,7 @@ def _append_middleware_block(
         + _middleware_block(
             middleware_name=middleware_name,
             endpoint=endpoint,
+            timeout_gateway_ceiling=timeout_gateway_ceiling,
         )
     )
 
@@ -461,13 +476,14 @@ def _middleware_block(
     *,
     middleware_name: str,
     endpoint: str,
+    timeout_gateway_ceiling: str,
 ) -> str:
     return (
         "[[openshell.supervisor.middleware]]\n"
         f'name = "{middleware_name}"\n'
         f'grpc_endpoint = "{endpoint}"\n'
         "max_body_bytes = 4194304\n"
-        f'timeout = "{DEFAULT_GATEWAY_REGISTRATION_TIMEOUT:g}s"\n'
+        f'timeout = "{timeout_gateway_ceiling}"\n'
     )
 
 
@@ -475,6 +491,7 @@ def _update_middleware_block(
     block: str,
     *,
     endpoint: str,
+    timeout_gateway_ceiling: str,
 ) -> str:
     updated = _replace_or_append_assignment(
         block,
@@ -489,7 +506,7 @@ def _update_middleware_block(
     return _replace_or_append_assignment(
         updated,
         key="timeout",
-        value=f'"{DEFAULT_GATEWAY_REGISTRATION_TIMEOUT:g}s"',
+        value=f'"{timeout_gateway_ceiling}"',
     )
 
 

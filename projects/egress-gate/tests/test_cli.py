@@ -54,6 +54,7 @@ def test_cli_narrow_help_preserves_complete_option_names() -> None:
     assert result.exit_code == 0
     assert "--host-ip" in result.stdout
     assert "--config" in result.stdout
+    assert "--timeout" in result.stdout
     assert "--host…" not in result.stdout
     assert "--conf…" not in result.stdout
 
@@ -96,14 +97,14 @@ def test_cli_serve_uses_one_concise_processing_timeout(
     assert "--timeout <str>" in serve_help
     assert "--timeout-seconds" not in serve_help
     assert "s for seconds or ms for milliseconds" in serve_help
-    assert "10ms through 29s" in serve_help
+    assert "Minimum 10ms" in serve_help
     assert "RPC timeout" in serve_help
 
     evaluate_help = CliRunner().invoke(app, ["evaluate", "--help"])
     assert evaluate_help.exit_code == 0, evaluate_help.output
     normalized_evaluate_help = " ".join(evaluate_help.stdout.split())
     assert "s for seconds or ms for milliseconds" in normalized_evaluate_help
-    assert "10ms through 29s" in normalized_evaluate_help
+    assert "Minimum 10ms" in normalized_evaluate_help
 
 
 def test_cli_serve_rejects_timeout_at_remembered_gateway_ceiling(
@@ -476,6 +477,8 @@ def test_cli_add_gateway_registration_reports_the_result(
             "192.0.2.10",
             "--config",
             str(config),
+            "--timeout",
+            "45s",
         ],
     )
 
@@ -488,7 +491,8 @@ def test_cli_add_gateway_registration_reports_the_result(
     assert "Endpoint" in result.stdout
     assert "http://192.0.2.10:50051" in result.stdout
     assert "Gateway RPC ceiling" in result.stdout
-    assert "30s" in result.stdout
+    assert "45s" in result.stdout
+    assert 'timeout = "45s"' in config.read_text()
     assert "Created the gateway configuration file" in result.stdout
     assert "Next: Start Egress Gate" in result.stdout
 
@@ -608,7 +612,7 @@ def test_cli_evaluate_explains_an_invalid_timeout() -> None:
             "--cases",
             str(project_dir / "examples/regex-redaction/cases.yaml"),
             "--timeout",
-            "0s",
+            "9ms",
         ],
         color=True,
     )
@@ -616,4 +620,4 @@ def test_cli_evaluate_explains_an_invalid_timeout() -> None:
     assert result.exit_code == 2
     error_output = Text.from_ansi(result.stderr).plain
     assert "Invalid value for --timeout" in error_output
-    assert "between 10ms and 29s" in error_output
+    assert "at least 10ms" in error_output

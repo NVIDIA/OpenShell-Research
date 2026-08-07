@@ -231,6 +231,7 @@ def test_update_gateway_config_updates_only_the_named_registration(
         middleware_name="egress-gate",
         host_ip="10.0.0.4",
         port=50053,
+        timeout_gateway_ceiling="45s",
     )
 
     assert result is GatewayConfigUpdate.UPDATED
@@ -239,16 +240,28 @@ def test_update_gateway_config_updates_only_the_named_registration(
     assert "# Keep this registration comment." in contents
     assert 'grpc_endpoint = "http://10.0.0.4:50053"' in contents
     assert "max_body_bytes = 4194304" in contents
-    assert 'timeout = "30s"' in contents
+    assert 'timeout = "45s"' in contents
 
     repeated = update_gateway_config(
         path,
         middleware_name="egress-gate",
         host_ip="10.0.0.4",
         port=50053,
+        timeout_gateway_ceiling="45s",
     )
 
     assert repeated is GatewayConfigUpdate.UNCHANGED
+
+
+def test_update_gateway_config_rejects_invalid_timeout(tmp_path: Path) -> None:
+    with pytest.raises(GatewayConfigError, match="gateway timeout"):
+        update_gateway_config(
+            tmp_path / "gateway.toml",
+            middleware_name="egress-gate",
+            host_ip="10.0.0.4",
+            port=50053,
+            timeout_gateway_ceiling="1m",
+        )
 
 
 def test_update_gateway_config_adds_the_operator_timeout_ceiling_when_missing(
