@@ -1,16 +1,6 @@
 # Egress Gate message fingerprinting and denied-history ledger plan
 
-## Status and handoff
-
-Planned follow-up work. Do not implement this feature in the request-content
-parsing PR. That PR establishes the parser, normalized message, and
-source-preserving replacement contracts on which this plan depends.
-
-A fresh agent should implement this plan in a subsequent PR. Start from the
-request-content parsing PR head if the work is stacked, or from `main` after
-that PR is merged. Re-read the resulting Egress Gate source and documentation
-before implementing; this plan records intended contracts, not permission to
-reintroduce names or assumptions that have since changed.
+## Scope
 
 The first release is intentionally process-local and in-memory. It does not
 provide cross-process, cross-replica, or restart persistence. Losing state may
