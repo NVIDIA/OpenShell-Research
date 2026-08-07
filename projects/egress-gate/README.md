@@ -102,8 +102,16 @@ server.serve_sync("127.0.0.1:50051")
 `timeout_middleware_processing` is the actual service setting, in seconds. The
 service turns it into one `Timeout` per evaluation and passes that same deadline
 through slot acquisition, policy preparation, and `RequestProcessor.process`.
-The OpenShell gateway enforces its separately configured
-`timeout_gateway_ceiling` as an upper bound.
+It accepts 10 milliseconds through 29 seconds. `Describe` leaves the optional
+binding RPC timeout empty, so OpenShell applies the timeout configured on the
+gateway registration to the complete RPC. The registration helper uses 30
+seconds by default, and operators can change that value in the gateway TOML.
+The helper remembers the gateway file and registration name. On later CLI
+starts, `serve` reads the current gateway timeout and requires the processing
+timeout to be lower. If no registration has been added with the CLI, `serve`
+starts without this check. If the gateway timeout expires, OpenShell applies
+the policy's `on_error` behavior; use `on_error: fail_closed` when middleware
+timeout failures must deny.
 
 ## Documentation and examples
 

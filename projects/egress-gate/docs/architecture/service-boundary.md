@@ -29,12 +29,21 @@ encoded configuration before registry parsing.
 
 ## Shared deadline and workers
 
-The service's `timeout_middleware_processing` value is returned in the
-`MiddlewareBinding` from `Describe`. `EvaluateHttpRequest` converts that same
-value into one monotonic `Timeout` used for semaphore acquisition, policy
-preparation, replacement-lock waits, gate execution, and final result checks.
-The gateway's separate `timeout_gateway_ceiling` can shorten, but never extend,
-that processing time.
+`EvaluateHttpRequest` converts `timeout_middleware_processing` into one monotonic
+`Timeout` used for semaphore acquisition, policy preparation, replacement-lock
+waits, gate execution, and final result checks. `Describe` leaves the binding's
+optional RPC timeout empty. OpenShell therefore applies the separately
+configured gateway registration timeout to the complete RPC.
+
+The middleware protocol does not report the resolved gateway timeout back to
+Egress Gate, and OpenShell does not propagate it as a gRPC deadline. For the
+normal CLI-managed path, `add-gateway-registration` remembers the gateway TOML
+path and registration name. `serve` reads the current timeout from that entry
+at startup and requires it to be greater than
+`timeout_middleware_processing`. Direct Python API use and manually managed
+registrations do not have this startup check. If the gateway timeout expires
+first, OpenShell applies the policy's `on_error` behavior.
+
 `RequestProcessor.process` accepts the caller-owned timeout and never creates or
 stores one.
 

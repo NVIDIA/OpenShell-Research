@@ -34,14 +34,21 @@ uv run egress-gate add-gateway-registration \
 The command updates `OPENSHELL_GATEWAY_CONFIG`, then
 `$XDG_CONFIG_HOME/openshell/gateway.toml`, then
 `~/.config/openshell/gateway.toml`. Use `--config PATH` for another file.
+It remembers the absolute gateway file path and registration name in
+`$XDG_CONFIG_HOME/openshell-egress-gate/registration.toml`, or under
+`~/.config` when `XDG_CONFIG_HOME` is unset.
 Start the gateways again with the same commands or service managers that you
 normally use.
 
-The registration writes `timeout = "30s"` in the gateway TOML. Egress Gate calls
-this setting `timeout_gateway_ceiling`: the maximum time the gateway permits
-for Egress Gate. Set the actual service value with
-`egress-gate serve --timeout DURATION`; Egress Gate calls that setting
-`timeout_middleware_processing`.
+The registration helper writes `timeout = "30s"` in the gateway TOML. This is a
+default, not a fixed limit: operators can edit the registration to use another
+supported timeout. Rerunning `add-gateway-registration` resets it to 30s. Set
+Egress Gate's internal processing budget with
+`egress-gate serve --timeout DURATION`; the Python API calls that setting
+`timeout_middleware_processing` and accepts 10ms through 29s. When a remembered
+registration exists, `serve` reads its current gateway timeout and refuses to
+start unless the processing timeout is lower. A manually managed setup with no
+remembered registration starts without this check.
 
 To remove a registration, stop any running gateways that use the configuration
 again. List the available names with:
@@ -60,17 +67,10 @@ uv run egress-gate remove-gateway-registration --name egress-gate
 
 Start the gateways again after the command completes.
 
-Egress Gate uses `timeout_middleware_processing` across queueing, policy
-preparation, and every configured gate. OpenShell applies
-`timeout_gateway_ceiling` as an independent upper bound:
-
-```text
-effective timeout = min(timeout_gateway_ceiling, timeout_middleware_processing)
-```
-
-With the registration command's 30s ceiling, any supported `--timeout` value
-becomes the effective timeout. If an operator lowers the gateway ceiling by
-editing the gateway configuration, that lower value wins.
+`serve --timeout` covers queueing, policy preparation, and every configured
+gate. If the gateway timeout expires first despite the startup check, OpenShell
+applies the policy's `on_error` setting: `fail_closed` denies the request, while
+`fail_open` allows it to continue.
 
 If the middleware RPC returns gRPC `RESOURCE_EXHAUSTED`, capacity may remain
 accounted for briefly while completed RPCs are torn down. The OpenShell gateway
