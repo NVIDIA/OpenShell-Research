@@ -16,6 +16,7 @@ from egress_gate.constants import (
     MAX_PROTO_FINDING_GROUPS,
 )
 from egress_gate.errors import (
+    BodyFormatError,
     EgressGateError,
     ErrorCode,
     GateConfigurationError,
@@ -174,6 +175,8 @@ class RequestProcessor:
         except GateLimitExceededError:
             _LOGGER.info("egress_gate_processing_limit kind=resource")
             return _runtime_limit_result(self._policy_fingerprint)
+        except BodyFormatError:
+            raise EgressGateError(ErrorCode.BODY_FORMAT_INVALID) from None
         except GateInputError:
             raise EgressGateError(ErrorCode.BODY_ENCODING_INVALID) from None
         except GateConfigurationError:

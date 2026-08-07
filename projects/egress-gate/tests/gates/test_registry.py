@@ -120,6 +120,16 @@ def test_builtin_registry_seals_on_first_use_and_contains_only_regex() -> None:
     )
     assert "RegexReplaceAction" in str(body_scan_schema)
     assert "RegexReplaceAction" not in str(header_scan_schema)
+    json_scan_schema = next(
+        value for key, value in definitions.items() if key == "RegexJsonFieldsScan"
+    )
+    message_scan_schema = next(
+        value for key, value in definitions.items() if key == "RegexMessageBlocksScan"
+    )
+    assert "RegexReplaceAction" in str(json_scan_schema)
+    assert "RegexReplaceAction" in str(message_scan_schema)
+    assert "JsonSelector" in str(json_scan_schema)
+    assert "JsonMessageMapConfig" in str(message_scan_schema)
 
     with pytest.raises(EgressGateError):
         registry.validate_config(

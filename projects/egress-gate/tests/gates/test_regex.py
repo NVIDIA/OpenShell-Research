@@ -222,6 +222,169 @@ def test_non_body_scan_can_make_a_terminal_deny_decision() -> None:
     assert evaluation.reason_code == "egress_gate_regex_denied"
 
 
+def test_json_fields_scan_only_matches_selected_string_nodes() -> None:
+    config = _config(
+        [{"pattern": "secret", "confidence": "high"}],
+        scan={
+            "kind": "json-fields",
+            "selectors": [
+                {
+                    "segments": [
+                        {"kind": "key", "value": "messages"},
+                        {"kind": "each"},
+                        {"kind": "key", "value": "content"},
+                    ]
+                }
+            ],
+        },
+    )
+
+    evaluation = RegexGate(config, None).evaluate(
+        _request(b'{"metadata":"secret","messages":[{"content":"secret"}]}'),
+        timeout=Timeout.from_seconds(1),
+    )
+
+    assert evaluation.findings[0].count == 1
+    assert evaluation.request_mutations.is_empty
+
+
+def test_json_fields_replace_preserves_unselected_json_source() -> None:
+    config = _config(
+        [{"pattern": "secret", "confidence": "high"}],
+        scan={
+            "kind": "json-fields",
+            "selectors": [
+                {
+                    "segments": [
+                        {"kind": "key", "value": "messages"},
+                        {"kind": "each"},
+                        {"kind": "key", "value": "content"},
+                    ]
+                }
+            ],
+        },
+        action_kind="replace",
+        template="[{entity}]",
+    )
+
+    evaluation = RegexGate(config, None).evaluate(
+        _request(
+            b'{ "messages" : [{"content":"a secret"}], "number":1.00, '
+            b'"escaped":"\\u0078" }'
+        ),
+        timeout=Timeout.from_seconds(1),
+    )
+
+    assert evaluation.request_mutations.replacement_body == (
+        b'{ "messages" : [{"content":"a [token]"}], "number":1.00, '
+        b'"escaped":"\\u0078" }'
+    )
+
+
+def test_json_fields_replace_preserves_explicit_intent_without_matches() -> None:
+    body = b'{ "messages": [{"content":"safe"}], "number":1.00 }'
+    config = _config(
+        [{"pattern": "secret", "confidence": "high"}],
+        scan={
+            "kind": "json-fields",
+            "selectors": [
+                {
+                    "segments": [
+                        {"kind": "key", "value": "messages"},
+                        {"kind": "each"},
+                        {"kind": "key", "value": "content"},
+                    ]
+                }
+            ],
+        },
+        action_kind="replace",
+    )
+
+    evaluation = RegexGate(config, None).evaluate(
+        _request(body),
+        timeout=Timeout.from_seconds(1),
+    )
+
+    assert evaluation.request_mutations.replacement_body == body
+
+
+def test_json_fields_matches_do_not_span_distinct_selected_nodes() -> None:
+    config = _config(
+        [{"pattern": "secretsecret", "confidence": "high"}],
+        scan={
+            "kind": "json-fields",
+            "selectors": [
+                {
+                    "segments": [
+                        {"kind": "key", "value": "messages"},
+                        {"kind": "each"},
+                    ]
+                }
+            ],
+        },
+    )
+
+    evaluation = RegexGate(config, None).evaluate(
+        _request(b'{"messages":["secret","secret"]}'),
+        timeout=Timeout.from_seconds(1),
+    )
+
+    assert evaluation.findings == ()
+
+
+def test_message_blocks_scan_filters_normalized_roles() -> None:
+    config = _config(
+        [{"pattern": "secret", "confidence": "high"}],
+        scan={
+            "kind": "message-blocks",
+            "parser": {
+                "kind": "json-message-map",
+                "messages": {"segments": [{"kind": "key", "value": "messages"}]},
+                "role_key": "role",
+                "text_selectors": [{"segments": [{"kind": "key", "value": "content"}]}],
+            },
+            "roles": ["user"],
+        },
+        action_kind="replace",
+    )
+
+    evaluation = RegexGate(config, None).evaluate(
+        _request(
+            b'{"messages":['
+            b'{"role":"assistant","content":"secret"},'
+            b'{"role":"user","content":"secret"}'
+            b"]}"
+        ),
+        timeout=Timeout.from_seconds(1),
+    )
+
+    assert evaluation.findings[0].count == 1
+    assert evaluation.request_mutations.replacement_body == (
+        b'{"messages":['
+        b'{"role":"assistant","content":"secret"},'
+        b'{"role":"user","content":"[token]"}'
+        b"]}"
+    )
+
+
+def test_message_block_filters_must_be_unique() -> None:
+    with pytest.raises(ValidationError, match="unique"):
+        _config(
+            [{"pattern": "secret", "confidence": "high"}],
+            scan={
+                "kind": "message-blocks",
+                "parser": {
+                    "kind": "json-message-map",
+                    "messages": {"segments": [{"kind": "key", "value": "messages"}]},
+                    "text_selectors": [
+                        {"segments": [{"kind": "key", "value": "content"}]}
+                    ],
+                },
+                "roles": ["user", "user"],
+            },
+        )
+
+
 @pytest.mark.parametrize("kind", ["path", "query", "header"])
 def test_replace_action_is_structurally_unavailable_for_non_body_scans(
     kind: str,
@@ -543,6 +706,24 @@ def test_patterns_compile_during_preparation_not_validation_or_each_run(
 
     assert prepared_count > 0
     assert recording_compile.call_count == prepared_count
+
+
+def test_request_content_parser_is_prepared_once_and_reused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_prepare = regex_module._prepare_content_parser
+    recording_prepare = Mock(wraps=original_prepare)
+    monkeypatch.setattr(regex_module, "_prepare_content_parser", recording_prepare)
+
+    gate = RegexGate(
+        _config([{"pattern": "x", "confidence": "high"}]),
+        None,
+        timeout=Timeout.from_seconds(1),
+    )
+    gate.evaluate(_request(b"x"), timeout=Timeout.from_seconds(1))
+    gate.evaluate(_request(b"x"), timeout=Timeout.from_seconds(1))
+
+    recording_prepare.assert_called_once()
 
 
 def test_gate_preparation_honors_an_expired_timeout() -> None:

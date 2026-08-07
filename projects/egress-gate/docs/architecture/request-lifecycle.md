@@ -31,12 +31,15 @@ For each configured gate, the Egress Gate pipeline processor:
 
 1. Check the shared deadline.
 2. Pass the current read-only `HttpRequest` snapshot to the gate.
-3. Reconstruct and validate the returned `GateEvaluation`.
-4. Add a content-safe `GateTrace` and `SourcedFinding` values owned by the
+3. When configured by the gate, parse the current body as strict JSON, select
+   bounded string nodes, and optionally normalize those nodes as message
+   blocks.
+4. Reconstruct and validate the returned `GateEvaluation`.
+5. Add a content-safe `GateTrace` and `SourcedFinding` values owned by the
    pipeline processor.
-5. On `proceed`, validate the request mutations and construct the next request
+6. On `proceed`, validate the request mutations and construct the next request
    snapshot.
-6. On terminal `allow` or `deny`, stop without invoking later gates.
+7. On terminal `allow` or `deny`, stop without invoking later gates.
 
 The pipeline processor never changes a request object in place. It keeps the
 first snapshot private, constructs a new snapshot after each validated mutation
@@ -44,6 +47,12 @@ set, and passes that snapshot to the next gate. The final allowed result
 combines these mutations in order. A denied result always has an empty mutation
 set. Body replacement `None` and `b""` remain distinct. Header mutation variants
 use the required `kind` values `write` and `remove`.
+
+Structured JSON replacement works through the same complete-body mutation
+contract. The JSON document replaces selected string tokens from the end of the
+source toward the beginning. It preserves every byte outside those tokens and
+returns one bounded complete replacement body. A later gate therefore parses
+the body snapshot produced by earlier structured or raw replacements.
 
 If every gate proceeds, `default_decision` controls the result. Default deny
 uses `egress_gate_default_deny`. Default allow has no reason code.
