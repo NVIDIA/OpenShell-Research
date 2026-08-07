@@ -9,9 +9,12 @@ from __future__ import annotations
 import re
 from importlib.metadata import version
 
-# Middleware processing timeout and the gateway's upper bound for it.
+# Egress Gate's internal maximum leaves headroom under the registration helper's
+# default. This is not a claim about the active gateway configuration: operators
+# can change that timeout outside this service.
 DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING = 1.0
-TIMEOUT_GATEWAY_CEILING = 30.0
+MAX_TIMEOUT_MIDDLEWARE_PROCESSING = 29.0
+DEFAULT_GATEWAY_REGISTRATION_TIMEOUT = 30.0
 
 # Middleware identity and stable response values.
 SERVICE_NAME = "egress-gate"
@@ -21,8 +24,8 @@ DEFAULT_DENY_REASON_CODE = "egress_gate_default_deny"
 LIMIT_REASON = (
     "Egress Gate exceeded a processing safety limit. Check Egress Gate logs "
     "for the limit kind. Reduce the request or replacement size, simplify the "
-    "configured gates and rules, or increase the timeout passed to "
-    "egress-gate serve --timeout, then retry."
+    "configured gates and rules, or increase the middleware processing timeout, "
+    "then retry."
 )
 LIMIT_REASON_CODE = "egress_gate_limit_exceeded"
 # Text input limits.

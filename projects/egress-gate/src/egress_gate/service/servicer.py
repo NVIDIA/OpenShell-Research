@@ -65,7 +65,11 @@ from egress_gate.result import (
     SourcedFinding,
 )
 from egress_gate.string_validators import validate_bounded_metadata_string
-from egress_gate.timeout import Timeout, format_timeout_middleware_processing
+from egress_gate.timeout import (
+    Timeout,
+    format_timeout_middleware_processing,
+    validate_timeout_middleware_processing,
+)
 
 
 class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
@@ -79,10 +83,9 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
     ) -> None:
         registry.configuration_json_schema()
         self._registry = registry
-        self._timeout_middleware_processing = format_timeout_middleware_processing(
-            timeout_middleware_processing
+        self._timeout_middleware_processing_seconds = (
+            validate_timeout_middleware_processing(timeout_middleware_processing)
         )
-        self._timeout_middleware_processing_seconds = timeout_middleware_processing
         self._policy = _ActivePolicy(registry)
         self._processing_slots = asyncio.Semaphore(MAX_CONCURRENT_PROCESSING)
         self._processing_executor = ThreadPoolExecutor(
@@ -93,7 +96,9 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
     @property
     def timeout_middleware_processing(self) -> str:
         """Return the configured middleware processing timeout."""
-        return self._timeout_middleware_processing
+        return format_timeout_middleware_processing(
+            self._timeout_middleware_processing_seconds
+        )
 
     async def close(self) -> None:
         """Wait for in-flight synchronous gates during shutdown."""
@@ -106,6 +111,9 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         context: grpc.aio.ServicerContext[object, pb2.MiddlewareManifest],
     ) -> pb2.MiddlewareManifest:
         """Describe the binding and its complete policy schema."""
+        # The protocol does not expose the operator-configured gateway timeout
+        # to this service. An empty binding timeout leaves that RPC limit under
+        # gateway ownership instead of replacing it with the internal budget.
         return pb2.MiddlewareManifest(
             name=SERVICE_NAME,
             service_version=SERVICE_VERSION,
@@ -114,7 +122,6 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                     operation=pb2.SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_REQUEST,
                     phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS,
                     max_body_bytes=MAX_BODY_BYTES,
-                    timeout=self._timeout_middleware_processing,
                 )
             ],
         )

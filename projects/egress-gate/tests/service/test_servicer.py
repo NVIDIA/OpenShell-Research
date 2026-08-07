@@ -109,7 +109,7 @@ class _SuccessfulEvaluationContext:
         raise AssertionError("successful evaluation unexpectedly aborted")
 
 
-def test_manifest_contains_the_middleware_processing_timeout() -> None:
+def test_manifest_leaves_the_gateway_rpc_timeout_to_the_operator() -> None:
     middleware = EgressGateMiddleware(
         create_builtin_registry(),
         timeout_middleware_processing=4.5,
@@ -119,7 +119,7 @@ def test_manifest_contains_the_middleware_processing_timeout() -> None:
     finally:
         asyncio.run(middleware.close())
 
-    assert manifest.bindings[0].timeout == "4500ms"
+    assert manifest.bindings[0].timeout == ""
 
 
 def test_copied_proto_remains_the_current_five_field_finding_contract() -> None:

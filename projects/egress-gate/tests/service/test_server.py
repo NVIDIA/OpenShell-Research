@@ -45,7 +45,10 @@ def test_server_rejects_a_registry_without_gates() -> None:
         EgressGateServer(GateRegistry())
 
 
-@pytest.mark.parametrize("seconds", [True, 0, 0.001, 31, float("inf")])
+@pytest.mark.parametrize(
+    "seconds",
+    [True, 0, 0.001, 1.0001, 30, float("inf")],
+)
 def test_server_validates_timeout_middleware_processing(
     seconds: bool | int | float,
 ) -> None:
@@ -56,7 +59,7 @@ def test_server_validates_timeout_middleware_processing(
         )
 
 
-def test_server_uses_timeout_middleware_processing_for_manifest_and_pipeline() -> None:
+def test_server_uses_timeout_middleware_processing_for_pipeline_and_logs() -> None:
     server = EgressGateServer(
         create_builtin_registry(),
         timeout_middleware_processing=4.5,
@@ -64,6 +67,7 @@ def test_server_uses_timeout_middleware_processing_for_manifest_and_pipeline() -
     try:
         assert server._middleware._timeout_middleware_processing_seconds == 4.5
         assert server._middleware.timeout_middleware_processing == "4500ms"
+        assert not hasattr(server._middleware, "_timeout_middleware_processing")
         assert not hasattr(
             server._middleware._policy,
             "_timeout_middleware_processing_seconds",

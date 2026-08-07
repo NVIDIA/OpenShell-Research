@@ -12,39 +12,40 @@ from typing import Self
 from pydantic import Field
 
 from egress_gate.base import StrictDomainModel
-from egress_gate.constants import TIMEOUT_GATEWAY_CEILING
+from egress_gate.constants import MAX_TIMEOUT_MIDDLEWARE_PROCESSING
 from egress_gate.errors import TimeoutExpiredError
 
 
 def validate_timeout_middleware_processing(seconds: object) -> float:
-    """Return a processing timeout within the gateway ceiling, in seconds."""
+    """Return a supported internal processing timeout, in seconds."""
     if (
         isinstance(seconds, bool)
         or not isinstance(seconds, int | float)
         or not math.isfinite(seconds)
-        or seconds <= 0
-        or seconds > TIMEOUT_GATEWAY_CEILING
     ):
         raise ValueError(
-            "timeout_middleware_processing must be greater than 0 and no more "
-            f"than the {TIMEOUT_GATEWAY_CEILING:g}s timeout_gateway_ceiling"
+            "timeout_middleware_processing must be between 10ms and "
+            f"{MAX_TIMEOUT_MIDDLEWARE_PROCESSING:g}s, using whole milliseconds"
         )
-    return float(seconds)
+    validated_seconds = float(seconds)
+    milliseconds = validated_seconds * 1000
+    rounded_milliseconds = round(milliseconds)
+    if (
+        rounded_milliseconds < 10
+        or validated_seconds > MAX_TIMEOUT_MIDDLEWARE_PROCESSING
+        or not math.isclose(milliseconds, rounded_milliseconds)
+    ):
+        raise ValueError(
+            "timeout_middleware_processing must be between 10ms and "
+            f"{MAX_TIMEOUT_MIDDLEWARE_PROCESSING:g}s, using whole milliseconds"
+        )
+    return validated_seconds
 
 
 def format_timeout_middleware_processing(seconds: object) -> str:
     """Format a processing timeout for the OpenShell duration contract."""
     validated_seconds = validate_timeout_middleware_processing(seconds)
-    milliseconds = validated_seconds * 1000
-    rounded_milliseconds = round(milliseconds)
-    if rounded_milliseconds < 10 or not math.isclose(
-        milliseconds,
-        rounded_milliseconds,
-    ):
-        raise ValueError(
-            "timeout_middleware_processing must use whole milliseconds and be at "
-            "least 10ms"
-        )
+    rounded_milliseconds = round(validated_seconds * 1000)
     if rounded_milliseconds % 1000 == 0:
         return f"{rounded_milliseconds // 1000}s"
     return f"{rounded_milliseconds}ms"
@@ -64,7 +65,7 @@ def parse_timeout_duration(duration: object) -> float:
     except ValueError:
         raise ValueError(
             "timeout must be between 10ms and "
-            f"{TIMEOUT_GATEWAY_CEILING:g}s, using whole milliseconds"
+            f"{MAX_TIMEOUT_MIDDLEWARE_PROCESSING:g}s, using whole milliseconds"
         ) from None
     return float(seconds)
 

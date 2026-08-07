@@ -14,7 +14,11 @@ from egress_gate.gateway_config import (
     GatewayConfigUpdate,
     GatewayMiddlewareRegistration,
     default_gateway_config_path,
+    default_registration_state_path,
     list_gateway_registrations,
+    load_remembered_gateway_registration,
+    read_remembered_gateway_timeout,
+    remember_gateway_registration,
     remove_gateway_config,
     update_gateway_config,
     validate_middleware_name,
@@ -54,6 +58,45 @@ def test_default_gateway_config_path_honors_openshell_override(
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "ignored"))
 
     assert default_gateway_config_path() == configured_path
+
+
+def test_remembered_registration_reads_current_gateway_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "user-config"))
+    gateway_config = tmp_path / "gateway.toml"
+    gateway_config.write_text(
+        "[openshell]\n"
+        "version = 1\n\n"
+        "[[openshell.supervisor.middleware]]\n"
+        'name = "egress-gate"\n'
+        'grpc_endpoint = "http://192.0.2.10:50051"\n'
+        'timeout = "2500ms"\n'
+    )
+
+    remember_gateway_registration(
+        gateway_config,
+        middleware_name="egress-gate",
+    )
+
+    remembered = load_remembered_gateway_registration()
+    assert remembered is not None
+    assert remembered.config_path == gateway_config.resolve()
+    assert remembered.middleware_name == "egress-gate"
+    assert default_registration_state_path().stat().st_mode & 0o777 == 0o600
+    assert read_remembered_gateway_timeout() == (remembered, 2.5)
+    assert read_remembered_gateway_timeout(unit="ms") == (remembered, 2500.0)
+
+
+def test_remembered_registration_is_optional(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+
+    assert load_remembered_gateway_registration() is None
+    assert read_remembered_gateway_timeout() is None
 
 
 def test_middleware_name_validation_matches_openshell_constraints() -> None:

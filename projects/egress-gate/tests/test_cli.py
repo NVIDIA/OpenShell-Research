@@ -60,6 +60,7 @@ def test_cli_narrow_help_preserves_complete_option_names() -> None:
 
 def test_cli_serve_uses_one_concise_processing_timeout(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     calls: list[tuple[float, str]] = []
 
@@ -80,6 +81,7 @@ def test_cli_serve_uses_one_concise_processing_timeout(
         "egress_gate.service.server.EgressGateServer",
         FakeServer,
     )
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
 
     result = CliRunner().invoke(
         app,
@@ -90,8 +92,44 @@ def test_cli_serve_uses_one_concise_processing_timeout(
     assert calls == [(4.5, "127.0.0.1:50055")]
 
     help_result = CliRunner().invoke(app, ["serve", "--help"])
-    assert "--timeout <str>" in help_result.stdout
-    assert "--timeout-seconds" not in help_result.stdout
+    serve_help = " ".join(help_result.stdout.split())
+    assert "--timeout <str>" in serve_help
+    assert "--timeout-seconds" not in serve_help
+    assert "s for seconds or ms for milliseconds" in serve_help
+    assert "10ms through 29s" in serve_help
+    assert "RPC timeout" in serve_help
+
+    evaluate_help = CliRunner().invoke(app, ["evaluate", "--help"])
+    assert evaluate_help.exit_code == 0, evaluate_help.output
+    normalized_evaluate_help = " ".join(evaluate_help.stdout.split())
+    assert "s for seconds or ms for milliseconds" in normalized_evaluate_help
+    assert "10ms through 29s" in normalized_evaluate_help
+
+
+def test_cli_serve_rejects_timeout_at_remembered_gateway_ceiling(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "user-config"))
+    config = tmp_path / "gateway.toml"
+    registration = CliRunner().invoke(
+        app,
+        [
+            "add-gateway-registration",
+            "--host-ip",
+            "192.0.2.10",
+            "--config",
+            str(config),
+        ],
+    )
+    assert registration.exit_code == 0, registration.output
+    config.write_text(config.read_text().replace('timeout = "30s"', 'timeout = "1s"'))
+
+    result = CliRunner().invoke(app, ["serve", "--timeout", "1s"])
+
+    assert result.exit_code == 2
+    assert "must be less than the 1s gateway timeout" in result.stderr
+    assert str(config) in result.stderr
 
 
 def test_cli_gates_describes_the_request_level_builtin() -> None:
@@ -424,7 +462,11 @@ def test_cli_evaluate_names_a_failing_case_and_keeps_completed_results(
     assert '"/w=="' not in result.output
 
 
-def test_cli_add_gateway_registration_reports_the_result(tmp_path: Path) -> None:
+def test_cli_add_gateway_registration_reports_the_result(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "user-config"))
     config = tmp_path / "gateway.toml"
     result = CliRunner().invoke(
         app,
@@ -445,7 +487,7 @@ def test_cli_add_gateway_registration_reports_the_result(tmp_path: Path) -> None
     assert "egress-gate" in result.stdout
     assert "Endpoint" in result.stdout
     assert "http://192.0.2.10:50051" in result.stdout
-    assert "Timeout gateway ceiling" in result.stdout
+    assert "Gateway RPC ceiling" in result.stdout
     assert "30s" in result.stdout
     assert "Created the gateway configuration file" in result.stdout
     assert "Next: Start Egress Gate" in result.stdout
@@ -474,7 +516,7 @@ def test_cli_lists_gateway_registration_names_for_removal(tmp_path: Path) -> Non
     assert "OpenShell middleware registrations" in result.stdout
     assert "eg-regex" in result.stdout
     assert "http://192.0.2.10:50051" in result.stdout
-    assert "Timeout gateway ceiling" in result.stdout
+    assert "Gateway RPC ceiling" in result.stdout
     assert "30s" in result.stdout
     assert "other-service" in result.stdout
     assert "remove-gateway-registration --name NAME" in result.stdout
@@ -574,4 +616,4 @@ def test_cli_evaluate_explains_an_invalid_timeout() -> None:
     assert result.exit_code == 2
     error_output = Text.from_ansi(result.stderr).plain
     assert "Invalid value for --timeout" in error_output
-    assert "between 10ms and 30s" in error_output
+    assert "between 10ms and 29s" in error_output
