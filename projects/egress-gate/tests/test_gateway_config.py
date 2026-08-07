@@ -253,14 +253,18 @@ def test_update_gateway_config_updates_only_the_named_registration(
     assert repeated is GatewayConfigUpdate.UNCHANGED
 
 
-def test_update_gateway_config_rejects_invalid_timeout(tmp_path: Path) -> None:
+@pytest.mark.parametrize("timeout", ["1m", "10ms"])
+def test_update_gateway_config_rejects_invalid_timeout(
+    tmp_path: Path,
+    timeout: str,
+) -> None:
     with pytest.raises(GatewayConfigError, match="gateway timeout"):
         update_gateway_config(
             tmp_path / "gateway.toml",
             middleware_name="egress-gate",
             host_ip="10.0.0.4",
             port=50053,
-            timeout_gateway_ceiling="1m",
+            timeout_gateway_ceiling=timeout,
         )
 
 

@@ -98,6 +98,27 @@ def remember_gateway_registration(
     )
 
 
+def forget_gateway_registration(
+    config_path: Path,
+    *,
+    middleware_name: str,
+) -> None:
+    """Forget the registration when it matches the CLI-managed registration."""
+    remembered = load_remembered_gateway_registration()
+    if remembered is None or (
+        remembered.config_path != config_path.expanduser().resolve()
+        or remembered.middleware_name != middleware_name
+    ):
+        return
+    state_path = default_registration_state_path()
+    try:
+        state_path.unlink(missing_ok=True)
+    except OSError as error:
+        raise GatewayConfigError(
+            f"Could not remove {state_path}. Check that its directory is writable."
+        ) from error
+
+
 def load_remembered_gateway_registration() -> RememberedGatewayRegistration | None:
     """Load the gateway registration most recently managed by the CLI."""
     state_path = default_registration_state_path()
@@ -226,13 +247,7 @@ def update_gateway_config(
 ) -> GatewayConfigUpdate:
     """Add or update one named Egress Gate middleware registration."""
     validate_middleware_name(middleware_name)
-    try:
-        parse_duration(timeout_gateway_ceiling)
-    except ValueError:
-        raise GatewayConfigError(
-            "The gateway timeout must use whole seconds or milliseconds, such as "
-            "30s or 500ms."
-        ) from None
+    validate_gateway_timeout(timeout_gateway_ceiling)
     endpoint = f"http://{host_ip}:{port}"
     try:
         original = path.read_text(encoding="utf-8")
@@ -387,6 +402,21 @@ def validate_middleware_name(name: str) -> str:
             "Operator-owned middleware names cannot start with 'openshell/'."
         )
     return name
+
+
+def validate_gateway_timeout(duration: str) -> float:
+    """Validate a gateway timeout that can exceed the processing minimum."""
+    message = (
+        "The gateway timeout must be greater than 10ms and use whole seconds or "
+        "milliseconds, such as 30s or 500ms."
+    )
+    try:
+        seconds = parse_duration(duration)
+    except ValueError:
+        raise GatewayConfigError(message) from None
+    if seconds <= 0.01:
+        raise GatewayConfigError(message)
+    return seconds
 
 
 def _new_gateway_config(
@@ -587,11 +617,13 @@ __all__ = [
     "MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES",
     "default_gateway_config_path",
     "default_registration_state_path",
+    "forget_gateway_registration",
     "list_gateway_registrations",
     "load_remembered_gateway_registration",
     "remember_gateway_registration",
     "read_remembered_gateway_timeout",
     "remove_gateway_config",
     "update_gateway_config",
+    "validate_gateway_timeout",
     "validate_middleware_name",
 ]

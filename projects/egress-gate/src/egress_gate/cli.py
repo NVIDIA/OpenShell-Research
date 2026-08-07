@@ -52,11 +52,13 @@ from egress_gate.gateway_config import (
     GatewayConfigUpdate,
     GatewayMiddlewareRegistration,
     default_gateway_config_path,
+    forget_gateway_registration,
     list_gateway_registrations,
     read_remembered_gateway_timeout,
     remember_gateway_registration,
     remove_gateway_config,
     update_gateway_config,
+    validate_gateway_timeout,
     validate_middleware_name,
 )
 from egress_gate.logging import LoggingConfig, configure_logging, get_logger
@@ -65,7 +67,6 @@ from egress_gate.result import EgressResult, GateDecisionSource
 from egress_gate.string_validators import BoundedMetadataString
 from egress_gate.timeout import (
     Timeout,
-    parse_duration,
     parse_timeout_duration,
     validate_timeout_middleware_processing,
 )
@@ -288,8 +289,8 @@ def add_gateway_registration(
             param_hint="--name",
         ) from None
     try:
-        parse_duration(timeout)
-    except ValueError as error:
+        validate_gateway_timeout(timeout)
+    except GatewayConfigError as error:
         raise typer.BadParameter(
             str(error),
             param_hint="--timeout",
@@ -390,6 +391,10 @@ def remove_gateway_registration(
     config_path = config or default_gateway_config_path()
     try:
         result = remove_gateway_config(
+            config_path,
+            middleware_name=name,
+        )
+        forget_gateway_registration(
             config_path,
             middleware_name=name,
         )

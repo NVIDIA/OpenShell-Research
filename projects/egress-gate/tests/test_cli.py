@@ -497,6 +497,80 @@ def test_cli_add_gateway_registration_reports_the_result(
     assert "Next: Start Egress Gate" in result.stdout
 
 
+def test_cli_rejects_gateway_timeout_without_processing_headroom(
+    tmp_path: Path,
+) -> None:
+    config = tmp_path / "gateway.toml"
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "add-gateway-registration",
+            "--host-ip",
+            "192.0.2.10",
+            "--config",
+            str(config),
+            "--timeout",
+            "10ms",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "gateway timeout must be greater than 10ms" in result.stderr
+    assert not config.exists()
+
+
+def test_cli_removal_forgets_registration_before_later_serve(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    calls: list[str] = []
+
+    class FakeServer:
+        def __init__(
+            self,
+            registry: GateRegistry,
+            *,
+            timeout_middleware_processing: float,
+        ) -> None:
+            del registry, timeout_middleware_processing
+
+        def serve_sync(self, listen: str) -> None:
+            calls.append(listen)
+
+    monkeypatch.setattr("egress_gate.service.server.EgressGateServer", FakeServer)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "user-config"))
+    config = tmp_path / "gateway.toml"
+    add_result = CliRunner().invoke(
+        app,
+        [
+            "add-gateway-registration",
+            "--host-ip",
+            "192.0.2.10",
+            "--config",
+            str(config),
+        ],
+    )
+    assert add_result.exit_code == 0, add_result.output
+
+    remove_result = CliRunner().invoke(
+        app,
+        [
+            "remove-gateway-registration",
+            "--name",
+            "egress-gate",
+            "--config",
+            str(config),
+        ],
+    )
+    assert remove_result.exit_code == 0, remove_result.output
+
+    serve_result = CliRunner().invoke(app, ["serve"])
+
+    assert serve_result.exit_code == 0, serve_result.output
+    assert calls == ["127.0.0.1:50051"]
+
+
 def test_cli_lists_gateway_registration_names_for_removal(tmp_path: Path) -> None:
     config = tmp_path / "gateway.toml"
     config.write_text(
