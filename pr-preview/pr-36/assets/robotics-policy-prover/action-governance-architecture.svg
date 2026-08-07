@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-labelledby="title desc">
+  <title id="title">Practical architecture for governing an AI agent's physical actions</title>
+  <desc id="desc">An AI agent runs inside a sandboxed agent runtime. Every proposed plan or short-horizon action passes through a deterministic action-admission prover that returns deny, allow, or allow with constraints. Admitted contracts reach either a simulation or a real-world robot, where dedicated controllers retain responsibility for low-level control. Changing world state feeds admission and runtime enforcement.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#667085"/>
+    </marker>
+    <marker id="green-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#5b8f00"/>
+    </marker>
+    <style>
+      .bg { fill: #f7f8fa; }
+      .runtime { fill: #fff; stroke: #98a2b3; stroke-width: 2.5; stroke-dasharray: 10 7; }
+      .card { fill: #fff; stroke: #d0d5dd; stroke-width: 2; }
+      .gateway { fill: #f4fbe8; stroke: #76b900; stroke-width: 3; }
+      .world { fill: #f8fafc; stroke: #98a2b3; stroke-width: 2; }
+      .title { font: 700 24px Inter, system-ui, sans-serif; fill: #101828; }
+      .section { font: 700 18px Inter, system-ui, sans-serif; fill: #101828; }
+      .label { font: 700 16px Inter, system-ui, sans-serif; fill: #101828; }
+      .body { font: 14px Inter, system-ui, sans-serif; fill: #475467; }
+      .tiny { font: 13px Inter, system-ui, sans-serif; fill: #667085; }
+      .green { fill: #4c7a00; }
+      .red { fill: #b42318; }
+      .arrow { fill: none; stroke: #667085; stroke-width: 2.5; marker-end: url(#arrow); }
+      .green-arrow { fill: none; stroke: #5b8f00; stroke-width: 3; marker-end: url(#green-arrow); }
+      .feedback { fill: none; stroke: #b42318; stroke-width: 2.5; stroke-dasharray: 7 5; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1200" height="720" rx="18"/>
+  <text class="title" x="50" y="49">A practical boundary between an AI agent and physical effects</text>
+  <text class="body" x="50" y="77">The agent operates inside a sandbox; the runtime admits each proposed plan or action before it reaches a simulator or robot.</text>
+
+  <!-- Sandboxed runtime -->
+  <rect class="runtime" x="48" y="116" width="735" height="382" rx="18"/>
+  <text class="section" x="76" y="153">Sandboxed agent runtime</text>
+  <text class="tiny" x="76" y="177">The agent can plan and use granted tools, but cannot bypass the action gateway.</text>
+
+  <rect class="card" x="78" y="215" width="245" height="190" rx="14"/>
+  <circle cx="111" cy="249" r="17" fill="#76b900"/>
+  <text x="111" y="255" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-weight="700" font-size="16" fill="#fff">1</text>
+  <text class="label" x="139" y="256">AI agent</text>
+  <text class="body" x="104" y="298">Frontier model</text>
+  <text class="body" x="104" y="324">Goal decomposition</text>
+  <text class="body" x="104" y="350">Planning + replanning</text>
+  <text class="body" x="104" y="376">Tool and action requests</text>
+
+  <path class="arrow" d="M323 310 H422"/>
+  <rect x="340" y="248" width="72" height="43" rx="8" fill="#fff" stroke="#d0d5dd"/>
+  <text class="tiny" x="376" y="266" text-anchor="middle">plan /</text>
+  <text class="tiny" x="376" y="283" text-anchor="middle">action</text>
+
+  <rect class="gateway" x="422" y="194" width="325" height="232" rx="16"/>
+  <circle cx="457" cy="229" r="17" fill="#76b900"/>
+  <text x="457" y="235" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-weight="700" font-size="16" fill="#fff">2</text>
+  <text class="label" x="485" y="236">Action admission + prover</text>
+  <text class="body" x="450" y="278">Inspect plan / short-horizon action</text>
+  <text class="body" x="450" y="304">Evaluate invariants with Rust + Z3</text>
+  <text class="body" x="450" y="330">Return constraints + runtime obligations</text>
+  <line x1="450" y1="351" x2="718" y2="351" stroke="#b8d98a"/>
+  <text class="tiny red" x="450" y="378">DENY → structured evidence for replanning</text>
+  <text class="tiny green" x="450" y="401">ALLOW / CONSTRAIN → admitted contract</text>
+
+  <path class="feedback" d="M540 426 V465 H200 V407"/>
+  <text class="tiny red" x="370" y="456" text-anchor="middle">violation · counterexample · admissible bound</text>
+
+  <!-- Environment -->
+  <path class="green-arrow" d="M747 310 H839"/>
+  <text class="tiny green" x="793" y="274" text-anchor="middle">admitted</text>
+  <text class="tiny green" x="793" y="291" text-anchor="middle">contract</text>
+
+  <rect class="card" x="839" y="116" width="313" height="382" rx="18"/>
+  <circle cx="878" cy="148" r="17" fill="#76b900"/>
+  <text x="878" y="154" text-anchor="middle" font-family="Inter,system-ui,sans-serif" font-weight="700" font-size="16" fill="#fff">3</text>
+  <text class="section" x="906" y="155">Action environment</text>
+  <text class="tiny" x="868" y="181">The same admitted contract governs</text>
+  <text class="tiny" x="868" y="198">simulated or physical effects.</text>
+
+  <rect class="world" x="868" y="215" width="255" height="102" rx="12"/>
+  <text class="label" x="894" y="247">Simulation</text>
+  <text class="body" x="894" y="275">Three.js · Isaac Sim · MuJoCo</text>
+  <text class="tiny" x="894" y="297">repeatable research + testing</text>
+
+  <text class="tiny" x="996" y="344" text-anchor="middle">or</text>
+
+  <rect class="world" x="868" y="365" width="255" height="102" rx="12"/>
+  <text class="label" x="894" y="397">Real world</text>
+  <text class="body" x="894" y="425">Robot · controller · sensors</text>
+  <text class="tiny" x="894" y="447">low-level control stays local</text>
+
+  <!-- Changing world state -->
+  <rect class="world" x="256" y="556" width="896" height="113" rx="15"/>
+  <text class="section" x="286" y="592">Changing world state</text>
+  <text class="body" x="286" y="621">human distance · occupancy · sensor freshness · object class · remaining budget</text>
+  <text class="tiny" x="286" y="648">Fresh observations can deny, narrow, pause, or revoke an action as conditions change.</text>
+
+  <path class="arrow" d="M583 556 V429"/>
+  <path class="arrow" d="M711 556 V429"/>
+  <path class="arrow" d="M998 498 V556"/>
+
+  <rect x="50" y="690" width="13" height="13" rx="3" fill="#76b900"/>
+  <text class="tiny" x="72" y="701">admitted action path</text>
+  <line x1="224" y1="697" x2="254" y2="697" stroke="#b42318" stroke-width="2.5" stroke-dasharray="7 5"/>
+  <text class="tiny" x="264" y="701">denied action returns to the agent; no external effect</text>
+</svg>
