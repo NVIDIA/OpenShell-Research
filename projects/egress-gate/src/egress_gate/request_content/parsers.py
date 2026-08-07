@@ -12,15 +12,8 @@ from egress_gate.request_content.messages import (
     MessageBodyParser,
     MessageRole,
 )
+from egress_gate.request_content.text import TextReplacement, TextTarget
 from egress_gate.timeout import Timeout
-
-
-@dataclass(frozen=True)
-class TextTarget:
-    """One independently inspected text value and its content-local identity."""
-
-    id: str
-    text: str
 
 
 class ParsedRequestContent(Protocol):
@@ -33,7 +26,7 @@ class ParsedRequestContent(Protocol):
 
     def replace_text(
         self,
-        replacements: tuple[tuple[str, str], ...],
+        replacements: tuple[TextReplacement, ...],
         *,
         timeout: Timeout,
     ) -> bytes:
@@ -138,14 +131,14 @@ class _Utf8ParsedRequestContent:
 
     def replace_text(
         self,
-        replacements: tuple[tuple[str, str], ...],
+        replacements: tuple[TextReplacement, ...],
         *,
         timeout: Timeout,
     ) -> bytes:
         timeout.raise_if_expired()
-        if len(replacements) != 1 or replacements[0][0] != self.targets[0].id:
+        if len(replacements) != 1 or replacements[0].target_id != self.targets[0].id:
             raise ValueError("UTF-8 body replacement target is invalid")
-        return replacements[0][1].encode("utf-8")
+        return replacements[0].text.encode("utf-8")
 
 
 @dataclass(frozen=True)
@@ -155,11 +148,11 @@ class _JsonParsedRequestContent:
 
     def replace_text(
         self,
-        replacements: tuple[tuple[str, str], ...],
+        replacements: tuple[TextReplacement, ...],
         *,
         timeout: Timeout,
     ) -> bytes:
-        replacement_ids = tuple(node_id for node_id, _ in replacements)
+        replacement_ids = tuple(item.target_id for item in replacements)
         if len(replacement_ids) != len(set(replacement_ids)):
             raise ValueError("request-content replacement target IDs must be unique")
         selected_ids = frozenset(target.id for target in self.targets)
@@ -173,6 +166,5 @@ __all__ = [
     "MessageBlocksParser",
     "ParsedRequestContent",
     "RequestContentParser",
-    "TextTarget",
     "Utf8TextParser",
 ]

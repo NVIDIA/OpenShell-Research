@@ -25,9 +25,9 @@ from egress_gate.request_content.parsers import (
     MessageBlocksParser,
     ParsedRequestContent,
     RequestContentParser,
-    TextTarget,
     Utf8TextParser,
 )
+from egress_gate.request_content.text import TextReplacement, TextTarget
 
 __all__ = [
     "JsonDocument",
@@ -50,6 +50,7 @@ __all__ = [
     "MessageRole",
     "ParsedRequestContent",
     "RequestContentParser",
+    "TextReplacement",
     "TextTarget",
     "Utf8TextParser",
 ]

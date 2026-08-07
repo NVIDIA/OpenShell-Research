@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+import egress_gate.request_content._json_parser as json_parser_module
 import egress_gate.request_content.json as json_module
 from egress_gate.errors import (
     BodyFormatError,
@@ -19,6 +20,7 @@ from egress_gate.request_content import (
     JsonKeySegment,
     JsonPathSegment,
     JsonSelector,
+    TextReplacement,
 )
 from egress_gate.timeout import Timeout
 
@@ -90,7 +92,7 @@ def test_replace_text_preserves_every_unselected_source_byte() -> None:
     node = document.select_text((selector,), timeout=Timeout.from_seconds(1))[0]
 
     replacement = document.replace_text(
-        ((node.id, 'safe\n"value"'),),
+        (TextReplacement(target_id=node.id, text='safe\n"value"'),),
         timeout=Timeout.from_seconds(1),
     )
 
@@ -109,12 +111,15 @@ def test_replace_text_rejects_duplicate_or_unknown_node_ids() -> None:
 
     with pytest.raises(ValueError, match="unique"):
         document.replace_text(
-            ((node.id, "two"), (node.id, "three")),
+            (
+                TextReplacement(target_id=node.id, text="two"),
+                TextReplacement(target_id=node.id, text="three"),
+            ),
             timeout=Timeout.from_seconds(1),
         )
     with pytest.raises(ValueError, match="unknown"):
         document.replace_text(
-            (("unknown", "two"),),
+            (TextReplacement(target_id="unknown", text="two"),),
             timeout=Timeout.from_seconds(1),
         )
 
@@ -132,7 +137,7 @@ def test_replace_text_handles_the_maximum_selected_nodes_in_linear_time() -> Non
     )
 
     replaced = document.replace_text(
-        tuple((node.id, "safe") for node in nodes),
+        tuple(TextReplacement(target_id=node.id, text="safe") for node in nodes),
         timeout=Timeout.from_seconds(1),
     )
 
@@ -291,7 +296,7 @@ def test_document_depth_is_bounded() -> None:
 def test_document_node_count_accepts_the_limit_and_rejects_the_next_node(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(json_module, "MAX_JSON_NODES", 3)
+    monkeypatch.setattr(json_parser_module, "MAX_JSON_NODES", 3)
 
     _parse(b'["one","two"]')
     with pytest.raises(GateLimitExceededError, match="node count"):

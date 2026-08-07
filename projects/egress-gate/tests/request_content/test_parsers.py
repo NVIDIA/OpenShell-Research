@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
+
 import pytest
 
 from egress_gate.errors import GateInputError
@@ -14,6 +16,7 @@ from egress_gate.request_content import (
     JsonSelector,
     MessageBlocksParser,
     MessageRole,
+    TextReplacement,
     Utf8TextParser,
 )
 from egress_gate.timeout import Timeout
@@ -29,6 +32,15 @@ def _content_selector() -> JsonSelector:
     )
 
 
+def test_text_replacement_is_named_and_immutable() -> None:
+    replacement = TextReplacement(target_id="target", text="safe")
+
+    assert replacement.target_id == "target"
+    assert replacement.text == "safe"
+    with pytest.raises(FrozenInstanceError):
+        setattr(replacement, "text", "changed")
+
+
 def test_utf8_parser_extracts_and_replaces_the_complete_body() -> None:
     content = Utf8TextParser().parse(
         b"secret",
@@ -40,7 +52,7 @@ def test_utf8_parser_extracts_and_replaces_the_complete_body() -> None:
     )
     assert (
         content.replace_text(
-            (("body", "safe"),),
+            (TextReplacement(target_id="body", text="safe"),),
             timeout=Timeout.from_seconds(1),
         )
         == b"safe"
@@ -64,7 +76,7 @@ def test_json_fields_parser_owns_source_preserving_replacement() -> None:
     assert tuple(target.text for target in content.targets) == ("secret",)
     assert (
         content.replace_text(
-            ((content.targets[0].id, "safe"),),
+            (TextReplacement(target_id=content.targets[0].id, text="safe"),),
             timeout=Timeout.from_seconds(1),
         )
         == b'{ "messages":[{"content":"safe"}], "number":1.00 }'
@@ -84,7 +96,7 @@ def test_json_fields_parser_rejects_replacement_of_an_unselected_node() -> None:
 
     with pytest.raises(ValueError, match="was not selected"):
         content.replace_text(
-            ((ignored.id, "exposed"),),
+            (TextReplacement(target_id=ignored.id, text="exposed"),),
             timeout=Timeout.from_seconds(1),
         )
 

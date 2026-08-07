@@ -15,12 +15,13 @@ helper-base behavior, or operational resources.
 Custom gates that inspect request-body text can compose the public
 `egress_gate.request_content` surface. `RequestContentParser` implementations
 return independent `TextTarget` values and own rendering complete target
-replacements back to bounded body bytes. `Utf8TextParser` handles a complete
-UTF-8 body, `JsonFieldsParser` selects configured JSON strings, and
-`MessageBlocksParser` filters normalized message text. The latter composes a
-`MessageBodyParser`; `JsonMessageMapParser` is the configurable implementation
-for harness-specific JSON envelopes. Prepared parsers are stateless and safe to
-reuse, while each parsed content result remains local to one `evaluate` call.
+replacements, expressed as immutable `TextReplacement` values, back to bounded
+body bytes. `Utf8TextParser` handles a complete UTF-8 body, `JsonFieldsParser`
+selects configured JSON strings, and `MessageBlocksParser` filters normalized
+message text. The latter composes a `MessageBodyParser`;
+`JsonMessageMapParser` is the configurable implementation for harness-specific
+JSON envelopes. Prepared parsers are stateless and safe to reuse, while each
+parsed content result remains local to one `evaluate` call.
 
 The repository includes runnable examples for both extension styles:
 

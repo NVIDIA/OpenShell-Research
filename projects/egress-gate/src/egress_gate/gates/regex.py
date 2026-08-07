@@ -56,6 +56,7 @@ from egress_gate.request_content import (
     MessageBlocksParser,
     ParsedRequestContent,
     RequestContentParser,
+    TextReplacement,
     TextTarget,
     Utf8TextParser,
 )
@@ -255,9 +256,9 @@ class RegexGate(Gate[RegexConfig, None]):
             return GateEvaluation.proceed(findings=findings)
 
         replacements = tuple(
-            (
-                target.id,
-                _render_bounded_replacement(
+            TextReplacement(
+                target_id=target.id,
+                text=_render_bounded_replacement(
                     target.text,
                     _resolve_overlaps(detections_by_target[target.id]),
                     action.template,
@@ -352,7 +353,7 @@ class _RegexTextView:
 
     def replace_text(
         self,
-        replacements: tuple[tuple[str, str], ...],
+        replacements: tuple[TextReplacement, ...],
         *,
         timeout: Timeout,
     ) -> bytes:
