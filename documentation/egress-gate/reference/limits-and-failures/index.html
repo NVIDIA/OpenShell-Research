@@ -1334,9 +1334,10 @@
 
 
 <h1 id="limits-and-failure-behavior">Limits and failure behavior</h1>
-<p>Limits are fail-closed and content-safe. The <code>service/</code> package checks exact
-encoded protobuf sizes. Domain models check scalar, aggregate, and result
-limits.</p>
+<p>Egress Gate-owned limits are fail-closed and content-safe. The <code>service/</code>
+package checks exact encoded protobuf sizes. Domain models check scalar,
+aggregate, and result limits. OpenShell owns the separate outer RPC ceiling and
+applies its configured <code>on_error</code> behavior when that ceiling expires first.</p>
 <table>
 <thead>
 <tr>
@@ -1378,8 +1379,16 @@ limits.</p>
 <td style="text-align: right;">64</td>
 </tr>
 <tr>
-<td>Processing timeout</td>
-<td style="text-align: right;">30 seconds maximum</td>
+<td>Offline <code>--timeout</code></td>
+<td style="text-align: right;">10 milliseconds minimum; whole milliseconds</td>
+</tr>
+<tr>
+<td><code>timeout_middleware_processing</code></td>
+<td style="text-align: right;">10 milliseconds minimum; whole milliseconds</td>
+</tr>
+<tr>
+<td>Gateway registration timeout</td>
+<td style="text-align: right;">Operator-configurable; helper default 30 seconds</td>
 </tr>
 <tr>
 <td>Concurrent processing slots</td>
@@ -1409,7 +1418,7 @@ rejected value.</p>
 <td>gRPC <code>INTERNAL</code></td>
 </tr>
 <tr>
-<td>Deadline or pipeline processor limit</td>
+<td>Internal processing deadline or pipeline processor limit</td>
 <td>deny, source <code>runtime_limit</code>, code <code>egress_gate_limit_exceeded</code></td>
 </tr>
 <tr>
@@ -1430,6 +1439,9 @@ rejected value.</p>
 trace details. Failed policy preparation leaves the active policy unchanged.
 Stable error catalogs and reason codes never include request content or
 arbitrary exception text.</p>
+<p>An internal processing timeout returns the runtime-limit denial only while the
+RPC remains active. If the gateway's independent outer RPC ceiling expires
+first, OpenShell applies the middleware entry's <code>on_error</code> policy.</p>
 <h2 id="finding-contract">Finding contract</h2>
 <p>The released OpenShell wire contract has five fields. The pipeline processor's
 <code>SourcedFinding</code> and <code>DecisionSource</code> preserve provenance for internal tests,

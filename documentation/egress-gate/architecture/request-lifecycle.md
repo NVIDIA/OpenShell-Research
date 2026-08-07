@@ -55,6 +55,12 @@ encoded output limits return an atomic deny with source `runtime_limit` and
 `egress_gate_limit_exceeded`. No partial mutations or findings are returned.
 Gate contract and execution failures remain gRPC failures.
 
+The internal processing timeout can return this denial only while the RPC is
+still active. The OpenShell gateway owns a separate outer RPC ceiling. If that
+outer clock expires first, OpenShell applies the middleware entry's `on_error`
+policy instead of receiving an Egress Gate result. Use `on_error: fail_closed`
+when middleware timeout failures must deny the request.
+
 ## 5. Serialize the result
 
 The Egress Gate service adapter maps the protobuf-free `EgressResult` to

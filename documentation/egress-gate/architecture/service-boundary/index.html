@@ -1404,7 +1404,7 @@ supervisor applies allowed mutations to the intercepted request.</p>
 <tbody>
 <tr>
 <td><code>Describe</code></td>
-<td>Advertise Egress Gate and the pre-credentials HTTP binding</td>
+<td>Return Egress Gate's pre-credentials HTTP binding</td>
 </tr>
 <tr>
 <td><code>ValidateConfig</code></td>
@@ -1420,10 +1420,21 @@ supervisor applies allowed mutations to the intercepted request.</p>
 safe integral doubles before strict domain validation and rejects oversized
 encoded configuration before registry parsing.</p>
 <h2 id="shared-deadline-and-workers">Shared deadline and workers</h2>
-<p><code>EvaluateHttpRequest</code> creates one monotonic <code>Timeout</code>. That same deadline is
-used for semaphore acquisition, policy preparation, replacement-lock waits,
-gate execution, and final result checks. <code>RequestProcessor.process</code> accepts the
-caller-owned timeout and never creates or stores one.</p>
+<p><code>EvaluateHttpRequest</code> converts <code>timeout_middleware_processing</code> into one monotonic
+<code>Timeout</code> used for semaphore acquisition, policy preparation, replacement-lock
+waits, gate execution, and final result checks. <code>Describe</code> leaves the binding's
+optional RPC timeout empty. OpenShell therefore applies the separately
+configured gateway registration timeout to the complete RPC.</p>
+<p>The middleware protocol does not report the resolved gateway timeout back to
+Egress Gate, and OpenShell does not propagate it as a gRPC deadline. For the
+normal CLI-managed path, <code>add-gateway-registration</code> remembers the gateway TOML
+path and registration name. <code>serve</code> reads the current timeout from that entry
+at startup and requires it to be greater than
+<code>timeout_middleware_processing</code>. Direct Python API use and manually managed
+registrations do not have this startup check. If the gateway timeout expires
+first, OpenShell applies the policy's <code>on_error</code> behavior.</p>
+<p><code>RequestProcessor.process</code> accepts the caller-owned timeout and never creates or
+stores one.</p>
 <p>Synchronous work runs in a bounded four-slot executor. The gRPC server permits
 sixteen concurrent RPCs. Cancellation does not stop Python code that already
 runs in a worker. The worker owns its slot until it exits.</p>

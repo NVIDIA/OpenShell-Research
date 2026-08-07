@@ -6,9 +6,10 @@ agent_markdown: true
 
 # Limits and failure behavior
 
-Limits are fail-closed and content-safe. The `service/` package checks exact
-encoded protobuf sizes. Domain models check scalar, aggregate, and result
-limits.
+Egress Gate-owned limits are fail-closed and content-safe. The `service/`
+package checks exact encoded protobuf sizes. Domain models check scalar,
+aggregate, and result limits. OpenShell owns the separate outer RPC ceiling and
+applies its configured `on_error` behavior when that ceiling expires first.
 
 | Area | Limit |
 | --- | ---: |
@@ -20,7 +21,9 @@ limits.
 | Result metadata aggregate strings | 32 KiB |
 | Gate traces per result | 10 |
 | Header mutations per gate evaluation | 64 |
-| Processing timeout | 30 seconds maximum |
+| Offline `--timeout` | 10 milliseconds minimum; whole milliseconds |
+| `timeout_middleware_processing` | 10 milliseconds minimum; whole milliseconds |
+| Gateway registration timeout | Operator-configurable; helper default 30 seconds |
 | Concurrent processing slots | 4 |
 
 Request context and target aggregates, headers, replacement bodies, regex
@@ -34,7 +37,7 @@ rejected value.
 | --- | --- |
 | Invalid phase, envelope, policy, or input encoding | gRPC `INVALID_ARGUMENT` |
 | Gate contract or unexpected execution failure | gRPC `INTERNAL` |
-| Deadline or pipeline processor limit | deny, source `runtime_limit`, code `egress_gate_limit_exceeded` |
+| Internal processing deadline or pipeline processor limit | deny, source `runtime_limit`, code `egress_gate_limit_exceeded` |
 | Gate terminal deny | deny, source `gate`, gate-owned reason code |
 | Pipeline default deny | deny, source `pipeline_default`, code `egress_gate_default_deny` |
 | Pipeline default allow | allow, source `pipeline_default`, no reason code |
@@ -43,6 +46,10 @@ Pipeline processor limit results contain no partial mutations, findings, or
 trace details. Failed policy preparation leaves the active policy unchanged.
 Stable error catalogs and reason codes never include request content or
 arbitrary exception text.
+
+An internal processing timeout returns the runtime-limit denial only while the
+RPC remains active. If the gateway's independent outer RPC ceiling expires
+first, OpenShell applies the middleware entry's `on_error` policy.
 
 ## Finding contract
 

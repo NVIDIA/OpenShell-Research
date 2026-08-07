@@ -19,7 +19,7 @@ supervisor applies allowed mutations to the intercepted request.
 
 | RPC | Behavior |
 | --- | --- |
-| `Describe` | Advertise Egress Gate and the pre-credentials HTTP binding |
+| `Describe` | Return Egress Gate's pre-credentials HTTP binding |
 | `ValidateConfig` | Validate a complete registry-backed pipeline without publishing it |
 | `EvaluateHttpRequest` | Adapt one request, prepare/reuse policy, execute, and serialize |
 
@@ -29,10 +29,23 @@ encoded configuration before registry parsing.
 
 ## Shared deadline and workers
 
-`EvaluateHttpRequest` creates one monotonic `Timeout`. That same deadline is
-used for semaphore acquisition, policy preparation, replacement-lock waits,
-gate execution, and final result checks. `RequestProcessor.process` accepts the
-caller-owned timeout and never creates or stores one.
+`EvaluateHttpRequest` converts `timeout_middleware_processing` into one monotonic
+`Timeout` used for semaphore acquisition, policy preparation, replacement-lock
+waits, gate execution, and final result checks. `Describe` leaves the binding's
+optional RPC timeout empty. OpenShell therefore applies the separately
+configured gateway registration timeout to the complete RPC.
+
+The middleware protocol does not report the resolved gateway timeout back to
+Egress Gate, and OpenShell does not propagate it as a gRPC deadline. For the
+normal CLI-managed path, `add-gateway-registration` remembers the gateway TOML
+path and registration name. `serve` reads the current timeout from that entry
+at startup and requires it to be greater than
+`timeout_middleware_processing`. Direct Python API use and manually managed
+registrations do not have this startup check. If the gateway timeout expires
+first, OpenShell applies the policy's `on_error` behavior.
+
+`RequestProcessor.process` accepts the caller-owned timeout and never creates or
+stores one.
 
 Synchronous work runs in a bounded four-slot executor. The gRPC server permits
 sixteen concurrent RPCs. Cancellation does not stop Python code that already
