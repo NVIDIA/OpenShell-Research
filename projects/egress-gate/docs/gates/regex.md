@@ -57,9 +57,10 @@ gate can return supported header writes or removals when it declares the
 ## Structured JSON fields
 
 `json-fields` parses the current body as strict UTF-8 JSON and scans only string
-values selected by typed paths. A selector starts at the document root. `key`
-selects one exact object member, `index` selects one zero-based array item, and
-`each` selects every immediate array item or object member value:
+values selected by typed paths. The selectors are part of the general
+[`egress_gate.request_content` contract](../request-content.md), which is also
+available to custom gates. A `json-fields` selector starts at the document
+root:
 
 ```yaml title="Selected JSON message content"
 name: message-identifiers

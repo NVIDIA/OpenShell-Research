@@ -128,6 +128,7 @@ timeout failures must deny.
 
 - [Overview](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/index.md)
 - [Configuration](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/configuration.md)
+- [Request-content parsing](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/request-content.md)
 - [Test policies offline](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/evaluation.md)
 - [Operations](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/operations.md)
 - [Gate authoring](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/gates/custom.md)

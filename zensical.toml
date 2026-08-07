@@ -29,6 +29,7 @@ nav = [
       "documentation/egress-gate/index.md",
       {"Guides" = [
         {"Configure policies" = "documentation/egress-gate/configuration.md"},
+        {"Parse request content" = "documentation/egress-gate/request-content.md"},
         {"Test policies offline" = "documentation/egress-gate/evaluation.md"},
         {"Run and operate Egress Gate" = "documentation/egress-gate/operations.md"}
       ]},

@@ -15,6 +15,9 @@ EGRESS_GATE_LANDING = ROOT / "site" / "documentation" / "egress-gate" / "index.h
 CONFIGURATION_GUIDE = (
     ROOT / "site" / "documentation" / "egress-gate" / "configuration" / "index.html"
 )
+REQUEST_CONTENT_GUIDE = (
+    ROOT / "site" / "documentation" / "egress-gate" / "request-content" / "index.html"
+)
 
 
 class PageNavigationTests(unittest.TestCase):
@@ -49,6 +52,7 @@ class PageNavigationTests(unittest.TestCase):
         documentation = DOCUMENTATION_LANDING.read_text(encoding="utf-8")
         egress_gate = EGRESS_GATE_LANDING.read_text(encoding="utf-8")
         configuration = CONFIGURATION_GUIDE.read_text(encoding="utf-8")
+        request_content = REQUEST_CONTENT_GUIDE.read_text(encoding="utf-8")
 
         self.assertIn("Back to OpenShell Research", documentation)
         self.assertIn("Next: Egress Gate", documentation)
@@ -56,7 +60,9 @@ class PageNavigationTests(unittest.TestCase):
         self.assertIn("Previous: Documentation", egress_gate)
         self.assertIn("Next: Configure policies", egress_gate)
         self.assertIn("Previous: Egress Gate", configuration)
-        self.assertIn("Next: Test policies offline", configuration)
+        self.assertIn("Next: Parse request content", configuration)
+        self.assertIn("Previous: Configure policies", request_content)
+        self.assertIn("Next: Test policies offline", request_content)
 
 
 if __name__ == "__main__":
