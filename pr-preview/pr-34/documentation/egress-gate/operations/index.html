@@ -1443,7 +1443,7 @@ trusted network. Do not expose the port to an untrusted network.</p>
 gateways that use it. A running gateway does not reload middleware
 registrations.</p>
 <div class="language-bash highlight"><span class="filename">Register Egress Gate</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>add-gateway-registration<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--host-ip<span class="w"> </span>YOUR_HOST_IPV4<span class="w"> </span>--name<span class="w"> </span>egress-gate<span class="w"> </span>--port<span class="w"> </span><span class="m">50051</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--host-ip<span class="w"> </span>YOUR_HOST_IPV4<span class="w"> </span>--name<span class="w"> </span>egress-gate<span class="w"> </span>--port<span class="w"> </span><span class="m">50051</span><span class="w"> </span>--timeout<span class="w"> </span>30s
 </span></code></pre></div>
 <p>The command updates <code>OPENSHELL_GATEWAY_CONFIG</code>, then
 <code>$XDG_CONFIG_HOME/openshell/gateway.toml</code>, then
@@ -1453,15 +1453,16 @@ It remembers the absolute gateway file path and registration name in
 <code>~/.config</code> when <code>XDG_CONFIG_HOME</code> is unset.
 Start the gateways again with the same commands or service managers that you
 normally use.</p>
-<p>The registration helper writes <code>timeout = "30s"</code> in the gateway TOML. This is a
-default, not a fixed limit: operators can edit the registration to use another
-supported timeout. Rerunning <code>add-gateway-registration</code> resets it to 30s. Set
-Egress Gate's internal processing budget with
+<p>The optional registration <code>--timeout</code> sets the gateway RPC timeout written to
+the TOML file and defaults to 30 seconds. It accepts whole seconds or
+milliseconds, such as <code>45s</code> or <code>500ms</code>. Rerunning the command writes the value
+passed on that invocation. Set Egress Gate's internal processing budget with
 <code>egress-gate serve --timeout DURATION</code>; the Python API calls that setting
-<code>timeout_middleware_processing</code> and accepts 10ms through 29s. When a remembered
-registration exists, <code>serve</code> reads its current gateway timeout and refuses to
-start unless the processing timeout is lower. A manually managed setup with no
-remembered registration starts without this check.</p>
+<code>timeout_middleware_processing</code>. It must be at least 10ms and resolve to whole
+milliseconds. When a remembered registration exists, <code>serve</code> reads its current
+gateway timeout and refuses to start unless the processing timeout is lower. A
+manually managed setup with no remembered registration starts without this
+check.</p>
 <p>To remove a registration, stop any running gateways that use the configuration
 again. List the available names with:</p>
 <div class="language-bash highlight"><span class="filename">List middleware registrations</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>list-gateway-registrations

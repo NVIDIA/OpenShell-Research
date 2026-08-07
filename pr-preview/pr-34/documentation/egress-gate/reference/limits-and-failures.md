@@ -21,8 +21,8 @@ applies its configured `on_error` behavior when that ceiling expires first.
 | Result metadata aggregate strings | 32 KiB |
 | Gate traces per result | 10 |
 | Header mutations per gate evaluation | 64 |
-| Offline `--timeout` | 29 seconds maximum |
-| `timeout_middleware_processing` | 29 seconds maximum |
+| Offline `--timeout` | 10 milliseconds minimum; whole milliseconds |
+| `timeout_middleware_processing` | 10 milliseconds minimum; whole milliseconds |
 | Gateway registration timeout | Operator-configurable; helper default 30 seconds |
 | Concurrent processing slots | 4 |
 

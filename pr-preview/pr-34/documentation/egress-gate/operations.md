@@ -28,7 +28,7 @@ registrations.
 
 ```bash title="Register Egress Gate"
 uv run egress-gate add-gateway-registration \
-  --host-ip YOUR_HOST_IPV4 --name egress-gate --port 50051
+  --host-ip YOUR_HOST_IPV4 --name egress-gate --port 50051 --timeout 30s
 ```
 
 The command updates `OPENSHELL_GATEWAY_CONFIG`, then
@@ -40,15 +40,16 @@ It remembers the absolute gateway file path and registration name in
 Start the gateways again with the same commands or service managers that you
 normally use.
 
-The registration helper writes `timeout = "30s"` in the gateway TOML. This is a
-default, not a fixed limit: operators can edit the registration to use another
-supported timeout. Rerunning `add-gateway-registration` resets it to 30s. Set
-Egress Gate's internal processing budget with
+The optional registration `--timeout` sets the gateway RPC timeout written to
+the TOML file and defaults to 30 seconds. It accepts whole seconds or
+milliseconds, such as `45s` or `500ms`. Rerunning the command writes the value
+passed on that invocation. Set Egress Gate's internal processing budget with
 `egress-gate serve --timeout DURATION`; the Python API calls that setting
-`timeout_middleware_processing` and accepts 10ms through 29s. When a remembered
-registration exists, `serve` reads its current gateway timeout and refuses to
-start unless the processing timeout is lower. A manually managed setup with no
-remembered registration starts without this check.
+`timeout_middleware_processing`. It must be at least 10ms and resolve to whole
+milliseconds. When a remembered registration exists, `serve` reads its current
+gateway timeout and refuses to start unless the processing timeout is lower. A
+manually managed setup with no remembered registration starts without this
+check.
 
 To remove a registration, stop any running gateways that use the configuration
 again. List the available names with:
