@@ -1,0 +1,14 @@
+node_modules/
+dist/
+target/
+policy-prover-service/target/
+.env
+.env.*
+!.env.example
+.z3-trace
+**/.z3-trace
+.DS_Store
+coverage/
+playwright-report/
+test-results/
+screenshots/

@@ -31,10 +31,44 @@ hide:
       <h2 id="featured-note-title">Featured note</h2>
       <span>Latest from the team</span>
     </div>
-    <article class="dev-note-card dev-note-card--featured dev-note-card--edge-ai dev-note-card--has-image">
+    <article class="dev-note-card dev-note-card--featured dev-note-card--physical-ai dev-note-card--has-image">
+      <a class="dev-note-card__link" href="posts/2026-08-07-formal-methods-ai-generated-robot-actions/">
+      <div class="dev-note-card__visual dev-note-card__visual--physical-ai dev-note-card__visual--image" aria-hidden="true">
+        <img class="dev-note-card__visual-image" src="../assets/robotics-policy-prover/robotics-policy-prover-hero.png" alt="" loading="eager" fetchpriority="high">
+      </div>
+      <div class="dev-note-card__copy">
+        <div class="dev-note-card__meta">
+          <time datetime="2026-08-07">August 7, 2026</time>
+          <span>Physical AI</span>
+        </div>
+        <h3>Can Formal Methods Govern AI-Generated Robot Actions? An OpenShell-Inspired Experiment</h3>
+        <p class="dev-note-card__summary">A robotics experiment asks whether an independent, SMT-backed policy boundary can efficiently govern AI-generated plans before they reach a simulated or physical robot.</p>
+        <div class="dev-note-card__tags" aria-label="Tags">
+          <span>physical-ai</span>
+          <span>formal-methods</span>
+          <span>policy</span>
+        </div>
+        <div class="dev-note-card__footer">
+        <span class="dev-note-card__authors" aria-label="Author: Alex Watson">
+          <img src="https://github.com/zredlined.png?size=64" alt="" loading="lazy">
+          <span class="dev-note-card__author-names">Alex Watson</span>
+        </span>
+          <span class="dev-note-card__read">Read note</span>
+        </div>
+      </div>
+      </a>
+    </article>
+  </section>
+  <section class="journal-section dev-notes-recent" aria-labelledby="recent-notes-title">
+    <div class="journal-section__head">
+      <h2 id="recent-notes-title">Recent notes</h2>
+      <span>The working archive</span>
+    </div>
+    <div class="dev-notes-recent-list">
+    <article class="dev-note-card dev-note-card--recent dev-note-card--edge-ai dev-note-card--has-image">
       <a class="dev-note-card__link" href="posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/">
       <div class="dev-note-card__visual dev-note-card__visual--edge-ai dev-note-card__visual--image" aria-hidden="true">
-        <img class="dev-note-card__visual-image" src="../assets/reachy-mini-openshell/hero.svg" alt="" loading="eager" fetchpriority="high">
+        <img class="dev-note-card__visual-image" src="../assets/reachy-mini-openshell/hero.svg" alt="" loading="lazy">
       </div>
       <div class="dev-note-card__copy">
         <div class="dev-note-card__meta">
@@ -58,6 +92,7 @@ hide:
       </div>
       </a>
     </article>
+    </div>
   </section>
 <!-- dev-notes:posts:end -->
 </div>
