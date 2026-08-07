@@ -568,6 +568,8 @@
       
         
       
+        
+      
     
     
     
@@ -623,6 +625,33 @@
     
   
   Configure policies
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../request-content/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Parse request content
 
     
   </span>
@@ -1428,9 +1457,10 @@ gate can return supported header writes or removals when it declares the
 <code>GateCapability.MUTATE_HEADERS</code> capability.</p>
 <h2 id="structured-json-fields">Structured JSON fields</h2>
 <p><code>json-fields</code> parses the current body as strict UTF-8 JSON and scans only string
-values selected by typed paths. A selector starts at the document root. <code>key</code>
-selects one exact object member, <code>index</code> selects one zero-based array item, and
-<code>each</code> selects every immediate array item or object member value:</p>
+values selected by typed paths. The selectors are part of the general
+<a href="../../request-content/"><code>egress_gate.request_content</code> contract</a>, which is also
+available to custom gates. A <code>json-fields</code> selector starts at the document
+root:</p>
 <div class="language-yaml highlight"><span class="filename">Selected JSON message content</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">message-identifiers</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">scan</span><span class="p">:</span>
