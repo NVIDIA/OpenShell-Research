@@ -101,32 +101,32 @@ class JsonMessageMapConfig(StrictDomainModel):
             )
         )
         if selector_count == 0:
-            raise ValueError("message parser requires at least one text selector")
+            raise ValueError("message mapping requires at least one text selector")
         if selector_count > MAX_JSON_SELECTORS:
-            raise ValueError("message parser selector count exceeds the limit")
+            raise ValueError("message mapping selector count exceeds the limit")
         return self
 
 
-class MessageBodyParser(Protocol):
-    """A stateless adapter from one JSON document to normalized message blocks."""
+class MessageBlockExtractor(Protocol):
+    """Extract normalized message blocks from one parsed JSON document."""
 
-    def parse(
+    def extract(
         self,
         document: JsonDocument,
         *,
         timeout: Timeout,
     ) -> MessageDocument:
-        """Return the normalized message view of one current request body."""
+        """Return normalized blocks backed by nodes in ``document``."""
         ...
 
 
-class JsonMessageMapParser:
-    """Apply one validated JSON message mapping without retaining request state."""
+class JsonMessageBlockExtractor:
+    """Extract normalized blocks with one validated JSON message mapping."""
 
     def __init__(self, config: JsonMessageMapConfig) -> None:
         self._config = config
 
-    def parse(
+    def extract(
         self,
         document: JsonDocument,
         *,
@@ -208,11 +208,11 @@ def _message_role(
 
 
 __all__ = [
+    "JsonMessageBlockExtractor",
     "JsonMessageMapConfig",
-    "JsonMessageMapParser",
     "MessageBlock",
+    "MessageBlockExtractor",
     "MessageBlockKind",
-    "MessageBodyParser",
     "MessageDocument",
     "MessageRole",
 ]

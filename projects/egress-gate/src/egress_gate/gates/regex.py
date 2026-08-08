@@ -52,7 +52,7 @@ from egress_gate.gates.regex_scans import (
 from egress_gate.request import HttpRequest, RequestMutations
 from egress_gate.request_content import (
     JsonFieldsParser,
-    JsonMessageMapParser,
+    JsonMessageBlockExtractor,
     MessageBlocksParser,
     ParsedRequestContent,
     RequestContentParser,
@@ -370,7 +370,7 @@ def _prepare_content_parser(scan: RegexScan) -> RequestContentParser | None:
             return JsonFieldsParser(selectors=scan.selectors)
         case RegexMessageBlocksScan():
             return MessageBlocksParser(
-                parser=JsonMessageMapParser(scan.parser),
+                extractor=JsonMessageBlockExtractor(scan.message_mapping),
                 roles=scan.roles,
                 block_kinds=scan.block_kinds,
             )

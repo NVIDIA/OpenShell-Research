@@ -337,7 +337,7 @@ def test_message_blocks_scan_filters_normalized_roles() -> None:
         [{"pattern": "secret", "confidence": "high"}],
         scan={
             "kind": "message-blocks",
-            "parser": {
+            "message_mapping": {
                 "kind": "json-message-map",
                 "messages": {"segments": [{"kind": "key", "value": "messages"}]},
                 "role_key": "role",
@@ -373,7 +373,7 @@ def test_message_block_filters_must_be_unique() -> None:
             [{"pattern": "secret", "confidence": "high"}],
             scan={
                 "kind": "message-blocks",
-                "parser": {
+                "message_mapping": {
                     "kind": "json-message-map",
                     "messages": {"segments": [{"kind": "key", "value": "messages"}]},
                     "text_selectors": [

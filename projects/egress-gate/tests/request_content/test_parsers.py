@@ -11,8 +11,8 @@ from egress_gate.request_content import (
     JsonEachSegment,
     JsonFieldsParser,
     JsonKeySegment,
+    JsonMessageBlockExtractor,
     JsonMessageMapConfig,
-    JsonMessageMapParser,
     JsonSelector,
     MessageBlocksParser,
     MessageRole,
@@ -103,7 +103,7 @@ def test_json_fields_parser_rejects_replacement_of_an_unselected_node() -> None:
 
 def test_message_blocks_parser_applies_mapping_and_filters() -> None:
     parser = MessageBlocksParser(
-        parser=JsonMessageMapParser(
+        extractor=JsonMessageBlockExtractor(
             JsonMessageMapConfig(
                 kind="json-message-map",
                 messages=JsonSelector(
@@ -135,7 +135,7 @@ def test_message_blocks_parser_applies_mapping_and_filters() -> None:
 def test_message_blocks_parser_deduplicates_shared_text_nodes() -> None:
     selector = JsonSelector(segments=(JsonKeySegment(kind="key", value="content"),))
     parser = MessageBlocksParser(
-        parser=JsonMessageMapParser(
+        extractor=JsonMessageBlockExtractor(
             JsonMessageMapConfig(
                 kind="json-message-map",
                 messages=JsonSelector(

@@ -10,8 +10,8 @@ from egress_gate.request_content import (
     JsonDocument,
     JsonEachSegment,
     JsonKeySegment,
+    JsonMessageBlockExtractor,
     JsonMessageMapConfig,
-    JsonMessageMapParser,
     JsonPathSegment,
     JsonSelector,
     MessageBlockKind,
@@ -52,7 +52,7 @@ def test_json_message_map_normalizes_roles_and_content_nodes() -> None:
         ),
     )
 
-    messages = JsonMessageMapParser(config).parse(
+    messages = JsonMessageBlockExtractor(config).extract(
         document,
         timeout=Timeout.from_seconds(1),
     )
@@ -97,7 +97,7 @@ def test_json_message_map_can_classify_explicit_tool_input_and_output_nodes() ->
         tool_output_selectors=(_selector(JsonKeySegment(kind="key", value="content")),),
     )
 
-    messages = JsonMessageMapParser(config).parse(
+    messages = JsonMessageBlockExtractor(config).extract(
         document,
         timeout=Timeout.from_seconds(1),
     )
@@ -112,7 +112,7 @@ def test_message_block_count_accepts_the_limit_and_rejects_the_next(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(messages_module, "MAX_MESSAGE_BLOCKS", 2)
-    parser = JsonMessageMapParser(
+    extractor = JsonMessageBlockExtractor(
         JsonMessageMapConfig(
             kind="json-message-map",
             messages=_selector(JsonKeySegment(kind="key", value="messages")),
@@ -128,6 +128,6 @@ def test_message_block_count_accepts_the_limit_and_rejects_the_next(
         timeout=Timeout.from_seconds(1),
     )
 
-    assert len(parser.parse(accepted, timeout=Timeout.from_seconds(1)).blocks) == 2
+    assert len(extractor.extract(accepted, timeout=Timeout.from_seconds(1)).blocks) == 2
     with pytest.raises(GateLimitExceededError, match="message block count"):
-        parser.parse(rejected, timeout=Timeout.from_seconds(1))
+        extractor.extract(rejected, timeout=Timeout.from_seconds(1))

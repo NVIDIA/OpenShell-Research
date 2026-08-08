@@ -132,7 +132,7 @@ class RegexMessageBlocksScan(StrictDomainModel):
     """Scan normalized text-bearing JSON message blocks."""
 
     kind: Literal["message-blocks"]
-    parser: JsonMessageMapConfig
+    message_mapping: JsonMessageMapConfig
     roles: tuple[MessageRole, ...] | None = None
     block_kinds: tuple[MessageBlockKind, ...] | None = None
     action: RegexBodyAction

@@ -145,10 +145,10 @@ scan:
 
 ## Map normalized message blocks
 
-`MessageBlocksParser` builds on the same strict JSON document. Its
-`MessageBodyParser` first selects message containers and normalizes their roles
-and text-bearing blocks. `JsonMessageMapParser` is the configurable mapping for
-ordinary JSON harness envelopes.
+`MessageBlocksParser` parses the request body as the same strict JSON document,
+then delegates message normalization to a `MessageBlockExtractor`. The built-in
+`JsonMessageBlockExtractor` applies a `JsonMessageMapConfig` for ordinary JSON
+harness envelopes.
 
 The mapping's `messages` selector starts at the document root. Its
 `text_selectors`, `tool_input_selectors`, and `tool_output_selectors` start at
@@ -157,8 +157,9 @@ selectors do not repeat the path to the message array.
 
 Message roles normalize to `system`, `developer`, `user`, `assistant`, `tool`,
 or `unknown`. Blocks normalize to `text`, `tool_input`, or `tool_output`.
-Provider- or harness-specific parsers can implement the public
-`MessageBodyParser` protocol without changing consumers such as the regex gate.
+Provider- or harness-specific adapters can implement the public
+`MessageBlockExtractor` protocol without changing request-content consumers
+such as the regex gate.
 
 See the [regex gate](gates/regex.md#normalized-message-blocks) for a complete
 policy example and [custom gates](gates/custom.md) for the trusted extension

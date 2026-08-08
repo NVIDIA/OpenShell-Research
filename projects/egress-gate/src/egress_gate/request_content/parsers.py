@@ -8,8 +8,8 @@ from typing import Protocol
 from egress_gate.errors import GateInputError
 from egress_gate.request_content.json import JsonDocument, JsonSelector
 from egress_gate.request_content.messages import (
+    MessageBlockExtractor,
     MessageBlockKind,
-    MessageBodyParser,
     MessageRole,
 )
 from egress_gate.request_content.text import TextReplacement, TextTarget
@@ -85,18 +85,18 @@ class JsonFieldsParser:
 
 
 class MessageBlocksParser:
-    """Expose filtered normalized JSON message blocks as text targets."""
+    """Parse a JSON body into filtered normalized message-block targets."""
 
-    __slots__ = ("_block_kinds", "_parser", "_roles")
+    __slots__ = ("_block_kinds", "_extractor", "_roles")
 
     def __init__(
         self,
         *,
-        parser: MessageBodyParser,
+        extractor: MessageBlockExtractor,
         roles: tuple[MessageRole, ...] | None = None,
         block_kinds: tuple[MessageBlockKind, ...] | None = None,
     ) -> None:
-        self._parser = parser
+        self._extractor = extractor
         self._roles = roles
         self._block_kinds = block_kinds
 
@@ -107,7 +107,7 @@ class MessageBlocksParser:
         timeout: Timeout,
     ) -> ParsedRequestContent:
         document = JsonDocument.parse(body, timeout=timeout)
-        message_document = self._parser.parse(document, timeout=timeout)
+        message_document = self._extractor.extract(document, timeout=timeout)
         targets: list[TextTarget] = []
         seen_nodes: set[str] = set()
         for block in message_document.blocks:
