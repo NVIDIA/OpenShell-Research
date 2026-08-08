@@ -1580,6 +1580,11 @@ or <code>unknown</code>. Blocks normalize to <code>text</code>, <code>tool_input
 Provider- or harness-specific adapters can implement the public
 <code>MessageBlockExtractor</code> protocol without changing request-content consumers
 such as the regex gate.</p>
+<p>When selector groups reach the same JSON string, the extractor retains each
+distinct block classification. <code>MessageBlocksParser</code> applies role and block
+kind filters first, then exposes the shared string once. A broad
+<code>text_selectors</code> entry therefore cannot hide the same node from an explicit
+tool-input or tool-output filter.</p>
 <p>See the <a href="../gates/regex/#normalized-message-blocks">regex gate</a> for a complete
 policy example and <a href="../gates/custom/">custom gates</a> for the trusted extension
 contract.</p>

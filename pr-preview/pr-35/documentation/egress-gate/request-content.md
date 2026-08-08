@@ -161,6 +161,12 @@ Provider- or harness-specific adapters can implement the public
 `MessageBlockExtractor` protocol without changing request-content consumers
 such as the regex gate.
 
+When selector groups reach the same JSON string, the extractor retains each
+distinct block classification. `MessageBlocksParser` applies role and block
+kind filters first, then exposes the shared string once. A broad
+`text_selectors` entry therefore cannot hide the same node from an explicit
+tool-input or tool-output filter.
+
 See the [regex gate](gates/regex.md#normalized-message-blocks) for a complete
 policy example and [custom gates](gates/custom.md) for the trusted extension
 contract.

@@ -16,7 +16,8 @@ applies its configured `on_error` behavior when that ceiling expires first.
 | Request body | 4 MiB |
 | JSON nesting depth | 128 |
 | JSON value nodes | 100,000 |
-| JSON selectors per scan or message mapping | 32 |
+| JSON field selectors per scan | 32 |
+| Message content selectors per mapping | 32, plus the required messages selector |
 | JSON path segments per selector | 32 |
 | Selected JSON nodes or normalized message blocks | 4,096 |
 | Pipeline gates | 10 |
