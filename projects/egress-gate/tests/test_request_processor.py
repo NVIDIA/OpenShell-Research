@@ -471,6 +471,45 @@ def test_three_regex_gates_progressively_redact_the_current_body() -> None:
     ]
 
 
+def test_structured_regex_scan_parses_the_body_replaced_by_an_earlier_gate() -> None:
+    processor = _processor(
+        (
+            (
+                "wrap",
+                {
+                    "kind": "test-control",
+                    "replacement": '{"messages":[{"content":"secret"}]}',
+                },
+            ),
+            (
+                "redact",
+                _regex_config(
+                    "replace",
+                    scan={
+                        "kind": "json-fields",
+                        "selectors": [
+                            {
+                                "segments": [
+                                    {"kind": "key", "value": "messages"},
+                                    {"kind": "each"},
+                                    {"kind": "key", "value": "content"},
+                                ]
+                            }
+                        ],
+                    },
+                ),
+            ),
+        ),
+        include_regex=True,
+    )
+
+    result = processor.process(_request(), timeout=Timeout.from_seconds(1))
+
+    assert result.request_mutations.replacement_body == (
+        b'{"messages":[{"content":"[token]"}]}'
+    )
+
+
 def test_later_regex_gates_use_the_body_after_overlapping_text_is_redacted() -> None:
     original = _request(body=b"credential: alice@example.com")
     processor = _processor(
@@ -979,6 +1018,30 @@ def test_invalid_utf8_is_translated_to_the_stable_input_error() -> None:
         processor.process(_request(body=b"\xff"), timeout=Timeout.from_seconds(1))
 
     assert error.value.code is ErrorCode.BODY_ENCODING_INVALID
+
+
+def test_invalid_json_is_translated_to_the_stable_body_format_error() -> None:
+    processor = _processor(
+        (
+            (
+                "regex",
+                _regex_config(
+                    scan={
+                        "kind": "json-fields",
+                        "selectors": [
+                            {"segments": [{"kind": "key", "value": "messages"}]}
+                        ],
+                    }
+                ),
+            ),
+        ),
+        include_regex=True,
+    )
+
+    with pytest.raises(EgressGateError) as error:
+        processor.process(_request(body=b"{"), timeout=Timeout.from_seconds(1))
+
+    assert error.value.code is ErrorCode.BODY_FORMAT_INVALID
 
 
 def test_prepared_gate_type_is_part_of_the_processor_contract() -> None:

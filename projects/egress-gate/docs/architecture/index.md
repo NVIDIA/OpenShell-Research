@@ -18,10 +18,12 @@ Egress Gate has one transport adapter and one protobuf-free pipeline processor.
 | Module | Responsibility |
 | --- | --- |
 | `request.py` | Immutable request, headers, and `RequestMutations` |
+| `request_content/` | Reusable text parsers, strict JSON documents, typed selection, source-preserving edits, and normalized message blocks |
 | `result.py` | Gate evaluations, five-field findings, provenance, traces, and result invariants |
 | `gates/base.py` | Gate lifecycle, capabilities, output validation, and UTF-8 helper |
 | `gates/registry.py` | Trusted registration, exact pipeline schema, resources, discovery, and processor preparation |
-| `gates/regex.py` | Typed scan and action selection, bounded matching, overlap handling, caching, and body replacement |
+| `gates/regex_scans.py` | Typed regex scan and action policy configuration |
+| `gates/regex.py` | Content-parser composition, non-body text adaptation, pattern catalogs, bounded matching, finding aggregation, and gate evaluation |
 | `config.py` | Strict ordered gates and required default decision |
 | `request_processor.py` | Shared deadline, immutable snapshot construction, control flow, aggregation, and provenance |
 | `service/` | Protobuf validation/conversion, worker slots, lifecycle, and wire serialization |
@@ -32,6 +34,21 @@ does not add a second execution path or import the transport adapter.
 
 Only `service/` imports generated protobuf/gRPC bindings. The pipeline processor
 and gates receive domain values and can be tested offline.
+
+The request body remains canonical immutable bytes. A configured gate can
+interpret the current body snapshot as strict JSON and select text nodes, then
+optionally adapt those nodes to normalized message blocks. These views remain
+local to one gate evaluation. The pipeline processor does not parse bodies or
+cache request state across reusable gate instances.
+
+Regex scan models remain declarative Pydantic configuration. During gate
+preparation, body-based variants compose a reusable `RequestContentParser`:
+`Utf8TextParser`, `JsonFieldsParser`, or `MessageBlocksParser`. Each parser owns
+text extraction and how immutable `TextReplacement` values become bounded body
+bytes. `MessageBlocksParser` composes a `MessageBlockExtractor` to normalize a
+parsed JSON document without conflating that semantic step with body parsing.
+The regex gate only adapts path, query, and header values itself, then applies
+matching and actions uniformly to the text targets it receives.
 
 ## Pipeline execution
 

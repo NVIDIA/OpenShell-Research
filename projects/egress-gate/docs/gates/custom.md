@@ -12,6 +12,13 @@ protobuf, or `RequestProcessor` internals. Use the function helper for a small,
 stateless gate. Use the class-based API when a gate needs initialization,
 helper-base behavior, or operational resources.
 
+Custom gates that inspect request-body text can compose the public
+`egress_gate.request_content` surface. Prepared parsers are stateless and safe
+to reuse; each parsed result and its text targets remain local to one
+`evaluate` call. See [Parse request content](../request-content.md) for parser
+selection, typed JSON paths, message mappings, replacement, and a custom-gate
+example.
+
 The repository includes runnable examples for both extension styles:
 
 - [Function-based custom gate](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/custom-gate)

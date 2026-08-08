@@ -56,14 +56,19 @@ from egress_gate.timeout import Timeout
 
 
 def _values(
-    *, action_kind: str = "detect", default_decision: str = "allow"
+    *,
+    action_kind: str = "detect",
+    default_decision: str = "allow",
+    scan: dict[str, object] | None = None,
 ) -> dict[str, object]:
     action: dict[str, object] = {"kind": action_kind}
     if action_kind == "replace":
         action["template"] = "[{entity}]"
+    scan_values = {"kind": "body"} if scan is None else dict(scan)
+    scan_values["action"] = action
     config: dict[str, object] = {
         "kind": "regex",
-        "scan": {"kind": "body", "action": action},
+        "scan": scan_values,
         "pattern_catalog": {
             "entities": [
                 {
@@ -616,6 +621,66 @@ def test_invalid_utf8_is_an_input_failure_before_wire_evaluation() -> None:
         asyncio.run(middleware.close())
 
     assert error.value.code is ErrorCode.BODY_ENCODING_INVALID
+
+
+def test_structured_replacement_is_serialized_as_a_complete_body_mutation() -> None:
+    middleware = EgressGateMiddleware(create_builtin_registry())
+    request = _request(body=b'{ "messages":[{"content":"secret"}], "n":1.00 }')
+    request.config.CopyFrom(
+        _proto_config(
+            _values(
+                action_kind="replace",
+                scan={
+                    "kind": "json-fields",
+                    "selectors": [
+                        {
+                            "segments": [
+                                {"kind": "key", "value": "messages"},
+                                {"kind": "each"},
+                                {"kind": "key", "value": "content"},
+                            ]
+                        }
+                    ],
+                },
+            )
+        )
+    )
+    try:
+        response, _ = asyncio.run(
+            middleware._evaluate_http_request(request, Timeout.from_seconds(1))
+        )
+    finally:
+        asyncio.run(middleware.close())
+
+    assert response.has_body is True
+    assert response.body == b'{ "messages":[{"content":"[token]"}], "n":1.00 }'
+
+
+def test_invalid_json_is_an_input_failure_for_a_structured_scan() -> None:
+    middleware = EgressGateMiddleware(create_builtin_registry())
+    request = _request(body=b"{")
+    request.config.CopyFrom(
+        _proto_config(
+            _values(
+                scan={
+                    "kind": "json-fields",
+                    "selectors": [{"segments": [{"kind": "key", "value": "messages"}]}],
+                }
+            )
+        )
+    )
+    try:
+        with pytest.raises(EgressGateError) as error:
+            asyncio.run(
+                middleware._evaluate_http_request(
+                    request,
+                    Timeout.from_seconds(1),
+                )
+            )
+    finally:
+        asyncio.run(middleware.close())
+
+    assert error.value.code is ErrorCode.BODY_FORMAT_INVALID
 
 
 def test_service_request_body_limit_is_checked_before_worker_execution() -> None:

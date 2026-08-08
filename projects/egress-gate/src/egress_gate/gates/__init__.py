@@ -9,20 +9,24 @@ from egress_gate.gates.base import (
 )
 from egress_gate.gates.regex import (
     ConfidenceLevel,
-    RegexBodyAction,
-    RegexBodyScan,
     RegexConfig,
-    RegexDenyAction,
-    RegexDetectAction,
     RegexEntity,
     RegexGate,
-    RegexHeaderScan,
-    RegexPathScan,
     RegexPatternCatalog,
+    RegexRule,
+)
+from egress_gate.gates.regex_scans import (
+    RegexBodyAction,
+    RegexBodyScan,
+    RegexDenyAction,
+    RegexDetectAction,
+    RegexHeaderScan,
+    RegexJsonFieldsScan,
+    RegexMessageBlocksScan,
+    RegexPathScan,
     RegexQueryScan,
     RegexReadOnlyAction,
     RegexReplaceAction,
-    RegexRule,
     RegexScan,
 )
 from egress_gate.gates.registry import (
@@ -49,6 +53,8 @@ __all__ = [
     "RegexEntity",
     "RegexGate",
     "RegexHeaderScan",
+    "RegexJsonFieldsScan",
+    "RegexMessageBlocksScan",
     "RegexPatternCatalog",
     "RegexPathScan",
     "RegexQueryScan",

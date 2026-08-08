@@ -1,4 +1,4 @@
-"""Typed, bounded regular-expression scans and actions for HTTP requests."""
+"""Bounded regex catalog compilation, matching, and gate evaluation."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from enum import StrEnum
 from pathlib import Path
 from stat import S_ISREG
 from string import Formatter
-from typing import Annotated, Literal, Protocol, Self, TypeAlias
+from typing import Literal, Protocol, Self
 
 import regex
 import yaml
@@ -24,9 +24,7 @@ from egress_gate.base import StrictDomainModel
 from egress_gate.constants import (
     MAX_BODY_BYTES,
     MAX_DETECTIONS_PER_GATE,
-    MAX_DIAGNOSTIC_TEXT_BYTES,
     MAX_PROTO_FINDING_GROUPS,
-    MAX_PROTO_HEADERS,
     MAX_REGEX_CATALOG_FILE_BYTES,
     MAX_REGEX_CATALOG_PATH_BYTES,
     MAX_REGEX_ENTITIES_PER_CATALOG,
@@ -37,11 +35,31 @@ from egress_gate.constants import (
 from egress_gate.errors import (
     GateConfigurationError,
     GateContractError,
-    GateInputError,
     GateLimitExceededError,
 )
 from egress_gate.gates.base import Gate, GateCapability, GateConfig
-from egress_gate.request import HeaderName, HttpRequest, RequestMutations
+from egress_gate.gates.regex_scans import (
+    RegexBodyScan,
+    RegexDenyAction,
+    RegexHeaderScan,
+    RegexJsonFieldsScan,
+    RegexMessageBlocksScan,
+    RegexPathScan,
+    RegexQueryScan,
+    RegexReplaceAction,
+    RegexScan,
+)
+from egress_gate.request import HttpRequest, RequestMutations
+from egress_gate.request_content import (
+    JsonFieldsParser,
+    JsonMessageBlockExtractor,
+    MessageBlocksParser,
+    ParsedRequestContent,
+    RequestContentParser,
+    TextReplacement,
+    TextTarget,
+    Utf8TextParser,
+)
 from egress_gate.result import Finding, FindingTypeDefinition, GateEvaluation
 from egress_gate.string_validators import ScalarString, validate_scalar_string
 from egress_gate.timeout import Timeout
@@ -141,99 +159,6 @@ class RegexPatternCatalog(StrictDomainModel):
         return self
 
 
-class RegexDetectAction(StrictDomainModel):
-    """Report matches and continue without changing the request."""
-
-    kind: Literal["detect"]
-
-
-class RegexDenyAction(StrictDomainModel):
-    """Deny the request when the scan finds a match."""
-
-    kind: Literal["deny"]
-
-
-class RegexReplaceAction(StrictDomainModel):
-    """Replace body matches with a constrained template."""
-
-    kind: Literal["replace"]
-    template: ScalarString = Field(default="[{entity}]", repr=False)
-
-    @field_validator("template")
-    @classmethod
-    def _template_is_safe_and_bounded(cls, value: str) -> str:
-        if len(value.encode("utf-8")) > MAX_DIAGNOSTIC_TEXT_BYTES:
-            raise ValueError("replacement template exceeds the size limit")
-        try:
-            for _, field_name, format_spec, conversion in Formatter().parse(value):
-                if field_name is not None and field_name != "entity":
-                    raise ValueError
-                if format_spec or conversion is not None:
-                    raise ValueError
-        except ValueError:
-            raise ValueError("replacement template syntax is invalid") from None
-        return value
-
-
-RegexReadOnlyAction: TypeAlias = Annotated[
-    RegexDetectAction | RegexDenyAction,
-    Field(discriminator="kind"),
-]
-RegexBodyAction: TypeAlias = Annotated[
-    RegexDetectAction | RegexDenyAction | RegexReplaceAction,
-    Field(discriminator="kind"),
-]
-
-
-class RegexBodyScan(StrictDomainModel):
-    """Scan the UTF-8 request body and apply a body-compatible action."""
-
-    kind: Literal["body"]
-    action: RegexBodyAction
-
-
-class RegexPathScan(StrictDomainModel):
-    """Scan the request path and detect or deny matches."""
-
-    kind: Literal["path"]
-    action: RegexReadOnlyAction
-
-
-class RegexQueryScan(StrictDomainModel):
-    """Scan the raw request query and detect or deny matches."""
-
-    kind: Literal["query"]
-    action: RegexReadOnlyAction
-
-
-class RegexHeaderScan(StrictDomainModel):
-    """Scan values from named request headers and detect or deny matches."""
-
-    kind: Literal["header"]
-    names: tuple[HeaderName, ...] = Field(min_length=1, max_length=MAX_PROTO_HEADERS)
-    action: RegexReadOnlyAction
-
-    @field_validator("names", mode="before")
-    @classmethod
-    def _names_are_a_tuple(cls, value: object) -> object:
-        if isinstance(value, list | tuple):
-            return tuple(value)
-        return value
-
-    @model_validator(mode="after")
-    def _names_are_unique(self) -> Self:
-        normalized = tuple(name.casefold() for name in self.names)
-        if len(normalized) != len(set(normalized)):
-            raise ValueError("header scan names must be unique")
-        return self
-
-
-RegexScan: TypeAlias = Annotated[
-    RegexBodyScan | RegexPathScan | RegexQueryScan | RegexHeaderScan,
-    Field(discriminator="kind"),
-]
-
-
 class RegexConfig(GateConfig):
     """Exact policy configuration owned by ``RegexGate``."""
 
@@ -272,7 +197,7 @@ class RegexConfig(GateConfig):
 
 
 class RegexGate(Gate[RegexConfig, None]):
-    """Scan the request body, path, query, or selected headers with regex rules."""
+    """Scan one raw or structured request view with bounded regex rules."""
 
     capabilities = frozenset(
         {
@@ -287,6 +212,7 @@ class RegexGate(Gate[RegexConfig, None]):
 
     def _initialize(self, *, timeout: Timeout | None = None) -> None:
         try:
+            self._content_parser = _prepare_content_parser(self.config.scan)
             self._rules = _compile_pattern_catalog(
                 self.config.pattern_catalog,
                 timeout=timeout,
@@ -302,10 +228,18 @@ class RegexGate(Gate[RegexConfig, None]):
         *,
         timeout: Timeout,
     ) -> GateEvaluation:
-        scan_texts = self._scan_texts(request)
+        text_view = _read_regex_text(
+            self.config.scan,
+            self._content_parser,
+            request,
+            timeout=timeout,
+        )
         detections_with_identity: list[tuple[_RegexDetection, str]] = []
-        for text in scan_texts:
-            detections_with_identity.extend(self._match_text(text, timeout=timeout))
+        detections_by_target: dict[str, list[tuple[_RegexDetection, str]]] = {}
+        for target in text_view.targets:
+            target_detections = self._match_text(target.text, timeout=timeout)
+            detections_by_target[target.id] = target_detections
+            detections_with_identity.extend(target_detections)
             if len(detections_with_identity) > MAX_DETECTIONS_PER_GATE:
                 raise GateLimitExceededError("regex detection count exceeds the limit")
         detections = tuple(item[0] for item in detections_with_identity)
@@ -321,38 +255,24 @@ class RegexGate(Gate[RegexConfig, None]):
         if not isinstance(action, RegexReplaceAction):
             return GateEvaluation.proceed(findings=findings)
 
-        body_text = scan_texts[0]
-        output_text = body_text
-        if detections:
-            winners = _resolve_overlaps(detections_with_identity)
-            output_text = _render_bounded_replacement(
-                body_text,
-                winners,
-                action.template,
+        replacements = tuple(
+            TextReplacement(
+                target_id=target.id,
+                text=_render_bounded_replacement(
+                    target.text,
+                    _resolve_overlaps(detections_by_target[target.id]),
+                    action.template,
+                ),
             )
-        return GateEvaluation.proceed(
-            request_mutations=RequestMutations(
-                replacement_body=output_text.encode("utf-8")
-            ),
-            findings=findings,
+            for target in text_view.targets
         )
-
-    def _scan_texts(self, request: HttpRequest) -> tuple[str, ...]:
-        scan = self.config.scan
-        if isinstance(scan, RegexBodyScan):
-            try:
-                return (request.body.decode("utf-8", errors="strict"),)
-            except UnicodeDecodeError:
-                raise GateInputError("regex body scan is not valid UTF-8") from None
-        if isinstance(scan, RegexPathScan):
-            return (request.target.path,)
-        if isinstance(scan, RegexQueryScan):
-            return (request.target.query,)
-        selected_names = frozenset(name.casefold() for name in scan.names)
-        return tuple(
-            header.value
-            for header in request.headers
-            if header.name.casefold() in selected_names
+        replacement_body = text_view.replace_text(
+            replacements,
+            timeout=timeout,
+        )
+        return GateEvaluation.proceed(
+            request_mutations=RequestMutations(replacement_body=replacement_body),
+            findings=findings,
         )
 
     def _match_text(
@@ -424,6 +344,70 @@ class _RegexDetection:
     start: int
     end: int
     confidence: ConfidenceLevel
+
+
+@dataclass(frozen=True)
+class _RegexTextView:
+    targets: tuple[TextTarget, ...]
+    parsed_content: ParsedRequestContent | None = None
+
+    def replace_text(
+        self,
+        replacements: tuple[TextReplacement, ...],
+        *,
+        timeout: Timeout,
+    ) -> bytes:
+        if self.parsed_content is None:
+            raise GateContractError("regex source does not support replacement")
+        return self.parsed_content.replace_text(replacements, timeout=timeout)
+
+
+def _prepare_content_parser(scan: RegexScan) -> RequestContentParser | None:
+    match scan:
+        case RegexBodyScan():
+            return Utf8TextParser()
+        case RegexJsonFieldsScan():
+            return JsonFieldsParser(selectors=scan.selectors)
+        case RegexMessageBlocksScan():
+            return MessageBlocksParser(
+                extractor=JsonMessageBlockExtractor(scan.message_mapping),
+                roles=scan.roles,
+                block_kinds=scan.block_kinds,
+            )
+        case _:
+            return None
+
+
+def _read_regex_text(
+    scan: RegexScan,
+    parser: RequestContentParser | None,
+    request: HttpRequest,
+    *,
+    timeout: Timeout,
+) -> _RegexTextView:
+    if parser is not None:
+        parsed_content = parser.parse(request.body, timeout=timeout)
+        return _RegexTextView(
+            targets=parsed_content.targets,
+            parsed_content=parsed_content,
+        )
+
+    timeout.raise_if_expired()
+    match scan:
+        case RegexPathScan():
+            targets = (TextTarget(id="path", text=request.target.path),)
+        case RegexQueryScan():
+            targets = (TextTarget(id="query", text=request.target.query),)
+        case RegexHeaderScan():
+            names = frozenset(name.casefold() for name in scan.names)
+            targets = tuple(
+                TextTarget(id=f"header-{index}", text=header.value)
+                for index, header in enumerate(request.headers)
+                if header.name.casefold() in names
+            )
+        case _:
+            raise GateContractError("regex source preparation is invalid")
+    return _RegexTextView(targets=targets)
 
 
 def _aggregate_findings(
@@ -798,19 +782,9 @@ _CONFIDENCE_RANK = {
 }
 __all__ = [
     "ConfidenceLevel",
-    "RegexBodyAction",
-    "RegexBodyScan",
     "RegexConfig",
-    "RegexDenyAction",
-    "RegexDetectAction",
     "RegexEntity",
     "RegexGate",
-    "RegexHeaderScan",
     "RegexPatternCatalog",
-    "RegexPathScan",
-    "RegexQueryScan",
-    "RegexReadOnlyAction",
-    "RegexReplaceAction",
     "RegexRule",
-    "RegexScan",
 ]

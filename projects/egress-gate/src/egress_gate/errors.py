@@ -35,6 +35,7 @@ class ErrorCode(StrEnum):
     REQUEST_ENVELOPE_INVALID = "request_envelope_invalid"
     REQUEST_BODY_TOO_LARGE = "request_body_too_large"
     BODY_ENCODING_INVALID = "body_encoding_invalid"
+    BODY_FORMAT_INVALID = "body_format_invalid"
     GATE_OUTPUT_INVALID = "gate_output_invalid"
     GATE_EXECUTION_FAILED = "gate_execution_failed"
     SERVER_BIND_FAILED = "server_bind_failed"
@@ -98,6 +99,10 @@ class GateLimitExceededError(GateError):
 
 class GateInputError(GateError):
     """A gate could not interpret a bounded request input."""
+
+
+class BodyFormatError(GateInputError):
+    """A gate expected a structured request body that was malformed."""
 
 
 class TimeoutExpiredError(Exception):
@@ -182,6 +187,14 @@ _ERROR_SPECS: dict[ErrorCode, _ErrorSpec] = {
         "decode_text",
         "Request body encoding is invalid.",
         "Supply a valid UTF-8 request body.",
+    ),
+    ErrorCode.BODY_FORMAT_INVALID: _ErrorSpec(
+        ErrorKind.INVALID_INPUT,
+        ErrorComponent.SERVICE,
+        "parse_body",
+        "Request body format is invalid.",
+        "Supply a strict JSON request body matching the configured structured "
+        "body scan.",
     ),
     ErrorCode.GATE_OUTPUT_INVALID: _ErrorSpec(
         ErrorKind.INTERNAL,

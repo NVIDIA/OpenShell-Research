@@ -66,12 +66,20 @@ gates:
 default_decision: allow
 ```
 
-The shipped registry contains exactly `regex`. Its `scan` selects the body,
-path, query, or selected request headers. Each scan contains its `action`.
-Every scan supports `detect` and `deny`. A body scan also supports `replace`.
-The typed configuration prevents unsupported combinations. A replace action
-preserves an explicit body-replacement intent even when the resulting bytes
-equal the input. Add custom trusted gates through `--registry`.
+The shipped registry contains exactly `regex`. Its `scan` selects the complete
+body, selected JSON string fields, normalized JSON message blocks, the path,
+query, or selected request headers. Each scan contains its `action`. Every scan
+supports `detect` and `deny`. Complete-body and structured JSON scans also
+support source-preserving `replace`. The typed configuration prevents
+unsupported combinations. A replace action preserves an explicit
+body-replacement intent even when the resulting bytes equal the input. Add
+custom trusted gates through `--registry`.
+
+Structured scans are explicit policy choices. `json-fields` uses bounded typed
+selectors. `message-blocks` applies a configurable JSON message mapping and can
+filter normalized roles and block kinds. Replacement re-encodes only selected
+JSON string tokens; all unrelated request-body bytes remain unchanged. Existing
+`body` scans continue to inspect and optionally replace the complete UTF-8 body.
 
 Small stateless gates can use the optional `registry.gate` helper. Gates that
 need initialization, helper bases, or typed resources use the full class-based
@@ -120,6 +128,7 @@ timeout failures must deny.
 
 - [Overview](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/index.md)
 - [Configuration](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/configuration.md)
+- [Request-content parsing](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/request-content.md)
 - [Test policies offline](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/evaluation.md)
 - [Operations](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/operations.md)
 - [Gate authoring](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/gates/custom.md)

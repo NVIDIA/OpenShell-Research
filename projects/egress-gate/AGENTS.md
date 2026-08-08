@@ -37,10 +37,13 @@ Run focused tests while working and `make check` before handoff.
 
 ## Project map
 
-- `src/egress_gate/gates/`: `Gate`, helper bases, registry, and the regex gate
+- `src/egress_gate/gates/`: `Gate`, helper bases, registry, regex policy models,
+  and regex matching
 - `src/egress_gate/config.py`: strict ordered `gates` and `default_decision`
   policy models
 - `src/egress_gate/request.py`: protobuf-free request and request-mutation models
+- `src/egress_gate/request_content/`: reusable text parsers, strict JSON
+  selection, source-preserving edits, and normalized message blocks
 - `src/egress_gate/result.py`: gate evaluations, five-field findings, provenance,
   traces, metadata, and final results
 - `src/egress_gate/request_processor.py`: shared deadline, current-request
@@ -93,10 +96,11 @@ registration state.
 
 ## Current built-ins and boundaries
 
-This slice ships exactly one built-in. `regex` selects one typed body, path,
-query, or header scan and preserves bounded catalog loading, matching,
-overlap resolution, and detect/deny actions. Body scans also support strict
-UTF-8 replacement. Deterministic network request policy belongs to OpenShell.
+This slice ships exactly one built-in. `regex` selects one typed complete-body,
+structured JSON, normalized message-block, path, query, or header scan and
+preserves bounded catalog loading, matching, overlap resolution, and
+detect/deny actions. Complete-body and structured scans also support bounded
+replacement. Deterministic network request policy belongs to OpenShell.
 Do not add more built-ins speculatively.
 
 The OpenShell wire `Finding` remains the released five-field contract:
