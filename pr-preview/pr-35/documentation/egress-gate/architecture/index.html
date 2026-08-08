@@ -1384,8 +1384,10 @@ cache request state across reusable gate instances.</p>
 preparation, body-based variants compose a reusable <code>RequestContentParser</code>:
 <code>Utf8TextParser</code>, <code>JsonFieldsParser</code>, or <code>MessageBlocksParser</code>. Each parser owns
 text extraction and how immutable <code>TextReplacement</code> values become bounded body
-bytes. The regex gate only adapts path, query, and header values itself, then
-applies matching and actions uniformly to the text targets it receives.</p>
+bytes. <code>MessageBlocksParser</code> composes a <code>MessageBlockExtractor</code> to normalize a
+parsed JSON document without conflating that semantic step with body parsing.
+The regex gate only adapts path, query, and header values itself, then applies
+matching and actions uniformly to the text targets it receives.</p>
 <h2 id="pipeline-execution">Pipeline execution</h2>
 <figure class="documentation-figure documentation-figure--wide">
   <img src="../assets/diagrams/processing-pipeline.svg" alt="A request moves through pipeline processor controls and an ordered gate pipeline before Egress Gate returns a result.">

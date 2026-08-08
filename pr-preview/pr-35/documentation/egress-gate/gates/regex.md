@@ -105,7 +105,7 @@ name: model-visible-identifiers
 kind: regex
 scan:
   kind: message-blocks
-  parser:
+  message_mapping:
     kind: json-message-map
     messages:
       segments:
@@ -136,8 +136,9 @@ missing roles normalize to `unknown`. Text selected from a `tool` message is a
 `tool_output`; other selected text is `text`. Message mappings are policy
 configuration, so harness-specific envelopes do not require changes to regex
 matching. A custom gate can reuse the public `RequestContentParser`,
-`MessageBlocksParser`, and `MessageBodyParser` surfaces when it needs the same
-text-target and replacement contracts with a different semantic adapter.
+`MessageBlocksParser`, and `MessageBlockExtractor` surfaces when it needs the
+same text-target and replacement contracts with a different semantic
+extractor.
 
 A catalog can be inline or in a relative `.yaml` or `.yml` file. Relative paths
 resolve from the Egress Gate process working directory, not from the policy
@@ -188,7 +189,7 @@ OpenShell body limit.
 | --- | --- | --- |
 | `body` | none | `detect`, `deny`, `replace` |
 | `json-fields` | non-empty typed `selectors` | `detect`, `deny`, `replace` |
-| `message-blocks` | `parser`; optional `roles` and `block_kinds` | `detect`, `deny`, `replace` |
+| `message-blocks` | `message_mapping`; optional `roles` and `block_kinds` | `detect`, `deny`, `replace` |
 | `path` | none | `detect`, `deny` |
 | `query` | none | `detect`, `deny` |
 | `header` | non-empty `names` list | `detect`, `deny` |

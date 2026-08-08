@@ -1567,18 +1567,19 @@ gate operation on one target cannot span another selected string.</p>
 </span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">    </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;[{entity}]&#39;</span>
 </span></code></pre></div>
 <h2 id="map-normalized-message-blocks">Map normalized message blocks</h2>
-<p><code>MessageBlocksParser</code> builds on the same strict JSON document. Its
-<code>MessageBodyParser</code> first selects message containers and normalizes their roles
-and text-bearing blocks. <code>JsonMessageMapParser</code> is the configurable mapping for
-ordinary JSON harness envelopes.</p>
+<p><code>MessageBlocksParser</code> parses the request body as the same strict JSON document,
+then delegates message normalization to a <code>MessageBlockExtractor</code>. The built-in
+<code>JsonMessageBlockExtractor</code> applies a <code>JsonMessageMapConfig</code> for ordinary JSON
+harness envelopes.</p>
 <p>The mapping's <code>messages</code> selector starts at the document root. Its
 <code>text_selectors</code>, <code>tool_input_selectors</code>, and <code>tool_output_selectors</code> start at
 each selected message object. This distinction is important: relative text
 selectors do not repeat the path to the message array.</p>
 <p>Message roles normalize to <code>system</code>, <code>developer</code>, <code>user</code>, <code>assistant</code>, <code>tool</code>,
 or <code>unknown</code>. Blocks normalize to <code>text</code>, <code>tool_input</code>, or <code>tool_output</code>.
-Provider- or harness-specific parsers can implement the public
-<code>MessageBodyParser</code> protocol without changing consumers such as the regex gate.</p>
+Provider- or harness-specific adapters can implement the public
+<code>MessageBlockExtractor</code> protocol without changing request-content consumers
+such as the regex gate.</p>
 <p>See the <a href="../gates/regex/#normalized-message-blocks">regex gate</a> for a complete
 policy example and <a href="../gates/custom/">custom gates</a> for the trusted extension
 contract.</p>
