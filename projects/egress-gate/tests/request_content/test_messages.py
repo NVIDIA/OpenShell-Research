@@ -131,3 +131,34 @@ def test_message_block_count_accepts_the_limit_and_rejects_the_next(
     assert len(extractor.extract(accepted, timeout=Timeout.from_seconds(1)).blocks) == 2
     with pytest.raises(GateLimitExceededError, match="message block count"):
         extractor.extract(rejected, timeout=Timeout.from_seconds(1))
+
+
+def test_message_block_limit_counts_unique_node_kind_classifications(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(messages_module, "MAX_MESSAGE_BLOCKS", 2)
+    selector = _selector(JsonKeySegment(kind="key", value="content"))
+    extractor = JsonMessageBlockExtractor(
+        JsonMessageMapConfig(
+            kind="json-message-map",
+            messages=_selector(JsonKeySegment(kind="key", value="messages")),
+            text_selectors=(selector,),
+            tool_output_selectors=(selector,),
+        )
+    )
+    document = JsonDocument.parse(
+        (
+            b'{"messages":['
+            b'{"role":"tool","content":"one"},'
+            b'{"role":"tool","content":"two"}'
+            b"]}"
+        ),
+        timeout=Timeout.from_seconds(1),
+    )
+
+    blocks = extractor.extract(document, timeout=Timeout.from_seconds(1)).blocks
+
+    assert tuple((block.kind, block.text) for block in blocks) == (
+        (MessageBlockKind.TOOL_OUTPUT, "one"),
+        (MessageBlockKind.TOOL_OUTPUT, "two"),
+    )

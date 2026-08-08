@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from egress_gate.errors import GateInputError
+from egress_gate.constants import MAX_BODY_BYTES
+from egress_gate.errors import GateInputError, GateLimitExceededError
 from egress_gate.request_content.json import JsonDocument, JsonSelector
 from egress_gate.request_content.messages import (
     MessageBlockExtractor,
@@ -57,6 +58,8 @@ class Utf8TextParser:
         timeout: Timeout,
     ) -> ParsedRequestContent:
         timeout.raise_if_expired()
+        if len(body) > MAX_BODY_BYTES:
+            raise GateLimitExceededError("UTF-8 request body exceeds the size limit")
         try:
             text = body.decode("utf-8", errors="strict")
         except UnicodeDecodeError:
@@ -138,7 +141,17 @@ class _Utf8ParsedRequestContent:
         timeout.raise_if_expired()
         if len(replacements) != 1 or replacements[0].target_id != self.targets[0].id:
             raise ValueError("UTF-8 body replacement target is invalid")
-        return replacements[0].text.encode("utf-8")
+        replacement_text = replacements[0].text
+        if len(replacement_text) > MAX_BODY_BYTES:
+            raise GateLimitExceededError("UTF-8 replacement body exceeds the limit")
+        try:
+            rendered = replacement_text.encode("utf-8", errors="strict")
+        except UnicodeEncodeError:
+            raise ValueError("UTF-8 body replacement text is invalid") from None
+        if len(rendered) > MAX_BODY_BYTES:
+            raise GateLimitExceededError("UTF-8 replacement body exceeds the limit")
+        timeout.raise_if_expired()
+        return rendered
 
 
 @dataclass(frozen=True)

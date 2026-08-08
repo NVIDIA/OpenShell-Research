@@ -271,6 +271,16 @@ def test_parse_distinguishes_invalid_utf8_from_invalid_json() -> None:
         _parse(b'"\xff"')
 
 
+def test_parse_enforces_the_request_body_size_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(json_module, "MAX_BODY_BYTES", 4)
+
+    _parse(b"null")
+    with pytest.raises(GateLimitExceededError, match="size limit"):
+        _parse(b" null")
+
+
 def test_selector_models_are_strict_bounded_and_discriminated() -> None:
     with pytest.raises(ValidationError):
         JsonSelector.model_validate({"segments": []})

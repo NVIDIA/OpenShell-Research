@@ -6,7 +6,8 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from egress_gate.errors import GateInputError
+import egress_gate.request_content.parsers as parsers_module
+from egress_gate.errors import GateInputError, GateLimitExceededError
 from egress_gate.request_content import (
     JsonEachSegment,
     JsonFieldsParser,
@@ -14,6 +15,7 @@ from egress_gate.request_content import (
     JsonMessageBlockExtractor,
     JsonMessageMapConfig,
     JsonSelector,
+    MessageBlockKind,
     MessageBlocksParser,
     MessageRole,
     TextReplacement,
@@ -63,6 +65,31 @@ def test_utf8_parser_rejects_invalid_body_encoding() -> None:
     with pytest.raises(GateInputError, match="not valid UTF-8"):
         Utf8TextParser().parse(
             b"\xff",
+            timeout=Timeout.from_seconds(1),
+        )
+
+
+def test_utf8_parser_enforces_input_and_replacement_body_limits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(parsers_module, "MAX_BODY_BYTES", 4)
+    parser = Utf8TextParser()
+
+    parser.parse(b"four", timeout=Timeout.from_seconds(1))
+    with pytest.raises(GateLimitExceededError, match="size limit"):
+        parser.parse(b"three", timeout=Timeout.from_seconds(1))
+
+    content = parser.parse(b"x", timeout=Timeout.from_seconds(1))
+    assert (
+        content.replace_text(
+            (TextReplacement(target_id="body", text="éé"),),
+            timeout=Timeout.from_seconds(1),
+        )
+        == "éé".encode()
+    )
+    with pytest.raises(GateLimitExceededError, match="exceeds the limit"):
+        content.replace_text(
+            (TextReplacement(target_id="body", text="ééx"),),
             timeout=Timeout.from_seconds(1),
         )
 
@@ -153,3 +180,27 @@ def test_message_blocks_parser_deduplicates_shared_text_nodes() -> None:
     )
 
     assert tuple(target.text for target in content.targets) == ("once",)
+
+
+def test_message_blocks_parser_filters_before_deduplicating_classifications() -> None:
+    selector = JsonSelector(segments=(JsonKeySegment(kind="key", value="content"),))
+    parser = MessageBlocksParser(
+        extractor=JsonMessageBlockExtractor(
+            JsonMessageMapConfig(
+                kind="json-message-map",
+                messages=JsonSelector(
+                    segments=(JsonKeySegment(kind="key", value="messages"),)
+                ),
+                text_selectors=(selector,),
+                tool_input_selectors=(selector,),
+            )
+        ),
+        block_kinds=(MessageBlockKind.TOOL_INPUT,),
+    )
+
+    content = parser.parse(
+        b'{"messages":[{"role":"assistant","content":"selected"}]}',
+        timeout=Timeout.from_seconds(1),
+    )
+
+    assert tuple(target.text for target in content.targets) == ("selected",)

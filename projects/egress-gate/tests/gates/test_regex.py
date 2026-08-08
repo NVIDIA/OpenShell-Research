@@ -367,6 +367,32 @@ def test_message_blocks_scan_filters_normalized_roles() -> None:
     )
 
 
+def test_message_blocks_scan_filters_overlapping_explicit_tool_classification() -> None:
+    selector = {"segments": [{"kind": "key", "value": "content"}]}
+    config = _config(
+        [{"pattern": "secret", "confidence": "high"}],
+        scan={
+            "kind": "message-blocks",
+            "message_mapping": {
+                "kind": "json-message-map",
+                "messages": {"segments": [{"kind": "key", "value": "messages"}]},
+                "text_selectors": [selector],
+                "tool_input_selectors": [selector],
+            },
+            "block_kinds": ["tool_input"],
+        },
+        action_kind="deny",
+    )
+
+    evaluation = RegexGate(config, None).evaluate(
+        _request(b'{"messages":[{"role":"assistant","content":"secret"}]}'),
+        timeout=Timeout.from_seconds(1),
+    )
+
+    assert evaluation.control is GateControl.DENY
+    assert evaluation.findings[0].count == 1
+
+
 def test_message_block_filters_must_be_unique() -> None:
     with pytest.raises(ValidationError, match="unique"):
         _config(

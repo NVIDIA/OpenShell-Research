@@ -138,7 +138,7 @@ class JsonMessageBlockExtractor:
             timeout=timeout,
         )
         blocks: list[MessageBlock] = []
-        seen_nodes: set[str] = set()
+        seen_classifications: set[tuple[str, MessageBlockKind]] = set()
         message_index = 0
         for container in containers:
             if container.kind is not JsonNodeKind.ARRAY:
@@ -168,9 +168,10 @@ class JsonMessageBlockExtractor:
                         selectors,
                         timeout=timeout,
                     ):
-                        if text_node.id in seen_nodes:
+                        classification = (text_node.id, kind)
+                        if classification in seen_classifications:
                             continue
-                        seen_nodes.add(text_node.id)
+                        seen_classifications.add(classification)
                         blocks.append(
                             MessageBlock(
                                 id=f"message-block-{len(blocks) + 1}",

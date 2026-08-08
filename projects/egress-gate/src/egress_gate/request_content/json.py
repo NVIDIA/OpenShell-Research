@@ -84,6 +84,8 @@ class JsonDocument:
     def parse(cls, body: bytes, *, timeout: Timeout) -> JsonDocument:
         """Parse one complete strict UTF-8 JSON body under the shared deadline."""
         timeout.raise_if_expired()
+        if len(body) > MAX_BODY_BYTES:
+            raise GateLimitExceededError("JSON request body exceeds the size limit")
         try:
             source = body.decode("utf-8", errors="strict")
         except UnicodeDecodeError:
