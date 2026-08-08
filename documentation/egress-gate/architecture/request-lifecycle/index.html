@@ -568,6 +568,8 @@
       
         
       
+        
+      
     
     
     
@@ -623,6 +625,33 @@
     
   
   Configure policies
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../request-content/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Parse request content
 
     
   </span>
@@ -1428,6 +1457,9 @@ candidate only after a final deadline check.</p>
 <ol>
 <li>Check the shared deadline.</li>
 <li>Pass the current read-only <code>HttpRequest</code> snapshot to the gate.</li>
+<li>When configured by the gate, parse the current body as strict JSON, select
+   bounded string nodes, and optionally normalize those nodes as message
+   blocks.</li>
 <li>Reconstruct and validate the returned <code>GateEvaluation</code>.</li>
 <li>Add a content-safe <code>GateTrace</code> and <code>SourcedFinding</code> values owned by the
    pipeline processor.</li>
@@ -1441,6 +1473,11 @@ set, and passes that snapshot to the next gate. The final allowed result
 combines these mutations in order. A denied result always has an empty mutation
 set. Body replacement <code>None</code> and <code>b""</code> remain distinct. Header mutation variants
 use the required <code>kind</code> values <code>write</code> and <code>remove</code>.</p>
+<p>Structured JSON replacement works through the same complete-body mutation
+contract. The JSON document renders selected string-token edits in one bounded
+pass while preserving every byte outside those tokens. It returns one complete
+replacement body. A later gate therefore parses the body snapshot produced by
+earlier structured or raw replacements.</p>
 <p>If every gate proceeds, <code>default_decision</code> controls the result. Default deny
 uses <code>egress_gate_default_deny</code>. Default allow has no reason code.</p>
 <h2 id="4-handle-pipeline-processor-limits">4. Handle pipeline processor limits</h2>

@@ -14,6 +14,12 @@ applies its configured `on_error` behavior when that ceiling expires first.
 | Area | Limit |
 | --- | ---: |
 | Request body | 4 MiB |
+| JSON nesting depth | 128 |
+| JSON value nodes | 100,000 |
+| JSON field selectors per scan | 32 |
+| Message content selectors per mapping | 32, plus the required messages selector |
+| JSON path segments per selector | 32 |
+| Selected JSON nodes or normalized message blocks | 4,096 |
 | Pipeline gates | 10 |
 | Finding groups per gate/result | 32 |
 | Estimated finding wire size | 4 KiB |
@@ -35,7 +41,7 @@ rejected value.
 
 | Condition | Outcome |
 | --- | --- |
-| Invalid phase, envelope, policy, or input encoding | gRPC `INVALID_ARGUMENT` |
+| Invalid phase, envelope, policy, input encoding, or configured JSON format | gRPC `INVALID_ARGUMENT` |
 | Gate contract or unexpected execution failure | gRPC `INTERNAL` |
 | Internal processing deadline or pipeline processor limit | deny, source `runtime_limit`, code `egress_gate_limit_exceeded` |
 | Gate terminal deny | deny, source `gate`, gate-owned reason code |

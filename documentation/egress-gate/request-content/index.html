@@ -6,17 +6,17 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Test policy decisions and findings before deployment.">
+        <meta name="description" content="Select and replace bounded text in complete bodies, JSON fields, and normalized message blocks.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
       
       
       
-        <link rel="prev" href="../request-content/">
+        <link rel="prev" href="../configuration/">
       
       
-        <link rel="next" href="../operations/">
+        <link rel="next" href="../evaluation/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Test policies offline - OpenShell Research</title>
+        <title>Parse request content - OpenShell Research</title>
       
     
     
@@ -80,7 +80,7 @@
     }
   </script>
   
-    <link rel="alternate" type="text/markdown" href="../evaluation.md" title="Markdown source">
+    <link rel="alternate" type="text/markdown" href="../request-content.md" title="Markdown source">
   
 
   </head>
@@ -102,7 +102,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#test-policies-offline" class="md-skip">
+        <a href="#parse-request-content" class="md-skip">
           Skip to content
         </a>
       
@@ -141,7 +141,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Test policies offline
+              Parse request content
             
           </span>
         </div>
@@ -643,33 +643,6 @@
                 
   
   
-  
-  
-    <li class="md-nav__item">
-      <a href="../request-content/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-  Parse request content
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
     
   
   
@@ -689,7 +662,7 @@
   <span class="md-ellipsis">
     
   
-  Test policies offline
+  Parse request content
 
     
   </span>
@@ -706,7 +679,7 @@
   <span class="md-ellipsis">
     
   
-  Test policies offline
+  Parse request content
 
     
   </span>
@@ -732,10 +705,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#try-the-included-example" class="md-nav__link">
+  <a href="#use-a-parser-from-a-custom-gate" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Try the included example
+        Use a parser from a custom gate
       </span>
     </span>
   </a>
@@ -743,10 +716,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#write-one-test-case" class="md-nav__link">
+  <a href="#select-json-values-with-typed-paths" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Write one test case
+        Select JSON values with typed paths
       </span>
     </span>
   </a>
@@ -754,10 +727,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#grow-the-suite-with-the-policy" class="md-nav__link">
+  <a href="#select-json-string-fields" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Grow the suite with the policy
+        Select JSON string fields
       </span>
     </span>
   </a>
@@ -765,10 +738,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#use-the-result-in-automation" class="md-nav__link">
+  <a href="#map-normalized-message-blocks" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Use the result in automation
+        Map normalized message blocks
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#replacement-and-parsing-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Replacement and parsing behavior
       </span>
     </span>
   </a>
@@ -779,6 +763,33 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Test policies offline
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1217,10 +1228,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#try-the-included-example" class="md-nav__link">
+  <a href="#use-a-parser-from-a-custom-gate" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Try the included example
+        Use a parser from a custom gate
       </span>
     </span>
   </a>
@@ -1228,10 +1239,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#write-one-test-case" class="md-nav__link">
+  <a href="#select-json-values-with-typed-paths" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Write one test case
+        Select JSON values with typed paths
       </span>
     </span>
   </a>
@@ -1239,10 +1250,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#grow-the-suite-with-the-policy" class="md-nav__link">
+  <a href="#select-json-string-fields" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Grow the suite with the policy
+        Select JSON string fields
       </span>
     </span>
   </a>
@@ -1250,10 +1261,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#use-the-result-in-automation" class="md-nav__link">
+  <a href="#map-normalized-message-blocks" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Use the result in automation
+        Map normalized message blocks
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#replacement-and-parsing-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Replacement and parsing behavior
       </span>
     </span>
   </a>
@@ -1409,164 +1431,174 @@
 
 
   
-  <a href="../evaluation.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
+  <a href="../request-content.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.56 18H3.44C2.65 18 2 17.37 2 16.59V7.41C2 6.63 2.65 6 3.44 6h17.12c.79 0 1.44.63 1.44 1.41v9.18c0 .78-.65 1.41-1.44 1.41M3.44 6.94c-.26 0-.48.21-.48.47v9.19c0 .25.22.46.48.46h17.12c.26 0 .48-.21.48-.46V7.41c0-.26-.22-.47-.48-.47zm1.45 8.25V8.81h1.92l1.92 2.35 1.92-2.35h1.93v6.38h-1.93v-3.66l-1.92 2.35-1.92-2.35v3.66zm12.01 0-2.9-3.1h1.94V8.81h1.92v3.28h1.93z"/></svg>
   </a>
 
 
-<h1 id="test-policies-offline">Test policies offline</h1>
-<p>A policy can be valid and still do the wrong thing. It might allow a request
-that you meant to deny, invoke the wrong gate, or stop reporting a finding
-after a rule changes.</p>
-<p><code>egress-gate evaluate</code> lets you catch these problems before the policy handles
-live traffic. You give it a policy and a set of request examples. Each example
-states the result that you expect. Egress Gate runs every request through the
-same prepared <code>RequestProcessor</code> that the service uses and reports any
-difference.</p>
-<p>This is useful when you want to:</p>
-<ul>
-<li>check a new policy before rollout</li>
-<li>turn a fixed bug into a permanent regression test</li>
-<li>test a custom gate without starting the gRPC service</li>
-<li>compare the behavior of two policy revisions</li>
-<li>build a repeatable request set for a separate performance benchmark</li>
-</ul>
-<p>The command tests correctness. It does not report latency or throughput. Use a
-benchmark harness around the same request set when you need performance data.</p>
-<h2 id="try-the-included-example">Try the included example</h2>
-<p>The repository includes a regex policy and two request cases. Run them from
-<code>projects/egress-gate/</code>; <code>uv</code> prepares the project environment automatically:</p>
-<div class="language-bash highlight"><span class="filename">Run the example policy tests</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span>evaluate<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--policy<span class="w"> </span>examples/regex-redaction/egress-gate-config.yaml<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--cases<span class="w"> </span>examples/regex-redaction/cases.yaml<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--timeout<span class="w"> </span>1s
+<h1 id="parse-request-content">Parse request content</h1>
+<p>The public <code>egress_gate.request_content</code> package lets built-in and custom gates
+interpret the current request body as independently inspectable text targets.
+It supports a complete UTF-8 body, selected strings in a strict JSON document,
+and normalized message blocks derived from harness-specific JSON envelopes.</p>
+<p><code>Utf8TextParser</code>, <code>JsonFieldsParser</code>, and <code>MessageBlocksParser</code> implement the
+same <code>RequestContentParser</code> contract. Each parser owns both text extraction and
+rendering immutable <code>TextReplacement</code> values back into a complete replacement
+body. The regex gate composes these parsers, but they are not regex-specific;
+trusted custom gates can use the same public API.</p>
+<p>Here, <em>bounded</em> means that parsing and replacement enforce explicit limits on
+body size, JSON depth, node and selector counts, selected text, and message
+blocks. All work also uses the request's shared deadline. See
+<a href="../reference/limits-and-failures/">Limits and failures</a> for the failure
+contract.</p>
+<h2 id="use-a-parser-from-a-custom-gate">Use a parser from a custom gate</h2>
+<p>Prepare a parser once with the gate, then parse the current body inside each
+evaluation. The returned view contains request-local targets and owns rendering
+their replacements back into complete body bytes:</p>
+<div class="language-python highlight"><span class="filename">Parse and replace selected JSON text</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">egress_gate.request_content</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">JsonFieldsParser</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">JsonKeySegment</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">JsonSelector</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">TextReplacement</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">parser</span> <span class="o">=</span> <span class="n">JsonFieldsParser</span><span class="p">(</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">selectors</span><span class="o">=</span><span class="p">(</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>        <span class="n">JsonSelector</span><span class="p">(</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>            <span class="n">segments</span><span class="o">=</span><span class="p">(</span><span class="n">JsonKeySegment</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s2">&quot;key&quot;</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="s2">&quot;prompt&quot;</span><span class="p">),),</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>        <span class="p">),</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="p">),</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="p">)</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="n">parsed</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">body</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">)</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="n">replacements</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="n">TextReplacement</span><span class="p">(</span><span class="n">target_id</span><span class="o">=</span><span class="n">target</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="n">transform</span><span class="p">(</span><span class="n">target</span><span class="o">.</span><span class="n">text</span><span class="p">))</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    <span class="k">for</span> <span class="n">target</span> <span class="ow">in</span> <span class="n">parsed</span><span class="o">.</span><span class="n">targets</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="p">)</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="n">replacement_body</span> <span class="o">=</span> <span class="n">parsed</span><span class="o">.</span><span class="n">replace_text</span><span class="p">(</span><span class="n">replacements</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">)</span>
 </span></code></pre></div>
-<p>The command prepares the policy once, runs each case with a fresh timeout, and
-shows whether each request produced its expected result:</p>
-<div class="language-text highlight"><span class="filename">Evaluation output</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Policy evaluation
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>Status    Case                                        Details
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>PASS      email-is-detected-and-request-is-allowed    All checks matched
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>PASS      ordinary-body-is-allowed                    All checks matched
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>2 passed · 0 failed · 2 total
-</span></code></pre></div>
-<p>If a case fails, the Details column shows each field that differed and its
-expected and actual values. The summary and exit status make the same result
-easy to use in CI.</p>
-<p>No request goes to an upstream service. The command does not start gRPC,
-attach credentials, or persist request data.</p>
-<h2 id="write-one-test-case">Write one test case</h2>
-<p>The CLI calls the cases file a <em>corpus</em>. In plain terms, it is a versioned YAML
-test suite. <code>version: 1</code> selects the current file format. You do not need to
-manage multiple versions.</p>
-<p>This example checks that the regex policy reports an email finding and then
-allows the request through its default decision:</p>
-<div class="language-yaml highlight"><span class="filename">cases.yaml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">cases</span><span class="p">:</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email-is-detected</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">provenance</span><span class="p">:</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">synthetic</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="nt">redacted</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">request</span><span class="p">:</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">      </span><span class="nt">context</span><span class="p">:</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">        </span><span class="nt">request_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test-email</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">        </span><span class="nt">sandbox_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test-sandbox</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">      </span><span class="nt">target</span><span class="p">:</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">        </span><span class="nt">scheme</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https</span>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">        </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api.example.com</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">        </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">        </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POST</span>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">        </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/v1/messages</span>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">        </span><span class="nt">query</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;&quot;</span>
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">      </span><span class="nt">headers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
-</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">      </span><span class="nt">body</span><span class="p">:</span>
-</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">        </span><span class="nt">encoding</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">utf8</span>
-</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="w">        </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;send</span><span class="nv"> </span><span class="s">alice@example.com&quot;</span>
-</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="w">    </span><span class="nt">expected</span><span class="p">:</span>
-</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="w">      </span><span class="nt">decision</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">allow</span>
-</span><span id="__span-2-24"><a id="__codelineno-2-24" name="__codelineno-2-24" href="#__codelineno-2-24"></a><span class="w">      </span><span class="nt">finding_types</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">regex_match</span><span class="p p-Indicator">]</span>
-</span></code></pre></div>
-<p>Each case has three parts:</p>
-<ul>
-<li><code>provenance</code> records whether the request is synthetic or captured and
-  whether its content is redacted.</li>
-<li><code>request</code> contains the first read-only HTTP request snapshot that the gates
-  will evaluate.</li>
-<li><code>expected</code> contains the result fields that must match.</li>
-</ul>
-<p>Only <code>expected.decision</code> is required. Add more expected fields when they make
-the test more useful:</p>
+<p>The custom gate can return <code>replacement_body</code> through <code>RequestMutations</code> after
+declaring <code>GateCapability.REPLACE_BODY</code>. Keeping parsing and rendering on the
+same request-local view prevents a replacement from targeting text that the
+parser did not expose.</p>
+<h2 id="select-json-values-with-typed-paths">Select JSON values with typed paths</h2>
+<p>A <code>JsonSelector</code> is an ordered sequence of typed path segments. It is not a
+JSONPath string. Egress Gate starts with one JSON value and applies each segment
+to the values selected by the preceding segment.</p>
 <table>
 <thead>
 <tr>
-<th>Expected field</th>
-<th>What it checks</th>
+<th>Segment</th>
+<th>Required input</th>
+<th>Selection</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>decision_source_kind</code></td>
-<td>Whether a gate, the pipeline default, or a pipeline processor limit made the decision</td>
+<td><code>key</code></td>
+<td>JSON object</td>
+<td>The value of the member whose key exactly equals <code>value</code></td>
 </tr>
 <tr>
-<td><code>gate_name</code></td>
-<td>Which configured gate made a terminal decision</td>
+<td><code>index</code></td>
+<td>JSON array</td>
+<td>The item at position <code>value</code>; <code>0</code> is the first item, <code>1</code> is the second, and so on</td>
 </tr>
 <tr>
-<td><code>gate_type</code></td>
-<td>Which gate implementation made a terminal decision</td>
-</tr>
-<tr>
-<td><code>finding_types</code></td>
-<td>The ordered finding types returned by the pipeline</td>
+<td><code>each</code></td>
+<td>JSON object or array</td>
+<td>Every immediate object-member value or array item</td>
 </tr>
 </tbody>
 </table>
-<p>Gate name and gate type apply only when <code>decision_source_kind</code> is <code>gate</code>.
-Omitted fields are not compared. The current evaluator does not compare the
-contents of request mutations.</p>
-<h2 id="grow-the-suite-with-the-policy">Grow the suite with the policy</h2>
-<p>Start with one normal request and one request for each important deny or
-finding rule. Add a case whenever you fix a policy bug. Keep captured requests
-small, deliberate, and redacted when possible.</p>
-<p>Case names must be unique. Optional tags can group cases for external tooling.
-The parser also rejects aliases, duplicate keys, unknown fields, invalid
-base64, and values that exceed pipeline processor limits. These checks keep tests
-repeatable and ensure that test requests follow the same bounds as service
-requests.</p>
-<p>Use <code>--registry</code> when the policy contains application-owned custom gates:</p>
-<div class="language-bash highlight"><span class="filename">Test a custom gate</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>uv<span class="w"> </span>run<span class="w"> </span>egress-gate<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--registry<span class="w"> </span>examples.custom-gate.keyword_gate:registry<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>evaluate<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--policy<span class="w"> </span>examples/custom-gate/egress-gate-config.yaml<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span>--cases<span class="w"> </span>examples/custom-gate/cases.yaml
+<p>For example, this selector chooses the <code>content</code> value from every item in the
+top-level <code>messages</code> array:</p>
+<div class="language-yaml highlight"><span class="filename">Select every message&#x27;s content</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">segments</span><span class="p">:</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">key</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">messages</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">each</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">key</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">content</span>
 </span></code></pre></div>
-<h2 id="use-the-result-in-automation">Use the result in automation</h2>
-<p>The command uses stable exit statuses:</p>
-<table>
-<thead>
-<tr>
-<th style="text-align: right;">Status</th>
-<th>Meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: right;"><code>0</code></td>
-<td>Every case matched</td>
-</tr>
-<tr>
-<td style="text-align: right;"><code>1</code></td>
-<td>One or more cases did not match</td>
-</tr>
-<tr>
-<td style="text-align: right;"><code>2</code></td>
-<td>The policy, cases, preparation, or execution failed</td>
-</tr>
-</tbody>
-</table>
-<p>Failure output contains decision metadata and finding types. It does not print
-request bodies or raw exception text. This makes the command suitable for CI
-logs while keeping request content out of normal output.</p>
+<p>Given this document:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">&quot;messages&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="p">{</span><span class="nt">&quot;content&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;first&quot;</span><span class="p">},</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="p">{</span><span class="nt">&quot;content&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;second&quot;</span><span class="p">}</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="p">]</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>the selector produces the two string values <code>first</code> and <code>second</code>.</p>
+<p>Use <code>index</code> when a policy needs one specific array position. The numeric
+<code>value</code> is the position in the array:</p>
+<div class="language-yaml highlight"><span class="filename">Select the first message&#x27;s content</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">segments</span><span class="p">:</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">key</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">messages</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">index</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">key</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">content</span>
+</span></code></pre></div>
+<p>This selector produces only <code>first</code>. An index equal to or greater than the
+array length selects nothing; it is not an input error.</p>
+<p>A segment applied to the wrong JSON kind also selects nothing. For example,
+<code>key</code> does not select from an array, and <code>index</code> does not select from an object.
+Missing paths therefore produce no selected values. When a parser requests
+text, selected non-string terminal values also produce no text targets.</p>
+<p>Multiple selectors are evaluated in configuration order. When selectors reach
+the same JSON node, Egress Gate returns that node once. Results produced by one
+selector follow their order in the document.</p>
+<h2 id="select-json-string-fields">Select JSON string fields</h2>
+<p><code>JsonFieldsParser</code> evaluates selectors from the JSON document root and exposes
+each selected string as an independent <code>TextTarget</code>. A match or other custom
+gate operation on one target cannot span another selected string.</p>
+<p>The regex gate exposes this parser through <code>scan.kind: json-fields</code>:</p>
+<div class="language-yaml highlight"><span class="filename">Scan selected JSON strings</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">scan</span><span class="p">:</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">json-fields</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">selectors</span><span class="p">:</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">segments</span><span class="p">:</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">key</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">messages</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">each</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">key</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">content</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">  </span><span class="nt">action</span><span class="p">:</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">    </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;[{entity}]&#39;</span>
+</span></code></pre></div>
+<h2 id="map-normalized-message-blocks">Map normalized message blocks</h2>
+<p><code>MessageBlocksParser</code> parses the request body as the same strict JSON document,
+then delegates message normalization to a <code>MessageBlockExtractor</code>. The built-in
+<code>JsonMessageBlockExtractor</code> applies a <code>JsonMessageMapConfig</code> for ordinary JSON
+harness envelopes.</p>
+<p>The mapping's <code>messages</code> selector starts at the document root. Its
+<code>text_selectors</code>, <code>tool_input_selectors</code>, and <code>tool_output_selectors</code> start at
+each selected message object. This distinction is important: relative text
+selectors do not repeat the path to the message array.</p>
+<p>Message roles normalize to <code>system</code>, <code>developer</code>, <code>user</code>, <code>assistant</code>, <code>tool</code>,
+or <code>unknown</code>. Blocks normalize to <code>text</code>, <code>tool_input</code>, or <code>tool_output</code>.
+Provider- or harness-specific adapters can implement the public
+<code>MessageBlockExtractor</code> protocol without changing request-content consumers
+such as the regex gate.</p>
+<p>When selector groups reach the same JSON string, the extractor retains each
+distinct block classification. <code>MessageBlocksParser</code> applies role and block
+kind filters first, then exposes the shared string once. A broad
+<code>text_selectors</code> entry therefore cannot hide the same node from an explicit
+tool-input or tool-output filter.</p>
+<p>See the <a href="../gates/regex/#normalized-message-blocks">regex gate</a> for a complete
+policy example and <a href="../gates/custom/">custom gates</a> for the trusted extension
+contract.</p>
+<h2 id="replacement-and-parsing-behavior">Replacement and parsing behavior</h2>
+<p>JSON parsing is strict and bounded. It rejects invalid UTF-8, malformed JSON,
+duplicate object keys, non-standard constants, invalid Unicode scalar values,
+and configured parsing limits.</p>
+<p>Structured replacement re-encodes only selected JSON string tokens. It
+preserves every source byte outside those tokens, including whitespace, number
+spellings, key order, and escaping in unrelated strings. A parsed-content view
+rejects replacement of targets it did not expose.</p>
+<p>Request-content parsers are prepared stateless objects. Each parsed result and
+its document-local target identities belong to one request evaluation and must
+not be reused with another request body.</p>
 
 
 
@@ -1608,23 +1640,23 @@ logs while keeping request content out of normal output.</p>
       <nav class="md-footer__inner md-grid" aria-label="Continue reading" >
         
           
-          <a href="../request-content/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Parse request content">
+          <a href="../configuration/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Configure policies">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
             </div>
             <div class="md-footer__title">
               <span class="md-footer__direction">Previous</span>
-              <div class="md-ellipsis">Parse request content</div>
+              <div class="md-ellipsis">Configure policies</div>
             </div>
           </a>
         
         
           
-          <a href="../operations/" class="md-footer__link md-footer__link--next" aria-label="Next: Run and operate Egress Gate">
+          <a href="../evaluation/" class="md-footer__link md-footer__link--next" aria-label="Next: Test policies offline">
             <div class="md-footer__title">
               <span class="md-footer__direction">Next</span>
-              <div class="md-ellipsis">Run and operate Egress Gate</div>
+              <div class="md-ellipsis">Test policies offline</div>
             </div>
             <div class="md-footer__button md-icon">
               

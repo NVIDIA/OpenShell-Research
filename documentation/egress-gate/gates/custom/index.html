@@ -568,6 +568,8 @@
       
         
       
+        
+      
     
     
     
@@ -623,6 +625,33 @@
     
   
   Configure policies
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../request-content/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Parse request content
 
     
   </span>
@@ -1325,6 +1354,12 @@
 protobuf, or <code>RequestProcessor</code> internals. Use the function helper for a small,
 stateless gate. Use the class-based API when a gate needs initialization,
 helper-base behavior, or operational resources.</p>
+<p>Custom gates that inspect request-body text can compose the public
+<code>egress_gate.request_content</code> surface. Prepared parsers are stateless and safe
+to reuse; each parsed result and its text targets remain local to one
+<code>evaluate</code> call. See <a href="../../request-content/">Parse request content</a> for parser
+selection, typed JSON paths, message mappings, replacement, and a custom-gate
+example.</p>
 <p>The repository includes runnable examples for both extension styles:</p>
 <ul>
 <li><a href="https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/custom-gate">Function-based custom gate</a></li>

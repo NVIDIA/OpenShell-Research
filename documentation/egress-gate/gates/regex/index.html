@@ -568,6 +568,8 @@
       
         
       
+        
+      
     
     
     
@@ -623,6 +625,33 @@
     
   
   Configure policies
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../request-content/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Parse request content
 
     
   </span>
@@ -829,6 +858,28 @@
       On this page
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#structured-json-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Structured JSON fields
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#normalized-message-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Normalized message blocks
+      </span>
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#actions" class="md-nav__link">
@@ -1166,6 +1217,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#structured-json-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Structured JSON fields
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#normalized-message-blocks" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Normalized message blocks
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#actions" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1343,8 +1416,9 @@
 
 <h1 id="regex-gate">Regex gate</h1>
 <p>The <code>regex</code> gate matches one configured part of the current request. It can
-inspect the body, path, query, or selected header values. It returns audit-safe
-findings with type <code>regex_match</code>.</p>
+inspect the complete body, selected JSON string fields, normalized JSON message
+blocks, path, query, or selected header values. It returns audit-safe findings
+with type <code>regex_match</code>.</p>
 <p>Choose what to scan with <code>scan.kind</code>, then choose what to do with
 <code>scan.action.kind</code>. This example replaces matches in the request body:</p>
 <div class="language-yaml highlight"><span class="filename">Inline regex catalog</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">customer-identifiers</span>
@@ -1381,6 +1455,81 @@ OpenShell permits writes only in the <code>x-openshell-middleware-</code> namesp
 general regex replacement cannot rewrite arbitrary selected headers. A custom
 gate can return supported header writes or removals when it declares the
 <code>GateCapability.MUTATE_HEADERS</code> capability.</p>
+<h2 id="structured-json-fields">Structured JSON fields</h2>
+<p><code>json-fields</code> parses the current body as strict UTF-8 JSON and scans only string
+values selected by typed paths. The selectors are part of the general
+<a href="../../request-content/"><code>egress_gate.request_content</code> contract</a>, which is also
+available to custom gates. A <code>json-fields</code> selector starts at the document
+root:</p>
+<div class="language-yaml highlight"><span class="filename">Selected JSON message content</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">message-identifiers</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="nt">scan</span><span class="p">:</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">json-fields</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span><span class="nt">selectors</span><span class="p">:</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">segments</span><span class="p">:</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">key</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">messages</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">each</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">key</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">content</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">  </span><span class="nt">action</span><span class="p">:</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">    </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;[{entity}]&#39;</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="nt">pattern_catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">patterns.yaml</span>
+</span></code></pre></div>
+<p>Missing paths and non-string terminal values produce no scan text. Overlapping
+selectors select the same JSON string once. Matches cannot span two selected
+string values. Structured replacement re-encodes each selected string token
+and preserves every source byte outside selected tokens, including whitespace,
+number spellings, key order, and escaping in unrelated strings.</p>
+<p>The JSON parser rejects invalid UTF-8, malformed JSON, duplicate object keys,
+non-standard constants, invalid Unicode scalar values, and configured parsing
+limits. Invalid UTF-8 produces <code>body_encoding_invalid</code>; invalid strict JSON
+produces <code>body_format_invalid</code>.</p>
+<h2 id="normalized-message-blocks">Normalized message blocks</h2>
+<p><code>message-blocks</code> builds on the same JSON document. A <code>json-message-map</code> selects
+one or more message arrays, reads each message role, and applies relative
+<code>text_selectors</code>. Optional <code>tool_input_selectors</code> and <code>tool_output_selectors</code>
+classify provider- or harness-specific fields explicitly. The mapping requires
+at least one selector across those three groups. The scan can then filter
+normalized roles and block kinds:</p>
+<div class="language-yaml highlight"><span class="filename">Selected user and tool messages</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">model-visible-identifiers</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">regex</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">scan</span><span class="p">:</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">message-blocks</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">message_mapping</span><span class="p">:</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">json-message-map</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="nt">messages</span><span class="p">:</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">      </span><span class="nt">segments</span><span class="p">:</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">key</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">request</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">key</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">          </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">messages</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">    </span><span class="nt">role_key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">role</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">    </span><span class="nt">text_selectors</span><span class="p">:</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">segments</span><span class="p">:</span>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">key</span>
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">            </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">content</span>
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">segments</span><span class="p">:</span>
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">key</span>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="w">            </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">content</span>
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">each</span>
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">key</span>
+</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="w">            </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">text</span>
+</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="w">  </span><span class="nt">roles</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">system</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">developer</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">user</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">tool</span><span class="p p-Indicator">]</span>
+</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="w">  </span><span class="nt">block_kinds</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">text</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">tool_output</span><span class="p p-Indicator">]</span>
+</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="w">  </span><span class="nt">action</span><span class="p">:</span>
+</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="w">    </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deny</span>
+</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a><span class="nt">pattern_catalog</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">patterns.yaml</span>
+</span></code></pre></div>
+<p>Known roles are <code>system</code>, <code>developer</code>, <code>user</code>, <code>assistant</code>, and <code>tool</code>; other or
+missing roles normalize to <code>unknown</code>. Text selected from a <code>tool</code> message is a
+<code>tool_output</code>; other selected text is <code>text</code>. Message mappings are policy
+configuration, so harness-specific envelopes do not require changes to regex
+matching. A custom gate can reuse the public <code>RequestContentParser</code>,
+<code>MessageBlocksParser</code>, and <code>MessageBlockExtractor</code> surfaces when it needs the
+same text-target and replacement contracts with a different semantic
+extractor.</p>
 <p>A catalog can be inline or in a relative <code>.yaml</code> or <code>.yml</code> file. Relative paths
 resolve from the Egress Gate process working directory, not from the policy
 file. Use an inline catalog when the process does not have a stable working
@@ -1415,15 +1564,17 @@ detections. Replacement uses deterministic, non-overlapping matches.</p>
 </tr>
 </tbody>
 </table>
-<p><code>detect</code> and <code>deny</code> work with every scan kind. <code>replace</code> exists only in the
-body scan schema. It cannot be configured for a path, query, or header scan.
+<p><code>detect</code> and <code>deny</code> work with every scan kind. <code>replace</code> exists in the complete
+body, <code>json-fields</code>, and <code>message-blocks</code> schemas. It cannot be configured for
+a path, query, or header scan.
 This structure keeps unsupported combinations out of generated schemas and
 editor suggestions. OpenShell middleware results cannot rewrite a request path
 or query. Header replacement is not part of the built-in gate.</p>
 <p>The replace action owns its template. It returns a body replacement even when
 there is no match. This preserves the operator's explicit intent to replace the
 current body. Invalid body UTF-8 is a stable <code>body_encoding_invalid</code> service
-failure.</p>
+failure. A structured scan whose UTF-8 body is not strict JSON produces the
+stable <code>body_format_invalid</code> failure.</p>
 <p>The regex gate does not edit the body in place. It returns the replacement in
 <code>RequestMutations</code>. The pipeline processor uses it to build the next immutable
 <code>HttpRequest</code> snapshot. If the pipeline allows the request, Egress Gate includes
@@ -1444,6 +1595,16 @@ OpenShell body limit.</p>
 <tr>
 <td><code>body</code></td>
 <td>none</td>
+<td><code>detect</code>, <code>deny</code>, <code>replace</code></td>
+</tr>
+<tr>
+<td><code>json-fields</code></td>
+<td>non-empty typed <code>selectors</code></td>
+<td><code>detect</code>, <code>deny</code>, <code>replace</code></td>
+</tr>
+<tr>
+<td><code>message-blocks</code></td>
+<td><code>message_mapping</code>; optional <code>roles</code> and <code>block_kinds</code></td>
 <td><code>detect</code>, <code>deny</code>, <code>replace</code></td>
 </tr>
 <tr>
