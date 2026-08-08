@@ -349,7 +349,7 @@ class _RegexDetection:
 @dataclass(frozen=True)
 class _RegexTextView:
     targets: tuple[TextTarget, ...]
-    content: ParsedRequestContent | None = None
+    parsed_content: ParsedRequestContent | None = None
 
     def replace_text(
         self,
@@ -357,9 +357,9 @@ class _RegexTextView:
         *,
         timeout: Timeout,
     ) -> bytes:
-        if self.content is None:
+        if self.parsed_content is None:
             raise GateContractError("regex source does not support replacement")
-        return self.content.replace_text(replacements, timeout=timeout)
+        return self.parsed_content.replace_text(replacements, timeout=timeout)
 
 
 def _prepare_content_parser(scan: RegexScan) -> RequestContentParser | None:
@@ -386,8 +386,11 @@ def _read_regex_text(
     timeout: Timeout,
 ) -> _RegexTextView:
     if parser is not None:
-        content = parser.parse(request.body, timeout=timeout)
-        return _RegexTextView(targets=content.targets, content=content)
+        parsed_content = parser.parse(request.body, timeout=timeout)
+        return _RegexTextView(
+            targets=parsed_content.targets,
+            parsed_content=parsed_content,
+        )
 
     timeout.raise_if_expired()
     match scan:

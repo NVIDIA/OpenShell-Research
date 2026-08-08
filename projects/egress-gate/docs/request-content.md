@@ -13,9 +13,50 @@ and normalized message blocks derived from harness-specific JSON envelopes.
 
 `Utf8TextParser`, `JsonFieldsParser`, and `MessageBlocksParser` implement the
 same `RequestContentParser` contract. Each parser owns both text extraction and
-rendering immutable `TextReplacement` values back to one bounded replacement
+rendering immutable `TextReplacement` values back into a complete replacement
 body. The regex gate composes these parsers, but they are not regex-specific;
 trusted custom gates can use the same public API.
+
+Here, *bounded* means that parsing and replacement enforce explicit limits on
+body size, JSON depth, node and selector counts, selected text, and message
+blocks. All work also uses the request's shared deadline. See
+[Limits and failures](reference/limits-and-failures.md) for the failure
+contract.
+
+## Use a parser from a custom gate
+
+Prepare a parser once with the gate, then parse the current body inside each
+evaluation. The returned view contains request-local targets and owns rendering
+their replacements back into complete body bytes:
+
+```python title="Parse and replace selected JSON text"
+from egress_gate.request_content import (
+    JsonFieldsParser,
+    JsonKeySegment,
+    JsonSelector,
+    TextReplacement,
+)
+
+parser = JsonFieldsParser(
+    selectors=(
+        JsonSelector(
+            segments=(JsonKeySegment(kind="key", value="prompt"),),
+        ),
+    ),
+)
+
+parsed = parser.parse(request.body, timeout=timeout)
+replacements = tuple(
+    TextReplacement(target_id=target.id, text=transform(target.text))
+    for target in parsed.targets
+)
+replacement_body = parsed.replace_text(replacements, timeout=timeout)
+```
+
+The custom gate can return `replacement_body` through `RequestMutations` after
+declaring `GateCapability.REPLACE_BODY`. Keeping parsing and rendering on the
+same request-local view prevents a replacement from targeting text that the
+parser did not expose.
 
 ## Select JSON values with typed paths
 
