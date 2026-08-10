@@ -30,6 +30,11 @@ def _rule(
         references = {
             _reference_key(match.group("label"))
             for match in _REFERENCE_DEFINITION.finditer(context.source)
+            if any(
+                masked.start <= match.start() < masked.end
+                and set(masked.reasons) == {"link-destination"}
+                for masked in context.document.masked_ranges
+            )
         }
         for match in compiled.finditer(context.projected_prose):
             sentence = next(

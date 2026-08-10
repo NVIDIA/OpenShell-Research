@@ -264,6 +264,18 @@ kind = "positive"
 source = "Experts say this pattern is safe [according to the audit][missing]."
 
 [[case]]
+name = "vague-authority-reference-defined-in-code"
+rule_id = "attribution.vague-authority"
+kind = "positive"
+source = "Experts say this pattern is safe [according to the audit][audit].\n\n```markdown\n[audit]: https://example.test/audit\n```"
+
+[[case]]
+name = "vague-authority-reference-defined-in-comment"
+rule_id = "attribution.vague-authority"
+kind = "positive"
+source = "Experts say this pattern is safe [according to the audit][audit].\n\n<!-- [audit]: https://example.test/audit -->"
+
+[[case]]
 name = "vague-authority-distant-citation"
 rule_id = "attribution.vague-authority"
 kind = "positive"
