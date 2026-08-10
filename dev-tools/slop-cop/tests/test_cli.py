@@ -152,6 +152,8 @@ def test_explain_unknown_rule_is_an_input_error(capsys: pytest.CaptureFixture[st
 
 def test_workflow_preserves_renamed_baselines_and_has_stdlib_error_report() -> None:
     workflow = (REPOSITORY / ".github/workflows/slop-cop.yml").read_text(encoding="utf-8")
+    authoritative_job = workflow.split("  analyze:", 1)[1].split("  validate-candidate:", 1)[0]
+    candidate_job = workflow.split("  validate-candidate:", 1)[1]
     fallback = workflow.split("Create an error report after an early analysis failure", 1)[1]
     fallback = fallback.split("Add bounded annotations and job summary", 1)[0]
     assert "previous_filename" in workflow
@@ -160,6 +162,9 @@ def test_workflow_preserves_renamed_baselines_and_has_stdlib_error_report() -> N
     assert "from slop_cop" not in fallback
     assert "json.dumps(result" in fallback
     assert "html.escape(message)" in fallback
+    assert "Test candidate implementation" not in authoritative_job
+    assert "working-directory: dev-tools/slop-cop" in candidate_job
+    assert "${{ runner.temp }}/slop-cop-report" not in candidate_job
 
 
 def test_trusted_reporter_revalidates_override_and_uses_pr_head() -> None:

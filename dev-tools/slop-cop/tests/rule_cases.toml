@@ -246,6 +246,24 @@ kind = "counterexample"
 source = "The linked audit reports this pattern is safe."
 
 [[case]]
+name = "vague-authority-inline-citation"
+rule_id = "attribution.vague-authority"
+kind = "counterexample"
+source = "Experts say this pattern is safe ([audit](https://example.test/audit))."
+
+[[case]]
+name = "vague-authority-reference-citation"
+rule_id = "attribution.vague-authority"
+kind = "counterexample"
+source = "Experts say this pattern is safe [according to the audit][audit]."
+
+[[case]]
+name = "vague-authority-distant-citation"
+rule_id = "attribution.vague-authority"
+kind = "positive"
+source = "Experts say this pattern is safe.\n\nThe separate API is documented in the [manual](https://example.test/manual)."
+
+[[case]]
 name = "citationless-study-positive"
 rule_id = "attribution.citationless-study"
 kind = "positive"
@@ -255,3 +273,15 @@ name = "citationless-study-counterexample"
 rule_id = "attribution.citationless-study"
 kind = "counterexample"
 source = "The benchmark below shows lower latency."
+
+[[case]]
+name = "identified-study-inline-citation"
+rule_id = "attribution.citationless-study"
+kind = "counterexample"
+source = "A recent study shows lower latency ([paper](https://example.test/paper))."
+
+[[case]]
+name = "citation-claim-in-code"
+rule_id = "attribution.citationless-study"
+kind = "counterexample"
+source = "Use `A recent study shows lower latency` as fixture text."

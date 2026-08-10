@@ -1,4 +1,4 @@
-"""Historical score calibration."""
+"""Score calibration references."""
 
 from __future__ import annotations
 
@@ -25,16 +25,19 @@ class BenchmarkReference(StrictModel):
     """One immutable document revision and its acceptable result."""
 
     name: str = Field(min_length=1, max_length=100)
-    revision: str
+    revision: str | None = None
     path: str = Field(min_length=1, max_length=4_096)
-    source_url: str = Field(min_length=1, max_length=4_096)
+    source_url: str | None = Field(default=None, min_length=1, max_length=4_096)
+    fixture_path: str | None = Field(default=None, min_length=1, max_length=4_096)
     expected_decision: Literal["pass", "fail"]
     min_score: int = Field(ge=0, le=100)
     max_score: int = Field(ge=0, le=100)
 
     @field_validator("revision")
     @classmethod
-    def validate_revision(cls, value: str) -> str:
+    def validate_revision(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         if not _REVISION.fullmatch(value):
             raise ValueError("benchmark revision must be a 40-character lowercase commit SHA")
         return value
@@ -49,17 +52,37 @@ class BenchmarkReference(StrictModel):
 
     @field_validator("source_url")
     @classmethod
-    def validate_source_url(cls, value: str) -> str:
+    def validate_source_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         parsed = urlsplit(value)
         if parsed.scheme != "https" or parsed.hostname != "github.com":
             raise ValueError("benchmark source_url must be an HTTPS GitHub URL")
+        return value
+
+    @field_validator("fixture_path")
+    @classmethod
+    def validate_fixture_path(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        path = PurePosixPath(value)
+        if path.is_absolute() or ".." in path.parts or path.suffix.casefold() != ".md":
+            raise ValueError("fixture_path must be a repository-relative Markdown path")
         return value
 
     @model_validator(mode="after")
     def validate_range(self) -> BenchmarkReference:
         if self.min_score > self.max_score:
             raise ValueError("benchmark min_score cannot exceed max_score")
-        if f"/blob/{self.revision}/{self.path}" not in self.source_url:
+        historical = self.revision is not None or self.source_url is not None
+        fixture = self.fixture_path is not None
+        if historical == fixture:
+            raise ValueError("benchmark must select one historical revision or fixture_path")
+        if historical and (
+            self.revision is None
+            or self.source_url is None
+            or f"/blob/{self.revision}/{self.path}" not in self.source_url
+        ):
             raise ValueError("benchmark source_url must identify its revision and path")
         return self
 
@@ -96,9 +119,22 @@ def load_benchmark_manifest(path: Path) -> BenchmarkManifest:
 
 
 def git_source_loader(repository_root: Path) -> SourceLoader:
-    """Return a loader for committed benchmark sources."""
+    """Return a loader for committed history and repository fixtures."""
 
     def load(reference: BenchmarkReference) -> bytes:
+        if reference.fixture_path is not None:
+            root = repository_root.resolve(strict=True)
+            fixture = (root / reference.fixture_path).resolve(strict=True)
+            try:
+                fixture.relative_to(root)
+            except ValueError as error:
+                raise ValueError(
+                    f"benchmark fixture is outside the repository: {reference.fixture_path}"
+                ) from error
+            if fixture.is_symlink() or not fixture.is_file():
+                raise ValueError(f"benchmark fixture is not a regular file: {fixture}")
+            return fixture.read_bytes()
+        assert reference.revision is not None
         completed = subprocess.run(
             ["git", "show", f"{reference.revision}:{reference.path}"],
             cwd=repository_root,

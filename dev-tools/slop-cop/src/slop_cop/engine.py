@@ -142,6 +142,7 @@ def deduplicate_findings(
     findings: tuple[Finding, ...], registry: RuleRegistry
 ) -> tuple[Finding, ...]:
     order = {configured.metadata.id: configured.order for configured in registry}
+    policies = {configured.metadata.id: configured.policy for configured in registry}
     values = list(findings)
     parent = list(range(len(values)))
 
@@ -188,6 +189,8 @@ def deduplicate_findings(
                 values[index].suppressed,
                 not values[index].blocking,
                 severity_rank[values[index].severity],
+                policies[values[index].rule_id].fixed_allowance,
+                -policies[values[index].rule_id].first_cost,
                 order.get(values[index].rule_id, 1_000_000),
                 span_length(values[index]),
             ),
@@ -221,7 +224,7 @@ async def _evaluate_rule(
     try:
         async with asyncio.timeout(timeout):
             evaluation = await configured.rule.evaluate(
-                context, manager.for_rule(configured.metadata)
+                context, manager.for_rule(configured.metadata, configured.policy)
             )
         evaluation = validate_evaluation(
             configured.metadata,

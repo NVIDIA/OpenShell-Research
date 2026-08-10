@@ -37,7 +37,6 @@ jobs:
                 head_sha: context.sha,
                 head_repository: `${context.repo.owner}/${context.repo.repo}`,
                 changed_notes: [],
-                tool_changed: false,
                 override: null,
               };
               fs.writeFileSync(`${process.env.RUNNER_TEMP}/slop-cop-inputs.json`, JSON.stringify(metadata));
@@ -64,11 +63,6 @@ jobs:
                 base_path: previous_filename || filename,
               }))
               .sort((left, right) => left.path.localeCompare(right.path));
-            const toolChanged = files.some(({ filename }) =>
-              filename.startsWith('dev-tools/slop-cop/') ||
-              filename === '.github/workflows/slop-cop.yml' ||
-              filename === '.github/workflows/slop-cop-report.yml');
-
             const reviews = await github.paginate(github.rest.pulls.listReviews, {
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -107,7 +101,6 @@ jobs:
               head_sha: pullRequest.head.sha,
               head_repository: pullRequest.head.repo.full_name,
               changed_notes: changedNotes,
-              tool_changed: toolChanged,
               override,
             };
             fs.writeFileSync(`${process.env.RUNNER_TEMP}/slop-cop-inputs.json`, JSON.stringify(metadata));
@@ -116,7 +109,6 @@ jobs:
             core.setOutput('base_sha', pullRequest.base.sha);
             core.setOutput('head_sha', pullRequest.head.sha);
             core.setOutput('head_repository', pullRequest.head.repo.full_name);
-            core.setOutput('tool_changed', String(toolChanged));
 
       - name: Check out trusted analyzer
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -228,24 +220,6 @@ jobs:
       - name: Note bootstrap analysis
         if: steps.roots.outputs.bootstrap == 'true'
         run: echo "This introducing run used the candidate analyzer because no base analyzer exists." >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Test candidate implementation
-        id: candidate
-        if: steps.inputs.outputs.tool_changed == 'true'
-        continue-on-error: true
-        working-directory: candidate/dev-tools/slop-cop
-        run: |
-          uv sync --frozen
-          uv run pytest
-          uv run ruff check .
-          uv run ruff format --check .
-          uv run mypy src tests
-          uv run slop-cop validate-rules
-          uv run slop-cop benchmark --repository-root ../..
-          uv run slop-cop check \
-            --config slop-cop.toml \
-            --repository-root ../.. \
-            ../../docs/dev-notes/posts/*.md
 
       - name: Create an error report after an early analysis failure
         if: always()
@@ -384,7 +358,6 @@ jobs:
       - name: Enforce saved result
         if: always()
         env:
-          CANDIDATE_OUTCOME: ${{ steps.candidate.outcome }}
           REPORT_JSON: ${{ runner.temp }}/slop-cop-report/report.json
         run: |
           python - <<'PY'
@@ -398,6 +371,40 @@ jobs:
           result = json.loads(path.read_text())
           if result.get("decision") not in {"pass", "overridden", "not_applicable"}:
               raise SystemExit(f"Slop Cop decision: {result.get('decision')}")
-          if os.environ.get("CANDIDATE_OUTCOME") == "failure":
-              raise SystemExit("Candidate Slop Cop validation failed")
           PY
+
+  validate-candidate:
+    name: Slop Cop / Candidate Tool
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.event_name == 'pull_request_review'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out candidate revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.31"
+          python-version: "3.12"
+
+      - name: Test candidate implementation
+        working-directory: dev-tools/slop-cop
+        run: |
+          uv sync --frozen
+          uv run pytest
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run mypy src tests
+          uv run slop-cop validate-rules
+          uv run slop-cop benchmark --repository-root ../..
+          uv run slop-cop check \
+            --config slop-cop.toml \
+            --repository-root ../.. \
+            ../../docs/dev-notes/posts/*.md

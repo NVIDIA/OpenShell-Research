@@ -9,6 +9,61 @@ Use a declarative rule for a literal phrase or bounded regular expression. Add
 the rule block to `slop-cop.toml` and add positive and counterexample cases to
 `tests/rule_cases.toml`. No engine or renderer change is required.
 
+Phrase rule:
+
+```toml
+[[custom_rules.phrase]]
+id = "custom.empty-intensifier"
+version = 1
+category = "vocabulary"
+severity = "warning"
+title = "Empty intensifier"
+rationale = "The phrase asserts importance without naming an effect."
+advice = "Name the concrete effect."
+phrases = ["deeply transformative"]
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 2
+repeat_cost = 1
+cap = 5
+```
+
+Regular-expression rule:
+
+```toml
+[[custom_rules.regex]]
+id = "custom.generic-promise"
+version = 1
+category = "rhetoric"
+severity = "warning"
+title = "Generic promise"
+rationale = "The sentence promises unspecified later detail."
+advice = "Name the follow-up topic or remove the promise."
+pattern = '''\bmore on (?:that|this) (?:later|soon)\b'''
+flags = ["IGNORECASE"]
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 2
+repeat_cost = 1
+cap = 5
+```
+
+Each rule needs cases that execute its match and a legitimate nonmatch:
+
+```toml
+[[case]]
+name = "empty-intensifier-positive"
+rule_id = "custom.empty-intensifier"
+kind = "positive"
+source = "This is deeply transformative work."
+
+[[case]]
+name = "empty-intensifier-counterexample"
+rule_id = "custom.empty-intensifier"
+kind = "counterexample"
+source = "This changes request routing."
+```
+
 Each rule has a stable ID, positive integer version, category, title, rationale,
 advice, severity, allowance, and explicit scoring values. Increment the version
 when matching behavior or external-response interpretation changes.
@@ -96,10 +151,12 @@ An external custom rule declares a named service in its metadata and obtains it
 through `RuleRuntime`:
 
 ```python
-response = await runtime.service("editorial_judge").post_json(
+response = await runtime.service().post_json(
     {"schema_version": 1, "prose": context.projected_prose}
 )
 result = JudgeResponse.model_validate(response.data)
+if result.judge_revision != runtime.settings["required_judge_revision"]:
+    raise ValueError("judge revision does not match configured revision")
 signal = RuleSignal.document(
     key=result.label,
     units=result.strength,
@@ -121,7 +178,16 @@ token_env = "SLOP_COP_EDITORIAL_JUDGE_TOKEN"
 timeout_seconds = 20
 max_response_bytes = 65536
 max_attempts = 1
-required_judge_revision = "editorial-v1"
+
+[rules."custom.editorial-judge"]
+severity = "warning"
+service = "editorial_judge"
+max_signal_units = 5
+fixed_allowance = 0
+first_cost = 4
+repeat_cost = 2
+cap = 12
+settings = { required_judge_revision = "editorial-v1" }
 ```
 
 The custom rule owns its request data, strict response model, and conversion to

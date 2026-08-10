@@ -196,6 +196,31 @@ def _add_fenced_code(source: str, ranges: list[tuple[int, int, str]]) -> None:
         cursor = closer.end()
 
 
+def _add_indented_code(source: str, ranges: list[tuple[int, int, str]]) -> None:
+    lines = list(re.finditer(r"^.*(?:\r?\n|$)", source, re.MULTILINE))
+    in_block = False
+    block_start = 0
+    block_end = 0
+    previous_blank = True
+    for line in lines:
+        text = line.group(0).rstrip("\r\n")
+        blank = not text.strip()
+        indented = text.startswith("    ") or text.startswith("\t")
+        if in_block:
+            if indented or blank:
+                block_end = line.end()
+            else:
+                ranges.append((block_start, block_end, "indented-code"))
+                in_block = False
+        if not in_block and indented and previous_blank and not _covered(line.start(), ranges):
+            in_block = True
+            block_start = line.start()
+            block_end = line.end()
+        previous_blank = blank
+    if in_block:
+        ranges.append((block_start, block_end, "indented-code"))
+
+
 def _add_suppressions(
     source: str, ranges: list[tuple[int, int, str]]
 ) -> list[tuple[tuple[RuleId, ...], str, Span]]:
@@ -365,9 +390,24 @@ def _add_links_and_images(source: str, ranges: list[tuple[int, int, str]]) -> No
 
 
 def _add_blockquotes(source: str, ranges: list[tuple[int, int, str]]) -> None:
-    for match in re.finditer(r"^ {0,3}>[^\r\n]*(?:\r?\n|$)", source, re.MULTILINE):
-        if not _covered(match.start(), ranges):
-            ranges.append((match.start(), match.end(), "blockquote"))
+    active = False
+    start = end = 0
+    for line in re.finditer(r"^.*(?:\r?\n|$)", source, re.MULTILINE):
+        text = line.group(0).rstrip("\r\n")
+        quoted = re.match(r"^ {0,3}>", text) is not None
+        blank = not text.strip()
+        if quoted and not _covered(line.start(), ranges):
+            if not active:
+                start = line.start()
+                active = True
+            end = line.end()
+        elif active and not blank:
+            end = line.end()
+        elif active:
+            ranges.append((start, end, "blockquote"))
+            active = False
+    if active:
+        ranges.append((start, end, "blockquote"))
 
 
 def _add_disabled_visible_contexts(
@@ -564,6 +604,7 @@ def build_document(
     front_matter = _add_front_matter(source, ranges)
     _add_generated_ranges(source, ranges)
     _add_fenced_code(source, ranges)
+    _add_indented_code(source, ranges)
     parsed_suppressions = _add_suppressions(source, ranges)
     _add_html_comments(source, ranges)
     _add_inline_code(source, ranges)

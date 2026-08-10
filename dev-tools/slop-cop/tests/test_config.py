@@ -76,13 +76,11 @@ def test_service_requires_https_except_for_loopback() -> None:
     assert ServiceConfig(
         url="http://localhost:8080/judge",
         token_env="SLOP_COP_TEST_TOKEN",
-        required_judge_revision="judge-v1",
     ).url.startswith("http://")
     with pytest.raises(ValidationError, match="HTTPS"):
         ServiceConfig(
             url="http://judge.example.test/v1",
             token_env="SLOP_COP_TEST_TOKEN",
-            required_judge_revision="judge-v1",
         )
 
 

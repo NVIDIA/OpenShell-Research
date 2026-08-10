@@ -9,7 +9,9 @@ artifact and updates one sticky PR comment. Generated reports are not committed.
 For a pull request, the required analysis runs Slop Cop code, configuration,
 and dependencies from the PR base revision against the candidate Dev Notes.
 Candidate Slop Cop changes are tested separately without credentials and scan
-the complete candidate Dev Note corpus as a non-authoritative preview.
+the complete candidate Dev Note corpus as a non-authoritative preview. Candidate
+code runs in a separate job and runner; it cannot access or modify the trusted
+analysis report.
 
 The `pull_request` event can use workflow orchestration changed by the pull
 request. Base-revision analyzer selection does not protect that orchestration by

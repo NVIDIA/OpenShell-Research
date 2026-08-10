@@ -91,11 +91,11 @@ their counterexamples and score boundaries are reliable.
 
 ## Calibration benchmarks
 
-`benchmarks/dev-note-history.toml` records immutable Git revisions, expected
-decisions, and acceptable score ranges. `slop-cop benchmark` loads each source
-with `git show`, scores it with the active configuration, and fails when a score
-or decision leaves its declared range. This makes calibration drift a tested
-policy change instead of an incidental result of editing rule weights.
+`benchmarks/dev-note-history.toml` records immutable Git revisions and focused
+repository fixtures with expected decisions and acceptable score ranges.
+`slop-cop benchmark` scores each source with the active configuration and fails
+when a score or decision leaves its declared range. This makes calibration drift
+a tested policy change instead of an incidental result of editing rule weights.
 
 The current references follow one Dev Note through revision and publication:
 
@@ -107,8 +107,15 @@ The current references follow one Dev Note through revision and publication:
 | [2026-07-17 revised draft](https://github.com/NVIDIA/OpenShell-Research/blob/be515c9c2684e1e3febec058f1a9e0e90da16a72/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md) | 88–94, pass | 91 |
 | [2026-07-18 revised draft](https://github.com/NVIDIA/OpenShell-Research/blob/069696b0a28ffd0cd77e1e043a532f81b9cec3e2/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md) | 94–100, pass | 97 |
 | [2026-07-20 published draft](https://github.com/NVIDIA/OpenShell-Research/blob/b0d481796b8a0492053c7b3cac0c65444a2e99be/docs/dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell.md) | 92–98, pass | 95 |
+| Clean technical fixture | 100, pass | 100 |
+| Legitimate contrast and citation fixture | 95–99, pass | 97 |
+| Normal technical structure fixture | 100, pass | 100 |
+| Dense multi-family fixture | 0–79, fail | 72 |
+| Blocking assistant residue fixture | 0, fail | 0 |
 
-Add references that represent a deliberate editorial judgment and a stable Git
-revision. Use ranges wide enough for targeted detector improvements but narrow
-enough to catch a material scoring regression. A scoring change must update the
-manifest only when the new result is intentional and supported by the source.
+Historical revisions detect drift against real prose; their chronology is not a
+quality label. Focused fixtures define the intended treatment of clean prose,
+legitimate constructions, dense independent signals, and blocking residue. Use
+ranges wide enough for targeted detector improvements but narrow enough to catch
+a material scoring regression. Update a range only when the new result is an
+intentional editorial-policy change supported by the source.

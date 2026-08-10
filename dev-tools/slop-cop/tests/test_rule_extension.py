@@ -179,7 +179,6 @@ def _external_config() -> SlopCopConfig:
             "timeout_seconds": 5.0,
             "max_response_bytes": 4096,
             "max_attempts": 1,
-            "required_judge_revision": "editorial-v1",
         }
     }
     raw["rules"]["custom.editorial-judge"] = {
@@ -190,6 +189,7 @@ def _external_config() -> SlopCopConfig:
         "first_cost": 4.0,
         "repeat_cost": 2.0,
         "cap": 12.0,
+        "settings": {"required_judge_revision": "editorial-v1"},
     }
     return SlopCopConfig.model_validate(raw)
 
@@ -206,13 +206,13 @@ def _judge_rule() -> FunctionRule:
     )
 
     async def evaluate(context: RuleContext, runtime: RuleRuntime) -> RuleEvaluation:
-        response = await runtime.service("editorial_judge").post_json(
+        response = await runtime.service().post_json(
             {"schema_version": 1, "prose": context.projected_prose}
         )
         result = JudgeResponse.model_validate(response.data)
         if result.schema_version != 1:
             raise ValueError("unsupported judge response schema")
-        expected = runtime.manager.config.services["editorial_judge"].required_judge_revision
+        expected = runtime.settings["required_judge_revision"]
         if result.judge_revision != expected:
             raise ValueError("judge revision does not match configured revision")
         signal = RuleSignal.document(
@@ -251,7 +251,8 @@ def test_external_custom_rule_maps_evidence_and_bounded_strength() -> None:
             environment={"SLOP_COP_JUDGE_TOKEN": "secret"},
         )
         evaluation = await registry.by_id(rule.metadata.id).rule.evaluate(
-            RuleContext(document), manager.for_rule(rule.metadata)
+            RuleContext(document),
+            manager.for_rule(rule.metadata, registry.by_id(rule.metadata.id).policy),
         )
         await client.aclose()
         return evaluation
@@ -300,7 +301,10 @@ def test_external_custom_rule_rejects_stale_or_malformed_response(
         try:
             await rule.evaluate(
                 RuleContext(build_document("note.md", "Direct prose for review.")),
-                manager.for_rule(rule.metadata),
+                manager.for_rule(
+                    rule.metadata,
+                    build_registry(config, custom_rules=(rule,)).by_id(rule.metadata.id).policy,
+                ),
             )
         finally:
             await client.aclose()

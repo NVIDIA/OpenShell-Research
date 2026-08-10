@@ -165,7 +165,6 @@ class ServiceConfig(StrictModel):
         le=MAX_EXTERNAL_RESPONSE_BYTES,
     )
     max_attempts: int = Field(default=1, ge=1, le=3)
-    required_judge_revision: str = Field(min_length=1, max_length=128)
 
     @field_validator("url")
     @classmethod

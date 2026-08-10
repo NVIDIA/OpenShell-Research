@@ -7,12 +7,13 @@ import os
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
 
-from slop_cop.config import ServiceConfig, SlopCopConfig
+from slop_cop.config import RulePolicy, ServiceConfig, SlopCopConfig
 from slop_cop.rules.api import RuleMetadata
 
 _RETRYABLE_STATUS_CODES = frozenset({429, 502, 503, 504})
@@ -55,25 +56,31 @@ class RuntimeManager:
         if self._owns_client and self.client is not None:
             await self.client.aclose()
 
-    def for_rule(self, metadata: RuleMetadata) -> RuleRuntime:
-        return RuleRuntime(self, metadata)
+    def for_rule(self, metadata: RuleMetadata, policy: RulePolicy) -> RuleRuntime:
+        return RuleRuntime(
+            self,
+            metadata,
+            policy.service,
+            MappingProxyType(dict(policy.settings)),
+        )
 
 
 @dataclass(frozen=True, slots=True)
 class RuleRuntime:
     manager: RuntimeManager
     metadata: RuleMetadata
+    selected_service: str | None
+    settings: Mapping[str, Any]
 
     @property
     def deadline(self) -> float:
         assert self.manager.deadline is not None
         return self.manager.deadline
 
-    def service(self, name: str) -> NamedService:
-        if name not in self.metadata.services:
-            raise RuleRuntimeError(
-                f"rule {self.metadata.id} attempted to use an undeclared service"
-            )
+    def service(self) -> NamedService:
+        name = self.selected_service
+        if name is None:
+            raise RuleRuntimeError(f"rule {self.metadata.id} has no configured service")
         try:
             service_config = self.manager.config.services[name]
         except KeyError as error:

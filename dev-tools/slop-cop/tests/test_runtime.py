@@ -8,7 +8,7 @@ from typing import Any
 import httpx
 import pytest
 
-from slop_cop.config import SlopCopConfig, load_config
+from slop_cop.config import RulePolicy, Severity, SlopCopConfig, load_config
 from slop_cop.rules.api import RuleMetadata
 from slop_cop.runtime import RuleRuntimeError, RuntimeManager, ServiceResponse
 
@@ -24,7 +24,6 @@ def _config(**service_overrides: Any) -> SlopCopConfig:
             "timeout_seconds": 5.0,
             "max_response_bytes": 1024,
             "max_attempts": 1,
-            "required_judge_revision": "editorial-v1",
             **service_overrides,
         }
     }
@@ -40,6 +39,18 @@ def _metadata() -> RuleMetadata:
         advice="Review the evidence and state the claim directly.",
         execution_kind="external",
         services=("judge",),
+    )
+
+
+def _policy() -> RulePolicy:
+    return RulePolicy(
+        severity=Severity.WARNING,
+        service="judge",
+        max_signal_units=1,
+        fixed_allowance=0,
+        first_cost=1,
+        repeat_cost=1,
+        cap=3,
     )
 
 
@@ -60,8 +71,8 @@ async def _post(
     )
     try:
         return (
-            await manager.for_rule(_metadata())
-            .service("judge")
+            await manager.for_rule(_metadata(), _policy())
+            .service()
             .post_json(payload or {"prose": "private prose"})
         )
     finally:
@@ -84,7 +95,9 @@ def test_named_service_applies_auth_and_returns_bounded_json() -> None:
         manager = RuntimeManager(
             _config(), client=client, environment={"SLOP_COP_JUDGE_TOKEN": "secret"}
         )
-        response = await manager.for_rule(_metadata()).service("judge").post_json({"prose": "text"})
+        response = (
+            await manager.for_rule(_metadata(), _policy()).service().post_json({"prose": "text"})
+        )
         await client.aclose()
         return response
 
@@ -99,7 +112,9 @@ def test_missing_service_credential_is_content_safe() -> None:
         manager = RuntimeManager(_config(), client=client, environment={})
         try:
             await (
-                manager.for_rule(_metadata()).service("judge").post_json({"prose": "secret prose"})
+                manager.for_rule(_metadata(), _policy())
+                .service()
+                .post_json({"prose": "secret prose"})
             )
         finally:
             await client.aclose()

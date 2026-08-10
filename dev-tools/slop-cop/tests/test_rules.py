@@ -49,6 +49,17 @@ def test_artifact_rule_ignores_inline_code() -> None:
     assert _signals("artifact.ai-disclosure", "As an AI language model, I cannot verify that.")
 
 
+def test_artifact_rule_ignores_indented_code_and_lazy_blockquotes() -> None:
+    assert not _signals(
+        "artifact.ai-disclosure",
+        "    As an AI language model, I cannot verify that.\n",
+    )
+    assert not _signals(
+        "artifact.ai-disclosure",
+        "> Example response:\nAs an AI language model, I cannot verify that.\n",
+    )
+
+
 def test_not_just_uses_word_boundaries() -> None:
     signals = _signals("rhetoric.not-just", "This is not just a wrapper.")
     assert len(signals) == 1

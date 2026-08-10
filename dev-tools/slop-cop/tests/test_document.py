@@ -37,6 +37,22 @@ def test_blockquotes_can_be_scanned_explicitly() -> None:
     assert "Quoted prose" in scanned.prose_projection
 
 
+def test_indented_code_and_lazy_blockquote_continuations_are_masked() -> None:
+    source = (
+        "    As an AI language model, this is sample output.\n\n"
+        "> Quoted first line\n"
+        "As an AI language model, this is a lazy continuation.\n\n"
+        "Visible prose.\n"
+    )
+
+    document = build_document("note.md", source)
+
+    assert "AI language model" not in document.prose_projection
+    assert "Visible prose" in document.prose_projection
+    assert any("indented-code" in item.reasons for item in document.masked_ranges)
+    assert any("blockquote" in item.reasons for item in document.masked_ranges)
+
+
 def test_segments_retain_exact_source_offsets_and_unicode_keys() -> None:
     source = "# Heading\n\nCafé’s source-aware token. Next sentence!\n"
     document = build_document("note.md", source)

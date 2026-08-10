@@ -40,6 +40,16 @@ def test_overlap_charges_one_primary_finding() -> None:
     assert any(finding.related_rule_ids for finding in overlapping)
 
 
+def test_compound_contrast_cannot_erase_not_just_cost() -> None:
+    standalone = _analyze("This is not just a wrapper.")
+    compound = _analyze("This is not just a wrapper, but a policy boundary.")
+
+    assert standalone.score == 97
+    assert compound.score == standalone.score
+    charged = [finding for finding in compound.findings if finding.chargeable]
+    assert [finding.rule_id for finding in charged] == ["rhetoric.not-just"]
+
+
 def test_ignore_next_suppresses_only_the_target_block() -> None:
     source = (
         '<!-- slop-cop: ignore-next=rhetoric.not-just reason="Named API contrast" -->\n'

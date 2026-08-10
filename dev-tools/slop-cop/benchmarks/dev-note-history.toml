@@ -51,3 +51,43 @@ source_url = "https://github.com/NVIDIA/OpenShell-Research/blob/b0d481796b8a0492
 expected_decision = "pass"
 min_score = 92
 max_score = 98
+
+[[benchmark]]
+name = "clean technical prose"
+path = "docs/dev-notes/posts/benchmark-clean.md"
+fixture_path = "dev-tools/slop-cop/benchmarks/fixtures/clean-technical.md"
+expected_decision = "pass"
+min_score = 100
+max_score = 100
+
+[[benchmark]]
+name = "legitimate contrast and citation"
+path = "docs/dev-notes/posts/benchmark-contrast.md"
+fixture_path = "dev-tools/slop-cop/benchmarks/fixtures/legitimate-contrast-and-citation.md"
+expected_decision = "pass"
+min_score = 95
+max_score = 99
+
+[[benchmark]]
+name = "normal technical structure"
+path = "docs/dev-notes/posts/benchmark-structure.md"
+fixture_path = "dev-tools/slop-cop/benchmarks/fixtures/normal-technical-structure.md"
+expected_decision = "pass"
+min_score = 100
+max_score = 100
+
+[[benchmark]]
+name = "dense multi-family prose"
+path = "docs/dev-notes/posts/benchmark-dense.md"
+fixture_path = "dev-tools/slop-cop/benchmarks/fixtures/dense-formulaic.md"
+expected_decision = "fail"
+min_score = 0
+max_score = 79
+
+[[benchmark]]
+name = "blocking assistant residue"
+path = "docs/dev-notes/posts/benchmark-blocking.md"
+fixture_path = "dev-tools/slop-cop/benchmarks/fixtures/blocking-residue.md"
+expected_decision = "fail"
+min_score = 0
+max_score = 0
