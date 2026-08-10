@@ -41,7 +41,7 @@ hide:
           <time datetime="2026-08-07">August 7, 2026</time>
           <span>Physical AI</span>
         </div>
-        <h3>Can Formal Methods Govern AI-Generated Robot Actions? An OpenShell-Inspired Experiment</h3>
+        <h3>Can Formal Methods Govern AI-Generated Robot Actions?</h3>
         <p class="dev-note-card__summary">A robotics experiment asks whether an independent, SMT-backed policy boundary can efficiently govern AI-generated plans before they reach a simulated or physical robot.</p>
         <div class="dev-note-card__tags" aria-label="Tags">
           <span>physical-ai</span>
