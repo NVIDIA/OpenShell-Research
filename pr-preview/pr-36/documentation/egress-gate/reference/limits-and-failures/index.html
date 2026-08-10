@@ -595,6 +595,8 @@
       
         
       
+        
+      
     
     
     
@@ -650,6 +652,33 @@
     
   
   Configure policies
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../request-content/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Parse request content
 
     
   </span>
@@ -1380,6 +1409,30 @@ applies its configured <code>on_error</code> behavior when that ceiling expires 
 <td style="text-align: right;">4 MiB</td>
 </tr>
 <tr>
+<td>JSON nesting depth</td>
+<td style="text-align: right;">128</td>
+</tr>
+<tr>
+<td>JSON value nodes</td>
+<td style="text-align: right;">100,000</td>
+</tr>
+<tr>
+<td>JSON field selectors per scan</td>
+<td style="text-align: right;">32</td>
+</tr>
+<tr>
+<td>Message content selectors per mapping</td>
+<td style="text-align: right;">32, plus the required messages selector</td>
+</tr>
+<tr>
+<td>JSON path segments per selector</td>
+<td style="text-align: right;">32</td>
+</tr>
+<tr>
+<td>Selected JSON nodes or normalized message blocks</td>
+<td style="text-align: right;">4,096</td>
+</tr>
+<tr>
 <td>Pipeline gates</td>
 <td style="text-align: right;">10</td>
 </tr>
@@ -1439,7 +1492,7 @@ rejected value.</p>
 </thead>
 <tbody>
 <tr>
-<td>Invalid phase, envelope, policy, or input encoding</td>
+<td>Invalid phase, envelope, policy, input encoding, or configured JSON format</td>
 <td>gRPC <code>INVALID_ARGUMENT</code></td>
 </tr>
 <tr>

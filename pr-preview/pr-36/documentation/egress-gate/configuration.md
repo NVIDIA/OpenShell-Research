@@ -49,10 +49,16 @@ fields, unknown gate types, missing defaults, and duplicate names.
 
 The shipped registry contains only `regex`. See
 [Regex gate](gates/regex.md) for scans, actions, catalogs, and replacement
-templates. `scan.kind` selects the body, path, query, or named headers.
-`scan.action.kind` selects `detect` or `deny`; a body scan can also select
-`replace`. The schema does not permit `replace` for another scan kind. A
-trusted application registry supplies other behavior.
+templates. `scan.kind` selects the complete body, selected JSON string fields,
+normalized message blocks, path, query, or named headers. Every scan supports
+`detect` and `deny`. Complete-body, `json-fields`, and `message-blocks` scans
+also support `replace`; path, query, and header schemas do not. A trusted
+application registry supplies other behavior.
+
+Structured scans do not activate automatically based on headers or request
+contents. Existing `kind: body` policies retain their complete-body UTF-8
+behavior. Choose `json-fields` or `message-blocks` explicitly when a policy
+expects a strict JSON request body.
 
 ## Inspect the installed registry
 

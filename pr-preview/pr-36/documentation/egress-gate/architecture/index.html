@@ -597,6 +597,8 @@
       
         
       
+        
+      
     
     
     
@@ -652,6 +654,33 @@
     
   
   Configure policies
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../request-content/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Parse request content
 
     
   </span>
@@ -1333,6 +1362,10 @@
 <td>Immutable request, headers, and <code>RequestMutations</code></td>
 </tr>
 <tr>
+<td><code>request_content/</code></td>
+<td>Reusable text parsers, strict JSON documents, typed selection, source-preserving edits, and normalized message blocks</td>
+</tr>
+<tr>
 <td><code>result.py</code></td>
 <td>Gate evaluations, five-field findings, provenance, traces, and result invariants</td>
 </tr>
@@ -1345,8 +1378,12 @@
 <td>Trusted registration, exact pipeline schema, resources, discovery, and processor preparation</td>
 </tr>
 <tr>
+<td><code>gates/regex_scans.py</code></td>
+<td>Typed regex scan and action policy configuration</td>
+</tr>
+<tr>
 <td><code>gates/regex.py</code></td>
-<td>Typed scan and action selection, bounded matching, overlap handling, caching, and body replacement</td>
+<td>Content-parser composition, non-body text adaptation, pattern catalogs, bounded matching, finding aggregation, and gate evaluation</td>
 </tr>
 <tr>
 <td><code>config.py</code></td>
@@ -1367,6 +1404,19 @@
 does not add a second execution path or import the transport adapter.</p>
 <p>Only <code>service/</code> imports generated protobuf/gRPC bindings. The pipeline processor
 and gates receive domain values and can be tested offline.</p>
+<p>The request body remains canonical immutable bytes. A configured gate can
+interpret the current body snapshot as strict JSON and select text nodes, then
+optionally adapt those nodes to normalized message blocks. These views remain
+local to one gate evaluation. The pipeline processor does not parse bodies or
+cache request state across reusable gate instances.</p>
+<p>Regex scan models remain declarative Pydantic configuration. During gate
+preparation, body-based variants compose a reusable <code>RequestContentParser</code>:
+<code>Utf8TextParser</code>, <code>JsonFieldsParser</code>, or <code>MessageBlocksParser</code>. Each parser owns
+text extraction and how immutable <code>TextReplacement</code> values become bounded body
+bytes. <code>MessageBlocksParser</code> composes a <code>MessageBlockExtractor</code> to normalize a
+parsed JSON document without conflating that semantic step with body parsing.
+The regex gate only adapts path, query, and header values itself, then applies
+matching and actions uniformly to the text targets it receives.</p>
 <h2 id="pipeline-execution">Pipeline execution</h2>
 <figure class="documentation-figure documentation-figure--wide">
   <img src="../assets/diagrams/processing-pipeline.svg" alt="A request moves through pipeline processor controls and an ordered gate pipeline before Egress Gate returns a result.">

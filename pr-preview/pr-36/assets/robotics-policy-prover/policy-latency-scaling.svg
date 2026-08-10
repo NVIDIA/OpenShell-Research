@@ -12,15 +12,15 @@
 <line class="grid" x1="90" y1="490.0" x2="1110" y2="490.0"/>
 <text class="tick" x="76" y="494.0" text-anchor="end">0.00</text>
 <line class="grid" x1="90" y1="426.0" x2="1110" y2="426.0"/>
-<text class="tick" x="76" y="430.0" text-anchor="end">0.48</text>
+<text class="tick" x="76" y="430.0" text-anchor="end">0.32</text>
 <line class="grid" x1="90" y1="362.0" x2="1110" y2="362.0"/>
-<text class="tick" x="76" y="366.0" text-anchor="end">0.96</text>
+<text class="tick" x="76" y="366.0" text-anchor="end">0.64</text>
 <line class="grid" x1="90" y1="298.0" x2="1110" y2="298.0"/>
-<text class="tick" x="76" y="302.0" text-anchor="end">1.44</text>
+<text class="tick" x="76" y="302.0" text-anchor="end">0.96</text>
 <line class="grid" x1="90" y1="234.0" x2="1110" y2="234.0"/>
-<text class="tick" x="76" y="238.0" text-anchor="end">1.92</text>
+<text class="tick" x="76" y="238.0" text-anchor="end">1.28</text>
 <line class="grid" x1="90" y1="170.0" x2="1110" y2="170.0"/>
-<text class="tick" x="76" y="174.0" text-anchor="end">2.40</text>
+<text class="tick" x="76" y="174.0" text-anchor="end">1.60</text>
 <line class="axis" x1="90" y1="170" x2="90" y2="490"/>
 <line class="axis" x1="90" y1="490" x2="1110" y2="490"/>
 <text class="tick" x="90.0" y="516" text-anchor="middle">3</text>
@@ -29,27 +29,27 @@
 <text class="tick" x="855.0" y="516" text-anchor="middle">24</text>
 <text class="tick" x="1110.0" y="516" text-anchor="middle">48</text>
 <text class="label" x="600.0" y="540" text-anchor="middle">Waypoints in proposed path</text>
-<polygon points="90.0,295.0 345.0,295.8 600.0,291.5 855.0,295.7 1110.0,292.2 1110.0,318.0 855.0,318.1 600.0,318.4 345.0,318.9 90.0,318.4" fill="#76b900" opacity="0.10"/>
-<polyline points="90.0,312.8 345.0,313.8 600.0,309.7 855.0,312.6 1110.0,310.3" fill="none" stroke="#76b900" stroke-width="3"/>
-<circle cx="90.0" cy="312.8" r="4.5" fill="#fff" stroke="#76b900" stroke-width="3"/>
-<circle cx="345.0" cy="313.8" r="4.5" fill="#fff" stroke="#76b900" stroke-width="3"/>
-<circle cx="600.0" cy="309.7" r="4.5" fill="#fff" stroke="#76b900" stroke-width="3"/>
-<circle cx="855.0" cy="312.6" r="4.5" fill="#fff" stroke="#76b900" stroke-width="3"/>
-<circle cx="1110.0" cy="310.3" r="4.5" fill="#fff" stroke="#76b900" stroke-width="3"/>
-<polygon points="90.0,289.4 345.0,291.0 600.0,184.8 855.0,290.0 1110.0,290.2 1110.0,317.6 855.0,317.7 600.0,317.2 345.0,317.7 90.0,317.6" fill="#d92d20" opacity="0.10"/>
-<polyline points="90.0,306.9 345.0,310.2 600.0,238.5 855.0,307.9 1110.0,308.1" fill="none" stroke="#d92d20" stroke-width="3"/>
-<circle cx="90.0" cy="306.9" r="4.5" fill="#fff" stroke="#d92d20" stroke-width="3"/>
-<circle cx="345.0" cy="310.2" r="4.5" fill="#fff" stroke="#d92d20" stroke-width="3"/>
-<circle cx="600.0" cy="238.5" r="4.5" fill="#fff" stroke="#d92d20" stroke-width="3"/>
-<circle cx="855.0" cy="307.9" r="4.5" fill="#fff" stroke="#d92d20" stroke-width="3"/>
-<circle cx="1110.0" cy="308.1" r="4.5" fill="#fff" stroke="#d92d20" stroke-width="3"/>
-<polygon points="90.0,290.7 345.0,290.2 600.0,291.4 855.0,292.3 1110.0,290.2 1110.0,317.6 855.0,321.3 600.0,318.0 345.0,317.8 90.0,318.0" fill="#1570ef" opacity="0.10"/>
-<polyline points="90.0,310.1 345.0,308.7 600.0,310.9 855.0,312.3 1110.0,306.5" fill="none" stroke="#1570ef" stroke-width="3"/>
-<circle cx="90.0" cy="310.1" r="4.5" fill="#fff" stroke="#1570ef" stroke-width="3"/>
-<circle cx="345.0" cy="308.7" r="4.5" fill="#fff" stroke="#1570ef" stroke-width="3"/>
-<circle cx="600.0" cy="310.9" r="4.5" fill="#fff" stroke="#1570ef" stroke-width="3"/>
-<circle cx="855.0" cy="312.3" r="4.5" fill="#fff" stroke="#1570ef" stroke-width="3"/>
-<circle cx="1110.0" cy="306.5" r="4.5" fill="#fff" stroke="#1570ef" stroke-width="3"/>
+<polygon points="90.0,239.8 345.0,233.8 600.0,234.1 855.0,229.7 1110.0,234.7 1110.0,292.3 855.0,292.7 600.0,316.4 345.0,317.4 90.0,335.8" fill="#76b900" opacity="0.10"/>
+<polyline points="90.0,243.6 345.0,241.5 600.0,241.9 855.0,241.1 1110.0,240.4" fill="none" stroke="#76b900" stroke-width="3"/>
+<circle cx="90.0" cy="243.6" r="4.5" fill="#fff" stroke="#76b900" stroke-width="3"/>
+<circle cx="345.0" cy="241.5" r="4.5" fill="#fff" stroke="#76b900" stroke-width="3"/>
+<circle cx="600.0" cy="241.9" r="4.5" fill="#fff" stroke="#76b900" stroke-width="3"/>
+<circle cx="855.0" cy="241.1" r="4.5" fill="#fff" stroke="#76b900" stroke-width="3"/>
+<circle cx="1110.0" cy="240.4" r="4.5" fill="#fff" stroke="#76b900" stroke-width="3"/>
+<polygon points="90.0,235.7 345.0,199.7 600.0,237.5 855.0,252.4 1110.0,252.2 1110.0,339.6 855.0,339.7 600.0,319.3 345.0,291.3 90.0,293.2" fill="#d92d20" opacity="0.10"/>
+<polyline points="90.0,242.0 345.0,240.2 600.0,241.7 855.0,288.3 1110.0,288.8" fill="none" stroke="#d92d20" stroke-width="3"/>
+<circle cx="90.0" cy="242.0" r="4.5" fill="#fff" stroke="#d92d20" stroke-width="3"/>
+<circle cx="345.0" cy="240.2" r="4.5" fill="#fff" stroke="#d92d20" stroke-width="3"/>
+<circle cx="600.0" cy="241.7" r="4.5" fill="#fff" stroke="#d92d20" stroke-width="3"/>
+<circle cx="855.0" cy="288.3" r="4.5" fill="#fff" stroke="#d92d20" stroke-width="3"/>
+<circle cx="1110.0" cy="288.8" r="4.5" fill="#fff" stroke="#d92d20" stroke-width="3"/>
+<polygon points="90.0,240.0 345.0,235.5 600.0,235.1 855.0,237.9 1110.0,248.2 1110.0,338.4 855.0,293.0 600.0,290.4 345.0,289.7 90.0,339.6" fill="#1570ef" opacity="0.10"/>
+<polyline points="90.0,272.7 345.0,240.3 600.0,239.9 855.0,240.8 1110.0,279.1" fill="none" stroke="#1570ef" stroke-width="3"/>
+<circle cx="90.0" cy="272.7" r="4.5" fill="#fff" stroke="#1570ef" stroke-width="3"/>
+<circle cx="345.0" cy="240.3" r="4.5" fill="#fff" stroke="#1570ef" stroke-width="3"/>
+<circle cx="600.0" cy="239.9" r="4.5" fill="#fff" stroke="#1570ef" stroke-width="3"/>
+<circle cx="855.0" cy="240.8" r="4.5" fill="#fff" stroke="#1570ef" stroke-width="3"/>
+<circle cx="1110.0" cy="279.1" r="4.5" fill="#fff" stroke="#1570ef" stroke-width="3"/>
 <line x1="780" y1="132" x2="804" y2="132" stroke="#76b900" stroke-width="3"/>
 <text class="tick" x="811" y="136">allow</text>
 <line x1="890" y1="132" x2="914" y2="132" stroke="#d92d20" stroke-width="3"/>
@@ -62,24 +62,24 @@
 <text class="note" x="65" y="617">Sensitivity analysis only: illustrative inference time + slowest measured policy p95. Model inference was not measured in this run.</text>
 <text class="tick" x="157" y="658" text-anchor="end">100 ms</text>
 <rect x="175" y="646" width="880" height="12" rx="6" fill="#eaecf0"/>
-<rect x="175" y="646" width="166.0" height="12" rx="6" fill="#76b900"/>
-<text class="tick" x="1070" y="658">1.89%</text>
+<rect x="175" y="646" width="110.0" height="12" rx="6" fill="#76b900"/>
+<text class="tick" x="1070" y="658">1.25%</text>
 <text class="tick" x="157" y="682" text-anchor="end">250 ms</text>
 <rect x="175" y="670" width="880" height="12" rx="6" fill="#eaecf0"/>
-<rect x="175" y="670" width="66.4" height="12" rx="6" fill="#76b900"/>
-<text class="tick" x="1070" y="682">0.75%</text>
+<rect x="175" y="670" width="44.0" height="12" rx="6" fill="#76b900"/>
+<text class="tick" x="1070" y="682">0.50%</text>
 <text class="tick" x="157" y="706" text-anchor="end">500 ms</text>
 <rect x="175" y="694" width="880" height="12" rx="6" fill="#eaecf0"/>
-<rect x="175" y="694" width="33.2" height="12" rx="6" fill="#76b900"/>
-<text class="tick" x="1070" y="706">0.38%</text>
+<rect x="175" y="694" width="22.0" height="12" rx="6" fill="#76b900"/>
+<text class="tick" x="1070" y="706">0.25%</text>
 <text class="tick" x="157" y="730" text-anchor="end">1,000 ms</text>
 <rect x="175" y="718" width="880" height="12" rx="6" fill="#eaecf0"/>
-<rect x="175" y="718" width="16.6" height="12" rx="6" fill="#76b900"/>
-<text class="tick" x="1070" y="730">0.19%</text>
+<rect x="175" y="718" width="11.0" height="12" rx="6" fill="#76b900"/>
+<text class="tick" x="1070" y="730">0.13%</text>
 <text class="tick" x="157" y="754" text-anchor="end">2,000 ms</text>
 <rect x="175" y="742" width="880" height="12" rx="6" fill="#eaecf0"/>
-<rect x="175" y="742" width="8.3" height="12" rx="6" fill="#76b900"/>
-<text class="tick" x="1070" y="754">0.09%</text>
-<text class="metric" x="1085" y="596" text-anchor="end">slowest p95: 1.886 ms</text>
+<rect x="175" y="742" width="5.5" height="12" rx="6" fill="#76b900"/>
+<text class="tick" x="1070" y="754">0.06%</text>
+<text class="metric" x="1085" y="596" text-anchor="end">slowest p95: 1.250 ms</text>
 <text class="note" x="60" y="808">Platform: NVIDIA DGX Spark (GB10, 20-core Arm), Ubuntu 24.04 · power mode uncontrolled</text>
 </svg>

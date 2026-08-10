@@ -99,6 +99,7 @@ policy pipeline can run in offline tests.
 ## Further reading
 
 - [Configuration](configuration.md)
+- [Parse request content](request-content.md)
 - [Test policies offline](evaluation.md)
 - [Operations](operations.md)
 - [Gate authoring](gates/custom.md)
