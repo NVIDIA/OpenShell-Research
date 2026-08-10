@@ -13,7 +13,11 @@ from pydantic import Field, model_validator
 
 from slop_cop.config import MAX_SOURCE_BYTES, ContextConfig, RuleId, StrictModel
 
-_FENCE_OPEN = re.compile(r"^( {0,3})(`{3,}|~{3,})[^\r\n]*(?:\r?\n|$)", re.MULTILINE)
+_FENCE_OPEN = re.compile(
+    r"^(?P<quote>(?: {0,3}>[ \t]?)*)(?P<indent> {0,3})"
+    r"(?P<fence>`{3,}|~{3,})[^\r\n]*(?:\r?\n|$)",
+    re.MULTILINE,
+)
 _BLOCK_INTERRUPT = re.compile(
     r"^(?: {4}|\t| {0,3}(?:#{1,6}(?:\s|$)|[-+*]\s|\d+[.)]\s|`{3,}|~{3,}|"
     r"(?:\*\s*){3,}$|(?:-\s*){3,}$|(?:_\s*){3,}$|<[/!?A-Za-z]))"
@@ -134,6 +138,14 @@ def _covered(offset: int, ranges: list[tuple[int, int, str]]) -> bool:
     return any(start <= offset < end for start, end, _ in ranges)
 
 
+def _strip_blockquote_markers(text: str) -> tuple[str, int]:
+    depth = 0
+    while (marker := re.match(r"^ {0,3}>[ \t]?", text)) is not None:
+        text = text[marker.end() :]
+        depth += 1
+    return text, depth
+
+
 def _add_front_matter(
     source: str, ranges: list[tuple[int, int, str]]
 ) -> tuple[tuple[str, str], ...]:
@@ -190,9 +202,12 @@ def _add_fenced_code(source: str, ranges: list[tuple[int, int, str]]) -> None:
         cursor = match.end()
         if _covered(match.start(), ranges):
             continue
-        fence = match.group(2)
+        fence = match.group("fence")
+        quote_depth = match.group("quote").count(">")
         closer = re.compile(
-            rf"^ {{0,3}}{re.escape(fence[0])}{{{len(fence)},}}[ \t]*(?:\r?\n|$)", re.MULTILINE
+            rf"^(?: {{0,3}}>[ \t]?){{{quote_depth}}} {{0,3}}"
+            rf"{re.escape(fence[0])}{{{len(fence)},}}[ \t]*(?:\r?\n|$)",
+            re.MULTILINE,
         ).search(source, match.end())
         if closer is None:
             raise ProjectionError("unterminated fenced code block", source, match.start())
@@ -208,8 +223,9 @@ def _add_indented_code(source: str, ranges: list[tuple[int, int, str]]) -> None:
     previous_blank = True
     for line in lines:
         text = line.group(0).rstrip("\r\n")
-        blank = not text.strip()
-        indented = text.startswith("    ") or text.startswith("\t")
+        content, _ = _strip_blockquote_markers(text)
+        blank = not content.strip()
+        indented = content.startswith("    ") or content.startswith("\t")
         if in_block:
             if indented or blank:
                 block_end = line.end()
@@ -406,9 +422,7 @@ def _add_blockquotes(source: str, ranges: list[tuple[int, int, str]]) -> None:
                 start = line.start()
                 active = True
             end = line.end()
-            content = text
-            while (nested := re.match(r"^ {0,3}>[ \t]?", content)) is not None:
-                content = content[nested.end() :]
+            content, _ = _strip_blockquote_markers(text)
             lazy_continuation = bool(content.strip()) and not _BLOCK_INTERRUPT.match(content)
         elif active and lazy_continuation and not blank and not _BLOCK_INTERRUPT.match(text):
             end = line.end()

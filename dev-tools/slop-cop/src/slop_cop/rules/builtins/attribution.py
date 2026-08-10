@@ -4,7 +4,15 @@ import regex
 
 from slop_cop.rules.api import FunctionRule, RuleContext, RuleEvaluation, RuleMetadata, RuleSignal
 
-_CITATION = regex.compile(r"(?<!!)\[[^\]\n]+\](?:\([^\n)]+\)|\[[^\]\n]*\])")
+_CITATION = regex.compile(
+    r"(?<!!)\[(?P<label>[^\]\n]+)\]"
+    r"(?:\((?P<destination>[^\n)]+)\)|\[(?P<reference>[^\]\n]*)\])"
+)
+_REFERENCE_DEFINITION = regex.compile(r"^ {0,3}\[(?P<label>[^\]\n]+)\]:\s*\S+", regex.MULTILINE)
+
+
+def _reference_key(value: str) -> str:
+    return " ".join(value.casefold().split())
 
 
 def _rule(
@@ -19,6 +27,10 @@ def _rule(
 
     def evaluate(context: RuleContext, runtime: object) -> RuleEvaluation:
         signals: list[RuleSignal] = []
+        references = {
+            _reference_key(match.group("label"))
+            for match in _REFERENCE_DEFINITION.finditer(context.source)
+        }
         for match in compiled.finditer(context.projected_prose):
             sentence = next(
                 item for item in context.sentences if item.start <= match.start() < item.end
@@ -26,7 +38,12 @@ def _rule(
             citation_end = min(sentence.end, match.end() + citation_distance)
             citations = _CITATION.finditer(context.source, match.end(), citation_end)
             if any(
-                any(
+                (
+                    citation.group("destination") is not None
+                    or _reference_key(citation.group("reference") or citation.group("label"))
+                    in references
+                )
+                and any(
                     masked.start <= citation.start() < masked.end
                     and set(masked.reasons) == {"link-markup"}
                     for masked in context.document.masked_ranges

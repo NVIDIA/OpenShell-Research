@@ -255,7 +255,13 @@ source = "Experts say this pattern is safe ([audit](https://example.test/audit))
 name = "vague-authority-reference-citation"
 rule_id = "attribution.vague-authority"
 kind = "counterexample"
-source = "Experts say this pattern is safe [according to the audit][audit]."
+source = "Experts say this pattern is safe [according to the audit][audit].\n\n[audit]: https://example.test/audit"
+
+[[case]]
+name = "vague-authority-dangling-reference"
+rule_id = "attribution.vague-authority"
+kind = "positive"
+source = "Experts say this pattern is safe [according to the audit][missing]."
 
 [[case]]
 name = "vague-authority-distant-citation"

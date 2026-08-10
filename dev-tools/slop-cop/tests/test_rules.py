@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from slop_cop.config import load_config
+from slop_cop.config import ContextConfig, load_config
 from slop_cop.document import build_document
 from slop_cop.rules.api import RuleContext, RuleSignal
 from slop_cop.rules.registry import build_registry
@@ -16,10 +16,12 @@ CASE_PATH = Path(__file__).with_name("rule_cases.toml")
 RULE_CASES = tomllib.loads(CASE_PATH.read_text(encoding="utf-8"))["case"]
 
 
-def _signals(rule_id: str, source: str) -> tuple[RuleSignal, ...]:
+def _signals(
+    rule_id: str, source: str, *, contexts: ContextConfig | None = None
+) -> tuple[RuleSignal, ...]:
     config = load_config(CONFIG_PATH)
     rule = build_registry(config).by_id(rule_id).rule
-    document = build_document("note.md", source)
+    document = build_document("note.md", source, contexts=contexts)
     return asyncio.run(rule.evaluate(RuleContext(document), object())).signals
 
 
@@ -57,6 +59,18 @@ def test_artifact_rule_ignores_indented_code_and_lazy_blockquotes() -> None:
     assert not _signals(
         "artifact.ai-disclosure",
         "> Example response:\nAs an AI language model, I cannot verify that.\n",
+    )
+
+
+def test_artifact_rule_ignores_code_inside_scanned_blockquotes() -> None:
+    source = (
+        "> Visible quoted prose.\n\n> ```text\n> As an AI language model, sample output.\n> ```\n"
+    )
+
+    assert not _signals(
+        "artifact.ai-disclosure",
+        source,
+        contexts=ContextConfig(scan_blockquotes=True),
     )
 
 

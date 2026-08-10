@@ -37,6 +37,24 @@ def test_blockquotes_can_be_scanned_explicitly() -> None:
     assert "Quoted prose" in scanned.prose_projection
 
 
+def test_scanned_blockquotes_still_mask_nested_code() -> None:
+    source = (
+        "> Visible quoted prose.\n\n"
+        "> ```text\n"
+        "> As an AI language model, fenced sample.\n"
+        "> ```\n\n"
+        ">\n"
+        ">     As an AI language model, indented sample.\n"
+    )
+
+    document = build_document("note.md", source, contexts=ContextConfig(scan_blockquotes=True))
+
+    assert "Visible quoted prose" in document.prose_projection
+    assert "AI language model" not in document.prose_projection
+    assert any("fenced-code" in item.reasons for item in document.masked_ranges)
+    assert any("indented-code" in item.reasons for item in document.masked_ranges)
+
+
 def test_indented_code_and_lazy_blockquote_continuations_are_masked() -> None:
     source = (
         "    As an AI language model, this is sample output.\n\n"
