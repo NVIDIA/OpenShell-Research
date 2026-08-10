@@ -177,3 +177,6 @@ def test_trusted_reporter_revalidates_override_and_uses_pr_head() -> None:
     assert "report.head_sha !== run.head_sha" not in workflow
     assert "run.pull_requests.length !== 1" in workflow
     assert ".replaceAll('@', '&#64;')" in workflow
+    assert "github.rest.actions.getWorkflow" in workflow
+    assert "run.workflow_id !== trustedWorkflow.id" in workflow
+    assert "run.path !== trustedWorkflow.path" in workflow

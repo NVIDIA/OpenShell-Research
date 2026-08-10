@@ -60,6 +60,9 @@ def test_indented_code_and_lazy_blockquote_continuations_are_masked() -> None:
         "> Quoted paragraph.\n# As an AI language model, this heading is outside.\n",
         "> - Quoted list item\nAs an AI language model, this is outside prose.\n",
         "> Quoted paragraph.\n---\nAs an AI language model, this is outside prose.\n",
+        "> > # Nested quoted heading\nAs an AI language model, this is outside prose.\n",
+        "> > - Nested quoted list\nAs an AI language model, this is outside prose.\n",
+        "> > ```text\nAs an AI language model, this is outside prose.\n",
     ],
 )
 def test_completed_blockquotes_do_not_mask_following_blocks(source: str) -> None:

@@ -29,6 +29,15 @@ jobs:
         with:
           script: |
             const run = context.payload.workflow_run;
+            const { data: trustedWorkflow } = await github.rest.actions.getWorkflow({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: '.github/workflows/slop-cop.yml',
+            });
+            if (run.workflow_id !== trustedWorkflow.id || run.path !== trustedWorkflow.path) {
+              core.setFailed('Workflow run did not originate from the authoritative Slop Cop workflow.');
+              return;
+            }
             const { data } = await github.rest.actions.listWorkflowRunArtifacts({
               owner: context.repo.owner,
               repo: context.repo.repo,

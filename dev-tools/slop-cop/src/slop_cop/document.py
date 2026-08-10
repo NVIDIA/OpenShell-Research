@@ -406,7 +406,9 @@ def _add_blockquotes(source: str, ranges: list[tuple[int, int, str]]) -> None:
                 start = line.start()
                 active = True
             end = line.end()
-            content = text[marker.end() :]
+            content = text
+            while (nested := re.match(r"^ {0,3}>[ \t]?", content)) is not None:
+                content = content[nested.end() :]
             lazy_continuation = bool(content.strip()) and not _BLOCK_INTERRUPT.match(content)
         elif active and lazy_continuation and not blank and not _BLOCK_INTERRUPT.match(text):
             end = line.end()
@@ -611,6 +613,8 @@ def build_document(
     ranges: list[tuple[int, int, str]] = []
     front_matter = _add_front_matter(source, ranges)
     _add_generated_ranges(source, ranges)
+    if not effective_contexts.scan_blockquotes:
+        _add_blockquotes(source, ranges)
     _add_fenced_code(source, ranges)
     _add_indented_code(source, ranges)
     parsed_suppressions = _add_suppressions(source, ranges)
@@ -618,8 +622,6 @@ def build_document(
     _add_inline_code(source, ranges)
     _add_html_tags(source, ranges)
     _add_links_and_images(source, ranges)
-    if not effective_contexts.scan_blockquotes:
-        _add_blockquotes(source, ranges)
     _add_disabled_visible_contexts(source, ranges, effective_contexts)
 
     masked = _merge_ranges(source, ranges)

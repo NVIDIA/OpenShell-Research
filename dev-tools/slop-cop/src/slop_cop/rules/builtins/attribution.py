@@ -24,7 +24,15 @@ def _rule(
                 item for item in context.sentences if item.start <= match.start() < item.end
             )
             citation_end = min(sentence.end, match.end() + citation_distance)
-            if _CITATION.search(context.source[match.end() : citation_end]):
+            citations = _CITATION.finditer(context.source, match.end(), citation_end)
+            if any(
+                any(
+                    masked.start <= citation.start() < masked.end
+                    and set(masked.reasons) == {"link-markup"}
+                    for masked in context.document.masked_ranges
+                )
+                for citation in citations
+            ):
                 continue
             signals.append(RuleSignal(start=match.start(), end=match.end(), key=rule_id))
         return RuleEvaluation(signals=tuple(signals))

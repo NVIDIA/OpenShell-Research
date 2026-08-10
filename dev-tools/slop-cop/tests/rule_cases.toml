@@ -282,6 +282,18 @@ kind = "positive"
 source = "Experts say this pattern is safe ![architecture](diagram.svg)."
 
 [[case]]
+name = "vague-authority-code-link"
+rule_id = "attribution.vague-authority"
+kind = "positive"
+source = "Experts say this pattern is safe `[unrelated](https://example.test)`."
+
+[[case]]
+name = "vague-authority-comment-link"
+rule_id = "attribution.vague-authority"
+kind = "positive"
+source = "Experts say this pattern is safe <!-- [unrelated](https://example.test) -->."
+
+[[case]]
 name = "citationless-study-positive"
 rule_id = "attribution.citationless-study"
 kind = "positive"
