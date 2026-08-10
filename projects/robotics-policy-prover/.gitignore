@@ -5,6 +5,7 @@ policy-prover-service/target/
 .env
 .env.*
 !.env.example
+!.env.sample
 .z3-trace
 **/.z3-trace
 .DS_Store

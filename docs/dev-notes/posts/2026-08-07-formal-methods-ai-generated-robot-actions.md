@@ -1,7 +1,7 @@
 ---
 title: "Can Formal Methods Govern AI-Generated Robot Actions? An OpenShell-Inspired Experiment"
 date: 2026-08-07
-updated: 2026-08-07
+updated: 2026-08-10
 description: "A robotics experiment asks whether an independent, SMT-backed policy boundary can efficiently govern AI-generated plans before they reach a simulated or physical robot."
 agent_markdown: true
 hero_image: "../../assets/robotics-policy-prover/robotics-policy-prover-hero.png"
@@ -47,8 +47,8 @@ card_tags:
 *We built a small robotics experiment to test whether OpenShell's approach to
 policy enforcement can be applied to AI-generated robot plans.*
 
-<figure class="dev-note-figure dev-note-figure--hero">
-  <img src="../../assets/robotics-policy-prover/robotics-policy-prover-hero.png" alt="A simulated robot workcell showing a denied six-waypoint path through a red restricted volume and the policy prover's 8.74 millisecond decision.">
+<figure class="dev-note-figure dev-note-figure--hero dev-note-figure--native-aspect">
+  <img src="../../assets/robotics-policy-prover/robotics-policy-prover-hero.png" alt="A simulated robot workcell showing an AI-generated waypoint path, a red restricted volume, and the policy prover's decision.">
 </figure>
 
 OpenShell uses policy enforcement to constrain what AI agents can do in digital
@@ -86,8 +86,8 @@ We set out to learn whether that check could return useful feedback to the
 planner and run quickly enough to fit into an agent's planning loop.
 
 <figure class="dev-note-figure">
-  <img src="../../assets/robotics-policy-prover/action-governance-architecture.svg" alt="Architecture diagram showing an AI agent inside a sandboxed agent runtime. Every proposed plan or short-horizon action passes through a Rust and Z3 action-admission prover that denies it with feedback or admits a constrained contract to either a simulation or a real-world robot. Dedicated controllers retain responsibility for low-level control, while changing world state feeds admission and runtime enforcement.">
-  <figcaption>The agent's plan passes through deterministic action admission before an admitted contract reaches a simulated or real-world environment. Low-level robot control remains outside the prover's planning-cadence role.</figcaption>
+  <img src="../../assets/robotics-policy-prover/action-governance-architecture.svg" alt="Architecture diagram distinguishing the implemented experiment—an AI planner, Rust and Z3 policy service, and Three.js simulator—from planned OpenShell sandbox, Isaac Sim, MuJoCo, and physical robot extensions.">
+  <figcaption>The solid green path is implemented in this experiment. Dashed boxes show the OpenShell runtime, robotics simulators, and physical hardware we plan to evaluate next.</figcaption>
 </figure>
 
 ---
@@ -101,16 +101,16 @@ planner and run quickly enough to fit into an agent's planning loop.
 
 The recorded run follows four steps: propose, check, adapt, execute.
 
-First, the agent proposes a six-waypoint path at 0.35 m/s. One of
-its segments crosses the red restricted volume. The policy service denies the
-action, identifies `restricted_zone_intersection`, returns an approximate
-counterexample point, and supplies a minimum bypass height. Nothing moves.
+First, GPT-5.6 Terra proposes a waypoint path whose direct route crosses the red
+restricted volume. The policy service denies the action, identifies
+`restricted_zone_intersection`, returns an approximate counterexample point,
+and supplies a minimum bypass height. Nothing moves.
 
-The planning loop uses that decision packet to produce a six-waypoint route around the
-restricted volume at 0.18 m/s. Before execution, the world changes: a human
-enters the caution radius. The policy service evaluates the action again and
-changes the contract. The path may proceed, but only at a speed of 0.08 m/s or
-less, with an obligation to pause if the human gets closer.
+The planning loop sends that decision packet back to the model, which proposes
+a route around the restricted volume. Before execution, the world changes: a
+human enters the caution radius. The policy service evaluates the action again
+and changes the contract. The path may proceed, but only at a speed of 0.08 m/s
+or less, with an obligation to pause if the human gets closer.
 
 The executor runs the revised path with the returned speed limit. In this run,
 the planning loop could propose and revise a path, while the policy boundary
@@ -130,7 +130,7 @@ The decision packet looks like this:
     "segment_id": "proposed_segment",
     "zone_id": "restricted_zone.alpha",
     "reason": "restricted_zone_intersection",
-    "point": [-0.18, 0.78, -0.20]
+    "point": [-0.18, 0.35, -0.20]
   }
 }
 ```
@@ -143,9 +143,8 @@ machine-readable feedback for replanning.
 
 ## Why Check the Proposed Action?
 
-This experiment does not attempt to explain or verify everything happening
-inside a model. It applies formal methods to a narrower artifact: the concrete
-action proposed by the planner.
+The prover evaluates the concrete action proposed by the planner. It does not
+inspect the model's reasoning or claim to verify the model itself.
 
 This resembles the formal-methods idea of a *shield*. In
 [safe reinforcement learning via shielding](https://ojs.aaai.org/index.php/AAAI/article/view/11797),
@@ -201,9 +200,8 @@ delegate work, but filesystem, network, process, and inference authority are
 enforced by infrastructure the agent does not control.
 
 This experiment explores whether the same architectural move can extend to the
-physical action domain. The question is not only, "May this agent call the robot
-service?" It is also, "May this particular motion run, with this object, at this
-speed, given the world state we have now?"
+physical action domain. Calling the robot service may be allowed while a
+particular motion, object, speed, or current world state is not.
 
 The prototype expresses each request as an action envelope:
 
@@ -227,9 +225,11 @@ The service turns that envelope into one of four decisions:
   bounds.
 - `approval_required`: stop at a human decision point.
 
-The result also contains obligations. An obligation is a rule the executor must
-continue enforcing after admission, such as pausing if the measured human
-distance drops below a threshold or writing a durable audit event.
+The result also contains obligations for the executor. In this prototype, the
+executor applies returned speed and force limits, emits an audit event, and
+checks the human-distance pause condition immediately before motion. Continuous
+monitoring during execution is part of the next simulator integration, not a
+property of this first version.
 
 The prototype divides responsibility this way:
 
@@ -248,14 +248,6 @@ motor controller.
 
 ## Latency in the Planning Loop
 
-The two decisions visible in the recorded walkthrough completed in 8.74 ms and
-8.55 ms:
-
-| Proposed action | Decision | Displayed policy-decision time |
-| --- | --- | ---: |
-| 6-waypoint initial path | Deny restricted-zone intersection | 8.74 ms |
-| 6-waypoint revised path with a nearby human | Constrain speed | 8.55 ms |
-
 One way to screen an AI-generated plan is to ask another model whether the plan
 looks safe. That can be a useful semantic review, but an LLM-as-judge remains a
 probabilistic decision and adds another inference pass. If the reviewing model
@@ -268,9 +260,42 @@ deterministic admission check against explicit invariants. The relevant
 performance question is therefore whether policy admission is small relative
 to the agent's planning cadence.
 
-Those walkthrough values motivated a reproducible release-mode benchmark of the
-current in-process decision path. We exercised allow, deny, and constrained
-outcomes across 3, 6, 12, 24, and 48 waypoints, with **5,000**
+For the updated example, both the initial plan and the revision were generated
+by **`openai/openai/gpt-5.6-terra`** through an OpenAI-compatible endpoint. The
+event stream records the model identifier and request latency rather than
+inferring them from the video timeline.
+
+We ran ten complete browser-driven missions with seed 42. All ten followed the
+intended sequence: the model proposed a direct path, the prover denied its
+restricted-zone intersection, the model revised the path from the structured
+feedback, the prover admitted it with a 0.08 m/s speed limit when a human entered
+the caution radius, and the executor applied that limit. The result was **10/10
+completed missions, 20 model-generated plans, and no fixture fallback**.
+
+<figure class="dev-note-figure dev-note-figure--wide">
+  <img src="../../assets/robotics-policy-prover/terra-planning-loop-variance.svg" alt="Ten successful GPT-5.6 Terra runs showing initial and revised planning latency between 7.5 and 16.9 seconds per mission, while two policy checks accounted for 0.05 to 0.26 percent of model inference time.">
+  <figcaption>Observed latency from ten sequential runs of the browser experiment. This small workload illustrates planning-loop variance; it is not a general benchmark of the model or serving endpoint.</figcaption>
+</figure>
+
+Initial-plan inference ranged from **2.28 to 10.38 seconds**, with a **2.54
+second median**. Replanning after prover feedback ranged from **4.97 to 10.64
+seconds**, with a **6.59 second median**. Total model inference per mission had a
+**10.26 second median** and a **7.53–16.90 second range**.
+
+The two policy decisions in each mission totaled **5.76–26.23 ms**, with a
+**17.30 ms median** in these browser-driven runs. Relative to the observed model
+inference, policy admission accounted for **0.05–0.26%**, with a **0.16% median**.
+That spread is not just benchmark noise to hide. Agent planning in richer
+robotics environments will contend with changing state, longer context, and
+plans of different complexity. This small sample does not reproduce all of
+those conditions, but it illustrates why the admission step should be evaluated
+inside the planning-time distribution rather than against a single model call.
+Here, model latency moved by seconds across an identical task and seed, while
+the deterministic admission step remained a small part of every loop.
+
+These end-to-end observations complement a reproducible release-mode benchmark
+of the current in-process decision path. We exercised allow, deny, and
+constrained outcomes across 3, 6, 12, 24, and 48 waypoints, with **5,000**
 measured decisions per case after **1,000** warm-up decisions.
 
 <figure class="dev-note-figure">
@@ -278,8 +303,8 @@ measured decisions per case after **1,000** warm-up decisions.
   <figcaption>Measured policy-decision latency on NVIDIA DGX Spark is shown separately from illustrative inference-time scenarios. Model inference depends on the model, request, hardware, and serving configuration.</figcaption>
 </figure>
 
-Across this matrix, p95 policy latency ranged from **1.321 ms** to
-**1.886 ms**. The 48-waypoint cases remained between **1.348 and 1.376 ms
+Across this matrix, p95 policy latency ranged from **1.006 ms** to
+**1.250 ms**. The 48-waypoint cases remained between **1.006 and 1.248 ms
 p95**. On this workload, the current SMT-backed admission check is small
 relative to the illustrative agent-planning latencies we considered.
 
@@ -287,23 +312,10 @@ Inference time matters to the complete propose-check-adapt loop, but it is not a
 property of the prover. The lower panel therefore shows a sensitivity analysis,
 not a model benchmark: measured policy p95 added to illustrative 100, 250, 500,
 1,000, and 2,000 ms planning-inference scenarios. Against a **100 ms** inference
-stage, the slowest measured p95 policy check adds about **1.89%**; against a
-**250 ms** inference stage, it adds about **0.75%**. On these workloads, policy
+stage, the slowest measured p95 policy check adds about **1.25%**; against a
+**250 ms** inference stage, it adds about **0.50%**. On these workloads, policy
 admission is therefore on the order of one percent of a fast agent-planning
 stage, without requiring another full model inference.
-
-The recording provides a second, less controlled point of context. Its first
-plan was produced through an OpenAI-compatible endpoint and appears roughly 6–7
-seconds after the planner request begins; the UI did not capture the exact model
-identifier or API latency. The 8.74 ms policy decision shown immediately
-afterward is roughly 0.1% of that observed planning interval. This is a
-walkthrough-level comparison, not a benchmark of the model or serving endpoint.
-
-For reproducibility, the revised path in this recording was produced by the
-demo's deterministic fixture planner after it received the denial packet. The
-project supports running both planning steps through an OpenAI-compatible
-endpoint, and a future recording will capture the model identifier and request
-latency directly in the event stream.
 
 The result is encouraging, not exhaustive. The benchmark measures the current
 local decision function on an **NVIDIA DGX Spark with an NVIDIA GB10 and
@@ -330,8 +342,11 @@ are involved.
 The current implementation combines deterministic Rust checks with an
 SMT-backed policy check using Z3. Rust derives facts about workspace bounds,
 sampled segment/zone intersections, sensor freshness, budget, authority, human
-proximity, speed, and force. The prototype submits Boolean policy facts to Z3
-with a bounded timeout and produces a typed decision packet.
+proximity, speed, and force. Z3 composes those Boolean facts into exactly one of
+the four policy outcomes with a bounded timeout. The model returned by Z3 is the
+source of the verdict; an unknown, inconsistent, or ambiguous result fails
+closed. Malformed action envelopes are rejected before they reach the solver.
+Rust then constructs the typed decision packet and supporting evidence.
 
 It does not yet encode continuous robot motion, full-body geometry, kinematics,
 dynamics, braking distance, or perception uncertainty as symbolic constraints.
@@ -346,10 +361,9 @@ therefore parts of the same assurance claim.
 
 So this is a research prototype, not a safety-rated system or a proof that a
 real robot trajectory is collision-free. The next formal-methods step is to
-make the solver result the authoritative source of the verdict and deepen the
-encoding from Boolean policy composition toward bounded trajectory constraints.
-The next robotics step is to connect those constraints to a real motion planner
-and runtime monitor.
+deepen the encoding from Boolean policy composition toward bounded trajectory
+constraints. The next robotics step is to connect those constraints to a real
+motion planner and runtime monitor.
 
 Making that boundary explicit is part of the research. The next stages should
 help us understand how useful the formal specification remains as the model,
@@ -373,8 +387,8 @@ Several steps would turn the prototype into a stronger research result:
 
 1. Replace sampled tool-head intersections with exact or conservatively bounded
    geometry checks.
-2. Encode richer trajectory and policy constraints symbolically and use the SMT
-   result directly for the action verdict.
+2. Encode richer trajectory and policy constraints symbolically, beyond the
+   Boolean policy composition used in this version.
 3. Connect the action contract to NVIDIA Isaac Sim and MuJoCo, then to a small
    physical platform such as an SO-100 arm.
 4. Run the planner inside OpenShell and place the policy service on the trusted
@@ -447,12 +461,13 @@ Resources:
 
 1. [Robotics policy-prover project source](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/robotics-policy-prover)
 2. [Machine-readable DGX Spark benchmark results](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/robotics-policy-prover/benchmarks/policy-latency.json)
-3. [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell)
-4. [ENPIRE: Agentic Robot Policy Self-Improvement in the Real World](https://research.nvidia.com/labs/gear/enpire/)
-5. [Z3 theorem prover](https://github.com/Z3Prover/z3)
-6. [Safe Reinforcement Learning via Shielding](https://ojs.aaai.org/index.php/AAAI/article/view/11797)
-7. [Safe Reinforcement Learning via Formal Methods: Toward Safe Control Through Proof and Learning](https://ojs.aaai.org/index.php/AAAI/article/view/12107)
-8. [Agent Behavioral Contracts](https://arxiv.org/abs/2602.22302)
-9. [Runtime Compliance Verification for AI Agents](https://arxiv.org/abs/2606.19242)
-10. [VeriGuard: Enhancing LLM Agent Safety via Verified Code Generation](https://research.google/pubs/veriguard-enhancing-llm-agent-safety-via-verified-code-generation/)
-11. [Efficient and Sound Probabilistic Verification for AI Agents](https://arxiv.org/abs/2606.20510)
+3. [Machine-readable Terra planning-loop sample](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/robotics-policy-prover/benchmarks/terra-planning-loop.json)
+4. [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell)
+5. [ENPIRE: Agentic Robot Policy Self-Improvement in the Real World](https://research.nvidia.com/labs/gear/enpire/)
+6. [Z3 theorem prover](https://github.com/Z3Prover/z3)
+7. [Safe Reinforcement Learning via Shielding](https://ojs.aaai.org/index.php/AAAI/article/view/11797)
+8. [Safe Reinforcement Learning via Formal Methods: Toward Safe Control Through Proof and Learning](https://ojs.aaai.org/index.php/AAAI/article/view/12107)
+9. [Agent Behavioral Contracts](https://arxiv.org/abs/2602.22302)
+10. [Runtime Compliance Verification for AI Agents](https://arxiv.org/abs/2606.19242)
+11. [VeriGuard: Enhancing LLM Agent Safety via Verified Code Generation](https://research.google/pubs/veriguard-enhancing-llm-agent-safety-via-verified-code-generation/)
+12. [Efficient and Sound Probabilistic Verification for AI Agents](https://arxiv.org/abs/2606.20510)

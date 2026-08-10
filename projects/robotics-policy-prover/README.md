@@ -12,7 +12,16 @@ The scene is simple on purpose: an agent proposes a tool-head path to pick up th
 - nearby humans clamp the allowed speed
 - approved moves emit runtime obligations
 
-If the path violates a rule, the prover returns a structured decision packet: a verdict, invariant ids, counterexample coordinates, constraints, obligations, and solver latency. The agent can use that packet to replan, but the prover remains the hard boundary.
+Rust derives concrete geometry and state facts, and Z3 selects exactly one
+policy outcome: allow, deny, allow with constraints, or require approval. If the
+path violates a rule, the service returns invariant ids, counterexample
+coordinates, constraints, obligations, and solver latency. The agent can use
+that packet to replan, but only an allowed outcome can reach the executor.
+
+The executor applies returned speed and force limits to the effective action and
+checks the human-distance pause obligation again immediately before motion.
+Malformed envelopes, solver failures, denials, and approval-required outcomes
+fail closed.
 
 The point of the experiment is to make the OpenShell runtime idea visible: an autonomous agent may plan freely, but every tool, delegation, or physical action can be checked against a policy-prover contract before execution.
 
@@ -49,12 +58,14 @@ Click **Run Experiment**.
 The app can run in two modes:
 
 - **Fixture**: deterministic and repeatable; good for presenting the demo.
-- **OpenAI-compatible**: uses `OPENAI_API_KEY` and an OpenAI-compatible chat/completions endpoint from `.env`; good for showing real model variability.
+- **OpenAI-compatible**: uses `OPENAI_API_KEY` and the configured model endpoint
+  from `.env`; good for showing real model variability. The event stream records
+  the exact model setting and request latency for each successful plan.
 
-Copy the example env file if you want to use the OpenAI-compatible mode:
+Copy the sample env file if you want to use the OpenAI-compatible mode:
 
 ```shell
-cp .env.example .env
+cp .env.sample .env
 ```
 
 Then fill in your local values. Do not commit `.env`.

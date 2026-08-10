@@ -46,10 +46,10 @@ function ToolHead({ step, playbackSpeed }) {
   const path = step.approvedPath?.length > 1 ? step.approvedPath : [homePosition];
   const [tip, setTip] = useState(() => toVector(path[0]));
   const progress = useRef(0);
-  const pausePulse = step.decision === "deny" || step.decision === "pending";
+  const pausePulse = !step.executing;
 
   useFrame((_, delta) => {
-    const pace = step.decision === "deny" ? 0 : playbackSpeed;
+    const pace = step.executing ? playbackSpeed : 0;
     progress.current = (progress.current + delta * 0.18 * pace) % 1;
     const next = samplePath(path, pausePulse ? 0 : progress.current);
     setTip(next);
@@ -114,7 +114,7 @@ function WorkcellObjects({ objects, step, playbackSpeed }) {
   const progressRef = useRef(0);
 
   useFrame((_, delta) => {
-    const shouldMove = path.length > 1 && step.decision !== "deny" && step.decision !== "pending";
+    const shouldMove = path.length > 1 && step.executing;
     const pace = shouldMove ? playbackSpeed : 0;
     progressRef.current = (progressRef.current + delta * 0.18 * pace) % 1;
     setProgress(progressRef.current);

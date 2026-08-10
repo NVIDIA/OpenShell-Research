@@ -15,7 +15,9 @@ function assert(condition, message) {
 
 await mkdir("screenshots", { recursive: true });
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({
+  executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH || undefined,
+});
 try {
   for (const viewport of viewports) {
     const page = await browser.newPage({ viewport });

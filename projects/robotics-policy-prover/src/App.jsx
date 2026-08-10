@@ -87,7 +87,8 @@ function normalizeStep(event, previous) {
   const decision = event?.decision?.decision ?? previous?.decision ?? "pending";
   let approvedPath = previous?.approvedPath ?? [homePosition];
   if (event && Object.hasOwn(event, "approved_path")) {
-    approvedPath = event.approved_path ?? (decision === "deny" ? [homePosition] : approvedPath);
+    const blocked = decision === "deny" || decision === "approval_required";
+    approvedPath = event.approved_path ?? (blocked ? [homePosition] : approvedPath);
   }
 
   return {
@@ -98,6 +99,10 @@ function normalizeStep(event, previous) {
     proposedPath: event?.proposed_path ?? previous?.proposedPath ?? [homePosition],
     approvedPath,
     highlight: event?.highlight ?? previous?.highlight,
+    executing:
+      event?.kind === "execution_update" &&
+      event?.highlight?.kind === "execution" &&
+      (event?.approved_path?.length ?? 0) > 1,
   };
 }
 
@@ -115,14 +120,14 @@ function DecisionBadge({ decision }) {
 function storyLabel(event) {
   if (event.kind === "agent_plan") return "Agent";
   if (event.kind === "prover_decision") return "Policy prover";
-  if (event.kind === "execution_update") return "Executor";
+  if (event.kind === "execution_update" || event.kind === "execution_blocked") return "Executor";
   return "World";
 }
 
 function storyTone(event) {
   if (event.kind === "agent_plan") return "agent";
   if (event.kind === "prover_decision") return event.decision?.decision ?? "prover";
-  if (event.kind === "execution_update") return "executor";
+  if (event.kind === "execution_update" || event.kind === "execution_blocked") return "executor";
   return "world";
 }
 
@@ -153,7 +158,7 @@ function App() {
   const sourceRef = useRef(null);
 
   const storyEvents = useMemo(
-    () => events.filter((event) => ["agent_plan", "prover_decision", "world_event", "execution_update"].includes(event.kind)),
+    () => events.filter((event) => ["agent_plan", "prover_decision", "world_event", "execution_update", "execution_blocked"].includes(event.kind)),
     [events],
   );
   const latestDecision = step.decision ?? "pending";
@@ -171,7 +176,7 @@ function App() {
       setStep((previous) => normalizeStep(event, previous));
     };
 
-    ["world_event", "agent_plan", "prover_decision", "execution_update", "error"].forEach((kind) =>
+    ["world_event", "agent_plan", "prover_decision", "execution_update", "execution_blocked", "error"].forEach((kind) =>
       source.addEventListener(kind, handle),
     );
   }, []);
@@ -241,7 +246,7 @@ function App() {
           <RobotScene world={world} step={step} playbackSpeed={playbackSpeed} />
           <div className="legend-strip">
             <span><i className="legend-dot proposed" />Agent path</span>
-            <span><i className="legend-dot approved" />Executed path</span>
+            <span><i className="legend-dot approved" />Admitted path</span>
             <span><i className="legend-dot restricted" />Restricted</span>
             <span><i className="legend-dot human" />Human</span>
           </div>

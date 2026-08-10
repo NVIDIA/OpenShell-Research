@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "date": "2026-08-10",
+  "description": "Ten complete browser-driven propose-check-replan-check-execute runs of the robotics policy-prover demo.",
+  "model": "openai/openai/gpt-5.6-terra",
+  "endpoint_type": "OpenAI-compatible chat completions",
+  "seed": 42,
+  "runs": 10,
+  "successful_runs": 10,
+  "fixture_fallbacks": 0,
+  "summary": {
+    "initial_inference_ms": {
+      "min": 2283,
+      "median": 2541.5,
+      "max": 10378,
+      "mean": 3434.3
+    },
+    "replan_inference_ms": {
+      "min": 4971,
+      "median": 6594,
+      "max": 10640,
+      "mean": 7532.8
+    },
+    "total_inference_ms": {
+      "min": 7534,
+      "median": 10262,
+      "max": 16901,
+      "mean": 10967.1
+    },
+    "total_policy_ms": {
+      "min": 5.76,
+      "median": 17.295,
+      "max": 26.23,
+      "mean": 15.394
+    },
+    "policy_share_of_inference_percent": {
+      "min": 0.0473,
+      "median": 0.1585,
+      "max": 0.264,
+      "mean": 0.1516
+    }
+  },
+  "measurements": [
+    { "run": 1, "initial_inference_ms": 10378, "replan_inference_ms": 6523, "deny_policy_ms": 11.75, "constrain_policy_ms": 3.15, "completed": true },
+    { "run": 2, "initial_inference_ms": 2520, "replan_inference_ms": 6556, "deny_policy_ms": 17.34, "constrain_policy_ms": 4.01, "completed": true },
+    { "run": 3, "initial_inference_ms": 2318, "replan_inference_ms": 10640, "deny_policy_ms": 3.91, "constrain_policy_ms": 22.32, "completed": true },
+    { "run": 4, "initial_inference_ms": 2563, "replan_inference_ms": 4971, "deny_policy_ms": 14.69, "constrain_policy_ms": 5.2, "completed": true },
+    { "run": 5, "initial_inference_ms": 2322, "replan_inference_ms": 9859, "deny_policy_ms": 2.88, "constrain_policy_ms": 2.88, "completed": true },
+    { "run": 6, "initial_inference_ms": 3071, "replan_inference_ms": 9165, "deny_policy_ms": 2.78, "constrain_policy_ms": 3.68, "completed": true },
+    { "run": 7, "initial_inference_ms": 2876, "replan_inference_ms": 6470, "deny_policy_ms": 8.83, "constrain_policy_ms": 14.59, "completed": true },
+    { "run": 8, "initial_inference_ms": 2434, "replan_inference_ms": 8506, "deny_policy_ms": 3.12, "constrain_policy_ms": 2.91, "completed": true },
+    { "run": 9, "initial_inference_ms": 3578, "replan_inference_ms": 6006, "deny_policy_ms": 16.62, "constrain_policy_ms": 3.07, "completed": true },
+    { "run": 10, "initial_inference_ms": 2283, "replan_inference_ms": 6632, "deny_policy_ms": 7.89, "constrain_policy_ms": 2.32, "completed": true }
+  ]
+}

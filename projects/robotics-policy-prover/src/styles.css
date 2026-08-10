@@ -29,7 +29,7 @@ select {
 }
 
 .app-shell {
-  width: min(100%, 1520px);
+  width: min(100%, 1680px);
   min-height: 100vh;
   margin: 0 auto;
   padding: 18px;
@@ -202,7 +202,8 @@ h1 {
 .simple-layout {
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(330px, 390px);
+  grid-template-columns: minmax(0, 1fr) minmax(310px, 340px);
+  align-items: start;
   gap: 14px;
 }
 
@@ -252,7 +253,9 @@ h1 {
 
 .scene-panel {
   position: relative;
-  min-height: 560px;
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   border-radius: 8px;
 }
@@ -959,6 +962,7 @@ button.scenario-tab {
 
   .simple-layout {
     grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .inspector {
@@ -1003,6 +1007,7 @@ button.scenario-tab {
   }
 
   .scene-panel {
+    aspect-ratio: auto;
     min-height: 430px;
   }
 

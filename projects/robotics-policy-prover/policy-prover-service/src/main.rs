@@ -18,14 +18,14 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, Mutex};
 use tokio::time::{sleep, Duration};
 use tokio_stream::wrappers::BroadcastStream;
-use tower_http::cors::CorsLayer;
 use uuid::Uuid;
 use z3::ast::Bool;
-use z3::{Config, Solver};
+use z3::{Config, SatResult, Solver};
 
 const WORKSPACE_MIN: Vec3 = [-1.35, 0.02, -0.95];
 const WORKSPACE_MAX: Vec3 = [1.25, 1.05, 0.85];
 const HOME: Vec3 = [-1.08, 0.78, 0.58];
+const POLICY_SOLVER_TIMEOUT_MS: u64 = 100;
 
 type Vec3 = [f64; 3];
 
@@ -226,9 +226,11 @@ struct AgentPlan {
     rationale: String,
     #[serde(default)]
     source: String,
+    #[serde(default)]
+    inference_ms: Option<f64>,
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
 
@@ -237,20 +239,31 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
+    // Pay one-time Z3 initialization costs before accepting interactive sessions.
+    for outcome in ["allow", "deny", "constrain"] {
+        for _ in 0..3 {
+            black_box(check_action(&benchmark_action(outcome, 6)));
+        }
+    }
+
     let state = AppState {
         sessions: Arc::new(Mutex::new(HashMap::new())),
     };
 
     let app = Router::new()
-        .route("/api/health", get(|| async { Json(serde_json::json!({ "ok": true })) }))
+        .route(
+            "/api/health",
+            get(|| async { Json(serde_json::json!({ "ok": true })) }),
+        )
         .route("/api/sessions", post(start_session))
         .route("/api/sessions/{id}/events", get(session_events))
         .route("/api/sessions/{id}/inject", post(inject_event))
         .route("/api/decide", post(decide))
-        .layer(CorsLayer::permissive())
         .with_state(state);
 
-    let addr: SocketAddr = "127.0.0.1:8787".parse()?;
+    let addr: SocketAddr = env::var("POLICY_PROVER_BIND_ADDR")
+        .unwrap_or_else(|_| "127.0.0.1:8787".to_owned())
+        .parse()?;
     println!("policy-prover service listening on http://{addr}");
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
@@ -344,7 +357,9 @@ async fn inject_event(
         InjectEvent::SensorStale => "Injected: sensor state is stale",
         InjectEvent::BudgetLow => "Injected: task budget is almost exhausted",
     };
-    let _ = handle.tx.send(DemoEvent::system("world_event", summary, None));
+    let _ = handle
+        .tx
+        .send(DemoEvent::system("world_event", summary, None));
     Json(serde_json::json!({ "ok": true }))
 }
 
@@ -400,7 +415,7 @@ async fn run_mission(mut runtime: MissionRuntime) -> Result<()> {
             .await;
 
         runtime.world.human.position = [0.12, 0.08, -0.22];
-        runtime.world.human.distance_m = 0.48;
+        runtime.world.human.distance_m = 0.58;
         runtime.emit_world(
             "world_event",
             "A human enters the caution radius before execution.",
@@ -421,7 +436,7 @@ async fn run_mission(mut runtime: MissionRuntime) -> Result<()> {
                 Some("Executor runs the revised path with the prover's speed limit"),
             )
             .await?;
-    } else {
+    } else if decision_is_executable(first_decision.decision) {
         runtime
             .execute_decision(
                 proposal,
@@ -474,16 +489,21 @@ impl MissionRuntime {
         _prior: Option<&ProverDecision>,
         plan: &AgentPlan,
     ) {
+        let latency = plan
+            .inference_ms
+            .map(|value| format!(" in {value:.0} ms"))
+            .unwrap_or_default();
         self.emit(DemoEvent {
             id: Uuid::new_v4().to_string(),
             kind: "agent_plan".to_owned(),
             timestamp_ms: 0,
             actor: "agent".to_owned(),
             summary: format!(
-                "{summary}: {} waypoints at {:.2} m/s. Source: {}.",
+                "{summary}: {} waypoints at {:.2} m/s. Source: {}{}.",
                 action.path.len(),
                 action.speed_mps,
-                plan.source
+                plan.source,
+                latency
             ),
             world: Some(self.world.clone()),
             action: Some(action.clone()),
@@ -501,7 +521,13 @@ impl MissionRuntime {
         if self.agent_mode != AgentMode::Openai {
             return Some(fixture_plan(&self.world, prior));
         }
-        ask_openai_plan(&self.world, prior).await.ok()
+        match ask_openai_plan(&self.world, prior).await {
+            Ok(plan) => Some(plan),
+            Err(error) => {
+                eprintln!("model planner failed; using fixture fallback: {error:#}");
+                None
+            }
+        }
     }
 
     async fn check_only(&mut self, action: ActionEnvelope) -> Result<ProverDecision> {
@@ -511,10 +537,8 @@ impl MissionRuntime {
         self.world.metrics.p95_solver_ms = p95(&self.solver_samples);
 
         let approved_path = match decision.decision {
-            Decision::Allow | Decision::AllowWithConstraints | Decision::ApprovalRequired => {
-                Some(action.path.clone())
-            }
-            Decision::Deny => None,
+            Decision::Allow | Decision::AllowWithConstraints => Some(action.path.clone()),
+            Decision::Deny | Decision::ApprovalRequired => None,
         };
         self.emit(DemoEvent {
             id: Uuid::new_v4().to_string(),
@@ -545,7 +569,7 @@ impl MissionRuntime {
         executor_note: Option<&str>,
     ) -> Result<()> {
         let decision = self.check_only(action.clone()).await?;
-        if decision.decision == Decision::Deny {
+        if !decision_is_executable(decision.decision) {
             return Ok(());
         }
         self.execute_decision(action, decision, executor_note).await
@@ -557,29 +581,69 @@ impl MissionRuntime {
         decision: ProverDecision,
         executor_note: Option<&str>,
     ) -> Result<()> {
+        anyhow::ensure!(
+            decision_is_executable(decision.decision),
+            "executor received a non-executable {:?} decision",
+            decision.decision
+        );
         sleep(Duration::from_millis(600)).await;
-        let speed = decision
-            .constraints
-            .speed_mps_max
-            .map(|value| format!(" at constrained speed <= {value:.2} m/s"))
-            .unwrap_or_default();
+        let mut effective_action = apply_decision_contract(action, &decision);
+        effective_action.context.human_distance_m = self.world.human.distance_m;
+        effective_action.context.sensor_age_ms = self.world.metrics.sensor_age_ms;
+
+        if let Some(obligation) = unmet_execution_obligation(&effective_action, &decision) {
+            self.emit(DemoEvent {
+                id: Uuid::new_v4().to_string(),
+                kind: "execution_blocked".to_owned(),
+                timestamp_ms: 0,
+                actor: "executor".to_owned(),
+                summary: format!("Executor paused: unmet obligation {obligation}"),
+                world: Some(self.world.clone()),
+                action: Some(effective_action.clone()),
+                decision: Some(decision),
+                proposed_path: Some(effective_action.path.clone()),
+                approved_path: None,
+                highlight: Some(Highlight {
+                    kind: "blocked".to_owned(),
+                    target: Some(effective_action.object_id),
+                }),
+            });
+            return Ok(());
+        }
+
+        let contract =
+            if effective_action.speed_mps < effective_action.context.requested_speed_cap_mps {
+                format!(" at {:.2} m/s", effective_action.speed_mps)
+            } else {
+                String::new()
+            };
         let note = executor_note.unwrap_or("Executor running approved segment");
         self.emit(DemoEvent {
             id: Uuid::new_v4().to_string(),
             kind: "execution_update".to_owned(),
             timestamp_ms: 0,
             actor: "executor".to_owned(),
-            summary: format!("{note}{speed}"),
+            summary: format!("{note}{contract}"),
             world: Some(self.world.clone()),
-            action: Some(action.clone()),
+            action: Some(effective_action.clone()),
             decision: Some(decision),
-            proposed_path: Some(action.path.clone()),
-            approved_path: Some(action.path.clone()),
+            proposed_path: Some(effective_action.path.clone()),
+            approved_path: Some(effective_action.path.clone()),
             highlight: Some(Highlight {
                 kind: "execution".to_owned(),
-                target: Some(action.object_id),
+                target: Some(effective_action.object_id.clone()),
             }),
         });
+        sleep(Duration::from_millis(5_600)).await;
+        if let Some(object) = self
+            .world
+            .objects
+            .iter_mut()
+            .find(|object| object.id == effective_action.object_id)
+        {
+            object.position = place_point();
+            object.sorted = true;
+        }
         Ok(())
     }
 }
@@ -602,114 +666,256 @@ impl DemoEvent {
     }
 }
 
+#[derive(Debug, Clone)]
+struct PolicyFacts {
+    out_of_bounds: bool,
+    restricted_hit: Option<(Zone, Vec3)>,
+    stale_sensor: bool,
+    budget_blocked: bool,
+    capability_expansion: bool,
+    human_speed_cap: bool,
+    fragile_force_cap: bool,
+}
+
+fn derive_policy_facts(action: &ActionEnvelope) -> PolicyFacts {
+    PolicyFacts {
+        out_of_bounds: action.path.iter().any(|point| !inside_workspace(*point)),
+        restricted_hit: first_path_intersection(&action.path, &action.context.restricted_zones),
+        stale_sensor: action.context.sensor_age_ms > 250,
+        budget_blocked: action.context.remaining_budget_ms < 1_200
+            && action.action != "arm.move_segment",
+        capability_expansion: action.action == "grant.capability"
+            && (action.capability == "unrestricted_motion"
+                || action.context.requested_speed_cap_mps > action.context.parent_speed_cap_mps),
+        human_speed_cap: action.context.human_distance_m < 0.75 && action.speed_mps > 0.08,
+        fragile_force_cap: matches!(action.object_class.as_str(), "fragile" | "hazardous")
+            && action.force_n > 2.0,
+    }
+}
+
+fn assert_fact(solver: &Solver, name: &str, value: bool) -> Bool {
+    let fact = Bool::new_const(name);
+    if value {
+        solver.assert(&fact);
+    } else {
+        solver.assert(&!fact.clone());
+    }
+    fact
+}
+
+fn solve_policy(facts: &PolicyFacts) -> std::result::Result<Decision, &'static str> {
+    let mut config = Config::new();
+    config.set_timeout_msec(POLICY_SOLVER_TIMEOUT_MS);
+    z3::with_z3_config(&config, || {
+        let solver = Solver::new();
+        let out_of_bounds = assert_fact(&solver, "workspace_bounds", facts.out_of_bounds);
+        let restricted = assert_fact(
+            &solver,
+            "restricted_zone_intersection",
+            facts.restricted_hit.is_some(),
+        );
+        let stale = assert_fact(&solver, "sensor_stale", facts.stale_sensor);
+        let budget = assert_fact(&solver, "budget_requires_approval", facts.budget_blocked);
+        let capability = assert_fact(&solver, "capability_expansion", facts.capability_expansion);
+        let human_cap = assert_fact(&solver, "human_speed_cap", facts.human_speed_cap);
+        let fragile_cap = assert_fact(&solver, "fragile_force_cap", facts.fragile_force_cap);
+
+        let hard_deny = Bool::or(&[out_of_bounds, restricted, stale, capability]);
+        let constrained = Bool::or(&[human_cap, fragile_cap]);
+        let deny = Bool::new_const("outcome_deny");
+        let approval = Bool::new_const("outcome_approval");
+        let constrain = Bool::new_const("outcome_constrain");
+        let allow = Bool::new_const("outcome_allow");
+
+        solver.assert(&deny.iff(&hard_deny));
+        solver.assert(&approval.iff(&Bool::and(&[!hard_deny.clone(), budget.clone()])));
+        solver.assert(&constrain.iff(&Bool::and(&[
+            !hard_deny.clone(),
+            !budget.clone(),
+            constrained.clone(),
+        ])));
+        solver.assert(&allow.iff(&Bool::and(&[!hard_deny, !budget, !constrained])));
+
+        match solver.check() {
+            SatResult::Sat => {
+                let model = solver.get_model().ok_or("policy_solver_missing_model")?;
+                let selected = [
+                    (Decision::Deny, deny),
+                    (Decision::ApprovalRequired, approval),
+                    (Decision::AllowWithConstraints, constrain),
+                    (Decision::Allow, allow),
+                ]
+                .into_iter()
+                .filter(|(_, outcome)| {
+                    model.eval(outcome, true).and_then(|value| value.as_bool()) == Some(true)
+                })
+                .map(|(decision, _)| decision)
+                .collect::<Vec<_>>();
+                match selected.as_slice() {
+                    [decision] => Ok(*decision),
+                    _ => Err("policy_solver_ambiguous_outcome"),
+                }
+            }
+            SatResult::Unsat => Err("policy_solver_inconsistent"),
+            SatResult::Unknown => Err("policy_solver_unknown"),
+        }
+    })
+}
+
+fn malformed_action_reasons(action: &ActionEnvelope) -> Vec<String> {
+    let mut reasons = Vec::new();
+    if action.actor.trim().is_empty()
+        || action.action.trim().is_empty()
+        || action.resource.trim().is_empty()
+        || action.capability.trim().is_empty()
+    {
+        reasons.push("missing_required_identity".to_owned());
+    }
+    if action.path.len() < 2 {
+        reasons.push("path_requires_two_waypoints".to_owned());
+    }
+    if !finite_vec(action.from)
+        || !finite_vec(action.to)
+        || action.path.iter().any(|point| !finite_vec(*point))
+    {
+        reasons.push("non_finite_path_coordinate".to_owned());
+    }
+    if action
+        .path
+        .first()
+        .is_some_and(|point| distance(*point, action.from) > 1e-6)
+        || action
+            .path
+            .last()
+            .is_some_and(|point| distance(*point, action.to) > 1e-6)
+    {
+        reasons.push("path_endpoints_do_not_match_envelope".to_owned());
+    }
+    if !action.speed_mps.is_finite() || action.speed_mps <= 0.0 {
+        reasons.push("invalid_speed".to_owned());
+    }
+    if !action.force_n.is_finite() || action.force_n < 0.0 {
+        reasons.push("invalid_force".to_owned());
+    }
+    if !action.context.human_distance_m.is_finite()
+        || action.context.human_distance_m < 0.0
+        || !action.context.parent_speed_cap_mps.is_finite()
+        || action.context.parent_speed_cap_mps < 0.0
+        || !action.context.requested_speed_cap_mps.is_finite()
+        || action.context.requested_speed_cap_mps < 0.0
+    {
+        reasons.push("invalid_action_context".to_owned());
+    }
+    if action
+        .context
+        .restricted_zones
+        .iter()
+        .chain(action.context.caution_zones.iter())
+        .any(|zone| {
+            !finite_vec(zone.position)
+                || !finite_vec(zone.size)
+                || zone.size.iter().any(|value| *value <= 0.0)
+        })
+    {
+        reasons.push("invalid_zone_geometry".to_owned());
+    }
+    reasons
+}
+
+fn finite_vec(point: Vec3) -> bool {
+    point.iter().all(|value| value.is_finite())
+}
+
+fn decision_is_executable(decision: Decision) -> bool {
+    matches!(decision, Decision::Allow | Decision::AllowWithConstraints)
+}
+
+fn apply_decision_contract(
+    mut action: ActionEnvelope,
+    decision: &ProverDecision,
+) -> ActionEnvelope {
+    if let Some(speed_max) = decision.constraints.speed_mps_max {
+        action.speed_mps = action.speed_mps.min(speed_max);
+    }
+    if let Some(force_max) = decision.constraints.force_n_max {
+        action.force_n = action.force_n.min(force_max);
+    }
+    action
+}
+
+fn unmet_execution_obligation(
+    action: &ActionEnvelope,
+    decision: &ProverDecision,
+) -> Option<&'static str> {
+    let pause_for_human = decision
+        .obligations
+        .iter()
+        .any(|value| value == "pause_if_human_distance_below_0_5m")
+        && action.context.human_distance_m < 0.5;
+    pause_for_human.then_some("pause_if_human_distance_below_0_5m")
+}
+
 fn check_action(action: &ActionEnvelope) -> ProverDecision {
     let start = Instant::now();
-    let mut config = Config::new();
-    config.set_timeout_msec(18);
-    let _ = z3::with_z3_config(&config, || {
-        let solver = Solver::new();
+    let malformed = malformed_action_reasons(action);
+    if !malformed.is_empty() {
+        let mut violations = vec!["malformed_action_envelope".to_owned()];
+        violations.extend(malformed);
+        return ProverDecision {
+            decision: Decision::Deny,
+            solver_ms: start.elapsed().as_secs_f64() * 1000.0,
+            violations,
+            constraints: DecisionConstraints::default(),
+            obligations: vec!["emit_audit_event".to_owned()],
+            counterexample: None,
+        };
+    }
 
-        let out_of_bounds = action.path.iter().any(|point| !inside_workspace(*point));
-        let restricted_hit = first_path_intersection(&action.path, &action.context.restricted_zones);
-        let stale_sensor = action.context.sensor_age_ms > 250;
-        let budget_blocked = action.context.remaining_budget_ms < 1_200 && action.action != "arm.move_segment";
-        let capability_expansion = action.action == "grant.capability"
-            && (action.capability == "unrestricted_motion"
-                || action.context.requested_speed_cap_mps > action.context.parent_speed_cap_mps);
-        let human_speed_cap = action.context.human_distance_m < 0.75 && action.speed_mps > 0.08;
-        let fragile_force_cap =
-            matches!(action.object_class.as_str(), "fragile" | "hazardous") && action.force_n > 2.0;
-
-        let facts = [
-            ("workspace_bounds", out_of_bounds),
-            ("restricted_zone_intersection", restricted_hit.is_some()),
-            ("sensor_stale", stale_sensor),
-            ("budget_or_approval_required", budget_blocked),
-            ("capability_expansion", capability_expansion),
-            ("human_speed_cap", human_speed_cap),
-            ("fragile_force_cap", fragile_force_cap),
-        ];
-
-        let mut vars = Vec::new();
-        for (name, value) in facts {
-            let var = Bool::new_const(name);
-            if value {
-                solver.assert(&var);
-            } else {
-                solver.assert(&!var.clone());
-            }
-            vars.push((name, value, var));
-        }
-        let unsafe_expr = Bool::or(&vars.iter().map(|(_, _, var)| var.clone()).collect::<Vec<_>>());
-        solver.assert(&unsafe_expr);
-        let _ = solver.check();
-    });
-
-    let out_of_bounds = action.path.iter().any(|point| !inside_workspace(*point));
-    let restricted_hit = first_path_intersection(&action.path, &action.context.restricted_zones);
-    let stale_sensor = action.context.sensor_age_ms > 250;
-    let budget_blocked = action.context.remaining_budget_ms < 1_200 && action.action != "arm.move_segment";
-    let capability_expansion = action.action == "grant.capability"
-        && (action.capability == "unrestricted_motion"
-            || action.context.requested_speed_cap_mps > action.context.parent_speed_cap_mps);
-    let human_speed_cap = action.context.human_distance_m < 0.75 && action.speed_mps > 0.08;
-    let fragile_force_cap =
-        matches!(action.object_class.as_str(), "fragile" | "hazardous") && action.force_n > 2.0;
-
+    let facts = derive_policy_facts(action);
+    let solved = solve_policy(&facts);
+    let decision = solved.unwrap_or(Decision::Deny);
     let mut violations = Vec::new();
-    if out_of_bounds {
+    if facts.out_of_bounds {
         violations.push("workspace_bounds".to_owned());
     }
-    if restricted_hit.is_some() {
+    if facts.restricted_hit.is_some() {
         violations.push("restricted_zone_intersection".to_owned());
     }
-    if stale_sensor {
+    if facts.stale_sensor {
         violations.push("sensor_stale".to_owned());
     }
-    if capability_expansion {
+    if facts.capability_expansion {
         violations.push("capability_expansion".to_owned());
     }
-    if budget_blocked {
+    if facts.budget_blocked {
         violations.push("budget_requires_approval".to_owned());
     }
-    if human_speed_cap {
+    if facts.human_speed_cap {
         violations.push("human_speed_cap".to_owned());
     }
-    if fragile_force_cap {
+    if facts.fragile_force_cap {
         violations.push("fragile_force_cap".to_owned());
     }
+    if let Err(reason) = solved {
+        violations.push(reason.to_owned());
+    }
 
-    let hard_deny = out_of_bounds || restricted_hit.is_some() || stale_sensor || capability_expansion;
     let mut constraints = DecisionConstraints::default();
-    if human_speed_cap {
+    if facts.human_speed_cap {
         constraints.speed_mps_max = Some(0.08);
     }
-    if fragile_force_cap {
+    if facts.fragile_force_cap {
         constraints.force_n_max = Some(2.0);
     }
-    if restricted_hit.is_some() {
+    if facts.restricted_hit.is_some() {
         constraints.bypass_z_min = Some(0.55);
     }
-
-    let decision = if hard_deny {
-        Decision::Deny
-    } else if budget_blocked {
-        Decision::ApprovalRequired
-    } else if constraints.speed_mps_max.is_some() || constraints.force_n_max.is_some() {
-        Decision::AllowWithConstraints
-    } else {
-        Decision::Allow
-    };
 
     let mut obligations = vec!["emit_audit_event".to_owned()];
     if action.context.human_distance_m < 0.75 {
         obligations.push("pause_if_human_distance_below_0_5m".to_owned());
     }
-    if decision != Decision::Deny {
-        obligations.push("expire_capability_after_action".to_owned());
-    }
-
-    let counterexample = restricted_hit.map(|(zone, point)| Counterexample {
+    let counterexample = facts.restricted_hit.map(|(zone, point)| Counterexample {
         segment_id: "proposed_segment".to_owned(),
         zone_id: Some(zone.id),
         reason: "restricted_zone_intersection".to_owned(),
@@ -786,7 +992,14 @@ fn seeded_world(seed: u64, goal: String) -> WorldState {
     }
 }
 
-fn action_for(world: &WorldState, object_id: &str, path: Vec<Vec3>, speed_mps: f64, force_n: f64, capability: &str) -> ActionEnvelope {
+fn action_for(
+    world: &WorldState,
+    object_id: &str,
+    path: Vec<Vec3>,
+    speed_mps: f64,
+    force_n: f64,
+    capability: &str,
+) -> ActionEnvelope {
     let object = world
         .objects
         .iter()
@@ -827,7 +1040,13 @@ fn pickup_point(world: &WorldState) -> Vec3 {
         .objects
         .iter()
         .find(|object| object.id == "green_vial")
-        .map(|object| [object.position[0], object.position[1] + object.size[1] * 0.65, object.position[2]])
+        .map(|object| {
+            [
+                object.position[0],
+                object.position[1] + object.size[1] * 0.65,
+                object.position[2],
+            ]
+        })
         .unwrap_or([-0.72, 0.35, -0.46])
 }
 
@@ -859,7 +1078,8 @@ fn north_bypass_path(world: &WorldState) -> Vec<Vec3> {
 }
 
 fn normalize_plan(mut plan: AgentPlan, world: &WorldState) -> AgentPlan {
-    plan.path.retain(|point| point.iter().all(|value| value.is_finite()));
+    plan.path
+        .retain(|point| point.iter().all(|value| value.is_finite()));
     if plan.path.len() < 2 {
         plan.path = direct_path(world);
     }
@@ -868,7 +1088,10 @@ fn normalize_plan(mut plan: AgentPlan, world: &WorldState) -> AgentPlan {
     }
     let pickup = pickup_point(world);
     let target = place_point();
-    let pickup_index = plan.path.iter().position(|point| distance(*point, pickup) <= 0.18);
+    let pickup_index = plan
+        .path
+        .iter()
+        .position(|point| distance(*point, pickup) <= 0.18);
     match pickup_index {
         Some(index) if index <= 2 => {
             plan.path[index] = pickup;
@@ -1134,7 +1357,7 @@ fn run_policy_benchmark() -> Result<()> {
         build_profile: "release".to_owned(),
         samples_per_case,
         warmup_per_case,
-        z3_timeout_ms: 18,
+        z3_timeout_ms: POLICY_SOLVER_TIMEOUT_MS,
         geometry_samples_per_segment: 33,
         cases,
     };
@@ -1231,11 +1454,18 @@ fn fixture_plan(world: &WorldState, prior: Option<&ProverDecision>) -> AgentPlan
         speed_mps,
         rationale,
         source: "Fixture agent".to_owned(),
+        inference_ms: None,
     }
 }
 
-fn normalize_agent_plan(mut plan: AgentPlan, source: &str, world: &WorldState) -> AgentPlan {
+fn normalize_agent_plan(
+    mut plan: AgentPlan,
+    source: &str,
+    inference_ms: f64,
+    world: &WorldState,
+) -> AgentPlan {
     plan.source = source.to_owned();
+    plan.inference_ms = Some(inference_ms);
     let trimmed = plan.rationale.trim();
     plan.rationale = if trimmed.chars().count() > 160 {
         format!("{}...", trimmed.chars().take(157).collect::<String>())
@@ -1251,8 +1481,10 @@ async fn ask_openai_plan(world: &WorldState, prior: Option<&ProverDecision>) -> 
         .or_else(|_| env::var("LLM_MODEL"))
         .or_else(|_| env::var("FAST_MODEL"))
         .unwrap_or_else(|_| "gpt-4.1-mini".to_owned());
-    let base_url = env::var("OPENAI_BASE_URL").unwrap_or_else(|_| "https://api.openai.com/v1".to_owned());
+    let base_url =
+        env::var("OPENAI_BASE_URL").unwrap_or_else(|_| "https://api.openai.com/v1".to_owned());
     let client = Client::new();
+    let inference_started = Instant::now();
     let agent_observation = serde_json::json!({
         "seed": world.seed,
         "goal": world.goal,
@@ -1304,32 +1536,51 @@ async fn ask_openai_plan(world: &WorldState, prior: Option<&ProverDecision>) -> 
 
     if !base_url.contains("api.openai.com") {
         let body = serde_json::json!({
-            "model": model,
-            "temperature": 0.85,
-            "max_tokens": 420,
+            "model": model.clone(),
             "messages": [
                 { "role": "system", "content": "You are a robotics path planner. Return only JSON with path, speed_mps, and rationale. Plan waypoints, not safety judgments; the OpenShell policy prover has final authority." },
                 { "role": "user", "content": prompt.to_string() }
             ]
         });
-        let response: serde_json::Value = client
-            .post(format!("{}/chat/completions", base_url.trim_end_matches('/')))
+        let response = client
+            .post(format!(
+                "{}/chat/completions",
+                base_url.trim_end_matches('/')
+            ))
             .bearer_auth(key)
             .json(&body)
             .send()
-            .await?
-            .error_for_status()?
-            .json()
             .await?;
+        let status = response.status();
+        let response: serde_json::Value = response.json().await?;
+        if !status.is_success() {
+            let detail = response
+                .pointer("/error/message")
+                .and_then(|value| value.as_str())
+                .or_else(|| response.get("detail").and_then(|value| value.as_str()))
+                .unwrap_or("no error detail returned");
+            anyhow::bail!("planner endpoint returned {status}: {detail}");
+        }
+        let response_model = response
+            .get("model")
+            .and_then(|value| value.as_str())
+            .unwrap_or(&model)
+            .to_owned();
         let text = response
             .pointer("/choices/0/message/content")
             .and_then(|value| value.as_str())
             .context("missing chat completion content")?;
-        return Ok(normalize_agent_plan(parse_plan_text(text)?, "OpenAI-compatible agent", world));
+        let source = format!("{response_model} via OpenAI-compatible endpoint");
+        return Ok(normalize_agent_plan(
+            parse_plan_text(text)?,
+            &source,
+            inference_started.elapsed().as_secs_f64() * 1000.0,
+            world,
+        ));
     }
 
     let body = serde_json::json!({
-        "model": model,
+        "model": model.clone(),
         "input": [
             { "role": "system", "content": "You are a robotics path planner. Return path waypoints, not safety judgments; the OpenShell policy prover has final authority." },
             { "role": "user", "content": prompt.to_string() }
@@ -1352,12 +1603,23 @@ async fn ask_openai_plan(world: &WorldState, prior: Option<&ProverDecision>) -> 
         .error_for_status()?
         .json()
         .await?;
+    let response_model = response
+        .get("model")
+        .and_then(|value| value.as_str())
+        .unwrap_or(&model)
+        .to_owned();
     let text = response
         .pointer("/output/0/content/0/text")
         .and_then(|value| value.as_str())
         .or_else(|| response.get("output_text").and_then(|value| value.as_str()))
         .context("missing structured output text")?;
-    Ok(normalize_agent_plan(parse_plan_text(text)?, "OpenAI-compatible agent", world))
+    let source = format!("{response_model} via OpenAI Responses API");
+    Ok(normalize_agent_plan(
+        parse_plan_text(text)?,
+        &source,
+        inference_started.elapsed().as_secs_f64() * 1000.0,
+        world,
+    ))
 }
 
 fn parse_plan_text(text: &str) -> Result<AgentPlan> {
@@ -1408,7 +1670,9 @@ mod tests {
         );
         let decision = check_action(&action);
         assert_eq!(decision.decision, Decision::Deny);
-        assert!(decision.violations.contains(&"restricted_zone_intersection".to_owned()));
+        assert!(decision
+            .violations
+            .contains(&"restricted_zone_intersection".to_owned()));
     }
 
     #[test]
@@ -1418,7 +1682,13 @@ mod tests {
         let mut action = action_for(
             &world,
             "green_vial",
-            vec![HOME, [-0.94, 0.82, 0.72], [-0.15, 0.74, 0.7], [0.7, 0.56, 0.58], [0.84, 0.34, 0.3]],
+            vec![
+                HOME,
+                [-0.94, 0.82, 0.72],
+                [-0.15, 0.74, 0.7],
+                [0.7, 0.56, 0.58],
+                [0.84, 0.34, 0.3],
+            ],
             0.2,
             3.0,
             "move_lab_samples",
@@ -1450,7 +1720,110 @@ mod tests {
         };
         let decision = check_action(&action);
         assert_eq!(decision.decision, Decision::Deny);
-        assert!(decision.violations.contains(&"capability_expansion".to_owned()));
+        assert!(decision
+            .violations
+            .contains(&"capability_expansion".to_owned()));
+    }
+
+    #[test]
+    fn denies_malformed_action_envelope() {
+        let world = seeded_world(11, "test".to_owned());
+        let mut action = action_for(
+            &world,
+            "green_vial",
+            vec![HOME, [-0.18, 0.72, 0.72], place_point()],
+            0.08,
+            1.0,
+            "move_lab_samples",
+        );
+        action.path.truncate(1);
+        let decision = check_action(&action);
+        assert_eq!(decision.decision, Decision::Deny);
+        assert!(decision
+            .violations
+            .contains(&"malformed_action_envelope".to_owned()));
+    }
+
+    #[test]
+    fn applies_constraints_to_effective_action() {
+        let world = seeded_world(12, "test".to_owned());
+        let action = action_for(
+            &world,
+            "green_vial",
+            vec![HOME, [-0.18, 0.72, 0.72], place_point()],
+            0.2,
+            3.0,
+            "move_lab_samples",
+        );
+        let decision = ProverDecision {
+            decision: Decision::AllowWithConstraints,
+            solver_ms: 0.0,
+            violations: Vec::new(),
+            constraints: DecisionConstraints {
+                speed_mps_max: Some(0.08),
+                force_n_max: Some(2.0),
+                bypass_z_min: None,
+            },
+            obligations: Vec::new(),
+            counterexample: None,
+        };
+        let effective = apply_decision_contract(action, &decision);
+        assert_eq!(effective.speed_mps, 0.08);
+        assert_eq!(effective.force_n, 2.0);
+    }
+
+    #[test]
+    fn pause_obligation_is_checked_before_execution() {
+        let mut world = seeded_world(13, "test".to_owned());
+        world.human.distance_m = 0.48;
+        let action = action_for(
+            &world,
+            "green_vial",
+            vec![HOME, [-0.18, 0.72, 0.72], place_point()],
+            0.2,
+            1.0,
+            "move_lab_samples",
+        );
+        let decision = check_action(&action);
+        assert_eq!(decision.decision, Decision::AllowWithConstraints);
+        assert_eq!(
+            unmet_execution_obligation(&action, &decision),
+            Some("pause_if_human_distance_below_0_5m")
+        );
+    }
+
+    #[tokio::test]
+    async fn approval_required_never_reaches_executor() {
+        let world = seeded_world(14, "test".to_owned());
+        let (tx, mut rx) = broadcast::channel(8);
+        let mut runtime = MissionRuntime {
+            tx,
+            world: world.clone(),
+            started: Instant::now(),
+            solver_samples: Vec::new(),
+            agent_mode: AgentMode::Fixture,
+        };
+        let mut action = action_for(
+            &world,
+            "green_vial",
+            vec![HOME, [-0.18, 0.72, 0.72], place_point()],
+            0.08,
+            1.0,
+            "move_lab_samples",
+        );
+        action.action = "mission.reserve_budget".to_owned();
+        action.context.remaining_budget_ms = 100;
+
+        runtime.check_and_execute(action, None).await.unwrap();
+
+        let events = std::iter::from_fn(|| rx.try_recv().ok()).collect::<Vec<_>>();
+        assert_eq!(events.len(), 1);
+        assert_eq!(
+            events[0].decision.as_ref().map(|value| value.decision),
+            Some(Decision::ApprovalRequired)
+        );
+        assert!(events[0].approved_path.is_none());
+        assert!(!events.iter().any(|event| event.kind == "execution_update"));
     }
 
     #[test]
@@ -1461,6 +1834,7 @@ mod tests {
             speed_mps: 0.2,
             rationale: "bad repair skipped pickup".to_owned(),
             source: "test".to_owned(),
+            inference_ms: None,
         };
         let action = action_from_plan(&world, &plan);
         assert!(distance(action.path[1], pickup_point(&world)) <= 0.01);
