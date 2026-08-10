@@ -1,0 +1,403 @@
+name: Slop Cop
+
+"on":
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  pull_request_review:
+    types: [submitted, dismissed]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+concurrency:
+  group: slop-cop-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Slop Cop / Dev Notes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve trusted inputs
+        id: inputs
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const fs = require('fs');
+            const isPullRequest = ['pull_request', 'pull_request_review'].includes(context.eventName);
+            if (!isPullRequest) {
+              const metadata = {
+                pull_request_number: null,
+                base_sha: context.sha,
+                head_sha: context.sha,
+                head_repository: `${context.repo.owner}/${context.repo.repo}`,
+                changed_notes: [],
+                tool_changed: false,
+                override: null,
+              };
+              fs.writeFileSync(`${process.env.RUNNER_TEMP}/slop-cop-inputs.json`, JSON.stringify(metadata));
+              core.setOutput('is_pull_request', 'false');
+              core.setOutput('base_sha', context.sha);
+              core.setOutput('head_sha', context.sha);
+              return;
+            }
+
+            const pullRequest = context.payload.pull_request;
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pullRequest.number,
+              per_page: 100,
+            });
+            const changedNotes = files
+              .filter(({ status, filename }) =>
+                status !== 'removed' &&
+                filename.startsWith('docs/dev-notes/posts/') &&
+                filename.endsWith('.md'))
+              .map(({ filename, previous_filename }) => ({
+                path: filename,
+                base_path: previous_filename || filename,
+              }))
+              .sort((left, right) => left.path.localeCompare(right.path));
+            const toolChanged = files.some(({ filename }) =>
+              filename.startsWith('dev-tools/slop-cop/') ||
+              filename === '.github/workflows/slop-cop.yml' ||
+              filename === '.github/workflows/slop-cop-report.yml');
+
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pullRequest.number,
+              per_page: 100,
+            });
+            const candidates = reviews
+              .filter((review) => review.state === 'APPROVED' && review.commit_id === pullRequest.head.sha)
+              .sort((left, right) => String(right.submitted_at).localeCompare(String(left.submitted_at)));
+            let override = null;
+            for (const review of candidates) {
+              const match = String(review.body || '').match(/^Slop-Cop-Override:\s*(\S.*)$/mi);
+              if (!match) continue;
+              const reason = match[1].trim();
+              if (!reason || reason.length > 1000 || /[\u0000-\u001f\u007f-\u009f]/u.test(reason)) {
+                continue;
+              }
+              const permission = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                username: review.user.login,
+              });
+              if (!['write', 'maintain', 'admin'].includes(permission.data.permission)) continue;
+              override = {
+                reviewer: review.user.login,
+                reason,
+                review_id: review.id,
+                review_url: review.html_url,
+                head_sha: pullRequest.head.sha,
+              };
+              break;
+            }
+            const metadata = {
+              pull_request_number: pullRequest.number,
+              base_sha: pullRequest.base.sha,
+              head_sha: pullRequest.head.sha,
+              head_repository: pullRequest.head.repo.full_name,
+              changed_notes: changedNotes,
+              tool_changed: toolChanged,
+              override,
+            };
+            fs.writeFileSync(`${process.env.RUNNER_TEMP}/slop-cop-inputs.json`, JSON.stringify(metadata));
+            core.setOutput('is_pull_request', 'true');
+            core.setOutput('number', String(pullRequest.number));
+            core.setOutput('base_sha', pullRequest.base.sha);
+            core.setOutput('head_sha', pullRequest.head.sha);
+            core.setOutput('head_repository', pullRequest.head.repo.full_name);
+            core.setOutput('tool_changed', String(toolChanged));
+
+      - name: Check out trusted analyzer
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ steps.inputs.outputs.base_sha }}
+          path: trusted
+          persist-credentials: false
+
+      - name: Check out candidate revision
+        if: steps.inputs.outputs.is_pull_request == 'true'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ steps.inputs.outputs.head_repository }}
+          ref: ${{ steps.inputs.outputs.head_sha }}
+          path: candidate
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.31"
+          python-version: "3.12"
+
+      - name: Select analyzer and content roots
+        id: roots
+        shell: bash
+        run: |
+          if [[ "${{ steps.inputs.outputs.is_pull_request }}" == "true" ]]; then
+            echo "content=$GITHUB_WORKSPACE/candidate" >> "$GITHUB_OUTPUT"
+            if [[ -f "$GITHUB_WORKSPACE/trusted/dev-tools/slop-cop/pyproject.toml" ]]; then
+              echo "analyzer=$GITHUB_WORKSPACE/trusted" >> "$GITHUB_OUTPUT"
+              echo "bootstrap=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "analyzer=$GITHUB_WORKSPACE/candidate" >> "$GITHUB_OUTPUT"
+              echo "bootstrap=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "content=$GITHUB_WORKSPACE/trusted" >> "$GITHUB_OUTPUT"
+            echo "analyzer=$GITHUB_WORKSPACE/trusted" >> "$GITHUB_OUTPUT"
+            echo "bootstrap=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install trusted analyzer
+        run: uv sync --frozen --project "${{ steps.roots.outputs.analyzer }}/dev-tools/slop-cop"
+
+      - name: Run trusted analysis
+        id: analysis
+        continue-on-error: true
+        env:
+          ANALYZER_ROOT: ${{ steps.roots.outputs.analyzer }}
+          CONTENT_ROOT: ${{ steps.roots.outputs.content }}
+          INPUTS_JSON: ${{ runner.temp }}/slop-cop-inputs.json
+          REPORT_DIR: ${{ runner.temp }}/slop-cop-report
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          metadata = json.loads(Path(os.environ["INPUTS_JSON"]).read_text())
+          analyzer = Path(os.environ["ANALYZER_ROOT"])
+          content = Path(os.environ["CONTENT_ROOT"])
+          notes = metadata["changed_notes"]
+          paths = [note["path"] for note in notes]
+          if metadata["pull_request_number"] is None:
+              paths = sorted(
+                  path.relative_to(content).as_posix()
+                  for path in (content / "docs/dev-notes/posts").glob("*.md")
+              )
+          override_path = Path(os.environ["REPORT_DIR"]).parent / "override.json"
+          command = [
+              "uv", "run", "--project", str(analyzer / "dev-tools/slop-cop"),
+              "slop-cop", "check",
+              "--config", str(analyzer / "dev-tools/slop-cop/slop-cop.toml"),
+              "--repository-root", str(content),
+              "--html-dir", os.environ["REPORT_DIR"],
+              "--repository", os.environ["REPOSITORY"],
+              "--base-sha", metadata["base_sha"],
+              "--head-sha", metadata["head_sha"],
+          ]
+          if metadata["pull_request_number"] is not None:
+              import shutil
+              baseline = Path(os.environ["REPORT_DIR"]).parent / "slop-cop-baseline"
+              baseline.mkdir(parents=True, exist_ok=True)
+              for note in notes:
+                  source = Path.cwd() / "trusted" / note["base_path"]
+                  if not source.exists():
+                      continue
+                  if source.is_symlink() or not source.is_file():
+                      raise SystemExit(f"Invalid baseline input: {note['base_path']}")
+                  destination = baseline / note["path"]
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(source, destination)
+              command.extend([
+                  "--pull-request-number", str(metadata["pull_request_number"]),
+                  "--baseline-root", str(baseline),
+              ])
+          if metadata["override"] is not None:
+              override_path.write_text(json.dumps(metadata["override"]))
+              command.extend(["--override-json", str(override_path)])
+          command.extend(str(content / path) for path in paths)
+          raise SystemExit(subprocess.run(command, check=False).returncode)
+          PY
+
+      - name: Note bootstrap analysis
+        if: steps.roots.outputs.bootstrap == 'true'
+        run: echo "This introducing run used the candidate analyzer because no base analyzer exists." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Test candidate implementation
+        id: candidate
+        if: steps.inputs.outputs.tool_changed == 'true'
+        continue-on-error: true
+        working-directory: candidate/dev-tools/slop-cop
+        run: |
+          uv sync --frozen
+          uv run pytest
+          uv run ruff check .
+          uv run ruff format --check .
+          uv run mypy src tests
+          uv run slop-cop validate-rules
+          uv run slop-cop benchmark --repository-root ../..
+          uv run slop-cop check \
+            --config slop-cop.toml \
+            --repository-root ../.. \
+            ../../docs/dev-notes/posts/*.md
+
+      - name: Create an error report after an early analysis failure
+        if: always()
+        env:
+          BASE_SHA: ${{ steps.inputs.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.inputs.outputs.head_sha }}
+          PR_NUMBER: ${{ steps.inputs.outputs.number }}
+          REPORT_DIR: ${{ runner.temp }}/slop-cop-report
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          if [[ -f "$REPORT_DIR/report.json" ]]; then
+            exit 0
+          fi
+          python - <<'PY'
+          import html
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
+          pull_request = event.get("pull_request") or {}
+          base_sha = os.environ.get("BASE_SHA") or pull_request.get("base", {}).get("sha")
+          head_sha = os.environ.get("HEAD_SHA") or pull_request.get("head", {}).get("sha")
+          number_value = os.environ.get("PR_NUMBER") or pull_request.get("number")
+          if not base_sha or not head_sha:
+              base_sha = head_sha = event.get("after") or os.environ.get("GITHUB_SHA")
+          number = int(number_value) if number_value else None
+          threshold = 80
+          message = "Slop Cop did not complete its analysis."
+          source_path = "docs/dev-notes/posts/analysis-error.md"
+          error = {
+              "rule_id": None,
+              "source_path": source_path,
+              "error_code": "analysis_failed",
+              "message": message,
+              "fatal": True,
+          }
+          file_result = {
+              "path": source_path,
+              "analysis_state": "error",
+              "decision": "fail",
+              "score": 0,
+              "threshold": threshold,
+              "hard_fail": False,
+              "metrics": {
+                  "source_bytes": 0,
+                  "source_code_points": 0,
+                  "analyzable_words": 0,
+                  "analyzable_sentences": 0,
+                  "analyzable_paragraphs": 0,
+                  "masked_code_points": 0,
+              },
+              "findings": [],
+              "suppressions": [],
+              "rule_costs": [],
+              "category_costs": [],
+              "errors": [error],
+              "base": None,
+          }
+          result = {
+              "schema_version": 1,
+              "analysis_state": "error",
+              "decision": "fail",
+              "score": 0,
+              "threshold": threshold,
+              "repository": os.environ["REPOSITORY"],
+              "pull_request_number": number,
+              "base_sha": base_sha,
+              "head_sha": head_sha,
+              "tool_version": "unavailable",
+              "config_digest": hashlib.sha256(b"slop-cop-analysis-unavailable").hexdigest(),
+              "files": [file_result],
+              "rule_errors": [error],
+              "external_audits": [],
+              "override": None,
+          }
+          report_dir = Path(os.environ["REPORT_DIR"])
+          report_dir.mkdir(parents=True, exist_ok=True)
+          (report_dir / "report.json").write_text(
+              json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+          )
+          escaped_message = html.escape(message)
+          escaped_head = html.escape(str(head_sha))
+          page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+          <meta name="viewport" content="width=device-width,initial-scale=1">
+          <title>Slop Cop error report</title><style>
+          body {{ font-family: system-ui,sans-serif; max-width: 60rem; margin: 3rem auto; padding: 1rem; }}
+          strong {{ color: #a12d2d; }} code {{ overflow-wrap: anywhere; }}
+          </style></head><body><main><h1>Slop Cop report</h1><p><strong>ERROR</strong></p>
+          <p>{escaped_message}</p><p>Head revision: <code>{escaped_head}</code></p>
+          <p>The required check failed. Review the analysis workflow logs.</p></main></body></html>\n"""
+          (report_dir / "index.html").write_text(page)
+          PY
+
+      - name: Add bounded annotations and job summary
+        if: always()
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          REPORT_JSON: ${{ runner.temp }}/slop-cop-report/report.json
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync(process.env.REPORT_JSON, 'utf8'));
+            const findings = (report.files || []).flatMap((file) =>
+              (file.findings || [])
+                .filter((finding) => !finding.suppressed && (finding.blocking || finding.chargeable))
+                .map((finding) => ({ file, finding })));
+            for (const { file, finding } of findings.slice(0, 50)) {
+              core.warning(`${finding.rule_id}: ${String(finding.advice || '').slice(0, 300)}`, {
+                file: file.path,
+                startLine: finding.line || 1,
+                startColumn: finding.column || 1,
+              });
+            }
+            await core.summary
+              .addHeading('Slop Cop')
+              .addRaw(`**${String(report.decision).toUpperCase()}** — score ${report.score ?? '—'}, threshold ${report.threshold}\n\n`)
+              .addTable([
+                [{data: 'Path', header: true}, {data: 'Head', header: true}, {data: 'Base', header: true}],
+                ...(report.files || []).map((file) => [file.path, String(file.score ?? '—'), String(file.base?.score ?? '—')]),
+              ])
+              .write();
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+        with:
+          name: slop-cop-pr-${{ steps.inputs.outputs.number || github.event.pull_request.number || 'main' }}-${{ steps.inputs.outputs.head_sha || github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/slop-cop-report
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce saved result
+        if: always()
+        env:
+          CANDIDATE_OUTCOME: ${{ steps.candidate.outcome }}
+          REPORT_JSON: ${{ runner.temp }}/slop-cop-report/report.json
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["REPORT_JSON"])
+          if not path.is_file():
+              raise SystemExit("Slop Cop did not produce report.json")
+          result = json.loads(path.read_text())
+          if result.get("decision") not in {"pass", "overridden", "not_applicable"}:
+              raise SystemExit(f"Slop Cop decision: {result.get('decision')}")
+          if os.environ.get("CANDIDATE_OUTCOME") == "failure":
+              raise SystemExit("Candidate Slop Cop validation failed")
+          PY

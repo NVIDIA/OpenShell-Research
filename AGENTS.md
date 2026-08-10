@@ -9,20 +9,24 @@ documentation for work that uses OpenShell as its runtime.
 
 - Put self-contained implementations and experiments in `projects/<name>/`.
 - Put project-specific user guides and references in `projects/<name>/docs/`.
+- Put repository development and CI tools in `dev-tools/<name>/`, with
+  tool-specific documentation beside the tool.
 - Put cross-project user-facing documentation in `docs/documentation/`.
 - Put Dev Notes (human-written technical notes) `docs/dev-notes/`.
 - Put agent-facing repository maintenance workflows in `docs/development/`.
 
-Before changing a project, read that project's `README.md` and `pyproject.toml`;
-projects are self-contained and may have different platforms, dependencies, and
-validation commands. Before changing anything under `docs/` or `zensical.toml`,
-read `docs/development/index.md`.
+Before changing a project or development tool, read its `README.md` and
+`pyproject.toml`; each is self-contained and may have different platforms,
+dependencies, and validation commands. Before changing anything under `docs/`
+or `zensical.toml`, read `docs/development/index.md`.
 
 ## Repository rules
 
 - Make the smallest change that satisfies the task and preserve unrelated work.
 - Prefer explicit, clear names and language over concise but ambiguous
   alternatives. Value concision when it does not reduce clarity.
+- Use absolute imports in handwritten Python package code. Generated sources
+  may retain the import style produced by their generator.
 - Use `uv` for Python dependency management, environments, locking, builds, and
   command execution unless a project explicitly documents an exception. Treat
   `pyproject.toml` and the committed `uv.lock` as the dependency sources of truth.
@@ -41,8 +45,8 @@ read `docs/development/index.md`.
 
 ## Validation
 
-- For project changes, run the checks documented by that project's README from
-  the project directory.
+- For project and development-tool changes, run the checks documented by its
+  README from that directory.
 - For documentation changes, run `python3 tests/test_render_dev_notes.py` and
   `scripts/build-docs.sh`, then serve the generated site as described in
   `docs/development/index.md`.

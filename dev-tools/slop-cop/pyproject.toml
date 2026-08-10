@@ -1,0 +1,48 @@
+[project]
+name = "slop-cop"
+version = "0.1.0"
+description = "Editorial policy checks for OpenShell Dev Notes"
+license = "Apache-2.0"
+requires-python = ">=3.12"
+dependencies = [
+  "httpx>=0.28.1,<0.29",
+  "pydantic>=2.11.0,<3",
+  "regex>=2025.7.34",
+]
+
+[project.scripts]
+slop-cop = "slop_cop.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+  "mypy>=1.17.1,<2",
+  "pytest>=8.4.1,<9",
+  "pytest-asyncio>=1.1.0,<2",
+  "ruff>=0.12.8,<0.13",
+  "types-regex>=2025.7.34.20250731",
+]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "TID252"]
+allowed-confusables = ["’", "”"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["slop_cop"]

@@ -1,0 +1,257 @@
+[[case]]
+name = "not-just-visible-prose"
+rule_id = "rhetoric.not-just"
+kind = "positive"
+source = "This is not just a wrapper."
+expected_spans = [[8, 16]]
+
+[[case]]
+name = "not-just-inline-code"
+rule_id = "rhetoric.not-just"
+kind = "counterexample"
+source = "Run `not just` as literal input."
+expected_spans = []
+
+[[case]]
+name = "assistant-disclosure"
+rule_id = "artifact.ai-disclosure"
+kind = "positive"
+source = "As an AI language model, I cannot verify this."
+expected_spans = [[0, 23]]
+
+[[case]]
+name = "assistant-disclosure-counterexample"
+rule_id = "artifact.ai-disclosure"
+kind = "counterexample"
+source = "The API reports its runtime type."
+
+[[case]]
+name = "chat-preamble-positive"
+rule_id = "artifact.chat-preamble"
+kind = "positive"
+source = "Certainly, here's the requested Dev Note."
+[[case]]
+name = "chat-preamble-counterexample"
+rule_id = "artifact.chat-preamble"
+kind = "counterexample"
+source = "Here is the enforcement boundary."
+
+[[case]]
+name = "continuation-offer-positive"
+rule_id = "artifact.continuation-offer"
+kind = "positive"
+source = "Let me know if you'd like more detail."
+[[case]]
+name = "continuation-offer-counterexample"
+rule_id = "artifact.continuation-offer"
+kind = "counterexample"
+source = "The next section provides more detail."
+
+[[case]]
+name = "placeholder-positive"
+rule_id = "artifact.placeholder"
+kind = "positive"
+source = "[TODO: add benchmark results]"
+[[case]]
+name = "placeholder-counterexample"
+rule_id = "artifact.placeholder"
+kind = "counterexample"
+source = "The benchmark results follow."
+
+[[case]]
+name = "instruction-residue-positive"
+rule_id = "artifact.instruction-residue"
+kind = "positive"
+source = "Rewrite this section to sound concise."
+[[case]]
+name = "instruction-residue-counterexample"
+rule_id = "artifact.instruction-residue"
+kind = "counterexample"
+source = "This section describes the concise protocol."
+
+[[case]]
+name = "not-but-positive"
+rule_id = "rhetoric.not-but"
+kind = "positive"
+source = "It is not a wrapper, but an enforcement boundary."
+[[case]]
+name = "not-but-counterexample"
+rule_id = "rhetoric.not-but"
+kind = "counterexample"
+source = "It is an enforcement boundary."
+
+[[case]]
+name = "no-no-positive"
+rule_id = "rhetoric.no-no"
+kind = "positive"
+source = "No setup, no delay."
+[[case]]
+name = "no-no-counterexample"
+rule_id = "rhetoric.no-no"
+kind = "counterexample"
+source = "Setup is immediate."
+
+[[case]]
+name = "imperative-reframe-positive"
+rule_id = "rhetoric.imperative-reframe"
+kind = "positive"
+source = "Don't configure it; govern it."
+[[case]]
+name = "imperative-reframe-counterexample"
+rule_id = "rhetoric.imperative-reframe"
+kind = "counterexample"
+source = "Configure the policy explicitly."
+
+[[case]]
+name = "stock-delves-positive"
+rule_id = "vocabulary.stock.delves"
+kind = "positive"
+source = "This section delves into policy."
+[[case]]
+name = "stock-delves-counterexample"
+rule_id = "vocabulary.stock.delves"
+kind = "counterexample"
+source = "This section explains policy."
+
+[[case]]
+name = "stock-tapestry-positive"
+rule_id = "vocabulary.stock.tapestry"
+kind = "positive"
+source = "The system is a rich tapestry of services."
+[[case]]
+name = "stock-tapestry-counterexample"
+rule_id = "vocabulary.stock.tapestry"
+kind = "counterexample"
+source = "The system contains three services."
+
+[[case]]
+name = "stock-realm-positive"
+rule_id = "vocabulary.stock.realm"
+kind = "positive"
+source = "In the realm of security, policy matters."
+[[case]]
+name = "stock-realm-counterexample"
+rule_id = "vocabulary.stock.realm"
+kind = "counterexample"
+source = "Security policy controls access."
+
+[[case]]
+name = "stock-underscore-positive"
+rule_id = "vocabulary.stock.underscore"
+kind = "positive"
+source = "This underscores the importance of isolation."
+[[case]]
+name = "stock-underscore-counterexample"
+rule_id = "vocabulary.stock.underscore"
+kind = "counterexample"
+source = "Isolation prevents cross-tenant access."
+
+[[case]]
+name = "stock-navigate-positive"
+rule_id = "vocabulary.stock.navigate"
+kind = "positive"
+source = "Operators navigate the complexities of deployment."
+[[case]]
+name = "stock-navigate-counterexample"
+rule_id = "vocabulary.stock.navigate"
+kind = "counterexample"
+source = "Operators deploy with one command."
+
+[[case]]
+name = "stock-multifaceted-positive"
+rule_id = "vocabulary.stock.multifaceted"
+kind = "positive"
+source = "The fix uses a multifaceted approach."
+[[case]]
+name = "stock-multifaceted-counterexample"
+rule_id = "vocabulary.stock.multifaceted"
+kind = "counterexample"
+source = "The fix changes the parser and cache."
+
+[[case]]
+name = "ngram-positive"
+rule_id = "repetition.ngram"
+kind = "positive"
+source = "One stable result here.\n\nOne stable result here.\n\nOne stable result here."
+[[case]]
+name = "ngram-counterexample"
+rule_id = "repetition.ngram"
+kind = "counterexample"
+source = "Each paragraph makes a distinct technical claim."
+
+[[case]]
+name = "sentence-opener-positive"
+rule_id = "repetition.sentence-opener"
+kind = "positive"
+source = "Clients receive stable data. Clients receive stable output. Clients receive stable results."
+[[case]]
+name = "sentence-opener-counterexample"
+rule_id = "repetition.sentence-opener"
+kind = "counterexample"
+source = "Clients read data. Servers enforce policy. Operators inspect results."
+
+[[case]]
+name = "template-shape-positive"
+rule_id = "repetition.template-shape"
+kind = "positive"
+source = "Not a cache but a store. Not local but remote. Not optional but required."
+[[case]]
+name = "template-shape-counterexample"
+rule_id = "repetition.template-shape"
+kind = "counterexample"
+source = "The cache is remote and required."
+
+[[case]]
+name = "emphatic-fragments-positive"
+rule_id = "repetition.emphatic-fragments"
+kind = "positive"
+source = "A direct result. No hidden state. One clear boundary. The service then returns data."
+[[case]]
+name = "emphatic-fragments-counterexample"
+rule_id = "repetition.emphatic-fragments"
+kind = "counterexample"
+source = "1. Build the project.\n2. Run the tests.\n3. Review the report."
+
+[[case]]
+name = "hedge-stack-positive"
+rule_id = "repetition.hedge-stack"
+kind = "positive"
+source = "Perhaps this could generally improve latency."
+[[case]]
+name = "hedge-stack-counterexample"
+rule_id = "repetition.hedge-stack"
+kind = "counterexample"
+source = "This reduces median latency by ten milliseconds."
+
+[[case]]
+name = "question-answer-positive"
+rule_id = "repetition.question-answer"
+kind = "positive"
+source = "What changed? The answer is isolation."
+[[case]]
+name = "question-answer-counterexample"
+rule_id = "repetition.question-answer"
+kind = "counterexample"
+source = "Isolation changed the execution boundary."
+
+[[case]]
+name = "vague-authority-positive"
+rule_id = "attribution.vague-authority"
+kind = "positive"
+source = "Experts say this pattern is safe."
+[[case]]
+name = "vague-authority-counterexample"
+rule_id = "attribution.vague-authority"
+kind = "counterexample"
+source = "The linked audit reports this pattern is safe."
+
+[[case]]
+name = "citationless-study-positive"
+rule_id = "attribution.citationless-study"
+kind = "positive"
+source = "A recent study shows lower latency."
+[[case]]
+name = "citationless-study-counterexample"
+rule_id = "attribution.citationless-study"
+kind = "counterexample"
+source = "The benchmark below shows lower latency."

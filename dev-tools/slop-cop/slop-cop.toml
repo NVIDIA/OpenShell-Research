@@ -1,0 +1,433 @@
+schema_version = 1
+profile = "dev-notes"
+threshold = 80
+paths = ["docs/dev-notes/posts/*.md"]
+
+[contexts]
+scan_blockquotes = false
+scan_headings = true
+scan_captions = true
+
+[categories.artifact]
+cap = 100
+
+[categories.rhetoric]
+cap = 25
+
+[categories.rhetoric.density]
+unit = "paragraph"
+window = 3
+allowed_units = 3
+first_cost = 2
+repeat_cost = 1
+cap = 5
+
+[categories.vocabulary]
+cap = 15
+
+[categories.vocabulary.density]
+unit = "paragraph"
+window = 3
+allowed_units = 3
+first_cost = 1
+repeat_cost = 1
+cap = 4
+
+[categories.repetition]
+cap = 25
+
+[categories.repetition.density]
+unit = "paragraph"
+window = 3
+allowed_units = 4
+first_cost = 2
+repeat_cost = 1
+cap = 5
+
+[categories.attribution]
+cap = 15
+
+[categories.ending]
+cap = 15
+
+[categories.structure]
+cap = 0
+
+[rules."artifact.ai-disclosure"]
+severity = "error"
+blocking = true
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 100
+repeat_cost = 100
+cap = 100
+
+[rules."artifact.chat-preamble"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 15
+repeat_cost = 10
+cap = 35
+
+[rules."artifact.continuation-offer"]
+severity = "error"
+blocking = true
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 100
+repeat_cost = 100
+cap = 100
+
+[rules."artifact.placeholder"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 8
+repeat_cost = 5
+cap = 20
+
+[rules."artifact.instruction-residue"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 10
+repeat_cost = 6
+cap = 25
+
+[rules."rhetoric.not-but"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 1
+first_cost = 3
+repeat_cost = 2
+cap = 9
+
+[rules."rhetoric.not-but".document_density]
+unit = "word"
+interval = 1000
+allowed_units = 1
+
+[rules."rhetoric.not-but".density]
+unit = "paragraph"
+window = 3
+allowed_units = 1
+first_cost = 2
+repeat_cost = 2
+cap = 6
+
+[rules."rhetoric.not-just"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 3
+repeat_cost = 2
+cap = 9
+
+[rules."rhetoric.not-just".document_density]
+unit = "word"
+interval = 1500
+allowed_units = 1
+
+[rules."rhetoric.not-just".density]
+unit = "paragraph"
+window = 3
+allowed_units = 1
+first_cost = 2
+repeat_cost = 2
+cap = 6
+
+[rules."rhetoric.no-no"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 1
+first_cost = 3
+repeat_cost = 2
+cap = 9
+
+[rules."rhetoric.no-no".density]
+unit = "paragraph"
+window = 3
+allowed_units = 1
+first_cost = 2
+repeat_cost = 2
+cap = 6
+
+[rules."rhetoric.imperative-reframe"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 1
+first_cost = 3
+repeat_cost = 2
+cap = 9
+
+[rules."rhetoric.imperative-reframe".density]
+unit = "paragraph"
+window = 3
+allowed_units = 1
+first_cost = 2
+repeat_cost = 2
+cap = 6
+
+[rules."rhetoric.dramatic-fragment"]
+severity = "info"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 0
+repeat_cost = 0
+cap = 0
+
+[rules."rhetoric.throat-clearing"]
+severity = "info"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 0
+repeat_cost = 0
+cap = 0
+
+[rules."rhetoric.testament"]
+severity = "info"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 0
+repeat_cost = 0
+cap = 0
+
+[rules."rhetoric.crucial-role"]
+severity = "info"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 0
+repeat_cost = 0
+cap = 0
+
+[rules."rhetoric.landscape-metaphor"]
+severity = "info"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 0
+repeat_cost = 0
+cap = 0
+
+[rules."rhetoric.formulaic-certainty"]
+severity = "info"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 0
+repeat_cost = 0
+cap = 0
+
+[rules."rhetoric.parallel-negation"]
+severity = "info"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 0
+repeat_cost = 0
+cap = 0
+
+[rules."vocabulary.stock.delves"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 1
+first_cost = 1
+repeat_cost = 1
+cap = 4
+
+[rules."vocabulary.stock.tapestry"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 1
+first_cost = 1
+repeat_cost = 1
+cap = 4
+
+[rules."vocabulary.stock.realm"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 1
+first_cost = 1
+repeat_cost = 1
+cap = 4
+
+[rules."vocabulary.stock.underscore"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 1
+first_cost = 1
+repeat_cost = 1
+cap = 4
+
+[rules."vocabulary.stock.navigate"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 1
+first_cost = 1
+repeat_cost = 1
+cap = 4
+
+[rules."vocabulary.stock.multifaceted"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 1
+first_cost = 1
+repeat_cost = 1
+cap = 4
+
+[rules."repetition.ngram"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 2
+first_cost = 3
+repeat_cost = 2
+cap = 10
+
+[rules."repetition.ngram".density]
+unit = "paragraph"
+window = 5
+allowed_units = 2
+first_cost = 2
+repeat_cost = 1
+cap = 4
+
+[rules."repetition.sentence-opener"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 1
+first_cost = 6
+repeat_cost = 3
+cap = 15
+
+[rules."repetition.sentence-opener".density]
+unit = "sentence"
+window = 5
+allowed_units = 2
+first_cost = 2
+repeat_cost = 1
+cap = 6
+
+[rules."repetition.template-shape"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 1
+first_cost = 6
+repeat_cost = 3
+cap = 15
+
+[rules."repetition.template-shape".density]
+unit = "paragraph"
+window = 3
+allowed_units = 2
+first_cost = 3
+repeat_cost = 2
+cap = 6
+
+[rules."repetition.emphatic-fragments"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 1
+first_cost = 6
+repeat_cost = 3
+cap = 15
+
+[rules."repetition.emphatic-fragments".density]
+unit = "sentence"
+window = 5
+allowed_units = 2
+first_cost = 3
+repeat_cost = 2
+cap = 6
+
+[rules."repetition.hedge-stack"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 1
+first_cost = 2
+repeat_cost = 2
+cap = 8
+
+[rules."repetition.question-answer"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 1
+first_cost = 2
+repeat_cost = 2
+cap = 8
+
+[rules."attribution.vague-authority"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 1
+first_cost = 2
+repeat_cost = 2
+cap = 8
+
+[rules."attribution.citationless-study"]
+severity = "warning"
+max_signal_units = 1
+fixed_allowance = 1
+first_cost = 2
+repeat_cost = 2
+cap = 8
+
+[rules."ending.participial-tail"]
+severity = "info"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 0
+repeat_cost = 0
+cap = 0
+
+[rules."ending.generic-explanation"]
+severity = "info"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 0
+repeat_cost = 0
+cap = 0
+
+[rules."structure.bold-leadins"]
+severity = "info"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 0
+repeat_cost = 0
+cap = 0
+
+[rules."structure.triad"]
+severity = "info"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 0
+repeat_cost = 0
+cap = 0
+
+[rules."structure.bullet-run"]
+severity = "info"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 0
+repeat_cost = 0
+cap = 0
+
+[rules."structure.horizontal-rules"]
+severity = "info"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 0
+repeat_cost = 0
+cap = 0
+
+[rules."structure.duplicate-title"]
+severity = "info"
+max_signal_units = 1
+fixed_allowance = 0
+first_cost = 0
+repeat_cost = 0
+cap = 0
+
+[vocabulary]
+allowed_terms = ["OpenShell", "Dev Note"]
+
+[custom_rules]
+
+[services]
