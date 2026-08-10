@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import html
 import json
+from base64 import b64encode
 from collections.abc import Mapping, Sequence
+from functools import cache
+from importlib.resources import files
 from pathlib import Path
 from typing import Any, cast
 
@@ -145,7 +148,9 @@ def html_report(
         '<meta name="viewport" content="width=device-width,initial-scale=1">',
         "<title>Slop Cop report</title>",
         f"<style>{_STYLE}</style></head><body><main>",
-        '<header><p class="eyebrow">Slop Cop</p><h1>Dev Notes report</h1>',
+        '<header><div class="report-heading">',
+        f'<img class="report-logo" src="{_logo_data_uri()}" alt="" width="160" height="160">',
+        '<div><p class="eyebrow">Slop Cop</p><h1>Dev Notes report</h1></div></div>',
         f'<p class="status {_status_class(state)}">{_h(state)}</p>',
         '<dl class="summary">',
         _dtdd("Score", _display(score)),
@@ -586,11 +591,23 @@ def _status_class(state: str) -> str:
     return "fail"
 
 
+@cache
+def _logo_data_uri() -> str:
+    try:
+        logo = files("slop_cop").joinpath("assets", "slop-cop.png").read_bytes()
+    except OSError as error:
+        raise ReportError("The Slop Cop report logo is unavailable.") from error
+    return "data:image/png;base64," + b64encode(logo).decode("ascii")
+
+
 _STYLE = """
 :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, sans-serif; }
 body { margin: 0; background: Canvas; color: CanvasText; }
 main { max-width: 76rem; margin: auto; padding: 2rem; }
 header, section, article, footer { margin-block: 1.5rem; }
+.report-heading { display: flex; align-items: center; gap: 1rem; }
+.report-heading h1 { margin-block: .25rem; }
+.report-logo { width: 6rem; height: 6rem; object-fit: contain; }
 article {
   border-top: 2px solid color-mix(in srgb, CanvasText 25%, transparent);
   padding-top: 1rem;

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -144,6 +146,15 @@ def test_html_report_is_self_contained_and_escapes_all_result_text() -> None:
     assert "https://" not in rendered
     assert "External rule audit" in rendered
     assert "Passage density" in rendered
+
+
+def test_html_report_embeds_the_logo() -> None:
+    rendered = html_report(sample_result())
+    match = re.search(r'<img class="report-logo" src="data:image/png;base64,([^"]+)"', rendered)
+    assert match is not None
+    logo = base64.b64decode(match.group(1), validate=True)
+    assert logo.startswith(b"\x89PNG\r\n\x1a\n")
+    assert len(logo) > 1_000_000
 
 
 def test_report_directory_contains_canonical_pair(tmp_path: Path) -> None:
