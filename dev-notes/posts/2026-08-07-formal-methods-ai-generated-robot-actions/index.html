@@ -6,17 +6,17 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Edge agents handle sensitive data and make decisions with physical consequences. Reachy Mini shows why privacy and safety controls must be deterministic and local.">
+        <meta name="description" content="A robotics experiment asks whether an independent, SMT-backed policy boundary can efficiently govern AI-generated plans before they reach a simulated or physical robot.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
       
       
       
-        <link rel="prev" href="../2026-08-07-formal-methods-ai-generated-robot-actions/">
+        <link rel="prev" href="../../">
       
       
-        <link rel="next" href="../../../documentation/">
+        <link rel="next" href="../2026-07-20-policy-controlling-reachy-mini-with-openshell/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Bringing Privacy and Security to the Edge with OpenShell - OpenShell Research</title>
+        <title>Can Formal Methods Govern AI-Generated Robot Actions? - OpenShell Research</title>
       
     
     
@@ -80,7 +80,7 @@
     }
   </script>
   
-    <link rel="alternate" type="text/markdown" href="../2026-07-20-policy-controlling-reachy-mini-with-openshell.md" title="Markdown source">
+    <link rel="alternate" type="text/markdown" href="../2026-08-07-formal-methods-ai-generated-robot-actions.md" title="Markdown source">
   
 
   </head>
@@ -102,7 +102,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#bringing-privacy-and-security-to-the-edge-with-openshell" class="md-skip">
+        <a href="#can-formal-methods-govern-ai-generated-robot-actions" class="md-skip">
           Skip to content
         </a>
       
@@ -141,7 +141,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Bringing Privacy and Security to the Edge with OpenShell
+              Can Formal Methods Govern AI-Generated Robot Actions?
             
           </span>
         </div>
@@ -380,33 +380,6 @@
                 
   
   
-  
-  
-    <li class="md-nav__item">
-      <a href="../2026-08-07-formal-methods-ai-generated-robot-actions/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-  Can Formal Methods Govern AI-Generated Robot Actions?
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
     
   
   
@@ -426,7 +399,7 @@
   <span class="md-ellipsis">
     
   
-  Bringing Privacy and Security to the Edge with OpenShell
+  Can Formal Methods Govern AI-Generated Robot Actions?
 
     
   </span>
@@ -443,7 +416,7 @@
   <span class="md-ellipsis">
     
   
-  Bringing Privacy and Security to the Edge with OpenShell
+  Can Formal Methods Govern AI-Generated Robot Actions?
 
     
   </span>
@@ -469,10 +442,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#give-each-job-its-own-boundary" class="md-nav__link">
+  <a href="#the-experiment" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Give Each Job Its Own Boundary
+        The Experiment
       </span>
     </span>
   </a>
@@ -480,71 +453,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-we-built-it" class="md-nav__link">
+  <a href="#why-check-the-proposed-action" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        How We Built It
-      </span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="How We Built It">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#run-openshell-entirely-on-device" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Run OpenShell entirely on device
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#expose-capabilities-not-complete-apis" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Expose capabilities, not complete APIs
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#keep-hardware-handles-in-trusted-native-code" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Keep hardware handles in trusted native code
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#use-a-remote-or-local-model" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Use a remote or local model
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-this-looks-like-on-reachy" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        What This Looks Like on Reachy
+        Why Check the Proposed Action?
       </span>
     </span>
   </a>
@@ -552,10 +464,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#keeping-data-private" class="md-nav__link">
+  <a href="#how-the-prototype-works" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Keeping Data Private
+        How the Prototype Works
       </span>
     </span>
   </a>
@@ -563,10 +475,54 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#conclusion" class="md-nav__link">
+  <a href="#prover-latency" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Conclusion
+        Prover Latency
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-prototype-verifies" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        What the Prototype Verifies
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-experiments" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Next Experiments
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#research-questions-and-collaboration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Research Questions and Collaboration
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-and-extend-the-experiment" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Run and Extend the Experiment
       </span>
     </span>
   </a>
@@ -577,6 +533,33 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Bringing Privacy and Security to the Edge with OpenShell
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1305,10 +1288,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#give-each-job-its-own-boundary" class="md-nav__link">
+  <a href="#the-experiment" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Give Each Job Its Own Boundary
+        The Experiment
       </span>
     </span>
   </a>
@@ -1316,71 +1299,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-we-built-it" class="md-nav__link">
+  <a href="#why-check-the-proposed-action" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        How We Built It
-      </span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="How We Built It">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#run-openshell-entirely-on-device" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Run OpenShell entirely on device
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#expose-capabilities-not-complete-apis" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Expose capabilities, not complete APIs
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#keep-hardware-handles-in-trusted-native-code" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Keep hardware handles in trusted native code
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#use-a-remote-or-local-model" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Use a remote or local model
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-this-looks-like-on-reachy" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        What This Looks Like on Reachy
+        Why Check the Proposed Action?
       </span>
     </span>
   </a>
@@ -1388,10 +1310,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#keeping-data-private" class="md-nav__link">
+  <a href="#how-the-prototype-works" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Keeping Data Private
+        How the Prototype Works
       </span>
     </span>
   </a>
@@ -1399,10 +1321,54 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#conclusion" class="md-nav__link">
+  <a href="#prover-latency" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Conclusion
+        Prover Latency
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-prototype-verifies" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        What the Prototype Verifies
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-experiments" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Next Experiments
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#research-questions-and-collaboration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Research Questions and Collaboration
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#run-and-extend-the-experiment" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Run and Extend the Experiment
       </span>
     </span>
   </a>
@@ -1492,7 +1458,7 @@
     
     
       <li class="md-path__item">
-        <a href="../2026-08-07-formal-methods-ai-generated-robot-actions/" class="md-path__link">
+        <a href="././" class="md-path__link">
           
   
   <span class="md-ellipsis">
@@ -1518,25 +1484,25 @@
 
 
   
-  <a href="../2026-07-20-policy-controlling-reachy-mini-with-openshell.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
+  <a href="../2026-08-07-formal-methods-ai-generated-robot-actions.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.56 18H3.44C2.65 18 2 17.37 2 16.59V7.41C2 6.63 2.65 6 3.44 6h17.12c.79 0 1.44.63 1.44 1.41v9.18c0 .78-.65 1.41-1.44 1.41M3.44 6.94c-.26 0-.48.21-.48.47v9.19c0 .25.22.46.48.46h17.12c.26 0 .48-.21.48-.46V7.41c0-.26-.22-.47-.48-.47zm1.45 8.25V8.81h1.92l1.92 2.35 1.92-2.35h1.93v6.38h-1.93v-3.66l-1.92 2.35-1.92-2.35v3.66zm12.01 0-2.9-3.1h1.94V8.81h1.92v3.28h1.93z"/></svg>
   </a>
 
 
-<h1 id="bringing-privacy-and-security-to-the-edge-with-openshell">Bringing Privacy and Security to the Edge with OpenShell</h1>
+<h1 id="can-formal-methods-govern-ai-generated-robot-actions">Can Formal Methods Govern AI-Generated Robot Actions?</h1>
 <!-- dev-note:byline:start -->
 <!-- Generated by scripts/render-dev-notes.py; edit front matter and authors.json. -->
 <div class="dev-note-byline">
   <p class="dev-note-byline__label">
     <span>Dev Note</span>
-    <time datetime="2026-07-20">July 20, 2026</time>
-    <span>Edge AI</span>
+    <time datetime="2026-08-07">August 7, 2026</time>
+    <span>Physical AI</span>
   </p>
-  <div class="dev-note-byline__authors" aria-label="Author: Kirit Thadaka">
-    <a class="dev-note-byline__author" href="https://github.com/kirit93">
-      <img src="https://github.com/kirit93.png?size=96" alt="" loading="lazy">
+  <div class="dev-note-byline__authors" aria-label="Author: Alex Watson">
+    <a class="dev-note-byline__author" href="https://github.com/zredlined">
+      <img src="https://github.com/zredlined.png?size=96" alt="" loading="lazy">
       <span class="dev-note-byline__copy">
-        <strong>Kirit Thadaka</strong>
+        <strong>Alex Watson</strong>
         <span>OpenShell Team @ NVIDIA</span>
       </span>
     </a>
@@ -1544,188 +1510,292 @@
 </div>
 <!-- dev-note:byline:end -->
 
-<figure class="dev-note-figure dev-note-figure--hero">
-  <img src="../../../assets/reachy-mini-openshell/hero.svg" alt="Bringing Privacy and Security to the Edge with OpenShell: a stylized Reachy Mini robot with two green camera eyes inside an OpenShell boundary ring.">
+<p><em>We built a small robotics experiment to test whether OpenShell's formal
+methods-based policy enforcement can govern robot plans generated by local and
+frontier AI models.</em></p>
+<figure class="dev-note-figure dev-note-figure--hero dev-note-figure--native-aspect">
+  <img src="../../../assets/robotics-policy-prover/robotics-policy-prover-hero.png" alt="A simulated robot workcell showing an AI-generated waypoint path, a red restricted volume, and the policy prover's decision.">
 </figure>
 
-<p>Useful AI agents now run for long periods of time, taking on critical tasks to accomplish goals. They call tools, learn new skills, write code, and keep working while no one is watching. How do you give autonomy to such a highly capable agent?</p>
-<p>OpenShell is the secure runtime for autonomous agents. It solves this problem by moving the security layer outside the agent. OpenShell runs your agent in a sandbox and sits in the path of everything the agent does. A policy layer, configured separately from the agent, governs what processes the agent can start, which hosts and ports it can reach, which models it can call, and which other services it needs to invoke along its network path.</p>
-<p>Every OpenShell deployment has different needs, and different agents want different things, so we made OpenShell extensible. You are not locked into a fixed set of behaviors. You can swap the isolation backend, add your own checks on policy updates, and plug in middleware services that run on traffic as it leaves the sandbox.</p>
-<p>The combination of autonomous agents and edge devices like robots brings the digital concerns of traditional software deployments into the physical world. Imagine a home assistant robot that is only supposed to clean. It suffers a prompt injection and starts unlocking the doors instead. At the edge, a compromised agent does not just leak data or crash a process. It can let a stranger into your home, or send what it sees and hears somewhere it should never go.</p>
-<p>OpenShell makes an autonomous agent safe to run at the edge by solving two problems:</p>
+<p>OpenShell uses formal methods-based policy enforcement to constrain what AI
+agents can do in digital environments. We wanted to see whether a similar
+approach could govern the higher-level plans local and frontier models generate
+for robots.</p>
+<p>To explore that question, we built a small robotics pick-and-place experiment.
+The task is intentionally simple: move a green block into a blue tray. An AI
+planner proposes a sequence of 3D waypoints, and a policy prover checks the path
+before the simulated tool head moves. The checks cover workspace limits, a
+restricted volume, human proximity, sensor freshness, delegated authority,
+force, and task budget.</p>
+<p>Formal methods are attracting renewed attention as AI systems become agents.
+Recent work is exploring
+<a href="https://arxiv.org/abs/2602.22302">behavioral contracts</a>,
+<a href="https://arxiv.org/abs/2606.19242">runtime compliance over agent traces</a>, and
+other ways to turn desired behavior into specifications an external system can
+check. Many familiar approaches focus on making the model itself more reliable:
+better instructions, safer training, stronger evaluations, or another model
+acting as a judge. Those remain important layers. This experiment looks at a
+complementary question: can a separate system check a proposed physical action
+before it reaches a simulator or robot?</p>
+<p>For this prototype, we split responsibility this way:</p>
 <ul>
-<li><strong>Restrict what the device can do.</strong> Deterministic policy decides what the agent can actually make the device do, and it is enforced on the device.</li>
-<li><strong>Keep the data private.</strong> Sensitive data stays local, and only approved services ever see it.</li>
+<li>The agent proposes a plan it believes will accomplish the task.</li>
+<li>An independent, deterministic policy boundary sits between that plan and the
+  simulated actuator.</li>
+<li>A rejection returns structured evidence the agent can use to revise its plan.</li>
+<li>Only a version admitted by the policy boundary reaches the executor, with any
+  returned constraints and runtime obligations attached.</li>
 </ul>
-<p>We used the HuggingFace Reachy Mini to see what that looks like in practice. We run a small chat application connected to an OpenAI endpoint within the OpenShell runtime, all on the Reachy Mini's onboard Raspberry Pi. Running the whole stack on a Raspberry Pi is part of the point: OpenShell holds up on the small, resource-constrained hardware that real edge devices ship with, not just a workstation. We use OpenShell to restrict what actions the model can take. Our next step is to route sensitive data to approved models, but more on that in a follow-up post.</p>
-<p>If you just want to try this for yourself, check out our tutorial <a href="https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/ONBOARD_SETUP.md">here</a>.</p>
-<hr />
-<h2 id="give-each-job-its-own-boundary">Give Each Job Its Own Boundary</h2>
-<p>Start with the first problem: restricting what the device can do. The simplest
-way to build this is to run the agent on the device and give it the robot's SDK.
-That works for a quick demo, but it puts two things that should be separate into
-a single process.</p>
-<p><strong>The agent gets more than it needs.</strong> A robot SDK exposes motors, raw targets,
-camera settings, recorded motions, app management, and system state. An agent
-that only needs a few fixed head moves should not inherit all of that.</p>
-<p><strong>The decision happens too far from the effect.</strong> A remote model can pick which
-tool to call, but it should not be the final say on whether a local motor
-actually moves. That call belongs on the device, right before the request reaches
-the controller.</p>
-<p>Both come from the same place: one process holds all the access and makes all the
-decisions. So we split the work into separate parts, each with one job.</p>
-<ol>
-<li><strong>The model reasons.</strong> It listens to what the user says and picks from the
-   tools the app offers. The model can be remote or local.</li>
-<li><strong>The sandboxed agent turns that choice into a concrete request.</strong> It owns the
-   conversation state and the tool logic, but it does not own the hardware.</li>
-<li><strong>OpenShell decides whether the request may leave the sandbox.</strong> It checks the
-   tool call request against the OpenShell policy.</li>
-<li><strong>A trusted adapter exposes one narrow capability.</strong> It owns the native device
-   objects and turns an approved request into a single bounded operation.</li>
-<li><strong>The device controller does the work.</strong> Motors, sensors, and cameras are
-   reached only after every boundary above has allowed it.</li>
-</ol>
+<p>We set out to learn whether that check could return useful feedback to the
+planner and run quickly enough to fit a robot-planning loop driven by an AI
+model.</p>
 <figure class="dev-note-figure">
-  <img src="../../../assets/reachy-mini-openshell/diagrams/boundary-stack.svg" alt="On-device boundary stack. Five boundaries connected top to bottom: a cloud or local model, the agent in an on-device OpenShell sandbox, the local OpenShell policy decision as the control point, a narrow trusted capability adapter, and the physical device, sensor, or local data.">
-  <figcaption>Reasoning, policy enforcement, hardware ownership, and device execution are separated into distinct boundaries. The local OpenShell policy decision is the control point, evaluated on the device before a request can leave the sandbox.</figcaption>
+  <img src="../../../assets/robotics-policy-prover/action-governance-architecture.svg" alt="Architecture diagram showing an AI agent inside a sandboxed agent runtime. Proposed plans pass through a Rust and Z3 action-admission prover before an admitted contract reaches a simulation or real-world robot. Changing world state feeds the admission and runtime-enforcement boundary.">
 </figure>
 
-<p>The sandbox starts with deny-by-default policy instead of inheriting everything
-the host can do. When OpenShell blocks an action, it returns a natural-language
-message explaining why, along with examples of what is allowed. The agent can
-tell the person what happened and look for a safe way to do the same task,
-instead of quietly working around the limit. An operator can change the policy
-without rebuilding the app, and the power to grant new authority stays outside
-the agent.</p>
 <hr />
-<h2 id="how-we-built-it">How We Built It</h2>
-<p>These were the main choices behind the build.</p>
-<h3 id="run-openshell-entirely-on-device">Run OpenShell entirely on device</h3>
-<p>We run all of OpenShell on Reachy's onboard computer. The gateway is the control
-plane: it creates the sandbox, holds the policy, and manages the sandbox
-lifecycle. The agent runs inside the sandbox. When the agent tries to move the
-robot, OpenShell checks the request on the device and decides whether it reaches
-the daemon. The same check controls what leaves the sandbox: every outbound
-connection can be allowed, routed somewhere else, or denied.</p>
-<h3 id="expose-capabilities-not-complete-apis">Expose capabilities, not complete APIs</h3>
-<p>We give the agent three tools:</p>
-<ul>
-<li><code>move_head(directions)</code> accepts <code>left</code>, <code>right</code>, <code>up</code>, <code>down</code>, and <code>front</code>.</li>
-<li><code>stop_motion()</code> stops active movements.</li>
-<li><code>camera(question)</code> requests one image for the current conversation.</li>
-</ul>
-<p>The model picks one of these tools. It does not build the HTTP request itself.
-Python handlers in the sandbox turn <code>move_head</code> into <code>POST /api/move/goto</code>,
-<code>stop_motion</code> into <code>POST /api/move/stop</code>, and <code>camera</code> into
-<code>POST /camera/capture</code>. OpenShell then checks that concrete request before it can
-leave the sandbox.</p>
-<p>The agent never sees the full Reachy API. Fixed tool inputs become fixed REST
-requests, so the capability you meant to grant is visible right at the network
-boundary. That is much easier to reason about than handing the agent a
-general-purpose SDK and trying to list every unsafe combination after the fact.</p>
-<p>Keeping the tools fixed also covers a gap in what policy can see. OpenShell
-matches the calling binary, destination, method, path, and query, but it does not
-yet check the values inside a JSON body. If one endpoint could do many things,
-allowing its path would let the sandbox send any body that endpoint accepts.
-Fixed tools avoid that: <code>move_head</code> only ever produces its five poses, a limit
-the app enforces rather than policy, and <code>POST /camera/capture</code> takes no
-arguments the model can set at all.</p>
-<h3 id="keep-hardware-handles-in-trusted-native-code">Keep hardware handles in trusted native code</h3>
-<p>Reachy's native app already owns the microphone, speaker, and camera. Moving
-those into the sandbox would split hardware ownership in two and drag the full
-Reachy SDK, media stack, and vision dependencies into the agent image.</p>
-<p>Instead, a small trusted Reachy App keeps the media objects. It forwards PCM
-audio over a local WebSocket and exposes one camera route with no arguments:
-<code>POST /camera/capture</code>. The sandbox can hold a conversation and ask for one
-frame. It never gets the camera handle, the device choice, the resolution
-controls, or a file path.</p>
-<h3 id="use-a-remote-or-local-model">Use a remote or local model</h3>
-<p>The model in our demo is remote, an OpenAI Realtime endpoint. Everything else,
-the conversation, the policy, the adapter, and the controller, runs on Reachy.
-Edge does not have to mean fully offline, and enforcing policy on the device does
-not need a local model. If you later want an on-device model, only the endpoint
-changes. The sandbox, the adapter, and the boundary stay the same.</p>
-<hr />
-<h2 id="what-this-looks-like-on-reachy">What This Looks Like on Reachy</h2>
-<figure class="dev-note-figure dev-note-figure--wide">
-  <img src="../../../assets/reachy-mini-openshell/diagrams/request-flow.svg" alt="Request flow on Reachy. The person speaks to the trusted native Reachy App, which streams PCM audio into the OpenShell sandbox, where the conversation agent exchanges policy-checked audio with the OpenAI Realtime API. Robot requests from the agent pass through the OpenShell gateway, which allows the POST /camera/capture path to the one-frame camera adapter and denies the POST /api/move/goto path to the Reachy daemon and motors.">
-  <figcaption>Every request to the hardware passes through OpenShell first. The OpenShell policy allows the camera capture path (green) and denies the movement path (red), so the camera works and the head does not move, enforced by policy rather than by the application choosing to refuse.</figcaption>
-</figure>
+<h2 id="the-experiment">The Experiment</h2>
+<video controls muted playsinline preload="none" poster="../../../assets/robotics-policy-prover/robotics-policy-prover-hero.png" style="width: 100%;">
+  <source src="../../../assets/robotics-policy-prover/openshell-robotics-prover-demo.mp4" type="video/mp4">
+  Your browser does not support embedded video. Download the recorded demo from the project assets.
+</video>
 
-<p>There is no laptop, browser, or Gradio page in the runtime path. The full
-request flow is:</p>
-<ol>
-<li>The trusted Reachy App captures microphone audio and streams PCM frames to
-   the audio service in the sandbox.</li>
-<li>The agent sends that audio to the OpenAI Realtime API over its
-   policy-approved WebSocket. The model gets the conversation along with the
-   fixed <code>move_head</code>, <code>stop_motion</code>, and <code>camera</code> tools.</li>
-<li>The model returns audio or picks a tool. For a tool call, Python code in the
-   sandbox turns the model's arguments into one of the fixed REST requests.</li>
-<li>OpenShell checks the destination, port, method, and path. An allowed request
-   reaches the trusted adapter or the Reachy daemon. A denied request comes back
-   as a policy error and never reaches the hardware.</li>
-<li>The agent uses the tool result or the policy error to keep talking, and the
-   response audio goes back through the native Reachy App to the speaker.</li>
-</ol>
-<p>The demo policy splits two physical capabilities:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>POST host.openshell.internal:8042/camera/capture   allowed
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>POST host.openshell.internal:8000/api/move/goto   denied
+<p>The recorded run follows four steps: propose, check, adapt, execute.</p>
+<p>First, GPT-5.6 Terra proposes a waypoint path whose direct route crosses the red
+restricted volume. The policy service denies the action, identifies
+<code>restricted_zone_intersection</code>, returns an approximate counterexample point,
+and supplies a minimum bypass height. Nothing moves.</p>
+<p>The planning loop sends that decision packet back to the model, which proposes
+a route around the restricted volume. Before execution, the world changes: a
+human enters the caution radius. The policy service evaluates the action again
+and changes the contract. The path may proceed, but only at a speed of 0.08 m/s
+or less, with an obligation to pause if the human gets closer.</p>
+<p>The executor runs the revised path with the returned speed limit. In this run,
+the planning loop could propose and revise a path, while the policy boundary
+determined which version reached the simulated actuator.</p>
+<p>Here is an example decision packet:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">&quot;decision&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;deny&quot;</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">&quot;violations&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;restricted_zone_intersection&quot;</span><span class="p">],</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">&quot;constraints&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">&quot;bypass_z_min&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.55</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="nt">&quot;obligations&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;emit_audit_event&quot;</span><span class="p">],</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="nt">&quot;counterexample&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="nt">&quot;segment_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;proposed_segment&quot;</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nt">&quot;zone_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;restricted_zone.alpha&quot;</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="nt">&quot;reason&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;restricted_zone_intersection&quot;</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">    </span><span class="nt">&quot;point&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">-0.18</span><span class="p">,</span><span class="w"> </span><span class="mf">0.35</span><span class="p">,</span><span class="w"> </span><span class="mf">-0.20</span><span class="p">]</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="p">}</span>
 </span></code></pre></div>
-<p>When someone says, "Take a picture of me," the agent calls <code>camera</code>, OpenShell
-allows the capture path, the trusted adapter returns one bounded JPEG, and
-Reachy describes it aloud.</p>
-<p>When they say, "Turn right and take a picture," the agent tries
-<code>POST /api/move/goto</code>. OpenShell denies it before it reaches the Reachy daemon.
-The robot stays still, and it says so out loud.</p>
-<p>The key point is that the app is not just choosing not to move. The agent makes
-a real attempt to move, and a separate policy boundary stops the physical
-effect.</p>
+<p>In this demo, that response gives the planner more to work with than a generic
+"unsafe" error. It serves as both an enforcement decision for the executor and
+machine-readable feedback for replanning.</p>
 <hr />
-<h2 id="keeping-data-private">Keeping Data Private</h2>
-<p>The demo above covers action restriction, the first of the two problems. The
-second is privacy, and at the edge it matters more than usual, because these
-devices can see and hear the room they are in. A camera should be able to
-describe a scene without sending raw video off the device, and a microphone
-should be able to drive a conversation while the recording stays local. The
-device should capture only what it needs, and anything sensitive should leave
-only when it has to.</p>
-<p>The next piece for Reachy is to add privacy routing. We use OpenShell's
-middleware service, which hooks into OpenShell's sandbox proxy. The middleware service is built to detect
-what type of data is leaving the sandbox. We keep things simple here: if it's image data, we route it to a model approved to
-handle image data, which may be sensitive. If it's not image data, it goes to a frontier model in the cloud. This is just an
-example, but the benefit of middleware is its flexibility. You can build in whatever routing logic you want, and use any tool you
-want for PII redaction or replacement.</p>
-<p>Keep an eye on this repo for more details on privacy routing!</p>
+<h2 id="why-check-the-proposed-action">Why Check the Proposed Action?</h2>
+<p>This experiment applies formal methods to the concrete action proposed by the
+planner.</p>
+<p>This resembles the formal-methods idea of a <em>shield</em>. In
+<a href="https://ojs.aaai.org/index.php/AAAI/article/view/11797">safe reinforcement learning via shielding</a>,
+a learned policy proposes actions while a reactive system monitors them and
+intervenes when one would violate a formal specification. Our prototype tests a
+similar division of work with an agent-generated robot path.</p>
+<p>Agent systems broaden that idea. A proposed action may be a shell command, a
+network request, a delegated capability, a financial transaction, or a robot
+trajectory. One useful formal object is a typed description of the action, the
+relevant state, and the invariant the surrounding system is expected to
+enforce—not the model's prose or chain of thought.</p>
+<p>The design also resembles the reference-monitor pattern emphasized in recent
+agent-security research. For example, <a href="https://research.google/pubs/veriguard-enhancing-llm-agent-safety-via-verified-code-generation/">VeriGuard</a>,
+work by Dj Dvijotham and collaborators at Google DeepMind, separates rigorous
+policy validation from a lightweight runtime monitor that checks each proposed
+action before execution. Applied to robotics, the open systems question is
+whether the monitor can cover the relevant paths from a planner's output to an
+actuator command.</p>
+<p>A robotics-focused prototype gives us a few key design goals to investigate:</p>
+<ul>
+<li><strong>Close to the effect.</strong> Check the plan after intent becomes a concrete
+  action, but before the simulator or robot moves.</li>
+<li><strong>Compositional.</strong> Evaluate overlapping concerns such as workspace,
+  authority, sensor freshness, human proximity, budget, speed, and force
+  together.</li>
+<li><strong>Constructive.</strong> Return a failed invariant, counterexample, or narrower
+  contract so the agent can improve its plan rather than guess.</li>
+</ul>
+<p>Any guarantee from the prototype remains relative to its specification and
+world model. Work
+on <a href="https://ojs.aaai.org/index.php/AAAI/article/view/12107">safe reinforcement learning through proof and learning</a>
+makes the same essential point: formal verification provides confidence relative
+to a model, and cyber-physical reality will always test the completeness of that
+model. For this experiment, that means stating the property, assumptions, and
+enforcement point precisely, then testing where each breaks down as the
+environment becomes more realistic.</p>
+<hr />
+<h2 id="how-the-prototype-works">How the Prototype Works</h2>
+<p>OpenShell's architecture is designed to move security policy out of the agent
+and into the environment that mediates its actions. A sandboxed agent can
+reason, write code, call tools, and delegate work, but filesystem, network,
+process, and inference authority are enforced by infrastructure the agent does
+not control.</p>
+<p>This experiment explores whether the same architectural move can extend from
+the digital domain—such as coding or cybersecurity—to physical actions. The
+question becomes: can this particular motion safely run, with this object, at
+this speed, given the world state we have now?</p>
+<p>The prototype expresses each request as an action envelope with multiple,
+often-overlapping rules:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>actor and delegated subagent
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>action and target resource
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>start, end, and waypoint path
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>requested speed and force
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>object identity and class
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>capability grant
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>human distance and sensor age
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>restricted and caution volumes
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>remaining task budget
+</span></code></pre></div>
+<p>The service turns that envelope into one of four decisions:</p>
+<ul>
+<li><code>allow</code>: execute the proposed action.</li>
+<li><code>deny</code>: do not execute; return violations and a counterexample when possible.</li>
+<li><code>allow_with_constraints</code>: execute only inside narrower speed, force, or path
+  bounds.</li>
+<li><code>approval_required</code>: stop at a human decision point.</li>
+</ul>
+<p>The result also contains obligations for the executor. In this prototype, the
+executor applies returned speed and force limits, emits an audit event, and
+checks the human-distance pause condition immediately before motion. Continuous
+monitoring during execution is part of the next simulator integration, not a
+property of this first version.</p>
+<p>The prototype divides responsibility this way:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>agent runtime     propose and revise the plan
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>policy service    decide and return an action contract
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>executor          enforce the contract and emit evidence
+</span></code></pre></div>
+<p>The policy check admits a plan or short-horizon physical action before execution.
+Once admitted, the robot's existing controller remains responsible for the
+low-level control loop. The solver is an action-admission boundary; it is not a
+motor controller.</p>
+<hr />
+<h2 id="prover-latency">Prover Latency</h2>
+<p>One way to review an AI-generated robot plan is to ask another model whether it
+looks safe. An LLM-as-judge can add useful semantic review, but it is another
+probabilistic inference call. If it takes as long as the planning model, it can
+nearly double the inference time.</p>
+<p>The first Terra path was invalid and had to be regenerated regardless of which
+review method caught it. The useful comparison is therefore the time spent
+checking the plans, not one plan versus two.</p>
+<p>The prover runs locally and has a narrower job: evaluate explicit invariants
+and return a deterministic admission decision. In ten complete browser
+missions, <strong><code>openai/openai/gpt-5.6-terra</code></strong> generated both the initial and
+corrected plans. All ten completed the deny, replan, constrain, and execute flow
+without a fixture fallback.</p>
+<p>Generating the two plans took <strong>7.53 to 16.90 seconds</strong> per mission. Proving
+both plans took <strong>5.76 to 26.23 ms</strong>, with a <strong>17.30 ms median</strong>—or
+<strong>0.05–0.26%</strong> of the observed inference time. Model planning varied by seconds;
+policy admission remained in milliseconds.</p>
 <figure class="dev-note-figure dev-note-figure--wide">
-  <img src="../../../assets/reachy-mini-openshell/diagrams/privacy-routing.svg" alt="Privacy routing with middleware. OpenShell's policy forces the sandboxed agent's outbound traffic through an OpenShell middleware service. A router in the middleware detects the data type: image data goes to a model approved to handle sensitive images, and everything else goes to a frontier model in the cloud.">
+  <img src="../../../assets/robotics-policy-prover/terra-planning-loop-variance.svg" alt="Ten successful GPT-5.6 Terra runs showing that two policy checks accounted for 0.05 to 0.26 percent of AI plan-generation time, with a median of 0.16 percent.">
+  <figcaption>Policy-prover time as a share of AI inference across ten sequential Terra missions. This is not a general benchmark of the model or serving endpoint.</figcaption>
 </figure>
 
+<p>We also isolated the policy decision in a release-mode benchmark on an <strong>NVIDIA
+DGX Spark</strong>. Across allow, deny, and constrained outcomes with 3 to 48
+waypoints, p95 latency was <strong>1.006–1.250 ms</strong>. Each of the 15 cases used 5,000
+measured decisions after 1,000 warm-ups. Against an illustrative 100 ms model
+call, the slowest p95 would add about <strong>1.25%</strong>. Against the multi-second
+calls observed in this experiment, the share is much smaller.</p>
+<figure class="dev-note-figure">
+  <img src="../../../assets/robotics-policy-prover/policy-latency-scaling.svg" alt="Release-mode benchmark showing policy-decision p95 latency between 1.006 and 1.250 milliseconds for allow, deny, and constrained outcomes across 3 to 48 waypoints.">
+  <figcaption>Release-mode p95 policy latency on NVIDIA DGX Spark.</figcaption>
+</figure>
+
+<p>The Spark benchmark isolates geometry checks and Z3 setup/checking; it excludes
+model inference, transport, rendering, and execution. It supports using the
+prover at an AI model's planning cadence, where a model proposes a path or
+short-horizon action. It does not establish a hard real-time guarantee, and it
+does not move balance, torque, or joint control out of the robot's dedicated
+controllers and safety systems.</p>
 <hr />
-<h2 id="conclusion">Conclusion</h2>
-<p>None of this is specific to Reachy. The same approach fits inspection robots,
-smart cameras, lab instruments, field vehicles, building gateways, and kiosks. In
-each one, the agent can read sensors and describe what it sees, while anything
-with a real consequence has to be approved by policy first: moving an actuator,
-changing a setpoint, or sending raw data off the device.</p>
-<p>The main result from putting this on Reachy is that the whole OpenShell stack,
-the gateway and the sandbox, runs on the device's own computer. The isolation and
-the policy do not depend on the network or a cloud service, so the device keeps
-enforcing its boundary even if the network drops or the model is unreachable.
-Running the full stack on device is what gives complete isolation and control at
-the edge.</p>
-<p>This is a repeatable pattern for edge and robotics. Agents are going to run
-everywhere: in homes, factories, vehicles, and hospitals, with more and more of
-them running side by side and working together. You cannot govern that many
-agents, in that many places, by writing a guardrail into each app. It takes one
-deterministic boundary you can put on any device and trust the same way every
-time. That is the pattern we are building with OpenShell.</p>
-<p>Key resources:</p>
+<h2 id="what-the-prototype-verifies">What the Prototype Verifies</h2>
+<p>The current implementation combines deterministic Rust checks with an
+SMT-backed policy check using Z3. Rust derives facts about workspace bounds,
+sampled segment/zone intersections, sensor freshness, budget, authority, human
+proximity, speed, and force. Z3 composes those Boolean facts into exactly one of
+the four policy outcomes with a bounded timeout. The model returned by Z3 is the
+source of the verdict; an unknown, inconsistent, or ambiguous result fails
+closed. Malformed action envelopes are rejected before they reach the solver.
+Rust then constructs the typed decision packet and supporting evidence.</p>
+<p>The current scope is a sampled tool-head path. It does not yet encode full-body
+geometry, kinematics, dynamics, braking distance, or perception uncertainty.
+Its guarantee also depends on complete mediation and accurate world state; an
+unobserved route to the actuator or a bad sensor value can invalidate the
+decision.</p>
+<p>This is a research prototype, not a safety-rated system or proof that a real
+trajectory is collision-free. The next steps are richer symbolic trajectory
+constraints, a real motion planner, and continuous runtime monitoring.</p>
+<hr />
+<h2 id="next-experiments">Next Experiments</h2>
+<p>The first results are encouraging, and this is an area we are actively exploring
+with partners around <a href="https://github.com/NVIDIA/OpenShell">OpenShell</a>, an
+Apache-2.0, community-driven project.</p>
+<p>Version one uses a Three.js workcell deliberately. Keeping the environment
+small let us focus on the policy contract and prover rather than simulator
+integration. The next parts of this research series will carry the boundary
+into NVIDIA Isaac Sim and MuJoCo, where we can test richer robot geometry,
+dynamics, perception, trajectory constraints, and changing world state before
+moving to a small physical platform.</p>
+<p>Physical perception also makes some policy predicates probabilistic rather than
+crisp. A human detector, distance estimate, occupancy map, or object classifier
+can be wrong, and their errors may be correlated. Recent work by Dvijotham and
+collaborators on
+<a href="https://arxiv.org/abs/2606.20510">sound probabilistic verification for AI agents</a>
+offers an interesting direction for representing that uncertainty while
+retaining the deterministic envelope as a separate layer.</p>
+<p>Related research such as
+<a href="https://research.nvidia.com/labs/gear/enpire/">ENPIRE</a> shows coding agents
+managing repeated real-world robot-policy improvement across reset,
+verification, rollout, and evolution. That raises a useful question for future
+experiments:</p>
+<blockquote>
+<p>Can an agent optimize a robot policy while the governing invariants remain
+outside the agent's control?</p>
+</blockquote>
+<p>We want to test that pattern with richer dynamics, uncertain perception, longer
+plans, and eventually real hardware.</p>
+<hr />
+<h2 id="research-questions-and-collaboration">Research Questions and Collaboration</h2>
+<p>We would like to study how formal specifications hold up under changing world
+state, whether constructive counterexamples improve replanning, and how an
+admitted contract can be carried reliably into a simulator or actuator.</p>
+<p>If you are working on SMT, temporal logic, runtime verification, control barrier
+functions, motion planning, digital twins, robot learning, or runtime assurance
+for agents, we would like to compare models and workloads. Some useful next
+experiments may come from connecting these communities rather than treating
+agent security and physical safety as separate problems.</p>
+<hr />
+<h2 id="run-and-extend-the-experiment">Run and Extend the Experiment</h2>
+<p>The complete prototype, local setup, benchmark harness, machine-readable
+results, and Dev Note live together in the
+<a href="https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/robotics-policy-prover">OpenShell Research repository</a>.
+The default fixture mode reproduces the interaction without model credentials;
+the optional agent mode can be used to explore different planners. We welcome
+new policy encodings, adversarial workloads, simulator adapters, and benchmark
+results through the normal OpenShell Research contribution process.</p>
+<p>Resources:</p>
 <ol>
-<li><a href="https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/ONBOARD_SETUP.md">Onboard Reachy Mini + OpenShell setup</a></li>
-<li><a href="https://github.com/NVIDIA/OpenShell-Research/tree/kirit93/reachy-implementation/projects/reachy-mini-openshell">Reachy Mini OpenShell project source</a></li>
-<li><a href="https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/openshell/policy-camera-enabled-motion-disabled.yaml">Camera-enabled, motion-disabled policy</a></li>
+<li><a href="https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/robotics-policy-prover">Robotics policy-prover project source</a></li>
+<li><a href="https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/robotics-policy-prover/benchmarks/policy-latency.json">Machine-readable DGX Spark benchmark results</a></li>
+<li><a href="https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/robotics-policy-prover/benchmarks/terra-planning-loop.json">Machine-readable Terra planning-loop sample</a></li>
+<li><a href="https://github.com/NVIDIA/OpenShell">NVIDIA OpenShell</a></li>
+<li><a href="https://research.nvidia.com/labs/gear/enpire/">ENPIRE: Agentic Robot Policy Self-Improvement in the Real World</a></li>
+<li><a href="https://github.com/Z3Prover/z3">Z3 theorem prover</a></li>
+<li><a href="https://ojs.aaai.org/index.php/AAAI/article/view/11797">Safe Reinforcement Learning via Shielding</a></li>
+<li><a href="https://ojs.aaai.org/index.php/AAAI/article/view/12107">Safe Reinforcement Learning via Formal Methods: Toward Safe Control Through Proof and Learning</a></li>
+<li><a href="https://arxiv.org/abs/2602.22302">Agent Behavioral Contracts</a></li>
+<li><a href="https://arxiv.org/abs/2606.19242">Runtime Compliance Verification for AI Agents</a></li>
+<li><a href="https://research.google/pubs/veriguard-enhancing-llm-agent-safety-via-verified-code-generation/">VeriGuard: Enhancing LLM Agent Safety via Verified Code Generation</a></li>
+<li><a href="https://arxiv.org/abs/2606.20510">Efficient and Sound Probabilistic Verification for AI Agents</a></li>
 </ol>
 
 
@@ -1735,28 +1805,7 @@ time. That is the pattern we are building with OpenShell.</p>
       
       
       
-        <span class="md-tag">reachy-mini</span>
-      
-    
-      
-      
-      
-      
         <span class="md-tag">openshell</span>
-      
-    
-      
-      
-      
-      
-        <span class="md-tag">edge-ai</span>
-      
-    
-      
-      
-      
-      
-        <span class="md-tag">sandbox</span>
       
     
       
@@ -1770,7 +1819,28 @@ time. That is the pattern we are building with OpenShell.</p>
       
       
       
+        <span class="md-tag">physical-ai</span>
+      
+    
+      
+      
+      
+      
+        <span class="md-tag">formal-methods</span>
+      
+    
+      
+      
+      
+      
         <span class="md-tag">policy</span>
+      
+    
+      
+      
+      
+      
+        <span class="md-tag">agents</span>
       
     
   </nav>
@@ -1814,23 +1884,23 @@ time. That is the pattern we are building with OpenShell.</p>
       <nav class="md-footer__inner md-grid" aria-label="Continue reading" >
         
           
-          <a href="../2026-08-07-formal-methods-ai-generated-robot-actions/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Can Formal Methods Govern AI-Generated Robot Actions?">
+          <a href="../../" class="md-footer__link md-footer__link--prev" aria-label="Previous: Dev Notes">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
             </div>
             <div class="md-footer__title">
               <span class="md-footer__direction">Previous</span>
-              <div class="md-ellipsis">Can Formal Methods Govern AI-Generated Robot Actions?</div>
+              <div class="md-ellipsis">Dev Notes</div>
             </div>
           </a>
         
         
           
-          <a href="../../../documentation/" class="md-footer__link md-footer__link--next" aria-label="Next: Documentation">
+          <a href="../2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-footer__link md-footer__link--next" aria-label="Next: Bringing Privacy and Security to the Edge with OpenShell">
             <div class="md-footer__title">
               <span class="md-footer__direction">Next</span>
-              <div class="md-ellipsis">Documentation</div>
+              <div class="md-ellipsis">Bringing Privacy and Security to the Edge with OpenShell</div>
             </div>
             <div class="md-footer__button md-icon">
               
