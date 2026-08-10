@@ -1551,7 +1551,6 @@ planner and run quickly enough to fit a robot-planning loop driven by an AI
 model.</p>
 <figure class="dev-note-figure">
   <img src="../../../assets/robotics-policy-prover/action-governance-architecture.svg" alt="Architecture diagram showing an AI agent inside a sandboxed agent runtime. Proposed plans pass through a Rust and Z3 action-admission prover before an admitted contract reaches a simulation or real-world robot. Changing world state feeds the admission and runtime-enforcement boundary.">
-  <figcaption>The agent's plan passes through deterministic action admission before an admitted contract reaches a simulated or real-world environment. Low-level robot control remains outside the prover's planning-cadence role.</figcaption>
 </figure>
 
 <hr />
