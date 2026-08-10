@@ -89,9 +89,9 @@ from slop_cop.rules.api import (
     RuleContext,
     RuleEvaluation,
     RuleMetadata,
-    RuleRuntime,
     RuleSignal,
 )
+from slop_cop.runtime import RuleRuntime
 
 METADATA = RuleMetadata(
     id="custom.repeated-claim-opener",

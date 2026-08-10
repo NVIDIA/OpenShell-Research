@@ -12,6 +12,7 @@ def phrase_rule(
     advice: str,
     *phrases: str,
     score_group: str | None = None,
+    overlap_priority: int = 0,
 ) -> PhraseRule:
     return PhraseRule(
         RuleMetadata(
@@ -21,6 +22,7 @@ def phrase_rule(
             rationale=rationale,
             advice=advice,
             score_group=score_group,
+            overlap_priority=overlap_priority,
         ),
         tuple(phrases),
     )
@@ -35,6 +37,7 @@ def regex_rule(
     pattern: str,
     *,
     score_group: str | None = None,
+    overlap_priority: int = 0,
     flags: tuple[str, ...] = ("IGNORECASE",),
 ) -> RegexRule:
     return RegexRule(
@@ -45,6 +48,7 @@ def regex_rule(
             rationale=rationale,
             advice=advice,
             score_group=score_group,
+            overlap_priority=overlap_priority,
         ),
         pattern,
         flags,

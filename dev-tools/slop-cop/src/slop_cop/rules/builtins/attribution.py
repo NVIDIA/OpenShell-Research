@@ -4,7 +4,7 @@ import regex
 
 from slop_cop.rules.api import FunctionRule, RuleContext, RuleEvaluation, RuleMetadata, RuleSignal
 
-_CITATION = regex.compile(r"\[[^\]\n]+\](?:\([^\n)]+\)|\[[^\]\n]*\])")
+_CITATION = regex.compile(r"(?<!!)\[[^\]\n]+\](?:\([^\n)]+\)|\[[^\]\n]*\])")
 
 
 def _rule(
@@ -13,16 +13,18 @@ def _rule(
     rationale: str,
     advice: str,
     pattern: str,
+    citation_distance: int,
 ) -> FunctionRule:
     compiled = regex.compile(pattern, regex.IGNORECASE)
 
     def evaluate(context: RuleContext, runtime: object) -> RuleEvaluation:
         signals: list[RuleSignal] = []
         for match in compiled.finditer(context.projected_prose):
-            paragraph = next(
-                item for item in context.paragraphs if item.start <= match.start() < item.end
+            sentence = next(
+                item for item in context.sentences if item.start <= match.start() < item.end
             )
-            if _CITATION.search(context.source[paragraph.start : paragraph.end]):
+            citation_end = min(sentence.end, match.end() + citation_distance)
+            if _CITATION.search(context.source[match.end() : citation_end]):
                 continue
             signals.append(RuleSignal(start=match.start(), end=match.end(), key=rule_id))
         return RuleEvaluation(signals=tuple(signals))
@@ -47,6 +49,7 @@ RULES = (
         "Name and link the relevant source or make the claim in the author's voice.",
         r"\b(?:experts|researchers|industry leaders|many observers|critics)\s+"
         r"(?:say|believe|agree|argue|suggest|warn)\b",
+        120,
     ),
     _rule(
         "attribution.citationless-study",
@@ -55,5 +58,6 @@ RULES = (
         "Name and link the study or describe the evidence directly.",
         r"\b(?:a|one|recent|new)\s+(?:study|report|survey|analysis)\s+"
         r"(?:shows?|finds?|found|suggests?|indicates?)\b",
+        160,
     ),
 )

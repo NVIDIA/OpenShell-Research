@@ -84,6 +84,7 @@ class RuleMetadata(BaseModel):
     execution_kind: Literal["local", "external"] = "local"
     services: tuple[str, ...] = ()
     score_group: str | None = Field(default=None, max_length=120)
+    overlap_priority: int = Field(default=0, ge=0, le=100)
 
     @model_validator(mode="after")
     def validate_metadata(self) -> RuleMetadata:

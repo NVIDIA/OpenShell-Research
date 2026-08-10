@@ -8,16 +8,16 @@ artifact and updates one sticky PR comment. Generated reports are not committed.
 
 For a pull request, the required analysis runs Slop Cop code, configuration,
 and dependencies from the PR base revision against the candidate Dev Notes.
-Candidate Slop Cop changes are tested separately without credentials and scan
-the complete candidate Dev Note corpus as a non-authoritative preview. Candidate
-code runs in a separate job and runner; it cannot access or modify the trusted
-analysis report.
+The separate `Slop Cop candidate` workflow tests candidate Slop Cop changes
+without credentials and scans the complete candidate Dev Note corpus as a
+non-authoritative preview. Candidate code cannot access or publish artifacts in
+the trusted analysis workflow run.
 
 The `pull_request` event can use workflow orchestration changed by the pull
 request. Base-revision analyzer selection does not protect that orchestration by
 itself. Enforce `.github/workflows/slop-cop.yml` as an organization or
 repository-ruleset required workflow using its default-branch definition. Add
-both Slop Cop workflow files to the repository's protected workflow paths and
+all three Slop Cop workflow files to the repository's protected workflow paths and
 require designated review for changes to them. A branch-protection check name
 without this ruleset protection does not establish the same boundary.
 

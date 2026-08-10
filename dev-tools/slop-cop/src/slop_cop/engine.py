@@ -143,6 +143,9 @@ def deduplicate_findings(
 ) -> tuple[Finding, ...]:
     order = {configured.metadata.id: configured.order for configured in registry}
     policies = {configured.metadata.id: configured.policy for configured in registry}
+    priorities = {
+        configured.metadata.id: configured.metadata.overlap_priority for configured in registry
+    }
     values = list(findings)
     parent = list(range(len(values)))
 
@@ -189,6 +192,7 @@ def deduplicate_findings(
                 values[index].suppressed,
                 not values[index].blocking,
                 severity_rank[values[index].severity],
+                -priorities[values[index].rule_id],
                 policies[values[index].rule_id].fixed_allowance,
                 -policies[values[index].rule_id].first_cost,
                 order.get(values[index].rule_id, 1_000_000),

@@ -160,7 +160,13 @@ Detector = Callable[[RuleContext], list[RuleSignal]]
 
 
 def _rule(
-    rule_id: str, title: str, rationale: str, advice: str, detector: Detector
+    rule_id: str,
+    title: str,
+    rationale: str,
+    advice: str,
+    detector: Detector,
+    *,
+    overlap_priority: int = 0,
 ) -> FunctionRule:
     def evaluate(context: RuleContext, runtime: object) -> RuleEvaluation:
         return RuleEvaluation(signals=tuple(detector(context)))
@@ -173,6 +179,7 @@ def _rule(
             rationale=rationale,
             advice=advice,
             score_group=detector.__name__.removeprefix("_"),
+            overlap_priority=overlap_priority,
         ),
         evaluate,
     )
@@ -199,6 +206,7 @@ RULES = (
         "The same rhetorical construction recurs several times.",
         "State the claims with structures suited to their content.",
         _template_shape,
+        overlap_priority=20,
     ),
     _rule(
         "repetition.emphatic-fragments",

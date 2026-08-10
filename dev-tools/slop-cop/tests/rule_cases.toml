@@ -264,6 +264,24 @@ kind = "positive"
 source = "Experts say this pattern is safe.\n\nThe separate API is documented in the [manual](https://example.test/manual)."
 
 [[case]]
+name = "vague-authority-distant-same-paragraph-link"
+rule_id = "attribution.vague-authority"
+kind = "positive"
+source = "Experts say this pattern is safe, although the claim has no identified source and the intervening discussion describes unrelated implementation details at length before eventually linking the [API manual](https://example.test/manual)."
+
+[[case]]
+name = "vague-authority-preceding-link"
+rule_id = "attribution.vague-authority"
+kind = "positive"
+source = "The [API manual](https://example.test/manual) is unrelated; experts say this pattern is safe."
+
+[[case]]
+name = "vague-authority-nearby-image"
+rule_id = "attribution.vague-authority"
+kind = "positive"
+source = "Experts say this pattern is safe ![architecture](diagram.svg)."
+
+[[case]]
 name = "citationless-study-positive"
 rule_id = "attribution.citationless-study"
 kind = "positive"

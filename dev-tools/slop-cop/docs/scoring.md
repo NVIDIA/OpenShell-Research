@@ -110,7 +110,7 @@ The current references follow one Dev Note through revision and publication:
 | Clean technical fixture | 100, pass | 100 |
 | Legitimate contrast and citation fixture | 95–99, pass | 97 |
 | Normal technical structure fixture | 100, pass | 100 |
-| Dense multi-family fixture | 0–79, fail | 72 |
+| Dense multi-family fixture | 0–79, fail | 71 |
 | Blocking assistant residue fixture | 0, fail | 0 |
 
 Historical revisions detect drift against real prose; their chronology is not a

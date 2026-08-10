@@ -53,6 +53,21 @@ def test_indented_code_and_lazy_blockquote_continuations_are_masked() -> None:
     assert any("blockquote" in item.reasons for item in document.masked_ranges)
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        "> # Quoted heading\nAs an AI language model, this is outside prose.\n",
+        "> Quoted paragraph.\n# As an AI language model, this heading is outside.\n",
+        "> - Quoted list item\nAs an AI language model, this is outside prose.\n",
+        "> Quoted paragraph.\n---\nAs an AI language model, this is outside prose.\n",
+    ],
+)
+def test_completed_blockquotes_do_not_mask_following_blocks(source: str) -> None:
+    document = build_document("note.md", source)
+
+    assert "As an AI language model" in document.prose_projection
+
+
 def test_segments_retain_exact_source_offsets_and_unicode_keys() -> None:
     source = "# Heading\n\nCafé’s source-aware token. Next sentence!\n"
     document = build_document("note.md", source)

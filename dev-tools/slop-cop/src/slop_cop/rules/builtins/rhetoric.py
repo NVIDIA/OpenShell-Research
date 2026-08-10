@@ -20,6 +20,7 @@ RULES = (
         "Name the broader property directly when the contrast adds little.",
         r"\bnot\s+just\b",
         score_group="contrast",
+        overlap_priority=10,
     ),
     regex_rule(
         "rhetoric.no-no",

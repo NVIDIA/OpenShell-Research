@@ -14,6 +14,10 @@ from pydantic import Field, model_validator
 from slop_cop.config import MAX_SOURCE_BYTES, ContextConfig, RuleId, StrictModel
 
 _FENCE_OPEN = re.compile(r"^( {0,3})(`{3,}|~{3,})[^\r\n]*(?:\r?\n|$)", re.MULTILINE)
+_BLOCK_INTERRUPT = re.compile(
+    r"^(?: {4}|\t| {0,3}(?:#{1,6}(?:\s|$)|[-+*]\s|\d+[.)]\s|`{3,}|~{3,}|"
+    r"(?:\*\s*){3,}$|(?:-\s*){3,}$|(?:_\s*){3,}$|<[/!?A-Za-z]))"
+)
 _SUPPRESSION = re.compile(
     r"^[ \t]*<!--\s*slop-cop:\s*ignore-next=(?P<ids>[a-z0-9.,-]+)\s+"
     r'reason="(?P<reason>[^"\r\n]{1,500})"\s*-->[ \t]*(?:\r?\n|$)',
@@ -391,21 +395,25 @@ def _add_links_and_images(source: str, ranges: list[tuple[int, int, str]]) -> No
 
 def _add_blockquotes(source: str, ranges: list[tuple[int, int, str]]) -> None:
     active = False
+    lazy_continuation = False
     start = end = 0
     for line in re.finditer(r"^.*(?:\r?\n|$)", source, re.MULTILINE):
         text = line.group(0).rstrip("\r\n")
-        quoted = re.match(r"^ {0,3}>", text) is not None
+        marker = re.match(r"^ {0,3}>[ \t]?", text)
         blank = not text.strip()
-        if quoted and not _covered(line.start(), ranges):
+        if marker is not None and not _covered(line.start(), ranges):
             if not active:
                 start = line.start()
                 active = True
             end = line.end()
-        elif active and not blank:
+            content = text[marker.end() :]
+            lazy_continuation = bool(content.strip()) and not _BLOCK_INTERRUPT.match(content)
+        elif active and lazy_continuation and not blank and not _BLOCK_INTERRUPT.match(text):
             end = line.end()
         elif active:
             ranges.append((start, end, "blockquote"))
             active = False
+            lazy_continuation = False
     if active:
         ranges.append((start, end, "blockquote"))
 

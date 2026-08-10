@@ -50,6 +50,34 @@ def test_compound_contrast_cannot_erase_not_just_cost() -> None:
     assert [finding.rule_id for finding in charged] == ["rhetoric.not-just"]
 
 
+def test_repeated_compound_contrast_preserves_template_cost() -> None:
+    simple = _analyze(
+        "\n\n".join(
+            (
+                "This is not a wrapper, but a policy boundary.",
+                "This is not a proxy, but an enforcement point.",
+                "This is not a suggestion, but a required check.",
+            )
+        )
+    )
+    with_just = _analyze(
+        "\n\n".join(
+            (
+                "This is not just a wrapper, but a policy boundary.",
+                "This is not just a proxy, but an enforcement point.",
+                "This is not just a suggestion, but a required check.",
+            )
+        )
+    )
+
+    assert with_just.score is not None and simple.score is not None
+    assert with_just.score <= simple.score
+    template_cost = next(
+        cost for cost in with_just.rule_costs if cost.rule_id == "repetition.template-shape"
+    )
+    assert template_cost.charged_cost > 0
+
+
 def test_ignore_next_suppresses_only_the_target_block() -> None:
     source = (
         '<!-- slop-cop: ignore-next=rhetoric.not-just reason="Named API contrast" -->\n'
