@@ -78,6 +78,20 @@ def test_repeated_compound_contrast_preserves_template_cost() -> None:
     assert template_cost.charged_cost > 0
 
 
+def test_adding_flagged_prose_cannot_raise_the_score() -> None:
+    paragraph = "This rich tapestry. It delves into. A multifaceted approach."
+    two_copies = _analyze("\n\n".join((paragraph, paragraph)))
+    three_copies = _analyze("\n\n".join((paragraph, paragraph, paragraph)))
+
+    assert two_copies.score is not None and three_copies.score is not None
+    assert three_copies.score <= two_copies.score
+    assert {finding.rule_id for finding in three_copies.findings if finding.chargeable} >= {
+        "vocabulary.stock.tapestry",
+        "vocabulary.stock.delves",
+        "vocabulary.stock.multifaceted",
+    }
+
+
 def test_ignore_next_suppresses_only_the_target_block() -> None:
     source = (
         '<!-- slop-cop: ignore-next=rhetoric.not-just reason="Named API contrast" -->\n'

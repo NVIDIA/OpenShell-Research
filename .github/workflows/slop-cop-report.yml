@@ -171,6 +171,10 @@ jobs:
               text(file.path, 'file path', 4096,
                 /^docs\/dev-notes\/posts\/[A-Za-z0-9][A-Za-z0-9._/-]*\.md$/);
               if (file.path.includes('..') || file.path.includes('//')) throw new Error('Invalid path.');
+              if (!['complete', 'incomplete', 'error'].includes(file.analysis_state) ||
+                  !['pass', 'fail'].includes(file.decision)) {
+                throw new Error('File result state is invalid.');
+              }
               optionalScore(file.score, 'file score');
               if (file.base !== null) {
                 plainObject(file.base, 'base comparison');
@@ -203,6 +207,10 @@ jobs:
               throw new Error('Override decision and metadata disagree.');
             }
             if (report.override !== null) {
+              if (report.analysis_state !== 'complete' ||
+                  !report.files.some((file) => file.decision === 'fail')) {
+                throw new Error('Override requires a completed policy failure.');
+              }
               const override = plainObject(report.override, 'override');
               const reviewer = text(override.reviewer, 'override reviewer', 256,
                 /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/);

@@ -131,11 +131,13 @@ def _apply_suppressions(
 def _materially_overlaps(left: Finding, right: Finding) -> bool:
     if left.span is None or right.span is None:
         return False
+    if left.score_group != right.score_group:
+        return False
     overlap = min(left.span.end, right.span.end) - max(left.span.start, right.span.start)
     if overlap <= 0:
         return False
     shorter = min(left.span.end - left.span.start, right.span.end - right.span.start)
-    return overlap == shorter or (left.score_group == right.score_group and overlap * 2 >= shorter)
+    return overlap == shorter or overlap * 2 >= shorter
 
 
 def deduplicate_findings(

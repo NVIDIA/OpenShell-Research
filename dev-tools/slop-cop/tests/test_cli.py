@@ -2,14 +2,34 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from slop_cop.cli import EXIT_ERROR, EXIT_OK, main
+import slop_cop.cli as cli_module
+from slop_cop.cli import EXIT_ERROR, EXIT_OK, EXIT_POLICY, main
+from slop_cop.findings import AnalysisState, Decision
 
 PROJECT = Path(__file__).parents[1]
 REPOSITORY = PROJECT.parents[1]
 CONFIG = PROJECT / "slop-cop.toml"
+
+
+def _write_override(tmp_path: Path) -> Path:
+    path = tmp_path / "override.json"
+    path.write_text(
+        json.dumps(
+            {
+                "reviewer": "maintainer",
+                "reason": "Reviewed manually",
+                "review_id": 1,
+                "review_url": "https://github.com/example/repository/pull/1#pullrequestreview-1",
+                "head_sha": "a" * 40,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
 
 
 def test_check_writes_one_run_result_to_json_and_html(
@@ -62,6 +82,77 @@ def test_check_without_paths_is_not_applicable_and_writes_reports(tmp_path: Path
     assert result == EXIT_OK
     assert data["decision"] == "not_applicable"
     assert data["score"] is None
+
+
+def test_override_does_not_pass_an_analysis_error(tmp_path: Path) -> None:
+    note = tmp_path / "note.md"
+    note.write_text("```text\nmasked\n```\n", encoding="utf-8")
+    override = _write_override(tmp_path)
+    report = tmp_path / "report.json"
+
+    result = main(
+        [
+            "check",
+            "--config",
+            str(CONFIG),
+            "--repository-root",
+            str(tmp_path),
+            "--head-sha",
+            "a" * 40,
+            "--override-json",
+            str(override),
+            "--json",
+            str(report),
+            str(note),
+        ]
+    )
+
+    data = json.loads(report.read_text(encoding="utf-8"))
+    assert result == EXIT_POLICY
+    assert data["analysis_state"] == "error"
+    assert data["decision"] == "fail"
+    assert data["override"] is None
+
+
+def test_override_does_not_pass_incomplete_analysis(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    note = tmp_path / "note.md"
+    note.write_text("Concrete prose remains available for analysis.\n", encoding="utf-8")
+    override = _write_override(tmp_path)
+    report = tmp_path / "report.json"
+    original_analyze = cli_module._analyze
+
+    async def force_incomplete(*args: Any, **kwargs: Any) -> Any:
+        output, document = await original_analyze(*args, **kwargs)
+        file_result = output.file_result.model_copy(
+            update={"analysis_state": AnalysisState.INCOMPLETE, "decision": Decision.FAIL}
+        )
+        return output.__class__(file_result, output.external_audits), document
+
+    monkeypatch.setattr(cli_module, "_analyze", force_incomplete)
+    result = main(
+        [
+            "check",
+            "--config",
+            str(CONFIG),
+            "--repository-root",
+            str(tmp_path),
+            "--head-sha",
+            "a" * 40,
+            "--override-json",
+            str(override),
+            "--json",
+            str(report),
+            str(note),
+        ]
+    )
+
+    data = json.loads(report.read_text(encoding="utf-8"))
+    assert result == EXIT_POLICY
+    assert data["analysis_state"] == "incomplete"
+    assert data["decision"] == "fail"
+    assert data["override"] is None
 
 
 def test_check_rejects_path_outside_repository_root(
@@ -180,3 +271,4 @@ def test_trusted_reporter_revalidates_override_and_uses_pr_head() -> None:
     assert "github.rest.actions.getWorkflow" in workflow
     assert "run.workflow_id !== trustedWorkflow.id" in workflow
     assert "run.path !== trustedWorkflow.path" in workflow
+    assert "Override requires a completed policy failure." in workflow

@@ -170,6 +170,22 @@ def test_html_size_limit_is_enforced(monkeypatch: pytest.MonkeyPatch) -> None:
         html_report(sample_result())
 
 
+def test_incomplete_analysis_cannot_be_overridden() -> None:
+    result = sample_result()
+    result["analysis_state"] = "incomplete"
+    result["decision"] = "overridden"
+    result["override"] = {
+        "reviewer": "maintainer",
+        "reason": "Reviewed manually",
+        "review_id": 1,
+        "review_url": "https://github.com/example/repository/pull/1#pullrequestreview-1",
+        "head_sha": "a" * 40,
+    }
+
+    with pytest.raises(ReportError, match="overrides require complete analysis"):
+        html_report(result)
+
+
 def test_not_applicable_has_no_synthetic_score() -> None:
     result = {
         "schema_version": 1,

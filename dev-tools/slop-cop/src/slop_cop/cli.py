@@ -368,8 +368,14 @@ async def _check(args: argparse.Namespace) -> int:
         else Decision.FAIL
     )
     override = _load_override(args.override_json, args.head_sha)
-    if override is not None:
+    if (
+        override is not None
+        and analysis_state is AnalysisState.COMPLETE
+        and decision is Decision.FAIL
+    ):
         decision = Decision.OVERRIDDEN
+    else:
+        override = None
     audits = tuple(
         _external_audit(audit) for output, _ in analyzed for audit in output.external_audits
     )

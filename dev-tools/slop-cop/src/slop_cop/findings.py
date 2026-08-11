@@ -221,6 +221,11 @@ class RunResult(StrictModel):
             raise ValueError("overridden decisions require override metadata")
         if self.decision is not Decision.OVERRIDDEN and self.override is not None:
             raise ValueError("override metadata requires an overridden decision")
+        if self.decision is Decision.OVERRIDDEN:
+            if self.analysis_state is not AnalysisState.COMPLETE:
+                raise ValueError("overrides require complete analysis")
+            if not any(item.decision is Decision.FAIL for item in self.files):
+                raise ValueError("overrides require a policy failure")
         return self
 
 
