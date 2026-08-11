@@ -44,8 +44,11 @@ slop-cop-report/
 
 Download the artifact from the sticky PR comment or the analysis run. Open
 `index.html` locally; it is self-contained and requires no network or
-JavaScript. The PR comment shows the decision, threshold, per-file scores, base
-deltas, top findings, override details, analyzed revision, and expiration note.
+JavaScript. The HTML report shows score deductions first. Signals covered by a
+document allowance and advisory-only signals are grouped separately with exact,
+expandable source context. The PR comment shows the decision, threshold,
+per-file scores, base deltas, contributing findings, override details, analyzed
+revision, and expiration note.
 
 ## Suppress one finding
 

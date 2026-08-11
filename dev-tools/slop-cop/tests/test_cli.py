@@ -257,6 +257,7 @@ def test_workflow_preserves_renamed_baselines_and_has_stdlib_error_report() -> N
     assert "Test candidate implementation" not in workflow
     assert "working-directory: dev-tools/slop-cop" in candidate_workflow
     assert "slop-cop-pr-" not in candidate_workflow
+    assert "chargedRuleIds.has(finding.rule_id)" in workflow
 
 
 def test_trusted_reporter_revalidates_override_and_uses_pr_head() -> None:
@@ -272,3 +273,4 @@ def test_trusted_reporter_revalidates_override_and_uses_pr_head() -> None:
     assert "run.workflow_id !== trustedWorkflow.id" in workflow
     assert "run.path !== trustedWorkflow.path" in workflow
     assert "Override requires a completed policy failure." in workflow
+    assert "chargedRuleIds.has(finding.rule_id)" in workflow

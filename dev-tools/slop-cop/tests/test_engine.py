@@ -40,14 +40,18 @@ def test_overlap_charges_one_primary_finding() -> None:
     assert any(finding.related_rule_ids for finding in overlapping)
 
 
-def test_compound_contrast_cannot_erase_not_just_cost() -> None:
+def test_single_contrast_stays_within_the_document_allowance() -> None:
     standalone = _analyze("This is not just a wrapper.")
     compound = _analyze("This is not just a wrapper, but a policy boundary.")
 
-    assert standalone.score == 97
+    assert standalone.score == 100
     assert compound.score == standalone.score
-    charged = [finding for finding in compound.findings if finding.chargeable]
-    assert [finding.rule_id for finding in charged] == ["rhetoric.not-just"]
+    cost = next(cost for cost in compound.rule_costs if cost.rule_id == "rhetoric.not-just")
+    assert cost.charged_cost == 0
+    match = next(
+        finding for finding in standalone.findings if finding.rule_id == "rhetoric.not-just"
+    )
+    assert match.excerpt == "not just"
 
 
 def test_repeated_compound_contrast_preserves_template_cost() -> None:

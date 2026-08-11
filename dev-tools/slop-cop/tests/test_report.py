@@ -4,6 +4,7 @@ import base64
 import json
 import re
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -78,7 +79,7 @@ def sample_result() -> dict[str, object]:
                         "category": "rhetoric",
                         "severity": "warning",
                         "source_path": "docs/dev-notes/posts/example.md",
-                        "span": {"start": 40, "end": 48},
+                        "span": {"start": 41, "end": 49},
                         "line": 1,
                         "column": 40,
                         "excerpt": "<img src=x onerror=alert(1)>",
@@ -142,10 +143,14 @@ def test_html_report_is_self_contained_and_escapes_all_result_text() -> None:
     assert "<script>alert(1)</script>" not in rendered
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in rendered
     assert "<img src=x onerror=alert(1)>" not in rendered
-    assert "&lt;img src=x onerror=alert(1)&gt;" in rendered
+    fallback = html_report(sample_result())
+    assert "&lt;img src=x onerror=alert(1)&gt;" in fallback
     assert "https://" not in rendered
     assert "External rule audit" in rendered
     assert "Passage density" in rendered
+    assert "<mark>not just</mark>" in rendered
+    assert "note that is <mark>not just</mark> vague." in rendered
+    assert "chargeable signal" not in rendered
 
 
 def test_html_report_embeds_the_logo() -> None:
@@ -155,6 +160,33 @@ def test_html_report_embeds_the_logo() -> None:
     logo = base64.b64decode(match.group(1), validate=True)
     assert logo.startswith(b"\x89PNG\r\n\x1a\n")
     assert len(logo) > 1_000_000
+
+
+def test_html_report_separates_allowed_signals_from_score_deductions() -> None:
+    result = sample_result()
+    file_result = cast(list[dict[str, Any]], result["files"])[0]
+    file_result["score"] = 100
+    file_result["decision"] = "pass"
+    rule_cost = cast(list[dict[str, Any]], file_result["rule_costs"])[0]
+    rule_cost["charged_cost"] = 0
+    rule_cost["base_cost"] = 0
+    density = cast(dict[str, Any], rule_cost["density"])
+    density["cost"] = 0
+    density["peak_excess"] = 0
+    cast(list[dict[str, Any]], file_result["category_costs"])[0]["charged_cost"] = 0
+    result["score"] = 100
+    result["decision"] = "pass"
+    source = "A <script>alert(1)</script> note that is not just vague."
+
+    rendered = html_report(result, sources={"docs/dev-notes/posts/example.md": source})
+
+    assert "Score deductions</h3><p>None." in rendered
+    assert "Unscored signals (1 across 1 rules; no score effect)" in rendered
+    assert "Within allowance" in rendered
+    assert "No findings affect the score." in rendered
+    terminal = terminal_report(result)
+    assert "unscored signals: within_allowance=1 advisory=0 suppressed=0" in terminal
+    assert "[rhetoric.not-just]" not in terminal
 
 
 def test_report_directory_contains_canonical_pair(tmp_path: Path) -> None:

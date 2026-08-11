@@ -326,10 +326,15 @@ jobs:
           script: |
             const fs = require('fs');
             const report = JSON.parse(fs.readFileSync(process.env.REPORT_JSON, 'utf8'));
-            const findings = (report.files || []).flatMap((file) =>
-              (file.findings || [])
-                .filter((finding) => !finding.suppressed && (finding.blocking || finding.chargeable))
-                .map((finding) => ({ file, finding })));
+            const findings = (report.files || []).flatMap((file) => {
+              const chargedRuleIds = new Set((file.rule_costs || [])
+                .filter((cost) => Number(cost.charged_cost) > 0)
+                .map((cost) => cost.rule_id));
+              return (file.findings || [])
+                .filter((finding) => !finding.suppressed &&
+                  (finding.blocking || (finding.chargeable && chargedRuleIds.has(finding.rule_id))))
+                .map((finding) => ({ file, finding }));
+            });
             for (const { file, finding } of findings.slice(0, 50)) {
               core.warning(`${finding.rule_id}: ${String(finding.advice || '').slice(0, 300)}`, {
                 file: file.path,

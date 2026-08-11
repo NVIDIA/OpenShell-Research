@@ -119,14 +119,14 @@ cap = 6
 [rules."rhetoric.not-just"]
 severity = "warning"
 max_signal_units = 1
-fixed_allowance = 0
+fixed_allowance = 1
 first_cost = 3
 repeat_cost = 2
 cap = 9
 
 [rules."rhetoric.not-just".document_density]
 unit = "word"
-interval = 1500
+interval = 1000
 allowed_units = 1
 
 [rules."rhetoric.not-just".density]

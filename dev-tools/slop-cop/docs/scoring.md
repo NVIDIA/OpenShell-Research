@@ -101,16 +101,16 @@ The current references follow one Dev Note through revision and publication:
 
 | Reference | Expected score | Baseline score |
 | --- | ---: | ---: |
-| [2026-07-13 initial draft](https://github.com/NVIDIA/OpenShell-Research/blob/2b8ae6ef4b74a1eeafa767f9d9f0238af17bdcd5/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md) | 70–79, fail | 76 |
-| [2026-07-14 revised draft](https://github.com/NVIDIA/OpenShell-Research/blob/808336e88d418e36364d57d6fda87e47e21dba82/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md) | 80–89, pass | 86 |
-| [2026-07-16 revised draft](https://github.com/NVIDIA/OpenShell-Research/blob/95a17f58c65df19166d92e70346cb7574ec84871/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md) | 84–91, pass | 88 |
+| [2026-07-13 initial draft](https://github.com/NVIDIA/OpenShell-Research/blob/2b8ae6ef4b74a1eeafa767f9d9f0238af17bdcd5/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md) | 70–79, fail | 79 |
+| [2026-07-14 revised draft](https://github.com/NVIDIA/OpenShell-Research/blob/808336e88d418e36364d57d6fda87e47e21dba82/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md) | 88–93, pass | 91 |
+| [2026-07-16 revised draft](https://github.com/NVIDIA/OpenShell-Research/blob/95a17f58c65df19166d92e70346cb7574ec84871/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md) | 84–91, pass | 91 |
 | [2026-07-17 revised draft](https://github.com/NVIDIA/OpenShell-Research/blob/be515c9c2684e1e3febec058f1a9e0e90da16a72/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md) | 88–94, pass | 91 |
-| [2026-07-18 revised draft](https://github.com/NVIDIA/OpenShell-Research/blob/069696b0a28ffd0cd77e1e043a532f81b9cec3e2/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md) | 94–100, pass | 97 |
-| [2026-07-20 published draft](https://github.com/NVIDIA/OpenShell-Research/blob/b0d481796b8a0492053c7b3cac0c65444a2e99be/docs/dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell.md) | 92–98, pass | 95 |
+| [2026-07-18 revised draft](https://github.com/NVIDIA/OpenShell-Research/blob/069696b0a28ffd0cd77e1e043a532f81b9cec3e2/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md) | 94–100, pass | 100 |
+| [2026-07-20 published draft](https://github.com/NVIDIA/OpenShell-Research/blob/b0d481796b8a0492053c7b3cac0c65444a2e99be/docs/dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell.md) | 97–100, pass | 100 |
 | Clean technical fixture | 100, pass | 100 |
-| Legitimate contrast and citation fixture | 95–99, pass | 97 |
+| Legitimate contrast and citation fixture | 100, pass | 100 |
 | Normal technical structure fixture | 100, pass | 100 |
-| Dense multi-family fixture | 0–79, fail | 71 |
+| Dense multi-family fixture | 0–79, fail | 62 |
 | Blocking assistant residue fixture | 0, fail | 0 |
 
 Historical revisions detect drift against real prose; their chronology is not a

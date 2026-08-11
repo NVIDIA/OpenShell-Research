@@ -251,9 +251,15 @@ jobs:
               const rows = report.files.map((file) =>
                 `| ${markdown(file.path, 'file path', 4096)} | ${displayScore(file.score)} | ` +
                 `${displayScore(file.base?.score ?? null)} |`);
-              const findings = report.files.flatMap((file) => (file.findings || [])
-                .filter((finding) => !finding.suppressed && (finding.blocking || finding.chargeable))
-                .map((finding) => ({file, finding}))).slice(0, 5);
+              const findings = report.files.flatMap((file) => {
+                const chargedRuleIds = new Set((file.rule_costs || [])
+                  .filter((cost) => Number(cost.charged_cost) > 0)
+                  .map((cost) => cost.rule_id));
+                return (file.findings || [])
+                  .filter((finding) => !finding.suppressed &&
+                    (finding.blocking || (finding.chargeable && chargedRuleIds.has(finding.rule_id))))
+                  .map((finding) => ({file, finding}));
+              }).slice(0, 5);
               const top = findings.length
                 ? '\n\nTop findings:\n' + findings.map(({file, finding}) =>
                     `- \`${markdown(finding.rule_id, 'rule ID', 128)}\` at ` +

@@ -64,6 +64,7 @@ def terminal_report(result: RunResult | Mapping[str, Any]) -> str:
     lines = [f"Slop Cop: {state}  score={_display(score)}  threshold={_display(threshold)}"]
     for file_result in _items(data.get("files")):
         path = _text(file_result.get("path"))
+        charged_rule_ids = _charged_rule_ids(file_result)
         file_score = file_result.get("score")
         file_state = _upper(
             file_result.get("decision") or file_result.get("analysis_state") or "complete"
@@ -99,6 +100,8 @@ def terminal_report(result: RunResult | Mapping[str, Any]) -> str:
         for finding in _findings(file_result):
             if finding.get("suppressed") or finding.get("advisory"):
                 continue
+            if finding.get("rule_id") not in charged_rule_ids and not finding.get("blocking"):
+                continue
             location = _finding_location(path, finding)
             rule_id = _text(finding.get("rule_id") or "unknown")
             excerpt = _bounded(_text(finding.get("excerpt")), 120)
@@ -106,15 +109,28 @@ def terminal_report(result: RunResult | Mapping[str, Any]) -> str:
             advice = _text(finding.get("advice"))
             if advice:
                 lines.append(f"    {advice}")
+        findings = _findings(file_result)
+        within_allowance = sum(
+            1
+            for finding in findings
+            if finding.get("chargeable")
+            and not finding.get("suppressed")
+            and not finding.get("blocking")
+            and finding.get("rule_id") not in charged_rule_ids
+        )
+        advisory = sum(1 for finding in findings if finding.get("advisory"))
+        suppressed = sum(1 for finding in findings if finding.get("suppressed"))
+        if within_allowance or advisory or suppressed:
+            lines.append(
+                "  unscored signals: "
+                f"within_allowance={within_allowance} advisory={advisory} "
+                f"suppressed={suppressed}"
+            )
         for error in _items(file_result.get("errors")):
             lines.append(
                 f"  analysis error [{_text(error.get('error_code') or 'unknown')}]: "
                 f"{_bounded(_text(error.get('message') or ''), 300)}"
             )
-    suppressed = _count_findings(data, "suppressed")
-    advisory = _count_findings(data, "advisory")
-    if suppressed or advisory:
-        lines.append(f"Suppressed: {suppressed}  Advisory: {advisory}")
     for error in _items(data.get("rule_errors")):
         lines.append(f"Rule error: {_bounded(_text(error.get('message') or error), 300)}")
     override = data.get("override")
@@ -152,15 +168,14 @@ def html_report(
         f'<img class="report-logo" src="{_logo_data_uri()}" alt="" width="160" height="160">',
         '<div><p class="eyebrow">Slop Cop</p><h1>Dev Notes report</h1></div></div>',
         f'<p class="status {_status_class(state)}">{_h(state)}</p>',
-        '<dl class="summary">',
+        '<dl class="summary run-summary">',
         _dtdd("Score", _display(score)),
         _dtdd("Threshold", _display(threshold)),
         _dtdd("Head revision", head_sha or "Not supplied"),
         _dtdd("Analysis", _text(data.get("analysis_state") or "complete")),
         "</dl></header>",
-        '<section aria-labelledby="meaning"><h2 id="meaning">Interpretation</h2>',
-        "<p>The score summarizes configured editorial signals. It does not identify "
-        "the author or determine whether a model wrote the text.</p></section>",
+        '<p class="interpretation">The score measures configured editorial signals. '
+        "It does not identify the author or determine whether a model wrote the text.</p>",
     ]
     override = data.get("override")
     if isinstance(override, Mapping):
@@ -173,7 +188,8 @@ def html_report(
         )
         body.append(f"<section><h2>Files</h2><p>{_h(message)}</p></section>")
     else:
-        body.append(_render_file_table(files))
+        if len(files) > 1:
+            body.append(_render_file_table(files))
         for index, file_result in enumerate(files, 1):
             body.append(_render_file(file_result, index, sources=sources))
     body.append(_render_rule_errors(data))
@@ -221,16 +237,33 @@ def _render_file_table(files: list[dict[str, Any]]) -> str:
         score = item.get("score")
         base = _base_score(item)
         state = _upper(item.get("decision") or item.get("analysis_state") or "complete")
+        findings = _findings(item)
+        charged_rule_ids = _charged_rule_ids(item)
+        scored = sum(
+            1
+            for finding in findings
+            if finding.get("rule_id") in charged_rule_ids
+            and finding.get("chargeable")
+            and not finding.get("suppressed")
+        )
+        unscored = sum(
+            1
+            for finding in findings
+            if not finding.get("blocking")
+            and not finding.get("suppressed")
+            and finding.get("rule_id") not in charged_rule_ids
+        )
         rows.append(
             "<tr>"
             f'<th scope="row">{_h(path)}</th><td>{_h(_display(score))}</td>'
             f"<td>{_h(_display(base))}</td><td>{_h(_signed(_delta(score, base)))}</td>"
-            f"<td>{_h(state)}</td>"
+            f"<td>{scored}</td><td>{unscored}</td><td>{_h(state)}</td>"
             "</tr>"
         )
     return (
         '<section aria-labelledby="files"><h2 id="files">Files</h2><div class="table-wrap"><table>'
-        "<thead><tr><th>Path</th><th>Head</th><th>Base</th><th>Delta</th><th>State</th></tr></thead>"
+        "<thead><tr><th>Path</th><th>Score</th><th>Base</th><th>Delta</th>"
+        "<th>Contributing</th><th>Unscored</th><th>State</th></tr></thead>"
         f"<tbody>{''.join(rows)}</tbody></table></div></section>"
     )
 
@@ -243,25 +276,62 @@ def _render_file(
 ) -> str:
     path = _text(item.get("path"))
     findings = _findings(item)
-    sections = [f'<article aria-labelledby="file-{index}"><h2 id="file-{index}">{_h(path)}</h2>']
+    sections = [
+        f'<article aria-labelledby="file-{index}"><h2 class="file-heading" '
+        f'id="file-{index}">{_h(path)}</h2>'
+    ]
     raw_metrics = item.get("metrics")
     metrics: Mapping[str, Any] = raw_metrics if isinstance(raw_metrics, Mapping) else {}
     source = sources.get(path) if sources is not None else None
+    charged_rule_ids = _charged_rule_ids(item)
+    scored = sum(
+        1
+        for finding in findings
+        if finding.get("rule_id") in charged_rule_ids
+        and finding.get("chargeable")
+        and not finding.get("suppressed")
+    )
+    unscored = sum(
+        1
+        for finding in findings
+        if not finding.get("blocking")
+        and not finding.get("suppressed")
+        and finding.get("rule_id") not in charged_rule_ids
+    )
     sections.append('<dl class="summary">')
     sections.append(_dtdd("Score", _display(item.get("score"))))
+    sections.append(_dtdd("Contributing signals", scored))
+    sections.append(_dtdd("Unscored signals", unscored))
     sections.append(_dtdd("Words analyzed", _display(metrics.get("analyzable_words"))))
     sections.append(_dtdd("Code points masked", _display(metrics.get("masked_code_points"))))
-    sections.append(_dtdd("Findings", str(len(findings))))
     sections.append("</dl>")
     sections.append(_render_costs(item))
     sections.append(_render_density(item, source=source if isinstance(source, str) else None))
-    sections.append(_render_findings(findings))
+    sections.append(
+        _render_findings(
+            findings,
+            source=source if isinstance(source, str) else None,
+            charged_rule_ids=charged_rule_ids,
+        )
+    )
     sections.append(_render_comparison(item))
     sections.append(_render_rule_errors(item))
     if isinstance(source, str):
+        scored_findings = [
+            finding
+            for finding in findings
+            if (finding.get("rule_id") in charged_rule_ids or finding.get("blocking"))
+            and not finding.get("suppressed")
+        ]
+        source_label = (
+            "Analyzed source with contributing signals highlighted"
+            if scored_findings
+            else "Analyzed source"
+        )
         sections.append(
-            '<details><summary>Escaped source view</summary><pre class="source"><code>'
-            f"{_highlight_source(source, findings)}</code></pre></details>"
+            f"<details><summary>{source_label}</summary>"
+            '<pre class="source"><code>'
+            f"{_highlight_source(source, scored_findings)}</code></pre></details>"
         )
     sections.append("</article>")
     return "".join(sections)
@@ -269,9 +339,11 @@ def _render_file(
 
 def _render_costs(item: Mapping[str, Any]) -> str:
     categories = _category_rows(item)
-    rule_costs = _items(item.get("rule_costs"))
+    rule_costs = [
+        rule for rule in _items(item.get("rule_costs")) if _number(rule.get("charged_cost"))
+    ]
     if not categories and not rule_costs:
-        return ""
+        return '<section class="deductions"><h3>Score deductions</h3><p>None.</p></section>'
     rows = [
         f"<tr><th>{_h(name)}</th><td>{_h(_display(cost))}</td></tr>" for name, cost in categories
     ]
@@ -288,9 +360,9 @@ def _render_costs(item: Mapping[str, Any]) -> str:
             f"allowance {_h(_display(allowance))})</td></tr>"
         )
     return (
-        "<details open><summary>Score arithmetic</summary><table><tbody>"
-        + "".join(rows)
-        + "</tbody></table></details>"
+        '<section class="deductions"><h3>Score deductions</h3><div class="table-wrap">'
+        '<p class="quiet">Category totals determine the score; rule rows explain those totals.</p>'
+        "<table><tbody>" + "".join(rows) + "</tbody></table></div></section>"
     )
 
 
@@ -299,7 +371,9 @@ def _render_density(item: Mapping[str, Any], *, source: str | None = None) -> st
     for owner_key, collection_key in (("rule_id", "rule_costs"), ("category", "category_costs")):
         for owner in _items(item.get(collection_key)):
             density = owner.get("density")
-            if isinstance(density, Mapping):
+            if isinstance(density, Mapping) and (
+                _number(density.get("cost")) or _number(density.get("peak_excess"))
+            ):
                 records.append({owner_key: owner.get(owner_key), **dict(density)})
     if not records:
         return ""
@@ -328,52 +402,161 @@ def _render_density(item: Mapping[str, Any], *, source: str | None = None) -> st
     )
 
 
-def _render_findings(findings: list[dict[str, Any]]) -> str:
+def _render_findings(
+    findings: list[dict[str, Any]],
+    *,
+    source: str | None,
+    charged_rule_ids: set[str],
+) -> str:
     if not findings:
-        return "<section><h3>Findings</h3><p>No findings.</p></section>"
-    groups: dict[str, list[dict[str, Any]]] = {
-        "Blocking": [],
-        "Chargeable": [],
-        "Advisory": [],
-        "Suppressed": [],
-    }
+        return "<section><h3>Findings</h3><p>No editorial signals detected.</p></section>"
+    blocking: list[dict[str, Any]] = []
+    scored: list[dict[str, Any]] = []
+    unscored: list[dict[str, Any]] = []
+    suppressed: list[dict[str, Any]] = []
     for finding in findings:
         if finding.get("suppressed"):
-            groups["Suppressed"].append(finding)
+            suppressed.append(finding)
         elif finding.get("blocking"):
-            groups["Blocking"].append(finding)
-        elif finding.get("advisory") or finding.get("chargeable") is False:
-            groups["Advisory"].append(finding)
+            blocking.append(finding)
+        elif finding.get("rule_id") in charged_rule_ids and finding.get("chargeable"):
+            scored.append(finding)
         else:
-            groups["Chargeable"].append(finding)
+            unscored.append(finding)
+
     output = ['<section aria-labelledby="findings"><h3 id="findings">Findings</h3>']
-    for name, values in groups.items():
-        if not values:
-            continue
+    important = blocking + scored
+    if important:
+        output.append('<div class="finding-list">')
+        output.extend(_render_finding(finding, source=source) for finding in important)
+        output.append("</div>")
+    else:
+        output.append('<p class="quiet">No findings affect the score.</p>')
+    if unscored:
+        output.append(_render_unscored_summary(unscored, source=source))
+    if suppressed:
         output.append(
-            f'<details open><summary>{_h(name)} ({len(values)})</summary><ol class="findings">'
+            f"<details><summary>Suppressed findings ({len(suppressed)})</summary>"
+            '<div class="finding-list">'
         )
-        for finding in values:
-            rule_id = _text(finding.get("rule_id") or "unknown")
-            line = _display(finding.get("line"))
-            column = _display(finding.get("column"))
-            excerpt = _text(finding.get("excerpt"))
-            rationale = _text(finding.get("explanation"))
-            advice = _text(finding.get("advice"))
-            charge = ' <span class="points">chargeable signal</span>'
-            output.append(
-                "<li>"
-                f"<p><strong>{_h(rule_id)}</strong> at {line}:{column} "
-                f"{charge}</p>"
-                f"<pre><code>{_h(_bounded(excerpt, 1000))}</code></pre>"
-                + (f"<p>{_h(rationale)}</p>" if rationale else "")
-                + (f"<p><strong>Action:</strong> {_h(advice)}</p>" if advice else "")
-                + _suppression_detail(finding)
-                + "</li>"
-            )
-        output.append("</ol></details>")
+        output.extend(_render_finding(finding, source=source) for finding in suppressed)
+        output.append("</div></details>")
     output.append("</section>")
     return "".join(output)
+
+
+def _render_finding(finding: Mapping[str, Any], *, source: str | None) -> str:
+    rule_id = _text(finding.get("rule_id") or "unknown")
+    line = _display(finding.get("line"))
+    column = _display(finding.get("column"))
+    rationale = _text(finding.get("explanation"))
+    advice = _text(finding.get("advice"))
+    label = "Blocking" if finding.get("blocking") else "Contributing"
+    return (
+        '<div class="finding">'
+        '<div class="finding-heading">'
+        f'<code class="rule-id">{_h(rule_id)}</code>'
+        f'<span class="location">line {line}, column {column}</span>'
+        f'<span class="badge">{label}</span></div>'
+        + _render_finding_context(finding, source=source)
+        + (f'<p class="rationale">{_h(rationale)}</p>' if rationale else "")
+        + (f'<p class="action"><strong>Suggested edit:</strong> {_h(advice)}</p>' if advice else "")
+        + _suppression_detail(finding)
+        + "</div>"
+    )
+
+
+def _render_finding_context(finding: Mapping[str, Any], *, source: str | None) -> str:
+    span = finding.get("span")
+    if source is not None and isinstance(span, Mapping):
+        start, end = span.get("start"), span.get("end")
+        if isinstance(start, int) and isinstance(end, int) and 0 <= start < end <= len(source):
+            left, right = _context_bounds(source, start, end)
+            prefix = "…" if left else ""
+            suffix = "…" if right < len(source) else ""
+            before = _compact(source[left:start])
+            match = _compact(source[start:end])
+            after = _compact(source[end:right])
+            return (
+                '<blockquote class="context">'
+                f"{_h(prefix + before)}<mark>{_h(match)}</mark>{_h(after + suffix)}"
+                "</blockquote>"
+            )
+    excerpt = _text(finding.get("excerpt"))
+    return f'<blockquote class="context"><mark>{_h(excerpt)}</mark></blockquote>'
+
+
+def _context_bounds(source: str, start: int, end: int, radius: int = 180) -> tuple[int, int]:
+    floor = max(0, start - radius)
+    left = floor
+    for marker in (". ", "! ", "? ", "\n"):
+        position = source.rfind(marker, floor, start)
+        if position >= left:
+            left = position + len(marker)
+    ceiling = min(len(source), end + radius)
+    right = ceiling
+    endings = [
+        position + 1
+        for marker in (".", "!", "?", "\n")
+        if (position := source.find(marker, end, ceiling)) >= 0
+    ]
+    if endings:
+        right = min(endings)
+    if left == floor and left > 0:
+        whitespace = source.find(" ", left, start)
+        if whitespace >= 0:
+            left = whitespace + 1
+    if right == ceiling and right < len(source):
+        whitespace = source.rfind(" ", end, right)
+        if whitespace >= end:
+            right = whitespace
+    return left, right
+
+
+def _compact(value: str) -> str:
+    compact = " ".join(value.split())
+    if compact and value[:1].isspace():
+        compact = " " + compact
+    if compact and value[-1:].isspace():
+        compact += " "
+    return compact
+
+
+def _render_unscored_summary(findings: list[dict[str, Any]], *, source: str | None) -> str:
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for finding in findings:
+        groups.setdefault(_text(finding.get("rule_id") or "unknown"), []).append(finding)
+    sections = []
+    for rule_id, values in sorted(groups.items()):
+        advice = _text(values[0].get("advice"))
+        effect = "Within allowance" if values[0].get("chargeable") else "Advisory"
+        matches = []
+        for finding in values:
+            line = _display(finding.get("line"))
+            matches.append(
+                f'<li><span class="location">line {line}</span>'
+                f"{_render_finding_context(finding, source=source)}</li>"
+            )
+        review = (
+            f"<details><summary>Review {len(values)} match"
+            f"{'es' if len(values) != 1 else ''}</summary>"
+            f'<ol class="compact-matches">{"".join(matches)}</ol></details>'
+        )
+        sections.append(
+            '<section class="signal-group"><div class="signal-heading">'
+            f'<code class="rule-id">{_h(rule_id)}</code>'
+            f'<span class="signal-count">{len(values)} match'
+            f"{'es' if len(values) != 1 else ''}</span>"
+            f'<span class="signal-effect">{_h(effect)}</span></div>'
+            + (f'<p class="signal-advice">{_h(advice)}</p>' if advice else "")
+            + review
+            + "</section>"
+        )
+    return (
+        f'<details class="advisories"><summary>Unscored signals ({len(findings)} across '
+        f'{len(groups)} rules; no score effect)</summary><div class="signal-groups">'
+        f"{''.join(sections)}</div></details>"
+    )
 
 
 def _render_comparison(item: Mapping[str, Any]) -> str:
@@ -503,6 +686,14 @@ def _findings(item: Mapping[str, Any]) -> list[dict[str, Any]]:
     return _items(item.get("findings"))
 
 
+def _charged_rule_ids(item: Mapping[str, Any]) -> set[str]:
+    return {
+        _text(rule.get("rule_id"))
+        for rule in _items(item.get("rule_costs"))
+        if _number(rule.get("charged_cost"))
+    }
+
+
 def _category_rows(item: Mapping[str, Any]) -> list[tuple[str, Any]]:
     rows = _items(item.get("category_costs"))
     return [
@@ -511,6 +702,7 @@ def _category_rows(item: Mapping[str, Any]) -> list[tuple[str, Any]]:
             row.get("charged_cost", 0),
         )
         for row in rows
+        if _number(row.get("charged_cost"))
     ]
 
 
@@ -523,12 +715,6 @@ def _delta(head: Any, base: Any) -> int | float | None:
     if _number(head) is not None and _number(base) is not None:
         return _number(head) - _number(base)  # type: ignore[operator]
     return None
-
-
-def _count_findings(data: Mapping[str, Any], field: str) -> int:
-    return sum(
-        1 for item in _items(data.get("files")) for finding in _findings(item) if finding.get(field)
-    )
 
 
 def _finding_location(path: str, finding: Mapping[str, Any]) -> str:
@@ -603,7 +789,7 @@ def _logo_data_uri() -> str:
 _STYLE = """
 :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, sans-serif; }
 body { margin: 0; background: Canvas; color: CanvasText; }
-main { max-width: 76rem; margin: auto; padding: 2rem; }
+main { max-width: 72rem; margin: auto; padding: 1.5rem 2rem 3rem; }
 header, section, article, footer { margin-block: 1.5rem; }
 .report-heading { display: flex; align-items: center; gap: 1rem; }
 .report-heading h1 { margin-block: .25rem; }
@@ -612,29 +798,79 @@ article {
   border-top: 2px solid color-mix(in srgb, CanvasText 25%, transparent);
   padding-top: 1rem;
 }
+.file-heading { font-size: clamp(1.2rem, 2.4vw, 1.65rem); overflow-wrap: anywhere; }
+.interpretation {
+  max-width: 52rem; margin-block: 1rem; padding: .75rem 1rem;
+  border-left: .25rem solid #5272b8;
+  background: color-mix(in srgb, #5272b8 10%, Canvas);
+}
 .eyebrow { font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .status { display: inline-block; padding: .35rem .65rem; border-radius: .25rem; font-weight: 800; }
 .pass { background: #176b3a; color: white; } .fail { background: #a12d2d; color: white; }
 .override { background: #6d4d00; color: white; } section.override { padding: 1rem; }
-.summary { display: flex; flex-wrap: wrap; gap: .75rem 2rem; }
-.summary div { min-width: 10rem; }
+.summary { display: flex; flex-wrap: wrap; gap: .65rem; }
+.summary div {
+  min-width: 8rem; padding: .65rem .8rem; border-radius: .4rem;
+  background: color-mix(in srgb, CanvasText 6%, Canvas);
+}
 dt { font-size: .85rem; opacity: .75; }
 dd { margin: .2rem 0 0; font-weight: 650; }
 .table-wrap { overflow-x: auto; } table { border-collapse: collapse; width: 100%; }
 th, td {
   border-bottom: 1px solid color-mix(in srgb, CanvasText 20%, transparent);
-  padding: .55rem; text-align: left; vertical-align: top;
+  padding: .5rem .6rem; text-align: left; vertical-align: top;
 }
+thead th { font-size: .8rem; opacity: .75; text-transform: uppercase; letter-spacing: .04em; }
+.deductions { margin-block: 1.25rem; }
+.finding-list { display: grid; gap: .8rem; }
+.finding {
+  border: 1px solid color-mix(in srgb, CanvasText 18%, transparent);
+  border-left: .3rem solid #a12d2d; border-radius: .35rem; padding: .8rem 1rem;
+}
+.finding p { margin-block: .5rem; }
+.finding-heading { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem .75rem; }
+.rule-id { font-weight: 750; }
+.location { font-size: .9rem; opacity: .72; }
+.badge {
+  margin-left: auto; padding: .15rem .45rem; border-radius: 999px;
+  background: #a12d2d; color: white; font-size: .75rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.context {
+  margin: .7rem 0; padding: .7rem .85rem; border-left: .2rem solid #d0a000;
+  background: color-mix(in srgb, #d0a000 9%, Canvas); line-height: 1.55;
+}
+.compact-matches { margin: .6rem 0; padding-left: 1.25rem; }
+.compact-matches li + li { margin-top: .65rem; }
+.compact-matches .context { margin: .25rem 0; }
+.signal-groups { display: grid; gap: .65rem; margin-top: .75rem; }
+.signal-group {
+  margin: 0; padding: .7rem .85rem; border-radius: .35rem;
+  border: 1px solid color-mix(in srgb, CanvasText 16%, transparent);
+}
+.signal-heading { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .75rem; }
+.signal-count { font-size: .85rem; opacity: .72; }
+.signal-effect {
+  margin-left: auto; font-size: .75rem; font-weight: 750;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.signal-advice { margin: .45rem 0; opacity: .8; }
+.rationale { opacity: .82; }
+.quiet { opacity: .75; }
+.advisories summary { color: color-mix(in srgb, CanvasText 80%, #5272b8); }
 pre {
   overflow-x: auto; padding: .75rem;
   background: color-mix(in srgb, CanvasText 7%, Canvas); white-space: pre-wrap;
 }
 .source { white-space: pre; }
 mark { background: #ffe66d; color: #171717; }
-.points { white-space: nowrap; }
-.findings > li { margin-block: 1rem; }
 details { margin-block: 1rem; }
 summary { cursor: pointer; font-weight: 700; }
 .errors { border-left: .35rem solid #a12d2d; padding-left: 1rem; }
 code { overflow-wrap: anywhere; }
+@media (max-width: 42rem) {
+  main { padding: 1rem; }
+  .report-logo { width: 4.5rem; height: 4.5rem; }
+  .badge { margin-left: 0; }
+}
 """

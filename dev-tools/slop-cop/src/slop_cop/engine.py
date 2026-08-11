@@ -28,11 +28,9 @@ class EngineOutput:
     external_audits: tuple[Mapping[str, Any], ...] = ()
 
 
-def _excerpt(source: str, start: int, end: int, limit: int = 240) -> str:
-    left = max(0, start - 80)
-    right = min(len(source), max(end + 80, left + limit))
-    value = " ".join(source[left:right].split())
-    return value[:limit]
+def _excerpt(source: str, start: int, end: int, limit: int = 1_000) -> str:
+    value = source[start:end]
+    return value if len(value) <= limit else value[: limit - 1] + "…"
 
 
 def _finding(

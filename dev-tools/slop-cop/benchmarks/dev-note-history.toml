@@ -13,8 +13,8 @@ revision = "808336e88d418e36364d57d6fda87e47e21dba82"
 path = "docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md"
 source_url = "https://github.com/NVIDIA/OpenShell-Research/blob/808336e88d418e36364d57d6fda87e47e21dba82/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md"
 expected_decision = "pass"
-min_score = 80
-max_score = 89
+min_score = 88
+max_score = 93
 
 [[benchmark]]
 name = "2026-07-16 revised draft"
@@ -49,8 +49,8 @@ revision = "b0d481796b8a0492053c7b3cac0c65444a2e99be"
 path = "docs/dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell.md"
 source_url = "https://github.com/NVIDIA/OpenShell-Research/blob/b0d481796b8a0492053c7b3cac0c65444a2e99be/docs/dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell.md"
 expected_decision = "pass"
-min_score = 92
-max_score = 98
+min_score = 97
+max_score = 100
 
 [[benchmark]]
 name = "clean technical prose"
@@ -65,8 +65,8 @@ name = "legitimate contrast and citation"
 path = "docs/dev-notes/posts/benchmark-contrast.md"
 fixture_path = "dev-tools/slop-cop/benchmarks/fixtures/legitimate-contrast-and-citation.md"
 expected_decision = "pass"
-min_score = 95
-max_score = 99
+min_score = 100
+max_score = 100
 
 [[benchmark]]
 name = "normal technical structure"
