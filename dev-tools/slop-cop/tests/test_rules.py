@@ -91,6 +91,17 @@ def test_repeated_ngram_requires_three_paragraphs() -> None:
     assert [signal.key for signal in signals].count("one stable result here") == 3
 
 
+def test_repeated_ngram_ignores_headings_links_and_captions() -> None:
+    source = (
+        "# One stable result here\n\n"
+        "A [one stable result here](https://example.test/a) appears in a citation.\n\n"
+        "<figcaption>One stable result here</figcaption>\n\n"
+        "Only one stable result here remains in body prose.\n"
+    )
+
+    assert not _signals("repetition.ngram", source)
+
+
 def test_emphatic_fragments_ignore_numbered_list_markers() -> None:
     source = "1. Build the project.\n2. Run the tests.\n3. Review the report."
     assert not _signals("repetition.emphatic-fragments", source)
@@ -103,7 +114,16 @@ def test_horizontal_rules_ignore_front_matter_delimiters() -> None:
 
 def test_duplicate_title_compares_front_matter_with_h1() -> None:
     source = "---\ntitle: Example\n---\n\n# Example\n\nVisible prose."
-    assert _signals("structure.duplicate-title", source)
+    signals = _signals("structure.duplicate-title", source)
+    assert [(signal.start, signal.end) for signal in signals] == [(24, 33)]
+
+
+def test_horizontal_rule_spans_do_not_include_adjacent_html() -> None:
+    source = '<img alt="Descriptive text" src="chart.png">\n\n---\n\n---\n\n---\n\n---\n'
+
+    signals = _signals("structure.horizontal-rules", source)
+
+    assert [source[signal.start : signal.end] for signal in signals] == ["---"] * 4
 
 
 def test_vague_authority_requires_an_attribution_verb() -> None:

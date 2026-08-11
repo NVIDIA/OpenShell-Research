@@ -85,6 +85,7 @@ class Document(StrictModel):
     path: str = Field(min_length=1, max_length=4_096)
     source: str
     prose_projection: str
+    repetition_projection: str
     line_starts: tuple[int, ...]
     front_matter: tuple[tuple[str, str], ...] = ()
     masked_ranges: tuple[MaskedRange, ...]
@@ -92,15 +93,22 @@ class Document(StrictModel):
     tokens: tuple[ProseSegment, ...]
     sentences: tuple[ProseSegment, ...]
     paragraphs: tuple[ProseSegment, ...]
+    repetition_tokens: tuple[ProseSegment, ...]
+    repetition_sentences: tuple[ProseSegment, ...]
+    repetition_paragraphs: tuple[ProseSegment, ...]
     metrics: DocumentMetrics
 
     @model_validator(mode="after")
     def validate_projection(self) -> Document:
         if len(self.source) != len(self.prose_projection):
             raise ValueError("prose projection must have the same length as source")
+        if len(self.source) != len(self.repetition_projection):
+            raise ValueError("repetition projection must have the same length as source")
         for index, character in enumerate(self.source):
             if character in "\r\n" and self.prose_projection[index] != character:
                 raise ValueError("prose projection must preserve line endings")
+            if character in "\r\n" and self.repetition_projection[index] != character:
+                raise ValueError("repetition projection must preserve line endings")
         if self.line_starts != _line_starts(self.source):
             raise ValueError("line-start index does not match source")
         return self
@@ -285,6 +293,17 @@ def _add_html_comments(source: str, ranges: list[tuple[int, int, str]]) -> None:
         cursor = end
 
 
+def _add_html_nonprose_blocks(source: str, ranges: list[tuple[int, int, str]]) -> None:
+    opening = r"<(script|style|template|pre|code|svg|math)\b(?:[^>'\"]|'[^']*'|\"[^\"]*\")*>"
+    for match in re.finditer(opening, source, re.IGNORECASE):
+        if _covered(match.start(), ranges):
+            continue
+        tag = match.group(1)
+        close = re.search(rf"</{re.escape(tag)}[ \t]*>", source[match.end() :], re.IGNORECASE)
+        if close is not None:
+            ranges.append((match.start(), match.end() + close.end(), "html-nonprose"))
+
+
 def _add_inline_code(source: str, ranges: list[tuple[int, int, str]]) -> None:
     cursor = 0
     while cursor < len(source):
@@ -333,7 +352,7 @@ def _add_html_tags(source: str, ranges: list[tuple[int, int, str]]) -> None:
                 ranges.append((start, end + 1, "html-tag"))
                 cursor = end + 1
                 break
-            elif char in "\r\n":
+            elif char == "<":
                 cursor = start + 1
                 break
             end += 1
@@ -361,7 +380,29 @@ def _find_closing_paren(source: str, start: int) -> int | None:
     return None
 
 
-def _add_links_and_images(source: str, ranges: list[tuple[int, int, str]]) -> None:
+def _find_closing_bracket(source: str, start: int) -> int | None:
+    depth = 1
+    escaped = False
+    for index in range(start, len(source)):
+        char = source[index]
+        if escaped:
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        elif char == "[":
+            depth += 1
+        elif char == "]":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
+
+
+def _add_links_and_images(
+    source: str,
+    ranges: list[tuple[int, int, str]],
+    repetition_ranges: list[tuple[int, int, str]],
+) -> None:
     reference = re.compile(r"^ {0,3}\[[^\]\r\n]+\]:[^\r\n]*(?:\r?\n|$)", re.MULTILINE)
     for match in reference.finditer(source):
         if not _covered(match.start(), ranges):
@@ -374,10 +415,14 @@ def _add_links_and_images(source: str, ranges: list[tuple[int, int, str]]) -> No
         cursor = opener_match.end()
         if _covered(start, ranges):
             continue
-        label_end = source.find("]", opener_match.end())
-        if label_end < 0:
+        label_end = _find_closing_bracket(source, opener_match.end())
+        if label_end is None:
             continue
         is_image = source[start] == "!"
+        if is_image:
+            ranges.append((start, label_end + 1, "image"))
+        else:
+            repetition_ranges.append((opener_match.end(), label_end, "repetition-link-label"))
         if label_end + 1 < len(source) and source[label_end + 1] == "(":
             close = _find_closing_paren(source, label_end + 2)
             if close is None:
@@ -407,6 +452,27 @@ def _add_links_and_images(source: str, ranges: list[tuple[int, int, str]]) -> No
                         )
                     )
                 cursor = ref_end + 1
+
+
+def _add_repetition_contexts(source: str, ranges: list[tuple[int, int, str]]) -> None:
+    for match in re.finditer(r"^ {0,3}#{1,6}(?:\s+|$)[^\r\n]*(?:\r?\n|$)", source, re.MULTILINE):
+        ranges.append((match.start(), match.end(), "repetition-heading"))
+    for match in re.finditer(
+        r"^.*(?:\r?\n)(?: {0,3})(?:=+|-+)[ \t]*(?:\r?\n|$)", source, re.MULTILINE
+    ):
+        ranges.append((match.start(), match.end(), "repetition-heading"))
+    for match in re.finditer(
+        r"<figcaption\b(?:[^>'\"]|'[^']*'|\"[^\"]*\")*>(.*?)</figcaption\s*>",
+        source,
+        re.IGNORECASE | re.DOTALL,
+    ):
+        ranges.append((match.start(1), match.end(1), "repetition-caption"))
+    for match in re.finditer(
+        r"<a\b(?:[^>'\"]|'[^']*'|\"[^\"]*\")*>(.*?)</a\s*>",
+        source,
+        re.IGNORECASE | re.DOTALL,
+    ):
+        ranges.append((match.start(1), match.end(1), "repetition-link-label"))
 
 
 def _add_blockquotes(source: str, ranges: list[tuple[int, int, str]]) -> None:
@@ -625,6 +691,7 @@ def build_document(
 
     effective_contexts = contexts or ContextConfig()
     ranges: list[tuple[int, int, str]] = []
+    repetition_ranges: list[tuple[int, int, str]] = []
     front_matter = _add_front_matter(source, ranges)
     _add_generated_ranges(source, ranges)
     if not effective_contexts.scan_blockquotes:
@@ -633,16 +700,23 @@ def build_document(
     _add_indented_code(source, ranges)
     parsed_suppressions = _add_suppressions(source, ranges)
     _add_html_comments(source, ranges)
+    _add_html_nonprose_blocks(source, ranges)
     _add_inline_code(source, ranges)
     _add_html_tags(source, ranges)
-    _add_links_and_images(source, ranges)
+    _add_links_and_images(source, ranges, repetition_ranges)
     _add_disabled_visible_contexts(source, ranges, effective_contexts)
+    _add_repetition_contexts(source, repetition_ranges)
 
     masked = _merge_ranges(source, ranges)
     projection = _project(source, masked)
+    repetition_masked = _merge_ranges(source, [*ranges, *repetition_ranges])
+    repetition_projection = _project(source, repetition_masked)
     tokens = _segment_tokens(projection)
     paragraphs = _segment_paragraphs(projection)
     sentences = _segment_sentences(projection, paragraphs)
+    repetition_tokens = _segment_tokens(repetition_projection)
+    repetition_paragraphs = _segment_paragraphs(repetition_projection)
+    repetition_sentences = _segment_sentences(repetition_projection, repetition_paragraphs)
     suppressions = _bind_suppressions(source, projection, parsed_suppressions, paragraphs)
     masked_count = sum(
         1
@@ -662,6 +736,7 @@ def build_document(
         path=Path(path).as_posix(),
         source=source,
         prose_projection=projection,
+        repetition_projection=repetition_projection,
         line_starts=_line_starts(source),
         front_matter=front_matter,
         masked_ranges=masked,
@@ -669,6 +744,9 @@ def build_document(
         tokens=tokens,
         sentences=sentences,
         paragraphs=paragraphs,
+        repetition_tokens=repetition_tokens,
+        repetition_sentences=repetition_sentences,
+        repetition_paragraphs=repetition_paragraphs,
         metrics=metrics,
     )
 

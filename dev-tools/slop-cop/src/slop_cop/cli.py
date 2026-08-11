@@ -341,9 +341,11 @@ async def _check(args: argparse.Namespace) -> int:
     baseline_root = args.baseline_root.resolve(strict=True) if args.baseline_root else None
     tasks = []
     sources: dict[str, str] = {}
+    projections: dict[str, str] = {}
     for logical, physical in resolved:
         document = _load_head_document(config, logical, physical)
         sources[logical] = document.source
+        projections[logical] = document.prose_projection
         base = _load_base_document(
             config,
             logical,
@@ -396,7 +398,12 @@ async def _check(args: argparse.Namespace) -> int:
     )
     sys.stdout.write(terminal_report(result))
     if args.html_dir:
-        write_report_directory(result, args.html_dir, sources=sources)
+        write_report_directory(
+            result,
+            args.html_dir,
+            sources=sources,
+            projections=projections,
+        )
     if args.json_path:
         write_json_report(result, args.json_path)
     return EXIT_OK if result.decision in {Decision.PASS, Decision.OVERRIDDEN} else EXIT_POLICY

@@ -38,9 +38,9 @@ _STOPWORDS = frozenset(
 
 
 def _ngram(context: RuleContext) -> list[RuleSignal]:
-    prose = context.projected_prose
+    prose = context.repetition_prose
     occurrences: dict[tuple[str, ...], list[tuple[int, int, int]]] = defaultdict(list)
-    for paragraph_index, paragraph in enumerate(context.paragraphs):
+    for paragraph_index, paragraph in enumerate(context.repetition_paragraphs):
         words = list(_WORD.finditer(prose, paragraph.start, paragraph.end))
         normalized = [word.group(0).casefold() for word in words]
         for size in range(4, 6):
@@ -71,8 +71,8 @@ def _ngram(context: RuleContext) -> list[RuleSignal]:
 def _sentence_opener(context: RuleContext) -> list[RuleSignal]:
     ignored = _STOPWORDS | {"also", "however", "therefore", "then", "instead"}
     values: list[tuple[int, int, str]] = []
-    for sentence in context.sentences:
-        words = list(_WORD.finditer(context.projected_prose, sentence.start, sentence.end))
+    for sentence in context.repetition_sentences:
+        words = list(_WORD.finditer(context.repetition_prose, sentence.start, sentence.end))
         while words and words[0].group(0).casefold() in ignored:
             words.pop(0)
         if len(words) < 3:
@@ -100,7 +100,10 @@ def _template_shape(context: RuleContext) -> list[RuleSignal]:
         "from-to": regex.compile(r"\bfrom\b[^.!?\n]{1,60}\bto\b", regex.I),
     }
     for key, pattern in patterns.items():
-        matches.extend((m.start(), m.end(), key) for m in pattern.finditer(context.projected_prose))
+        matches.extend(
+            (match.start(), match.end(), key)
+            for match in pattern.finditer(context.repetition_prose)
+        )
     counts: dict[str, int] = defaultdict(int)
     for _, _, key in matches:
         counts[key] += 1
@@ -113,10 +116,10 @@ def _template_shape(context: RuleContext) -> list[RuleSignal]:
 
 def _emphatic_fragments(context: RuleContext) -> list[RuleSignal]:
     values: list[tuple[int, int, str]] = []
-    prose = context.projected_prose
-    for paragraph in context.paragraphs:
+    prose = context.repetition_prose
+    for paragraph in context.repetition_paragraphs:
         paragraph_values: list[tuple[int, int, str]] = []
-        for sentence in context.sentences:
+        for sentence in context.repetition_sentences:
             start, end = sentence.start, sentence.end
             if not paragraph.start <= start < paragraph.end:
                 continue
@@ -140,7 +143,7 @@ def _hedge_stack(context: RuleContext) -> list[RuleSignal]:
     pattern = regex.compile(rf"\b{hedge}\b(?:[^.!?\n]{{0,60}}\b{hedge}\b){{2,}}", regex.I)
     return [
         RuleSignal(start=match.start(), end=match.end(), key="hedge-stack")
-        for match in pattern.finditer(context.projected_prose)
+        for match in pattern.finditer(context.repetition_prose)
     ]
 
 
@@ -152,7 +155,7 @@ def _question_answer(context: RuleContext) -> list[RuleSignal]:
     )
     return [
         RuleSignal(start=match.start(1), end=match.end(1), key="question-answer")
-        for match in pattern.finditer(context.projected_prose)
+        for match in pattern.finditer(context.repetition_prose)
     ]
 
 

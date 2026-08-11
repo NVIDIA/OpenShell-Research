@@ -161,14 +161,34 @@ class RuleContext:
     def paragraphs(self) -> tuple[Any, ...]:
         return tuple(getattr(self.document, "paragraphs", ()))
 
+    @property
+    def repetition_prose(self) -> str:
+        return str(getattr(self.document, "repetition_projection", self.projected_prose))
+
+    @property
+    def repetition_tokens(self) -> tuple[Any, ...]:
+        return tuple(getattr(self.document, "repetition_tokens", self.tokens))
+
+    @property
+    def repetition_sentences(self) -> tuple[Any, ...]:
+        return tuple(getattr(self.document, "repetition_sentences", self.sentences))
+
+    @property
+    def repetition_paragraphs(self) -> tuple[Any, ...]:
+        return tuple(getattr(self.document, "repetition_paragraphs", self.paragraphs))
+
     def span_text(self, start: int, end: int) -> str:
         return self.source[start:end]
 
     def repeated_sentence_starts(self, minimum_count: int = 3) -> tuple[TextSpan, ...]:
         starts: list[TextSpan] = []
         ignored = {"a", "an", "the", "also", "however", "therefore", "then"}
-        for sentence in self.sentences:
-            text = getattr(sentence, "text", self.projected_prose[sentence.start : sentence.end])
+        for sentence in self.repetition_sentences:
+            text = getattr(
+                sentence,
+                "text",
+                self.repetition_prose[sentence.start : sentence.end],
+            )
             words = list(re.finditer(r"(?u)\b[^\W_]+(?:['’-][^\W_]+)*\b", text))
             while words and words[0].group(0).casefold() in ignored:
                 words.pop(0)

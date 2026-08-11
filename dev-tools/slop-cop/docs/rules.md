@@ -141,6 +141,15 @@ suppressions, scoring, and reporting. The custom evaluator only returns bounded
 signals and optional audit data. It cannot set the score, threshold, decision,
 or override state.
 
+`context.projected_prose`, `context.tokens`, `context.sentences`, and
+`context.paragraphs` contain reader-visible prose with code, comments, link
+destinations, image alt text, and HTML tag attributes removed. Repetition rules
+should use `context.repetition_prose`, `context.repetition_tokens`,
+`context.repetition_sentences`, and `context.repetition_paragraphs`. That view
+also removes headings, link labels, and figure captions, where repeated wording
+is commonly structural or descriptive. Both views preserve source length and
+line endings, so returned spans use the original source offsets.
+
 Add positive and counterexample entries to `tests/rule_cases.toml`. The shared
 contract suite validates IDs, metadata, result bounds, spans, ordering, and
 fixture coverage for built-in, declarative, and custom rules.

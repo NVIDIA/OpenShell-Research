@@ -37,7 +37,7 @@ def _duplicate_title(context: RuleContext, runtime: Any) -> RuleEvaluation:
         return RuleEvaluation()
     signals = tuple(
         RuleSignal(start=match.start(), end=match.end(), key="duplicate-title")
-        for match in regex.finditer(r"(?m)^#\s+(.+?)\s*$", context.projected_prose)
+        for match in regex.finditer(r"(?m)^#[ \t]+([^\r\n]+?)[ \t]*$", context.projected_prose)
         if match.group(1).strip().casefold() == title
     )
     return RuleEvaluation(signals=signals)
@@ -66,7 +66,7 @@ RULES = (
         "Repeated bold lead-ins",
         "Several adjacent sections use bold labels as sentence prefixes.",
         "Use headings or ordinary prose when the labels do not aid scanning.",
-        r"(?m)^\s*(?:[-*+]\s+)?\*\*[^*\n]{2,80}\*\*[:.]?",
+        r"(?m)^[ \t]*(?:[-*+][ \t]+)?\*\*[^*\n]{2,80}\*\*[:.]?",
         4,
     ),
     _make(
@@ -82,7 +82,7 @@ RULES = (
         "Long bullet run",
         "A long uninterrupted bullet list can obscure hierarchy.",
         "Group related items under specific subheadings when useful.",
-        r"(?m)^(?:\s*[-*+]\s+[^\n]+\n){7,}",
+        r"(?m)^(?:[ \t]*[-*+][ \t]+[^\n]+\n){7,}",
         1,
     ),
     _make(
@@ -90,7 +90,7 @@ RULES = (
         "Frequent horizontal rules",
         "Frequent horizontal rules can fragment the note.",
         "Use headings to express section hierarchy.",
-        r"(?m)^\s*(?:---+|___+|\*\*\*+)\s*$",
+        r"(?m)^[ \t]*(?:---+|___+|\*\*\*+)[ \t]*$",
         4,
     ),
     FunctionRule(

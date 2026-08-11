@@ -149,7 +149,10 @@ def terminal_report(result: RunResult | Mapping[str, Any]) -> str:
 
 
 def html_report(
-    result: RunResult | Mapping[str, Any], *, sources: Mapping[str, str] | None = None
+    result: RunResult | Mapping[str, Any],
+    *,
+    sources: Mapping[str, str] | None = None,
+    projections: Mapping[str, str] | None = None,
 ) -> str:
     """Render a self-contained HTML report with all result text escaped."""
     data = result_data(result)
@@ -191,7 +194,7 @@ def html_report(
         if len(files) > 1:
             body.append(_render_file_table(files))
         for index, file_result in enumerate(files, 1):
-            body.append(_render_file(file_result, index, sources=sources))
+            body.append(_render_file(file_result, index, sources=sources, projections=projections))
     body.append(_render_rule_errors(data))
     body.append(_render_external_audits(data))
     body.append(_render_provenance(data))
@@ -207,11 +210,12 @@ def write_html_report(
     destination: str | Path,
     *,
     sources: Mapping[str, str] | None = None,
+    projections: Mapping[str, str] | None = None,
 ) -> Path:
     """Write the self-contained HTML report."""
     path = Path(destination)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(html_report(result, sources=sources), encoding="utf-8")
+    path.write_text(html_report(result, sources=sources, projections=projections), encoding="utf-8")
     return path
 
 
@@ -220,12 +224,18 @@ def write_report_directory(
     destination: str | Path,
     *,
     sources: Mapping[str, str] | None = None,
+    projections: Mapping[str, str] | None = None,
 ) -> tuple[Path, Path]:
     """Write ``index.html`` and ``report.json`` into one artifact directory."""
     directory = Path(destination)
     directory.mkdir(parents=True, exist_ok=True)
     return (
-        write_html_report(result, directory / "index.html", sources=sources),
+        write_html_report(
+            result,
+            directory / "index.html",
+            sources=sources,
+            projections=projections,
+        ),
         write_json_report(result, directory / "report.json"),
     )
 
@@ -273,6 +283,7 @@ def _render_file(
     index: int,
     *,
     sources: Mapping[str, str] | None,
+    projections: Mapping[str, str] | None,
 ) -> str:
     path = _text(item.get("path"))
     findings = _findings(item)
@@ -283,6 +294,7 @@ def _render_file(
     raw_metrics = item.get("metrics")
     metrics: Mapping[str, Any] = raw_metrics if isinstance(raw_metrics, Mapping) else {}
     source = sources.get(path) if sources is not None else None
+    projection = projections.get(path) if projections is not None else None
     charged_rule_ids = _charged_rule_ids(item)
     scored = sum(
         1
@@ -306,11 +318,18 @@ def _render_file(
     sections.append(_dtdd("Code points masked", _display(metrics.get("masked_code_points"))))
     sections.append("</dl>")
     sections.append(_render_costs(item))
-    sections.append(_render_density(item, source=source if isinstance(source, str) else None))
+    sections.append(
+        _render_density(
+            item,
+            source=source if isinstance(source, str) else None,
+            projection=projection if isinstance(projection, str) else None,
+        )
+    )
     sections.append(
         _render_findings(
             findings,
             source=source if isinstance(source, str) else None,
+            projection=projection if isinstance(projection, str) else None,
             charged_rule_ids=charged_rule_ids,
         )
     )
@@ -366,7 +385,12 @@ def _render_costs(item: Mapping[str, Any]) -> str:
     )
 
 
-def _render_density(item: Mapping[str, Any], *, source: str | None = None) -> str:
+def _render_density(
+    item: Mapping[str, Any],
+    *,
+    source: str | None = None,
+    projection: str | None = None,
+) -> str:
     records: list[dict[str, Any]] = []
     for owner_key, collection_key in (("rule_id", "rule_costs"), ("category", "category_costs")):
         for owner in _items(item.get(collection_key)):
@@ -386,7 +410,12 @@ def _render_density(item: Mapping[str, Any], *, source: str | None = None) -> st
         if not passage and source is not None and isinstance(span, Mapping):
             start, end = span.get("start"), span.get("end")
             if isinstance(start, int) and isinstance(end, int) and 0 <= start < end <= len(source):
-                passage = source[start:end]
+                passage_source = (
+                    projection
+                    if projection is not None and len(projection) == len(source)
+                    else source
+                )
+                passage = passage_source[start:end]
         rows.append(
             "<tr>"
             f"<th>{_h(label)}</th><td>{_h(window)}</td>"
@@ -406,6 +435,7 @@ def _render_findings(
     findings: list[dict[str, Any]],
     *,
     source: str | None,
+    projection: str | None,
     charged_rule_ids: set[str],
 ) -> str:
     if not findings:
@@ -428,24 +458,30 @@ def _render_findings(
     important = blocking + scored
     if important:
         output.append('<div class="finding-list">')
-        output.extend(_render_finding(finding, source=source) for finding in important)
+        output.extend(
+            _render_finding(finding, source=source, projection=projection) for finding in important
+        )
         output.append("</div>")
     else:
         output.append('<p class="quiet">No findings affect the score.</p>')
     if unscored:
-        output.append(_render_unscored_summary(unscored, source=source))
+        output.append(_render_unscored_summary(unscored, source=source, projection=projection))
     if suppressed:
         output.append(
             f"<details><summary>Suppressed findings ({len(suppressed)})</summary>"
             '<div class="finding-list">'
         )
-        output.extend(_render_finding(finding, source=source) for finding in suppressed)
+        output.extend(
+            _render_finding(finding, source=source, projection=projection) for finding in suppressed
+        )
         output.append("</div></details>")
     output.append("</section>")
     return "".join(output)
 
 
-def _render_finding(finding: Mapping[str, Any], *, source: str | None) -> str:
+def _render_finding(
+    finding: Mapping[str, Any], *, source: str | None, projection: str | None
+) -> str:
     rule_id = _text(finding.get("rule_id") or "unknown")
     line = _display(finding.get("line"))
     column = _display(finding.get("column"))
@@ -458,7 +494,7 @@ def _render_finding(finding: Mapping[str, Any], *, source: str | None) -> str:
         f'<code class="rule-id">{_h(rule_id)}</code>'
         f'<span class="location">line {line}, column {column}</span>'
         f'<span class="badge">{label}</span></div>'
-        + _render_finding_context(finding, source=source)
+        + _render_finding_context(finding, source=source, projection=projection)
         + (f'<p class="rationale">{_h(rationale)}</p>' if rationale else "")
         + (f'<p class="action"><strong>Suggested edit:</strong> {_h(advice)}</p>' if advice else "")
         + _suppression_detail(finding)
@@ -466,17 +502,22 @@ def _render_finding(finding: Mapping[str, Any], *, source: str | None) -> str:
     )
 
 
-def _render_finding_context(finding: Mapping[str, Any], *, source: str | None) -> str:
+def _render_finding_context(
+    finding: Mapping[str, Any], *, source: str | None, projection: str | None
+) -> str:
     span = finding.get("span")
     if source is not None and isinstance(span, Mapping):
         start, end = span.get("start"), span.get("end")
         if isinstance(start, int) and isinstance(end, int) and 0 <= start < end <= len(source):
-            left, right = _context_bounds(source, start, end)
+            context_source = (
+                projection if projection is not None and len(projection) == len(source) else source
+            )
+            left, right = _context_bounds(context_source, start, end)
             prefix = "…" if left else ""
             suffix = "…" if right < len(source) else ""
-            before = _compact(source[left:start])
-            match = _compact(source[start:end])
-            after = _compact(source[end:right])
+            before = _compact(context_source[left:start])
+            match = _compact(context_source[start:end])
+            after = _compact(context_source[end:right])
             return (
                 '<blockquote class="context">'
                 f"{_h(prefix + before)}<mark>{_h(match)}</mark>{_h(after + suffix)}"
@@ -522,7 +563,9 @@ def _compact(value: str) -> str:
     return compact
 
 
-def _render_unscored_summary(findings: list[dict[str, Any]], *, source: str | None) -> str:
+def _render_unscored_summary(
+    findings: list[dict[str, Any]], *, source: str | None, projection: str | None
+) -> str:
     groups: dict[str, list[dict[str, Any]]] = {}
     for finding in findings:
         groups.setdefault(_text(finding.get("rule_id") or "unknown"), []).append(finding)
@@ -535,7 +578,7 @@ def _render_unscored_summary(findings: list[dict[str, Any]], *, source: str | No
             line = _display(finding.get("line"))
             matches.append(
                 f'<li><span class="location">line {line}</span>'
-                f"{_render_finding_context(finding, source=source)}</li>"
+                f"{_render_finding_context(finding, source=source, projection=projection)}</li>"
             )
         review = (
             f"<details><summary>Review {len(values)} match"

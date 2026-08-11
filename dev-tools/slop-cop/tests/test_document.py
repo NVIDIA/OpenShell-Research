@@ -27,6 +27,38 @@ def test_projection_masks_ignored_contexts_and_preserves_visible_prose() -> None
     assert "Quoted not just prose" not in document.prose_projection
 
 
+def test_projection_masks_multiline_html_attributes_and_complex_image_alt_text() -> None:
+    source = (
+        '<img\n  src="chart.png"\n  alt="As an AI language model, not just a chart">\n\n'
+        "![As an AI language model, a [nested]\nchart](chart.png)\n\n"
+        "![As an AI language model, a shortcut image]\n\n"
+        "<pre><code>As an AI language model, sample output.</code></pre>\n\n"
+        "<svg><title>As an AI language model, an accessible title.</title></svg>\n\n"
+        "Visible prose.\n"
+    )
+
+    document = build_document("note.md", source)
+
+    assert "As an AI language model" not in document.prose_projection
+    assert "Visible prose" in document.prose_projection
+
+
+def test_repetition_projection_omits_expected_repeated_contexts() -> None:
+    source = (
+        "# Repeated technical phrase here\n\n"
+        "Body prose keeps its exact wording.\n\n"
+        "[Repeated technical phrase here](https://example.test/paper)\n\n"
+        '<a href="https://example.test">Repeated technical phrase here</a>\n\n'
+        "<figcaption>Repeated technical phrase here</figcaption>\n"
+    )
+
+    document = build_document("note.md", source)
+
+    assert "Repeated technical phrase here" in document.prose_projection
+    assert "Repeated technical phrase here" not in document.repetition_projection
+    assert "Body prose keeps its exact wording" in document.repetition_projection
+
+
 def test_blockquotes_can_be_scanned_explicitly() -> None:
     source = "> Quoted prose.\n\nVisible prose.\n"
 

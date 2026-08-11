@@ -29,7 +29,7 @@ class EngineOutput:
 
 
 def _excerpt(source: str, start: int, end: int, limit: int = 1_000) -> str:
-    value = source[start:end]
+    value = " ".join(source[start:end].split())
     return value if len(value) <= limit else value[: limit - 1] + "…"
 
 
@@ -46,7 +46,7 @@ def _finding(
     if signal.scope == "span":
         span = Span(start=signal.start, end=signal.end)
         line, column = document.line_column(signal.start)
-        excerpt = _excerpt(document.source, signal.start, signal.end)
+        excerpt = _excerpt(document.prose_projection, signal.start, signal.end)
     advisory = policy.severity is Severity.INFO or policy.cap == 0
     return Finding(
         rule_id=metadata.id,

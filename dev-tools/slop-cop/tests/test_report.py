@@ -8,6 +8,7 @@ from typing import Any, cast
 
 import pytest
 
+from slop_cop.document import build_document
 from slop_cop.report import (
     ReportError,
     html_report,
@@ -151,6 +152,30 @@ def test_html_report_is_self_contained_and_escapes_all_result_text() -> None:
     assert "<mark>not just</mark>" in rendered
     assert "note that is <mark>not just</mark> vague." in rendered
     assert "chargeable signal" not in rendered
+
+
+def test_html_finding_context_uses_the_analyzed_projection() -> None:
+    source = (
+        '<img\n alt="Not just meaningful alt text"\n src="chart.png">\n'
+        "Direct prose is not just vague."
+    )
+    document = build_document("docs/dev-notes/posts/example.md", source)
+    result = sample_result()
+    file_result = cast(list[dict[str, Any]], result["files"])[0]
+    finding = cast(list[dict[str, Any]], file_result["findings"])[0]
+    start = source.index("not just vague")
+    finding["span"] = {"start": start, "end": start + len("not just")}
+
+    rendered = html_report(
+        result,
+        sources={document.path: document.source},
+        projections={document.path: document.prose_projection},
+    )
+
+    context = re.search(r'<blockquote class="context">(.*?)</blockquote>', rendered)
+    assert context is not None
+    assert "meaningful alt text" not in context.group(1)
+    assert "Direct prose is <mark>not just</mark> vague." in context.group(1)
 
 
 def test_html_report_embeds_the_logo() -> None:
