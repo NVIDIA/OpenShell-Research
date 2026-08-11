@@ -1,5 +1,7 @@
 # Slop Cop
 
+<img src="src/slop_cop/assets/slop-cop.png" alt="Slop Cop" width="240">
+
 Slop Cop reviews Dev Notes for configured editorial signals. It reports precise
 findings, calculates a transparent score, and enforces the repository threshold.
 The score is not an estimate of who or what wrote the document.
