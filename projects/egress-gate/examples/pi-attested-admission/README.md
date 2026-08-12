@@ -49,10 +49,18 @@ Register this service as an OpenShell supervisor middleware and start it without
 `--no-require-pi-receipt`. Configure exactly one network middleware entry for
 the OpenAI provider host. When OpenShell sees that the service advertises the
 Pi admission binding, it exposes the loopback bridge and sets
-`OPENSHELL_PI_CONVERSATION_URL` in the sandbox. The pinned Pi fork detects that
-variable and loads its bundled `openshell-input-admission.ts` extension. A
-normal Egress Gate deployment that does not use managed Pi must start with
-`--no-require-pi-receipt`; it advertises and evaluates only HTTP middleware.
+`OPENSHELL_PI_CONVERSATION_URL` in the sandbox. Start the pinned Pi fork with
+the standard extension option and this example's extension:
+
+```shell
+pi --extension ./openshell-input-admission.ts
+```
+
+Pi remains unaware of OpenShell; the deployment is responsible for loading the
+extension. Receipt enforcement makes a missing or inactive extension fail
+closed at provider egress. A normal Egress Gate deployment that does not use
+managed Pi must start with `--no-require-pi-receipt`; it advertises and
+evaluates only HTTP middleware.
 
 The managed path currently supports direct OpenAI Chat Completions requests
 from the pinned Pi serializer. It does not support images, steering or queued
