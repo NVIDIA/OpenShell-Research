@@ -30,7 +30,7 @@ interface CandidateEnvelope {
 export default function (pi: ExtensionAPI) {
 	let pendingReceipt: string | undefined;
 
-	pi.on("before_user_message_commit", async (event, ctx) => {
+	pi.on("before_user_message_append", async (event, ctx) => {
 		try {
 			pendingReceipt = undefined;
 			if (!ctx.isIdle() || event.images?.length) {
