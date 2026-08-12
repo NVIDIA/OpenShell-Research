@@ -42,7 +42,7 @@ public API and preserve this ordering.
 
 Use the matching integration branches:
 
-- [Pi `openshell/pi-egress-admission`](https://github.com/johnnygreco/pi/tree/openshell/pi-egress-admission)
+- [Pi user-message append hook PR](https://github.com/johnnygreco/pi/pull/1)
 - [OpenShell `openshell/pi-egress-admission`](https://github.com/johnnygreco/OpenShell/tree/openshell/pi-egress-admission)
 
 Register this service as an OpenShell supervisor middleware and start it without
