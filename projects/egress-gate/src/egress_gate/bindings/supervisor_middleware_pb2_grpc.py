@@ -28,7 +28,7 @@ if _version_not_supported:
 
 class SupervisorMiddlewareStub:
     """SupervisorMiddleware lets an operator-run service inspect and transform
-    sandbox HTTP egress before OpenShell injects credentials.
+    sandbox HTTP egress or evaluate a supported agent-harness request.
     """
 
     def __init__(self, channel):
@@ -52,11 +52,16 @@ class SupervisorMiddlewareStub:
                 request_serializer=supervisor__middleware__pb2.HttpRequestEvaluation.SerializeToString,
                 response_deserializer=supervisor__middleware__pb2.HttpRequestResult.FromString,
                 _registered_method=True)
+        self.EvaluateAgentConversation = channel.unary_unary(
+                '/openshell.middleware.v1.SupervisorMiddleware/EvaluateAgentConversation',
+                request_serializer=supervisor__middleware__pb2.AgentConversationEvaluation.SerializeToString,
+                response_deserializer=supervisor__middleware__pb2.AgentConversationResult.FromString,
+                _registered_method=True)
 
 
 class SupervisorMiddlewareServicer:
     """SupervisorMiddleware lets an operator-run service inspect and transform
-    sandbox HTTP egress before OpenShell injects credentials.
+    sandbox HTTP egress or evaluate a supported agent-harness request.
     """
 
     def Describe(self, request, context):
@@ -81,6 +86,14 @@ class SupervisorMiddlewareServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def EvaluateAgentConversation(self, request, context):
+        """EvaluateAgentConversation returns an allow, deny, or replacement decision for
+        one versioned, harness-native request before the harness commits or sends it.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_SupervisorMiddlewareServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -99,6 +112,11 @@ def add_SupervisorMiddlewareServicer_to_server(servicer, server):
                     request_deserializer=supervisor__middleware__pb2.HttpRequestEvaluation.FromString,
                     response_serializer=supervisor__middleware__pb2.HttpRequestResult.SerializeToString,
             ),
+            'EvaluateAgentConversation': grpc.unary_unary_rpc_method_handler(
+                    servicer.EvaluateAgentConversation,
+                    request_deserializer=supervisor__middleware__pb2.AgentConversationEvaluation.FromString,
+                    response_serializer=supervisor__middleware__pb2.AgentConversationResult.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'openshell.middleware.v1.SupervisorMiddleware', rpc_method_handlers)
@@ -109,7 +127,7 @@ def add_SupervisorMiddlewareServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class SupervisorMiddleware:
     """SupervisorMiddleware lets an operator-run service inspect and transform
-    sandbox HTTP egress before OpenShell injects credentials.
+    sandbox HTTP egress or evaluate a supported agent-harness request.
     """
 
     @staticmethod
@@ -183,6 +201,33 @@ class SupervisorMiddleware:
             '/openshell.middleware.v1.SupervisorMiddleware/EvaluateHttpRequest',
             supervisor__middleware__pb2.HttpRequestEvaluation.SerializeToString,
             supervisor__middleware__pb2.HttpRequestResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def EvaluateAgentConversation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/openshell.middleware.v1.SupervisorMiddleware/EvaluateAgentConversation',
+            supervisor__middleware__pb2.AgentConversationEvaluation.SerializeToString,
+            supervisor__middleware__pb2.AgentConversationResult.FromString,
             options,
             channel_credentials,
             insecure,

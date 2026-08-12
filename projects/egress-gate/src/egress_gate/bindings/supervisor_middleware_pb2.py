@@ -26,53 +26,63 @@ from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 from google.protobuf import struct_pb2 as google_dot_protobuf_dot_struct__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bsupervisor_middleware.proto\x12\x17openshell.middleware.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1cgoogle/protobuf/struct.proto\"y\n\x12MiddlewareManifest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x17\n\x0fservice_version\x18\x02 \x01(\t\x12<\n\x08\x62indings\x18\x03 \x03(\x0b\x32*.openshell.middleware.v1.MiddlewareBinding\"\xca\x01\n\x11MiddlewareBinding\x12I\n\toperation\x18\x01 \x01(\x0e\x32\x36.openshell.middleware.v1.SupervisorMiddlewareOperation\x12\x41\n\x05phase\x18\x02 \x01(\x0e\x32\x32.openshell.middleware.v1.SupervisorMiddlewarePhase\x12\x16\n\x0emax_body_bytes\x18\x03 \x01(\x04\x12\x0f\n\x07timeout\x18\x04 \x01(\t\"Y\n\x15ValidateConfigRequest\x12\'\n\x06\x63onfig\x18\x01 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x17\n\x0fmiddleware_name\x18\x02 \x01(\t\"7\n\x16ValidateConfigResponse\x12\r\n\x05valid\x18\x01 \x01(\x08\x12\x0e\n\x06reason\x18\x02 \x01(\t\"\xd6\x02\n\x15HttpRequestEvaluation\x12\x41\n\x05phase\x18\x01 \x01(\x0e\x32\x32.openshell.middleware.v1.SupervisorMiddlewarePhase\x12\x38\n\x07\x63ontext\x18\x02 \x01(\x0b\x32\'.openshell.middleware.v1.RequestContext\x12\'\n\x06\x63onfig\x18\x03 \x01(\x0b\x32\x17.google.protobuf.Struct\x12:\n\x06target\x18\x04 \x01(\x0b\x32*.openshell.middleware.v1.HttpRequestTarget\x12\x34\n\x07headers\x18\x05 \x03(\x0b\x32#.openshell.middleware.v1.HttpHeader\x12\x0c\n\x04\x62ody\x18\x06 \x01(\x0c\x12\x17\n\x0fmiddleware_name\x18\x07 \x01(\t\")\n\nHttpHeader\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"w\n\x0eRequestContext\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x12\n\nsandbox_id\x18\x02 \x01(\t\x12=\n\x13originating_process\x18\x03 \x01(\x0b\x32 .openshell.middleware.v1.Process\"l\n\x11HttpRequestTarget\x12\x0e\n\x06scheme\x18\x01 \x01(\t\x12\x0c\n\x04host\x18\x02 \x01(\t\x12\x0c\n\x04port\x18\x03 \x01(\r\x12\x0e\n\x06method\x18\x04 \x01(\t\x12\x0c\n\x04path\x18\x05 \x01(\t\x12\r\n\x05query\x18\x06 \x01(\t\"9\n\x07Process\x12\x0e\n\x06\x62inary\x18\x01 \x01(\t\x12\x0b\n\x03pid\x18\x02 \x01(\r\x12\x11\n\tancestors\x18\x03 \x03(\t\"[\n\x07\x46inding\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\r\n\x05label\x18\x02 \x01(\t\x12\r\n\x05\x63ount\x18\x03 \x01(\r\x12\x12\n\nconfidence\x18\x04 \x01(\t\x12\x10\n\x08severity\x18\x05 \x01(\t\"n\n\x0bWriteHeader\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x12\x42\n\x0bon_existing\x18\x03 \x01(\x0e\x32-.openshell.middleware.v1.ExistingHeaderAction\"\x1c\n\x0cRemoveHeader\x12\x0c\n\x04name\x18\x01 \x01(\t\"\x8d\x01\n\x0eHeaderMutation\x12\x35\n\x05write\x18\x01 \x01(\x0b\x32$.openshell.middleware.v1.WriteHeaderH\x00\x12\x37\n\x06remove\x18\x02 \x01(\x0b\x32%.openshell.middleware.v1.RemoveHeaderH\x00\x42\x0b\n\toperation\"\x81\x03\n\x11HttpRequestResult\x12\x33\n\x08\x64\x65\x63ision\x18\x01 \x01(\x0e\x32!.openshell.middleware.v1.Decision\x12\x0e\n\x06reason\x18\x02 \x01(\t\x12\x0c\n\x04\x62ody\x18\x03 \x01(\x0c\x12\x10\n\x08has_body\x18\x04 \x01(\x08\x12\x41\n\x10header_mutations\x18\x05 \x03(\x0b\x32\'.openshell.middleware.v1.HeaderMutation\x12\x32\n\x08\x66indings\x18\x06 \x03(\x0b\x32 .openshell.middleware.v1.Finding\x12J\n\x08metadata\x18\x07 \x03(\x0b\x32\x38.openshell.middleware.v1.HttpRequestResult.MetadataEntry\x12\x13\n\x0breason_code\x18\x08 \x01(\t\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01*\x82\x01\n\x1dSupervisorMiddlewareOperation\x12/\n+SUPERVISOR_MIDDLEWARE_OPERATION_UNSPECIFIED\x10\x00\x12\x30\n,SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_REQUEST\x10\x01*y\n\x19SupervisorMiddlewarePhase\x12+\n\'SUPERVISOR_MIDDLEWARE_PHASE_UNSPECIFIED\x10\x00\x12/\n+SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS\x10\x01*K\n\x08\x44\x65\x63ision\x12\x18\n\x14\x44\x45\x43ISION_UNSPECIFIED\x10\x00\x12\x12\n\x0e\x44\x45\x43ISION_ALLOW\x10\x01\x12\x11\n\rDECISION_DENY\x10\x02*\xa8\x01\n\x14\x45xistingHeaderAction\x12&\n\"EXISTING_HEADER_ACTION_UNSPECIFIED\x10\x00\x12!\n\x1d\x45XISTING_HEADER_ACTION_APPEND\x10\x01\x12$\n EXISTING_HEADER_ACTION_OVERWRITE\x10\x02\x12\x1f\n\x1b\x45XISTING_HEADER_ACTION_SKIP\x10\x03\x32\xcd\x02\n\x14SupervisorMiddleware\x12O\n\x08\x44\x65scribe\x12\x16.google.protobuf.Empty\x1a+.openshell.middleware.v1.MiddlewareManifest\x12q\n\x0eValidateConfig\x12..openshell.middleware.v1.ValidateConfigRequest\x1a/.openshell.middleware.v1.ValidateConfigResponse\x12q\n\x13\x45valuateHttpRequest\x12..openshell.middleware.v1.HttpRequestEvaluation\x1a*.openshell.middleware.v1.HttpRequestResultb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1bsupervisor_middleware.proto\x12\x17openshell.middleware.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1cgoogle/protobuf/struct.proto\"y\n\x12MiddlewareManifest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x17\n\x0fservice_version\x18\x02 \x01(\t\x12<\n\x08\x62indings\x18\x03 \x03(\x0b\x32*.openshell.middleware.v1.MiddlewareBinding\"\x81\x02\n\x11MiddlewareBinding\x12I\n\toperation\x18\x01 \x01(\x0e\x32\x36.openshell.middleware.v1.SupervisorMiddlewareOperation\x12\x41\n\x05phase\x18\x02 \x01(\x0e\x32\x32.openshell.middleware.v1.SupervisorMiddlewarePhase\x12\x16\n\x0emax_body_bytes\x18\x03 \x01(\x04\x12\x0f\n\x07timeout\x18\x04 \x01(\t\x12\x0f\n\x07harness\x18\x05 \x01(\t\x12\x0c\n\x04hook\x18\x06 \x01(\t\x12\x16\n\x0eschema_version\x18\x07 \x01(\t\"Y\n\x15ValidateConfigRequest\x12\'\n\x06\x63onfig\x18\x01 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x17\n\x0fmiddleware_name\x18\x02 \x01(\t\"7\n\x16ValidateConfigResponse\x12\r\n\x05valid\x18\x01 \x01(\x08\x12\x0e\n\x06reason\x18\x02 \x01(\t\"\xd6\x02\n\x15HttpRequestEvaluation\x12\x41\n\x05phase\x18\x01 \x01(\x0e\x32\x32.openshell.middleware.v1.SupervisorMiddlewarePhase\x12\x38\n\x07\x63ontext\x18\x02 \x01(\x0b\x32\'.openshell.middleware.v1.RequestContext\x12\'\n\x06\x63onfig\x18\x03 \x01(\x0b\x32\x17.google.protobuf.Struct\x12:\n\x06target\x18\x04 \x01(\x0b\x32*.openshell.middleware.v1.HttpRequestTarget\x12\x34\n\x07headers\x18\x05 \x03(\x0b\x32#.openshell.middleware.v1.HttpHeader\x12\x0c\n\x04\x62ody\x18\x06 \x01(\x0c\x12\x17\n\x0fmiddleware_name\x18\x07 \x01(\t\")\n\nHttpHeader\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"w\n\x0eRequestContext\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x12\n\nsandbox_id\x18\x02 \x01(\t\x12=\n\x13originating_process\x18\x03 \x01(\x0b\x32 .openshell.middleware.v1.Process\"l\n\x11HttpRequestTarget\x12\x0e\n\x06scheme\x18\x01 \x01(\t\x12\x0c\n\x04host\x18\x02 \x01(\t\x12\x0c\n\x04port\x18\x03 \x01(\r\x12\x0e\n\x06method\x18\x04 \x01(\t\x12\x0c\n\x04path\x18\x05 \x01(\t\x12\r\n\x05query\x18\x06 \x01(\t\"9\n\x07Process\x12\x0e\n\x06\x62inary\x18\x01 \x01(\t\x12\x0b\n\x03pid\x18\x02 \x01(\r\x12\x11\n\tancestors\x18\x03 \x03(\t\"\xa3\x01\n\x17\x41gentConversationTarget\x12\x0f\n\x07harness\x18\x01 \x01(\t\x12\x17\n\x0fharness_version\x18\x02 \x01(\t\x12\x0c\n\x04hook\x18\x03 \x01(\t\x12\x16\n\x0eschema_version\x18\x04 \x01(\t\x12\x0e\n\x06scheme\x18\x05 \x01(\t\x12\x0c\n\x04host\x18\x06 \x01(\t\x12\x0c\n\x04port\x18\x07 \x01(\r\x12\x0c\n\x04path\x18\x08 \x01(\t\"\xc9\x03\n\x1b\x41gentConversationEvaluation\x12\x41\n\x05phase\x18\x01 \x01(\x0e\x32\x32.openshell.middleware.v1.SupervisorMiddlewarePhase\x12\x38\n\x07\x63ontext\x18\x02 \x01(\x0b\x32\'.openshell.middleware.v1.RequestContext\x12\'\n\x06\x63onfig\x18\x03 \x01(\x0b\x32\x17.google.protobuf.Struct\x12@\n\x06target\x18\x04 \x01(\x0b\x32\x30.openshell.middleware.v1.AgentConversationTarget\x12\x17\n\x0fmiddleware_name\x18\x06 \x01(\t\x12\x12\n\nsession_id\x18\x07 \x01(\t\x12\x0f\n\x07turn_id\x18\x08 \x01(\t\x12\x14\n\x0crequest_body\x18\t \x01(\x0c\x12\x0e\n\x06source\x18\n \x01(\t\x12\x10\n\x08\x64\x65livery\x18\x0b \x01(\t\x12\x14\n\x0crequest_kind\x18\x0c \x01(\t\x12\x1c\n\x0f\x63\x61ndidate_index\x18\r \x01(\rH\x00\x88\x01\x01\x42\x12\n\x10_candidate_indexJ\x04\x08\x05\x10\x06\"\x83\x03\n\x17\x41gentConversationResult\x12\x33\n\x08\x64\x65\x63ision\x18\x01 \x01(\x0e\x32!.openshell.middleware.v1.Decision\x12\x0e\n\x06reason\x18\x02 \x01(\t\x12\x13\n\x0b\x61ttestation\x18\x05 \x01(\x0c\x12\x32\n\x08\x66indings\x18\x06 \x03(\x0b\x32 .openshell.middleware.v1.Finding\x12P\n\x08metadata\x18\x07 \x03(\x0b\x32>.openshell.middleware.v1.AgentConversationResult.MetadataEntry\x12\x13\n\x0breason_code\x18\x08 \x01(\t\x12\x18\n\x10replacement_body\x18\t \x01(\x0c\x12\x1c\n\x14has_replacement_body\x18\n \x01(\x08\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01J\x04\x08\x03\x10\x04J\x04\x08\x04\x10\x05\"[\n\x07\x46inding\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\r\n\x05label\x18\x02 \x01(\t\x12\r\n\x05\x63ount\x18\x03 \x01(\r\x12\x12\n\nconfidence\x18\x04 \x01(\t\x12\x10\n\x08severity\x18\x05 \x01(\t\"n\n\x0bWriteHeader\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x12\x42\n\x0bon_existing\x18\x03 \x01(\x0e\x32-.openshell.middleware.v1.ExistingHeaderAction\"\x1c\n\x0cRemoveHeader\x12\x0c\n\x04name\x18\x01 \x01(\t\"\x8d\x01\n\x0eHeaderMutation\x12\x35\n\x05write\x18\x01 \x01(\x0b\x32$.openshell.middleware.v1.WriteHeaderH\x00\x12\x37\n\x06remove\x18\x02 \x01(\x0b\x32%.openshell.middleware.v1.RemoveHeaderH\x00\x42\x0b\n\toperation\"\x81\x03\n\x11HttpRequestResult\x12\x33\n\x08\x64\x65\x63ision\x18\x01 \x01(\x0e\x32!.openshell.middleware.v1.Decision\x12\x0e\n\x06reason\x18\x02 \x01(\t\x12\x0c\n\x04\x62ody\x18\x03 \x01(\x0c\x12\x10\n\x08has_body\x18\x04 \x01(\x08\x12\x41\n\x10header_mutations\x18\x05 \x03(\x0b\x32\'.openshell.middleware.v1.HeaderMutation\x12\x32\n\x08\x66indings\x18\x06 \x03(\x0b\x32 .openshell.middleware.v1.Finding\x12J\n\x08metadata\x18\x07 \x03(\x0b\x32\x38.openshell.middleware.v1.HttpRequestResult.MetadataEntry\x12\x13\n\x0breason_code\x18\x08 \x01(\t\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01*\xba\x01\n\x1dSupervisorMiddlewareOperation\x12/\n+SUPERVISOR_MIDDLEWARE_OPERATION_UNSPECIFIED\x10\x00\x12\x30\n,SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_REQUEST\x10\x01\x12\x36\n2SUPERVISOR_MIDDLEWARE_OPERATION_AGENT_CONVERSATION\x10\x02*\xa8\x01\n\x19SupervisorMiddlewarePhase\x12+\n\'SUPERVISOR_MIDDLEWARE_PHASE_UNSPECIFIED\x10\x00\x12/\n+SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS\x10\x01\x12-\n)SUPERVISOR_MIDDLEWARE_PHASE_AGENT_CONTEXT\x10\x02*K\n\x08\x44\x65\x63ision\x12\x18\n\x14\x44\x45\x43ISION_UNSPECIFIED\x10\x00\x12\x12\n\x0e\x44\x45\x43ISION_ALLOW\x10\x01\x12\x11\n\rDECISION_DENY\x10\x02*\xa8\x01\n\x14\x45xistingHeaderAction\x12&\n\"EXISTING_HEADER_ACTION_UNSPECIFIED\x10\x00\x12!\n\x1d\x45XISTING_HEADER_ACTION_APPEND\x10\x01\x12$\n EXISTING_HEADER_ACTION_OVERWRITE\x10\x02\x12\x1f\n\x1b\x45XISTING_HEADER_ACTION_SKIP\x10\x03\x32\xd3\x03\n\x14SupervisorMiddleware\x12O\n\x08\x44\x65scribe\x12\x16.google.protobuf.Empty\x1a+.openshell.middleware.v1.MiddlewareManifest\x12q\n\x0eValidateConfig\x12..openshell.middleware.v1.ValidateConfigRequest\x1a/.openshell.middleware.v1.ValidateConfigResponse\x12q\n\x13\x45valuateHttpRequest\x12..openshell.middleware.v1.HttpRequestEvaluation\x1a*.openshell.middleware.v1.HttpRequestResult\x12\x83\x01\n\x19\x45valuateAgentConversation\x12\x34.openshell.middleware.v1.AgentConversationEvaluation\x1a\x30.openshell.middleware.v1.AgentConversationResultb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'supervisor_middleware_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
+  _globals['_AGENTCONVERSATIONRESULT_METADATAENTRY']._loaded_options = None
+  _globals['_AGENTCONVERSATIONRESULT_METADATAENTRY']._serialized_options = b'8\001'
   _globals['_HTTPREQUESTRESULT_METADATAENTRY']._loaded_options = None
   _globals['_HTTPREQUESTRESULT_METADATAENTRY']._serialized_options = b'8\001'
-  _globals['_SUPERVISORMIDDLEWAREOPERATION']._serialized_start=2037
-  _globals['_SUPERVISORMIDDLEWAREOPERATION']._serialized_end=2167
-  _globals['_SUPERVISORMIDDLEWAREPHASE']._serialized_start=2169
-  _globals['_SUPERVISORMIDDLEWAREPHASE']._serialized_end=2290
-  _globals['_DECISION']._serialized_start=2292
-  _globals['_DECISION']._serialized_end=2367
-  _globals['_EXISTINGHEADERACTION']._serialized_start=2370
-  _globals['_EXISTINGHEADERACTION']._serialized_end=2538
+  _globals['_SUPERVISORMIDDLEWAREOPERATION']._serialized_start=3108
+  _globals['_SUPERVISORMIDDLEWAREOPERATION']._serialized_end=3294
+  _globals['_SUPERVISORMIDDLEWAREPHASE']._serialized_start=3297
+  _globals['_SUPERVISORMIDDLEWAREPHASE']._serialized_end=3465
+  _globals['_DECISION']._serialized_start=3467
+  _globals['_DECISION']._serialized_end=3542
+  _globals['_EXISTINGHEADERACTION']._serialized_start=3545
+  _globals['_EXISTINGHEADERACTION']._serialized_end=3713
   _globals['_MIDDLEWAREMANIFEST']._serialized_start=115
   _globals['_MIDDLEWAREMANIFEST']._serialized_end=236
   _globals['_MIDDLEWAREBINDING']._serialized_start=239
-  _globals['_MIDDLEWAREBINDING']._serialized_end=441
-  _globals['_VALIDATECONFIGREQUEST']._serialized_start=443
-  _globals['_VALIDATECONFIGREQUEST']._serialized_end=532
-  _globals['_VALIDATECONFIGRESPONSE']._serialized_start=534
-  _globals['_VALIDATECONFIGRESPONSE']._serialized_end=589
-  _globals['_HTTPREQUESTEVALUATION']._serialized_start=592
-  _globals['_HTTPREQUESTEVALUATION']._serialized_end=934
-  _globals['_HTTPHEADER']._serialized_start=936
-  _globals['_HTTPHEADER']._serialized_end=977
-  _globals['_REQUESTCONTEXT']._serialized_start=979
-  _globals['_REQUESTCONTEXT']._serialized_end=1098
-  _globals['_HTTPREQUESTTARGET']._serialized_start=1100
-  _globals['_HTTPREQUESTTARGET']._serialized_end=1208
-  _globals['_PROCESS']._serialized_start=1210
-  _globals['_PROCESS']._serialized_end=1267
-  _globals['_FINDING']._serialized_start=1269
-  _globals['_FINDING']._serialized_end=1360
-  _globals['_WRITEHEADER']._serialized_start=1362
-  _globals['_WRITEHEADER']._serialized_end=1472
-  _globals['_REMOVEHEADER']._serialized_start=1474
-  _globals['_REMOVEHEADER']._serialized_end=1502
-  _globals['_HEADERMUTATION']._serialized_start=1505
-  _globals['_HEADERMUTATION']._serialized_end=1646
-  _globals['_HTTPREQUESTRESULT']._serialized_start=1649
-  _globals['_HTTPREQUESTRESULT']._serialized_end=2034
-  _globals['_HTTPREQUESTRESULT_METADATAENTRY']._serialized_start=1987
-  _globals['_HTTPREQUESTRESULT_METADATAENTRY']._serialized_end=2034
-  _globals['_SUPERVISORMIDDLEWARE']._serialized_start=2541
-  _globals['_SUPERVISORMIDDLEWARE']._serialized_end=2874
+  _globals['_MIDDLEWAREBINDING']._serialized_end=496
+  _globals['_VALIDATECONFIGREQUEST']._serialized_start=498
+  _globals['_VALIDATECONFIGREQUEST']._serialized_end=587
+  _globals['_VALIDATECONFIGRESPONSE']._serialized_start=589
+  _globals['_VALIDATECONFIGRESPONSE']._serialized_end=644
+  _globals['_HTTPREQUESTEVALUATION']._serialized_start=647
+  _globals['_HTTPREQUESTEVALUATION']._serialized_end=989
+  _globals['_HTTPHEADER']._serialized_start=991
+  _globals['_HTTPHEADER']._serialized_end=1032
+  _globals['_REQUESTCONTEXT']._serialized_start=1034
+  _globals['_REQUESTCONTEXT']._serialized_end=1153
+  _globals['_HTTPREQUESTTARGET']._serialized_start=1155
+  _globals['_HTTPREQUESTTARGET']._serialized_end=1263
+  _globals['_PROCESS']._serialized_start=1265
+  _globals['_PROCESS']._serialized_end=1322
+  _globals['_AGENTCONVERSATIONTARGET']._serialized_start=1325
+  _globals['_AGENTCONVERSATIONTARGET']._serialized_end=1488
+  _globals['_AGENTCONVERSATIONEVALUATION']._serialized_start=1491
+  _globals['_AGENTCONVERSATIONEVALUATION']._serialized_end=1948
+  _globals['_AGENTCONVERSATIONRESULT']._serialized_start=1951
+  _globals['_AGENTCONVERSATIONRESULT']._serialized_end=2338
+  _globals['_AGENTCONVERSATIONRESULT_METADATAENTRY']._serialized_start=2279
+  _globals['_AGENTCONVERSATIONRESULT_METADATAENTRY']._serialized_end=2326
+  _globals['_FINDING']._serialized_start=2340
+  _globals['_FINDING']._serialized_end=2431
+  _globals['_WRITEHEADER']._serialized_start=2433
+  _globals['_WRITEHEADER']._serialized_end=2543
+  _globals['_REMOVEHEADER']._serialized_start=2545
+  _globals['_REMOVEHEADER']._serialized_end=2573
+  _globals['_HEADERMUTATION']._serialized_start=2576
+  _globals['_HEADERMUTATION']._serialized_end=2717
+  _globals['_HTTPREQUESTRESULT']._serialized_start=2720
+  _globals['_HTTPREQUESTRESULT']._serialized_end=3105
+  _globals['_HTTPREQUESTRESULT_METADATAENTRY']._serialized_start=2279
+  _globals['_HTTPREQUESTRESULT_METADATAENTRY']._serialized_end=2326
+  _globals['_SUPERVISORMIDDLEWARE']._serialized_start=3716
+  _globals['_SUPERVISORMIDDLEWARE']._serialized_end=4183
 # @@protoc_insertion_point(module_scope)

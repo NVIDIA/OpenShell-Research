@@ -167,6 +167,17 @@ def serve(
             ),
         ),
     ] = f"{DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING:g}s",
+    require_pi_receipt: Annotated[
+        bool,
+        typer.Option(
+            "--require-pi-receipt/--no-require-pi-receipt",
+            help=(
+                "Require and verify a matching Pi rendered-prompt receipt "
+                "on HTTP egress. Enabled by default; disable only for an "
+                "explicitly unmanaged deployment."
+            ),
+        ),
+    ] = True,
 ) -> None:
     """Start the Egress Gate gRPC service and run until shutdown."""
     options = _command_options(context)
@@ -209,6 +220,7 @@ def serve(
         EgressGateServer(
             options.registry,
             timeout_middleware_processing=timeout_middleware_processing,
+            require_pi_receipt=require_pi_receipt,
         ).serve_sync(listen)
     except EgressGateError as error:
         _render_egress_error("Egress Gate could not start", error)

@@ -13,11 +13,13 @@ class SupervisorMiddlewareOperation(int, metaclass=_enum_type_wrapper.EnumTypeWr
     __slots__ = ()
     SUPERVISOR_MIDDLEWARE_OPERATION_UNSPECIFIED: _ClassVar[SupervisorMiddlewareOperation]
     SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_REQUEST: _ClassVar[SupervisorMiddlewareOperation]
+    SUPERVISOR_MIDDLEWARE_OPERATION_AGENT_CONVERSATION: _ClassVar[SupervisorMiddlewareOperation]
 
 class SupervisorMiddlewarePhase(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     SUPERVISOR_MIDDLEWARE_PHASE_UNSPECIFIED: _ClassVar[SupervisorMiddlewarePhase]
     SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS: _ClassVar[SupervisorMiddlewarePhase]
+    SUPERVISOR_MIDDLEWARE_PHASE_AGENT_CONTEXT: _ClassVar[SupervisorMiddlewarePhase]
 
 class Decision(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -33,8 +35,10 @@ class ExistingHeaderAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     EXISTING_HEADER_ACTION_SKIP: _ClassVar[ExistingHeaderAction]
 SUPERVISOR_MIDDLEWARE_OPERATION_UNSPECIFIED: SupervisorMiddlewareOperation
 SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_REQUEST: SupervisorMiddlewareOperation
+SUPERVISOR_MIDDLEWARE_OPERATION_AGENT_CONVERSATION: SupervisorMiddlewareOperation
 SUPERVISOR_MIDDLEWARE_PHASE_UNSPECIFIED: SupervisorMiddlewarePhase
 SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS: SupervisorMiddlewarePhase
+SUPERVISOR_MIDDLEWARE_PHASE_AGENT_CONTEXT: SupervisorMiddlewarePhase
 DECISION_UNSPECIFIED: Decision
 DECISION_ALLOW: Decision
 DECISION_DENY: Decision
@@ -54,16 +58,22 @@ class MiddlewareManifest(_message.Message):
     def __init__(self, name: _Optional[str] = ..., service_version: _Optional[str] = ..., bindings: _Optional[_Iterable[_Union[MiddlewareBinding, _Mapping]]] = ...) -> None: ...
 
 class MiddlewareBinding(_message.Message):
-    __slots__ = ("operation", "phase", "max_body_bytes", "timeout")
+    __slots__ = ("operation", "phase", "max_body_bytes", "timeout", "harness", "hook", "schema_version")
     OPERATION_FIELD_NUMBER: _ClassVar[int]
     PHASE_FIELD_NUMBER: _ClassVar[int]
     MAX_BODY_BYTES_FIELD_NUMBER: _ClassVar[int]
     TIMEOUT_FIELD_NUMBER: _ClassVar[int]
+    HARNESS_FIELD_NUMBER: _ClassVar[int]
+    HOOK_FIELD_NUMBER: _ClassVar[int]
+    SCHEMA_VERSION_FIELD_NUMBER: _ClassVar[int]
     operation: SupervisorMiddlewareOperation
     phase: SupervisorMiddlewarePhase
     max_body_bytes: int
     timeout: str
-    def __init__(self, operation: _Optional[_Union[SupervisorMiddlewareOperation, str]] = ..., phase: _Optional[_Union[SupervisorMiddlewarePhase, str]] = ..., max_body_bytes: _Optional[int] = ..., timeout: _Optional[str] = ...) -> None: ...
+    harness: str
+    hook: str
+    schema_version: str
+    def __init__(self, operation: _Optional[_Union[SupervisorMiddlewareOperation, str]] = ..., phase: _Optional[_Union[SupervisorMiddlewarePhase, str]] = ..., max_body_bytes: _Optional[int] = ..., timeout: _Optional[str] = ..., harness: _Optional[str] = ..., hook: _Optional[str] = ..., schema_version: _Optional[str] = ...) -> None: ...
 
 class ValidateConfigRequest(_message.Message):
     __slots__ = ("config", "middleware_name")
@@ -142,6 +152,81 @@ class Process(_message.Message):
     pid: int
     ancestors: _containers.RepeatedScalarFieldContainer[str]
     def __init__(self, binary: _Optional[str] = ..., pid: _Optional[int] = ..., ancestors: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class AgentConversationTarget(_message.Message):
+    __slots__ = ("harness", "harness_version", "hook", "schema_version", "scheme", "host", "port", "path")
+    HARNESS_FIELD_NUMBER: _ClassVar[int]
+    HARNESS_VERSION_FIELD_NUMBER: _ClassVar[int]
+    HOOK_FIELD_NUMBER: _ClassVar[int]
+    SCHEMA_VERSION_FIELD_NUMBER: _ClassVar[int]
+    SCHEME_FIELD_NUMBER: _ClassVar[int]
+    HOST_FIELD_NUMBER: _ClassVar[int]
+    PORT_FIELD_NUMBER: _ClassVar[int]
+    PATH_FIELD_NUMBER: _ClassVar[int]
+    harness: str
+    harness_version: str
+    hook: str
+    schema_version: str
+    scheme: str
+    host: str
+    port: int
+    path: str
+    def __init__(self, harness: _Optional[str] = ..., harness_version: _Optional[str] = ..., hook: _Optional[str] = ..., schema_version: _Optional[str] = ..., scheme: _Optional[str] = ..., host: _Optional[str] = ..., port: _Optional[int] = ..., path: _Optional[str] = ...) -> None: ...
+
+class AgentConversationEvaluation(_message.Message):
+    __slots__ = ("phase", "context", "config", "target", "middleware_name", "session_id", "turn_id", "request_body", "source", "delivery", "request_kind", "candidate_index")
+    PHASE_FIELD_NUMBER: _ClassVar[int]
+    CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    CONFIG_FIELD_NUMBER: _ClassVar[int]
+    TARGET_FIELD_NUMBER: _ClassVar[int]
+    MIDDLEWARE_NAME_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    TURN_ID_FIELD_NUMBER: _ClassVar[int]
+    REQUEST_BODY_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_FIELD_NUMBER: _ClassVar[int]
+    DELIVERY_FIELD_NUMBER: _ClassVar[int]
+    REQUEST_KIND_FIELD_NUMBER: _ClassVar[int]
+    CANDIDATE_INDEX_FIELD_NUMBER: _ClassVar[int]
+    phase: SupervisorMiddlewarePhase
+    context: RequestContext
+    config: _struct_pb2.Struct
+    target: AgentConversationTarget
+    middleware_name: str
+    session_id: str
+    turn_id: str
+    request_body: bytes
+    source: str
+    delivery: str
+    request_kind: str
+    candidate_index: int
+    def __init__(self, phase: _Optional[_Union[SupervisorMiddlewarePhase, str]] = ..., context: _Optional[_Union[RequestContext, _Mapping]] = ..., config: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., target: _Optional[_Union[AgentConversationTarget, _Mapping]] = ..., middleware_name: _Optional[str] = ..., session_id: _Optional[str] = ..., turn_id: _Optional[str] = ..., request_body: _Optional[bytes] = ..., source: _Optional[str] = ..., delivery: _Optional[str] = ..., request_kind: _Optional[str] = ..., candidate_index: _Optional[int] = ...) -> None: ...
+
+class AgentConversationResult(_message.Message):
+    __slots__ = ("decision", "reason", "attestation", "findings", "metadata", "reason_code", "replacement_body", "has_replacement_body")
+    class MetadataEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    DECISION_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    ATTESTATION_FIELD_NUMBER: _ClassVar[int]
+    FINDINGS_FIELD_NUMBER: _ClassVar[int]
+    METADATA_FIELD_NUMBER: _ClassVar[int]
+    REASON_CODE_FIELD_NUMBER: _ClassVar[int]
+    REPLACEMENT_BODY_FIELD_NUMBER: _ClassVar[int]
+    HAS_REPLACEMENT_BODY_FIELD_NUMBER: _ClassVar[int]
+    decision: Decision
+    reason: str
+    attestation: bytes
+    findings: _containers.RepeatedCompositeFieldContainer[Finding]
+    metadata: _containers.ScalarMap[str, str]
+    reason_code: str
+    replacement_body: bytes
+    has_replacement_body: bool
+    def __init__(self, decision: _Optional[_Union[Decision, str]] = ..., reason: _Optional[str] = ..., attestation: _Optional[bytes] = ..., findings: _Optional[_Iterable[_Union[Finding, _Mapping]]] = ..., metadata: _Optional[_Mapping[str, str]] = ..., reason_code: _Optional[str] = ..., replacement_body: _Optional[bytes] = ..., has_replacement_body: _Optional[bool] = ...) -> None: ...
 
 class Finding(_message.Message):
     __slots__ = ("type", "label", "count", "confidence", "severity")
