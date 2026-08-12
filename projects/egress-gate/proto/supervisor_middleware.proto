@@ -9,7 +9,7 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/struct.proto";
 
 // SupervisorMiddleware lets an operator-run service inspect and transform
-// sandbox HTTP egress before OpenShell injects credentials.
+// sandbox HTTP egress or evaluate a supported agent-harness request.
 service SupervisorMiddleware {
   // Describe returns the service manifest and declared bindings.
   rpc Describe(google.protobuf.Empty) returns (MiddlewareManifest);
@@ -20,6 +20,10 @@ service SupervisorMiddleware {
   // EvaluateHttpRequest returns an allow, deny, or mutation decision for one
   // buffered HTTP request.
   rpc EvaluateHttpRequest(HttpRequestEvaluation) returns (HttpRequestResult);
+
+  // EvaluateAgentConversation returns an allow, deny, or replacement decision for
+  // one versioned, harness-native request before the harness commits or sends it.
+  rpc EvaluateAgentConversation(AgentConversationEvaluation) returns (AgentConversationResult);
 }
 
 // MiddlewareManifest describes one middleware service and the bindings it
@@ -38,9 +42,9 @@ message MiddlewareManifest {
 
 // MiddlewareBinding declares one operation and phase supported by a service.
 message MiddlewareBinding {
-  // Supported operation. V1 supports HTTP_REQUEST.
+  // Supported operation.
   SupervisorMiddlewareOperation operation = 1;
-  // Supported evaluation phase. V1 supports PRE_CREDENTIALS.
+  // Supported evaluation phase.
   SupervisorMiddlewarePhase phase = 2;
   // Maximum request or replacement body this binding can process.
   uint64 max_body_bytes = 3;
@@ -50,6 +54,12 @@ message MiddlewareBinding {
   // Values use an integer with an `ms` or `s` suffix and must be between
   // 10ms and 30s.
   string timeout = 4;
+  // Agent harness supported by an AGENT_CONVERSATION binding. Empty for HTTP_REQUEST.
+  string harness = 5;
+  // Harness hook supported by an AGENT_CONVERSATION binding. Empty for HTTP_REQUEST.
+  string hook = 6;
+  // Version of the harness-native request schema. Empty for HTTP_REQUEST.
+  string schema_version = 7;
 }
 
 // ValidateConfigRequest contains one policy configuration to validate.
@@ -104,12 +114,14 @@ message HttpHeader {
 enum SupervisorMiddlewareOperation {
   SUPERVISOR_MIDDLEWARE_OPERATION_UNSPECIFIED = 0;
   SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_REQUEST = 1;
+  SUPERVISOR_MIDDLEWARE_OPERATION_AGENT_CONVERSATION = 2;
 }
 
 // Ordered phase within a supervisor operation.
 enum SupervisorMiddlewarePhase {
   SUPERVISOR_MIDDLEWARE_PHASE_UNSPECIFIED = 0;
   SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS = 1;
+  SUPERVISOR_MIDDLEWARE_PHASE_AGENT_CONTEXT = 2;
 }
 
 // RequestContext identifies the sandbox request being evaluated.
@@ -146,6 +158,51 @@ message Process {
   uint32 pid = 2;
   // Executable paths for ancestor processes, nearest parent first.
   repeated string ancestors = 3;
+}
+
+// AgentConversationTarget identifies the harness hook and provider destination for
+// which an allowed model request may receive a receipt.
+message AgentConversationTarget {
+  string harness = 1;
+  string harness_version = 2;
+  string hook = 3;
+  string schema_version = 4;
+  string scheme = 5;
+  string host = 6;
+  uint32 port = 7;
+  string path = 8;
+}
+
+// AgentConversationEvaluation is stamped by the supervisor-owned bridge. Workload
+// callers supply only the harness request and untrusted request provenance.
+message AgentConversationEvaluation {
+  SupervisorMiddlewarePhase phase = 1;
+  RequestContext context = 2;
+  google.protobuf.Struct config = 3;
+  AgentConversationTarget target = 4;
+  reserved 5;
+  string middleware_name = 6;
+  string session_id = 7;
+  string turn_id = 8;
+  bytes request_body = 9;
+  string source = 10;
+  string delivery = 11;
+  string request_kind = 12;
+  optional uint32 candidate_index = 13;
+}
+
+// AgentConversationResult carries the authority decision, an optional complete
+// replacement body, and a model-request receipt opaque to OpenShell.
+message AgentConversationResult {
+  Decision decision = 1;
+  string reason = 2;
+  reserved 3, 4;
+  bytes attestation = 5;
+  repeated Finding findings = 6;
+  map<string, string> metadata = 7;
+  string reason_code = 8;
+  bytes replacement_body = 9;
+  bool has_replacement_body = 10;
 }
 
 // Decision controls whether OpenShell continues processing the request.

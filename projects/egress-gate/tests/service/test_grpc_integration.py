@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -13,6 +14,10 @@ import pytest
 from google.protobuf import empty_pb2, json_format, message_factory
 from google.protobuf.message import Message
 
+from egress_gate.admission import (
+    PiInputV1,
+    canonical_json_bytes,
+)
 from egress_gate.bindings import supervisor_middleware_pb2 as pb2
 from egress_gate.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
 from egress_gate.errors import EgressGateError, ErrorCode
@@ -151,6 +156,152 @@ async def test_generated_stub_round_trip_covers_manifest_and_gate_actions() -> N
     assert len(detected.findings) == 1
     assert denied.decision == pb2.DECISION_DENY
     assert denied.reason_code == "egress_gate_regex_denied"
+
+
+@pytest.mark.asyncio
+async def test_generated_stub_issues_a_rendered_prompt_receipt() -> None:
+    body = canonical_json_bytes(
+        PiInputV1(schema_version="openshell.pi-input.v1", text="safe")
+    )
+    request = pb2.AgentConversationEvaluation(
+        phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_AGENT_CONTEXT,
+        context=pb2.RequestContext(request_id="admission-1", sandbox_id="sandbox"),
+        config=_config(action_kind="detect"),
+        target=pb2.AgentConversationTarget(
+            harness="pi",
+            harness_version="extension-v1",
+            hook="rendered_prompt_admission",
+            schema_version="openshell.pi-input.v1",
+            scheme="https",
+            host="provider.invalid",
+            port=443,
+            path="/v1/chat/completions",
+        ),
+        middleware_name="pi-egress",
+        session_id="session-1",
+        turn_id="submission-1",
+        request_body=body,
+    )
+    middleware = EgressGateMiddleware(
+        create_builtin_registry(), require_pi_receipt=True
+    )
+    async with _running_stub(middleware) as (stub, _):
+        response = await stub.EvaluateAgentConversation(request)
+
+    assert response.decision == pb2.DECISION_ALLOW
+    assert response.attestation.startswith(b"eg1.")
+    assert response.has_replacement_body is False
+    assert response.metadata["admission_schema"] == "openshell.pi-input.v1"
+
+
+@pytest.mark.asyncio
+async def test_agent_admission_is_unavailable_when_receipt_enforcement_is_off() -> None:
+    request = pb2.AgentConversationEvaluation(
+        phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_AGENT_CONTEXT
+    )
+    middleware = EgressGateMiddleware(create_builtin_registry())
+    async with _running_stub(middleware) as (stub, _):
+        response = await stub.EvaluateAgentConversation(request)
+
+    assert response.decision == pb2.DECISION_DENY
+    assert response.reason_code == "admission_unavailable"
+
+
+@pytest.mark.asyncio
+async def test_admission_receipt_is_verified_and_stripped_for_http_egress() -> None:
+    pi_body = canonical_json_bytes(
+        PiInputV1(schema_version="openshell.pi-input.v1", text="safe")
+    )
+    admission = pb2.AgentConversationEvaluation(
+        phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_AGENT_CONTEXT,
+        context=pb2.RequestContext(request_id="admission-2", sandbox_id="sandbox"),
+        config=_config(action_kind="detect"),
+        target=pb2.AgentConversationTarget(
+            harness="pi",
+            harness_version="extension-v1",
+            hook="rendered_prompt_admission",
+            schema_version="openshell.pi-input.v1",
+            scheme="https",
+            host="provider.invalid",
+            port=443,
+            path="/v1/chat/completions",
+        ),
+        middleware_name="pi-egress",
+        session_id="session-1",
+        turn_id="submission-2",
+        request_body=pi_body,
+    )
+    provider_body = json.dumps(
+        {
+            "model": "fixture-model",
+            "messages": [
+                {"role": "system", "content": "system"},
+                {"role": "user", "content": "safe"},
+            ],
+            "temperature": 0,
+            "max_completion_tokens": 128,
+            "tool_choice": "auto",
+            "stream": True,
+            "stream_options": {"include_usage": True},
+            "store": False,
+            "prompt_cache_key": "session-1",
+        },
+        separators=(",", ":"),
+    ).encode()
+    middleware = EgressGateMiddleware(
+        create_builtin_registry(), require_pi_receipt=True
+    )
+    async with _running_stub(middleware) as (stub, _):
+        admitted = await stub.EvaluateAgentConversation(admission)
+        network = _evaluation(provider_body, action_kind="detect")
+        network.context.request_id = "network-2"
+        network.target.host = "provider.invalid"
+        network.target.path = "/v1/chat/completions"
+        network.middleware_name = "pi-egress"
+        network.headers.extend(
+            [
+                pb2.HttpHeader(name="content-type", value="application/json"),
+                pb2.HttpHeader(
+                    name="x-openshell-middleware-egress-receipt",
+                    value=admitted.attestation.decode("ascii"),
+                ),
+            ]
+        )
+        allowed = await stub.EvaluateHttpRequest(network)
+        missing = _evaluation(provider_body, action_kind="detect")
+        missing.target.host = "provider.invalid"
+        missing.target.path = "/v1/chat/completions"
+        missing.middleware_name = "pi-egress"
+        missing.headers.append(
+            pb2.HttpHeader(name="content-type", value="application/json")
+        )
+        denied = await stub.EvaluateHttpRequest(missing)
+
+    assert allowed.decision == pb2.DECISION_ALLOW
+    assert (
+        allowed.header_mutations[0].remove.name
+        == "x-openshell-middleware-egress-receipt"
+    )
+    assert denied.decision == pb2.DECISION_DENY
+    assert denied.reason_code == "receipt_missing"
+
+
+@pytest.mark.asyncio
+async def test_unmanaged_http_rejects_the_reserved_receipt_header() -> None:
+    middleware = EgressGateMiddleware(create_builtin_registry())
+    request = _evaluation(b"safe", action_kind="detect")
+    request.headers.append(
+        pb2.HttpHeader(
+            name="X-OpenShell-Middleware-Egress-Receipt",
+            value="eg1.untrusted",
+        )
+    )
+
+    async with _running_stub(middleware) as (stub, _):
+        response = await stub.EvaluateHttpRequest(request)
+
+    assert response.decision == pb2.DECISION_DENY
+    assert response.reason_code == "reserved_receipt_header"
 
 
 @pytest.mark.asyncio

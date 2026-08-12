@@ -74,8 +74,9 @@ def test_cli_serve_uses_one_concise_processing_timeout(
             registry: GateRegistry,
             *,
             timeout_middleware_processing: float,
+            require_pi_receipt: bool = False,
         ) -> None:
-            del registry
+            del registry, require_pi_receipt
             self.timeout_middleware_processing = timeout_middleware_processing
 
         def serve_sync(self, listen: str) -> None:
@@ -535,8 +536,9 @@ def test_cli_removal_forgets_registration_before_later_serve(
             registry: GateRegistry,
             *,
             timeout_middleware_processing: float,
+            require_pi_receipt: bool = False,
         ) -> None:
-            del registry, timeout_middleware_processing
+            del registry, timeout_middleware_processing, require_pi_receipt
 
         def serve_sync(self, listen: str) -> None:
             calls.append(listen)

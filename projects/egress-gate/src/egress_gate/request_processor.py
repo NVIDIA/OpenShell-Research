@@ -92,6 +92,11 @@ class RequestProcessor:
         self._gates = gates
         self._policy_fingerprint = policy_fingerprint
 
+    @property
+    def policy_fingerprint(self) -> str | None:
+        """Return the immutable fingerprint of the prepared policy."""
+        return self._policy_fingerprint
+
     def process(self, request: HttpRequest, *, timeout: Timeout) -> EgressResult:
         """Evaluate one request and return an atomic final domain result."""
         if not isinstance(request, HttpRequest):

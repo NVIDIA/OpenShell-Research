@@ -26,6 +26,22 @@ HeaderName = Annotated[ScalarString, Field(min_length=1)]
 HeaderValue = ScalarString
 
 
+class EnforcementPoint(StrEnum):
+    """The trusted boundary at which a request is being evaluated."""
+
+    NETWORK_EGRESS = "network_egress"
+    HARNESS_ADMISSION = "harness_admission"
+
+
+class HarnessAdmissionMetadata(StrictDomainModel):
+    """Bounded harness-shape metadata stamped by the trusted transport."""
+
+    harness: ScalarString
+    harness_version: ScalarString
+    hook: ScalarString
+    schema_version: ScalarString
+
+
 class Process(StrictDomainModel):
     """The originating workload process and its executable ancestry."""
 
@@ -40,6 +56,8 @@ class RequestContext(StrictDomainModel):
     request_id: ScalarString
     sandbox_id: ScalarString
     originating_process: Process | None = None
+    enforcement_point: EnforcementPoint = EnforcementPoint.NETWORK_EGRESS
+    harness_admission: HarnessAdmissionMetadata | None = None
 
     @model_validator(mode="after")
     def _context_strings_are_bounded(self) -> RequestContext:
@@ -52,8 +70,23 @@ class RequestContext(StrictDomainModel):
                 len(ancestor.encode("utf-8"))
                 for ancestor in self.originating_process.ancestors
             )
+        if self.harness_admission is not None:
+            string_bytes += sum(
+                len(value.encode("utf-8"))
+                for value in (
+                    self.harness_admission.harness,
+                    self.harness_admission.harness_version,
+                    self.harness_admission.hook,
+                    self.harness_admission.schema_version,
+                )
+            )
         if string_bytes > MAX_PROTO_CONTEXT_BYTES:
             raise ValueError("request context strings exceed the size limit")
+        if self.enforcement_point is EnforcementPoint.HARNESS_ADMISSION:
+            if self.harness_admission is None:
+                raise ValueError("harness admission requires trusted metadata")
+        elif self.harness_admission is not None:
+            raise ValueError("network egress cannot carry harness metadata")
         return self
 
 
@@ -178,10 +211,12 @@ class RequestMutations(StrictDomainModel):
 
 
 __all__ = [
+    "EnforcementPoint",
     "ExistingHeaderAction",
     "HeaderMutation",
     "HeaderName",
     "HeaderValue",
+    "HarnessAdmissionMetadata",
     "HttpHeader",
     "HttpRequest",
     "HttpTarget",
