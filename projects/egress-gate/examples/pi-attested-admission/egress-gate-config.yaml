@@ -1,0 +1,29 @@
+gates:
+  - name: deny-marker
+    kind: regex
+    scan:
+      kind: body
+      action:
+        kind: deny
+    pattern_catalog:
+      entities:
+        - name: unsafe-marker
+          rules:
+            - name: exact-deny-marker
+              pattern: OPEN_SHELL_ADMISSION_DENY_TEST
+              confidence: high
+  - name: replace-marker
+    kind: regex
+    scan:
+      kind: body
+      action:
+        kind: replace
+        template: "[REDACTED]"
+    pattern_catalog:
+      entities:
+        - name: replacement-marker
+          rules:
+            - name: exact-replacement-marker
+              pattern: OPEN_SHELL_ADMISSION_REPLACE_TEST
+              confidence: high
+default_decision: allow
