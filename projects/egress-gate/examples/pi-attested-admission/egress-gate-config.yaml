@@ -10,7 +10,7 @@ gates:
         - name: unsafe-marker
           rules:
             - name: exact-deny-marker
-              pattern: OPEN_SHELL_ADMISSION_DENY_TEST
+              pattern: DENY_THIS
               confidence: high
   - name: replace-marker
     kind: regex
@@ -24,6 +24,6 @@ gates:
         - name: replacement-marker
           rules:
             - name: exact-replacement-marker
-              pattern: OPEN_SHELL_ADMISSION_REPLACE_TEST
+              pattern: REDACT_THIS
               confidence: high
 default_decision: allow
