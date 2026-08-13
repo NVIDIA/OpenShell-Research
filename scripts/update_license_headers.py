@@ -19,6 +19,7 @@ SKIP_PATTERNS = frozenset(
         ".egg-info",
         ".git",
         ".pytest_cache",
+        "/bindings/",
         "node_modules",
         ".venv",
         "venv",
@@ -396,7 +397,7 @@ if __name__ == "__main__":
     total_processed = total_updated = total_skipped = 0
 
     # Process root-level directories
-    for folder in ["docs", "scripts", "tests_e2e"]:
+    for folder in ["dev-tools", "docs", "projects", "scripts", "tests_e2e"]:
         folder_path = repo_path / folder
         if not folder_path.exists():
             continue

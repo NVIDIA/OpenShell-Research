@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """Background tool orchestrator for non-blocking tool execution.
 
 Allows tools to run long operations asynchronously while the robot
