@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """Reachy Mini conversation app fork for OpenShell demos."""
 
 from importlib.metadata import PackageNotFoundError, version

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """OpenAI-compatible STT and TTS endpoint helpers for local-STT mode."""
 
 from typing import Any, Callable
