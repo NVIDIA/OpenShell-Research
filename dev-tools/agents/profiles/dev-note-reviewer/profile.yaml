@@ -1,0 +1,30 @@
+version: 1
+id: dev-note-reviewer
+display_name: Dev Note Reviewer
+description: Review OpenShell Dev Notes for editorial quality and technical grounding.
+
+harness:
+  name: pi
+
+inference:
+  provider: model-gateway
+  context_window: 1000000
+  max_tokens: 128000
+
+sandbox:
+  policy: policy.yaml
+
+tasks:
+  editorial:
+    prompt: prompts/editorial.md
+    output_schema: schemas/review-response.json
+    input_label: Untrusted projected prose data
+    tools: []
+    skills: []
+
+  technical:
+    prompt: prompts/technical.md
+    output_schema: schemas/review-response.json
+    input_label: Untrusted candidate data and diff
+    tools: []
+    skills: []

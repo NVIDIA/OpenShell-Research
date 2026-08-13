@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NVIDIA/OpenShell-Research/dev-tools/agents/profiles/dev-note-reviewer/schemas/review-response.json",
+  "title": "Slop Cop qualitative judge response",
+  "oneOf": [
+    { "$ref": "#/$defs/editorial" },
+    { "$ref": "#/$defs/technicalNote" }
+  ],
+  "$defs": {
+    "subscore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criterion", "score", "explanation"],
+      "properties": {
+        "criterion": { "type": "string", "pattern": "^[a-z][a-z_]{0,63}$" },
+        "score": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "explanation": { "type": "string", "minLength": 1, "maxLength": 1200 }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["severity", "quote", "source_path", "line", "column", "explanation", "editorial_action"],
+      "properties": {
+        "severity": { "enum": ["advisory", "warning", "blocking"] },
+        "quote": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "source_path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 },
+        "explanation": { "type": "string", "minLength": 1, "maxLength": 1200 },
+        "editorial_action": { "type": "string", "minLength": 1, "maxLength": 1200 }
+      }
+    },
+    "common": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "judge_id", "rubric_revision", "model_id",
+        "analyzed_head_sha", "source_content_digest", "rubric_subscores",
+        "overall_score", "verdict", "confidence", "findings", "overall_assessment"
+      ],
+      "properties": {
+        "schema_version": { "const": 1 },
+        "judge_id": { "enum": ["editorial", "technical-note"] },
+        "rubric_revision": { "type": "string", "pattern": "^[A-Za-z0-9._:/-]{1,128}$" },
+        "model_id": { "type": "string", "pattern": "^[A-Za-z0-9._:/-]{1,128}$" },
+        "analyzed_head_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "source_content_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "rubric_subscores": { "type": "array", "items": { "$ref": "#/$defs/subscore" } },
+        "overall_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "verdict": { "enum": ["pass", "revise", "manual_review"] },
+        "confidence": { "enum": ["low", "medium", "high"] },
+        "findings": { "type": "array", "maxItems": 12, "items": { "$ref": "#/$defs/finding" } },
+        "overall_assessment": { "type": "string", "minLength": 1, "maxLength": 1200 },
+        "request_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "response_digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "editorial": {
+      "allOf": [
+        { "$ref": "#/$defs/common" },
+        {
+          "properties": {
+            "judge_id": { "const": "editorial" },
+            "rubric_revision": { "const": "editorial-v1" },
+            "rubric_subscores": {
+              "minItems": 7,
+              "maxItems": 7,
+              "items": {
+                "allOf": [
+                  { "$ref": "#/$defs/subscore" },
+                  { "properties": { "criterion": { "enum": ["formulaic_language", "empty_emphasis", "repetitive_cadence", "unnecessary_summary", "inflated_claims", "vague_attribution", "directness"] } } }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "technicalNote": {
+      "allOf": [
+        { "$ref": "#/$defs/common" },
+        {
+          "properties": {
+            "judge_id": { "const": "technical-note" },
+            "rubric_revision": { "const": "technical-note-v1" },
+            "rubric_subscores": {
+              "minItems": 5,
+              "maxItems": 5,
+              "items": {
+                "allOf": [
+                  { "$ref": "#/$defs/subscore" },
+                  { "properties": { "criterion": { "enum": ["directness", "technical_grounding", "proportionality", "reader_utility", "evidence_quality"] } } }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NVIDIA/OpenShell-Research/dev-tools/agents/schemas/profile.schema.json",
+  "title": "Repository agent profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "id", "display_name", "description", "harness", "inference", "sandbox", "tasks"],
+  "properties": {
+    "version": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "description": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "harness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": { "name": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" } }
+    },
+    "inference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "context_window", "max_tokens"],
+      "properties": {
+        "provider": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "context_window": { "type": "integer", "minimum": 1 },
+        "max_tokens": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "sandbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy"],
+      "properties": { "policy": { "type": "string", "minLength": 1 } }
+    },
+    "tasks": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["prompt", "output_schema", "input_label"],
+        "properties": {
+          "prompt": { "type": "string", "minLength": 1 },
+          "output_schema": { "type": "string", "minLength": 1 },
+          "input_label": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "tools": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" } },
+          "skills": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "guidance": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,69 @@
+name: Repository agents
+
+"on":
+  pull_request:
+    paths:
+      - .github/workflows/repository-agents.yml
+      - dev-tools/agents/**
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/repository-agents.yml
+      - dev-tools/agents/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-agents-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check repository agents
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dev-tools/agents
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.31"
+          python-version: "3.12"
+
+      - name: Configure isolated uv cache
+        run: echo "UV_CACHE_DIR=$RUNNER_TEMP/repository-agents-uv-cache" >> "$GITHUB_ENV"
+
+      - name: Validate standalone helper lock
+        run: uv lock --script helpers.py --check
+
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Check Python
+        run: |
+          uv run --with ruff==0.16.2 ruff check helpers.py tests/test_helpers.py
+          uv run --with ruff==0.16.2 ruff format --check helpers.py tests/test_helpers.py
+          python -m compileall -q helpers.py tests
+
+      - name: Check shell syntax
+        run: bash -n run.sh runtime/harnesses/pi/exec.sh
+
+      - name: Build the staged Pi sandbox
+        run: |
+          ./run.sh \
+            --profile dev-note-reviewer \
+            --task editorial \
+            --prepare-only "$RUNNER_TEMP/repository-agent-stage" \
+            < /dev/null
+          docker build \
+            --tag repository-agent-pi:ci \
+            "$RUNNER_TEMP/repository-agent-stage/sandbox"
