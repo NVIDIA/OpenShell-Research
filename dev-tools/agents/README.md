@@ -7,10 +7,7 @@ more related tasks with reviewed prompts, schemas, skills, and sandbox policy.
 ## Layout
 
 ```text
-run.sh              # owns the visible OpenShell lifecycle
-helpers.py          # parses YAML and generates/validates files
-runtime/harnesses/   # translates a resolved task into a harness invocation
-inference/providers/ # describes OpenShell-backed inference providers
+runner/              # owns launching, profile resolution, providers, and harnesses
 profiles/            # owns agent identity, tasks, prompts, schemas, and policy
 ```
 
@@ -23,32 +20,34 @@ coupled to GitHub Actions.
 Set the same model values used by CI:
 
 ```bash
-export MODEL_BASE_URL=https://model-gateway.example/v1
-export MODEL_API_KEY=replace-me
-export MODEL_ID=model-id
+export INFERENCE_BASE_URL=https://model-gateway.example/v1
+export INFERENCE_API_KEY=replace-me
+export MODEL_ID_TOP=model-id
 
-dev-tools/agents/run.sh \
+dev-tools/agents/runner/run.sh \
   --profile dev-note-reviewer \
   --task editorial \
   --output /tmp/editorial-result.json \
   < /tmp/editorial-input.json
 ```
 
-`run.sh` keeps the OpenShell control flow visible. It calls the standalone
-`helpers.py` only for YAML/JSON parsing, safe path resolution, prompt and Pi
-configuration generation, URL checking, and response checking. The helper's two
-pinned dependencies are recorded in `helpers.py.lock`; it is not a Python
-package. The default mode downloads checksum-pinned OpenShell binaries, starts
-a local ephemeral gateway, attaches the selected provider, builds a disposable
-sandbox, and exits after one Pi print-mode response.
+`runner/run.sh` keeps the OpenShell control flow visible. It calls the
+standalone `runner/profile_resolver.py` to resolve and validate a profile,
+stage its prompt and Pi configuration, and validate the response. The
+resolver's two pinned dependencies are recorded in
+`runner/profile_resolver.py.lock`; it is not a Python package. The default mode
+downloads checksum-pinned OpenShell binaries, starts an ephemeral mTLS gateway,
+attaches the selected provider, builds a disposable sandbox, and exits after
+one Pi print-mode response.
 
 For an existing gateway, pass `--gateway-endpoint URL` and optionally
 `--openshell-bin PATH`. If model credentials are present, the launcher creates
 or updates the selected provider. Without them, the named provider must already
-exist on that gateway. `MODEL_ID` is always required.
+exist on that gateway. `MODEL_ID_TOP` is always required.
 
-Use `--guidance PATH` to add a reviewed trusted guidance file to a task. The
-option is repeatable. Standard input remains the untrusted task payload.
+Profiles may declare reviewed guidance paths relative to their own directory.
+Use `--guidance PATH` to append a reviewed trusted guidance file for one run;
+the option is repeatable. Standard input remains the untrusted task payload.
 
 ## Security model
 
@@ -65,12 +64,13 @@ option is repeatable. Standard input remains the untrusted task payload.
 ## Validate
 
 ```bash
-uv lock --script helpers.py --check
+cd dev-tools/agents/runner
+uv lock --script profile_resolver.py --check
 python3 -m unittest discover -s tests -v
-uv run --with ruff==0.16.2 ruff check helpers.py tests/test_helpers.py
-uv run --with ruff==0.16.2 ruff format --check helpers.py tests/test_helpers.py
-python3 -m compileall -q helpers.py tests
-bash -n run.sh runtime/harnesses/pi/exec.sh
+uv run --with ruff==0.16.2 ruff check profile_resolver.py tests/test_profile_resolver.py
+uv run --with ruff==0.16.2 ruff format --check profile_resolver.py tests/test_profile_resolver.py
+python3 -m compileall -q profile_resolver.py tests
+bash -n run.sh harnesses/pi/exec.sh
 ```
 
 The tests are credential-free and do not launch a model or Docker sandbox.

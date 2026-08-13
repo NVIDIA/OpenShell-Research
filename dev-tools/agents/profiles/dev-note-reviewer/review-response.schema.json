@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/NVIDIA/OpenShell-Research/dev-tools/agents/profiles/dev-note-reviewer/schemas/review-response.json",
+  "$id": "https://github.com/NVIDIA/OpenShell-Research/dev-tools/agents/profiles/dev-note-reviewer/review-response.schema.json",
   "title": "Slop Cop qualitative judge response",
   "oneOf": [
     { "$ref": "#/$defs/editorial" },
-    { "$ref": "#/$defs/technicalNote" }
+    { "$ref": "#/$defs/technical" }
   ],
   "$defs": {
     "subscore": {
@@ -66,18 +66,22 @@
             "rubric_subscores": {
               "minItems": 7,
               "maxItems": 7,
-              "items": {
-                "allOf": [
-                  { "$ref": "#/$defs/subscore" },
-                  { "properties": { "criterion": { "enum": ["formulaic_language", "empty_emphasis", "repetitive_cadence", "unnecessary_summary", "inflated_claims", "vague_attribution", "directness"] } } }
-                ]
-              }
+              "prefixItems": [
+                { "allOf": [{ "$ref": "#/$defs/subscore" }, { "properties": { "criterion": { "const": "formulaic_language" } } }] },
+                { "allOf": [{ "$ref": "#/$defs/subscore" }, { "properties": { "criterion": { "const": "empty_emphasis" } } }] },
+                { "allOf": [{ "$ref": "#/$defs/subscore" }, { "properties": { "criterion": { "const": "repetitive_cadence" } } }] },
+                { "allOf": [{ "$ref": "#/$defs/subscore" }, { "properties": { "criterion": { "const": "unnecessary_summary" } } }] },
+                { "allOf": [{ "$ref": "#/$defs/subscore" }, { "properties": { "criterion": { "const": "inflated_claims" } } }] },
+                { "allOf": [{ "$ref": "#/$defs/subscore" }, { "properties": { "criterion": { "const": "vague_attribution" } } }] },
+                { "allOf": [{ "$ref": "#/$defs/subscore" }, { "properties": { "criterion": { "const": "directness" } } }] }
+              ],
+              "items": false
             }
           }
         }
       ]
     },
-    "technicalNote": {
+    "technical": {
       "allOf": [
         { "$ref": "#/$defs/common" },
         {
@@ -87,12 +91,14 @@
             "rubric_subscores": {
               "minItems": 5,
               "maxItems": 5,
-              "items": {
-                "allOf": [
-                  { "$ref": "#/$defs/subscore" },
-                  { "properties": { "criterion": { "enum": ["directness", "technical_grounding", "proportionality", "reader_utility", "evidence_quality"] } } }
-                ]
-              }
+              "prefixItems": [
+                { "allOf": [{ "$ref": "#/$defs/subscore" }, { "properties": { "criterion": { "const": "directness" } } }] },
+                { "allOf": [{ "$ref": "#/$defs/subscore" }, { "properties": { "criterion": { "const": "technical_grounding" } } }] },
+                { "allOf": [{ "$ref": "#/$defs/subscore" }, { "properties": { "criterion": { "const": "proportionality" } } }] },
+                { "allOf": [{ "$ref": "#/$defs/subscore" }, { "properties": { "criterion": { "const": "reader_utility" } } }] },
+                { "allOf": [{ "$ref": "#/$defs/subscore" }, { "properties": { "criterion": { "const": "evidence_quality" } } }] }
+              ],
+              "items": false
             }
           }
         }

@@ -3,10 +3,9 @@ id: model-gateway
 description: OpenAI-compatible model endpoint mediated by the OpenShell inference proxy.
 openshell:
   type: openai
-  base_url_source_env: MODEL_BASE_URL
-  api_key_source_env: MODEL_API_KEY
-  base_url_export_env: OPENAI_BASE_URL
-  api_key_export_env: OPENAI_API_KEY
+  base_url_source_env: INFERENCE_BASE_URL
+  api_key_source_env: INFERENCE_API_KEY
+  base_url_config_key: OPENAI_BASE_URL
 sandbox:
   api: openai-completions
   base_url: https://inference.local/v1

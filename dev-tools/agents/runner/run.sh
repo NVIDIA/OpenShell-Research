@@ -2,8 +2,8 @@
 set -euo pipefail
 umask 077
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-helper=(uv run --locked --script "$script_dir/helpers.py")
+runner_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+profile_resolver=(uv run --locked --script "$runner_dir/profile_resolver.py")
 
 usage() {
   cat >&2 <<'EOF'
@@ -61,23 +61,23 @@ cleanup() {
 }
 trap cleanup EXIT
 
-model_id="${MODEL_ID:-}"
+model_id="${MODEL_ID_TOP:-}"
 if [[ -n "$prepare_only" && -z "$model_id" ]]; then
   model_id=prepare-only-model
 fi
 if [[ -z "$model_id" ]]; then
-  echo "repository agents: MODEL_ID must be set" >&2
+  echo "repository agents: MODEL_ID_TOP must be set" >&2
   exit 2
 fi
 stage="$work_root/staged"
 prepare_arguments=(
-  prepare --root "$script_dir" --profile "$profile" --task "$task"
+  prepare --runner-root "$runner_dir" --profile "$profile" --task "$task"
   --destination "$stage" --model-id "$model_id"
 )
 for path in "${guidance[@]}"; do
   prepare_arguments+=(--guidance "$path")
 done
-"${helper[@]}" "${prepare_arguments[@]}"
+"${profile_resolver[@]}" "${prepare_arguments[@]}"
 
 if [[ -n "$prepare_only" ]]; then
   if [[ -e "$prepare_only" || -L "$prepare_only" ]]; then
@@ -90,17 +90,16 @@ if [[ -n "$prepare_only" ]]; then
 fi
 
 provider_config_file="$work_root/provider-config"
-"${helper[@]}" values "$stage/resolved.json" \
+"${profile_resolver[@]}" values "$stage/resolved.json" \
   provider.id provider.type provider.base_url_source_env provider.api_key_source_env \
-  provider.base_url_export_env provider.api_key_export_env \
+  provider.base_url_config_key \
   >"$provider_config_file"
 mapfile -t provider_config <"$provider_config_file"
 provider_name="${provider_config[0]}"
 provider_type="${provider_config[1]}"
 base_source_env="${provider_config[2]}"
 key_source_env="${provider_config[3]}"
-base_export_env="${provider_config[4]}"
-key_export_env="${provider_config[5]}"
+base_url_config_key="${provider_config[4]}"
 base_url="${!base_source_env:-}"
 api_key="${!key_source_env:-}"
 if [[ -n "$base_url" || -n "$api_key" ]]; then
@@ -108,7 +107,7 @@ if [[ -n "$base_url" || -n "$api_key" ]]; then
     echo "repository agents: both $base_source_env and $key_source_env are required" >&2
     exit 2
   fi
-  "${helper[@]}" validate-url "$base_url"
+  "${profile_resolver[@]}" validate-url "$base_url"
 fi
 
 if [[ -z "$gateway_endpoint" ]]; then
@@ -135,9 +134,13 @@ if [[ -z "$gateway_endpoint" ]]; then
     a02d2e5a3d0d7e2a399162b269cc2bf148829851f7469d437ba6ee95c3de7324 openshell-sandbox
 
   openshell_bin="$bin_dir/openshell"
-  gateway_endpoint=http://127.0.0.1:17670
+  gateway_endpoint=https://127.0.0.1:17670
   export XDG_CONFIG_HOME="$runtime_root/config"
   export XDG_STATE_HOME="$runtime_root/state"
+  tls_dir="$runtime_root/tls"
+  export OPENSHELL_LOCAL_TLS_DIR="$tls_dir"
+  "$bin_dir/openshell-gateway" generate-certs \
+    --output-dir "$tls_dir" --server-san host.openshell.internal >/dev/null
   gateway_config="$runtime_root/gateway.toml"
   cat >"$gateway_config" <<EOF
 [openshell]
@@ -145,19 +148,27 @@ version = 1
 
 [openshell.gateway]
 compute_drivers = ["docker"]
+health_bind_address = "127.0.0.1:17671"
 
 [openshell.gateway.auth]
-allow_unauthenticated_users = true
+allow_unauthenticated_users = false
 
 [openshell.drivers.docker]
 socket_path = "/var/run/docker.sock"
-grpc_endpoint = "http://host.openshell.internal:17670"
+grpc_endpoint = "https://host.openshell.internal:17670"
 supervisor_bin = "$bin_dir/openshell-sandbox"
 image_pull_policy = "IfNotPresent"
+guest_tls_ca = "$tls_dir/ca.crt"
+guest_tls_cert = "$tls_dir/client/tls.crt"
+guest_tls_key = "$tls_dir/client/tls.key"
 EOF
   "$bin_dir/openshell-gateway" \
-    --config "$gateway_config" --disable-tls --bind-address 0.0.0.0 \
-    --port 17670 --health-port 17671 >"$runtime_root/gateway.log" 2>&1 &
+    --config "$gateway_config" --bind-address 0.0.0.0 \
+    --tls-cert "$tls_dir/server/tls.crt" \
+    --tls-key "$tls_dir/server/tls.key" \
+    --tls-client-ca "$tls_dir/ca.crt" \
+    --enable-mtls-auth true \
+    --port 17670 >"$runtime_root/gateway.log" 2>&1 &
   gateway_pid="$!"
   for _ in {1..60}; do
     if curl --fail --silent http://127.0.0.1:17671/readyz >/dev/null; then break; fi
@@ -168,6 +179,8 @@ EOF
     sleep 1
   done
   curl --fail --silent http://127.0.0.1:17671/readyz >/dev/null
+  "$openshell_bin" gateway add "$gateway_endpoint" --local --name openshell >/dev/null
+  export OPENSHELL_GATEWAY=openshell
 else
   openshell_bin="${openshell_override:-$(command -v openshell || true)}"
   if [[ -z "$openshell_bin" || ! -x "$openshell_bin" ]]; then
@@ -179,14 +192,15 @@ fi
 export OPENSHELL_GATEWAY_ENDPOINT="$gateway_endpoint"
 "$openshell_bin" settings set --global --key providers_v2_enabled --value true --yes >/dev/null
 if [[ -n "$base_url" ]]; then
-  printf -v "$base_export_env" '%s' "$base_url"
-  printf -v "$key_export_env" '%s' "$api_key"
-  export "$base_export_env" "$key_export_env"
   if "$openshell_bin" provider get "$provider_name" >/dev/null 2>&1; then
-    "$openshell_bin" provider update "$provider_name" --from-existing >/dev/null
+    "$openshell_bin" provider update "$provider_name" \
+      --credential "$key_source_env" \
+      --config "$base_url_config_key=$base_url" >/dev/null
   else
     "$openshell_bin" provider create \
-      --name "$provider_name" --type "$provider_type" --from-existing >/dev/null
+      --name "$provider_name" --type "$provider_type" \
+      --credential "$key_source_env" \
+      --config "$base_url_config_key=$base_url" >/dev/null
   fi
 elif ! "$openshell_bin" provider get "$provider_name" >/dev/null 2>&1; then
   echo "repository agents: provider '$provider_name' is not configured on the selected gateway" >&2
@@ -195,9 +209,9 @@ fi
 "$openshell_bin" inference set \
   --provider "$provider_name" --model "$model_id" --timeout "$timeout_seconds" >/dev/null
 
-unset "$base_source_env" "$key_source_env" "$base_export_env" "$key_export_env"
+unset "$base_source_env" "$key_source_env"
 resource_args_file="$work_root/resource-args"
-"${helper[@]}" resource-args "$stage/resolved.json" >"$resource_args_file"
+"${profile_resolver[@]}" resource-args "$stage/resolved.json" >"$resource_args_file"
 mapfile -d '' -t resource_args <"$resource_args_file"
 response="$work_root/response.json"
 sandbox_name="agent-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}-${profile}-${task}"
@@ -214,7 +228,7 @@ timeout "$timeout_seconds" "$openshell_bin" sandbox create \
   /sandbox/task/prompt.md "$model_id" "${resource_args[@]}" \
   >"$response"
 
-"${helper[@]}" validate-response "$response"
+"${profile_resolver[@]}" validate-response "$response" "$stage/response.schema.json"
 if [[ "$output" == "-" ]]; then
   cat "$response"
 else
