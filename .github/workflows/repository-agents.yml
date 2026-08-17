@@ -1,0 +1,101 @@
+name: Repository agents
+
+"on":
+  pull_request:
+    paths:
+      - .pre-commit-config.yaml
+      - .github/workflows/repository-agents.yml
+      - .github/openshell-agents/**
+      - projects/openshell-agent-runner/**
+  push:
+    branches:
+      - main
+    paths:
+      - .pre-commit-config.yaml
+      - .github/workflows/repository-agents.yml
+      - .github/openshell-agents/**
+      - projects/openshell-agent-runner/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-agents-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check repository agents
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.31"
+          python-version: "3.12"
+
+      - name: Configure isolated uv paths
+        run: |
+          echo "UV_CACHE_DIR=$RUNNER_TEMP/repository-agents-uv-cache" >> "$GITHUB_ENV"
+          echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/repository-agents-venv" >> "$GITHUB_ENV"
+
+      - name: Install locked dependencies
+        run: uv sync --project projects/openshell-agent-runner --locked
+
+      - name: Validate agent profiles
+        run: |
+          uv run --project projects/openshell-agent-runner oar validate \
+            .github/openshell-agents/profiles/dev-note-reviewer/profile.yaml
+          uv run --project projects/openshell-agent-runner oar validate \
+            projects/openshell-agent-runner/profiles/reviewer/profile.yaml
+
+      - name: Preview agent execution
+        run: |
+          uv run --project projects/openshell-agent-runner oar run \
+            .github/openshell-agents/profiles/dev-note-reviewer/profile.yaml \
+            --task editorial \
+            --gateway openshell \
+            --upload .:/workspace/source \
+            --upload .git:/workspace/source/.git \
+            --env REVIEW_TARGET_PATH=docs/dev-notes/posts/2026-08-07-formal-methods-ai-generated-robot-actions.md \
+            --output "$RUNNER_TEMP/editorial-review.json" \
+            --dry-run
+
+      - name: Run project checks
+        working-directory: projects/openshell-agent-runner
+        run: |
+          uv run pre-commit validate-config ../../.pre-commit-config.yaml
+          uv run ruff format --check .
+          uv run ruff check .
+          uv run ty check
+          uv run pytest
+          python -m compileall -q src tests
+          bash -n src/openshell_agent_runner/harnesses/pi/assets/exec.sh
+
+      - name: Build distributions
+        working-directory: projects/openshell-agent-runner
+        run: |
+          uv build
+          wheel="$(find dist -name '*.whl' -print -quit)"
+          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/assets/Dockerfile'
+          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/assets/exec.sh'
+          python -m zipfile -l "$wheel" | grep -F 'dist-info/licenses/LICENSE'
+
+      - name: Verify the built wheel
+        working-directory: projects/openshell-agent-runner
+        run: |
+          wheel="$(find dist -name '*.whl' -print -quit)"
+          uvx --from "$wheel" oar validate \
+            profiles/reviewer/profile.yaml
+
+      - name: Build the Pi image
+        run: |
+          docker build \
+            --tag openshell-agent-runner-pi:ci \
+            projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/assets
