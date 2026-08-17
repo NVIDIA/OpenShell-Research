@@ -246,6 +246,7 @@ def test_cli_evaluate_runs_the_custom_gate_examples(
 @pytest.mark.parametrize(
     ("registry_reference", "example_directory", "registration_name"),
     [
+        (None, "pi-attested-admission", "pi-egress"),
         (None, "regex-redaction", "eg-regex"),
         (
             "examples.custom-gate.keyword_gate:registry",

@@ -1,0 +1,25 @@
+{
+  "providers": {
+    "openai-chat-completions": {
+      "baseUrl": "https://api.openai.com/v1",
+      "api": "openai-completions",
+      "apiKey": "$OPENAI_API_KEY",
+      "models": [
+        {
+          "id": "gpt-4o-mini",
+          "name": "GPT-4o mini (Chat Completions)",
+          "reasoning": false,
+          "input": ["text"],
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "cost": {
+            "input": 0.15,
+            "output": 0.6,
+            "cacheRead": 0.075,
+            "cacheWrite": 0
+          }
+        }
+      ]
+    }
+  }
+}
