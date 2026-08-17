@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """Public, transport-neutral models for harness admission."""
 
 from __future__ import annotations
@@ -8,11 +11,12 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from egress_gate.base import StrictDomainModel
-from egress_gate.constants import MAX_BODY_BYTES, MAX_PROTO_FINDING_GROUPS
+from egress_gate.constants import MAX_PROTO_FINDING_GROUPS
 from egress_gate.request import HttpTarget
 from egress_gate.result import ReasonCode, SourcedFinding
 from egress_gate.string_validators import BoundedMetadataString, ScalarString
 
+MAX_ADMISSION_BODY_BYTES = 32 * 1024
 PI_HARNESS_VERSION = "extension-v1"
 
 
@@ -41,7 +45,7 @@ class PromptProvenance(StrictDomainModel):
 class HarnessAdmissionRequest(StrictDomainModel):
     """One complete harness-native rendered prompt."""
 
-    request_body: bytes = Field(max_length=MAX_BODY_BYTES, repr=False)
+    request_body: bytes = Field(max_length=MAX_ADMISSION_BODY_BYTES, repr=False)
     provenance: PromptProvenance
 
 
@@ -66,7 +70,7 @@ class HarnessAdmissionResult(StrictDomainModel):
     decision: AdmissionDecision
     replacement_body: bytes | None = Field(
         default=None,
-        max_length=MAX_BODY_BYTES,
+        max_length=MAX_ADMISSION_BODY_BYTES,
         repr=False,
     )
     receipt: bytes | None = Field(
@@ -112,6 +116,7 @@ __all__ = [
     "HarnessAdmissionContext",
     "HarnessAdmissionRequest",
     "HarnessAdmissionResult",
+    "MAX_ADMISSION_BODY_BYTES",
     "PromptProvenance",
     "PI_HARNESS_VERSION",
 ]

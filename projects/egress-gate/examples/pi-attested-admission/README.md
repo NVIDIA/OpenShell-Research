@@ -1,8 +1,7 @@
 # Managed Pi deny-or-redact example
 
-This directory contains a real OpenShell configuration for running the Pi
-admission extension with Egress Gate. It does not contain a simulated Pi
-session or provider.
+This directory contains an OpenShell configuration for running the Pi
+admission extension with Egress Gate.
 
 The policy demonstrates two outcomes for rendered Pi prompts:
 
@@ -207,17 +206,15 @@ replacement: Egress Gate rejects a receipt when the provider request contains a
 different final user prompt. The network middleware consumes the receipt, then
 removes the internal receipt header before forwarding upstream.
 
-## Configuration correspondence
+## Configuration
 
-[`egress-gate-config.yaml`](egress-gate-config.yaml) is the standalone Egress
-Gate configuration. [`policy.yaml`](policy.yaml) embeds that exact configuration
-under `network_middlewares.pi_egress_gate.config`, attaches the registered
-`pi-egress` service, selects exactly `api.openai.com`, and fails closed if the
-middleware is unavailable.
+[`policy.yaml`](policy.yaml) configures the `pi-egress` middleware for both
+rendered-prompt admission and requests to `api.openai.com`. It fails closed if
+the middleware is unavailable.
 
 OpenShell uses the same middleware configuration for rendered-prompt admission
 and provider HTTP egress. This is what lets Egress Gate issue a receipt before
-Pi persists the candidate and verify it again at the network boundary.
+Pi persists the candidate and verify the receipt again at the network boundary.
 
 ## Current scope
 

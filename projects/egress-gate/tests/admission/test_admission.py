@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """Conformance tests for rendered-prompt admission and attested egress."""
 
 from __future__ import annotations
@@ -23,11 +26,13 @@ from egress_gate.gates import create_builtin_registry
 from egress_gate.request import HttpHeader, HttpRequest, HttpTarget, RequestContext
 from egress_gate.timeout import Timeout
 
-DENY_MARKER = "OPEN_SHELL_ADMISSION_DENY_TEST"
-REPLACE_MARKER = "OPEN_SHELL_ADMISSION_REPLACE_TEST"
+DENY_TEXT = "DENY_THIS"
+REDACT_TEXT = "REDACT_THIS"
 
 
-def _processors() -> tuple[HarnessAdmissionProcessor, AttestedEgressProcessor]:
+def _processors(
+    *, replacement_template: str = "[REDACTED]"
+) -> tuple[HarnessAdmissionProcessor, AttestedEgressProcessor]:
     registry = create_builtin_registry()
     config = registry.validate_config(
         {
@@ -43,7 +48,7 @@ def _processors() -> tuple[HarnessAdmissionProcessor, AttestedEgressProcessor]:
                                 "rules": [
                                     {
                                         "name": "exact-marker",
-                                        "pattern": DENY_MARKER,
+                                        "pattern": DENY_TEXT,
                                         "confidence": "high",
                                     }
                                 ],
@@ -56,7 +61,10 @@ def _processors() -> tuple[HarnessAdmissionProcessor, AttestedEgressProcessor]:
                     "kind": "regex",
                     "scan": {
                         "kind": "body",
-                        "action": {"kind": "replace", "template": "[REDACTED]"},
+                        "action": {
+                            "kind": "replace",
+                            "template": replacement_template,
+                        },
                     },
                     "pattern_catalog": {
                         "entities": [
@@ -65,7 +73,7 @@ def _processors() -> tuple[HarnessAdmissionProcessor, AttestedEgressProcessor]:
                                 "rules": [
                                     {
                                         "name": "exact-marker",
-                                        "pattern": REPLACE_MARKER,
+                                        "pattern": REDACT_TEXT,
                                         "confidence": "high",
                                     }
                                 ],
@@ -211,7 +219,7 @@ def test_rendered_prompt_receipt_is_consumed_after_first_request() -> None:
 
 def test_denial_returns_no_receipt_or_replacement() -> None:
     admission, _ = _processors()
-    _, denied = _admit(admission, f"do not persist {DENY_MARKER}")
+    _, denied = _admit(admission, f"do not persist {DENY_TEXT}")
 
     assert denied.decision is AdmissionDecision.DENY
     assert denied.receipt is None
@@ -220,7 +228,7 @@ def test_denial_returns_no_receipt_or_replacement() -> None:
 
 def test_redaction_receipt_binds_only_the_replacement() -> None:
     admission, egress = _processors()
-    original = f"hide {REPLACE_MARKER} please"
+    original = f"hide {REDACT_TEXT} please"
     _, admitted = _admit(admission, original)
 
     assert admitted.decision is AdmissionDecision.REPLACE
@@ -244,6 +252,16 @@ def test_redaction_receipt_binds_only_the_replacement() -> None:
         ).decision.value
         == "allow"
     )
+
+
+def test_oversized_redaction_fails_before_receipt_issuance() -> None:
+    admission, _ = _processors(replacement_template="x" * 1024)
+
+    _, denied = _admit(admission, REDACT_TEXT * 33)
+
+    assert denied.decision is AdmissionDecision.DENY
+    assert denied.reason_code == "admission_contract_invalid"
+    assert denied.receipt is None
 
 
 def test_changed_prompt_and_unattested_continuation_fail_closed() -> None:

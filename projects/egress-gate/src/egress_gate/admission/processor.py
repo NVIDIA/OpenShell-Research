@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """Harness-admission orchestration and attested network egress."""
 
 from __future__ import annotations
@@ -15,6 +18,7 @@ from egress_gate.admission.adapters import (
 )
 from egress_gate.admission.canonical import canonical_json_bytes
 from egress_gate.admission.models import (
+    MAX_ADMISSION_BODY_BYTES,
     AdmissionDecision,
     AdmissionHook,
     HarnessAdmissionContext,
@@ -117,6 +121,8 @@ class HarnessAdmissionProcessor:
             replacement, rendered_prompt = adapter.validate_result(
                 prepared, final_request.body, context, timeout
             )
+            if replacement is not None and len(replacement) > MAX_ADMISSION_BODY_BYTES:
+                raise AdmissionMutationError("admission replacement body is too large")
             timeout.raise_if_expired()
             receipt = self._receipt_authority.issue(
                 rendered_prompt,
