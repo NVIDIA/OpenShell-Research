@@ -186,7 +186,7 @@ src/openshell_agent_runner/
 ├── cli.py
 ├── config.py
 ├── runner.py
-├── commands.py
+├── openshell_commands.py
 ├── openshell.py
 ├── document_review.py
 ├── artifacts.py
