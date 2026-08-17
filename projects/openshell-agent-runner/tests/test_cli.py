@@ -9,9 +9,7 @@ from typer.testing import CliRunner
 from openshell_agent_runner.cli import app
 
 REPOSITORY = Path(__file__).resolve().parents[3]
-PACKAGED_PROFILE = (
-    REPOSITORY / "projects/openshell-agent-runner/profiles/reviewer/profile.yaml"
-)
+PACKAGED_PROFILE = REPOSITORY / "projects/openshell-agent-runner/profiles/reviewer"
 
 
 def test_root_help_exposes_only_supported_commands() -> None:
@@ -35,6 +33,7 @@ def test_run_help_has_only_the_supported_override_surface() -> None:
     result = CliRunner().invoke(app, ["run", "--help"])
 
     assert result.exit_code == 0
+    assert "PROFILE_DIRECTORY" in result.stdout
     run_command = get_group(app).commands["run"]
     options = {
         option
@@ -85,7 +84,7 @@ def test_validate_reports_invalid_encoding_as_cli_input_error(tmp_path: Path) ->
     profile = tmp_path / "profile.yaml"
     profile.write_bytes(b"\xff\xfe")
 
-    result = CliRunner().invoke(app, ["validate", str(profile)])
+    result = CliRunner().invoke(app, ["validate", str(tmp_path)])
 
     assert result.exit_code == 2
     assert "cannot read configuration" in result.stderr

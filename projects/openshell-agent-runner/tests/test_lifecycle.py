@@ -43,7 +43,7 @@ tasks:
       max_bytes: 1000
 """
     )
-    return profile
+    return tmp_path
 
 
 def fake_openshell(tmp_path: Path) -> tuple[Path, Path, Path]:
@@ -100,7 +100,7 @@ else:
 
 def request(profile: Path, executable: Path, output: Path) -> RunRequest:
     return RunRequest(
-        profile_path=profile,
+        profile_directory=profile,
         task_id="smoke",
         output=output,
         openshell_bin=str(executable),

@@ -27,7 +27,11 @@ app = typer.Typer(
 @app.command()
 def validate(
     profile: Annotated[
-        Path, typer.Argument(help="Path to a profile YAML file.", metavar="PROFILE")
+        Path,
+        typer.Argument(
+            help="Profile directory containing profile.yaml.",
+            metavar="PROFILE_DIRECTORY",
+        ),
     ],
 ) -> None:
     """Validate a profile and all referenced local resources."""
@@ -43,7 +47,11 @@ def validate(
 @app.command()
 def run(
     profile: Annotated[
-        Path, typer.Argument(help="Path to a profile YAML file.", metavar="PROFILE")
+        Path,
+        typer.Argument(
+            help="Profile directory containing profile.yaml.",
+            metavar="PROFILE_DIRECTORY",
+        ),
     ],
     task: Annotated[str, typer.Option("--task", help="Task identifier to run.")],
     output: Annotated[
@@ -81,7 +89,7 @@ def run(
 ) -> None:
     """Run or preview one profile task and its validated output."""
     request = RunRequest(
-        profile_path=profile,
+        profile_directory=profile,
         task_id=task,
         output=output,
         uploads=upload or (),

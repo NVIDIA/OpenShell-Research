@@ -9,12 +9,8 @@ from openshell_agent_runner.config import load_profile
 from openshell_agent_runner.errors import ConfigurationError
 
 REPOSITORY = Path(__file__).resolve().parents[3]
-PROFILE = (
-    REPOSITORY / ".github/openshell-agents/profiles/dev-note-reviewer/profile.yaml"
-)
-PACKAGED_PROFILE = (
-    REPOSITORY / "projects/openshell-agent-runner/profiles/reviewer/profile.yaml"
-)
+PROFILE = REPOSITORY / ".github/openshell-agents/profiles/dev-note-reviewer"
+PACKAGED_PROFILE = REPOSITORY / "projects/openshell-agent-runner/profiles/reviewer"
 
 
 def test_repository_profile_validates() -> None:
@@ -31,11 +27,24 @@ def test_packaged_profile_validates() -> None:
     )
 
 
+def test_profile_argument_must_be_a_directory(tmp_path: Path) -> None:
+    profile = tmp_path / "profile.yaml"
+    profile.write_text("id: test\n")
+
+    with pytest.raises(ConfigurationError, match="profile must be a directory"):
+        load_profile(profile)
+
+
+def test_profile_directory_requires_profile_yaml(tmp_path: Path) -> None:
+    with pytest.raises(ConfigurationError, match="missing profile configuration"):
+        load_profile(tmp_path)
+
+
 def test_unknown_profile_key_is_rejected(tmp_path: Path) -> None:
     profile = tmp_path / "profile.yaml"
     profile.write_text("id: test\nunexpected: true\n")
     with pytest.raises(ConfigurationError, match="unexpected"):
-        load_profile(profile)
+        load_profile(tmp_path)
 
 
 def test_profile_resource_escape_is_rejected(tmp_path: Path) -> None:
@@ -61,7 +70,7 @@ tasks:
 """
     )
     with pytest.raises(ConfigurationError, match="escapes"):
-        load_profile(profile)
+        load_profile(tmp_path)
 
 
 def test_duplicate_document_review_criteria_are_rejected(tmp_path: Path) -> None:
@@ -86,7 +95,7 @@ tasks:
 """
     )
     with pytest.raises(ConfigurationError, match="criteria must be unique"):
-        load_profile(profile)
+        load_profile(tmp_path)
 
 
 @pytest.mark.parametrize(
@@ -133,7 +142,7 @@ tasks:
 """
     )
     with pytest.raises(ConfigurationError, match=message):
-        load_profile(profile)
+        load_profile(tmp_path)
 
 
 def test_profile_resource_types_are_checked(tmp_path: Path) -> None:
@@ -158,7 +167,7 @@ tasks:
 """
     )
     with pytest.raises(ConfigurationError, match="sandbox policy must be a file"):
-        load_profile(profile)
+        load_profile(tmp_path)
 
 
 def test_skill_directory_requires_skill_markdown(tmp_path: Path) -> None:
@@ -185,7 +194,7 @@ tasks:
 """
     )
     with pytest.raises(ConfigurationError, match="missing SKILL.md"):
-        load_profile(profile)
+        load_profile(tmp_path)
 
 
 def test_skill_tree_rejects_symlinks(tmp_path: Path) -> None:
@@ -218,7 +227,7 @@ tasks:
     )
 
     with pytest.raises(ConfigurationError, match="contains a symlink"):
-        load_profile(profile)
+        load_profile(tmp_path)
 
 
 def test_harness_token_limit_must_fit_context_window(tmp_path: Path) -> None:
@@ -244,7 +253,7 @@ tasks:
     )
 
     with pytest.raises(ConfigurationError, match="max_tokens must not exceed"):
-        load_profile(profile)
+        load_profile(tmp_path)
 
 
 @pytest.mark.parametrize("model_line", ["", "  model: bad model\n"])
@@ -272,7 +281,7 @@ tasks:
     )
 
     with pytest.raises(ConfigurationError, match="harness.model"):
-        load_profile(profile)
+        load_profile(tmp_path)
 
 
 def test_invalid_profile_encoding_is_configuration_error(tmp_path: Path) -> None:
@@ -280,4 +289,4 @@ def test_invalid_profile_encoding_is_configuration_error(tmp_path: Path) -> None
     profile.write_bytes(b"\xff\xfe")
 
     with pytest.raises(ConfigurationError, match="cannot read configuration"):
-        load_profile(profile)
+        load_profile(tmp_path)

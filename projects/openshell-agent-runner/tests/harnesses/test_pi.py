@@ -46,7 +46,7 @@ def test_pi_entrypoint_disables_automatic_resources() -> None:
 
 def test_declared_tools_are_forwarded_exactly() -> None:
     resolved = load_profile(
-        REPOSITORY / ".github/openshell-agents/profiles/dev-note-reviewer/profile.yaml"
+        REPOSITORY / ".github/openshell-agents/profiles/dev-note-reviewer"
     )
     prepared = prepare_resources(resolved, "editorial", resolved.profile.harness.model)
     try:
@@ -78,7 +78,7 @@ def test_submission_extension_checks_evidence_only_after_schema_validation() -> 
 
     assert "schemaDiagnostics.length === 0 ? evidenceErrors(params) : []" in extension
     assert "const outputPath = `${outputDirectory}/review.json`" in extension
-    resolved = load_profile(profile_root / "profile.yaml")
+    resolved = load_profile(profile_root)
     assert (
         resolved.profile.tasks["editorial"].output.sandbox_path
         == "/sandbox/artifacts/review.json"

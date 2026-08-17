@@ -6,8 +6,8 @@ Provide a small installable tool that validates and runs declarative Pi agent
 profiles in OpenShell:
 
 ```text
-oar validate PROFILE
-oar run PROFILE --task TASK --output PATH
+oar validate PROFILE_DIRECTORY
+oar run PROFILE_DIRECTORY --task TASK --output PATH
 oar doctor
 ```
 
@@ -18,7 +18,7 @@ inspection, Git operations, tool use, analysis, and conclusions.
 
 The runner supports:
 
-- one profile YAML passed directly to each command;
+- one profile directory containing `profile.yaml` passed to each command;
 - one or more named tasks within that profile;
 - Pi as the only harness;
 - native OpenShell file and directory uploads;
@@ -46,14 +46,15 @@ It deliberately does not include:
 ### Validate
 
 ```bash
-oar validate path/to/profile.yaml
+oar validate path/to/profile
 ```
 
 Validation must:
 
 1. parse the profile with strict Pydantic models;
 2. reject unknown fields;
-3. resolve policy, prompt, skill, and extension paths relative to the profile;
+3. resolve policy, prompt, skill, and extension paths relative to the profile
+   directory;
 4. reject profile-owned resource path escapes;
 5. validate sandbox uploads and non-secret environment assignments; and
 6. validate every task's output contract.
@@ -75,7 +76,7 @@ It never creates or changes OpenShell resources.
 ### Run
 
 ```bash
-oar run path/to/profile.yaml \
+oar run path/to/profile \
   --task editorial \
   --gateway openshell \
   --workspace default \
@@ -140,7 +141,7 @@ tasks:
       max_bytes: 1048576
 ```
 
-All profile-owned resource paths are relative to the profile file. Native
+All profile-owned resource paths are relative to the profile directory. Native
 upload sources retain OpenShell's current-working-directory behavior.
 
 ## Runtime pipeline
