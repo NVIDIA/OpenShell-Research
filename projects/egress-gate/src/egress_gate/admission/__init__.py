@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """First-class harness admission and attested-egress APIs."""
 
 from egress_gate.admission.adapters import (
@@ -23,6 +26,7 @@ from egress_gate.admission.canonical import (
     canonical_json_bytes,
 )
 from egress_gate.admission.models import (
+    MAX_ADMISSION_BODY_BYTES,
     PI_HARNESS_VERSION,
     AdmissionDecision,
     AdmissionHook,
@@ -54,6 +58,7 @@ __all__ = [
     "HarnessAdmissionProcessor",
     "HarnessAdmissionRequest",
     "HarnessAdmissionResult",
+    "MAX_ADMISSION_BODY_BYTES",
     "PromptProvenance",
     "PI_HARNESS_VERSION",
     "ModelRequestV1",

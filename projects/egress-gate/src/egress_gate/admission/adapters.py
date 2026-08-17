@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """Registered Pi and provider request-shape adapters."""
 
 from __future__ import annotations
@@ -344,7 +347,7 @@ def create_pi_adapter_registry() -> HarnessAdapterRegistry:
 
 
 def create_provider_adapter_registry() -> ProviderAdapterRegistry:
-    """Return the milestone-one provider registry."""
+    """Return the built-in OpenAI Chat Completions provider registry."""
     registry = ProviderAdapterRegistry()
     registry.register(OpenAIChatCompletionsV1Adapter())
     return registry

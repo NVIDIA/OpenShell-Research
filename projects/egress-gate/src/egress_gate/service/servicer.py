@@ -19,6 +19,7 @@ from google.protobuf import json_format
 from google.protobuf.message import Message
 
 from egress_gate.admission import (
+    MAX_ADMISSION_BODY_BYTES,
     PI_HARNESS_VERSION,
     RECEIPT_HEADER,
     AdmissionDecision,
@@ -108,9 +109,6 @@ def _require_pi_harness_version(value: str) -> Literal["extension-v1"]:
     raise ValueError("invalid Pi harness version")
 
 
-MAX_AGENT_ADMISSION_BODY_BYTES = 32 * 1024
-
-
 class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
     """Validate, prepare, resolve, and run Egress Gate policies."""
 
@@ -169,7 +167,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                     pb2.MiddlewareBinding(
                         operation=pb2.SUPERVISOR_MIDDLEWARE_OPERATION_AGENT_CONVERSATION,
                         phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_AGENT_CONTEXT,
-                        max_body_bytes=MAX_AGENT_ADMISSION_BODY_BYTES,
+                        max_body_bytes=MAX_ADMISSION_BODY_BYTES,
                         harness="pi",
                         hook=hook.value,
                         schema_version="openshell.pi-input.v1",
@@ -227,7 +225,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                 raise ValueError("agent admission is disabled")
             if request.phase != pb2.SUPERVISOR_MIDDLEWARE_PHASE_AGENT_CONTEXT:
                 raise ValueError("invalid admission phase")
-            if len(request.request_body) > MAX_AGENT_ADMISSION_BODY_BYTES:
+            if len(request.request_body) > MAX_ADMISSION_BODY_BYTES:
                 raise ValueError("admission request body is too large")
             hook = AdmissionHook(request.target.hook)
             target = HttpTarget(

@@ -246,7 +246,6 @@ def test_cli_evaluate_runs_the_custom_gate_examples(
 @pytest.mark.parametrize(
     ("registry_reference", "example_directory", "registration_name"),
     [
-        (None, "pi-attested-admission", "pi-egress"),
         (None, "regex-redaction", "eg-regex"),
         (
             "examples.custom-gate.keyword_gate:registry",
@@ -288,6 +287,17 @@ def test_openshell_example_policies_use_valid_gate_configuration(
             )
 
     assert embedded_config == standalone_config
+
+
+def test_pi_admission_policy_uses_valid_gate_configuration() -> None:
+    project_dir = Path(__file__).parents[1]
+    policy_path = project_dir / "examples/pi-attested-admission/policy.yaml"
+    policy = yaml.safe_load(policy_path.read_text())
+    middleware = policy["network_middlewares"]["pi_egress_gate"]
+
+    assert middleware["middleware"] == "pi-egress"
+    assert len(middleware["middleware"]) <= MAX_MIDDLEWARE_REGISTRATION_NAME_BYTES
+    create_builtin_registry().validate_config(middleware["config"])
 
 
 @pytest.mark.parametrize(
