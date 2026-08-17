@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 RESERVED_LABEL = "oar-run-id"
 
 
-def create_command(
+def create(
     resolved: ResolvedRun,
     resources: PreparedResources,
     name: str,
@@ -35,7 +35,7 @@ def create_command(
     return command
 
 
-def download_command(resolved: ResolvedRun, name: str, destination: Path) -> list[str]:
+def download(resolved: ResolvedRun, name: str, destination: Path) -> list[str]:
     output = resolved.profile.profile.tasks[resolved.request.task_id].output
     return [
         resolved.request.openshell_bin,
@@ -48,7 +48,7 @@ def download_command(resolved: ResolvedRun, name: str, destination: Path) -> lis
     ]
 
 
-def get_command(request: RunRequest, name: str) -> list[str]:
+def get(request: RunRequest, name: str) -> list[str]:
     return [
         request.openshell_bin,
         "sandbox",
@@ -60,7 +60,7 @@ def get_command(request: RunRequest, name: str) -> list[str]:
     ]
 
 
-def delete_command(request: RunRequest, name: str) -> list[str]:
+def delete(request: RunRequest, name: str) -> list[str]:
     return [
         request.openshell_bin,
         "sandbox",
@@ -70,7 +70,7 @@ def delete_command(request: RunRequest, name: str) -> list[str]:
     ]
 
 
-def run_command(
+def run(
     command: list[str], timeout: int, *, capture: bool = False
 ) -> subprocess.CompletedProcess[str]:
     try:

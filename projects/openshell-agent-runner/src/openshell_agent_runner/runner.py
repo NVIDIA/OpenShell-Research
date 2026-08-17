@@ -14,7 +14,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-import openshell_agent_runner.commands as openshell_commands
+import openshell_agent_runner.openshell_commands as openshell_commands
 from openshell_agent_runner.artifacts import atomic_publish, validate_artifact
 from openshell_agent_runner.config import (
     ResolvedProfile,
@@ -101,11 +101,11 @@ def render_dry_run(request: RunRequest) -> str:
             commands = [
                 (
                     "create",
-                    openshell_commands.create_command(resolved, resources, name, token),
+                    openshell_commands.create(resolved, resources, name, token),
                 ),
                 (
                     "download",
-                    openshell_commands.download_command(resolved, name, downloaded),
+                    openshell_commands.download(resolved, name, downloaded),
                 ),
             ]
             if not request.keep_sandbox:
@@ -113,9 +113,9 @@ def render_dry_run(request: RunRequest) -> str:
                     [
                         (
                             "verify ownership",
-                            openshell_commands.get_command(request, name),
+                            openshell_commands.get(request, name),
                         ),
-                        ("delete", openshell_commands.delete_command(request, name)),
+                        ("delete", openshell_commands.delete(request, name)),
                     ]
                 )
             lines = [
@@ -148,15 +148,15 @@ def run_agent(request: RunRequest) -> str:
     resolved = resolve_run(request)
     name, token = _identity()
     resources = prepare_resources(resolved.profile, request.task_id, resolved.model)
-    create = openshell_commands.create_command(resolved, resources, name, token)
+    create = openshell_commands.create(resolved, resources, name, token)
     primary_error: BaseException | None = None
     try:
-        openshell_commands.run_command(create, request.timeout_seconds)
+        openshell_commands.run(create, request.timeout_seconds)
         output = resolved.profile.profile.tasks[request.task_id].output
         with tempfile.TemporaryDirectory(prefix="oar-output-") as directory:
             downloaded = Path(directory) / "output.download"
-            openshell_commands.run_command(
-                openshell_commands.download_command(resolved, name, downloaded), 120
+            openshell_commands.run(
+                openshell_commands.download(resolved, name, downloaded), 120
             )
             validate_artifact(downloaded, output, resolved.model)
             atomic_publish(downloaded, request.output)
@@ -171,9 +171,7 @@ def run_agent(request: RunRequest) -> str:
         else:
             try:
                 _verify_ownership(request, name, token)
-                openshell_commands.run_command(
-                    openshell_commands.delete_command(request, name), 60
-                )
+                openshell_commands.run(openshell_commands.delete(request, name), 60)
             except ExecutionError as cleanup_error:
                 if primary_error is None:
                     raise
@@ -203,8 +201,8 @@ def _identity() -> tuple[str, str]:
 
 
 def _verify_ownership(request: RunRequest, name: str, token: str) -> None:
-    command = openshell_commands.get_command(request, name)
-    result = openshell_commands.run_command(command, 30, capture=True)
+    command = openshell_commands.get(request, name)
+    result = openshell_commands.run(command, 30, capture=True)
     try:
         document = json.loads(result.stdout)
     except json.JSONDecodeError as error:

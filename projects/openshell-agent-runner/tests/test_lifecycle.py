@@ -252,9 +252,9 @@ def test_malformed_ownership_response_refuses_delete(
     tmp_path: Path, monkeypatch
 ) -> None:
     profile, executable, state, _ = prepare(tmp_path, monkeypatch)
-    import openshell_agent_runner.commands as commands_module
+    import openshell_agent_runner.openshell_commands as openshell_commands
 
-    original = commands_module.run_command
+    original = openshell_commands.run
 
     def malformed_get(command, timeout, *, capture=False):
         result = original(command, timeout, capture=capture)
@@ -267,7 +267,7 @@ def test_malformed_ownership_response_refuses_delete(
             )
         return result
 
-    monkeypatch.setattr(commands_module, "run_command", malformed_get)
+    monkeypatch.setattr(openshell_commands, "run", malformed_get)
     with pytest.raises(ExecutionError, match="mismatched ownership"):
         run_agent(request(profile, executable, tmp_path / "result.json"))
     assert state.exists()
@@ -300,10 +300,10 @@ def test_cleanup_failure_after_success_is_reported(tmp_path: Path, monkeypatch) 
 
 
 def test_interrupt_preserves_interrupt_and_cleans(tmp_path: Path, monkeypatch) -> None:
-    import openshell_agent_runner.commands as commands_module
+    import openshell_agent_runner.openshell_commands as openshell_commands
 
     profile, executable, state, _ = prepare(tmp_path, monkeypatch)
-    original = commands_module.run_command
+    original = openshell_commands.run
     interrupted = False
 
     def interrupt_after_create(command, timeout, *, capture=False):
@@ -314,7 +314,7 @@ def test_interrupt_preserves_interrupt_and_cleans(tmp_path: Path, monkeypatch) -
             raise KeyboardInterrupt
         return result
 
-    monkeypatch.setattr(commands_module, "run_command", interrupt_after_create)
+    monkeypatch.setattr(openshell_commands, "run", interrupt_after_create)
     with pytest.raises(KeyboardInterrupt):
         run_agent(request(profile, executable, tmp_path / "result.json"))
     assert not state.exists()
