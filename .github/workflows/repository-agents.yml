@@ -51,14 +51,14 @@ jobs:
       - name: Validate agent profiles
         run: |
           uv run --project projects/openshell-agent-runner oar validate \
-            .github/openshell-agents/profiles/dev-note-reviewer/profile.yaml
+            .github/openshell-agents/profiles/dev-note-reviewer
           uv run --project projects/openshell-agent-runner oar validate \
-            projects/openshell-agent-runner/profiles/reviewer/profile.yaml
+            projects/openshell-agent-runner/profiles/reviewer
 
       - name: Preview agent execution
         run: |
           uv run --project projects/openshell-agent-runner oar run \
-            .github/openshell-agents/profiles/dev-note-reviewer/profile.yaml \
+            .github/openshell-agents/profiles/dev-note-reviewer \
             --task editorial \
             --gateway openshell \
             --upload .:/workspace/source \
@@ -92,7 +92,7 @@ jobs:
         run: |
           wheel="$(find dist -name '*.whl' -print -quit)"
           uvx --from "$wheel" oar validate \
-            profiles/reviewer/profile.yaml
+            profiles/reviewer
 
       - name: Build the Pi image
         run: |

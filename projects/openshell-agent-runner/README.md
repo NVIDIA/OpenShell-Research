@@ -4,8 +4,8 @@
 declarative agent profiles in OpenShell sandboxes. It has three commands:
 
 ```text
-oar validate PROFILE
-oar run PROFILE --task TASK --output PATH [OPTIONS]
+oar validate PROFILE_DIRECTORY
+oar run PROFILE_DIRECTORY --task TASK --output PATH [OPTIONS]
 oar doctor [OPTIONS]
 ```
 
@@ -43,11 +43,11 @@ creates or changes gateways, providers, or inference routes.
 
 ## Validate a profile
 
-Pass the profile YAML directly:
+Pass the profile directory containing `profile.yaml`:
 
 ```bash
 uv run --project projects/openshell-agent-runner oar validate \
-  .github/openshell-agents/profiles/dev-note-reviewer/profile.yaml
+  .github/openshell-agents/profiles/dev-note-reviewer
 ```
 
 Validation loads every referenced prompt, policy, skill, and extension; rejects
@@ -67,7 +67,7 @@ uv run --project projects/openshell-agent-runner oar doctor \
 
 ```bash
 uv run --project projects/openshell-agent-runner oar run \
-  .github/openshell-agents/profiles/dev-note-reviewer/profile.yaml \
+  .github/openshell-agents/profiles/dev-note-reviewer \
   --task editorial \
   --gateway openshell \
   --upload .:/workspace/source \
@@ -103,7 +103,7 @@ Add `--dry-run` to the same `run` invocation:
 
 ```bash
 uv run --project projects/openshell-agent-runner oar run \
-  .github/openshell-agents/profiles/dev-note-reviewer/profile.yaml \
+  .github/openshell-agents/profiles/dev-note-reviewer \
   --task editorial \
   --gateway openshell \
   --upload .:/workspace/source \
@@ -159,8 +159,9 @@ tasks:
       max_bytes: 1048576
 ```
 
-Profile-owned paths resolve relative to the profile file. Native upload sources
-retain OpenShell's current-directory semantics.
+Each profile directory must contain `profile.yaml`. Profile-owned paths resolve
+relative to that directory. Native upload sources retain OpenShell's
+current-directory semantics.
 
 `approval_mode: auto` is the autonomous-runner default. It lets OpenShell
 automatically accept agent-authored policy proposals only when its prover finds

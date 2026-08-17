@@ -28,7 +28,7 @@ from openshell_agent_runner.harnesses.pi.resources import prepare_resources
 
 @dataclass(frozen=True)
 class RunRequest:
-    profile_path: Path
+    profile_directory: Path
     task_id: str
     output: Path
     uploads: Sequence[str] = ()
@@ -51,7 +51,7 @@ class ResolvedRun:
 
 
 def resolve_run(request: RunRequest) -> ResolvedRun:
-    profile = resolve_task(request.profile_path, request.task_id)
+    profile = resolve_task(request.profile_directory, request.task_id)
     model = profile.profile.harness.model
     uploads = _validate_uploads([*profile.profile.sandbox.upload, *request.uploads])
     environments = _validate_environments(

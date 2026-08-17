@@ -10,9 +10,7 @@ from openshell_agent_runner.errors import ConfigurationError
 from openshell_agent_runner.runner import RunRequest, resolve_run
 
 REPOSITORY = Path(__file__).resolve().parents[3]
-PROFILE = (
-    REPOSITORY / ".github/openshell-agents/profiles/dev-note-reviewer/profile.yaml"
-)
+PROFILE = REPOSITORY / ".github/openshell-agents/profiles/dev-note-reviewer"
 
 
 def request(
@@ -22,7 +20,7 @@ def request(
     gateway: str | None = None,
 ) -> RunRequest:
     return RunRequest(
-        profile_path=PROFILE,
+        profile_directory=PROFILE,
         task_id="editorial",
         output=Path("/tmp/review.json"),
         uploads=uploads,

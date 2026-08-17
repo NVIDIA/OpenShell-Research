@@ -26,6 +26,7 @@ IDENTIFIER_PATTERN = r"^[a-z][a-z0-9-]{0,62}$"
 RESOURCE_IDENTIFIER_PATTERN = r"^[a-z][a-z0-9_-]{0,62}$"
 MODEL_IDENTIFIER_PATTERN = r"^[A-Za-z0-9._:/-]{1,256}$"
 MAX_ARTIFACT_BYTES = 10 * 1024 * 1024
+PROFILE_FILENAME = "profile.yaml"
 
 
 class StrictModel(BaseModel):
@@ -139,25 +140,41 @@ class ResolvedProfile(StrictModel):
     profile: ProfileConfig
 
 
-def load_profile(path: Path) -> ResolvedProfile:
+def load_profile(directory: Path) -> ResolvedProfile:
     try:
-        profile_path = path.resolve(strict=True)
+        profile_dir = directory.resolve(strict=True)
+    except OSError as error:
+        raise ConfigurationError(f"missing profile directory: {directory}") from error
+    if not profile_dir.is_dir():
+        raise ConfigurationError(
+            f"profile must be a directory containing {PROFILE_FILENAME}: {directory}"
+        )
+    candidate = profile_dir / PROFILE_FILENAME
+    try:
+        profile_path = candidate.resolve(strict=True)
+    except OSError as error:
+        raise ConfigurationError(
+            f"missing profile configuration: {candidate}"
+        ) from error
+    if not profile_path.is_relative_to(profile_dir) or not profile_path.is_file():
+        raise ConfigurationError(
+            f"profile configuration must be a file inside {profile_dir}: {candidate}"
+        )
+    try:
         profile = ProfileConfig.model_validate(_load_yaml(profile_path))
     except ValidationError as error:
         raise ConfigurationError(f"invalid profile {profile_path}: {error}") from error
-    except OSError as error:
-        raise ConfigurationError(f"missing profile: {path}") from error
     resolved = ResolvedProfile(
         profile_path=profile_path,
-        profile_dir=profile_path.parent,
+        profile_dir=profile_dir,
         profile=profile,
     )
     _validate_profile_resources(resolved)
     return resolved
 
 
-def resolve_task(profile_path: Path, task_id: str) -> ResolvedProfile:
-    resolved = load_profile(profile_path)
+def resolve_task(profile_directory: Path, task_id: str) -> ResolvedProfile:
+    resolved = load_profile(profile_directory)
     if task_id not in resolved.profile.tasks:
         raise ConfigurationError(
             f"unknown task {task_id!r} for profile {resolved.profile.id!r}"
