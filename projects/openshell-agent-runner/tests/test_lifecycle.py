@@ -1,0 +1,340 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+import json
+import subprocess
+from dataclasses import replace
+from pathlib import Path
+
+import pytest
+
+from openshell_agent_runner.errors import ArtifactError, ExecutionError
+from openshell_agent_runner.runner import (
+    RunRequest,
+    render_dry_run,
+    resolve_run,
+    run_agent,
+)
+
+
+def fixture(tmp_path: Path) -> Path:
+    (tmp_path / "policy.yaml").write_text("version: 1\n")
+    (tmp_path / "prompt.md").write_text("Return the configured output.\n")
+    profile = tmp_path / "profile.yaml"
+    profile.write_text(
+        """id: test
+description: Fake OpenShell contract profile.
+harness:
+  type: pi
+  model: fake-model
+sandbox:
+  from: ignored-by-fake
+  policy: policy.yaml
+  no_auto_providers: true
+tasks:
+  smoke:
+    prompt: prompt.md
+    output:
+      type: document_review
+      contract:
+        reviewer_id: result
+        criteria: [result]
+      sandbox_path: /sandbox/artifacts/result.json
+      max_bytes: 1000
+"""
+    )
+    return profile
+
+
+def fake_openshell(tmp_path: Path) -> tuple[Path, Path, Path]:
+    executable = tmp_path / "openshell"
+    state = tmp_path / "state.json"
+    log = tmp_path / "commands.jsonl"
+    executable.write_text(
+        """#!/usr/bin/env python3
+import json, os, pathlib, sys
+state = pathlib.Path(os.environ["FAKE_STATE"])
+log = pathlib.Path(os.environ["FAKE_LOG"])
+with log.open("a") as stream:
+    stream.write(json.dumps(sys.argv[1:]) + "\\n")
+args = sys.argv[1:]
+operation = args[1]
+if operation == "create":
+    name = args[args.index("--name") + 1]
+    labels = [args[index + 1] for index, item in enumerate(args) if item == "--label"]
+    token = next(item.split("=", 1)[1] for item in labels if item.startswith("oar-run-id="))
+    state.write_text(json.dumps({"name": name, "labels": {"oar-run-id": token}}))
+    if os.environ.get("FAKE_FAIL_CREATE") == "1": sys.exit(1)
+    if os.environ.get("FAKE_SLEEP_CREATE") == "1":
+        import time; time.sleep(5)
+elif operation == "get":
+    if not state.exists(): sys.exit(1)
+    document = json.loads(state.read_text())
+    if os.environ.get("FAKE_COLLISION") == "1": document["labels"]["oar-run-id"] = "wrong"
+    print(json.dumps(document))
+elif operation == "download":
+    if os.environ.get("FAKE_FAIL_DOWNLOAD") == "1": sys.exit(1)
+    fallback = json.dumps({
+        "reviewer_id": "result",
+        "model_id": "fake-model",
+        "source_revision": "abc123",
+        "source_content_digest": "a" * 64,
+        "criterion_scores": [{"criterion": "result", "score": 4, "explanation": "Good."}],
+        "overall_score": 100,
+        "verdict": "pass",
+        "confidence": "high",
+        "findings": [],
+        "overall_assessment": "Good.",
+    })
+    pathlib.Path(args[4]).write_text(os.environ.get("FAKE_OUTPUT", fallback) + "\\n")
+elif operation == "delete":
+    if os.environ.get("FAKE_FAIL_DELETE") == "1": sys.exit(1)
+    state.unlink(missing_ok=True)
+else:
+    sys.exit(8)
+"""
+    )
+    executable.chmod(0o755)
+    return executable, state, log
+
+
+def request(profile: Path, executable: Path, output: Path) -> RunRequest:
+    return RunRequest(
+        profile_path=profile,
+        task_id="smoke",
+        output=output,
+        openshell_bin=str(executable),
+        uploads=(".:/workspace/source",),
+        timeout_seconds=30,
+    )
+
+
+def prepare(tmp_path: Path, monkeypatch) -> tuple[Path, Path, Path, Path]:
+    profile = fixture(tmp_path)
+    executable, state, log = fake_openshell(tmp_path)
+    monkeypatch.setenv("FAKE_STATE", str(state))
+    monkeypatch.setenv("FAKE_LOG", str(log))
+    return profile, executable, state, log
+
+
+def test_create_download_owned_delete_order(tmp_path: Path, monkeypatch) -> None:
+    profile, executable, state, log = prepare(tmp_path, monkeypatch)
+    output = tmp_path / "result.json"
+
+    name = run_agent(request(profile, executable, output))
+
+    assert len(name) == 19
+    assert json.loads(output.read_text())["verdict"] == "pass"
+    assert not state.exists()
+    commands = [json.loads(line) for line in log.read_text().splitlines()]
+    assert [command[1] for command in commands] == [
+        "create",
+        "download",
+        "get",
+        "delete",
+    ]
+
+
+def test_resolved_command_is_the_create_prefix(tmp_path: Path, monkeypatch) -> None:
+    profile, executable, state, log = prepare(tmp_path, monkeypatch)
+    item = request(profile, executable, tmp_path / "result.json")
+    resolved = resolve_run(item)
+
+    run_agent(item)
+
+    create = json.loads(log.read_text().splitlines()[0])
+    assert create[: len(resolved.create_command) - 1] == list(
+        resolved.create_command[1:]
+    )
+    assert ["--", "bash", "/opt/oar/pi/exec.sh", "fake-model"] == create[
+        create.index("--") : create.index("--") + 4
+    ]
+    uploads = [
+        create[index + 1] for index, value in enumerate(create) if value == "--upload"
+    ]
+    assert any(
+        value.endswith(":/sandbox/oar-runtime/schemas/output.schema.json")
+        for value in uploads
+    )
+    assert not state.exists()
+
+
+def test_dry_run_prints_every_command_without_executing(
+    tmp_path: Path, monkeypatch
+) -> None:
+    profile, executable, state, log = prepare(tmp_path, monkeypatch)
+    output = tmp_path / "result.json"
+
+    preview = render_dry_run(request(profile, executable, output))
+
+    assert "Dry run: no commands were executed." in preview
+    assert "[create]" in preview
+    assert "sandbox create" in preview
+    assert "[download]" in preview
+    assert "sandbox download" in preview
+    assert "[verify ownership]" in preview
+    assert "sandbox get" in preview
+    assert "[delete]" in preview
+    assert "sandbox delete" in preview
+    assert "/sandbox/oar-runtime/schemas/output.schema.json" in preview
+    assert f"[publish] atomically replace {output}" in preview
+    assert not state.exists()
+    assert not log.exists()
+    assert not output.exists()
+
+
+def test_keep_sandbox_dry_run_omits_cleanup_commands(
+    tmp_path: Path, monkeypatch
+) -> None:
+    profile, executable, state, log = prepare(tmp_path, monkeypatch)
+    item = replace(
+        request(profile, executable, tmp_path / "result.json"), keep_sandbox=True
+    )
+
+    preview = render_dry_run(item)
+
+    assert "sandbox get" not in preview
+    assert "sandbox delete" not in preview
+    assert "[cleanup] skipped" in preview
+    assert not state.exists()
+    assert not log.exists()
+
+
+def test_keep_sandbox_skips_inspection_and_delete(tmp_path: Path, monkeypatch) -> None:
+    profile, executable, state, log = prepare(tmp_path, monkeypatch)
+    item = replace(
+        request(profile, executable, tmp_path / "result.json"), keep_sandbox=True
+    )
+    run_agent(item)
+    assert state.exists()
+    assert [json.loads(line)[1] for line in log.read_text().splitlines()] == [
+        "create",
+        "download",
+    ]
+
+
+def test_keep_sandbox_reports_name_after_artifact_failure(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    profile, executable, state, _ = prepare(tmp_path, monkeypatch)
+    monkeypatch.setenv("FAKE_OUTPUT", "{}")
+    item = replace(
+        request(profile, executable, tmp_path / "result.json"), keep_sandbox=True
+    )
+
+    with pytest.raises(ArtifactError):
+        run_agent(item)
+
+    assert state.exists()
+    assert "oar: sandbox name (--keep-sandbox): oar-" in capsys.readouterr().err
+
+
+def test_timeout_cleans_owned_sandbox(tmp_path: Path, monkeypatch) -> None:
+    profile, executable, state, _ = prepare(tmp_path, monkeypatch)
+    monkeypatch.setenv("FAKE_SLEEP_CREATE", "1")
+    item = replace(
+        request(profile, executable, tmp_path / "result.json"), timeout_seconds=1
+    )
+    with pytest.raises(ExecutionError):
+        run_agent(item)
+    assert not state.exists()
+
+
+def test_collision_refuses_delete(tmp_path: Path, monkeypatch) -> None:
+    profile, executable, state, _ = prepare(tmp_path, monkeypatch)
+    monkeypatch.setenv("FAKE_COLLISION", "1")
+    with pytest.raises(ExecutionError, match="mismatched ownership"):
+        run_agent(request(profile, executable, tmp_path / "result.json"))
+    assert state.exists()
+
+
+def test_malformed_ownership_response_refuses_delete(
+    tmp_path: Path, monkeypatch
+) -> None:
+    profile, executable, state, _ = prepare(tmp_path, monkeypatch)
+    import openshell_agent_runner.commands as commands_module
+
+    original = commands_module.run_command
+
+    def malformed_get(command, timeout, *, capture=False):
+        result = original(command, timeout, capture=capture)
+        if command[1:3] == ["sandbox", "get"]:
+            return subprocess.CompletedProcess(
+                result.args,
+                result.returncode,
+                '{"name": "wrong-shape", "labels": []}\n',
+                result.stderr,
+            )
+        return result
+
+    monkeypatch.setattr(commands_module, "run_command", malformed_get)
+    with pytest.raises(ExecutionError, match="mismatched ownership"):
+        run_agent(request(profile, executable, tmp_path / "result.json"))
+    assert state.exists()
+
+
+def test_invalid_output_still_cleans(tmp_path: Path, monkeypatch) -> None:
+    profile, executable, state, _ = prepare(tmp_path, monkeypatch)
+    monkeypatch.setenv("FAKE_OUTPUT", "{}")
+    with pytest.raises(ArtifactError):
+        run_agent(request(profile, executable, tmp_path / "result.json"))
+    assert not state.exists()
+
+
+def test_cleanup_failure_does_not_mask_primary_error(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    profile, executable, _, _ = prepare(tmp_path, monkeypatch)
+    monkeypatch.setenv("FAKE_FAIL_CREATE", "1")
+    monkeypatch.setenv("FAKE_FAIL_DELETE", "1")
+    with pytest.raises(ExecutionError, match="sandbox create"):
+        run_agent(request(profile, executable, tmp_path / "result.json"))
+    assert "cleanup failed after primary error" in capsys.readouterr().err
+
+
+def test_cleanup_failure_after_success_is_reported(tmp_path: Path, monkeypatch) -> None:
+    profile, executable, _, _ = prepare(tmp_path, monkeypatch)
+    monkeypatch.setenv("FAKE_FAIL_DELETE", "1")
+    with pytest.raises(ExecutionError, match="sandbox delete"):
+        run_agent(request(profile, executable, tmp_path / "result.json"))
+
+
+def test_interrupt_preserves_interrupt_and_cleans(tmp_path: Path, monkeypatch) -> None:
+    import openshell_agent_runner.commands as commands_module
+
+    profile, executable, state, _ = prepare(tmp_path, monkeypatch)
+    original = commands_module.run_command
+    interrupted = False
+
+    def interrupt_after_create(command, timeout, *, capture=False):
+        nonlocal interrupted
+        result = original(command, timeout, capture=capture)
+        if command[1:3] == ["sandbox", "create"] and not interrupted:
+            interrupted = True
+            raise KeyboardInterrupt
+        return result
+
+    monkeypatch.setattr(commands_module, "run_command", interrupt_after_create)
+    with pytest.raises(KeyboardInterrupt):
+        run_agent(request(profile, executable, tmp_path / "result.json"))
+    assert not state.exists()
+
+
+def test_download_failure_cleans(tmp_path: Path, monkeypatch) -> None:
+    profile, executable, state, _ = prepare(tmp_path, monkeypatch)
+    monkeypatch.setenv("FAKE_FAIL_DOWNLOAD", "1")
+    with pytest.raises(ExecutionError, match="sandbox download"):
+        run_agent(request(profile, executable, tmp_path / "result.json"))
+    assert not state.exists()
+
+
+def test_create_failure_still_deletes_owned_sandbox(
+    tmp_path: Path, monkeypatch
+) -> None:
+    profile, executable, state, log = prepare(tmp_path, monkeypatch)
+    monkeypatch.setenv("FAKE_FAIL_CREATE", "1")
+    with pytest.raises(ExecutionError):
+        run_agent(request(profile, executable, tmp_path / "result.json"))
+    assert not state.exists()
+    commands = [json.loads(line) for line in log.read_text().splitlines()]
+    assert [command[1] for command in commands] == ["create", "get", "delete"]

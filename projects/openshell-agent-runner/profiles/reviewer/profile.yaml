@@ -1,0 +1,27 @@
+id: reviewer
+description: Inspect uploaded files and publish a small structured review.
+
+harness:
+  type: pi
+  model: aws/anthropic/bedrock-claude-opus-5
+
+sandbox:
+  from: projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/assets
+  policy: policy.yaml
+  no_auto_providers: true
+  approval_mode: auto
+  env:
+    - REPOSITORY_ROOT=/workspace/input
+
+tasks:
+  inspect:
+    prompt: prompt.md
+    tools: [read, grep, find, ls, bash]
+    output:
+      type: document_review
+      contract:
+        reviewer_id: general
+        criteria: [clarity, completeness]
+        max_findings: 8
+      sandbox_path: /sandbox/artifacts/report.json
+      max_bytes: 1048576
