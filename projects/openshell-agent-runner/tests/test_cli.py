@@ -3,6 +3,7 @@
 
 from pathlib import Path
 
+from typer.main import get_group
 from typer.testing import CliRunner
 
 from openshell_agent_runner.cli import app
@@ -34,7 +35,14 @@ def test_run_help_has_only_the_supported_override_surface() -> None:
     result = CliRunner().invoke(app, ["run", "--help"])
 
     assert result.exit_code == 0
-    for option in (
+    run_command = get_group(app).commands["run"]
+    options = {
+        option
+        for parameter in run_command.params
+        for option in parameter.opts
+        if option.startswith("--")
+    }
+    assert options == {
         "--task",
         "--output",
         "--upload",
@@ -44,18 +52,7 @@ def test_run_help_has_only_the_supported_override_surface() -> None:
         "--timeout-seconds",
         "--keep-sandbox",
         "--dry-run",
-    ):
-        assert option in result.stdout
-    for removed in (
-        "--config",
-        "--artifact",
-        "--run-metadata",
-        "--from",
-        "--model",
-        "--provider",
-        "--gateway-endpoint",
-    ):
-        assert removed not in result.stdout
+    }
 
 
 def test_run_dry_run_does_not_publish_output(tmp_path: Path) -> None:
