@@ -1,0 +1,53 @@
+[project]
+name = "openshell-agent-runner"
+version = "0.1.0"
+description = "Run declarative agent profiles in OpenShell sandboxes."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+  { name = "NVIDIA CORPORATION & AFFILIATES" },
+]
+dependencies = [
+  "pydantic>=2.11,<3",
+  "pyyaml>=6,<7",
+  "typer>=0.16,<1",
+]
+
+[project.scripts]
+oar = "openshell_agent_runner.cli:app"
+openshell-agent-runner = "openshell_agent_runner.cli:app"
+
+[project.urls]
+Repository = "https://github.com/NVIDIA/OpenShell-Research"
+
+[dependency-groups]
+dev = [
+  "pre-commit>=4,<5",
+  "pytest>=8.4,<10",
+  "ruff==0.16.2",
+  "ty>=0.0.1a34",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.8,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "TID252", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv.build-backend]
+module-name = "openshell_agent_runner"

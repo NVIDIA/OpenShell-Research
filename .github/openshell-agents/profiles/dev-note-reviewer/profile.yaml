@@ -1,0 +1,57 @@
+id: dev-note-reviewer
+description: Review OpenShell Dev Notes for editorial and technical quality.
+
+harness:
+  type: pi
+  model: aws/anthropic/bedrock-claude-opus-5
+  context_window: 1000000
+  max_tokens: 128000
+
+sandbox:
+  from: projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/assets
+  policy: policy.yaml
+  no_auto_providers: true
+  approval_mode: auto
+  env:
+    - REPOSITORY_ROOT=/workspace/source
+
+tasks:
+  editorial:
+    prompt: prompts/editorial.md
+    tools: [read, grep, find, ls, bash, submit_review]
+    skills: [skills/review-dev-note]
+    extensions: [extensions/submit-review.ts]
+    output:
+      type: document_review
+      contract:
+        reviewer_id: editorial
+        criteria:
+          - formulaic_language
+          - empty_emphasis
+          - repetitive_cadence
+          - unnecessary_summary
+          - inflated_claims
+          - vague_attribution
+          - directness
+        max_findings: 12
+      sandbox_path: /sandbox/artifacts/review.json
+      max_bytes: 1048576
+
+  technical:
+    prompt: prompts/technical.md
+    tools: [read, grep, find, ls, bash, submit_review]
+    skills: [skills/review-dev-note]
+    extensions: [extensions/submit-review.ts]
+    output:
+      type: document_review
+      contract:
+        reviewer_id: technical_note
+        criteria:
+          - directness
+          - technical_grounding
+          - proportionality
+          - reader_utility
+          - evidence_quality
+        max_findings: 12
+      sandbox_path: /sandbox/artifacts/review.json
+      max_bytes: 1048576
