@@ -1,7 +1,7 @@
 [project]
 name = "openshell-agent-runner"
 dynamic = ["version"]
-description = "Run declarative agent profiles in OpenShell sandboxes."
+description = "Launch ephemeral agents for single tasks in OpenShell sandboxes."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"

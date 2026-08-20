@@ -20,7 +20,7 @@ from openshell_agent_runner.openshell import doctor as run_doctor
 from openshell_agent_runner.runner import RunRequest, render_dry_run, run_agent
 
 app = typer.Typer(
-    help="Validate and run agent profiles in OpenShell sandboxes.",
+    help="Launch ephemeral agents for single tasks in OpenShell sandboxes.",
     no_args_is_help=True,
     add_completion=False,
     pretty_exceptions_enable=False,
@@ -113,7 +113,7 @@ def run(
         ),
     ] = False,
 ) -> None:
-    """Run or preview one profile task and publish its result."""
+    """Launch or preview an ephemeral agent for one profile task."""
     request = RunRequest(
         profile_directory=profile,
         task_id=task,

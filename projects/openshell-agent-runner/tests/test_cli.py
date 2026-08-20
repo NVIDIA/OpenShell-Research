@@ -19,7 +19,7 @@ def test_root_help_exposes_only_supported_commands() -> None:
     assert result.exit_code == 0
     for command, description in (
         ("validate", "Validate a profile and all referenced local resources."),
-        ("run", "Run or preview one profile task and publish its result."),
+        ("run", "Launch or preview an ephemeral agent for one profile task."),
         ("doctor", "Check OpenShell readiness without changing its state."),
     ):
         assert command in result.stdout
@@ -122,7 +122,7 @@ def test_run_help_rejects_unknown_profile_task() -> None:
 
     assert result.exit_code == 2
     assert "unknown task 'inspect' for profile 'reviewer'" in result.stderr
-    assert "Run or preview one profile task" not in result.stdout
+    assert "Launch or preview an ephemeral agent" not in result.stdout
     assert "Options" not in result.stdout
 
 

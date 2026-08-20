@@ -1,7 +1,8 @@
 # OpenShell Agent Runner development instructions
 
-- Keep the package focused on launching explicitly configured agents. Do not
-  add Git, repository inspection, provider management, or inference mutation.
+- Keep the package focused on launching one explicitly configured ephemeral
+  agent task per invocation. Do not add Git, repository inspection, provider
+  management, or inference mutation.
 - Preserve native OpenShell option names and transfer semantics.
 - Keep profiles strict and declarative; reject unknown keys and trusted-resource
   paths that escape their profile directory.

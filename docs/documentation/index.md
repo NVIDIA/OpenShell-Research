@@ -11,5 +11,5 @@ OpenShell Research projects.
 
 - [Egress Gate](egress-gate/index.md): extensible middleware for applying gates
   to outgoing HTTP requests.
-- [OpenShell Agent Runner](openshell-agent-runner/index.md): declarative agent
-  profiles, sandbox execution, and validated result handling.
+- [OpenShell Agent Runner](openshell-agent-runner/index.md): launch ephemeral
+  agents for single, bounded tasks in CI and automated workflows.

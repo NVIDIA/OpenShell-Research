@@ -2,8 +2,9 @@
 
 ## Goal
 
-Provide a small installable tool that validates and runs declarative Pi agent
-profiles in OpenShell:
+Provide a small installable CLI that launches one ephemeral Pi agent to
+accomplish one configured task per invocation. This bounded lifecycle is
+designed for CI and other automated workflows:
 
 ```text
 oar validate PROFILE_DIRECTORY
@@ -11,8 +12,9 @@ oar run PROFILE_DIRECTORY --task TASK --output PATH
 oar doctor
 ```
 
-The runner orchestrates OpenShell. The sandboxed agent owns repository
-inspection, Git operations, tool use, analysis, and conclusions.
+OAR starts the ephemeral agent through OpenShell and collects its single result.
+The sandboxed agent owns repository inspection, Git operations, tool use,
+analysis, and conclusions.
 
 ## Scope
 
