@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 720" role="img" aria-labelledby="title description">
+  <title id="title">OAR run lifecycle</title>
+  <desc id="description">One OAR invocation launches an ephemeral agent for one task through profile validation, sandbox creation, Pi execution, result publication, and ownership-checked deletion.</desc>
+  <defs>
+    <style>
+      text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#1f2933}
+      .host{fill:#eef6ff;stroke:#3973ad;stroke-width:2}
+      .open{fill:#fff5eb;stroke:#c86622;stroke-width:2}
+      .agent{fill:#eef9f1;stroke:#2f855a;stroke-width:2}
+      .title{font-size:19px;font-weight:700}.subtitle{font-size:14px;fill:#5f6b76}.number{font-size:18px;font-weight:700;fill:white}
+      .badge-host{fill:#3973ad}.badge-open{fill:#c86622}.badge-agent{fill:#2f855a}
+      .arrow{fill:none;stroke:#718096;stroke-width:2.5;marker-end:url(#arrow)}
+      @media(prefers-color-scheme:dark){text{fill:#edf2f7}.host{fill:#162b3f;stroke:#7db6e8}.open{fill:#3a2819;stroke:#f6ad55}.agent{fill:#143126;stroke:#68d391}.subtitle{fill:#aeb8c5}.arrow{stroke:#8b98a5}}
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#718096"/></marker>
+  </defs>
+
+  <rect x="55" y="55" width="430" height="105" rx="16" class="host"/>
+  <circle cx="90" cy="90" r="19" class="badge-host"/><text x="90" y="96" text-anchor="middle" class="number">1</text>
+  <text x="125" y="91" class="title">Validate profile</text><text x="125" y="119" class="subtitle">YAML · model settings · referenced resources</text>
+
+  <rect x="635" y="55" width="430" height="105" rx="16" class="host"/>
+  <circle cx="670" cy="90" r="19" class="badge-host"/><text x="670" y="96" text-anchor="middle" class="number">2</text>
+  <text x="705" y="91" class="title">Resolve run</text><text x="705" y="119" class="subtitle">task · uploads · environment · target</text>
+
+  <rect x="635" y="215" width="430" height="105" rx="16" class="host"/>
+  <circle cx="670" cy="250" r="19" class="badge-host"/><text x="670" y="256" text-anchor="middle" class="number">3</text>
+  <text x="705" y="251" class="title">Prepare Pi runtime</text><text x="705" y="279" class="subtitle">prompt · settings · skills · extensions · schema</text>
+
+  <rect x="55" y="215" width="430" height="105" rx="16" class="open"/>
+  <circle cx="90" cy="250" r="19" class="badge-open"/><text x="90" y="256" text-anchor="middle" class="number">4</text>
+  <text x="125" y="251" class="title">Create sandbox</text><text x="125" y="279" class="subtitle">image · policy · uploads · ownership label</text>
+
+  <rect x="55" y="375" width="430" height="105" rx="16" class="agent"/>
+  <circle cx="90" cy="410" r="19" class="badge-agent"/><text x="90" y="416" text-anchor="middle" class="number">5</text>
+  <text x="125" y="411" class="title">Run one agent task</text><text x="125" y="439" class="subtitle">Pi · tools · managed inference</text>
+
+  <rect x="635" y="375" width="430" height="105" rx="16" class="open"/>
+  <circle cx="670" cy="410" r="19" class="badge-open"/><text x="670" y="416" text-anchor="middle" class="number">6</text>
+  <text x="705" y="411" class="title">Download result</text><text x="705" y="439" class="subtitle">/sandbox/artifacts/result</text>
+
+  <rect x="635" y="535" width="430" height="105" rx="16" class="host"/>
+  <circle cx="670" cy="570" r="19" class="badge-host"/><text x="670" y="576" text-anchor="middle" class="number">7</text>
+  <text x="705" y="571" class="title">Validate and publish</text><text x="705" y="599" class="subtitle">checks · schema · atomic publication</text>
+
+  <rect x="55" y="535" width="430" height="105" rx="16" class="open"/>
+  <circle cx="90" cy="570" r="19" class="badge-open"/><text x="90" y="576" text-anchor="middle" class="number">8</text>
+  <text x="125" y="571" class="title">Verify and delete</text><text x="125" y="599" class="subtitle">name + oar-run-id must match</text>
+
+  <path d="M485 107h150" class="arrow"/><path d="M850 160v55" class="arrow"/><path d="M635 267H485" class="arrow"/><path d="M270 320v55" class="arrow"/><path d="M485 427h150" class="arrow"/><path d="M850 480v55" class="arrow"/><path d="M635 587H485" class="arrow"/>
+</svg>
