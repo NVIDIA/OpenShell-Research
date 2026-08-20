@@ -20,27 +20,27 @@ from openshell_agent_runner.runner import (
 def fixture(tmp_path: Path) -> Path:
     (tmp_path / "policy.yaml").write_text("version: 1\n")
     (tmp_path / "prompt.md").write_text("Return the configured output.\n")
+    (tmp_path / "models.json").write_text(
+        '{"providers":{"openshell":{"models":[{"id":"fake-model"}]}}}'
+    )
+    (tmp_path / "settings.json").write_text(
+        '{"defaultProvider":"openshell","defaultModel":"fake-model",'
+        '"defaultThinkingLevel":"high"}'
+    )
+    (tmp_path / "output.schema.json").write_text(
+        '{"type":"object","additionalProperties":false,"required":["status"],'
+        '"properties":{"status":{"const":"pass"}}}'
+    )
     profile = tmp_path / "profile.yaml"
     profile.write_text(
         """id: test
 description: Fake OpenShell contract profile.
-harness:
-  type: pi
-  model: fake-model
 sandbox:
-  from: ignored-by-fake
   policy: policy.yaml
-  no_auto_providers: true
 tasks:
   smoke:
     prompt: prompt.md
-    output:
-      type: document_review
-      contract:
-        reviewer_id: result
-        criteria: [result]
-      sandbox_path: /sandbox/artifacts/result.json
-      max_bytes: 1000
+    output_schema: output.schema.json
 """
     )
     return tmp_path
@@ -74,18 +74,7 @@ elif operation == "get":
     print(json.dumps(document))
 elif operation == "download":
     if os.environ.get("FAKE_FAIL_DOWNLOAD") == "1": sys.exit(1)
-    fallback = json.dumps({
-        "reviewer_id": "result",
-        "model_id": "fake-model",
-        "source_revision": "abc123",
-        "source_content_digest": "a" * 64,
-        "criterion_scores": [{"criterion": "result", "score": 4, "explanation": "Good."}],
-        "overall_score": 100,
-        "verdict": "pass",
-        "confidence": "high",
-        "findings": [],
-        "overall_assessment": "Good.",
-    })
+    fallback = json.dumps({"status": "pass"})
     pathlib.Path(args[4]).write_text(os.environ.get("FAKE_OUTPUT", fallback) + "\\n")
 elif operation == "delete":
     if os.environ.get("FAKE_FAIL_DELETE") == "1": sys.exit(1)
@@ -124,7 +113,7 @@ def test_create_download_owned_delete_order(tmp_path: Path, monkeypatch) -> None
     name = run_agent(request(profile, executable, output))
 
     assert len(name) == 19
-    assert json.loads(output.read_text())["verdict"] == "pass"
+    assert json.loads(output.read_text())["status"] == "pass"
     assert not state.exists()
     commands = [json.loads(line) for line in log.read_text().splitlines()]
     assert [command[1] for command in commands] == [
@@ -146,15 +135,16 @@ def test_resolved_command_is_the_create_prefix(tmp_path: Path, monkeypatch) -> N
     assert create[: len(resolved.create_command) - 1] == list(
         resolved.create_command[1:]
     )
-    assert ["--", "bash", "/opt/oar/pi/exec.sh", "fake-model"] == create[
-        create.index("--") : create.index("--") + 4
-    ]
+    harness = create[create.index("--") :]
+    assert harness[:3] == ["--", "bash", "/opt/oar/pi/exec.sh"]
+    assert harness[harness.index("--provider") + 1] == "openshell"
+    assert harness[harness.index("--model") + 1] == "fake-model"
+    assert harness[harness.index("--thinking") + 1] == "high"
     uploads = [
         create[index + 1] for index, value in enumerate(create) if value == "--upload"
     ]
     assert any(
-        value.endswith(":/sandbox/oar-runtime/schemas/output.schema.json")
-        for value in uploads
+        value.endswith(":/sandbox/oar-runtime/output.schema.json") for value in uploads
     )
     assert not state.exists()
 
@@ -176,7 +166,7 @@ def test_dry_run_prints_every_command_without_executing(
     assert "sandbox get" in preview
     assert "[delete]" in preview
     assert "sandbox delete" in preview
-    assert "/sandbox/oar-runtime/schemas/output.schema.json" in preview
+    assert "/sandbox/oar-runtime/output.schema.json" in preview
     assert f"[publish] atomically replace {output}" in preview
     assert not state.exists()
     assert not log.exists()
@@ -252,9 +242,9 @@ def test_malformed_ownership_response_refuses_delete(
     tmp_path: Path, monkeypatch
 ) -> None:
     profile, executable, state, _ = prepare(tmp_path, monkeypatch)
-    import openshell_agent_runner.openshell_commands as openshell_commands
+    import openshell_agent_runner.openshell as openshell
 
-    original = openshell_commands.run
+    original = openshell.run
 
     def malformed_get(command, timeout, *, capture=False):
         result = original(command, timeout, capture=capture)
@@ -267,7 +257,7 @@ def test_malformed_ownership_response_refuses_delete(
             )
         return result
 
-    monkeypatch.setattr(openshell_commands, "run", malformed_get)
+    monkeypatch.setattr(openshell, "run", malformed_get)
     with pytest.raises(ExecutionError, match="mismatched ownership"):
         run_agent(request(profile, executable, tmp_path / "result.json"))
     assert state.exists()
@@ -300,10 +290,10 @@ def test_cleanup_failure_after_success_is_reported(tmp_path: Path, monkeypatch) 
 
 
 def test_interrupt_preserves_interrupt_and_cleans(tmp_path: Path, monkeypatch) -> None:
-    import openshell_agent_runner.openshell_commands as openshell_commands
+    import openshell_agent_runner.openshell as openshell
 
     profile, executable, state, _ = prepare(tmp_path, monkeypatch)
-    original = openshell_commands.run
+    original = openshell.run
     interrupted = False
 
     def interrupt_after_create(command, timeout, *, capture=False):
@@ -314,7 +304,7 @@ def test_interrupt_preserves_interrupt_and_cleans(tmp_path: Path, monkeypatch) -
             raise KeyboardInterrupt
         return result
 
-    monkeypatch.setattr(openshell_commands, "run", interrupt_after_create)
+    monkeypatch.setattr(openshell, "run", interrupt_after_create)
     with pytest.raises(KeyboardInterrupt):
         run_agent(request(profile, executable, tmp_path / "result.json"))
     assert not state.exists()

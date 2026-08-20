@@ -27,9 +27,10 @@ Every finding must quote exact, unique reader-visible text and provide the
 one-based line and column where that quote begins. Omit a finding if the quote is
 not unique. Provide at most 12 findings.
 
-Set `reviewer_id` to `technical_note`. Put the five rubric results in
+Set `reviewer_id` to `technical_note`. Set `model_id` from `$OAR_MODEL_ID`, obtain
+the source revision with Git, and calculate the candidate's SHA-256 content
+digest. Put the five rubric results in
 `criterion_scores`, in the order listed above, and use `recommended_action` for
-each finding. Use the required model identity. The submission tool supplies
-provenance and source locations. Finish only by calling
-`submit_review`. If the tool rejects the report, correct it and call the tool
+each finding. Finish only by calling `submit_result`. If the tool rejects the
+report, correct it and call the tool
 again.

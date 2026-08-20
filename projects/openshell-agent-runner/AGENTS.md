@@ -10,7 +10,8 @@
 - Treat caller uploads as disposable writable agent workspace. Only the task's
   declared output may be downloaded. Image-baked `/opt/oar` assets are
   read-only; native per-run resources under `/sandbox/oar-runtime` are writable
-  because OpenShell cannot upload into a read-only path. Host Pydantic validation
-  is the structural output boundary; it does not attest agent-produced claims.
+  because OpenShell cannot upload into a read-only path. Host transport checks
+  and optional JSON Schema validation are the output boundary; they do not
+  attest agent-produced claims.
 - Use `apply_patch` for edits and `uv` for dependencies, builds, and execution.
 - Before handing off, run `uv sync --locked`, Ruff, ty, pytest, and `uv build`.

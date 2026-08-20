@@ -1,0 +1,21 @@
+{
+  "providers": {
+    "openshell": {
+      "baseUrl": "https://inference.local/v1",
+      "api": "openai-completions",
+      "apiKey": "unused",
+      "authHeader": true,
+      "compat": {
+        "supportsDeveloperRole": false
+      },
+      "models": [
+        {
+          "id": "aws/anthropic/bedrock-claude-opus-5",
+          "reasoning": true,
+          "contextWindow": 200000,
+          "maxTokens": 32000
+        }
+      ]
+    }
+  }
+}
