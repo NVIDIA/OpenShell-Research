@@ -1,22 +1,32 @@
 ---
-title: How OpenShell Agent Runner works
-description: OAR components, execution lifecycle, uploads, and result handling.
+title: Run a single task with OpenShell Agent Runner
+description: Launch ephemeral agents for bounded tasks in CI and automated workflows.
 agent_markdown: true
 ---
 
-# How OpenShell Agent Runner works
+# Run a single task with OpenShell Agent Runner
 
-OpenShell Agent Runner (OAR) converts a profile and CLI arguments into native
-OpenShell commands. OpenShell provisions the sandbox. Pi performs the configured
-agent task inside it. OAR downloads, validates, and publishes the result.
+OpenShell Agent Runner (OAR) is a CLI for launching an ephemeral agent to
+accomplish one task. Each `oar run` creates an isolated OpenShell sandbox, starts
+Pi with the selected profile task, publishes one result, and removes the
+sandbox. The agent exists only for that run.
 
-OAR does not perform the configured task itself. Task behavior comes from the
-profile's prompt, tools, skills, extensions, uploads, model settings, and sandbox
-policy.
+## Why OAR fits CI
+
+This bounded lifecycle is designed for CI and other automated workflows: a job
+can provide explicit inputs, run one review or transformation, consume the
+result, and finish without maintaining a long-lived agent service. The profile
+defines the task behavior through its prompt, tools, skills, extensions,
+uploads, model settings, and sandbox policy.
+
+Profiles can be versioned with the repository, while stable exit codes and an
+explicit output path make the result available to later job steps. The CI worker
+must have access to an existing OpenShell gateway and inference route; OAR does
+not provision providers or credentials.
 
 <figure class="documentation-figure documentation-figure--wide">
-  <img src="assets/diagrams/system-overview.svg" alt="OAR validates a profile and constructs native OpenShell commands. OpenShell provisions a sandbox where Pi works with uploaded files and managed inference, then OAR downloads and publishes the result.">
-  <figcaption>OAR orchestrates the run. OpenShell owns the sandbox and inference path. Pi performs the agent task.</figcaption>
+  <img src="assets/diagrams/system-overview.svg" alt="A user or CI job invokes OAR for one task. OAR launches an ephemeral Pi agent in an OpenShell sandbox, publishes its result, and removes the sandbox.">
+  <figcaption>One CLI invocation launches one ephemeral agent, produces one result, and cleans up.</figcaption>
 </figure>
 
 ## Profile inputs
@@ -51,7 +61,7 @@ The CLI supplies run-specific values:
 
 <figure class="documentation-figure documentation-figure--wide">
   <img src="assets/diagrams/run-lifecycle.svg" alt="A run validates its profile, prepares runtime files, creates an OpenShell sandbox, starts Pi, downloads and validates the result, publishes it, verifies ownership, and deletes the sandbox.">
-  <figcaption>One run produces one sandbox and one published result.</figcaption>
+  <figcaption>One run launches one ephemeral agent in one sandbox and produces one published result.</figcaption>
 </figure>
 
 The sequence is:

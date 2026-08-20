@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 720" role="img" aria-labelledby="title description">
   <title id="title">OAR run lifecycle</title>
-  <desc id="description">Eight steps show profile validation, run resolution, runtime preparation, sandbox creation, Pi execution, result download, host validation and publication, and ownership-checked deletion.</desc>
+  <desc id="description">One OAR invocation launches an ephemeral agent for one task through profile validation, sandbox creation, Pi execution, result publication, and ownership-checked deletion.</desc>
   <defs>
     <style>
       text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#1f2933}
@@ -33,7 +33,7 @@
 
   <rect x="55" y="375" width="430" height="105" rx="16" class="agent"/>
   <circle cx="90" cy="410" r="19" class="badge-agent"/><text x="90" y="416" text-anchor="middle" class="number">5</text>
-  <text x="125" y="411" class="title">Run Pi</text><text x="125" y="439" class="subtitle">prompt on stdin · tools · managed inference</text>
+  <text x="125" y="411" class="title">Run one agent task</text><text x="125" y="439" class="subtitle">Pi · tools · managed inference</text>
 
   <rect x="635" y="375" width="430" height="105" rx="16" class="open"/>
   <circle cx="670" cy="410" r="19" class="badge-open"/><text x="670" y="416" text-anchor="middle" class="number">6</text>

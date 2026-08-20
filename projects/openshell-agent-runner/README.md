@@ -1,7 +1,12 @@
 # OpenShell Agent Runner
 
-`openshell-agent-runner` provides the `oar` command for validating and running
-declarative agent profiles in OpenShell sandboxes. It has three commands:
+`openshell-agent-runner` provides the `oar` CLI for launching an ephemeral agent
+to accomplish one configured task. Each `oar run` creates an isolated OpenShell
+sandbox, runs the task, publishes one result, and removes the sandbox. This
+single-task lifecycle makes OAR a natural fit for CI jobs and other automated
+workflows that need bounded agent execution.
+
+OAR has three commands:
 
 ```text
 oar validate PROFILE_DIRECTORY
@@ -9,15 +14,29 @@ oar run PROFILE_DIRECTORY --task TASK --output PATH [OPTIONS]
 oar doctor [OPTIONS]
 ```
 
-OAR is an orchestrator, not an agent. It uploads explicitly selected files,
-starts Pi, captures its result, optionally validates it against a configured
-JSON Schema, publishes it atomically, and deletes the sandbox. Repository
-inspection, Git operations, and conclusions belong to Pi inside the sandbox.
+The profile defines what the ephemeral agent can see and do. OAR uploads the
+declared inputs, starts Pi for the selected task, captures its result, optionally
+validates it against a configured JSON Schema, publishes it atomically, and
+deletes the sandbox. Repository inspection, Git operations, and conclusions
+belong to Pi inside the sandbox.
+
+## Why OAR fits CI
+
+- Each invocation has a bounded lifecycle: one task, one ephemeral sandbox, one
+  result, then cleanup.
+- Profiles can be versioned with the repository so agent behavior, permissions,
+  model settings, and output contracts are reviewable inputs to the job.
+- Stable exit codes and an explicit `--output` path let later CI steps consume
+  the result or fail the job.
+
+The CI worker must be able to reach an existing OpenShell gateway with an
+inference route for the profile's model. OAR uses that configured runtime; it
+does not provision providers or credentials.
 
 ## Documentation
 
-- [How OAR works](docs/index.md): components, profiles, uploads, execution
-  lifecycle, result handling, and failure boundaries.
+- [Run a single task with OAR](docs/index.md): ephemeral-agent lifecycle,
+  profiles, CI usage, uploads, result handling, and failure boundaries.
 
 ## Install
 

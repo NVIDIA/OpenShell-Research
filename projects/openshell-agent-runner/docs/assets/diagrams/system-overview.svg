@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 520" role="img" aria-labelledby="title description">
   <title id="title">OpenShell Agent Runner system overview</title>
-  <desc id="description">The user invokes OAR on the host. OAR validates the profile and issues native commands to the OpenShell gateway. The gateway provisions a sandbox where Pi works with uploaded files and managed inference. OAR downloads, validates, and publishes the result.</desc>
+  <desc id="description">A user or CI job invokes OAR for one task. OAR launches an ephemeral Pi agent in an OpenShell sandbox, publishes one result, and removes the sandbox.</desc>
   <defs>
     <style>
       text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#1f2933}
@@ -26,12 +26,12 @@
   <rect x="20" y="25" width="310" height="470" rx="20" class="group"/>
   <text x="45" y="57" class="heading">HOST</text>
   <rect x="50" y="85" width="250" height="72" rx="13" class="host"/>
-  <text x="175" y="115" text-anchor="middle" class="title">User or CI</text>
+  <text x="175" y="115" text-anchor="middle" class="title">User or CI job</text>
   <text x="175" y="139" text-anchor="middle" class="subtitle">profile · task · uploads</text>
   <rect x="50" y="215" width="250" height="105" rx="13" class="host"/>
   <text x="175" y="248" text-anchor="middle" class="title">OAR</text>
-  <text x="175" y="273" text-anchor="middle" class="subtitle">validate · resolve · command</text>
-  <text x="175" y="296" text-anchor="middle" class="subtitle">download · publish · cleanup</text>
+  <text x="175" y="273" text-anchor="middle" class="subtitle">launch one agent task</text>
+  <text x="175" y="296" text-anchor="middle" class="subtitle">publish · clean up</text>
   <rect x="50" y="378" width="250" height="72" rx="13" class="artifact"/>
   <text x="175" y="408" text-anchor="middle" class="title">Host result</text>
   <text x="175" y="432" text-anchor="middle" class="subtitle">plain text or validated JSON</text>
@@ -42,10 +42,10 @@
   <text x="550" y="115" text-anchor="middle" class="title">Gateway</text>
   <text x="550" y="139" text-anchor="middle" class="subtitle">provision · policy · inference</text>
   <rect x="740" y="85" width="325" height="340" rx="18" class="open"/>
-  <text x="902" y="119" text-anchor="middle" class="title">Sandbox</text>
+  <text x="902" y="119" text-anchor="middle" class="title">Ephemeral sandbox</text>
   <rect x="775" y="150" width="255" height="64" rx="12" class="agent"/>
-  <text x="902" y="178" text-anchor="middle" class="title">Pi agent</text>
-  <text x="902" y="199" text-anchor="middle" class="subtitle">configured task behavior</text>
+  <text x="902" y="178" text-anchor="middle" class="title">Single-task Pi agent</text>
+  <text x="902" y="199" text-anchor="middle" class="subtitle">profile-defined behavior</text>
   <rect x="775" y="246" width="255" height="64" rx="12" class="agent"/>
   <text x="902" y="274" text-anchor="middle" class="title">Uploads</text>
   <text x="902" y="295" text-anchor="middle" class="subtitle">workspace · runtime resources</text>
