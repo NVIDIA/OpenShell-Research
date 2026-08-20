@@ -8,13 +8,13 @@ PROJECT_DIRECTORY=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 PYPIRC_REPOSITORY="openshell-research"
 
 usage() {
-    echo "Usage: $0 VERSION [--dry-run]"
+    echo "Usage: $0 VERSION [--dry-run] [--allow-non-main]"
     echo
     echo "Build and publish openshell-agent-runner using the '$PYPIRC_REPOSITORY'"
     echo "repository configured in ~/.pypirc."
 }
 
-if [[ $# -lt 1 || $# -gt 2 ]]; then
+if [[ $# -lt 1 ]]; then
     usage >&2
     exit 2
 fi
@@ -26,14 +26,24 @@ fi
 
 VERSION="$1"
 DRY_RUN=false
+ALLOW_NON_MAIN=false
+shift
 
-if [[ $# -eq 2 ]]; then
-    if [[ "$2" != "--dry-run" ]]; then
-        usage >&2
-        exit 2
-    fi
-    DRY_RUN=true
-fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --dry-run)
+            DRY_RUN=true
+            ;;
+        --allow-non-main)
+            ALLOW_NON_MAIN=true
+            ;;
+        *)
+            usage >&2
+            exit 2
+            ;;
+    esac
+    shift
+done
 
 if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(rc[0-9]+)?$ ]]; then
     echo "publish: invalid version '$VERSION'; expected X.Y.Z or X.Y.ZrcN" >&2
@@ -47,8 +57,9 @@ if [[ -n "$(git status --porcelain)" ]]; then
     exit 1
 fi
 
-if [[ "$(git branch --show-current)" != "main" ]]; then
-    echo "publish: releases must be created from main" >&2
+CURRENT_BRANCH=$(git branch --show-current)
+if [[ "$CURRENT_BRANCH" != "main" && "$ALLOW_NON_MAIN" != true ]]; then
+    echo "publish: releases must be created from main; pass --allow-non-main to override" >&2
     exit 1
 fi
 
