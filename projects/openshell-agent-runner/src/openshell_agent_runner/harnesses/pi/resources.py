@@ -3,104 +3,89 @@
 
 """Materialize the explicit native-upload runtime bundle for Pi."""
 
-import json
 import shutil
 import tempfile
 from importlib.resources import files
 from pathlib import Path
 
-from openshell_agent_runner.config import ResolvedProfile
-from openshell_agent_runner.document_review import document_review_schema
+from openshell_agent_runner.config import (
+    MODELS_FILENAME,
+    SETTINGS_FILENAME,
+    ResolvedProfile,
+)
 from openshell_agent_runner.harnesses.resources import PreparedResources
 
-
-def assets_directory() -> Path:
-    return Path(str(files("openshell_agent_runner.harnesses.pi") / "assets"))
+SANDBOX_RUNTIME_ROOT = "/sandbox/oar-runtime"
 
 
-def prepare_resources(
-    resolved: ResolvedProfile, task_id: str, model: str
-) -> PreparedResources:
+def image_directory() -> Path:
+    return Path(str(files("openshell_agent_runner.harnesses.pi") / "runtime" / "image"))
+
+
+def prepare_resources(resolved: ResolvedProfile, task_id: str) -> PreparedResources:
     temporary = tempfile.TemporaryDirectory(prefix="oar-pi-")
     runtime = Path(temporary.name) / "runtime"
     (runtime / "skills").mkdir(parents=True, exist_ok=True)
     (runtime / "extensions").mkdir(parents=True, exist_ok=True)
-    (runtime / "schemas").mkdir(parents=True, exist_ok=True)
     task = resolved.profile.tasks[task_id]
     shutil.copy2(resolved.profile_dir / task.prompt, runtime / "prompt.md")
-    contract = task.output.contract
-    schema = document_review_schema(
-        reviewer_id=contract.reviewer_id,
-        model_id=model,
-        criteria=contract.criteria,
-        max_findings=contract.max_findings,
-    )
-    (runtime / "schemas" / "output.schema.json").write_text(
-        json.dumps(schema), encoding="utf-8"
-    )
-    arguments: list[str] = (
-        ["--tools", ",".join(task.tools)] if task.tools else ["--no-tools"]
-    )
+    shutil.copy2(resolved.profile_dir / MODELS_FILENAME, runtime / MODELS_FILENAME)
+    shutil.copy2(resolved.profile_dir / SETTINGS_FILENAME, runtime / SETTINGS_FILENAME)
+    arguments = [
+        "--provider",
+        resolved.runtime.provider,
+        "--model",
+        resolved.runtime.model,
+        "--thinking",
+        resolved.runtime.thinking,
+    ]
+    tools = list(task.tools)
+    if task.output_schema is not None:
+        shutil.copy2(
+            resolved.profile_dir / task.output_schema, runtime / "output.schema.json"
+        )
+        submit_result = Path(
+            str(
+                files("openshell_agent_runner.harnesses.pi")
+                / "runtime"
+                / "extensions"
+                / "submit-result.ts"
+            )
+        )
+        shutil.copy2(submit_result, runtime / "extensions" / "oar-submit-result.ts")
+        tools.append("submit_result")
+        arguments.extend(
+            [
+                "--extension",
+                f"{SANDBOX_RUNTIME_ROOT}/extensions/oar-submit-result.ts",
+            ]
+        )
+    arguments.extend(["--tools", ",".join(tools)] if tools else ["--no-tools"])
     for index, skill in enumerate(task.skills):
         target = runtime / "skills" / f"{index:02d}-{skill.name}"
         shutil.copytree(resolved.profile_dir / skill, target)
-        arguments.extend(["--skill", f"/sandbox/oar-runtime/skills/{target.name}"])
+        arguments.extend(["--skill", f"{SANDBOX_RUNTIME_ROOT}/skills/{target.name}"])
     for index, extension in enumerate(task.extensions):
         target = runtime / "extensions" / f"{index:02d}-{extension.name}"
         shutil.copy2(resolved.profile_dir / extension, target)
         arguments.extend(
-            ["--extension", f"/sandbox/oar-runtime/extensions/{target.name}"]
+            ["--extension", f"{SANDBOX_RUNTIME_ROOT}/extensions/{target.name}"]
         )
-    models = {
-        "providers": {
-            "openshell": {
-                "baseUrl": "https://inference.local/v1",
-                "api": "openai-completions",
-                "apiKey": "unused",
-                "authHeader": True,
-                "compat": {
-                    "supportsDeveloperRole": False,
-                    "supportsReasoningEffort": False,
-                },
-                "models": [
-                    {
-                        "id": model,
-                        "name": model,
-                        "reasoning": False,
-                        "input": ["text"],
-                        "contextWindow": resolved.profile.harness.context_window,
-                        "maxTokens": resolved.profile.harness.max_tokens,
-                        "cost": {
-                            "input": 0,
-                            "output": 0,
-                            "cacheRead": 0,
-                            "cacheWrite": 0,
-                        },
-                    }
-                ],
-            }
-        }
-    }
-    (runtime / "models.json").write_text(json.dumps(models), encoding="utf-8")
-    (runtime / "settings.json").write_text(
-        json.dumps({"enableInstallTelemetry": False, "defaultProjectTrust": "never"}),
-        encoding="utf-8",
-    )
     uploads = [
-        f"{runtime / 'prompt.md'}:/sandbox/oar-runtime/prompt.md",
-        f"{runtime / 'models.json'}:/sandbox/oar-runtime/models.json",
-        f"{runtime / 'settings.json'}:/sandbox/oar-runtime/settings.json",
+        f"{runtime / 'prompt.md'}:{SANDBOX_RUNTIME_ROOT}/prompt.md",
+        f"{runtime / 'models.json'}:{SANDBOX_RUNTIME_ROOT}/models.json",
+        f"{runtime / 'settings.json'}:{SANDBOX_RUNTIME_ROOT}/settings.json",
     ]
+    if task.output_schema is not None:
+        uploads.append(
+            f"{runtime / 'output.schema.json'}:{SANDBOX_RUNTIME_ROOT}/output.schema.json"
+        )
     uploads.extend(
-        f"{path}:/sandbox/oar-runtime/schemas/{path.name}"
-        for path in sorted((runtime / "schemas").iterdir())
-    )
-    uploads.extend(
-        f"{path}:/sandbox/oar-runtime/skills"
+        f"{path}:{SANDBOX_RUNTIME_ROOT}/skills"
         for path in sorted((runtime / "skills").iterdir())
     )
     uploads.extend(
-        f"{path}:/sandbox/oar-runtime/extensions/{path.name}"
+        f"{path}:{SANDBOX_RUNTIME_ROOT}/extensions/{path.name}"
         for path in sorted((runtime / "extensions").iterdir())
     )
     return PreparedResources(temporary, tuple(uploads), tuple(arguments))

@@ -76,15 +76,16 @@ jobs:
           uv run ty check
           uv run pytest
           python -m compileall -q src tests
-          bash -n src/openshell_agent_runner/harnesses/pi/assets/exec.sh
+          bash -n src/openshell_agent_runner/harnesses/pi/runtime/image/exec.sh
 
       - name: Build distributions
         working-directory: projects/openshell-agent-runner
         run: |
           uv build
           wheel="$(find dist -name '*.whl' -print -quit)"
-          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/assets/Dockerfile'
-          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/assets/exec.sh'
+          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/image/Dockerfile'
+          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/image/exec.sh'
+          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/extensions/submit-result.ts'
           python -m zipfile -l "$wheel" | grep -F 'dist-info/licenses/LICENSE'
 
       - name: Verify the built wheel
@@ -98,4 +99,4 @@ jobs:
         run: |
           docker build \
             --tag openshell-agent-runner-pi:ci \
-            projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/assets
+            projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/image

@@ -1,65 +1,48 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Validate downloaded artifacts without interpreting domain fields."""
+"""Validate and publish agent results without interpreting domain fields."""
 
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 from pathlib import Path
 
-from pydantic import ValidationError
+from jsonschema import Draft202012Validator
 
-from openshell_agent_runner.config import OutputConfig
-from openshell_agent_runner.document_review import DocumentReview
 from openshell_agent_runner.errors import ArtifactError
 
+ARTIFACT_PATH = "/sandbox/artifacts/result"
+MAX_ARTIFACT_BYTES = 1024 * 1024
 
-def validate_artifact(
-    downloaded: Path, output: OutputConfig, expected_model: str
-) -> DocumentReview:
+
+def validate_artifact(downloaded: Path, schema_path: Path | None = None) -> None:
     try:
         size = downloaded.stat().st_size
     except OSError as error:
         raise ArtifactError(f"required artifact is missing: {downloaded}") from error
-    if size > output.max_bytes:
+    if size == 0:
+        raise ArtifactError("agent result is empty")
+    if size > MAX_ARTIFACT_BYTES:
         raise ArtifactError(
-            f"output exceeds maximum size ({size} > {output.max_bytes} bytes)"
+            f"output exceeds maximum size ({size} > {MAX_ARTIFACT_BYTES} bytes)"
         )
+    if schema_path is None:
+        return
     try:
-        review = DocumentReview.model_validate_json(
-            downloaded.read_text(encoding="utf-8")
-        )
-    except (OSError, UnicodeError, ValidationError) as error:
-        raise ArtifactError(
-            f"artifact failed DocumentReview validation: {error}"
-        ) from error
-    contract = output.contract
-    diagnostics: list[str] = []
-    if review.reviewer_id != contract.reviewer_id:
-        diagnostics.append(
-            f"reviewer_id must be {contract.reviewer_id!r}, got {review.reviewer_id!r}"
-        )
-    criteria = [score.criterion for score in review.criterion_scores]
-    if criteria != contract.criteria:
-        diagnostics.append(
-            f"criterion order must be {contract.criteria!r}, got {criteria!r}"
-        )
-    if len(review.findings) > contract.max_findings:
-        diagnostics.append(
-            f"findings exceed maximum ({len(review.findings)} > "
-            f"{contract.max_findings})"
-        )
-    if review.model_id != expected_model:
-        diagnostics.append(
-            f"model_id must be {expected_model!r}, got {review.model_id!r}"
-        )
-    if diagnostics:
-        raise ArtifactError(
-            "artifact failed DocumentReview contract: " + "; ".join(diagnostics)
-        )
-    return review
+        result = json.loads(downloaded.read_text(encoding="utf-8"))
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ArtifactError(f"result is not valid JSON: {error}") from error
+    errors = sorted(
+        Draft202012Validator(schema).iter_errors(result),
+        key=lambda error: tuple(str(part) for part in error.absolute_path),
+    )
+    if errors:
+        diagnostics = "; ".join(error.message for error in errors[:12])
+        raise ArtifactError(f"result failed output schema validation: {diagnostics}")
 
 
 def atomic_publish(source: Path, destination: Path) -> None:

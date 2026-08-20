@@ -6,92 +6,64 @@ from pathlib import Path
 
 import pytest
 
-from openshell_agent_runner.artifacts import atomic_publish, validate_artifact
-from openshell_agent_runner.config import OutputConfig
+from openshell_agent_runner.artifacts import (
+    MAX_ARTIFACT_BYTES,
+    atomic_publish,
+    validate_artifact,
+)
 from openshell_agent_runner.errors import ArtifactError
 
 
-def output(max_bytes: int = 1000) -> OutputConfig:
-    return OutputConfig.model_validate(
-        {
-            "type": "document_review",
-            "contract": {
-                "reviewer_id": "general",
-                "criteria": ["clarity"],
-                "max_findings": 2,
-            },
-            "sandbox_path": "/sandbox/artifacts/result.json",
-            "max_bytes": max_bytes,
-        }
+def test_plain_result_is_accepted_and_published(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.write_text("Useful result.\n")
+
+    validate_artifact(source)
+    destination = tmp_path / "out" / "result.md"
+    atomic_publish(source, destination)
+
+    assert destination.read_text() == "Useful result.\n"
+
+
+def test_json_result_is_validated_against_configured_schema(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.write_text('{"status":"pass"}\n')
+    schema = tmp_path / "schema.json"
+    schema.write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["status"],
+                "properties": {"status": {"enum": ["pass", "fail"]}},
+            }
+        )
     )
 
+    validate_artifact(source, schema)
 
-def valid_review() -> dict[str, object]:
-    return {
-        "reviewer_id": "general",
-        "model_id": "test-model",
-        "source_revision": "abc123",
-        "source_content_digest": "a" * 64,
-        "criterion_scores": [
-            {"criterion": "clarity", "score": 4, "explanation": "Clear."}
-        ],
-        "overall_score": 100,
-        "verdict": "pass",
-        "confidence": "high",
-        "findings": [],
-        "overall_assessment": "The document is clear.",
-    }
+    source.write_text('{"status":"unknown"}\n')
+    with pytest.raises(ArtifactError, match="output schema validation"):
+        validate_artifact(source, schema)
 
 
-def test_valid_document_review_and_atomic_publish(tmp_path: Path) -> None:
-    source = tmp_path / "source.json"
-    source.write_text(json.dumps(valid_review()))
-    assert validate_artifact(source, output(), "test-model").verdict == "pass"
-    destination = tmp_path / "out" / "result.json"
-    atomic_publish(source, destination)
-    assert json.loads(destination.read_text()) == valid_review()
+def test_invalid_json_fails_when_schema_is_configured(tmp_path: Path) -> None:
+    source = tmp_path / "source"
+    source.write_text("not json")
+    schema = tmp_path / "schema.json"
+    schema.write_text('{"type":"object"}')
+
+    with pytest.raises(ArtifactError, match="not valid JSON"):
+        validate_artifact(source, schema)
 
 
-def test_invalid_and_oversized_document_reviews_fail(tmp_path: Path) -> None:
-    source = tmp_path / "source.json"
-    invalid = valid_review()
-    invalid["reviewer_id"] = "wrong"
-    source.write_text(json.dumps(invalid))
-    with pytest.raises(ArtifactError, match="DocumentReview contract"):
-        validate_artifact(source, output(), "test-model")
-    with pytest.raises(ArtifactError, match="maximum size"):
-        validate_artifact(source, output(1), "test-model")
+@pytest.mark.parametrize("content", ["", "x" * (MAX_ARTIFACT_BYTES + 1)])
+def test_empty_and_oversized_results_fail(tmp_path: Path, content: str) -> None:
+    source = tmp_path / "source"
+    source.write_text(content)
 
-
-def test_document_review_contract_checks_model_and_criterion_order(
-    tmp_path: Path,
-) -> None:
-    source = tmp_path / "source.json"
-    invalid = valid_review()
-    invalid["model_id"] = "other-model"
-    invalid["criterion_scores"] = [
-        {"criterion": "other", "score": 4, "explanation": "Clear."}
-    ]
-    source.write_text(json.dumps(invalid))
-
-    with pytest.raises(ArtifactError) as caught:
-        validate_artifact(source, output(), "test-model")
-
-    assert "criterion order" in str(caught.value)
-    assert "model_id" in str(caught.value)
-
-
-@pytest.mark.parametrize("invalid_score", ["4", True])
-def test_document_review_rejects_coerced_scores(
-    tmp_path: Path, invalid_score: object
-) -> None:
-    source = tmp_path / "source.json"
-    invalid = valid_review()
-    invalid["overall_score"] = invalid_score
-    source.write_text(json.dumps(invalid))
-
-    with pytest.raises(ArtifactError, match="DocumentReview validation"):
-        validate_artifact(source, output(), "test-model")
+    with pytest.raises(ArtifactError):
+        validate_artifact(source)
 
 
 def test_symlink_destination_is_rejected(tmp_path: Path) -> None:

@@ -5,19 +5,20 @@
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
-from typing import Annotated, Any, Literal, Self
+from typing import Annotated, Any, Literal
 
 import yaml
+from jsonschema import Draft202012Validator, SchemaError
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
     ValidationError,
     field_validator,
-    model_validator,
 )
 
 from openshell_agent_runner.errors import ConfigurationError
@@ -25,35 +26,24 @@ from openshell_agent_runner.errors import ConfigurationError
 IDENTIFIER_PATTERN = r"^[a-z][a-z0-9-]{0,62}$"
 RESOURCE_IDENTIFIER_PATTERN = r"^[a-z][a-z0-9_-]{0,62}$"
 MODEL_IDENTIFIER_PATTERN = r"^[A-Za-z0-9._:/-]{1,256}$"
-MAX_ARTIFACT_BYTES = 10 * 1024 * 1024
+MODELS_FILENAME = "models.json"
 PROFILE_FILENAME = "profile.yaml"
+SETTINGS_FILENAME = "settings.json"
+_PI_RUNTIME_SETTING_KEYS = {
+    "defaultProvider",
+    "defaultModel",
+    "defaultThinkingLevel",
+}
 
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class PiHarnessConfig(StrictModel):
-    type: Literal["pi"]
-    model: Annotated[str, Field(pattern=MODEL_IDENTIFIER_PATTERN)]
-    context_window: int = Field(default=200_000, ge=1, le=2_000_000)
-    max_tokens: int = Field(default=32_000, ge=1, le=256_000)
-
-    @model_validator(mode="after")
-    def validate_token_limit(self) -> Self:
-        if self.max_tokens > self.context_window:
-            raise ValueError("max_tokens must not exceed context_window")
-        return self
-
-
 class SandboxConfig(StrictModel):
-    from_: str = Field(alias="from", min_length=1)
     policy: Path
     upload: list[str] = Field(default_factory=list)
-    no_git_ignore: bool = False
     env: list[str] = Field(default_factory=list)
-    approval_mode: Literal["manual", "auto"] = "auto"
-    no_auto_providers: bool = False
 
     @field_validator("upload")
     @classmethod
@@ -68,48 +58,16 @@ class SandboxConfig(StrictModel):
         return values
 
 
-class DocumentReviewContract(StrictModel):
-    reviewer_id: Annotated[str, Field(pattern=RESOURCE_IDENTIFIER_PATTERN)]
-    criteria: list[Annotated[str, Field(pattern=RESOURCE_IDENTIFIER_PATTERN)]] = Field(
-        min_length=1, max_length=32
-    )
-    max_findings: int = Field(default=12, ge=0, le=100)
-
-    @field_validator("criteria")
-    @classmethod
-    def require_unique_criteria(cls, values: list[str]) -> list[str]:
-        if len(values) != len(set(values)):
-            raise ValueError("document-review criteria must be unique")
-        return values
-
-
-class OutputConfig(StrictModel):
-    type: Literal["document_review"]
-    contract: DocumentReviewContract
-    sandbox_path: str
-    max_bytes: int = Field(gt=0, le=MAX_ARTIFACT_BYTES)
-
-    @field_validator("sandbox_path")
-    @classmethod
-    def validate_sandbox_path(cls, value: str) -> str:
-        path = PurePosixPath(value)
-        if not path.is_absolute() or ".." in path.parts:
-            raise ValueError("sandbox_path must be absolute and normalized")
-        if path == PurePosixPath("/sandbox/artifacts") or not path.is_relative_to(
-            "/sandbox/artifacts"
-        ):
-            raise ValueError("sandbox_path must be beneath /sandbox/artifacts")
-        return str(path)
-
-
 class TaskConfig(StrictModel):
+    description: str | None = Field(default=None, min_length=1, max_length=1000)
+    required_input: Literal["document"] | None = None
     prompt: Path
+    output_schema: Path | None = None
     tools: list[Annotated[str, Field(pattern=RESOURCE_IDENTIFIER_PATTERN)]] = Field(
         default_factory=list
     )
     skills: list[Path] = Field(default_factory=list)
     extensions: list[Path] = Field(default_factory=list)
-    output: OutputConfig
 
     @field_validator("tools", "skills", "extensions")
     @classmethod
@@ -122,7 +80,6 @@ class TaskConfig(StrictModel):
 class ProfileConfig(StrictModel):
     id: Annotated[str, Field(pattern=IDENTIFIER_PATTERN)]
     description: str = Field(min_length=1, max_length=1000)
-    harness: PiHarnessConfig
     sandbox: SandboxConfig
     tasks: dict[Annotated[str, Field(pattern=IDENTIFIER_PATTERN)], TaskConfig]
 
@@ -134,10 +91,17 @@ class ProfileConfig(StrictModel):
         return value
 
 
+class PiRuntimeSettings(StrictModel):
+    provider: Literal["openshell"]
+    model: Annotated[str, Field(pattern=MODEL_IDENTIFIER_PATTERN)]
+    thinking: Literal["off", "minimal", "low", "medium", "high", "xhigh", "max"]
+
+
 class ResolvedProfile(StrictModel):
     profile_path: Path
     profile_dir: Path
     profile: ProfileConfig
+    runtime: PiRuntimeSettings
 
 
 def load_profile(directory: Path) -> ResolvedProfile:
@@ -164,10 +128,16 @@ def load_profile(directory: Path) -> ResolvedProfile:
         profile = ProfileConfig.model_validate(_load_yaml(profile_path))
     except ValidationError as error:
         raise ConfigurationError(f"invalid profile {profile_path}: {error}") from error
+    model_path = _inside(profile_dir, profile_dir / MODELS_FILENAME, "Pi models file")
+    settings_path = _inside(
+        profile_dir, profile_dir / SETTINGS_FILENAME, "Pi settings file"
+    )
+    model_id = _load_pi_model_id(model_path)
     resolved = ResolvedProfile(
         profile_path=profile_path,
         profile_dir=profile_dir,
         profile=profile,
+        runtime=_load_pi_runtime_settings(settings_path, model_id),
     )
     _validate_profile_resources(resolved)
     return resolved
@@ -238,6 +208,69 @@ def _load_yaml(path: Path) -> Any:
         raise ConfigurationError(f"invalid YAML in {path}: {error}") from error
 
 
+def _load_pi_model_id(path: Path) -> str:
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ConfigurationError(f"invalid Pi models file {path}: {error}") from error
+    providers = document.get("providers") if isinstance(document, dict) else None
+    if not isinstance(providers, dict) or set(providers) != {"openshell"}:
+        raise ConfigurationError(
+            "Pi models file must contain exactly one provider named 'openshell'"
+        )
+    provider = providers["openshell"]
+    models = provider.get("models") if isinstance(provider, dict) else None
+    if not isinstance(models, list) or len(models) != 1:
+        raise ConfigurationError(
+            "Pi models file must contain exactly one model under 'openshell'"
+        )
+    model = models[0]
+    model_id = model.get("id") if isinstance(model, dict) else None
+    if not isinstance(model_id, str) or not re.fullmatch(
+        MODEL_IDENTIFIER_PATTERN, model_id
+    ):
+        raise ConfigurationError("Pi model must have a valid string id")
+    return model_id
+
+
+def _load_pi_runtime_settings(path: Path, model_id: str) -> PiRuntimeSettings:
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ConfigurationError(f"invalid Pi settings file {path}: {error}") from error
+    if not isinstance(document, dict):
+        raise ConfigurationError(f"Pi settings file must contain an object: {path}")
+    unexpected = set(document) - _PI_RUNTIME_SETTING_KEYS
+    missing = _PI_RUNTIME_SETTING_KEYS - set(document)
+    if unexpected or missing:
+        diagnostics = []
+        if missing:
+            diagnostics.append(f"missing {sorted(missing)}")
+        if unexpected:
+            diagnostics.append(f"unexpected {sorted(unexpected)}")
+        raise ConfigurationError(
+            f"Pi settings file must contain only runtime selection keys: "
+            f"{', '.join(diagnostics)}"
+        )
+    try:
+        runtime = PiRuntimeSettings.model_validate(
+            {
+                "provider": document.get("defaultProvider"),
+                "model": document.get("defaultModel"),
+                "thinking": document.get("defaultThinkingLevel"),
+            }
+        )
+    except ValidationError as error:
+        raise ConfigurationError(
+            f"invalid Pi runtime settings in {path}: {error}"
+        ) from error
+    if runtime.model != model_id:
+        raise ConfigurationError(
+            "Pi settings defaultModel must identify the model in models.json"
+        )
+    return runtime
+
+
 def _inside(
     owner: Path, candidate: Path, description: str, *, directory: bool = False
 ) -> Path:
@@ -261,6 +294,13 @@ def _validate_profile_resources(resolved: ResolvedProfile) -> None:
     _inside(directory, directory / resolved.profile.sandbox.policy, "sandbox policy")
     for task_id, task in resolved.profile.tasks.items():
         _inside(directory, directory / task.prompt, f"prompt for task {task_id}")
+        if task.output_schema is not None:
+            schema = _inside(
+                directory,
+                directory / task.output_schema,
+                f"output schema for task {task_id}",
+            )
+            _validate_output_schema(schema)
         for skill in task.skills:
             skill_directory = _inside(
                 directory,
@@ -280,3 +320,27 @@ def _validate_profile_resources(resolved: ResolvedProfile) -> None:
                     )
         for extension in task.extensions:
             _inside(directory, directory / extension, f"extension for task {task_id}")
+
+
+def _validate_output_schema(path: Path) -> None:
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+        Draft202012Validator.check_schema(document)
+    except (OSError, UnicodeError, json.JSONDecodeError, SchemaError) as error:
+        raise ConfigurationError(f"invalid output schema {path}: {error}") from error
+    _validate_schema_references(document, path)
+
+
+def _validate_schema_references(document: Any, path: Path) -> None:
+    if isinstance(document, dict):
+        for key, value in document.items():
+            if key in {"$ref", "$dynamicRef", "$recursiveRef"} and (
+                not isinstance(value, str) or not value.startswith("#")
+            ):
+                raise ConfigurationError(
+                    f"output schema references must stay inside {path}: {value!r}"
+                )
+            _validate_schema_references(value, path)
+    elif isinstance(document, list):
+        for value in document:
+            _validate_schema_references(value, path)

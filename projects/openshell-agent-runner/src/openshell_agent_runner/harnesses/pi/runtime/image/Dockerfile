@@ -1,12 +1,17 @@
 FROM node:24-bookworm-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03
 
 ARG PI_VERSION=0.82.1
+ARG AJV_VERSION=8.17.1
+
+ENV NODE_PATH=/usr/local/lib/node_modules
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends ca-certificates git iproute2 python3 ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
-RUN npm install --global --ignore-scripts "@earendil-works/pi-coding-agent@${PI_VERSION}" \
+RUN npm install --global --ignore-scripts \
+        "@earendil-works/pi-coding-agent@${PI_VERSION}" \
+        "ajv@${AJV_VERSION}" \
     && npm cache clean --force >/dev/null 2>&1 \
     && test "$(pi --version)" = "${PI_VERSION}"
 

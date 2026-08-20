@@ -5,14 +5,16 @@
 set -euo pipefail
 umask 077
 
-if [[ "$#" -lt 1 ]]; then
-  echo "usage: exec.sh MODEL_ID [PI_RESOURCE_ARGS...]" >&2
-  exit 2
-fi
-model_id="$1"
-shift
+model_id=""
+arguments=("$@")
+for ((index = 0; index < ${#arguments[@]}; index++)); do
+  if [[ "${arguments[$index]}" == "--model" && $((index + 1)) -lt ${#arguments[@]} ]]; then
+    model_id="${arguments[$((index + 1))]}"
+    break
+  fi
+done
 if [[ ! "$model_id" =~ ^[A-Za-z0-9._:/-]{1,256}$ ]]; then
-  echo "Pi harness: model ID is invalid" >&2
+  echo "Pi harness: --model is missing or invalid" >&2
   exit 2
 fi
 
@@ -43,7 +45,9 @@ if [[ ! -d "$agent_workdir" ]]; then
 fi
 cd "$agent_workdir"
 
-exec pi \
+stdout_path=/sandbox/artifacts/result.stdout
+result_path=/sandbox/artifacts/result
+pi \
   --print \
   --no-session \
   --no-extensions \
@@ -54,6 +58,11 @@ exec pi \
   --no-approve \
   --offline \
   "$@" \
-  --provider openshell \
-  --model "$model_id" \
-  <"$payload/prompt.md"
+  <"$payload/prompt.md" \
+  >"$stdout_path"
+
+if [[ -s "$result_path" ]]; then
+  rm -f "$stdout_path"
+else
+  mv "$stdout_path" "$result_path"
+fi
