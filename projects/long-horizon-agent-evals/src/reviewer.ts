@@ -1,0 +1,170 @@
+import { readFile, writeFile } from 'node:fs/promises'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { appendJsonl, connect, delay, json, loadEnv, redactUntrusted, required, status, writeJson } from './common.js'
+import { reviewWithResponses, type ReviewerState } from './reviewer-model.js'
+
+async function main(): Promise<void> {
+  await loadEnv()
+  const sandbox = required('LAB_SANDBOX')
+  const owner = required('LAB_GITHUB_OWNER')
+  const repo = required('LAB_GITHUB_REPO')
+  const runDir = required('LAB_RUN_DIR')
+  const workspace = process.env.LAB_WORKSPACE ?? 'default'
+  const deadlineMs = Number(process.env.LAB_DEADLINE_MS ?? Date.now() + 30 * 60_000)
+  const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
+  const instructionsTemplate = await readFile(path.join(root, 'experiments', 'github-policy-review', 'reviewer.md'), 'utf8')
+  const protectedRepository = `${owner}/${repo}`
+  const targetPlaceholder = '{{PROTECTED_REPOSITORY}}'
+  if (!instructionsTemplate.includes(targetPlaceholder)) {
+    throw new Error(`reviewer prompt is missing required placeholder ${targetPlaceholder}`)
+  }
+  const baseInstructions = instructionsTemplate.replaceAll(targetPlaceholder, protectedRepository)
+  await writeFile(path.join(runDir, 'reviewer-prompt.md'), baseInstructions)
+  const client = await connect()
+  const processed = new Set<string>()
+  const state: ReviewerState = { history: [] }
+  let decisionNumber = 0
+
+  const errorText = (error: unknown): string => {
+    const text = error instanceof Error ? error.message : String(error)
+    return String(redactUntrusted(text)).slice(0, 2000)
+  }
+
+  await appendJsonl(path.join(runDir, 'reviewer-process.jsonl'), { event: 'reviewer_ready', sandbox })
+  await writeJson(path.join(runDir, 'reviewer-ready.json'), { sandbox, readyAt: new Date().toISOString() })
+  status('reviewer.ready', { sandbox, deadlineMs })
+
+  while (Date.now() < deadlineMs) {
+      const inbox = await client.raw.getDraftPolicy({ name: sandbox, statusFilter: 'pending', workspace })
+      const chunks = inbox.chunks.filter((chunk) => !processed.has(chunk.id)).sort((a, b) => Number(a.createdAtMs - b.createdAtMs))
+      if (chunks.length === 0) {
+        await delay(750)
+        continue
+      }
+
+      for (const chunk of chunks) {
+        if (Date.now() >= deadlineMs) break
+        processed.add(chunk.id)
+        decisionNumber += 1
+        const current = await client.sandbox.getConfig(sandbox)
+        const packet = redactUntrusted({
+          sandbox,
+          protectedRepository,
+          proposal: chunk,
+          currentPolicy: current.policy,
+        })
+        status('reviewer.proposal', { sandbox, decisionNumber, ruleName: chunk.ruleName, stage: chunk.stage })
+        await writeJson(path.join(runDir, `proposal-${String(decisionNumber).padStart(3, '0')}.json`), packet)
+
+        let decision: { decision: 'approve' | 'reject'; reason: string }
+        try {
+          decision = await reviewWithResponses(
+            runDir,
+            state,
+            baseInstructions,
+            `Review this pending request:\n${json(packet)}`,
+            decisionNumber,
+            Math.max(1, deadlineMs - Date.now()),
+          )
+        } catch (error) {
+          decision = { decision: 'reject', reason: `Reviewer failed closed: ${errorText(error)}` }
+        }
+
+        status('reviewer.decision', { sandbox, decisionNumber, decision: decision.decision, reason: decision.reason })
+        if (decision.decision === 'approve') {
+          try {
+            await client.raw.approveDraftChunk({ name: sandbox, chunkId: chunk.id, workspace })
+            await appendJsonl(path.join(runDir, 'decisions.jsonl'), {
+              chunkId: chunk.id,
+              ...decision,
+              effectiveDecision: 'approve',
+              application: 'applied',
+            })
+            status('reviewer.applied', { sandbox, decisionNumber, decision: 'approve' })
+          } catch (error) {
+            const applicationError = errorText(error)
+            await appendJsonl(path.join(runDir, 'reviewer-errors.jsonl'), {
+              event: 'approval_apply_failed',
+              chunkId: chunk.id,
+              decisionNumber,
+              error: applicationError,
+            })
+            status('reviewer.apply_failed', { sandbox, decisionNumber, decision: 'approve', error: applicationError })
+            try {
+              await client.raw.rejectDraftChunk({
+                name: sandbox,
+                chunkId: chunk.id,
+                workspace,
+                reason: `Approval could not be applied by gateway validation; failed closed. ${applicationError}`,
+              })
+              await appendJsonl(path.join(runDir, 'decisions.jsonl'), {
+                chunkId: chunk.id,
+                ...decision,
+                effectiveDecision: 'reject',
+                application: 'approval_failed_then_rejected',
+                applicationError,
+              })
+              status('reviewer.applied', { sandbox, decisionNumber, decision: 'reject_after_approval_failure' })
+            } catch (fallbackError) {
+              const fallbackApplicationError = errorText(fallbackError)
+              await appendJsonl(path.join(runDir, 'decisions.jsonl'), {
+                chunkId: chunk.id,
+                ...decision,
+                effectiveDecision: 'pending',
+                application: 'failed',
+                applicationError,
+                fallbackApplicationError,
+              })
+              await appendJsonl(path.join(runDir, 'reviewer-errors.jsonl'), {
+                event: 'fallback_rejection_failed',
+                chunkId: chunk.id,
+                decisionNumber,
+                error: fallbackApplicationError,
+              })
+              status('reviewer.apply_failed', { sandbox, decisionNumber, decision: 'fallback_reject', error: fallbackApplicationError })
+            }
+          }
+        } else {
+          try {
+            await client.raw.rejectDraftChunk({ name: sandbox, chunkId: chunk.id, workspace, reason: decision.reason })
+            await appendJsonl(path.join(runDir, 'decisions.jsonl'), {
+              chunkId: chunk.id,
+              ...decision,
+              effectiveDecision: 'reject',
+              application: 'applied',
+            })
+            status('reviewer.applied', { sandbox, decisionNumber, decision: 'reject' })
+          } catch (error) {
+            const applicationError = errorText(error)
+            await appendJsonl(path.join(runDir, 'decisions.jsonl'), {
+              chunkId: chunk.id,
+              ...decision,
+              effectiveDecision: 'pending',
+              application: 'failed',
+              applicationError,
+            })
+            await appendJsonl(path.join(runDir, 'reviewer-errors.jsonl'), {
+              event: 'rejection_apply_failed',
+              chunkId: chunk.id,
+              decisionNumber,
+              error: applicationError,
+            })
+            status('reviewer.apply_failed', { sandbox, decisionNumber, decision: 'reject', error: applicationError })
+          }
+        }
+      }
+    }
+
+  await appendJsonl(path.join(runDir, 'reviewer-process.jsonl'), {
+    event: 'reviewer_stopped',
+    decisions: decisionNumber,
+    reason: 'deadline',
+  })
+  status('reviewer.stopped', { sandbox, decisions: decisionNumber, reason: 'deadline' })
+}
+
+main().catch((error) => {
+  process.stderr.write(`${error instanceof Error ? error.stack : String(error)}\n`)
+  process.exitCode = 1
+})
