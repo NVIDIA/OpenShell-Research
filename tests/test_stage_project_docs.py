@@ -10,16 +10,24 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "scripts" / "stage-egress-gate-docs.py"
+SCRIPT = ROOT / "scripts" / "stage-project-docs.py"
 
-SPEC = importlib.util.spec_from_file_location("stage_egress_gate_docs", SCRIPT)
+SPEC = importlib.util.spec_from_file_location("stage_project_docs", SCRIPT)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"could not load {SCRIPT}")
 STAGER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(STAGER)
 
 
-class StageEgressGateDocsTests(unittest.TestCase):
+class StageProjectDocsTests(unittest.TestCase):
+    def test_configures_every_published_project(self) -> None:
+        self.assertEqual(
+            set(STAGER.PROJECT_DOCUMENTATION),
+            {"egress-gate", "openshell-agent-runner"},
+        )
+        for source in STAGER.PROJECT_DOCUMENTATION.values():
+            self.assertTrue((source / "index.md").is_file())
+
     def test_stage_replaces_destination_with_source_tree(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -34,7 +42,7 @@ class StageEgressGateDocsTests(unittest.TestCase):
             destination.mkdir()
             (destination / "stale.md").write_text("# Stale\n", encoding="utf-8")
 
-            STAGER.stage_egress_gate_docs(source, destination)
+            STAGER.stage_project_docs(source, destination)
 
             self.assertEqual(
                 (destination / "index.md").read_text(encoding="utf-8"),
@@ -53,7 +61,7 @@ class StageEgressGateDocsTests(unittest.TestCase):
             (source / "linked.md").symlink_to(target)
 
             with self.assertRaisesRegex(ValueError, "must not contain symlinks"):
-                STAGER.stage_egress_gate_docs(source, root / "site-docs")
+                STAGER.stage_project_docs(source, root / "site-docs")
 
     def test_stage_rejects_destination_inside_source(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -61,7 +69,7 @@ class StageEgressGateDocsTests(unittest.TestCase):
             source.mkdir()
 
             with self.assertRaisesRegex(ValueError, "must not overlap"):
-                STAGER.stage_egress_gate_docs(source, source / "published")
+                STAGER.stage_project_docs(source, source / "published")
 
     def test_stage_rejects_source_inside_destination(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -70,7 +78,7 @@ class StageEgressGateDocsTests(unittest.TestCase):
             source.mkdir(parents=True)
 
             with self.assertRaisesRegex(ValueError, "must not overlap"):
-                STAGER.stage_egress_gate_docs(source, destination)
+                STAGER.stage_project_docs(source, destination)
 
 
 if __name__ == "__main__":
