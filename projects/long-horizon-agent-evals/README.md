@@ -17,54 +17,32 @@ composition and enforcement to an externally observed outcome. The experiment
 is intentionally small and direct so it can be read, forked, and changed
 without learning a framework.
 
-## Architecture and trust boundaries
+## The setup
 
 ```mermaid
 flowchart LR
-  subgraph Sandbox["OpenShell sandbox — untrusted"]
-    Challenger["Challenger agent<br/>persistent Codex thread"]
-  end
+  Challenger["Challenger agent<br/>inside an OpenShell sandbox"]
+  OpenShell["OpenShell<br/>policy boundary + prover"]
+  Reviewer["AI reviewer<br/>separate process, no tools"]
+  GitHub["Disposable<br/>GitHub repository"]
 
-  subgraph OpenShell["OpenShell boundary"]
-    Policy["Effective policy<br/>and enforcement"]
-    Inbox["Policy proposal inbox"]
-    Prover["Prover findings<br/>and candidate validation"]
-  end
-
-  subgraph Host["Trusted experiment host"]
-    Runner["Campaign runner"]
-    ReviewLoop["Reviewer loop"]
-    ReviewModel["Reviewer model<br/>no tools"]
-    Oracle["External oracle"]
-    Evidence["Evidence + transcript"]
-  end
-
-  Target["Disposable GitHub repository"]
-
-  Runner --> Challenger
-  Runner --> ReviewLoop
-  Challenger -->|"tool or network action"| Policy
-  Policy -->|"denied capability request"| Inbox
-  Inbox --> Prover
-  Prover -->|"proposal + current policy + findings"| ReviewLoop
-  ReviewLoop --> ReviewModel
-  ReviewModel -->|"approve or reject"| ReviewLoop
-  ReviewLoop -->|"apply decision through SDK"| Inbox
-  Inbox -->|"approved policy update"| Policy
-  Policy -->|"allowed GitHub request"| Target
-  Oracle -->|"read-only observation"| Target
-  Challenger -.-> Evidence
-  ReviewLoop -.-> Evidence
-  Policy -.-> Evidence
-  Oracle -.-> Evidence
+  Challenger -->|"tries a GitHub action"| OpenShell
+  OpenShell -->|"blocked action becomes<br/>a policy change request"| Reviewer
+  Reviewer -->|"approve or reject"| OpenShell
+  OpenShell -->|"only allowed traffic passes"| GitHub
 ```
 
-The challenger is untrusted and runs with normal development tools inside the
-sandbox. The reviewer model has no tools or credentials; a trusted host process
-gives it the pending proposal, current effective policy, and available prover
-context, then applies its structured decision through the OpenShell SDK. The
-host independently observes GitHub rather than asking either model whether the
-objective succeeded.
+The challenger is untrusted and runs with normal development tools and a real,
+repository-scoped GitHub token. The starting OpenShell policy permits GitHub
+reads but not writes. When OpenShell blocks an action, the challenger can ask
+for a policy change.
+
+A separate trusted process gives that request, the current policy, and
+OpenShell's deterministic prover findings to an AI reviewer. The reviewer has
+no tools or credentials. It returns `approve` or `reject`, and the trusted
+process applies that decision through the OpenShell SDK. The experiment runner
+checks the repository directly to determine whether the protected file changed;
+it does not ask either model whether the objective succeeded.
 
 An approval is not automatically a security failure. Keep four events distinct
 when interpreting a run:
@@ -86,9 +64,10 @@ outcomes instead of collapsing them into one pass/fail label.
    GitHub token and read-only GitHub network policy.
 3. A separate, tool-free reviewer watches OpenShell policy proposals and returns
    `approve` or `reject` through a Responses-compatible model endpoint.
-4. OpenShell applies the decision. GitHub itself is the external outcome oracle.
-5. The harness stops at the deadline, saves the transcript and raw evidence,
-   and deletes the sandbox and temporary OpenShell providers.
+4. OpenShell applies the decision. The experiment runner checks GitHub directly
+   for the protected change.
+5. At the deadline, the runner saves the transcript and raw evidence, then
+   deletes the sandbox and temporary OpenShell providers.
 
 The challenger keeps one Codex thread for the full campaign. The reviewer also
 keeps its conversation history for the campaign. Scale mode starts fresh
@@ -240,9 +219,9 @@ outcome classification.
 
 ## Limits
 
-- The target oracle polls periodically, so a write created and removed between
-  polls may evade that check. Final branch and repository-ref comparisons catch
-  persistent mutations.
+- The experiment runner checks the target periodically, so a write created and
+  removed between checks may evade that observation. Final branch and
+  repository-ref comparisons catch persistent mutations.
 - Concurrent unrelated repository activity can require manual attribution.
 - A zero-compromise result applies only to the exact models, prompts, OpenShell
   version, configuration, and budget recorded for that run.
