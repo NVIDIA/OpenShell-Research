@@ -1,220 +1,122 @@
 # Managed Pi deny-or-redact example
 
-This directory contains an OpenShell configuration for running the Pi
-admission extension with Egress Gate.
+This example runs the forked Pi CLI inside OpenShell and sends its rendered
+user submissions through Egress Gate. It makes real OpenAI API calls and may
+incur provider charges.
 
-The policy demonstrates two outcomes for rendered Pi prompts:
+- `DENY_THIS` is rejected before Pi writes it to session history or starts a
+  model turn.
+- `REDACT_THIS` becomes `[REDACTED]` before Pi writes or sends it.
 
-- `DENY_THIS` denies the submission before Pi appends it to session history or
-  starts a provider request.
-- `REDACT_THIS` becomes `[REDACTED]` before Pi appends the submission. Pi sends
-  that same replacement in the provider request.
+## Before you start
 
-This example makes real OpenAI API calls and may incur provider charges.
-
-## Prerequisites
-
-Use these matching fork branches:
+Use the matching branches:
 
 - [Pi user-message append hook PR](https://github.com/johnnygreco/pi/pull/1)
-- [OpenShell integration branch](https://github.com/johnnygreco/OpenShell/tree/openshell/pi-egress-admission)
+- [OpenShell managed admission PR](https://github.com/johnnygreco/OpenShell/pull/1)
 - [OpenShell Research integration branch](https://github.com/NVIDIA/OpenShell-Research/tree/johnny/pi-attested-admission)
 
-Install the development prerequisites documented by each repository. The host
-must have an `OPENAI_API_KEY`, and the host, gateway, and sandbox supervisor
-must be able to reach the Egress Gate service.
-
-The instructions below use these checkout placeholders:
-
-```text
-/path/to/pi
-/path/to/OpenShell
-/path/to/OpenShell-Research
-```
-
-Replace them with absolute paths on your machine.
-
-## 1. Build the Pi fork
-
-Build the coding-agent package from the Pi fork, pack it, and install it into a
-standalone directory that can be uploaded to a sandbox:
+Install each repository's development prerequisites and export:
 
 ```shell
-cd /path/to/pi
-npm install --ignore-scripts
-npm run build
-mkdir -p /tmp/pi-egress-pack /tmp/pi-egress-runtime
-npm pack --workspace @earendil-works/pi-coding-agent \
-  --pack-destination /tmp/pi-egress-pack
+export OPENAI_API_KEY=your-key
+export EGRESS_GATE_HOST_IP=192.168.1.20
 ```
 
-The last command prints the tarball name. Pass that exact file to:
+`EGRESS_GATE_HOST_IP` must be a non-loopback IPv4 address reachable by the
+gateway and sandbox supervisors. `hostname -I` usually shows the available
+addresses; choose the address for the host network shared with OpenShell.
+
+The helper expects sibling checkouts named `pi`, `OpenShell`, and
+`OpenShell-Research`. For another layout, set `PI_REPO` and `OPENSHELL_REPO` to
+absolute paths.
+
+From the `OpenShell-Research` checkout, change to the example directory. Run
+all remaining commands there:
 
 ```shell
-npm install --prefix /tmp/pi-egress-runtime --ignore-scripts \
-  /tmp/pi-egress-pack/earendil-works-pi-coding-agent-VERSION.tgz
+cd projects/egress-gate/examples/pi-attested-admission
 ```
 
-Replace `VERSION` with the version in the printed filename. The built CLI entry
-point is then
-`/tmp/pi-egress-runtime/node_modules/@earendil-works/pi-coding-agent/dist/cli.js`.
-
-## 2. Register and start Egress Gate
-
-Stop any OpenShell gateway that uses the target gateway configuration. A
-running gateway does not reload middleware registrations.
-
-From the Egress Gate project, add the operator middleware registration. Replace
-`YOUR_HOST_IPV4` with a non-loopback IPv4 address reachable by the gateway and
-sandbox supervisors:
+You can inspect every command before running anything:
 
 ```shell
-cd /path/to/OpenShell-Research/projects/egress-gate
-uv run egress-gate add-gateway-registration \
-  --host-ip YOUR_HOST_IPV4 \
-  --name pi-egress \
-  --port 50051
+./demo.sh --print all
 ```
 
-In the same directory, start Egress Gate with Pi receipt enforcement enabled:
+## Try it
+
+Build the Pi fork and register Egress Gate with OpenShell:
 
 ```shell
-uv run egress-gate --debug serve \
-  --listen 0.0.0.0:50051 \
-  --timeout 4s \
-  --require-pi-receipt
+./demo.sh prepare
 ```
 
-Keep this terminal open. The service exposes both the rendered-prompt admission
-binding and the HTTP egress binding used by this example.
+Keep Egress Gate running in one terminal:
 
-## 3. Start the OpenShell fork
-
-In another terminal, start the gateway from the matching OpenShell fork. It
-loads the `pi-egress` registration added above:
-
-```shell
-cd /path/to/OpenShell
-mise trust
-mise run gateway
+```shell title="Terminal 1: Egress Gate"
+./demo.sh serve
 ```
 
-Leave the gateway running. Use the repository's `scripts/bin/openshell` wrapper
-for the remaining OpenShell commands so the CLI and gateway come from the same
-fork.
+Start the matching OpenShell gateway in a second terminal:
 
-## 4. Create an OpenAI provider
-
-In a third terminal, create a provider whose credential is injected only when
-the admitted request reaches `api.openai.com`:
-
-```shell
-cd /path/to/OpenShell
-/path/to/OpenShell/scripts/bin/openshell provider create \
-  --name pi-openai \
-  --type openai \
-  --credential OPENAI_API_KEY
+```shell title="Terminal 2: OpenShell gateway"
+./demo.sh gateway
 ```
 
-The bare credential name reads `OPENAI_API_KEY` from the host environment. It
-does not place the real key in the sandbox environment.
+After the gateway reports that it is ready, launch the real Pi CLI from a
+third terminal:
 
-## 5. Create the managed Pi sandbox
-
-Run the following command from this example directory:
-
-```shell
-cd /path/to/OpenShell-Research/projects/egress-gate/examples/pi-attested-admission
-/path/to/OpenShell/scripts/bin/openshell sandbox create \
-  --name pi-egress-demo \
-  --from base \
-  --provider pi-openai \
-  --policy policy.yaml \
-  --upload /tmp/pi-egress-runtime:/sandbox/pi-runtime \
-  --upload ./openshell-input-admission.ts:/sandbox/openshell-input-admission.ts \
-  --upload ./models.json:/sandbox/pi-agent/models.json \
-  -- env PI_CODING_AGENT_DIR=/sandbox/pi-agent \
-  node /sandbox/pi-runtime/node_modules/@earendil-works/pi-coding-agent/dist/cli.js \
-  --provider openai-chat-completions \
-  --model gpt-4o-mini \
-  --extension /sandbox/openshell-input-admission.ts \
-  --session-dir /sandbox/pi-sessions
+```shell title="Terminal 3: managed Pi"
+./demo.sh launch
 ```
 
-OpenShell recognizes the configured Pi admission binding, starts its
-loopback-only bridge, and sets `OPENSHELL_PI_CONVERSATION_URL` for the Pi
-process. The extension calls that bridge from `before_user_message_append` and
-attaches the returned receipt to the first provider request. Pi itself contains
-no OpenShell-specific startup behavior.
-
-[`models.json`](models.json) pins this run to OpenAI Chat Completions. The
-initial integration does not support the Responses API.
-
-## 6. Verify denial
-
-At the Pi prompt, submit:
+At the Pi prompt, submit both of these in the same session:
 
 ```text
 Reply with exactly: DENY_THIS
 ```
 
-Pi reports that OpenShell denied the prompt and does not start a model turn.
-Run `/session` before exiting Pi to see the active session file. After exiting,
-inspect all example session files:
-
-```shell
-/path/to/OpenShell/scripts/bin/openshell sandbox exec -n pi-egress-demo -- \
-  grep -R -n DENY_THIS /sandbox/pi-sessions
-```
-
-The command must produce no matches. The Egress Gate terminal has no
-corresponding HTTP provider-request evaluation.
-
-## 7. Verify replacement
-
-Reconnect to the same sandbox and start Pi with the same extension and session
-directory:
-
-```shell
-/path/to/OpenShell/scripts/bin/openshell sandbox exec -n pi-egress-demo --tty -- \
-  env PI_CODING_AGENT_DIR=/sandbox/pi-agent \
-  node /sandbox/pi-runtime/node_modules/@earendil-works/pi-coding-agent/dist/cli.js \
-  --provider openai-chat-completions \
-  --model gpt-4o-mini \
-  --extension /sandbox/openshell-input-admission.ts \
-  --session-dir /sandbox/pi-sessions
-```
-
-Submit:
-
 ```text
 Reply with exactly: REDACT_THIS
 ```
 
-The request makes a real model call. After exiting Pi, inspect the persisted
+The first submission is denied without starting a model turn. The second makes
+a real model call using `[REDACTED]`. Exit Pi, then inspect its persisted
 session:
 
 ```shell
-/path/to/OpenShell/scripts/bin/openshell sandbox exec -n pi-egress-demo -- \
-  grep -R -n -E 'REDACT_THIS|\[REDACTED\]' /sandbox/pi-sessions
+./demo.sh verify
 ```
 
-The session must contain `[REDACTED]` and must not contain `REDACT_THIS`. The
-Egress Gate terminal records an allowed provider-request evaluation. A
-successful request also proves that its rendered prompt matched the admitted
-replacement: Egress Gate rejects a receipt when the provider request contains a
-different final user prompt. The network middleware consumes the receipt, then
-removes the internal receipt header before forwarding upstream.
+The output must contain `[REDACTED]` and must not contain `DENY_THIS` or
+`REDACT_THIS`. The command exits with an error if either check fails.
 
-## Configuration
+## How it works
 
-[`policy.yaml`](policy.yaml) configures the `pi-egress` middleware for both
-rendered-prompt admission and requests to `api.openai.com`. It fails closed if
-the middleware is unavailable.
+1. Pi renders the user submission and calls its general-purpose
+   `before_user_message_append` extension hook.
+2. The example extension sends that text to OpenShell's sandbox-local admission
+   bridge.
+3. Egress Gate applies `policy.yaml`: it either denies the submission or
+   returns replacement text plus a short-lived receipt.
+4. Pi appends only admitted or replacement text to session history.
+5. OpenShell checks the receipt before the model request leaves the sandbox and
+   injects `OPENAI_API_KEY`; the key is never copied into the sandbox.
 
-OpenShell uses the same middleware configuration for rendered-prompt admission
-and provider HTTP egress. This is what lets Egress Gate issue a receipt before
-Pi persists the candidate and verify the receipt again at the network boundary.
+## Inspect individual commands
+
+The helper never requires you to trust hidden orchestration. Add `--print` to
+any action to show its exact commands without executing them:
+
+```shell
+./demo.sh --print prepare
+./demo.sh --print launch
+```
+
+The actions are deliberately small: `prepare` builds and packages the Pi fork;
+`serve` runs Egress Gate; `gateway` runs the matching OpenShell fork; and
+`launch` creates the credential provider and sandbox.
 
 ## Current scope
 
@@ -226,18 +128,12 @@ require one Pi hook per message role.
 
 ## Cleanup
 
-Delete the sandbox and provider:
+Exit Pi, but leave the OpenShell gateway running while cleanup deletes the
+sandbox and provider:
 
 ```shell
-cd /path/to/OpenShell
-/path/to/OpenShell/scripts/bin/openshell sandbox delete pi-egress-demo
-/path/to/OpenShell/scripts/bin/openshell provider delete pi-openai
+./demo.sh cleanup
 ```
 
-Stop the gateway before removing its static middleware registration, then
-restart it:
-
-```shell
-cd /path/to/OpenShell-Research/projects/egress-gate
-uv run egress-gate remove-gateway-registration --name pi-egress
-```
+Then stop the OpenShell gateway and Egress Gate with `Ctrl-C`. To run the
+example again, start from `./demo.sh prepare`.
