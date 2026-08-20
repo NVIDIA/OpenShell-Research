@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Stage canonical Egress Gate documentation in the site source tree."""
+"""Stage canonical project documentation in the site source tree."""
 
 from __future__ import annotations
 
@@ -12,12 +12,18 @@ import shutil
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SOURCE = ROOT / "projects" / "egress-gate" / "docs"
-DEFAULT_DESTINATION = ROOT / "docs" / "documentation" / "egress-gate"
+PROJECT_DOCUMENTATION = {
+    "egress-gate": ROOT / "projects" / "egress-gate" / "docs",
+    "openshell-agent-runner": ROOT
+    / "projects"
+    / "openshell-agent-runner"
+    / "docs",
+}
+DOCUMENTATION_ROOT = ROOT / "docs" / "documentation"
 
 
-def stage_egress_gate_docs(source: Path, destination: Path) -> None:
-    """Replace the generated site mirror with one canonical project-docs tree."""
+def stage_project_docs(source: Path, destination: Path) -> None:
+    """Replace one generated site mirror with its canonical project-docs tree."""
 
     source = source.resolve()
     destination_is_symlink = destination.is_symlink()
@@ -46,8 +52,9 @@ def stage_egress_gate_docs(source: Path, destination: Path) -> None:
 
 
 def main() -> int:
-    stage_egress_gate_docs(DEFAULT_SOURCE, DEFAULT_DESTINATION)
-    print(f"Staged Egress Gate documentation from {DEFAULT_SOURCE}.")
+    for project, source in PROJECT_DOCUMENTATION.items():
+        stage_project_docs(source, DOCUMENTATION_ROOT / project)
+        print(f"Staged {project} documentation from {source}.")
     return 0
 
 

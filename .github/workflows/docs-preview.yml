@@ -47,17 +47,17 @@ jobs:
               'scripts/build-docs.sh',
               'scripts/publish-agent-markdown.py',
               'scripts/render-dev-notes.py',
-              'scripts/stage-egress-gate-docs.py',
+              'scripts/stage-project-docs.py',
               'tests/test_agent_markdown.py',
               'tests/test_docs_404.py',
               'tests/test_render_dev_notes.py',
-              'tests/test_stage_egress_gate_docs.py',
+              'tests/test_stage_project_docs.py',
               'zensical.toml',
             ]);
             const docsChanged = files.some(
               ({ filename }) => filename.startsWith('docs/') ||
                 filename.startsWith('overrides/') ||
-                filename.startsWith('projects/egress-gate/docs/') ||
+                /^projects\/[^/]+\/docs\//.test(filename) ||
                 exactInputs.has(filename),
             );
             core.setOutput('operation', docsChanged ? 'deploy' : 'remove');

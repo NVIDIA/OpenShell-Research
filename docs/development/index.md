@@ -92,10 +92,11 @@ scripts/build-docs.sh
 ```
 
 `scripts/build-docs.sh` recreates `.venv-docs`, installs the pinned toolchain,
-stages canonical Egress Gate documentation from
-`projects/egress-gate/docs/`, renders Dev Notes metadata, and runs
-`zensical build --clean --strict`. Do not report success unless it completes
-without issues.
+stages each configured canonical project documentation tree from `projects/`
+under `docs/documentation/`, renders Dev Notes metadata, and runs `zensical
+build --clean --strict`. Configure project trees in
+`scripts/stage-project-docs.py`. Do not report success unless the build
+completes without issues.
 
 For documentation-site changes, serve the complete built artifact before
 handing the task back:
