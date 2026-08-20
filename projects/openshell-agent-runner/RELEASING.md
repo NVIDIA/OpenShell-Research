@@ -19,6 +19,16 @@ The dry run checks the clean `main` branch, runs the project validation suite,
 builds the wheel and source distribution, and validates both with Twine. It
 does not create a tag or upload anything.
 
+To validate or publish deliberately from another branch, add
+`ALLOW_NON_MAIN=1`:
+
+```bash
+make publish VERSION=0.1.0 DRY_RUN=1 ALLOW_NON_MAIN=1
+```
+
+This bypasses only the branch-name check. The working tree must still be clean,
+the version tag must not exist, and every release check must pass.
+
 ## Publish a release
 
 After the release commit is merged and checked out on a clean `main` branch:
