@@ -15,7 +15,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import openshell_agent_runner.openshell as openshell
-from openshell_agent_runner.artifacts import atomic_publish, validate_artifact
+from openshell_agent_runner.artifacts import (
+    MAX_ARTIFACT_BYTES,
+    atomic_publish,
+    validate_artifact,
+)
 from openshell_agent_runner.config import (
     ResolvedProfile,
     resolve_task,
@@ -164,7 +168,11 @@ def run_agent(request: RunRequest) -> str:
         task = resolved.profile.profile.tasks[request.task_id]
         with tempfile.TemporaryDirectory(prefix="oar-output-") as directory:
             downloaded = Path(directory) / "output.download"
-            openshell.run(openshell.sandbox_download(resolved, name, downloaded), 120)
+            openshell.run(
+                openshell.sandbox_download(resolved, name, downloaded),
+                120,
+                max_file_bytes=MAX_ARTIFACT_BYTES,
+            )
             schema_path = (
                 resolved.profile.profile_dir / task.output_schema
                 if task.output_schema is not None

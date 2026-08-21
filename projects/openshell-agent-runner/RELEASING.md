@@ -49,5 +49,6 @@ The script:
    repository.
 
 If the upload fails after the tag is pushed, correct the cause and rerun the
-same command. A matching existing tag is treated as a retry; a tag on another
-commit is rejected.
+same command. A matching existing tag is treated as a retry, and Twine skips an
+artifact that the repository already accepted. A tag on another commit is
+rejected.

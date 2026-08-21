@@ -188,12 +188,14 @@ def validate_environment_assignments(values: Sequence[str]) -> tuple[str, ...]:
     assignments: dict[str, str] = {}
     for value in values:
         key, separator, assigned = value.partition("=")
-        if (
-            not separator
-            or not assigned
-            or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.-]*", key)
-        ):
+        if not separator or not assigned:
             raise ValueError("environment must use non-empty KEY=VALUE syntax")
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+            raise ValueError(f"invalid OpenShell environment name: {key!r}")
+        if key.startswith("OPENSHELL_"):
+            raise ValueError(
+                f"environment name uses reserved OPENSHELL_ prefix: {key!r}"
+            )
         previous = assignments.get(key)
         if previous is not None and previous != assigned:
             raise ValueError(f"conflicting environment values for key {key!r}")

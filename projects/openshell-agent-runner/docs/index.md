@@ -89,6 +89,10 @@ The CLI supplies run-specific values:
 - `--output` selects the host result path.
 - `--timeout-seconds` limits the agent run.
 
+Environment keys start with a letter or underscore and contain only letters,
+digits, and underscores. They cannot start with OpenShell's reserved
+`OPENSHELL_` prefix.
+
 ## Run lifecycle
 
 <figure class="documentation-figure documentation-figure--wide">
@@ -116,8 +120,8 @@ The sequence is:
 
 6. Pi reads uploaded files, uses its declared tools, and accesses inference
    through OpenShell's managed inference path.
-7. OAR downloads `/sandbox/artifacts/result`, validates it, and atomically
-   replaces the requested host output.
+7. OAR downloads `/sandbox/artifacts/result` under a one-MiB file limit,
+   validates it, and atomically replaces the requested host output.
 8. OAR verifies the sandbox name and `oar-run-id` ownership label before
    deleting it. `--keep-sandbox` skips this cleanup.
 
@@ -160,8 +164,9 @@ Invalid submissions return diagnostics to Pi, which can correct and resubmit
 inside the same agent session. OAR validates the downloaded JSON against the
 same schema again before publishing it.
 
-Both validators treat JSON Schema `format` values as annotations. Use structural
-keywords such as `type`, `pattern`, and numeric bounds for enforced constraints.
+Both validators treat extension keywords and JSON Schema `format` values as
+annotations. Use structural keywords such as `type`, `pattern`, and numeric
+bounds for enforced constraints.
 
 The schema belongs to the profile. OAR has no built-in review or other
 task-specific result type.

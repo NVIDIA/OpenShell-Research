@@ -69,3 +69,18 @@ def test_environment_names_are_forwarded_to_native_openshell() -> None:
     resolved = resolve_run(request(environments=("KEYBOARD_LAYOUT=us",)))
 
     assert "KEYBOARD_LAYOUT=us" in resolved.environments
+
+
+@pytest.mark.parametrize(
+    ("environment", "message"),
+    [
+        ("BAD.NAME=value", "invalid OpenShell environment name"),
+        ("BAD-NAME=value", "invalid OpenShell environment name"),
+        ("OPENSHELL_GATEWAY=local", "reserved OPENSHELL_ prefix"),
+    ],
+)
+def test_environment_names_match_openshell_contract(
+    environment: str, message: str
+) -> None:
+    with pytest.raises(ConfigurationError, match=message):
+        resolve_run(request(environments=(environment,)))

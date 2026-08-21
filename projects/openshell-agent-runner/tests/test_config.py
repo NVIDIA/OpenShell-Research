@@ -74,6 +74,8 @@ def test_profile_resource_escape_is_rejected(tmp_path: Path) -> None:
             "upload: [one://sandbox/oar-runtime/file]",
             "canonical absolute paths",
         ),
+        ("env: [BAD-NAME=value]", "invalid OpenShell environment name"),
+        ("env: [OPENSHELL_GATEWAY=local]", "reserved OPENSHELL_ prefix"),
         ("env: [MODE=one, MODE=two]", "conflicting environment values"),
     ],
 )
@@ -178,7 +180,7 @@ def test_invalid_output_schema_is_rejected(tmp_path: Path) -> None:
 def test_output_schema_accepts_standard_format_annotations(tmp_path: Path) -> None:
     _write_profile(tmp_path, task="output_schema: output.schema.json")
     (tmp_path / "output.schema.json").write_text(
-        '{"type":"string","format":"date-time"}'
+        '{"type":"string","format":"date-time","x-oar-note":true}'
     )
 
     load_profile(tmp_path)

@@ -58,8 +58,24 @@ The pre-commit hook automatically applies Ruff's Black-compatible formatter to
 staged Python files in this project. Hook installation is required once per
 checkout.
 
-After the package is published, the equivalent package-index invocation is
-`uvx --from openshell-agent-runner oar --help`.
+After publication, run the CLI with
+`uvx --from openshell-agent-runner oar --help`. Profiles are separate,
+repository-owned configuration and are not bundled with the package. To try the
+published CLI with the starter profile:
+
+```bash
+git clone https://github.com/NVIDIA/OpenShell-Research.git
+cd OpenShell-Research
+uvx --from openshell-agent-runner oar run \
+  projects/openshell-agent-runner/profiles/reviewer \
+  --task review \
+  --input README.md \
+  --output /tmp/oar-review.md \
+  --dry-run
+```
+
+Remove `--dry-run` after `oar doctor` confirms that your OpenShell gateway and
+inference route are ready.
 
 See the [release instructions](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-agent-runner/RELEASING.md)
 for package publication. The release command builds and publishes only
@@ -123,7 +139,8 @@ The supported run options are deliberately small:
 - `--output`: host destination for the agent result.
 - `--input`: host document required by tasks declaring `required_input: document`.
 - `--upload`: repeatable native OpenShell `SOURCE:DESTINATION` mapping.
-- `--env`: repeatable non-secret `KEY=VALUE` sandbox environment value.
+- `--env`: repeatable non-secret `KEY=VALUE` sandbox environment value. Keys use
+  shell identifier syntax; OpenShell reserves the `OPENSHELL_` prefix.
 - `--gateway` and `--workspace`: select existing OpenShell state.
 - `--timeout-seconds`: maximum agent runtime.
 - `--keep-sandbox`: retain the sandbox for deliberate debugging.
@@ -244,7 +261,8 @@ were omitted.
 
 By default, OAR captures Pi's final headless response and publishes it without
 interpreting its contents. The result must exist, be non-empty, and fit within
-the one-MiB transport limit.
+the one-MiB transport limit. OAR applies that limit to the download process and
+checks the downloaded file again before publication.
 
 A task can optionally require structured JSON by referencing a JSON Schema:
 
@@ -262,8 +280,9 @@ resubmit within the same session. OAR validates the accepted JSON against the
 same Draft 2020-12 schema again before publishing it. Pi's tool parameters use
 TypeBox, as required by its extension API, while the submitted result is
 validated with Ajv. The schema and its domain concepts belong entirely to the
-profile; OAR has no built-in review result type. JSON Schema `format` values are
-treated as annotations rather than additional validation rules on both sides.
+profile; OAR has no built-in review result type. JSON Schema extension keywords
+and `format` values are treated as annotations rather than additional validation
+rules on both sides.
 
 OAR fixes implementation details that do not change the intended result: Pi is
 the harness, its image is bundled with the package, autonomous approval and

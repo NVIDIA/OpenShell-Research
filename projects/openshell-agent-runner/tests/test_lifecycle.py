@@ -75,7 +75,8 @@ elif operation == "get":
 elif operation == "download":
     if os.environ.get("FAKE_FAIL_DOWNLOAD") == "1": sys.exit(1)
     fallback = json.dumps({"status": "pass"})
-    pathlib.Path(args[4]).write_text(os.environ.get("FAKE_OUTPUT", fallback) + "\\n")
+    output = "x" * (2 * 1024 * 1024) if os.environ.get("FAKE_LARGE_OUTPUT") == "1" else os.environ.get("FAKE_OUTPUT", fallback)
+    pathlib.Path(args[4]).write_text(output + "\\n")
 elif operation == "delete":
     if os.environ.get("FAKE_FAIL_DELETE") == "1": sys.exit(1)
     state.unlink(missing_ok=True)
@@ -246,8 +247,13 @@ def test_malformed_ownership_response_refuses_delete(
 
     original = openshell.run
 
-    def malformed_get(command, timeout, *, capture=False):
-        result = original(command, timeout, capture=capture)
+    def malformed_get(command, timeout, *, capture=False, max_file_bytes=None):
+        result = original(
+            command,
+            timeout,
+            capture=capture,
+            max_file_bytes=max_file_bytes,
+        )
         if command[1:3] == ["sandbox", "get"]:
             return subprocess.CompletedProcess(
                 result.args,
@@ -296,9 +302,14 @@ def test_interrupt_preserves_interrupt_and_cleans(tmp_path: Path, monkeypatch) -
     original = openshell.run
     interrupted = False
 
-    def interrupt_after_create(command, timeout, *, capture=False):
+    def interrupt_after_create(command, timeout, *, capture=False, max_file_bytes=None):
         nonlocal interrupted
-        result = original(command, timeout, capture=capture)
+        result = original(
+            command,
+            timeout,
+            capture=capture,
+            max_file_bytes=max_file_bytes,
+        )
         if command[1:3] == ["sandbox", "create"] and not interrupted:
             interrupted = True
             raise KeyboardInterrupt
@@ -315,6 +326,20 @@ def test_download_failure_cleans(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("FAKE_FAIL_DOWNLOAD", "1")
     with pytest.raises(ExecutionError, match="sandbox download"):
         run_agent(request(profile, executable, tmp_path / "result.json"))
+    assert not state.exists()
+
+
+def test_oversized_download_is_stopped_during_transfer(
+    tmp_path: Path, monkeypatch
+) -> None:
+    profile, executable, state, _ = prepare(tmp_path, monkeypatch)
+    monkeypatch.setenv("FAKE_LARGE_OUTPUT", "1")
+    output = tmp_path / "result.json"
+
+    with pytest.raises(ExecutionError, match="sandbox download"):
+        run_agent(request(profile, executable, output))
+
+    assert not output.exists()
     assert not state.exists()
 
 
