@@ -11,11 +11,13 @@ const runtimeRoot = process.env.OAR_RUNTIME_ROOT || "/sandbox/oar-runtime";
 const schema = JSON.parse(
   readFileSync(`${runtimeRoot}/output.schema.json`, "utf8"),
 );
-// Python jsonschema and Ajv both enforce the schema's structure. Neither applies
-// optional format semantics, which keeps validation identical on both sides.
-const validate = new Ajv2020({ allErrors: true, validateFormats: false }).compile(
-  schema,
-);
+// Match Python jsonschema's Draft 2020-12 behavior: extension keywords and
+// formats remain annotations, while standard structural keywords are enforced.
+const validate = new Ajv2020({
+  allErrors: true,
+  strict: false,
+  validateFormats: false,
+}).compile(schema);
 const parameters = Type.Object({ result: Type.Unsafe(schema) });
 const outputDirectory = "/sandbox/artifacts";
 const outputPath = `${outputDirectory}/result`;

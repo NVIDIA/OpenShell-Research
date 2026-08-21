@@ -120,7 +120,8 @@ def test_generic_submission_extension_validates_and_saves_result() -> None:
 
     assert 'import Ajv2020 from "ajv/dist/2020.js"' in extension
     assert 'import { Type } from "typebox"' in extension
-    assert "allErrors: true, validateFormats: false" in extension
+    assert "strict: false" in extension
+    assert "validateFormats: false" in extension
     assert "Type.Object({ result: Type.Unsafe(schema) })" in extension
     assert "async execute(_toolCallId, { result })" in extension
     assert 'name: "submit_result"' in extension

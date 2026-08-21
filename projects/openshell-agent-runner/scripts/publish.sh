@@ -134,7 +134,9 @@ fi
 
 echo "Uploading openshell-agent-runner $VERSION with .pypirc repository '$PYPIRC_REPOSITORY'..."
 if ! uv run --with twine python -m twine upload \
-    --repository "$PYPIRC_REPOSITORY" "${ARTIFACTS[@]}"; then
+    --repository "$PYPIRC_REPOSITORY" \
+    --skip-existing \
+    "${ARTIFACTS[@]}"; then
     echo "publish: upload failed; fix the cause and rerun the same release command" >&2
     exit 1
 fi

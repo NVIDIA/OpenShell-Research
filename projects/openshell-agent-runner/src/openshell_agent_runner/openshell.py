@@ -6,10 +6,12 @@
 from __future__ import annotations
 
 import re
+import resource
 import shlex
 import subprocess
 from collections.abc import Sequence
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -88,7 +90,11 @@ def sandbox_delete(request: RunRequest, name: str) -> list[str]:
 
 
 def run(
-    command: list[str], timeout: int, *, capture: bool = False
+    command: list[str],
+    timeout: int,
+    *,
+    capture: bool = False,
+    max_file_bytes: int | None = None,
 ) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(
@@ -97,11 +103,20 @@ def run(
             text=True,
             capture_output=capture,
             timeout=timeout,
+            preexec_fn=(
+                partial(_set_file_size_limit, max_file_bytes)
+                if max_file_bytes is not None
+                else None
+            ),
         )
     except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
         raise ExecutionError(
             f"command failed: {shlex.join(command)}: {error}"
         ) from error
+
+
+def _set_file_size_limit(max_file_bytes: int) -> None:
+    resource.setrlimit(resource.RLIMIT_FSIZE, (max_file_bytes, max_file_bytes))
 
 
 def doctor(target: NativeTarget) -> list[tuple[str, str]]:
