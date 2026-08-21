@@ -165,8 +165,9 @@ inside the same agent session. OAR validates the downloaded JSON against the
 same schema again before publishing it.
 
 Both validators treat extension keywords and JSON Schema `format` values as
-annotations. Use structural keywords such as `type`, `pattern`, and numeric
-bounds for enforced constraints.
+annotations. OAR rejects `pattern` and `patternProperties` because Python and
+JavaScript use different regular-expression dialects. Use portable structural
+keywords such as `type`, `enum`, `const`, length, and numeric bounds instead.
 
 The schema belongs to the profile. OAR has no built-in review or other
 task-specific result type.
@@ -190,6 +191,6 @@ without creating a sandbox.
 | Exit code | Meaning |
 | --- | --- |
 | `0` | The result was validated and published. |
-| `1` | OpenShell execution, timeout, ownership inspection, or cleanup failed. |
+| `1` | OpenShell execution, timeout, download size limit, ownership inspection, or cleanup failed. |
 | `2` | CLI input or profile configuration was invalid. |
-| `3` | The result was missing, oversized, invalid, or failed its schema. |
+| `3` | The result was missing, empty, invalid, or failed its schema. |

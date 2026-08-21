@@ -8,7 +8,7 @@ PROJECT_DIRECTORY=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 PYPIRC_REPOSITORY="openshell-research"
 
 usage() {
-    echo "Usage: $0 VERSION [--dry-run] [--allow-non-main]"
+    echo "Usage: $0 VERSION [--dry-run] [--allow-non-main] [--retry-artifact wheel|sdist]"
     echo
     echo "Build and publish openshell-agent-runner using the '$PYPIRC_REPOSITORY'"
     echo "repository configured in ~/.pypirc."
@@ -27,6 +27,7 @@ fi
 VERSION="$1"
 DRY_RUN=false
 ALLOW_NON_MAIN=false
+RETRY_ARTIFACT=""
 shift
 
 while [[ $# -gt 0 ]]; do
@@ -36,6 +37,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --allow-non-main)
             ALLOW_NON_MAIN=true
+            ;;
+        --retry-artifact)
+            if [[ $# -lt 2 ]]; then
+                usage >&2
+                exit 2
+            fi
+            RETRY_ARTIFACT="$2"
+            shift
             ;;
         *)
             usage >&2
@@ -47,6 +56,14 @@ done
 
 if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(rc[0-9]+)?$ ]]; then
     echo "publish: invalid version '$VERSION'; expected X.Y.Z or X.Y.ZrcN" >&2
+    exit 2
+fi
+if [[ -n "$RETRY_ARTIFACT" && "$RETRY_ARTIFACT" != "wheel" && "$RETRY_ARTIFACT" != "sdist" ]]; then
+    echo "publish: --retry-artifact must be 'wheel' or 'sdist'" >&2
+    exit 2
+fi
+if [[ "$DRY_RUN" == true && -n "$RETRY_ARTIFACT" ]]; then
+    echo "publish: --retry-artifact cannot be combined with --dry-run" >&2
     exit 2
 fi
 
@@ -84,6 +101,13 @@ else
     TAG_CREATED=true
 fi
 
+cleanup_local_tag() {
+    if [[ "$TAG_CREATED" == true && "$TAG_PUBLIC" != true ]]; then
+        git tag -d "$TAG" >/dev/null
+    fi
+}
+trap cleanup_local_tag EXIT
+
 REMOTE_TAG=$(git ls-remote --tags origin "refs/tags/$TAG" | cut -f1)
 if [[ -n "$REMOTE_TAG" ]]; then
     if [[ "$REMOTE_TAG" != "$(git rev-parse HEAD)" ]]; then
@@ -93,12 +117,14 @@ if [[ -n "$REMOTE_TAG" ]]; then
     TAG_PUBLIC=true
 fi
 
-cleanup_local_tag() {
-    if [[ "$TAG_CREATED" == true && "$TAG_PUBLIC" != true ]]; then
-        git tag -d "$TAG" >/dev/null
-    fi
-}
-trap cleanup_local_tag EXIT
+if [[ -n "$RETRY_ARTIFACT" && "$TAG_PUBLIC" != true ]]; then
+    echo "publish: --retry-artifact requires the matching remote tag '$TAG'" >&2
+    exit 1
+fi
+if [[ -z "$RETRY_ARTIFACT" && "$DRY_RUN" != true && "$TAG_PUBLIC" == true ]]; then
+    echo "publish: remote tag '$TAG' already exists; retry only the missing artifact with --retry-artifact" >&2
+    exit 1
+fi
 
 echo "Running release checks..."
 uv sync --locked
@@ -132,12 +158,18 @@ if [[ "$TAG_PUBLIC" != true ]]; then
     TAG_PUBLIC=true
 fi
 
+UPLOAD_ARTIFACTS=("${ARTIFACTS[@]}")
+if [[ "$RETRY_ARTIFACT" == "wheel" ]]; then
+    UPLOAD_ARTIFACTS=("${WHEELS[@]}")
+elif [[ "$RETRY_ARTIFACT" == "sdist" ]]; then
+    UPLOAD_ARTIFACTS=("${SDISTS[@]}")
+fi
+
 echo "Uploading openshell-agent-runner $VERSION with .pypirc repository '$PYPIRC_REPOSITORY'..."
 if ! uv run --with twine python -m twine upload \
     --repository "$PYPIRC_REPOSITORY" \
-    --skip-existing \
-    "${ARTIFACTS[@]}"; then
-    echo "publish: upload failed; fix the cause and rerun the same release command" >&2
+    "${UPLOAD_ARTIFACTS[@]}"; then
+    echo "publish: upload failed; identify the missing artifact and retry only that artifact" >&2
     exit 1
 fi
 

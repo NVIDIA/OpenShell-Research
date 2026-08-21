@@ -66,6 +66,7 @@ published CLI with the starter profile:
 ```bash
 git clone https://github.com/NVIDIA/OpenShell-Research.git
 cd OpenShell-Research
+uvx --from openshell-agent-runner oar doctor --gateway openshell
 uvx --from openshell-agent-runner oar run \
   projects/openshell-agent-runner/profiles/reviewer \
   --task review \
@@ -74,8 +75,8 @@ uvx --from openshell-agent-runner oar run \
   --dry-run
 ```
 
-Remove `--dry-run` after `oar doctor` confirms that your OpenShell gateway and
-inference route are ready.
+Replace `openshell` if your gateway has a different name. Remove `--dry-run`
+after `doctor` confirms that the gateway and inference route are ready.
 
 See the [release instructions](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-agent-runner/RELEASING.md)
 for package publication. The release command builds and publishes only
@@ -282,7 +283,9 @@ TypeBox, as required by its extension API, while the submitted result is
 validated with Ajv. The schema and its domain concepts belong entirely to the
 profile; OAR has no built-in review result type. JSON Schema extension keywords
 and `format` values are treated as annotations rather than additional validation
-rules on both sides.
+rules on both sides. OAR rejects `pattern` and `patternProperties` because Python
+and JavaScript use different regular-expression dialects; use `enum`, `const`,
+length, and numeric constraints for portable validation.
 
 OAR fixes implementation details that do not change the intended result: Pi is
 the harness, its image is bundled with the package, autonomous approval and
@@ -327,9 +330,9 @@ OpenShell's managed inference path.
 | Code | Meaning |
 | --- | --- |
 | `0` | Execution completed and the output validated. |
-| `1` | OpenShell execution, timeout, ownership inspection, or cleanup failed. |
+| `1` | OpenShell execution, timeout, download size limit, ownership inspection, or cleanup failed. |
 | `2` | CLI input or profile configuration was invalid. |
-| `3` | The output was missing, oversized, invalid, or failed its contract. |
+| `3` | The output was missing, empty, invalid, or failed its contract. |
 
 ## Development
 

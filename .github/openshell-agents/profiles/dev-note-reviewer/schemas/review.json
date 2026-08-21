@@ -75,7 +75,8 @@
     },
     "source_content_digest": {
       "type": "string",
-      "pattern": "^[0-9a-f]{64}$"
+      "minLength": 64,
+      "maxLength": 64
     },
     "criterion_scores": {
       "type": "array",
@@ -88,7 +89,7 @@
         "properties": {
           "criterion": {
             "type": "string",
-            "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+            "minLength": 1
           },
           "score": {
             "type": "integer",

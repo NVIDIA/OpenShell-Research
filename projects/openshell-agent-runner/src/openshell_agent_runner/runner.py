@@ -168,6 +168,7 @@ def run_agent(request: RunRequest) -> str:
         task = resolved.profile.profile.tasks[request.task_id]
         with tempfile.TemporaryDirectory(prefix="oar-output-") as directory:
             downloaded = Path(directory) / "output.download"
+            downloaded.touch(mode=0o600)
             openshell.run(
                 openshell.sandbox_download(resolved, name, downloaded),
                 120,

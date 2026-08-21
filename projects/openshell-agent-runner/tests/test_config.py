@@ -186,6 +186,39 @@ def test_output_schema_accepts_standard_format_annotations(tmp_path: Path) -> No
     load_profile(tmp_path)
 
 
+@pytest.mark.parametrize("keyword", ["pattern", "patternProperties"])
+def test_output_schema_rejects_regex_keywords(tmp_path: Path, keyword: str) -> None:
+    _write_profile(tmp_path, task="output_schema: output.schema.json")
+    value: object = (
+        {"(?i)abc": {"type": "string"}} if keyword == "patternProperties" else "(?i)abc"
+    )
+    (tmp_path / "output.schema.json").write_text(
+        json.dumps({"type": "object", keyword: value})
+    )
+
+    with pytest.raises(ConfigurationError, match="regular-expression keywords"):
+        load_profile(tmp_path)
+
+
+def test_output_schema_allows_property_names_that_match_schema_keywords(
+    tmp_path: Path,
+) -> None:
+    _write_profile(tmp_path, task="output_schema: output.schema.json")
+    (tmp_path / "output.schema.json").write_text(
+        json.dumps(
+            {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string"},
+                    "$ref": {"type": "string"},
+                },
+            }
+        )
+    )
+
+    load_profile(tmp_path)
+
+
 @pytest.mark.parametrize("keyword", ["$ref", "$dynamicRef", "$recursiveRef"])
 def test_output_schema_rejects_external_references(
     tmp_path: Path, keyword: str

@@ -11,7 +11,7 @@ REPOSITORY = Path(__file__).resolve().parents[3]
 PUBLISH_SCRIPT = REPOSITORY / "projects/openshell-agent-runner/scripts/publish.sh"
 
 
-def test_publish_retry_skips_an_artifact_already_in_the_repository(
+def test_publish_retry_uploads_only_the_missing_artifact(
     tmp_path: Path,
 ) -> None:
     project = tmp_path / "project"
@@ -33,14 +33,30 @@ def test_publish_retry_skips_an_artifact_already_in_the_repository(
         if [[ "$1" == "status" ]]; then exit 0; fi
         if [[ "$1" == "branch" ]]; then printf 'main\\n'; exit 0; fi
         if [[ "$1" == "fetch" ]]; then exit 0; fi
-        if [[ "$1" == "rev-parse" && "$2" == "--verify" ]]; then exit 0; fi
+        if [[ "$1" == "rev-parse" && "$2" == "--verify" ]]; then
+            test -e "$FAKE_GIT_STATE/local-tag"
+            exit
+        fi
         if [[ "$1" == "rev-parse" ]]; then printf 'abc123\\n'; exit 0; fi
         if [[ "$1" == "rev-list" ]]; then printf 'abc123\\n'; exit 0; fi
         if [[ "$1" == "ls-remote" ]]; then
-            printf 'abc123\\trefs/tags/v0.1.0\\n'
+            if [[ -e "$FAKE_GIT_STATE/remote-tag" ]]; then
+                printf 'abc123\\trefs/tags/v0.1.0\\n'
+            fi
             exit 0
         fi
-        if [[ "$1" == "push" ]]; then exit 90; fi
+        if [[ "$1" == "tag" && "$2" == "-d" ]]; then
+            rm -f "$FAKE_GIT_STATE/local-tag"
+            exit 0
+        fi
+        if [[ "$1" == "tag" ]]; then
+            touch "$FAKE_GIT_STATE/local-tag"
+            exit 0
+        fi
+        if [[ "$1" == "push" ]]; then
+            touch "$FAKE_GIT_STATE/remote-tag"
+            exit 0
+        fi
         exit 91
         """,
     )
@@ -54,31 +70,58 @@ def test_publish_retry_skips_an_artifact_already_in_the_repository(
             : > dist/openshell_agent_runner-0.1.0-py3-none-any.whl
             : > dist/openshell_agent_runner-0.1.0.tar.gz
         fi
-        if [[ "$*" == *"twine upload"* && "$*" != *"--skip-existing"* ]]; then
-            exit 92
+        if [[ "$*" == *"twine upload"* ]]; then
+            if [[ "$*" == *"--skip-existing"* ]]; then exit 92; fi
+            if [[ "$*" == *".whl"* && "$*" == *".tar.gz"* ]]; then
+                touch "$FAKE_REPOSITORY_STATE/wheel"
+                exit 93
+            fi
+            if [[ "$*" == *".tar.gz"* ]]; then
+                touch "$FAKE_REPOSITORY_STATE/sdist"
+                exit 0
+            fi
         fi
         exit 0
         """,
     )
 
     uv_log = tmp_path / "uv.log"
+    git_state = tmp_path / "git-state"
+    repository_state = tmp_path / "repository-state"
+    git_state.mkdir()
+    repository_state.mkdir()
     environment = os.environ.copy()
     environment["PATH"] = f"{fake_bin}:{environment['PATH']}"
     environment["FAKE_UV_LOG"] = str(uv_log)
+    environment["FAKE_GIT_STATE"] = str(git_state)
+    environment["FAKE_REPOSITORY_STATE"] = str(repository_state)
 
-    completed = subprocess.run(
+    first_attempt = subprocess.run(
         ["bash", str(script), "0.1.0"],
         text=True,
         capture_output=True,
         env=environment,
         check=False,
     )
+    assert first_attempt.returncode == 1
+    assert (repository_state / "wheel").exists()
+    assert not (repository_state / "sdist").exists()
 
-    assert completed.returncode == 0, completed.stderr
-    upload = next(
-        line for line in uv_log.read_text().splitlines() if "twine upload" in line
+    retry = subprocess.run(
+        ["bash", str(script), "0.1.0", "--retry-artifact", "sdist"],
+        text=True,
+        capture_output=True,
+        env=environment,
+        check=False,
     )
-    assert "--skip-existing" in upload
+
+    assert retry.returncode == 0, retry.stderr
+    assert (repository_state / "sdist").exists()
+    uploads = [
+        line for line in uv_log.read_text().splitlines() if "twine upload" in line
+    ]
+    assert ".whl" in uploads[0] and ".tar.gz" in uploads[0]
+    assert ".whl" not in uploads[1] and ".tar.gz" in uploads[1]
 
 
 def _write_executable(path: Path, content: str) -> None:

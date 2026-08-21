@@ -48,7 +48,15 @@ The script:
 5. Uploads only those two artifacts through the `openshell-research` `.pypirc`
    repository.
 
-If the upload fails after the tag is pushed, correct the cause and rerun the
-same command. A matching existing tag is treated as a retry, and Twine skips an
-artifact that the repository already accepted. A tag on another commit is
-rejected.
+If the upload fails after the tag is pushed, check the repository or Twine log
+to identify which artifact is missing. Retry only that artifact:
+
+```bash
+make publish VERSION=0.1.0 RETRY_ARTIFACT=sdist
+```
+
+Use `wheel` instead of `sdist` when the wheel is missing. The retry rebuilds and
+checks both artifacts from the tagged commit but uploads only the selected file,
+so it works with private indexes that reject duplicate filenames. A retry
+requires the remote tag to match the current commit. If both files are already
+present, there is nothing to retry.
