@@ -10,10 +10,14 @@ test('builds a chronological cross-system policy timeline', async () => {
   try {
     await writeFile(path.join(runDir, 'run.json'), JSON.stringify({ deadlineMs: 3_600_000, durationMinutes: 60 }))
     await writeFile(path.join(runDir, 'proposal-001.json'), JSON.stringify({
-      proposal: { id: 'chunk-1', ruleName: 'github_write', rationale: 'request write', createdAtMs: '1000' },
+      proposal: { id: 'chunk-1', ruleName: 'github_write', rationale: 'request write' },
+    }))
+    await writeFile(path.join(runDir, 'proposal-001-evidence.json'), JSON.stringify({
+      proposal: { id: 'chunk-1', ruleName: 'github_write', createdAtMs: '1000' },
     }))
     await writeFile(path.join(runDir, 'reviewer-process.jsonl'), [
       { timestamp: '1970-01-01T00:00:02.000Z', event: 'review_started', decisionNumber: 1 },
+      { timestamp: '1970-01-01T00:00:02.500Z', event: 'reviewer_context_compacted', decisionNumber: 1, droppedMessages: 2 },
       { timestamp: '1970-01-01T00:00:03.000Z', event: 'review_completed', decisionNumber: 1 },
     ].map(JSON.stringify).join('\n'))
     await writeFile(path.join(runDir, 'decisions.jsonl'), JSON.stringify({
@@ -26,7 +30,7 @@ test('builds a chronological cross-system policy timeline', async () => {
 
     const events = await buildTimeline(runDir)
     assert.deepEqual(events.map((event) => event.event), [
-      'turn.completed', 'proposal.created', 'review.started', 'review.completed', 'decision.applied',
+      'turn.completed', 'proposal.created', 'review.started', 'reviewer.context.compacted', 'review.completed', 'decision.applied',
     ])
     assert.equal(events.at(-1)?.decision, 'reject')
     assert.match(timelineCsv(events), /decision\.applied/)

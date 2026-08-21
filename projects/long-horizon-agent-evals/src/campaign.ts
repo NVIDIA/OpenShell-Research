@@ -53,6 +53,7 @@ function safeReviewerEnvironment(): NodeJS.ProcessEnv {
     'SSL_CERT_FILE', 'SSL_CERT_DIR', 'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY',
     'http_proxy', 'https_proxy', 'no_proxy',
     'LAB_MODEL_BACKOFF_BASE_SECONDS', 'LAB_MODEL_BACKOFF_MAX_SECONDS', 'LAB_MODEL_REQUEST_TIMEOUT_SECONDS',
+    'LAB_REVIEWER_HISTORY_MAX_MESSAGES', 'LAB_REVIEWER_HISTORY_MAX_CHARACTERS',
     'LAB_OPENSHELL_GATEWAY', 'OPENSHELL_GATEWAY_ENDPOINT', 'OPENSHELL_TOKEN', 'OPENSHELL_CA_CERT',
     'OPENSHELL_CLIENT_CERT', 'OPENSHELL_CLIENT_KEY', 'OPENSHELL_INSECURE',
   ]
@@ -317,6 +318,8 @@ async function main(): Promise<void> {
   const reviewerResponsesUrl = process.env.LAB_REVIEWER_RESPONSES_URL || challengerResponsesUrl
   const reviewerModel = process.env.LAB_REVIEWER_MODEL || challengerModel
   const reviewerReasoning = process.env.LAB_REVIEWER_REASONING || challengerReasoning
+  const reviewerHistoryMaxMessages = integer('LAB_REVIEWER_HISTORY_MAX_MESSAGES', 16)
+  const reviewerHistoryMaxCharacters = integer('LAB_REVIEWER_HISTORY_MAX_CHARACTERS', 240_000)
   const challengerEndpoint = responsesEndpoint(challengerResponsesUrl)
   const responsesProfileId = `long-horizon-responses-${createHash('sha256')
     .update(`${challengerEndpoint.host}:${challengerEndpoint.port}`)
@@ -449,6 +452,12 @@ async function main(): Promise<void> {
           responsesUrl: publicUrl(reviewerResponsesUrl),
         },
       },
+      reviewerContext: {
+        strategy: 'bounded_recent_exchanges',
+        maxMessages: reviewerHistoryMaxMessages,
+        maxCharacters: reviewerHistoryMaxCharacters,
+        authoritativeState: 'candidateEffectivePolicy',
+      },
       runtime: { node: process.version, openshellSdk: sdkPackage.version, sandboxImage },
       clientGuidance: { githubProviderSkill: 'replaced with neutral tool guidance by scripts/challenger.sh' },
     })
@@ -471,6 +480,8 @@ async function main(): Promise<void> {
         LAB_REVIEWER_RESPONSES_URL: reviewerResponsesUrl,
         LAB_REVIEWER_MODEL: reviewerModel,
         LAB_REVIEWER_REASONING: reviewerReasoning,
+        LAB_REVIEWER_HISTORY_MAX_MESSAGES: String(reviewerHistoryMaxMessages),
+        LAB_REVIEWER_HISTORY_MAX_CHARACTERS: String(reviewerHistoryMaxCharacters),
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     })

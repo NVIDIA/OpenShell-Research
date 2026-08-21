@@ -15,6 +15,24 @@ export interface ReviewerState {
   history: ConversationMessage[]
 }
 
+function historyCharacters(state: ReviewerState): number {
+  return state.history.reduce((total, message) => total + message.content.length, 0)
+}
+
+export function compactReviewerHistory(
+  state: ReviewerState,
+  maxMessages: number,
+  maxCharacters: number,
+): number {
+  let droppedMessages = 0
+  while (state.history.length > maxMessages || historyCharacters(state) > maxCharacters) {
+    const count = Math.min(2, state.history.length)
+    state.history.splice(0, count)
+    droppedMessages += count
+  }
+  return droppedMessages
+}
+
 interface ResponsesBody {
   id?: string
   model?: string
@@ -26,6 +44,12 @@ interface ResponsesBody {
   }>
   usage?: unknown
   error?: { type?: string; code?: string; message?: string }
+}
+
+export function isContextLengthExceeded(status: number, body: ResponsesBody): boolean {
+  const code = body.error?.code ?? body.error?.type ?? ''
+  const message = body.error?.message ?? ''
+  return status === 400 && (code === 'context_length_exceeded' || /context (?:window|length)|input exceeds/i.test(message))
 }
 
 function outputText(body: ResponsesBody): string {
@@ -64,6 +88,7 @@ export async function reviewWithResponses(
   prompt: string,
   decisionNumber: number,
   timeoutMs: number,
+  historyPrompt = prompt,
 ): Promise<ReviewDecision> {
   const apiKey = process.env.LAB_REVIEWER_API_KEY
   if (!apiKey) throw new Error('LAB_REVIEWER_API_KEY is required for the reviewer')
@@ -72,7 +97,7 @@ export async function reviewWithResponses(
   const reasoning = process.env.LAB_REVIEWER_REASONING ?? 'high'
   const url = process.env.LAB_REVIEWER_RESPONSES_URL
   if (!url) throw new Error('LAB_REVIEWER_RESPONSES_URL is required for the reviewer')
-  const request = {
+  const request = () => ({
     model,
     input: [
       { role: 'developer', content: baseInstructions },
@@ -97,7 +122,7 @@ export async function reviewWithResponses(
       },
     },
     max_output_tokens: 2048,
-  }
+  })
 
   await appendJsonl(path.join(runDir, 'reviewer-process.jsonl'), {
     event: 'review_started',
@@ -111,7 +136,10 @@ export async function reviewWithResponses(
   const baseBackoffMs = integer('LAB_MODEL_BACKOFF_BASE_SECONDS', 15) * 1000
   const maxBackoffMs = integer('LAB_MODEL_BACKOFF_MAX_SECONDS', 120) * 1000
   const requestTimeoutMs = integer('LAB_MODEL_REQUEST_TIMEOUT_SECONDS', 180) * 1000
+  const maxHistoryMessages = integer('LAB_REVIEWER_HISTORY_MAX_MESSAGES', 16)
+  const maxHistoryCharacters = integer('LAB_REVIEWER_HISTORY_MAX_CHARACTERS', 240_000)
   let attempt = 0
+  let contextReset = false
   let response: Response | undefined
   let body: ResponsesBody = {}
   let lastError: unknown
@@ -122,7 +150,7 @@ export async function reviewWithResponses(
       response = await fetch(url, {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(request),
+        body: JSON.stringify(request()),
         signal: AbortSignal.timeout(Math.min(requestTimeoutMs, remainingMs)),
       })
       body = (await response.json().catch(() => ({}))) as ResponsesBody
@@ -132,6 +160,21 @@ export async function reviewWithResponses(
       )
       if (response.ok) break
       lastError = new Error(`Responses HTTP ${response.status}: ${body.error?.message ?? 'unknown error'}`)
+      if (isContextLengthExceeded(response.status, body) && state.history.length > 0 && !contextReset) {
+        const droppedMessages = state.history.length
+        state.history.length = 0
+        contextReset = true
+        await appendJsonl(path.join(runDir, 'reviewer-process.jsonl'), {
+          event: 'reviewer_context_reset',
+          decisionNumber,
+          attempt,
+          droppedMessages,
+          reason: 'context_length_exceeded',
+        })
+        response = undefined
+        body = {}
+        continue
+      }
       if (!transientStatus(response.status)) throw lastError
     } catch (error) {
       lastError = error
@@ -166,7 +209,17 @@ export async function reviewWithResponses(
     throw new Error(`invalid reviewer decision: ${text}`)
   }
   const decision = { decision: parsed.decision, reason: parsed.reason }
-  state.history.push({ role: 'user', content: prompt }, { role: 'assistant', content: JSON.stringify(decision) })
+  state.history.push({ role: 'user', content: historyPrompt }, { role: 'assistant', content: JSON.stringify(decision) })
+  const droppedMessages = compactReviewerHistory(state, maxHistoryMessages, maxHistoryCharacters)
+  if (droppedMessages > 0) {
+    await appendJsonl(path.join(runDir, 'reviewer-process.jsonl'), {
+      event: 'reviewer_context_compacted',
+      decisionNumber,
+      droppedMessages,
+      retainedMessages: state.history.length,
+      retainedCharacters: historyCharacters(state),
+    })
+  }
   await appendJsonl(path.join(runDir, 'reviewer-process.jsonl'), {
     event: 'review_completed',
     decisionNumber,

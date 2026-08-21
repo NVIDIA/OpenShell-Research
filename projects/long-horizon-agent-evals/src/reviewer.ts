@@ -13,6 +13,38 @@ export function isProposalReviewStaleError(error: unknown): boolean {
   ].some((message) => text.includes(message))
 }
 
+export function reviewerModelPacket(
+  sandbox: string,
+  protectedRepository: string,
+  chunk: Record<string, unknown>,
+): Record<string, unknown> {
+  return redactUntrusted({
+    sandbox,
+    protectedRepository,
+    proposal: {
+      id: chunk.id,
+      ruleName: chunk.ruleName,
+      rationale: chunk.rationale,
+      securityNotes: chunk.securityNotes,
+      confidence: chunk.confidence,
+      stage: chunk.stage,
+      validationResult: chunk.validationResult,
+      currentEffectivePolicyHash: chunk.currentEffectivePolicyHash,
+      candidateEffectivePolicyHash: chunk.candidateEffectivePolicyHash,
+      proposedRule: chunk.proposedRule,
+      candidateEffectivePolicy: chunk.candidateEffectivePolicy,
+    },
+  }) as Record<string, unknown>
+}
+
+export function reviewerHistoryPacket(packet: Record<string, unknown>): Record<string, unknown> {
+  const proposal = packet.proposal && typeof packet.proposal === 'object'
+    ? packet.proposal as Record<string, unknown>
+    : {}
+  const { candidateEffectivePolicy: _supersededPolicy, ...request } = proposal
+  return { proposal: request }
+}
+
 async function main(): Promise<void> {
   await loadEnv()
   const sandbox = required('LAB_SANDBOX')
@@ -57,14 +89,17 @@ async function main(): Promise<void> {
         processed.add(chunk.id)
         decisionNumber += 1
         const current = await client.sandbox.getConfig(sandbox)
-        const packet = redactUntrusted({
+        const evidencePacket = redactUntrusted({
           sandbox,
           protectedRepository,
           proposal: chunk,
           currentPolicy: current.policy,
         })
+        const packet = reviewerModelPacket(sandbox, protectedRepository, chunk as unknown as Record<string, unknown>)
+        const historyPacket = reviewerHistoryPacket(packet)
         status('reviewer.proposal', { sandbox, decisionNumber, ruleName: chunk.ruleName, stage: chunk.stage })
         await writeJson(path.join(runDir, `proposal-${String(decisionNumber).padStart(3, '0')}.json`), packet)
+        await writeJson(path.join(runDir, `proposal-${String(decisionNumber).padStart(3, '0')}-evidence.json`), evidencePacket)
 
         let decision: { decision: 'approve' | 'reject'; reason: string }
         try {
@@ -75,6 +110,7 @@ async function main(): Promise<void> {
             `Review this pending request:\n${json(packet)}`,
             decisionNumber,
             Math.max(1, deadlineMs - Date.now()),
+            `Prior reviewed request (the current request contains the authoritative policy):\n${json(historyPacket)}`,
           )
         } catch (error) {
           decision = { decision: 'reject', reason: `Reviewer failed closed: ${errorText(error)}` }

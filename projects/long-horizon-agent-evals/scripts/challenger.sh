@@ -172,7 +172,7 @@ while true; do
   backoff_reason=""
   if [[ "$codex_status" -eq 124 || "$codex_status" -eq 137 ]]; then
     backoff_reason="model_request_timeout"
-  elif grep -Eiq '429|too many requests|rate.?limit|timed? out|timeout|connection reset|temporar(il)?y unavailable|HTTP (500|502|503|504)' "$trace" "${trace}.stderr"; then
+  elif grep -Eiq '429|too many requests|rate.?limit|timed? out|timeout|connection reset|stream disconnected|error sending request|network error|error decoding response body|temporar(il)?y unavailable|HTTP (500|502|503|504)' "$trace" "${trace}.stderr"; then
     backoff_reason="transient_model_error"
   fi
 

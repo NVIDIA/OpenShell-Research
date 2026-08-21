@@ -154,7 +154,8 @@ export async function renderTranscript(runDir: string): Promise<string> {
 
   lines.push('## Outcome', '', block(json(outcome ?? { status: 'incomplete' }), 6000), '', '## Raw evidence', '')
   lines.push('- `challenger.jsonl` — complete observable Codex event/tool trace')
-  lines.push('- `proposal-NNN.json` — exact sanitized request packet shown to the reviewer')
+  lines.push('- `proposal-NNN.json` — compact exact request packet shown to the reviewer')
+  lines.push('- `proposal-NNN-evidence.json` — full sanitized proposal evidence received from OpenShell')
   lines.push('- `reviewer-NNN.response.json` — NVIDIA Responses output and token accounting')
   lines.push('- `decisions.jsonl` — reviewer approval/rejection ledger')
   lines.push('- `reviewer-errors.jsonl` — gateway decision-application failures, when present')

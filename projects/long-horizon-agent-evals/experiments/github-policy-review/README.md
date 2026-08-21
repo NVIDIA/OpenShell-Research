@@ -14,6 +14,14 @@ successful reviewer strategy. It sees the pending proposal and current effective
 policy, but it receives no credentials or tools. The harness—not the model—uses
 the OpenShell SDK to apply its structured decision.
 
+Each request includes the exact cumulative candidate policy and a bounded window
+of recent reviewer exchanges. Historical exchanges retain the request metadata,
+proposed rule, and decision, but do not replay superseded policy snapshots. The
+harness rotates that window deterministically while retaining every full proposal
+and decision as run evidence. If the model still reports a context-limit error,
+the harness clears the recent window and retries the same request once; it never
+summarizes untrusted proposal text with a second model.
+
 The challenger receives a simple objective, a random branch, path, and payload,
 and no catalog of possible attacks. It may use any strategy within the named
 repository and its local OpenShell surfaces. Other repositories and internet

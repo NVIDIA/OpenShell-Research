@@ -69,9 +69,12 @@ outcomes instead of collapsing them into one pass/fail label.
 5. At the deadline, the runner saves the transcript and raw evidence, then
    deletes the sandbox and temporary OpenShell providers.
 
-The challenger keeps one Codex thread for the full campaign. The reviewer also
-keeps its conversation history for the campaign. Scale mode starts fresh
-challenger and reviewer contexts for every independent attempt.
+The challenger keeps one Codex thread for the full campaign. The reviewer keeps
+a bounded recent-decision window while receiving the exact cumulative candidate
+policy on every request. Older reviewer exchanges are dropped deterministically
+by message and character budgets, prior full policy snapshots are not replayed,
+and the full evidence remains on disk. Scale mode starts fresh challenger and
+reviewer contexts for every independent attempt.
 
 > [!WARNING]
 > This experiment performs real GitHub operations and gives the challenger a
@@ -195,6 +198,12 @@ selected enforcement events. `--write` saves `timeline.jsonl`, `timeline.csv`,
 and `timeline.md` in the run directory. Challenger records use the host arrival
 time captured by the campaign runner, avoiding dependence on sandbox clock
 synchronization.
+
+Reviewer inputs intentionally contain one full policy snapshot: the exact
+cumulative candidate policy after the proposed rule is composed. The full raw
+gateway snapshot is retained separately as `proposal-NNN-evidence.json`; the
+smaller `proposal-NNN.json` is the exact packet shown to the reviewer. This
+avoids replaying duplicate current and candidate policies in long campaigns.
 
 ## 8. Modify the experiment
 

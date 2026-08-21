@@ -96,10 +96,14 @@ export async function buildTimeline(runDir: string): Promise<TimelineEvent[]> {
   for (const [index, proposalFile] of proposalFiles.entries()) {
     const packet = await optionalJson(path.join(runDir, proposalFile)) ?? {}
     const proposal = packet.proposal && typeof packet.proposal === 'object' ? packet.proposal as JsonRecord : {}
+    const evidence = await optionalJson(path.join(runDir, proposalFile.replace('.json', '-evidence.json')))
+    const evidenceProposal = evidence?.proposal && typeof evidence.proposal === 'object'
+      ? evidence.proposal as JsonRecord
+      : {}
     const decisionNumber = index + 1
     const proposalMeta = { chunkId: string(proposal.id), ruleName: string(proposal.ruleName) }
     proposalsByNumber.set(decisionNumber, proposalMeta)
-    const createdAt = timestamp(proposal.createdAtMs ?? proposal.firstSeenMs)
+    const createdAt = timestamp(evidenceProposal.createdAtMs ?? evidenceProposal.firstSeenMs ?? proposal.createdAtMs ?? proposal.firstSeenMs)
     if (createdAt) {
       events.push({
         timestamp: createdAt,
@@ -120,17 +124,27 @@ export async function buildTimeline(runDir: string): Promise<TimelineEvent[]> {
   for (const record of reviewerEvents) {
     const at = timestamp(record.timestamp)
     const decisionNumber = number(record.decisionNumber)
-    if (!at || !decisionNumber || !['review_started', 'review_completed', 'review_retry', 'review_stale_retry'].includes(String(record.event))) continue
+    if (!at || !decisionNumber || ![
+      'review_started',
+      'review_completed',
+      'review_retry',
+      'review_stale_retry',
+      'reviewer_context_compacted',
+      'reviewer_context_reset',
+    ].includes(String(record.event))) continue
     const decision = decisionsByNumber.get(decisionNumber)
     const proposal = proposalsByNumber.get(decisionNumber)
     const completed = record.event === 'review_completed'
+    const contextEvent = String(record.event).startsWith('reviewer_context_')
     events.push({
       timestamp: at,
       system: 'reviewer',
       event: String(record.event).replaceAll('_', '.'),
       summary: completed
         ? bounded(decision?.reason ?? `Review ${decisionNumber} completed`)
-        : bounded(record.error ?? `Review ${decisionNumber} ${String(record.event).replace('review_', '')}`),
+        : contextEvent
+          ? bounded(`${String(record.reason ?? String(record.event).replace('reviewer_context_', 'context '))}; dropped ${String(record.droppedMessages ?? 0)} messages`)
+          : bounded(record.error ?? `Review ${decisionNumber} ${String(record.event).replace('review_', '')}`),
       decisionNumber,
       chunkId: string(record.chunkId ?? decision?.chunkId ?? proposal?.chunkId),
       ruleName: proposal?.ruleName,
