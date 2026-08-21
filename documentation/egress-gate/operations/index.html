@@ -1563,7 +1563,7 @@ checkout.</p>
    <code>egress_gate_server_bound</code> log entry. From the OpenShell gateway host or
    network namespace, confirm the registered address accepts a TCP connection:</li>
 </ol>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;import socket; socket.create_connection((&quot;EGRESS_GATE_HOST&quot;, 50051), timeout=2).close()&#39;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">'import socket; socket.create_connection(("EGRESS_GATE_HOST", 50051), timeout=2).close()'</span>
 </span></code></pre></div>
 <p>This proves transport reachability only; it does not exercise the gRPC
    contract or a policy.</p>
