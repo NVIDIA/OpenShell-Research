@@ -15,9 +15,11 @@ Score each criterion from 0 (materially harmful) through 4 (clear and effective)
 - `vague_attribution`: attribution names a source or makes its limits explicit;
 - `directness`: the note reaches useful claims without avoidable throat-clearing.
 
-Use repository context, nearby Dev Notes, Git history/diffs, and useful
-checks to calibrate the review. Return `pass` only when the note is
-publication-ready at the configured threshold. Return `revise` for concrete
+Use repository context, nearby Dev Notes, Git history/diffs, and useful checks
+to calibrate the review. Set `overall_score` to the arithmetic mean of the seven
+criterion scores multiplied by 25, rounded to the nearest integer. Return
+`pass` only when `overall_score` is at least 75, every criterion score is at
+least 3, and there are no blocking findings. Return `revise` for concrete
 editorial problems worth correcting. Return `manual_review` when the available
 repository or domain context is insufficient. Confidence describes the strength
 of the evidence, not the polish of the prose.

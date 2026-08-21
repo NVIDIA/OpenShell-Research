@@ -66,6 +66,14 @@ def test_profile_resource_escape_is_rejected(tmp_path: Path) -> None:
             "upload: [one:/workspace/input, two:/workspace/input]",
             "conflicting upload destination",
         ),
+        (
+            "upload: [one:/sandbox/artifacts/result]",
+            "reserved for runner resources",
+        ),
+        (
+            "upload: [one://sandbox/oar-runtime/file]",
+            "canonical absolute paths",
+        ),
         ("env: [MODE=one, MODE=two]", "conflicting environment values"),
     ],
 )
@@ -165,6 +173,15 @@ def test_invalid_output_schema_is_rejected(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigurationError, match="invalid output schema"):
         load_profile(tmp_path)
+
+
+def test_output_schema_accepts_standard_format_annotations(tmp_path: Path) -> None:
+    _write_profile(tmp_path, task="output_schema: output.schema.json")
+    (tmp_path / "output.schema.json").write_text(
+        '{"type":"string","format":"date-time"}'
+    )
+
+    load_profile(tmp_path)
 
 
 @pytest.mark.parametrize("keyword", ["$ref", "$dynamicRef", "$recursiveRef"])

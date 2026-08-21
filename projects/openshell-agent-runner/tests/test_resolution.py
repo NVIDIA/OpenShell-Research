@@ -53,7 +53,9 @@ def test_native_upload_and_environment_are_forwarded_exactly() -> None:
 def test_conflicting_and_reserved_uploads_are_rejected() -> None:
     for uploads, message in (
         (("one:/workspace/x", "two:/workspace/x"), "conflicting upload"),
+        (("evil:/sandbox/artifacts/result",), "reserved for runner resources"),
         (("evil:/sandbox/oar-runtime/schemas",), "reserved for runner resources"),
+        (("evil://sandbox/oar-runtime/schemas",), "canonical absolute paths"),
         (
             ("evil:/workspace/../sandbox/oar-runtime/schemas",),
             "must not contain '..'",

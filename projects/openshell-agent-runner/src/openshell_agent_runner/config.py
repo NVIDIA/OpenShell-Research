@@ -161,14 +161,19 @@ def validate_upload_mappings(values: Sequence[str]) -> tuple[str, ...]:
         if not separator or not source or not destination.startswith("/"):
             raise ValueError("uploads must use SOURCE:/ABSOLUTE/DESTINATION")
         path = PurePosixPath(destination)
+        if destination.startswith("//") or str(path) != destination:
+            raise ValueError("upload destinations must use canonical absolute paths")
         if ".." in path.parts:
             raise ValueError("upload destinations must not contain '..'")
-        if path == PurePosixPath("/sandbox/oar-runtime") or path.is_relative_to(
-            "/sandbox/oar-runtime"
+        for reserved in (
+            PurePosixPath("/sandbox/artifacts"),
+            PurePosixPath("/sandbox/oar-runtime"),
         ):
-            raise ValueError(
-                f"upload destination is reserved for runner resources: {destination}"
-            )
+            if path == reserved or path.is_relative_to(reserved):
+                raise ValueError(
+                    "upload destination is reserved for runner resources: "
+                    f"{destination}"
+                )
         normalized = str(path)
         previous = destinations.get(normalized)
         if previous is not None and previous != source:

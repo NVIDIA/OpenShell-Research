@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from openshell_agent_runner.harnesses.resources import PreparedResources
     from openshell_agent_runner.runner import ResolvedRun, RunRequest
 
-MINIMUM_OPEN_SHELL_VERSION = (0, 0, 106)
+MINIMUM_OPEN_SHELL_VERSION = (0, 0, 111)
 RESERVED_LABEL = "oar-run-id"
 VERSION_PATTERN = re.compile(r"\b(\d+)\.(\d+)\.(\d+)\b")
 

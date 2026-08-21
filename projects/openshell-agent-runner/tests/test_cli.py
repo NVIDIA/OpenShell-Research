@@ -61,7 +61,7 @@ def test_doctor_separates_native_output_with_blank_lines(monkeypatch) -> None:
         cli,
         "run_doctor",
         lambda _target: [
-            ("version", "openshell 0.0.106"),
+            ("version", "openshell 0.0.111"),
             ("status", "Server Status\n\n  Status: Connected"),
             ("inference", "Inference:\n\n  Provider: example"),
         ],
@@ -71,7 +71,7 @@ def test_doctor_separates_native_output_with_blank_lines(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert result.stdout == (
-        "openshell 0.0.106\n\n"
+        "openshell 0.0.111\n\n"
         "Server Status\n\n"
         "  Status: Connected\n\n"
         "Inference:\n\n"

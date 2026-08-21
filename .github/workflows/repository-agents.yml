@@ -26,19 +26,23 @@ concurrency:
 
 jobs:
   check:
-    name: Check repository agents
+    name: Check repository agents (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up uv and Python
-        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          version: "0.11.31"
-          python-version: "3.12"
+          version: "0.12.5"
+          python-version: ${{ matrix.python-version }}
 
       - name: Configure isolated uv paths
         run: |
@@ -94,9 +98,31 @@ jobs:
           wheel="$(find dist -name '*.whl' -print -quit)"
           uvx --from "$wheel" oar validate \
             profiles/reviewer
+          printf '# Review me\n\nA short document.\n' > "$RUNNER_TEMP/review-input.md"
+          uvx --from "$wheel" oar run \
+            profiles/reviewer \
+            --task review \
+            --input "$RUNNER_TEMP/review-input.md" \
+            --output "$RUNNER_TEMP/review-output.md" \
+            --dry-run
+          test ! -e "$RUNNER_TEMP/review-output.md"
 
       - name: Build the Pi image
+        if: matrix.python-version == '3.12'
         run: |
           docker build \
             --tag openshell-agent-runner-pi:ci \
             projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/image
+
+      - name: Compile the submission extension
+        if: matrix.python-version == '3.12'
+        run: |
+          docker run --rm \
+            --entrypoint bash \
+            --env OAR_RUNTIME_ROOT=/sandbox \
+            --volume "$PWD/projects/openshell-agent-runner/tests/fixtures/format-output.schema.json:/sandbox/output.schema.json:ro" \
+            --volume "$PWD/projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/extensions/submit-result.ts:/sandbox/oar-submit-result.ts:ro" \
+            openshell-agent-runner-pi:ci \
+            -c "ln -s /usr/local/lib/node_modules /sandbox/node_modules && node \
+              --experimental-strip-types --no-warnings \
+              --eval \"import('/sandbox/oar-submit-result.ts')\""
