@@ -219,6 +219,19 @@ def test_output_schema_allows_property_names_that_match_schema_keywords(
     load_profile(tmp_path)
 
 
+@pytest.mark.parametrize("keyword", ["const", "examples", "x-oar-note"])
+def test_output_schema_does_not_treat_instance_data_as_a_schema(
+    tmp_path: Path, keyword: str
+) -> None:
+    _write_profile(tmp_path, task="output_schema: output.schema.json")
+    value: object = (
+        [{"pattern": "value"}] if keyword == "examples" else {"pattern": "value"}
+    )
+    (tmp_path / "output.schema.json").write_text(json.dumps({keyword: value}))
+
+    load_profile(tmp_path)
+
+
 @pytest.mark.parametrize("keyword", ["$ref", "$dynamicRef", "$recursiveRef"])
 def test_output_schema_rejects_external_references(
     tmp_path: Path, keyword: str
