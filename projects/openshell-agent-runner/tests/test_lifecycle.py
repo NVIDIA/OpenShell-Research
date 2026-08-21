@@ -74,6 +74,11 @@ elif operation == "get":
     print(json.dumps(document))
 elif operation == "download":
     if os.environ.get("FAKE_FAIL_DOWNLOAD") == "1": sys.exit(1)
+    if os.environ.get("FAKE_DIRECTORY_OUTPUT") == "1":
+        if pathlib.Path(args[4]).is_file(): sys.exit(1)
+        pathlib.Path(args[4]).mkdir()
+        for index in range(4): (pathlib.Path(args[4]) / str(index)).write_bytes(b"x" * (512 * 1024))
+        sys.exit(0)
     fallback = json.dumps({"status": "pass"})
     output = "x" * (2 * 1024 * 1024) if os.environ.get("FAKE_LARGE_OUTPUT") == "1" else os.environ.get("FAKE_OUTPUT", fallback)
     pathlib.Path(args[4]).write_text(output + "\\n")
@@ -334,6 +339,20 @@ def test_oversized_download_is_stopped_during_transfer(
 ) -> None:
     profile, executable, state, _ = prepare(tmp_path, monkeypatch)
     monkeypatch.setenv("FAKE_LARGE_OUTPUT", "1")
+    output = tmp_path / "result.json"
+
+    with pytest.raises(ExecutionError, match="sandbox download"):
+        run_agent(request(profile, executable, output))
+
+    assert not output.exists()
+    assert not state.exists()
+
+
+def test_directory_result_is_rejected_before_transfer(
+    tmp_path: Path, monkeypatch
+) -> None:
+    profile, executable, state, _ = prepare(tmp_path, monkeypatch)
+    monkeypatch.setenv("FAKE_DIRECTORY_OUTPUT", "1")
     output = tmp_path / "result.json"
 
     with pytest.raises(ExecutionError, match="sandbox download"):

@@ -341,13 +341,27 @@ def _validate_output_schema(path: Path) -> None:
 def _validate_schema_references(document: Any, path: Path) -> None:
     if isinstance(document, dict):
         for key, value in document.items():
+            if key in {"pattern", "patternProperties"}:
+                raise ConfigurationError(
+                    "output schemas do not support regular-expression keywords "
+                    f"({key}) because host and sandbox engines use different dialects"
+                )
             if key in {"$ref", "$dynamicRef", "$recursiveRef"} and (
                 not isinstance(value, str) or not value.startswith("#")
             ):
                 raise ConfigurationError(
                     f"output schema references must stay inside {path}: {value!r}"
                 )
-            _validate_schema_references(value, path)
+            if key in {
+                "$defs",
+                "definitions",
+                "properties",
+                "dependentSchemas",
+            } and isinstance(value, dict):
+                for schema in value.values():
+                    _validate_schema_references(schema, path)
+            else:
+                _validate_schema_references(value, path)
     elif isinstance(document, list):
         for value in document:
             _validate_schema_references(value, path)
