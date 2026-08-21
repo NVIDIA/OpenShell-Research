@@ -3,6 +3,52 @@
   "title": "DevNoteReview",
   "type": "object",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {"reviewer_id": {"const": "editorial"}},
+        "required": ["reviewer_id"]
+      },
+      "then": {
+        "properties": {
+          "criterion_scores": {
+            "minItems": 7,
+            "maxItems": 7,
+            "prefixItems": [
+              {"properties": {"criterion": {"const": "formulaic_language"}}},
+              {"properties": {"criterion": {"const": "empty_emphasis"}}},
+              {"properties": {"criterion": {"const": "repetitive_cadence"}}},
+              {"properties": {"criterion": {"const": "unnecessary_summary"}}},
+              {"properties": {"criterion": {"const": "inflated_claims"}}},
+              {"properties": {"criterion": {"const": "vague_attribution"}}},
+              {"properties": {"criterion": {"const": "directness"}}}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"reviewer_id": {"const": "technical_note"}},
+        "required": ["reviewer_id"]
+      },
+      "then": {
+        "properties": {
+          "criterion_scores": {
+            "minItems": 5,
+            "maxItems": 5,
+            "prefixItems": [
+              {"properties": {"criterion": {"const": "directness"}}},
+              {"properties": {"criterion": {"const": "technical_grounding"}}},
+              {"properties": {"criterion": {"const": "proportionality"}}},
+              {"properties": {"criterion": {"const": "reader_utility"}}},
+              {"properties": {"criterion": {"const": "evidence_quality"}}}
+            ]
+          }
+        }
+      }
+    }
+  ],
   "required": [
     "reviewer_id",
     "model_id",
@@ -17,8 +63,7 @@
   ],
   "properties": {
     "reviewer_id": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+      "enum": ["editorial", "technical_note"]
     },
     "model_id": {
       "type": "string",

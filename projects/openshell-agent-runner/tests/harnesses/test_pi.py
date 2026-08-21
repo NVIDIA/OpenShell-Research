@@ -19,8 +19,9 @@ REPOSITORY = Path(__file__).resolve().parents[4]
 
 def test_pi_image_contract_is_pinned_and_least_privilege() -> None:
     dockerfile = (image_directory() / "Dockerfile").read_text()
-    assert "ARG PI_VERSION=0.82.1" in dockerfile
-    assert "ARG AJV_VERSION=8.17.1" in dockerfile
+    assert "ARG PI_VERSION=0.84.2" in dockerfile
+    assert "ARG AJV_VERSION=8.20.0" in dockerfile
+    assert "ARG TYPEBOX_VERSION=1.3.16" in dockerfile
     assert "ENV NODE_PATH=/usr/local/lib/node_modules" in dockerfile
     assert "iproute2" in dockerfile
     assert "git" in dockerfile
@@ -118,7 +119,8 @@ def test_generic_submission_extension_validates_and_saves_result() -> None:
     ).read_text()
 
     assert 'import Ajv2020 from "ajv/dist/2020.js"' in extension
-    assert "new Ajv2020({ allErrors: true }).compile(schema)" in extension
+    assert 'import { Type } from "typebox"' in extension
+    assert "allErrors: true, validateFormats: false" in extension
     assert "Type.Object({ result: Type.Unsafe(schema) })" in extension
     assert "async execute(_toolCallId, { result })" in extension
     assert 'name: "submit_result"' in extension

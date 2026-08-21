@@ -13,6 +13,12 @@ from openshell_agent_runner.artifacts import (
 )
 from openshell_agent_runner.errors import ArtifactError
 
+REPOSITORY = Path(__file__).resolve().parents[3]
+DEV_NOTE_SCHEMA = (
+    REPOSITORY
+    / ".github/openshell-agents/profiles/dev-note-reviewer/schemas/review.json"
+)
+
 
 def test_plain_result_is_accepted_and_published(tmp_path: Path) -> None:
     source = tmp_path / "source"
@@ -55,6 +61,43 @@ def test_invalid_json_fails_when_schema_is_configured(tmp_path: Path) -> None:
 
     with pytest.raises(ArtifactError, match="not valid JSON"):
         validate_artifact(source, schema)
+
+
+def test_dev_note_schema_requires_each_editorial_criterion_in_order(
+    tmp_path: Path,
+) -> None:
+    criteria = [
+        "formulaic_language",
+        "empty_emphasis",
+        "repetitive_cadence",
+        "unnecessary_summary",
+        "inflated_claims",
+        "vague_attribution",
+        "directness",
+    ]
+    result = {
+        "reviewer_id": "editorial",
+        "model_id": "provider/model",
+        "source_revision": "abc123",
+        "source_content_digest": "0" * 64,
+        "criterion_scores": [
+            {"criterion": criterion, "score": 3, "explanation": "Clear."}
+            for criterion in criteria
+        ],
+        "overall_score": 75,
+        "verdict": "pass",
+        "confidence": "high",
+        "findings": [],
+        "overall_assessment": "Ready.",
+    }
+    source = tmp_path / "review.json"
+    source.write_text(json.dumps(result))
+    validate_artifact(source, DEV_NOTE_SCHEMA)
+
+    result["criterion_scores"][1]["criterion"] = "formulaic_language"
+    source.write_text(json.dumps(result))
+    with pytest.raises(ArtifactError, match="output schema validation"):
+        validate_artifact(source, DEV_NOTE_SCHEMA)
 
 
 @pytest.mark.parametrize("content", ["", "x" * (MAX_ARTIFACT_BYTES + 1)])

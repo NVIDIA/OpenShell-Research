@@ -14,7 +14,7 @@ def test_doctor_runs_only_read_only_checks(monkeypatch) -> None:
 
     def fake_run(command, **_kwargs):
         commands.append(command)
-        output = "openshell 0.0.106\n" if "--version" in command else "ready\n"
+        output = "openshell 0.0.111\n" if "--version" in command else "ready\n"
         return subprocess.CompletedProcess(command, 0, output, "")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
@@ -39,9 +39,9 @@ def test_doctor_runs_only_read_only_checks(monkeypatch) -> None:
 
 def test_doctor_rejects_unsupported_openshell(monkeypatch) -> None:
     def fake_run(command, **_kwargs):
-        return subprocess.CompletedProcess(command, 0, "openshell 0.0.105\n", "")
+        return subprocess.CompletedProcess(command, 0, "openshell 0.0.110\n", "")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    with pytest.raises(ExecutionError, match="0.0.106 or newer"):
+    with pytest.raises(ExecutionError, match="0.0.111 or newer"):
         doctor(NativeTarget())

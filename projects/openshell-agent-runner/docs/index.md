@@ -11,6 +11,38 @@ accomplish one task. Each `oar run` creates an isolated OpenShell sandbox, start
 Pi with the selected profile task, publishes one result, and removes the
 sandbox. The agent exists only for that run.
 
+## Run the starter task
+
+Start from the repository root. You need OpenShell 0.0.111 or newer, a selected
+workspace, and an inference route for the profile's model. OAR uses this existing
+OpenShell configuration; it does not create gateways, providers, or credentials.
+
+Install the locked development environment and check the selected gateway:
+
+```bash
+uv sync --project projects/openshell-agent-runner --locked
+uv run --project projects/openshell-agent-runner oar doctor \
+  --gateway openshell
+```
+
+Validate the included profile, then preview the run without creating a sandbox:
+
+```bash
+uv run --project projects/openshell-agent-runner oar validate \
+  projects/openshell-agent-runner/profiles/reviewer
+
+uv run --project projects/openshell-agent-runner oar run \
+  projects/openshell-agent-runner/profiles/reviewer \
+  --task review \
+  --gateway openshell \
+  --input README.md \
+  --output /tmp/oar-review.md \
+  --dry-run
+```
+
+Remove `--dry-run` to launch the agent. A successful run writes the review to
+`/tmp/oar-review.md`. Replace `openshell` if your gateway has a different name.
+
 ## Why OAR fits CI
 
 This bounded lifecycle is designed for CI and other automated workflows: a job
@@ -108,8 +140,9 @@ Uploads come from three places:
 | OAR | Prompt, Pi model settings, skills, extensions, and optional schema |
 
 Caller uploads normally live under `/workspace`. OAR runtime uploads live under
-`/sandbox/oar-runtime`. Uploaded workspace changes are disposable and are not
-synchronized back to the host.
+`/sandbox/oar-runtime`, and results live under `/sandbox/artifacts`. Both
+`/sandbox` paths are reserved for OAR. Uploaded workspace changes are disposable
+and are not synchronized back to the host.
 
 ## Result handling
 
@@ -126,6 +159,9 @@ uses TypeBox for its Pi tool parameters and Ajv for Draft 2020-12 validation.
 Invalid submissions return diagnostics to Pi, which can correct and resubmit
 inside the same agent session. OAR validates the downloaded JSON against the
 same schema again before publishing it.
+
+Both validators treat JSON Schema `format` values as annotations. Use structural
+keywords such as `type`, `pattern`, and numeric bounds for enforced constraints.
 
 The schema belongs to the profile. OAR has no built-in review or other
 task-specific result type.

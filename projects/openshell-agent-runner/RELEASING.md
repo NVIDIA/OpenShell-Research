@@ -15,9 +15,10 @@ From this directory, run:
 make publish VERSION=0.1.0 DRY_RUN=1
 ```
 
-The dry run checks the clean `main` branch, runs the project validation suite,
-builds the wheel and source distribution, and validates both with Twine. It
-does not create a tag or upload anything.
+The dry run fetches `origin/main` and tags, confirms that local `main` is current,
+runs the project validation suite, and builds the requested version. It verifies
+one wheel and one source distribution with Twine. The temporary local tag is
+removed before the command exits; nothing is pushed or uploaded.
 
 To validate or publish deliberately from another branch, add
 `ALLOW_NON_MAIN=1`:
@@ -26,8 +27,9 @@ To validate or publish deliberately from another branch, add
 make publish VERSION=0.1.0 DRY_RUN=1 ALLOW_NON_MAIN=1
 ```
 
-This bypasses only the branch-name check. The working tree must still be clean,
-the version tag must not exist, and every release check must pass.
+This bypasses the branch and `origin/main` commit checks. The working tree must
+still be clean, an existing version tag must point to the current commit, and
+every release check must pass.
 
 ## Publish a release
 
@@ -39,16 +41,13 @@ make publish VERSION=0.1.0
 
 The script:
 
-1. Runs the same checks and builds the distributions.
-2. Creates `v0.1.0` locally.
-3. Rebuilds so the distributions carry version `0.1.0`.
-4. Uploads only `openshell-agent-runner` through the `openshell-research`
-   `.pypirc` repository.
-5. Pushes the tag after the upload succeeds.
+1. Fetches `origin/main` and tags and confirms that local `main` is current.
+2. Runs the same checks and builds version `0.1.0` from the local tag.
+3. Verifies the exact wheel and source distribution with Twine.
+4. Pushes `v0.1.0`, establishing the public source commit before publication.
+5. Uploads only those two artifacts through the `openshell-research` `.pypirc`
+   repository.
 
-If a build or upload fails after tag creation, delete the unpushed local tag
-before retrying:
-
-```bash
-git tag -d v0.1.0
-```
+If the upload fails after the tag is pushed, correct the cause and rerun the
+same command. A matching existing tag is treated as a retry; a tag on another
+commit is rejected.

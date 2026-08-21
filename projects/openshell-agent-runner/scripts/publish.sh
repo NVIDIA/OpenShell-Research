@@ -64,10 +64,41 @@ if [[ "$CURRENT_BRANCH" != "main" && "$ALLOW_NON_MAIN" != true ]]; then
 fi
 
 TAG="v$VERSION"
-if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
-    echo "publish: tag '$TAG' already exists" >&2
+git fetch origin main --tags
+
+if [[ "$ALLOW_NON_MAIN" != true ]] && \
+    [[ "$(git rev-parse HEAD)" != "$(git rev-parse refs/remotes/origin/main)" ]]; then
+    echo "publish: local main must match origin/main" >&2
     exit 1
 fi
+
+TAG_CREATED=false
+TAG_PUBLIC=false
+if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
+    if [[ "$(git rev-list -n 1 "$TAG")" != "$(git rev-parse HEAD)" ]]; then
+        echo "publish: tag '$TAG' exists on another commit" >&2
+        exit 1
+    fi
+else
+    git tag "$TAG"
+    TAG_CREATED=true
+fi
+
+REMOTE_TAG=$(git ls-remote --tags origin "refs/tags/$TAG" | cut -f1)
+if [[ -n "$REMOTE_TAG" ]]; then
+    if [[ "$REMOTE_TAG" != "$(git rev-parse HEAD)" ]]; then
+        echo "publish: remote tag '$TAG' exists on another commit" >&2
+        exit 1
+    fi
+    TAG_PUBLIC=true
+fi
+
+cleanup_local_tag() {
+    if [[ "$TAG_CREATED" == true && "$TAG_PUBLIC" != true ]]; then
+        git tag -d "$TAG" >/dev/null
+    fi
+}
+trap cleanup_local_tag EXIT
 
 echo "Running release checks..."
 uv sync --locked
@@ -80,33 +111,32 @@ bash -n src/openshell_agent_runner/harnesses/pi/runtime/image/exec.sh
 
 echo "Building distributions..."
 uv build --clear --no-sources
-uv run --with twine python -m twine check dist/*
+
+shopt -s nullglob
+WHEELS=(dist/openshell_agent_runner-"$VERSION"-*.whl)
+SDISTS=(dist/openshell_agent_runner-"$VERSION".tar.gz)
+if [[ ${#WHEELS[@]} -ne 1 || ${#SDISTS[@]} -ne 1 ]]; then
+    echo "publish: expected one wheel and one source distribution for '$VERSION'" >&2
+    exit 1
+fi
+ARTIFACTS=("${WHEELS[@]}" "${SDISTS[@]}")
+uv run --with twine python -m twine check "${ARTIFACTS[@]}"
 
 if [[ "$DRY_RUN" == true ]]; then
     echo "Dry run complete; no tag was created and nothing was uploaded."
     exit 0
 fi
 
-git tag "$TAG"
-
-# Rebuild on the tag so uv-dynamic-versioning emits the requested release version.
-uv build --clear --no-sources
-uv run --with twine python -m twine check dist/*
-
-shopt -s nullglob
-WHEELS=(dist/openshell_agent_runner-"$VERSION"-*.whl)
-if [[ ${#WHEELS[@]} -ne 1 ]]; then
-    echo "publish: expected one wheel for version '$VERSION'" >&2
-    echo "publish: remove the local tag before retrying: git tag -d '$TAG'" >&2
-    exit 1
+if [[ "$TAG_PUBLIC" != true ]]; then
+    git push origin "$TAG"
+    TAG_PUBLIC=true
 fi
 
 echo "Uploading openshell-agent-runner $VERSION with .pypirc repository '$PYPIRC_REPOSITORY'..."
 if ! uv run --with twine python -m twine upload \
-    --repository "$PYPIRC_REPOSITORY" dist/*; then
-    echo "publish: upload failed; remove the local tag before retrying: git tag -d '$TAG'" >&2
+    --repository "$PYPIRC_REPOSITORY" "${ARTIFACTS[@]}"; then
+    echo "publish: upload failed; fix the cause and rerun the same release command" >&2
     exit 1
 fi
 
-git push origin "$TAG"
-echo "Published openshell-agent-runner $VERSION and pushed $TAG."
+echo "Published openshell-agent-runner $VERSION from $TAG."

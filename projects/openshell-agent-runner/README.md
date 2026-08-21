@@ -35,8 +35,8 @@ does not provision providers or credentials.
 
 ## Documentation
 
-- [Run a single task with OAR](docs/index.md): ephemeral-agent lifecycle,
-  profiles, CI usage, uploads, result handling, and failure boundaries.
+- [Run a single task with OAR](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-agent-runner/docs/index.md):
+  install, run a starter task, and understand the execution lifecycle.
 
 ## Install
 
@@ -61,11 +61,11 @@ checkout.
 After the package is published, the equivalent package-index invocation is
 `uvx --from openshell-agent-runner oar --help`.
 
-Release instructions are in [RELEASING.md](RELEASING.md). The release command
-builds and publishes only `openshell-agent-runner`; it does not package other
-projects in this repository.
+See the [release instructions](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-agent-runner/RELEASING.md)
+for package publication. The release command builds and publishes only
+`openshell-agent-runner`; it does not package other projects in this repository.
 
-OpenShell 0.0.106 or newer, a selected workspace, and an existing inference
+OpenShell 0.0.111 or newer, a selected workspace, and an existing inference
 route for the profile's model are required. OAR consumes that state and never
 creates or changes gateways, providers, or inference routes.
 
@@ -96,9 +96,8 @@ uv run --project projects/openshell-agent-runner oar doctor \
 Show help for a specific task by placing its profile and task before `--help`:
 
 ```bash
-cd projects/openshell-agent-runner
-uv run oar run \
-  profiles/reviewer \
+uv run --project projects/openshell-agent-runner oar run \
+  projects/openshell-agent-runner/profiles/reviewer \
   --task review \
   --help
 ```
@@ -263,7 +262,8 @@ resubmit within the same session. OAR validates the accepted JSON against the
 same Draft 2020-12 schema again before publishing it. Pi's tool parameters use
 TypeBox, as required by its extension API, while the submitted result is
 validated with Ajv. The schema and its domain concepts belong entirely to the
-profile; OAR has no built-in review result type.
+profile; OAR has no built-in review result type. JSON Schema `format` values are
+treated as annotations rather than additional validation rules on both sides.
 
 OAR fixes implementation details that do not change the intended result: Pi is
 the harness, its image is bundled with the package, autonomous approval and
@@ -271,9 +271,9 @@ provider isolation are enabled, the result is written to a standard sandbox
 path, and the result size guard is one MiB.
 
 The checkout includes a repository-neutral starter profile under
-[`profiles`](profiles). Run it from the `projects/openshell-agent-runner`
-directory. Its `review` task requires `--input DOCUMENT` and uploads that file
-to OAR's standard document location in the sandbox.
+[`profiles`](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/openshell-agent-runner/profiles).
+Its `review` task requires `--input DOCUMENT` and uploads that file to OAR's
+standard document location in the sandbox.
 
 ## Image contract
 
@@ -288,6 +288,8 @@ This keeps the harness implementation and image contract in one release unit.
 - Caller uploads under `/workspace` and generated resources under
   `/sandbox/oar-runtime` are writable because OpenShell performs uploads through
   the workload policy.
+- `/sandbox/oar-runtime` and `/sandbox/artifacts` are reserved for the runner;
+  profile and command-line uploads cannot write there.
 - Source changes are disposable and are never synchronized back.
 - Only OAR's standard result path is downloaded.
 - Host-side transport checks, optional JSON Schema validation, and atomic

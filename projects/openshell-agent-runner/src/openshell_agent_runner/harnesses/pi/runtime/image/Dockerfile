@@ -1,7 +1,8 @@
 FROM node:24-bookworm-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03
 
-ARG PI_VERSION=0.82.1
-ARG AJV_VERSION=8.17.1
+ARG PI_VERSION=0.84.2
+ARG AJV_VERSION=8.20.0
+ARG TYPEBOX_VERSION=1.3.16
 
 ENV NODE_PATH=/usr/local/lib/node_modules
 
@@ -12,6 +13,7 @@ RUN apt-get update \
 RUN npm install --global --ignore-scripts \
         "@earendil-works/pi-coding-agent@${PI_VERSION}" \
         "ajv@${AJV_VERSION}" \
+        "typebox@${TYPEBOX_VERSION}" \
     && npm cache clean --force >/dev/null 2>&1 \
     && test "$(pi --version)" = "${PI_VERSION}"
 

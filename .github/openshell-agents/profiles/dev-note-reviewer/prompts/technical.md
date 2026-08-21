@@ -16,12 +16,13 @@ Score each criterion from 0 (materially harmful) through 4 (clear and effective)
 - `evidence_quality`: citations, code, measurements, and limitations are specific
   enough to check.
 
-Use Git diffs and repository evidence to understand what the note
-adds. Inspect important technical claims against relevant code, references, or
-tests when possible. Return `pass` only when the note is useful and
-publication-ready at the configured threshold. Return `revise` for concrete
-problems. Return `manual_review` when repository or domain context is
-insufficient.
+Use Git diffs and repository evidence to understand what the note adds. Inspect
+important technical claims against relevant code, references, or tests when
+possible. Set `overall_score` to the arithmetic mean of the five criterion
+scores multiplied by 25, rounded to the nearest integer. Return `pass` only when
+`overall_score` is at least 75, every criterion score is at least 3, and there
+are no blocking findings. Return `revise` for concrete problems. Return
+`manual_review` when repository or domain context is insufficient.
 
 Every finding must quote exact, unique reader-visible text and provide the
 one-based line and column where that quote begins. Omit a finding if the quote is
