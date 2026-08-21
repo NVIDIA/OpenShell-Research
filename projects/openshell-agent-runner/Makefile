@@ -22,7 +22,7 @@ help: ## Show available targets and configurable variables.
 	@printf "  VERSION=X.Y.Z      Required package version for publish\n"
 	@printf "  DRY_RUN=1          Validate a release without tagging or uploading\n"
 	@printf "  ALLOW_NON_MAIN=1   Permit release validation or publishing off main\n"
-	@printf "  RETRY_ARTIFACT=... Retry only a missing wheel or sdist after partial upload\n"
+	@printf "  RETRY_ARTIFACT=... Retry a missing wheel, sdist, or both after a failed upload\n"
 
 publish: ## Validate or publish a release; requires VERSION.
 ifndef VERSION

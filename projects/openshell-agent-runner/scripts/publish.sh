@@ -8,7 +8,7 @@ PROJECT_DIRECTORY=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 PYPIRC_REPOSITORY="openshell-research"
 
 usage() {
-    echo "Usage: $0 VERSION [--dry-run] [--allow-non-main] [--retry-artifact wheel|sdist]"
+    echo "Usage: $0 VERSION [--dry-run] [--allow-non-main] [--retry-artifact wheel|sdist|both]"
     echo
     echo "Build and publish openshell-agent-runner using the '$PYPIRC_REPOSITORY'"
     echo "repository configured in ~/.pypirc."
@@ -58,8 +58,8 @@ if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(rc[0-9]+)?$ ]]; then
     echo "publish: invalid version '$VERSION'; expected X.Y.Z or X.Y.ZrcN" >&2
     exit 2
 fi
-if [[ -n "$RETRY_ARTIFACT" && "$RETRY_ARTIFACT" != "wheel" && "$RETRY_ARTIFACT" != "sdist" ]]; then
-    echo "publish: --retry-artifact must be 'wheel' or 'sdist'" >&2
+if [[ -n "$RETRY_ARTIFACT" && "$RETRY_ARTIFACT" != "wheel" && "$RETRY_ARTIFACT" != "sdist" && "$RETRY_ARTIFACT" != "both" ]]; then
+    echo "publish: --retry-artifact must be 'wheel', 'sdist', or 'both'" >&2
     exit 2
 fi
 if [[ "$DRY_RUN" == true && -n "$RETRY_ARTIFACT" ]]; then
@@ -122,7 +122,7 @@ if [[ -n "$RETRY_ARTIFACT" && "$TAG_PUBLIC" != true ]]; then
     exit 1
 fi
 if [[ -z "$RETRY_ARTIFACT" && "$DRY_RUN" != true && "$TAG_PUBLIC" == true ]]; then
-    echo "publish: remote tag '$TAG' already exists; retry only the missing artifact with --retry-artifact" >&2
+    echo "publish: remote tag '$TAG' already exists; retry the missing artifact or artifacts with --retry-artifact" >&2
     exit 1
 fi
 
@@ -169,8 +169,12 @@ echo "Uploading openshell-agent-runner $VERSION with .pypirc repository '$PYPIRC
 if ! uv run --with twine python -m twine upload \
     --repository "$PYPIRC_REPOSITORY" \
     "${UPLOAD_ARTIFACTS[@]}"; then
-    echo "publish: upload failed; identify the missing artifact and retry only that artifact" >&2
+    echo "publish: upload failed; identify the missing artifact or artifacts before retrying" >&2
     exit 1
 fi
 
-echo "Published openshell-agent-runner $VERSION from $TAG."
+if [[ "$RETRY_ARTIFACT" == "wheel" || "$RETRY_ARTIFACT" == "sdist" ]]; then
+    echo "Uploaded the missing $RETRY_ARTIFACT artifact for openshell-agent-runner $VERSION."
+else
+    echo "Published openshell-agent-runner $VERSION from $TAG."
+fi

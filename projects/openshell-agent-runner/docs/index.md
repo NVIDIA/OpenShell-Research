@@ -191,6 +191,6 @@ without creating a sandbox.
 | Exit code | Meaning |
 | --- | --- |
 | `0` | The result was validated and published. |
-| `1` | OpenShell execution, timeout, download size limit, ownership inspection, or cleanup failed. |
+| `1` | OpenShell execution, timeout, missing remote output, download size limit, ownership inspection, or cleanup failed. |
 | `2` | CLI input or profile configuration was invalid. |
-| `3` | The result was missing, empty, invalid, or failed its schema. |
+| `3` | A downloaded result was empty, invalid, or failed its schema. |

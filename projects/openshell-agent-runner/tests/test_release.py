@@ -7,12 +7,18 @@ import subprocess
 import textwrap
 from pathlib import Path
 
+import pytest
+
 REPOSITORY = Path(__file__).resolve().parents[3]
 PUBLISH_SCRIPT = REPOSITORY / "projects/openshell-agent-runner/scripts/publish.sh"
 
 
-def test_publish_retry_uploads_only_the_missing_artifact(
-    tmp_path: Path,
+@pytest.mark.parametrize(
+    ("first_accepts_wheel", "retry_artifact"),
+    [(True, "sdist"), (False, "both")],
+)
+def test_publish_retry_uploads_only_missing_artifacts(
+    tmp_path: Path, first_accepts_wheel: bool, retry_artifact: str
 ) -> None:
     project = tmp_path / "project"
     script = project / "scripts/publish.sh"
@@ -73,8 +79,16 @@ def test_publish_retry_uploads_only_the_missing_artifact(
         if [[ "$*" == *"twine upload"* ]]; then
             if [[ "$*" == *"--skip-existing"* ]]; then exit 92; fi
             if [[ "$*" == *".whl"* && "$*" == *".tar.gz"* ]]; then
+                if [[ ! -e "$FAKE_REPOSITORY_STATE/attempted" ]]; then
+                    touch "$FAKE_REPOSITORY_STATE/attempted"
+                    if [[ "$FAKE_FIRST_ACCEPTS_WHEEL" == "true" ]]; then
+                        touch "$FAKE_REPOSITORY_STATE/wheel"
+                    fi
+                    exit 93
+                fi
                 touch "$FAKE_REPOSITORY_STATE/wheel"
-                exit 93
+                touch "$FAKE_REPOSITORY_STATE/sdist"
+                exit 0
             fi
             if [[ "$*" == *".tar.gz"* ]]; then
                 touch "$FAKE_REPOSITORY_STATE/sdist"
@@ -95,6 +109,7 @@ def test_publish_retry_uploads_only_the_missing_artifact(
     environment["FAKE_UV_LOG"] = str(uv_log)
     environment["FAKE_GIT_STATE"] = str(git_state)
     environment["FAKE_REPOSITORY_STATE"] = str(repository_state)
+    environment["FAKE_FIRST_ACCEPTS_WHEEL"] = str(first_accepts_wheel).lower()
 
     first_attempt = subprocess.run(
         ["bash", str(script), "0.1.0"],
@@ -104,11 +119,11 @@ def test_publish_retry_uploads_only_the_missing_artifact(
         check=False,
     )
     assert first_attempt.returncode == 1
-    assert (repository_state / "wheel").exists()
+    assert (repository_state / "wheel").exists() is first_accepts_wheel
     assert not (repository_state / "sdist").exists()
 
     retry = subprocess.run(
-        ["bash", str(script), "0.1.0", "--retry-artifact", "sdist"],
+        ["bash", str(script), "0.1.0", "--retry-artifact", retry_artifact],
         text=True,
         capture_output=True,
         env=environment,
@@ -121,7 +136,11 @@ def test_publish_retry_uploads_only_the_missing_artifact(
         line for line in uv_log.read_text().splitlines() if "twine upload" in line
     ]
     assert ".whl" in uploads[0] and ".tar.gz" in uploads[0]
-    assert ".whl" not in uploads[1] and ".tar.gz" in uploads[1]
+    assert (".whl" in uploads[1]) is (retry_artifact == "both")
+    assert ".tar.gz" in uploads[1]
+    if retry_artifact == "sdist":
+        assert "Uploaded the missing sdist artifact" in retry.stdout
+        assert "Published openshell-agent-runner" not in retry.stdout
 
 
 def _write_executable(path: Path, content: str) -> None:

@@ -70,6 +70,7 @@ uvx --from openshell-agent-runner oar doctor --gateway openshell
 uvx --from openshell-agent-runner oar run \
   projects/openshell-agent-runner/profiles/reviewer \
   --task review \
+  --gateway openshell \
   --input README.md \
   --output /tmp/oar-review.md \
   --dry-run
@@ -330,9 +331,9 @@ OpenShell's managed inference path.
 | Code | Meaning |
 | --- | --- |
 | `0` | Execution completed and the output validated. |
-| `1` | OpenShell execution, timeout, download size limit, ownership inspection, or cleanup failed. |
+| `1` | OpenShell execution, timeout, missing remote output, download size limit, ownership inspection, or cleanup failed. |
 | `2` | CLI input or profile configuration was invalid. |
-| `3` | The output was missing, empty, invalid, or failed its contract. |
+| `3` | A downloaded output was empty, invalid, or failed its contract. |
 
 ## Development
 

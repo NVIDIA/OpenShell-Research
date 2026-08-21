@@ -339,29 +339,44 @@ def _validate_output_schema(path: Path) -> None:
 
 
 def _validate_schema_references(document: Any, path: Path) -> None:
-    if isinstance(document, dict):
-        for key, value in document.items():
-            if key in {"pattern", "patternProperties"}:
-                raise ConfigurationError(
-                    "output schemas do not support regular-expression keywords "
-                    f"({key}) because host and sandbox engines use different dialects"
-                )
-            if key in {"$ref", "$dynamicRef", "$recursiveRef"} and (
-                not isinstance(value, str) or not value.startswith("#")
-            ):
-                raise ConfigurationError(
-                    f"output schema references must stay inside {path}: {value!r}"
-                )
-            if key in {
-                "$defs",
-                "definitions",
-                "properties",
-                "dependentSchemas",
-            } and isinstance(value, dict):
-                for schema in value.values():
-                    _validate_schema_references(schema, path)
-            else:
-                _validate_schema_references(value, path)
-    elif isinstance(document, list):
-        for value in document:
-            _validate_schema_references(value, path)
+    if not isinstance(document, dict):
+        return
+
+    for key in {"pattern", "patternProperties"}:
+        if key in document:
+            raise ConfigurationError(
+                "output schemas do not support regular-expression keywords "
+                f"({key}) because host and sandbox engines use different dialects"
+            )
+    for key in {"$ref", "$dynamicRef", "$recursiveRef"}:
+        if key in document and (
+            not isinstance(document[key], str) or not document[key].startswith("#")
+        ):
+            raise ConfigurationError(
+                f"output schema references must stay inside {path}: {document[key]!r}"
+            )
+
+    for key in {"$defs", "definitions", "properties", "dependentSchemas"}:
+        value = document.get(key)
+        if isinstance(value, dict):
+            for schema in value.values():
+                _validate_schema_references(schema, path)
+    for key in {"allOf", "anyOf", "oneOf", "prefixItems"}:
+        value = document.get(key)
+        if isinstance(value, list):
+            for schema in value:
+                _validate_schema_references(schema, path)
+    for key in {
+        "additionalProperties",
+        "contains",
+        "contentSchema",
+        "else",
+        "if",
+        "items",
+        "not",
+        "propertyNames",
+        "then",
+        "unevaluatedItems",
+        "unevaluatedProperties",
+    }:
+        _validate_schema_references(document.get(key), path)

@@ -49,14 +49,15 @@ The script:
    repository.
 
 If the upload fails after the tag is pushed, check the repository or Twine log
-to identify which artifact is missing. Retry only that artifact:
+to identify which artifacts are missing. Retry a missing artifact with:
 
 ```bash
 make publish VERSION=0.1.0 RETRY_ARTIFACT=sdist
 ```
 
-Use `wheel` instead of `sdist` when the wheel is missing. The retry rebuilds and
-checks both artifacts from the tagged commit but uploads only the selected file,
-so it works with private indexes that reject duplicate filenames. A retry
+Use `wheel` instead of `sdist` when the wheel is missing. If neither artifact
+was accepted, use `RETRY_ARTIFACT=both`. Every retry rebuilds and checks both
+artifacts from the tagged commit, then uploads only the selected file or files.
+This works with private indexes that reject duplicate filenames. A retry
 requires the remote tag to match the current commit. If both files are already
 present, there is nothing to retry.
