@@ -11,6 +11,38 @@ accomplish one task. Each `oar run` creates an isolated OpenShell sandbox, start
 Pi with the selected profile task, publishes one result, and removes the
 sandbox. The agent exists only for that run.
 
+## Run the starter task
+
+Start from the repository root. You need OpenShell 0.0.111 or newer, a selected
+workspace, and an inference route for the profile's model. OAR uses this existing
+OpenShell configuration; it does not create gateways, providers, or credentials.
+
+Install the locked development environment and check the selected gateway:
+
+```bash
+uv sync --project projects/openshell-agent-runner --locked
+uv run --project projects/openshell-agent-runner oar doctor \
+  --gateway openshell
+```
+
+Validate the included profile, then preview the run without creating a sandbox:
+
+```bash
+uv run --project projects/openshell-agent-runner oar validate \
+  projects/openshell-agent-runner/profiles/reviewer
+
+uv run --project projects/openshell-agent-runner oar run \
+  projects/openshell-agent-runner/profiles/reviewer \
+  --task review \
+  --gateway openshell \
+  --input README.md \
+  --output /tmp/oar-review.md \
+  --dry-run
+```
+
+Remove `--dry-run` to launch the agent. A successful run writes the review to
+`/tmp/oar-review.md`. Replace `openshell` if your gateway has a different name.
+
 ## Why OAR fits CI
 
 This bounded lifecycle is designed for CI and other automated workflows: a job
@@ -57,6 +89,10 @@ The CLI supplies run-specific values:
 - `--output` selects the host result path.
 - `--timeout-seconds` limits the agent run.
 
+Environment keys start with a letter or underscore and contain only letters,
+digits, and underscores. They cannot start with OpenShell's reserved
+`OPENSHELL_` prefix.
+
 ## Run lifecycle
 
 <figure class="documentation-figure documentation-figure--wide">
@@ -84,8 +120,8 @@ The sequence is:
 
 6. Pi reads uploaded files, uses its declared tools, and accesses inference
    through OpenShell's managed inference path.
-7. OAR downloads `/sandbox/artifacts/result`, validates it, and atomically
-   replaces the requested host output.
+7. OAR downloads `/sandbox/artifacts/result` under a one-MiB file limit,
+   validates it, and atomically replaces the requested host output.
 8. OAR verifies the sandbox name and `oar-run-id` ownership label before
    deleting it. `--keep-sandbox` skips this cleanup.
 
@@ -108,8 +144,9 @@ Uploads come from three places:
 | OAR | Prompt, Pi model settings, skills, extensions, and optional schema |
 
 Caller uploads normally live under `/workspace`. OAR runtime uploads live under
-`/sandbox/oar-runtime`. Uploaded workspace changes are disposable and are not
-synchronized back to the host.
+`/sandbox/oar-runtime`, and results live under `/sandbox/artifacts`. Both
+`/sandbox` paths are reserved for OAR. Uploaded workspace changes are disposable
+and are not synchronized back to the host.
 
 ## Result handling
 
@@ -126,6 +163,11 @@ uses TypeBox for its Pi tool parameters and Ajv for Draft 2020-12 validation.
 Invalid submissions return diagnostics to Pi, which can correct and resubmit
 inside the same agent session. OAR validates the downloaded JSON against the
 same schema again before publishing it.
+
+Both validators treat extension keywords and JSON Schema `format` values as
+annotations. OAR rejects `pattern` and `patternProperties` because Python and
+JavaScript use different regular-expression dialects. Use portable structural
+keywords such as `type`, `enum`, `const`, length, and numeric bounds instead.
 
 The schema belongs to the profile. OAR has no built-in review or other
 task-specific result type.
@@ -149,6 +191,6 @@ without creating a sandbox.
 | Exit code | Meaning |
 | --- | --- |
 | `0` | The result was validated and published. |
-| `1` | OpenShell execution, timeout, ownership inspection, or cleanup failed. |
+| `1` | OpenShell execution, timeout, missing remote output, download size limit, ownership inspection, or cleanup failed. |
 | `2` | CLI input or profile configuration was invalid. |
-| `3` | The result was missing, oversized, invalid, or failed its schema. |
+| `3` | A downloaded result was empty, invalid, or failed its schema. |

@@ -1218,6 +1218,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#run-the-starter-task" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Run the starter task
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#why-oar-fits-ci" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1415,6 +1426,29 @@
 accomplish one task. Each <code>oar run</code> creates an isolated OpenShell sandbox, starts
 Pi with the selected profile task, publishes one result, and removes the
 sandbox. The agent exists only for that run.</p>
+<h2 id="run-the-starter-task">Run the starter task</h2>
+<p>Start from the repository root. You need OpenShell 0.0.111 or newer, a selected
+workspace, and an inference route for the profile's model. OAR uses this existing
+OpenShell configuration; it does not create gateways, providers, or credentials.</p>
+<p>Install the locked development environment and check the selected gateway:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>sync<span class="w"> </span>--project<span class="w"> </span>projects/openshell-agent-runner<span class="w"> </span>--locked
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uv<span class="w"> </span>run<span class="w"> </span>--project<span class="w"> </span>projects/openshell-agent-runner<span class="w"> </span>oar<span class="w"> </span>doctor<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--gateway<span class="w"> </span>openshell
+</span></code></pre></div>
+<p>Validate the included profile, then preview the run without creating a sandbox:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>run<span class="w"> </span>--project<span class="w"> </span>projects/openshell-agent-runner<span class="w"> </span>oar<span class="w"> </span>validate<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>projects/openshell-agent-runner/profiles/reviewer
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>uv<span class="w"> </span>run<span class="w"> </span>--project<span class="w"> </span>projects/openshell-agent-runner<span class="w"> </span>oar<span class="w"> </span>run<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span>projects/openshell-agent-runner/profiles/reviewer<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span>--task<span class="w"> </span>review<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span>--gateway<span class="w"> </span>openshell<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span>--input<span class="w"> </span>README.md<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span>--output<span class="w"> </span>/tmp/oar-review.md<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span>--dry-run
+</span></code></pre></div>
+<p>Remove <code>--dry-run</code> to launch the agent. A successful run writes the review to
+<code>/tmp/oar-review.md</code>. Replace <code>openshell</code> if your gateway has a different name.</p>
 <h2 id="why-oar-fits-ci">Why OAR fits CI</h2>
 <p>This bounded lifecycle is designed for CI and other automated workflows: a job
 can provide explicit inputs, run one review or transformation, consume the
@@ -1432,15 +1466,15 @@ not provision providers or credentials.</p>
 
 <h2 id="profile-inputs">Profile inputs</h2>
 <p>A profile directory is the complete task configuration:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>profile/
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── profile.yaml       Task, sandbox policy, tools, skills, and extensions
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├── models.json        Pi provider and model definition
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>├── settings.json      Pi model selection and thinking level
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>├── policy.yaml        OpenShell sandbox policy
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>├── prompts/           Task instructions
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>├── schemas/           Optional result schemas
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>├── skills/            Optional Pi skills
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>└── extensions/        Optional Pi extensions
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>profile/
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── profile.yaml       Task, sandbox policy, tools, skills, and extensions
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>├── models.json        Pi provider and model definition
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>├── settings.json      Pi model selection and thinking level
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>├── policy.yaml        OpenShell sandbox policy
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>├── prompts/           Task instructions
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>├── schemas/           Optional result schemas
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>├── skills/            Optional Pi skills
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>└── extensions/        Optional Pi extensions
 </span></code></pre></div>
 <p>The CLI supplies run-specific values:</p>
 <ul>
@@ -1454,6 +1488,9 @@ not provision providers or credentials.</p>
 <li><code>--output</code> selects the host result path.</li>
 <li><code>--timeout-seconds</code> limits the agent run.</li>
 </ul>
+<p>Environment keys start with a letter or underscore and contain only letters,
+digits, and underscores. They cannot start with OpenShell's reserved
+<code>OPENSHELL_</code> prefix.</p>
 <h2 id="run-lifecycle">Run lifecycle</h2>
 <figure class="documentation-figure documentation-figure--wide">
   <img src="assets/diagrams/run-lifecycle.svg" alt="A run validates its profile, prepares runtime files, creates an OpenShell sandbox, starts Pi, downloads and validates the result, publishes it, verifies ownership, and deletes the sandbox.">
@@ -1474,21 +1511,21 @@ not provision providers or credentials.</p>
    to <code>REPOSITORY_ROOT</code>, and passes the prompt to <code>pi --print</code> through standard
    input:</li>
 </ol>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pi<span class="w"> </span>--print<span class="w"> </span>...<span class="w"> </span>&lt;<span class="w"> </span>/sandbox/oar-runtime/prompt.md
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pi<span class="w"> </span>--print<span class="w"> </span>...<span class="w"> </span>&lt;<span class="w"> </span>/sandbox/oar-runtime/prompt.md
 </span></code></pre></div>
 <ol>
 <li>Pi reads uploaded files, uses its declared tools, and accesses inference
    through OpenShell's managed inference path.</li>
-<li>OAR downloads <code>/sandbox/artifacts/result</code>, validates it, and atomically
-   replaces the requested host output.</li>
+<li>OAR downloads <code>/sandbox/artifacts/result</code> under a one-MiB file limit,
+   validates it, and atomically replaces the requested host output.</li>
 <li>OAR verifies the sandbox name and <code>oar-run-id</code> ownership label before
    deleting it. <code>--keep-sandbox</code> skips this cleanup.</li>
 </ol>
 <h2 id="uploads">Uploads</h2>
 <p>OAR uses OpenShell's term <strong>upload</strong> for files transferred into the sandbox.
 General uploads accept files or directories:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>--upload<span class="w"> </span>./document.md:/workspace/document.md
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>--upload<span class="w"> </span>./repository:/workspace/repository
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>--upload<span class="w"> </span>./document.md:/workspace/document.md
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>--upload<span class="w"> </span>./repository:/workspace/repository
 </span></code></pre></div>
 <p>Uploads come from three places:</p>
 <table>
@@ -1514,8 +1551,9 @@ General uploads accept files or directories:</p>
 </tbody>
 </table>
 <p>Caller uploads normally live under <code>/workspace</code>. OAR runtime uploads live under
-<code>/sandbox/oar-runtime</code>. Uploaded workspace changes are disposable and are not
-synchronized back to the host.</p>
+<code>/sandbox/oar-runtime</code>, and results live under <code>/sandbox/artifacts</code>. Both
+<code>/sandbox</code> paths are reserved for OAR. Uploaded workspace changes are disposable
+and are not synchronized back to the host.</p>
 <h2 id="result-handling">Result handling</h2>
 <figure class="documentation-figure documentation-figure--wide">
   <img src="assets/diagrams/result-handling.svg" alt="Without a schema, Pi's final response becomes the result. With a schema, Pi calls submit_result, receives Ajv errors until valid, and saves JSON. Both paths are downloaded, checked on the host, and atomically published.">
@@ -1529,14 +1567,18 @@ uses TypeBox for its Pi tool parameters and Ajv for Draft 2020-12 validation.
 Invalid submissions return diagnostics to Pi, which can correct and resubmit
 inside the same agent session. OAR validates the downloaded JSON against the
 same schema again before publishing it.</p>
+<p>Both validators treat extension keywords and JSON Schema <code>format</code> values as
+annotations. OAR rejects <code>pattern</code> and <code>patternProperties</code> because Python and
+JavaScript use different regular-expression dialects. Use portable structural
+keywords such as <code>type</code>, <code>enum</code>, <code>const</code>, length, and numeric bounds instead.</p>
 <p>The schema belongs to the profile. OAR has no built-in review or other
 task-specific result type.</p>
 <h2 id="native-command-sequence">Native command sequence</h2>
 <p>A normal run issues four native commands:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>openshell sandbox create ...
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>openshell sandbox download ...
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>openshell sandbox get ...
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>openshell sandbox delete ...
+<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>openshell sandbox create ...
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>openshell sandbox download ...
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>openshell sandbox get ...
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>openshell sandbox delete ...
 </span></code></pre></div>
 <p>Use <code>--dry-run</code> to print the complete generated commands and host actions
 without creating a sandbox.</p>
@@ -1555,7 +1597,7 @@ without creating a sandbox.</p>
 </tr>
 <tr>
 <td><code>1</code></td>
-<td>OpenShell execution, timeout, ownership inspection, or cleanup failed.</td>
+<td>OpenShell execution, timeout, missing remote output, download size limit, ownership inspection, or cleanup failed.</td>
 </tr>
 <tr>
 <td><code>2</code></td>
@@ -1563,7 +1605,7 @@ without creating a sandbox.</p>
 </tr>
 <tr>
 <td><code>3</code></td>
-<td>The result was missing, oversized, invalid, or failed its schema.</td>
+<td>A downloaded result was empty, invalid, or failed its schema.</td>
 </tr>
 </tbody>
 </table>
