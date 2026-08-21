@@ -13,6 +13,7 @@
     "endpoint:check": "node scripts/check-responses-endpoints.mjs",
     "github:preflight": "tsx src/github-preflight.ts",
     "transcript": "tsx src/transcript.ts",
+    "timeline": "tsx src/timeline.ts",
     "costs": "tsx src/costs.ts",
     "test": "tsx --test test/*.test.ts",
     "check": "npm run typecheck && npm test"

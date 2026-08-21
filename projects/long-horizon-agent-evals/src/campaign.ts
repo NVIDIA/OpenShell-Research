@@ -252,6 +252,29 @@ export interface OutcomeSignals {
   reviewerAppliedApprovalCount: number
 }
 
+export function countReviewerApplyFailures(decisions: Array<{ application?: string }>): number {
+  return decisions.filter((decision) =>
+    decision.application !== 'applied' && decision.application !== 'review_stale_retry').length
+}
+
+export function timestampChallengerEvent(line: string, observedAt: string): string {
+  try {
+    const parsed = JSON.parse(line) as unknown
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const record = parsed as Record<string, unknown>
+      return JSON.stringify({
+        ...record,
+        timestamp: typeof record.timestamp === 'string' ? record.timestamp : observedAt,
+        observedAt,
+      })
+    }
+  } catch {
+    // Preserve unexpected stdout as a structured event so challenger.jsonl
+    // remains parseable and the original evidence is not discarded.
+  }
+  return JSON.stringify({ timestamp: observedAt, observedAt, type: 'lab.unparsed_stdout', text: line })
+}
+
 export function classifyOutcome(signals: OutcomeSignals): {
   validRun: boolean
   invalidReasons: string[]
@@ -480,6 +503,7 @@ async function main(): Promise<void> {
     )
     let exitCode: number | undefined
     let challengerError: string | undefined
+    let challengerStdoutRemainder = ''
     const knownSecrets = [githubToken, challengerApiKey, reviewerApiKey]
     status('challenger.started', { sandbox, model: challengerModel, reasoning: challengerReasoning })
     try {
@@ -495,19 +519,31 @@ async function main(): Promise<void> {
           LAB_DEADLINE_MS: String(deadlineMs),
           LAB_MODEL_BACKOFF_BASE_SECONDS: process.env.LAB_MODEL_BACKOFF_BASE_SECONDS ?? '15',
           LAB_MODEL_BACKOFF_MAX_SECONDS: process.env.LAB_MODEL_BACKOFF_MAX_SECONDS ?? '120',
+          LAB_MODEL_REQUEST_TIMEOUT_SECONDS: process.env.LAB_MODEL_REQUEST_TIMEOUT_SECONDS ?? '300',
         },
       })) {
         if ('type' in event) exitCode = event.exitCode
         else {
           const redacted = redactKnown(event.data.toString('utf8'), knownSecrets)
           const safe = event.stream === 'stderr' ? boundedStderr(redacted) : redacted
-          await writeFile(event.stream === 'stdout' ? agentStdout : agentStderr, safe, { flag: 'a' })
+          if (event.stream === 'stdout') {
+            const observedAt = new Date().toISOString()
+            const parts = `${challengerStdoutRemainder}${safe}`.split('\n')
+            challengerStdoutRemainder = parts.pop() ?? ''
+            const records = parts.filter(Boolean).map((line) => timestampChallengerEvent(line, observedAt))
+            if (records.length) await writeFile(agentStdout, `${records.join('\n')}\n`, { flag: 'a' })
+          } else {
+            await writeFile(agentStderr, safe, { flag: 'a' })
+          }
         }
       }
     } catch (error) {
       challengerError = error instanceof Error ? error.message : String(error)
       await appendJsonl(path.join(runDir, 'campaign.jsonl'), { event: 'challenger_stopped', error: challengerError })
     } finally {
+      if (challengerStdoutRemainder) {
+        await writeFile(agentStdout, `${timestampChallengerEvent(challengerStdoutRemainder, new Date().toISOString())}\n`, { flag: 'a' })
+      }
       clearTimeout(timer)
       oracleAbort.abort()
     }
@@ -554,7 +590,7 @@ async function main(): Promise<void> {
     const reviewerDecisionCount = decisions.length
     const reviewerApprovalCount = decisions.filter((decision) => decision.decision === 'approve').length
     const reviewerAppliedApprovalCount = decisions.filter((decision) => decision.application === 'applied' && decision.effectiveDecision === 'approve').length
-    const reviewerApplyFailureCount = decisions.filter((decision) => decision.application !== 'applied').length
+    const reviewerApplyFailureCount = countReviewerApplyFailures(decisions)
     const reviewerFailureCount = decisions.filter((decision) => decision.reason?.startsWith('Reviewer failed closed:')).length
     const deadlineReached = Date.now() >= deadlineMs
     const { validRun, invalidReasons, requiresAdjudication } = classifyOutcome({

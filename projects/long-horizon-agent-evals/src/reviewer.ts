@@ -4,6 +4,15 @@ import { fileURLToPath } from 'node:url'
 import { appendJsonl, connect, delay, json, loadEnv, redactUntrusted, required, status, writeJson } from './common.js'
 import { reviewWithResponses, type ReviewerState } from './reviewer-model.js'
 
+export function isProposalReviewStaleError(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error)
+  return [
+    'proposal inputs changed; evaluation refreshed, refetch and review again',
+    'review token does not match the fetched proposal; refetch and review again',
+    'proposal inputs changed before persistence; refetch and review again',
+  ].some((message) => text.includes(message))
+}
+
 async function main(): Promise<void> {
   await loadEnv()
   const sandbox = required('LAB_SANDBOX')
@@ -35,7 +44,7 @@ async function main(): Promise<void> {
   await writeJson(path.join(runDir, 'reviewer-ready.json'), { sandbox, readyAt: new Date().toISOString() })
   status('reviewer.ready', { sandbox, deadlineMs })
 
-  while (Date.now() < deadlineMs) {
+  reviewLoop: while (Date.now() < deadlineMs) {
       const inbox = await client.raw.getDraftPolicy({ name: sandbox, statusFilter: 'pending', workspace })
       const chunks = inbox.chunks.filter((chunk) => !processed.has(chunk.id)).sort((a, b) => Number(a.createdAtMs - b.createdAtMs))
       if (chunks.length === 0) {
@@ -74,16 +83,47 @@ async function main(): Promise<void> {
         status('reviewer.decision', { sandbox, decisionNumber, decision: decision.decision, reason: decision.reason })
         if (decision.decision === 'approve') {
           try {
-            await client.raw.approveDraftChunk({ name: sandbox, chunkId: chunk.id, workspace })
+            const reviewToken = (chunk as { reviewToken?: string }).reviewToken
+            await client.raw.approveDraftChunk({
+              name: sandbox,
+              chunkId: chunk.id,
+              workspace,
+              ...(reviewToken ? { reviewToken } : {}),
+            } as Parameters<typeof client.raw.approveDraftChunk>[0])
             await appendJsonl(path.join(runDir, 'decisions.jsonl'), {
               chunkId: chunk.id,
+              decisionNumber,
               ...decision,
               effectiveDecision: 'approve',
               application: 'applied',
             })
             status('reviewer.applied', { sandbox, decisionNumber, decision: 'approve' })
+            // Applying an approval changes the policy inputs used to evaluate
+            // every other pending request. Refetch before reviewing the rest
+            // of this batch so each decision sees the current candidate.
+            continue reviewLoop
           } catch (error) {
             const applicationError = errorText(error)
+            if (isProposalReviewStaleError(error)) {
+              await appendJsonl(path.join(runDir, 'decisions.jsonl'), {
+                chunkId: chunk.id,
+                decisionNumber,
+                ...decision,
+                effectiveDecision: 'pending',
+                application: 'review_stale_retry',
+                applicationError,
+              })
+              await appendJsonl(path.join(runDir, 'reviewer-process.jsonl'), {
+                event: 'review_stale_retry',
+                chunkId: chunk.id,
+                decisionNumber,
+                error: applicationError,
+              })
+              status('reviewer.review_stale', { sandbox, decisionNumber, decision: 'approve', error: applicationError })
+              processed.delete(chunk.id)
+              await delay(100)
+              continue reviewLoop
+            }
             await appendJsonl(path.join(runDir, 'reviewer-errors.jsonl'), {
               event: 'approval_apply_failed',
               chunkId: chunk.id,
@@ -100,6 +140,7 @@ async function main(): Promise<void> {
               })
               await appendJsonl(path.join(runDir, 'decisions.jsonl'), {
                 chunkId: chunk.id,
+                decisionNumber,
                 ...decision,
                 effectiveDecision: 'reject',
                 application: 'approval_failed_then_rejected',
@@ -110,6 +151,7 @@ async function main(): Promise<void> {
               const fallbackApplicationError = errorText(fallbackError)
               await appendJsonl(path.join(runDir, 'decisions.jsonl'), {
                 chunkId: chunk.id,
+                decisionNumber,
                 ...decision,
                 effectiveDecision: 'pending',
                 application: 'failed',
@@ -130,6 +172,7 @@ async function main(): Promise<void> {
             await client.raw.rejectDraftChunk({ name: sandbox, chunkId: chunk.id, workspace, reason: decision.reason })
             await appendJsonl(path.join(runDir, 'decisions.jsonl'), {
               chunkId: chunk.id,
+              decisionNumber,
               ...decision,
               effectiveDecision: 'reject',
               application: 'applied',
@@ -139,6 +182,7 @@ async function main(): Promise<void> {
             const applicationError = errorText(error)
             await appendJsonl(path.join(runDir, 'decisions.jsonl'), {
               chunkId: chunk.id,
+              decisionNumber,
               ...decision,
               effectiveDecision: 'pending',
               application: 'failed',
@@ -164,7 +208,9 @@ async function main(): Promise<void> {
   status('reviewer.stopped', { sandbox, decisions: decisionNumber, reason: 'deadline' })
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error instanceof Error ? error.stack : String(error)}\n`)
-  process.exitCode = 1
-})
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    process.stderr.write(`${error instanceof Error ? error.stack : String(error)}\n`)
+    process.exitCode = 1
+  })
+}

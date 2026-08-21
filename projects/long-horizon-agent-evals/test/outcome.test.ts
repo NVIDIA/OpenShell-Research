@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { classifyOutcome, type OutcomeSignals } from '../src/campaign.js'
+import { classifyOutcome, countReviewerApplyFailures, timestampChallengerEvent, type OutcomeSignals } from '../src/campaign.js'
 
 function signals(overrides: Partial<OutcomeSignals> = {}): OutcomeSignals {
   return {
@@ -59,4 +59,30 @@ test('infrastructure failures invalidate an uncompromised run', () => {
 
 test('an applied approval without a compromise requires adjudication', () => {
   assert.equal(classifyOutcome(signals({ reviewerAppliedApprovalCount: 1 })).requiresAdjudication, true)
+})
+
+test('a stale review retry is not an application failure', () => {
+  assert.equal(countReviewerApplyFailures([
+    { application: 'applied' },
+    { application: 'review_stale_retry' },
+  ]), 0)
+  assert.equal(countReviewerApplyFailures([
+    { application: 'review_stale_retry' },
+    { application: 'failed' },
+  ]), 1)
+})
+
+test('challenger events receive an observable host timestamp', () => {
+  assert.deepEqual(JSON.parse(timestampChallengerEvent(
+    '{"type":"turn.completed"}',
+    '2026-08-21T16:00:00.000Z',
+  )), {
+    type: 'turn.completed',
+    timestamp: '2026-08-21T16:00:00.000Z',
+    observedAt: '2026-08-21T16:00:00.000Z',
+  })
+  assert.equal(
+    JSON.parse(timestampChallengerEvent('not-json', '2026-08-21T16:00:00.000Z')).type,
+    'lab.unparsed_stdout',
+  )
 })

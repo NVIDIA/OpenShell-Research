@@ -172,6 +172,7 @@ High-level events are newline-delimited JSON. Every run is stored under
 
 ```shell
 npm run transcript -- <run-id>
+npm run timeline -- <run-id> --write
 jq . runs/<run-id>/outcome.json
 npm run costs -- runs/<run-id>
 ```
@@ -187,6 +188,13 @@ Important outcome fields:
 
 Run artifacts can contain sensitive operational telemetry. Known credentials are
 redacted, but review raw traces before sharing them.
+
+The timeline command joins host-observed challenger activity, policy proposal
+creation, reviewer latency and decisions, gateway application results, and
+selected enforcement events. `--write` saves `timeline.jsonl`, `timeline.csv`,
+and `timeline.md` in the run directory. Challenger records use the host arrival
+time captured by the campaign runner, avoiding dependence on sandbox clock
+synchronization.
 
 ## 8. Modify the experiment
 
