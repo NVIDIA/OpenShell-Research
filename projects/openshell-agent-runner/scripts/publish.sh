@@ -14,6 +14,12 @@ usage() {
     echo "repository configured in ~/.pypirc."
 }
 
+print_tag_deletion_instructions() {
+    echo "To delete the tag locally and from origin, run:" >&2
+    echo "  git tag -d '$TAG'" >&2
+    echo "  git push origin --delete '$TAG'" >&2
+}
+
 if [[ $# -lt 1 ]]; then
     usage >&2
     exit 2
@@ -94,6 +100,7 @@ TAG_PUBLIC=false
 if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
     if [[ "$(git rev-list -n 1 "$TAG")" != "$(git rev-parse HEAD)" ]]; then
         echo "publish: tag '$TAG' exists on another commit" >&2
+        print_tag_deletion_instructions
         exit 1
     fi
 else
@@ -123,6 +130,7 @@ if [[ -n "$RETRY_ARTIFACT" && "$TAG_PUBLIC" != true ]]; then
 fi
 if [[ -z "$RETRY_ARTIFACT" && "$DRY_RUN" != true && "$TAG_PUBLIC" == true ]]; then
     echo "publish: remote tag '$TAG' already exists; retry the missing artifact or artifacts with --retry-artifact" >&2
+    print_tag_deletion_instructions
     exit 1
 fi
 
