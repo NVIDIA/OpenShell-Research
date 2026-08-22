@@ -13,6 +13,50 @@ REPOSITORY = Path(__file__).resolve().parents[3]
 PUBLISH_SCRIPT = REPOSITORY / "projects/openshell-agent-runner/scripts/publish.sh"
 
 
+def test_publish_prints_tag_deletion_commands_for_existing_remote_tag(
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "project"
+    script = project / "scripts/publish.sh"
+    script.parent.mkdir(parents=True)
+    shutil.copy2(PUBLISH_SCRIPT, script)
+
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    _write_executable(
+        fake_bin / "git",
+        """
+        #!/usr/bin/env bash
+        if [[ "$1" == "status" ]]; then exit 0; fi
+        if [[ "$1" == "branch" ]]; then printf 'main\\n'; exit 0; fi
+        if [[ "$1" == "fetch" ]]; then exit 0; fi
+        if [[ "$1" == "rev-parse" && "$2" == "--verify" ]]; then exit 0; fi
+        if [[ "$1" == "rev-parse" ]]; then printf 'abc123\\n'; exit 0; fi
+        if [[ "$1" == "rev-list" ]]; then printf 'abc123\\n'; exit 0; fi
+        if [[ "$1" == "ls-remote" ]]; then
+            printf 'abc123\\trefs/tags/v0.1.0\\n'
+            exit 0
+        fi
+        exit 91
+        """,
+    )
+    environment = os.environ.copy()
+    environment["PATH"] = f"{fake_bin}:{environment['PATH']}"
+
+    result = subprocess.run(
+        ["bash", str(script), "0.1.0"],
+        text=True,
+        capture_output=True,
+        env=environment,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "remote tag 'v0.1.0' already exists" in result.stderr
+    assert "git tag -d 'v0.1.0'" in result.stderr
+    assert "git push origin --delete 'v0.1.0'" in result.stderr
+
+
 @pytest.mark.parametrize(
     ("first_accepts_wheel", "retry_artifact"),
     [(True, "sdist"), (False, "both")],
