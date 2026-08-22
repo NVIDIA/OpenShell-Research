@@ -1,5 +1,5 @@
 id: reviewer
-description: Review a required input document and publish a structured result.
+description: Review a required input document and publish the result.
 
 sandbox:
   policy: policy.yaml

@@ -10,7 +10,10 @@ import openshell_agent_runner.cli as cli
 from openshell_agent_runner.cli import app
 
 REPOSITORY = Path(__file__).resolve().parents[3]
-PACKAGED_PROFILE = REPOSITORY / "projects/openshell-agent-runner/profiles/reviewer"
+PACKAGED_PROFILE = (
+    REPOSITORY
+    / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/reviewer"
+)
 
 
 def test_root_help_exposes_only_supported_commands() -> None:
@@ -18,6 +21,7 @@ def test_root_help_exposes_only_supported_commands() -> None:
 
     assert result.exit_code == 0
     for command, description in (
+        ("init", "Create editable profiles from resources packaged with OAR."),
         ("validate", "Validate a profile and all referenced local resources."),
         ("run", "Launch or preview an ephemeral agent for one profile task."),
         ("doctor", "Check OpenShell readiness without changing its state."),
@@ -28,6 +32,43 @@ def test_root_help_exposes_only_supported_commands() -> None:
         assert f"│ {removed}" not in result.stdout
     assert "--install-completion" not in result.stdout
     assert "--show-completion" not in result.stdout
+
+
+def test_init_help_has_only_the_supported_options() -> None:
+    result = CliRunner().invoke(app, ["init", "--help"])
+
+    assert result.exit_code == 0
+    assert "PROFILE_ROOT" in result.stdout
+    init_command = get_group(app).commands["init"]
+    options = {
+        option
+        for parameter in init_command.params
+        for option in parameter.opts
+        if option.startswith("--")
+    }
+    assert options == {"--model", "--profile", "--thinking"}
+
+
+def test_init_command_creates_a_valid_profile(tmp_path: Path) -> None:
+    destination = tmp_path / "profiles"
+    result = CliRunner().invoke(
+        app,
+        [
+            "init",
+            str(destination),
+            "--profile",
+            "reviewer",
+            "--model",
+            "provider/model",
+            "--thinking",
+            "medium",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert f"  {destination / 'reviewer'}" in result.stdout
+    validation = CliRunner().invoke(app, ["validate", str(destination / "reviewer")])
+    assert validation.exit_code == 0, validation.output
 
 
 def test_run_help_has_only_the_supported_override_surface() -> None:

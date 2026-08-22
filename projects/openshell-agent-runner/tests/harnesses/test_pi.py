@@ -102,7 +102,8 @@ def test_schema_task_receives_generic_submission_protocol() -> None:
 
 def test_plain_task_uses_final_response_without_submission_tool() -> None:
     resolved = load_profile(
-        REPOSITORY / "projects/openshell-agent-runner/profiles/reviewer"
+        REPOSITORY
+        / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/reviewer"
     )
     prepared = prepare_resources(resolved, "review")
     try:
@@ -132,7 +133,8 @@ def test_generic_submission_extension_validates_and_saves_result() -> None:
 def test_supplied_policies_allow_no_ordinary_network_egress() -> None:
     policies = [
         REPOSITORY / ".github/openshell-agents/profiles/dev-note-reviewer/policy.yaml",
-        REPOSITORY / "projects/openshell-agent-runner/profiles/reviewer/policy.yaml",
+        REPOSITORY
+        / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/reviewer/policy.yaml",
     ]
 
     for path in policies:

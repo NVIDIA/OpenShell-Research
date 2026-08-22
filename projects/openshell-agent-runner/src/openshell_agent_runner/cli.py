@@ -17,6 +17,7 @@ from openshell_agent_runner.config import ResolvedProfile, load_profile, resolve
 from openshell_agent_runner.errors import ArtifactError, ConfigurationError, OarError
 from openshell_agent_runner.openshell import NativeTarget
 from openshell_agent_runner.openshell import doctor as run_doctor
+from openshell_agent_runner.profile_init import ThinkingLevel, initialize_profiles
 from openshell_agent_runner.runner import RunRequest, render_dry_run, run_agent
 
 app = typer.Typer(
@@ -44,6 +45,46 @@ class ProfileTaskHelpCommand(TyperCommand):
         except OarError as error:
             _fail(error)
         return _render_task_help(profile_directory, resolved, task_id)
+
+
+@app.command()
+def init(
+    destination: Annotated[
+        Path,
+        typer.Argument(
+            help="Directory that will contain the initialized profiles.",
+            metavar="PROFILE_ROOT",
+        ),
+    ],
+    model: Annotated[
+        str,
+        typer.Option("--model", help="Inference route model identifier."),
+    ],
+    profile: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--profile",
+            help="Packaged profile to initialize. Repeat to select several; omit for all.",
+        ),
+    ] = None,
+    thinking: Annotated[
+        ThinkingLevel,
+        typer.Option("--thinking", help="Pi thinking level."),
+    ] = ThinkingLevel.HIGH,
+) -> None:
+    """Create editable profiles from resources packaged with OAR."""
+    try:
+        created = initialize_profiles(
+            destination,
+            profile or (),
+            model,
+            thinking,
+        )
+    except OarError as error:
+        _fail(error)
+    typer.echo("Created profiles:")
+    for path in created:
+        typer.echo(f"  {path}")
 
 
 @app.command()

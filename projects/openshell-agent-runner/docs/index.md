@@ -14,38 +14,36 @@ jobs and other automated workflows.
 
 ## Requirements
 
-- A checkout of this repository and [`uv`](https://docs.astral.sh/uv/).
+- [`uv`](https://docs.astral.sh/uv/).
 - OpenShell 0.0.111 or newer.
 - A running OpenShell gateway that the host can reach.
-- An OpenShell workspace and inference route configured for the profile's
-  model.
+- An inference route and its model ID.
 
 OAR uses this existing OpenShell configuration. It does not create gateways,
-providers, inference routes, or credentials.
+providers, workspaces, inference routes, or credentials. It uses the gateway's
+`default` workspace unless you select another one. An OpenShell workspace is a
+gateway-side namespace for sandboxes, inference routes, and access controls; it
+is not the `/workspace` directory inside a sandbox.
 
 ## Run the starter task
 
-Start from the repository root. Ready-to-run profiles are under
-`projects/openshell-agent-runner/profiles/`; the starter commands use the
-`reviewer` profile in that directory. Repository-specific CI profiles are under
-`.github/openshell-agents/profiles/`.
-
-Install the locked development environment and check the selected gateway:
+Choose the model ID configured on your inference route. Create every profile
+packaged with OAR, then check the gateway:
 
 ```bash
-uv sync --project projects/openshell-agent-runner --locked
-uv run --project projects/openshell-agent-runner oar doctor \
-  --gateway openshell
+export MODEL_ID="provider/model"
+
+uvx --from openshell-agent-runner oar init ./profiles \
+  --model "$MODEL_ID"
+uvx --from openshell-agent-runner oar doctor --gateway openshell
 ```
 
 Validate the included profile, then preview the run without creating a sandbox:
 
 ```bash
-uv run --project projects/openshell-agent-runner oar validate \
-  projects/openshell-agent-runner/profiles/reviewer
+uvx --from openshell-agent-runner oar validate ./profiles/reviewer
 
-uv run --project projects/openshell-agent-runner oar run \
-  projects/openshell-agent-runner/profiles/reviewer \
+uvx --from openshell-agent-runner oar run ./profiles/reviewer \
   --task review \
   --gateway openshell \
   --input README.md \
@@ -54,7 +52,16 @@ uv run --project projects/openshell-agent-runner oar run \
 ```
 
 Remove `--dry-run` to launch the agent. A successful run writes the review to
-`/tmp/oar-review.md`. Replace `openshell` if your gateway has a different name.
+`/tmp/oar-review.md`. Replace `provider/model` with the route's model ID and
+`openshell` with your gateway name.
+
+`init` copies packaged profiles into an ordinary local directory so they can be
+inspected, edited, and committed. Omit `--profile` to create all packaged
+profiles. Use repeatable `--profile NAME` options to select a subset. The
+required `--model` value is written into Pi's model registry and runtime
+selection; OAR does not read `MODEL_ID` implicitly. Use `--thinking LEVEL` to
+override the default `high` thinking level, or `--thinking off` when the model
+does not support reasoning.
 
 ## Why OAR fits CI
 
@@ -98,7 +105,9 @@ The CLI supplies run-specific values:
 - `--input FILE` is an optional document-task convenience. OAR uploads the file
   to `/workspace/input/document.md` and sets `REPOSITORY_ROOT=/workspace/input`.
 - `--env KEY=VALUE` adds a sandbox environment value.
-- `--gateway` and `--workspace` select existing OpenShell state.
+- `--gateway` selects an existing OpenShell gateway.
+- `--workspace` selects a gateway-side OpenShell namespace. It defaults to
+  `default` and is unrelated to the sandbox's `/workspace` directory.
 - `--output` selects the host result path.
 - `--timeout-seconds` limits the agent run.
 
