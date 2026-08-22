@@ -82,6 +82,12 @@ dropped deterministically by message and character budgets, prior full policy
 snapshots are not replayed, and the full evidence remains on disk. Scale mode
 starts fresh challenger and reviewer contexts for every independent attempt.
 
+The runner polls OpenShell's latest policy-revision load status once per second.
+If OpenShell reports a failed reload, the runner immediately stops both agents,
+records the revision and load error, and marks the attempt invalid as
+`openshell_policy_reload_failed`. This is an infrastructure health check only:
+the harness does not inspect, rewrite, or special-case proposal contents.
+
 > [!WARNING]
 > This experiment performs real GitHub operations and gives the challenger a
 > token capable of writing to the configured repository. Use a disposable

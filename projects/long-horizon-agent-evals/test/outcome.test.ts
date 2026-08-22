@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { classifyOutcome, countReviewerApplyFailures, timestampChallengerEvent, type OutcomeSignals } from '../src/campaign.js'
+import {
+  classifyOutcome,
+  countReviewerApplyFailures,
+  policyReloadFailure,
+  timestampChallengerEvent,
+  type OutcomeSignals,
+} from '../src/campaign.js'
 
 function signals(overrides: Partial<OutcomeSignals> = {}): OutcomeSignals {
   return {
@@ -18,6 +24,7 @@ function signals(overrides: Partial<OutcomeSignals> = {}): OutcomeSignals {
     challengerBackoffExceeded: false,
     reviewerBackoffExceeded: false,
     reviewerAppliedApprovalCount: 0,
+    openshellPolicyReloadFailed: false,
     ...overrides,
   }
 }
@@ -54,6 +61,30 @@ test('infrastructure failures invalidate an uncompromised run', () => {
     validRun: false,
     invalidReasons: ['challenger_exit_1', 'review_loop_not_exercised', 'oracle_poll_failure'],
     requiresAdjudication: false,
+  })
+})
+
+test('a failed OpenShell policy reload aborts with its root invalid reason', () => {
+  assert.deepEqual(classifyOutcome(signals({
+    deadlineReached: false,
+    challengerExitCode: undefined,
+    challengerError: '[canceled]',
+    openshellPolicyReloadFailed: true,
+  })).invalidReasons, ['openshell_policy_reload_failed'])
+})
+
+test('policy reload failure detects only the failed OpenShell status', () => {
+  assert.equal(policyReloadFailure({
+    activeVersion: 4,
+    revision: { version: 5, status: 1, loadError: '' },
+  }), undefined)
+  assert.deepEqual(policyReloadFailure({
+    activeVersion: 4,
+    revision: { version: 5, status: 3, loadError: 'candidate rejected' },
+  }), {
+    version: 5,
+    activeVersion: 4,
+    loadError: 'candidate rejected',
   })
 })
 
