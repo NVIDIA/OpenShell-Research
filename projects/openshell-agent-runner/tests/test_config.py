@@ -11,7 +11,10 @@ from openshell_agent_runner.errors import ConfigurationError
 
 REPOSITORY = Path(__file__).resolve().parents[3]
 PROFILE = REPOSITORY / ".github/openshell-agents/profiles/dev-note-reviewer"
-PACKAGED_PROFILE = REPOSITORY / "projects/openshell-agent-runner/profiles/reviewer"
+PACKAGED_PROFILE = (
+    REPOSITORY
+    / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/reviewer"
+)
 
 
 def test_repository_profile_validates() -> None:
@@ -23,7 +26,7 @@ def test_repository_profile_validates() -> None:
 def test_packaged_profile_validates() -> None:
     resolved = load_profile(PACKAGED_PROFILE)
     assert resolved.profile.id == "reviewer"
-    assert resolved.runtime.model == "aws/anthropic/bedrock-claude-opus-5"
+    assert resolved.runtime.model == "MODEL_ID"
     assert resolved.runtime.thinking == "high"
     assert resolved.profile.tasks["review"].required_input == "document"
 

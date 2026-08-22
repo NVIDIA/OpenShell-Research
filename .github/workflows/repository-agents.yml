@@ -57,7 +57,7 @@ jobs:
           uv run --project projects/openshell-agent-runner oar validate \
             .github/openshell-agents/profiles/dev-note-reviewer
           uv run --project projects/openshell-agent-runner oar validate \
-            projects/openshell-agent-runner/profiles/reviewer
+            projects/openshell-agent-runner/src/openshell_agent_runner/profiles/reviewer
 
       - name: Preview agent execution
         run: |
@@ -90,17 +90,21 @@ jobs:
           python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/image/Dockerfile'
           python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/image/exec.sh'
           python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/extensions/submit-result.ts'
+          python -m zipfile -l "$wheel" | grep -F 'profiles/reviewer/profile.yaml'
+          python -m zipfile -l "$wheel" | grep -F 'profiles/reviewer/models.json'
           python -m zipfile -l "$wheel" | grep -F 'dist-info/licenses/LICENSE'
 
       - name: Verify the built wheel
         working-directory: projects/openshell-agent-runner
         run: |
           wheel="$(find dist -name '*.whl' -print -quit)"
+          uvx --from "$wheel" oar init "$RUNNER_TEMP/profiles" \
+            --model provider/model
           uvx --from "$wheel" oar validate \
-            profiles/reviewer
+            "$RUNNER_TEMP/profiles/reviewer"
           printf '# Review me\n\nA short document.\n' > "$RUNNER_TEMP/review-input.md"
           uvx --from "$wheel" oar run \
-            profiles/reviewer \
+            "$RUNNER_TEMP/profiles/reviewer" \
             --task review \
             --input "$RUNNER_TEMP/review-input.md" \
             --output "$RUNNER_TEMP/review-output.md" \
@@ -113,6 +117,12 @@ jobs:
           docker build \
             --tag openshell-agent-runner-pi:ci \
             projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/image
+          docker run --rm \
+            --entrypoint pi \
+            --env PI_CODING_AGENT_DIR=/profile \
+            --volume "$RUNNER_TEMP/profiles/reviewer:/profile:ro" \
+            openshell-agent-runner-pi:ci \
+            --offline --list-models openshell | grep -F 'provider/model'
 
       - name: Compile the submission extension
         if: matrix.python-version == '3.12'
