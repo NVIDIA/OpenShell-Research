@@ -120,7 +120,7 @@ jobs:
           docker run --rm \
             --entrypoint pi \
             --env PI_CODING_AGENT_DIR=/profile \
-            --volume "$RUNNER_TEMP/profiles/reviewer:/profile:ro" \
+            --volume "$RUNNER_TEMP/profiles/reviewer:/profile" \
             openshell-agent-runner-pi:ci \
             --offline --list-models openshell | grep -F 'provider/model'
 
