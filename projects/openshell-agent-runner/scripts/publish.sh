@@ -5,13 +5,12 @@
 set -euo pipefail
 
 PROJECT_DIRECTORY=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-PYPIRC_REPOSITORY="openshell-research"
 
 usage() {
     echo "Usage: $0 VERSION [--dry-run] [--allow-non-main] [--retry-artifact wheel|sdist|both]"
     echo
-    echo "Build and publish openshell-agent-runner using the '$PYPIRC_REPOSITORY'"
-    echo "repository configured in ~/.pypirc."
+    echo "Build and publish openshell-agent-runner to PyPI with uv."
+    echo "Publishing requires UV_PUBLISH_TOKEN in the current environment."
 }
 
 print_tag_deletion_instructions() {
@@ -154,11 +153,16 @@ if [[ ${#WHEELS[@]} -ne 1 || ${#SDISTS[@]} -ne 1 ]]; then
     exit 1
 fi
 ARTIFACTS=("${WHEELS[@]}" "${SDISTS[@]}")
-uv run --with twine python -m twine check "${ARTIFACTS[@]}"
+uv publish --dry-run --trusted-publishing never "${ARTIFACTS[@]}"
 
 if [[ "$DRY_RUN" == true ]]; then
     echo "Dry run complete; no tag was created and nothing was uploaded."
     exit 0
+fi
+
+if [[ -z "${UV_PUBLISH_TOKEN:-}" ]]; then
+    echo "publish: UV_PUBLISH_TOKEN is not set; export it before publishing" >&2
+    exit 1
 fi
 
 if [[ "$TAG_PUBLIC" != true ]]; then
@@ -173,10 +177,8 @@ elif [[ "$RETRY_ARTIFACT" == "sdist" ]]; then
     UPLOAD_ARTIFACTS=("${SDISTS[@]}")
 fi
 
-echo "Uploading openshell-agent-runner $VERSION with .pypirc repository '$PYPIRC_REPOSITORY'..."
-if ! uv run --with twine python -m twine upload \
-    --repository "$PYPIRC_REPOSITORY" \
-    "${UPLOAD_ARTIFACTS[@]}"; then
+echo "Uploading openshell-agent-runner $VERSION to PyPI with uv..."
+if ! uv publish --trusted-publishing never "${UPLOAD_ARTIFACTS[@]}"; then
     echo "publish: upload failed; identify the missing artifact or artifacts before retrying" >&2
     exit 1
 fi
