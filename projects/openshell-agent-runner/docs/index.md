@@ -1,21 +1,34 @@
 ---
-title: Run a single task with OpenShell Agent Runner
+title: Launch ephemeral agents with OpenShell Agent Runner
 description: Launch ephemeral agents for bounded tasks in CI and automated workflows.
 agent_markdown: true
 ---
 
-# Run a single task with OpenShell Agent Runner
+# Launch ephemeral agents with OpenShell Agent Runner (OAR)
 
 OpenShell Agent Runner (OAR) is a CLI for launching an ephemeral agent to
-accomplish one task. Each `oar run` creates an isolated OpenShell sandbox, starts
-Pi with the selected profile task, publishes one result, and removes the
-sandbox. The agent exists only for that run.
+accomplish one configurable task. Each `oar run` creates an isolated OpenShell
+sandbox, starts Pi with the selected profile, publishes one result, and removes
+the sandbox. The agent exists only for that run, making OAR well suited to CI
+jobs and other automated workflows.
+
+## Requirements
+
+- A checkout of this repository and [`uv`](https://docs.astral.sh/uv/).
+- OpenShell 0.0.111 or newer.
+- A running OpenShell gateway that the host can reach.
+- An OpenShell workspace and inference route configured for the profile's
+  model.
+
+OAR uses this existing OpenShell configuration. It does not create gateways,
+providers, inference routes, or credentials.
 
 ## Run the starter task
 
-Start from the repository root. You need OpenShell 0.0.111 or newer, a selected
-workspace, and an inference route for the profile's model. OAR uses this existing
-OpenShell configuration; it does not create gateways, providers, or credentials.
+Start from the repository root. Ready-to-run profiles are under
+`projects/openshell-agent-runner/profiles/`; the starter commands use the
+`reviewer` profile in that directory. Repository-specific CI profiles are under
+`.github/openshell-agents/profiles/`.
 
 Install the locked development environment and check the selected gateway:
 
@@ -158,11 +171,13 @@ and are not synchronized back to the host.
 Without `output_schema`, Pi's final headless response becomes the result. OAR
 requires it to be present, non-empty, and no larger than one MiB.
 
-With `output_schema`, OAR enables the generic `submit_result` Pi tool. The tool
-uses TypeBox for its Pi tool parameters and Ajv for Draft 2020-12 validation.
-Invalid submissions return diagnostics to Pi, which can correct and resubmit
-inside the same agent session. OAR validates the downloaded JSON against the
-same schema again before publishing it.
+With `output_schema`, OAR automatically loads its built-in Pi extension and
+adds the generic `submit_result` tool to the agent session. Profiles do not need
+to provide this extension themselves. The tool uses TypeBox for its Pi tool
+parameters and Ajv for Draft 2020-12 validation. Invalid submissions return
+diagnostics to Pi, which can correct and resubmit inside the same agent session.
+OAR validates the downloaded JSON against the same schema again before
+publishing it.
 
 Both validators treat extension keywords and JSON Schema `format` values as
 annotations. OAR rejects `pattern` and `patternProperties` because Python and
