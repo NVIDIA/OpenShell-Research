@@ -25,7 +25,7 @@
     
     
       
-        <title>Run a single task with OpenShell Agent Runner - OpenShell Research</title>
+        <title>Launch ephemeral agents with OpenShell Agent Runner - OpenShell Research</title>
       
     
     
@@ -100,7 +100,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#run-a-single-task-with-openshell-agent-runner" class="md-skip">
+        <a href="#launch-ephemeral-agents-with-openshell-agent-runner-oar" class="md-skip">
           Skip to content
         </a>
       
@@ -139,7 +139,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Run a single task with OpenShell Agent Runner
+              Launch ephemeral agents with OpenShell Agent Runner
             
           </span>
         </div>
@@ -1218,6 +1218,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Requirements
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#run-the-starter-task" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1421,15 +1432,27 @@
   </a>
 
 
-<h1 id="run-a-single-task-with-openshell-agent-runner">Run a single task with OpenShell Agent Runner</h1>
+<h1 id="launch-ephemeral-agents-with-openshell-agent-runner-oar">Launch ephemeral agents with OpenShell Agent Runner (OAR)</h1>
 <p>OpenShell Agent Runner (OAR) is a CLI for launching an ephemeral agent to
-accomplish one task. Each <code>oar run</code> creates an isolated OpenShell sandbox, starts
-Pi with the selected profile task, publishes one result, and removes the
-sandbox. The agent exists only for that run.</p>
+accomplish one configurable task. Each <code>oar run</code> creates an isolated OpenShell
+sandbox, starts Pi with the selected profile, publishes one result, and removes
+the sandbox. The agent exists only for that run, making OAR well suited to CI
+jobs and other automated workflows.</p>
+<h2 id="requirements">Requirements</h2>
+<ul>
+<li>A checkout of this repository and <a href="https://docs.astral.sh/uv/"><code>uv</code></a>.</li>
+<li>OpenShell 0.0.111 or newer.</li>
+<li>A running OpenShell gateway that the host can reach.</li>
+<li>An OpenShell workspace and inference route configured for the profile's
+  model.</li>
+</ul>
+<p>OAR uses this existing OpenShell configuration. It does not create gateways,
+providers, inference routes, or credentials.</p>
 <h2 id="run-the-starter-task">Run the starter task</h2>
-<p>Start from the repository root. You need OpenShell 0.0.111 or newer, a selected
-workspace, and an inference route for the profile's model. OAR uses this existing
-OpenShell configuration; it does not create gateways, providers, or credentials.</p>
+<p>Start from the repository root. Ready-to-run profiles are under
+<code>projects/openshell-agent-runner/profiles/</code>; the starter commands use the
+<code>reviewer</code> profile in that directory. Repository-specific CI profiles are under
+<code>.github/openshell-agents/profiles/</code>.</p>
 <p>Install the locked development environment and check the selected gateway:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>sync<span class="w"> </span>--project<span class="w"> </span>projects/openshell-agent-runner<span class="w"> </span>--locked
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uv<span class="w"> </span>run<span class="w"> </span>--project<span class="w"> </span>projects/openshell-agent-runner<span class="w"> </span>oar<span class="w"> </span>doctor<span class="w"> </span><span class="se">\</span>
@@ -1562,11 +1585,13 @@ and are not synchronized back to the host.</p>
 
 <p>Without <code>output_schema</code>, Pi's final headless response becomes the result. OAR
 requires it to be present, non-empty, and no larger than one MiB.</p>
-<p>With <code>output_schema</code>, OAR enables the generic <code>submit_result</code> Pi tool. The tool
-uses TypeBox for its Pi tool parameters and Ajv for Draft 2020-12 validation.
-Invalid submissions return diagnostics to Pi, which can correct and resubmit
-inside the same agent session. OAR validates the downloaded JSON against the
-same schema again before publishing it.</p>
+<p>With <code>output_schema</code>, OAR automatically loads its built-in Pi extension and
+adds the generic <code>submit_result</code> tool to the agent session. Profiles do not need
+to provide this extension themselves. The tool uses TypeBox for its Pi tool
+parameters and Ajv for Draft 2020-12 validation. Invalid submissions return
+diagnostics to Pi, which can correct and resubmit inside the same agent session.
+OAR validates the downloaded JSON against the same schema again before
+publishing it.</p>
 <p>Both validators treat extension keywords and JSON Schema <code>format</code> values as
 annotations. OAR rejects <code>pattern</code> and <code>patternProperties</code> because Python and
 JavaScript use different regular-expression dialects. Use portable structural
