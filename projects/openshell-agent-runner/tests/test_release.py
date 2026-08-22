@@ -120,8 +120,7 @@ def test_publish_retry_uploads_only_missing_artifacts(
             : > dist/openshell_agent_runner-0.1.0-py3-none-any.whl
             : > dist/openshell_agent_runner-0.1.0.tar.gz
         fi
-        if [[ "$*" == *"twine upload"* ]]; then
-            if [[ "$*" == *"--skip-existing"* ]]; then exit 92; fi
+        if [[ "$1" == "publish" && "$*" != *"--dry-run"* ]]; then
             if [[ "$*" == *".whl"* && "$*" == *".tar.gz"* ]]; then
                 if [[ ! -e "$FAKE_REPOSITORY_STATE/attempted" ]]; then
                     touch "$FAKE_REPOSITORY_STATE/attempted"
@@ -154,6 +153,7 @@ def test_publish_retry_uploads_only_missing_artifacts(
     environment["FAKE_GIT_STATE"] = str(git_state)
     environment["FAKE_REPOSITORY_STATE"] = str(repository_state)
     environment["FAKE_FIRST_ACCEPTS_WHEEL"] = str(first_accepts_wheel).lower()
+    environment["UV_PUBLISH_TOKEN"] = "test-token"
 
     first_attempt = subprocess.run(
         ["bash", str(script), "0.1.0"],
@@ -176,9 +176,11 @@ def test_publish_retry_uploads_only_missing_artifacts(
 
     assert retry.returncode == 0, retry.stderr
     assert (repository_state / "sdist").exists()
-    uploads = [
-        line for line in uv_log.read_text().splitlines() if "twine upload" in line
+    publish_commands = [
+        line for line in uv_log.read_text().splitlines() if line.startswith("publish ")
     ]
+    assert all("--trusted-publishing never" in line for line in publish_commands)
+    uploads = [line for line in publish_commands if "--dry-run" not in line]
     assert ".whl" in uploads[0] and ".tar.gz" in uploads[0]
     assert (".whl" in uploads[1]) is (retry_artifact == "both")
     assert ".tar.gz" in uploads[1]

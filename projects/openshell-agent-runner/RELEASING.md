@@ -1,11 +1,17 @@
 # Releasing openshell-agent-runner
 
-The release process follows DataDesigner's local PyPI publishing pattern. A
-version tag supplies the package version, and Twine uses the
-`openshell-research` repository already configured in `~/.pypirc`.
+The release process publishes to PyPI from a local shell. A version tag supplies
+the package version, and `uv publish` uploads the built distributions.
 
-The publishing script does not inspect or print `.pypirc`. Twine reads that file
-only when an upload is performed.
+Set a PyPI API token in the shell before publishing:
+
+```bash
+export UV_PUBLISH_TOKEN="pypi-..."
+```
+
+The script reads the token from the environment and never prints it. It does not
+use `.pypirc`. If the export is in `~/.bashrc`, open an interactive shell or
+source that file before running `make publish`.
 
 ## Validate a release
 
@@ -16,9 +22,11 @@ make publish VERSION=0.1.0 DRY_RUN=1
 ```
 
 The dry run fetches `origin/main` and tags, confirms that local `main` is current,
-runs the project validation suite, and builds the requested version. It verifies
-one wheel and one source distribution with Twine. The temporary local tag is
-removed before the command exits; nothing is pushed or uploaded.
+runs the project validation suite, and builds the requested version. It checks
+one wheel and one source distribution with `uv publish --dry-run`. Trusted
+publishing is disabled because this workflow is intentionally local. The
+temporary local tag is removed before the command exits; nothing is pushed or
+uploaded.
 
 To validate or publish deliberately from another branch, add
 `ALLOW_NON_MAIN=1`:
@@ -43,13 +51,12 @@ The script:
 
 1. Fetches `origin/main` and tags and confirms that local `main` is current.
 2. Runs the same checks and builds version `0.1.0` from the local tag.
-3. Verifies the exact wheel and source distribution with Twine.
+3. Checks the exact wheel and source distribution with `uv publish --dry-run`.
 4. Pushes `v0.1.0`, establishing the public source commit before publication.
-5. Uploads only those two artifacts through the `openshell-research` `.pypirc`
-   repository.
+5. Uploads only those two artifacts to PyPI with `uv publish`.
 
-If the upload fails after the tag is pushed, check the repository or Twine log
-to identify which artifacts are missing. Retry a missing artifact with:
+If the upload fails after the tag is pushed, check the `uv publish` output or
+PyPI to identify which artifacts are missing. Retry a missing artifact with:
 
 ```bash
 make publish VERSION=0.1.0 RETRY_ARTIFACT=sdist
