@@ -5,6 +5,7 @@
 set -euo pipefail
 
 PROJECT_DIRECTORY=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+PYPI_PROJECT_URL="https://pypi.org/project/openshell-agent-runner"
 
 usage() {
     echo "Usage: $0 VERSION [--dry-run] [--allow-non-main] [--retry-artifact wheel|sdist|both]"
@@ -188,3 +189,4 @@ if [[ "$RETRY_ARTIFACT" == "wheel" || "$RETRY_ARTIFACT" == "sdist" ]]; then
 else
     echo "Published openshell-agent-runner $VERSION from $TAG."
 fi
+echo "PyPI: $PYPI_PROJECT_URL/$VERSION/"

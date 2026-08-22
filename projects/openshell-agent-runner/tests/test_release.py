@@ -184,6 +184,9 @@ def test_publish_retry_uploads_only_missing_artifacts(
     assert ".whl" in uploads[0] and ".tar.gz" in uploads[0]
     assert (".whl" in uploads[1]) is (retry_artifact == "both")
     assert ".tar.gz" in uploads[1]
+    assert (
+        "PyPI: https://pypi.org/project/openshell-agent-runner/0.1.0/" in retry.stdout
+    )
     if retry_artifact == "sdist":
         assert "Uploaded the missing sdist artifact" in retry.stdout
         assert "Published openshell-agent-runner" not in retry.stdout

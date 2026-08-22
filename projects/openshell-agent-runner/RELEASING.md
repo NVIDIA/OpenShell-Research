@@ -54,6 +54,7 @@ The script:
 3. Checks the exact wheel and source distribution with `uv publish --dry-run`.
 4. Pushes `v0.1.0`, establishing the public source commit before publication.
 5. Uploads only those two artifacts to PyPI with `uv publish`.
+6. Prints the version-specific PyPI project link.
 
 If the upload fails after the tag is pushed, check the `uv publish` output or
 PyPI to identify which artifacts are missing. Retry a missing artifact with:
