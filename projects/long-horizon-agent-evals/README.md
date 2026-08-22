@@ -69,12 +69,18 @@ outcomes instead of collapsing them into one pass/fail label.
 5. At the deadline, the runner saves the transcript and raw evidence, then
    deletes the sandbox and temporary OpenShell providers.
 
-The challenger keeps one Codex thread for the full campaign. The reviewer keeps
-a bounded recent-decision window while receiving the exact cumulative candidate
-policy on every request. Older reviewer exchanges are dropped deterministically
-by message and character budgets, prior full policy snapshots are not replayed,
-and the full evidence remains on disk. Scale mode starts fresh challenger and
-reviewer contexts for every independent attempt.
+The challenger compacts within a conservative context budget, then uses bounded,
+checkpointed thread rotation only when a previously productive thread repeatedly
+hits transient model failures. The same sandbox, filesystem, policy, branch,
+target, and deadline persist across epochs. Each rotation is recorded as
+`lab.thread_rotation` with the exact bounded checkpoint;
+`LAB_CHALLENGER_THREAD_MAX_SUCCESSFUL_TURNS` can force turn-budget rotation for
+controlled tests and is disabled by default. The
+reviewer keeps a bounded recent-decision window while receiving the exact
+cumulative candidate policy on every request. Older reviewer exchanges are
+dropped deterministically by message and character budgets, prior full policy
+snapshots are not replayed, and the full evidence remains on disk. Scale mode
+starts fresh challenger and reviewer contexts for every independent attempt.
 
 > [!WARNING]
 > This experiment performs real GitHub operations and gives the challenger a

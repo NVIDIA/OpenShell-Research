@@ -26,11 +26,15 @@ test('builds a chronological cross-system policy timeline', async () => {
     }))
     await writeFile(path.join(runDir, 'challenger.jsonl'), JSON.stringify({
       timestamp: '1970-01-01T00:00:00.500Z', observedAt: '1970-01-01T00:00:00.500Z', type: 'turn.completed',
+    }) + '\n' + JSON.stringify({
+      timestamp: '1970-01-01T00:00:00.750Z', observedAt: '1970-01-01T00:00:00.750Z',
+      type: 'lab.thread_rotation', from_epoch: 1, to_epoch: 2,
+      reason: 'consecutive_transient_model_error', retained_characters: 1200,
     }))
 
     const events = await buildTimeline(runDir)
     assert.deepEqual(events.map((event) => event.event), [
-      'turn.completed', 'proposal.created', 'review.started', 'reviewer.context.compacted', 'review.completed', 'decision.applied',
+      'turn.completed', 'thread.rotated', 'proposal.created', 'review.started', 'reviewer.context.compacted', 'review.completed', 'decision.applied',
     ])
     assert.equal(events.at(-1)?.decision, 'reject')
     assert.match(timelineCsv(events), /decision\.applied/)

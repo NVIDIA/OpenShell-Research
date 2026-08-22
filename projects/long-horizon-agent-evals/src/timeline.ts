@@ -58,6 +58,12 @@ function challengerSummary(record: JsonRecord): { event: string; summary: string
   if (record.type === 'lab.backoff') {
     return { event: 'model.backoff', summary: `${String(record.reason ?? 'transient error')}; delay ${String(record.delay_ms ?? '?')} ms` }
   }
+  if (record.type === 'lab.thread_rotation') {
+    return {
+      event: 'thread.rotated',
+      summary: `Epoch ${String(record.from_epoch ?? '?')} → ${String(record.to_epoch ?? '?')}; ${String(record.reason ?? 'recovery')}; retained ${String(record.retained_characters ?? '?')} characters`,
+    }
+  }
   if (record.type === 'lab.unparsed_stdout') return { event: 'stdout.unparsed', summary: bounded(record.text) }
   if (record.type !== 'item.completed' || !record.item || typeof record.item !== 'object') return undefined
   const item = record.item as JsonRecord

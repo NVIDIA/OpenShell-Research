@@ -320,6 +320,15 @@ async function main(): Promise<void> {
   const reviewerReasoning = process.env.LAB_REVIEWER_REASONING || challengerReasoning
   const reviewerHistoryMaxMessages = integer('LAB_REVIEWER_HISTORY_MAX_MESSAGES', 16)
   const reviewerHistoryMaxCharacters = integer('LAB_REVIEWER_HISTORY_MAX_CHARACTERS', 240_000)
+  const challengerContextWindow = integer('LAB_CHALLENGER_CONTEXT_WINDOW', 128_000)
+  const challengerEffectiveContextPercent = integer('LAB_CHALLENGER_EFFECTIVE_CONTEXT_PERCENT', 80)
+  if (challengerEffectiveContextPercent > 100) throw new Error('LAB_CHALLENGER_EFFECTIVE_CONTEXT_PERCENT must be at most 100')
+  const challengerThreadRotateAfterFailures = integer('LAB_CHALLENGER_THREAD_ROTATE_AFTER_FAILURES', 3)
+  const challengerMaxThreadRotations = integer('LAB_CHALLENGER_MAX_THREAD_ROTATIONS', 6)
+  const challengerThreadMaxSuccessfulTurns = process.env.LAB_CHALLENGER_THREAD_MAX_SUCCESSFUL_TURNS
+    ? integer('LAB_CHALLENGER_THREAD_MAX_SUCCESSFUL_TURNS', 1)
+    : 0
+  const challengerHandoffMaxCharacters = integer('LAB_CHALLENGER_HANDOFF_MAX_CHARACTERS', 24_000)
   const challengerEndpoint = responsesEndpoint(challengerResponsesUrl)
   const responsesProfileId = `long-horizon-responses-${createHash('sha256')
     .update(`${challengerEndpoint.host}:${challengerEndpoint.port}`)
@@ -458,6 +467,16 @@ async function main(): Promise<void> {
         maxCharacters: reviewerHistoryMaxCharacters,
         authoritativeState: 'candidateEffectivePolicy',
       },
+      challengerContext: {
+        strategy: 'compact_then_checkpointed_rotation',
+        contextWindow: challengerContextWindow,
+        effectiveContextPercent: challengerEffectiveContextPercent,
+        rotateAfterConsecutiveFailures: challengerThreadRotateAfterFailures,
+        maxRotations: challengerMaxThreadRotations,
+        maxSuccessfulTurnsPerThread: challengerThreadMaxSuccessfulTurns || null,
+        handoffMaxCharacters: challengerHandoffMaxCharacters,
+        persistentState: ['sandbox', 'filesystem', 'effectivePolicy', 'githubBranch', 'target', 'deadline'],
+      },
       runtime: { node: process.version, openshellSdk: sdkPackage.version, sandboxImage },
       clientGuidance: { githubProviderSkill: 'replaced with neutral tool guidance by scripts/challenger.sh' },
     })
@@ -531,6 +550,12 @@ async function main(): Promise<void> {
           LAB_MODEL_BACKOFF_BASE_SECONDS: process.env.LAB_MODEL_BACKOFF_BASE_SECONDS ?? '15',
           LAB_MODEL_BACKOFF_MAX_SECONDS: process.env.LAB_MODEL_BACKOFF_MAX_SECONDS ?? '120',
           LAB_MODEL_REQUEST_TIMEOUT_SECONDS: process.env.LAB_MODEL_REQUEST_TIMEOUT_SECONDS ?? '300',
+          LAB_CHALLENGER_CONTEXT_WINDOW: String(challengerContextWindow),
+          LAB_CHALLENGER_EFFECTIVE_CONTEXT_PERCENT: String(challengerEffectiveContextPercent),
+          LAB_CHALLENGER_THREAD_ROTATE_AFTER_FAILURES: String(challengerThreadRotateAfterFailures),
+          LAB_CHALLENGER_MAX_THREAD_ROTATIONS: String(challengerMaxThreadRotations),
+          LAB_CHALLENGER_THREAD_MAX_SUCCESSFUL_TURNS: String(challengerThreadMaxSuccessfulTurns),
+          LAB_CHALLENGER_HANDOFF_MAX_CHARACTERS: String(challengerHandoffMaxCharacters),
         },
       })) {
         if ('type' in event) exitCode = event.exitCode
@@ -591,6 +616,7 @@ async function main(): Promise<void> {
     const challengerEvents = await readJsonl(agentStdout)
     const reviewerEvents = await readJsonl(path.join(runDir, 'reviewer-process.jsonl'))
     const challengerTurnCount = challengerEvents.filter((event) => event.type === 'turn.completed').length
+    const challengerThreadRotationCount = challengerEvents.filter((event) => event.type === 'lab.thread_rotation').length
     const challengerBackoffs = challengerEvents.filter((event) => event.type === 'lab.backoff' && event.source === 'challenger')
     const reviewerBackoffs = reviewerEvents.filter((event) => event.event === 'review_retry')
     const challengerBackoffMs = challengerBackoffs.reduce((sum, event) => sum + (typeof event.delay_ms === 'number' ? event.delay_ms : 0), 0)
@@ -654,6 +680,7 @@ async function main(): Promise<void> {
       requiresAdjudication,
       reviewerFailureCount,
       challengerTurnCount,
+      challengerThreadRotationCount,
       githubSha: githubResult.sha,
       initialBranchSha,
       finalBranchSha,
@@ -684,6 +711,7 @@ async function main(): Promise<void> {
       reviewerApplyFailureCount,
       requiresAdjudication,
       challengerTurnCount,
+      challengerThreadRotationCount,
       pendingAfterSettle,
       exitCode,
       challengerError,
@@ -705,6 +733,7 @@ async function main(): Promise<void> {
       reviewerApplyFailureCount,
       requiresAdjudication,
       challengerTurnCount,
+      challengerThreadRotationCount,
       pendingAfterSettle,
       modelAvailability,
       estimatedCostUsd: usage.estimatedCostUsd,

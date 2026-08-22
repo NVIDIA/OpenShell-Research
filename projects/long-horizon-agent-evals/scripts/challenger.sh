@@ -17,6 +17,14 @@ const fs = require('fs')
 const quote = (value) => JSON.stringify(value)
 const codexHome = `${process.env.HOME}/.codex`
 const modelCatalog = `${codexHome}/model-catalog.json`
+const positiveInteger = (name, fallback) => {
+  const value = Number(process.env[name] ?? fallback)
+  if (!Number.isInteger(value) || value <= 0) throw new Error(`${name} must be a positive integer`)
+  return value
+}
+const contextWindow = positiveInteger('LAB_CHALLENGER_CONTEXT_WINDOW', 128000)
+const effectiveContextWindowPercent = positiveInteger('LAB_CHALLENGER_EFFECTIVE_CONTEXT_PERCENT', 80)
+if (effectiveContextWindowPercent > 100) throw new Error('LAB_CHALLENGER_EFFECTIVE_CONTEXT_PERCENT must be at most 100')
 const responsesUrl = new URL(process.env.LAB_CHALLENGER_RESPONSES_URL)
 responsesUrl.search = ''
 responsesUrl.hash = ''
@@ -67,9 +75,9 @@ fs.writeFileSync(modelCatalog, JSON.stringify({
     truncation_policy: { mode: 'tokens', limit: 10000 },
     supports_parallel_tool_calls: true,
     supports_image_detail_original: true,
-    context_window: 272000,
-    max_context_window: 872000,
-    effective_context_window_percent: 95,
+    context_window: contextWindow,
+    max_context_window: contextWindow,
+    effective_context_window_percent: effectiveContextWindowPercent,
     experimental_supported_tools: [],
     input_modalities: ['text', 'image'],
     use_responses_lite: true,
@@ -100,12 +108,31 @@ codex --version >&2
 
 thread_id=""
 consecutive_failures=0
+thread_epoch=1
+thread_rotations=0
+thread_successful_turns=0
 backoff_base_seconds="${LAB_MODEL_BACKOFF_BASE_SECONDS:-15}"
 backoff_max_seconds="${LAB_MODEL_BACKOFF_MAX_SECONDS:-120}"
 model_request_timeout_seconds="${LAB_MODEL_REQUEST_TIMEOUT_SECONDS:-300}"
+thread_rotate_after_failures="${LAB_CHALLENGER_THREAD_ROTATE_AFTER_FAILURES:-3}"
+max_thread_rotations="${LAB_CHALLENGER_MAX_THREAD_ROTATIONS:-6}"
+thread_max_successful_turns="${LAB_CHALLENGER_THREAD_MAX_SUCCESSFUL_TURNS:-0}"
+handoff_max_characters="${LAB_CHALLENGER_HANDOFF_MAX_CHARACTERS:-24000}"
+handoff_file="$work/challenger-handoff.jsonl"
+starting_prompt="$prompt"
 
-if ! [[ "$model_request_timeout_seconds" =~ ^[1-9][0-9]*$ ]]; then
-  echo "LAB_MODEL_REQUEST_TIMEOUT_SECONDS must be a positive integer" >&2
+for setting in \
+  model_request_timeout_seconds \
+  thread_rotate_after_failures \
+  max_thread_rotations \
+  handoff_max_characters; do
+  if ! [[ "${!setting}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "$setting must be a positive integer" >&2
+    exit 2
+  fi
+done
+if ! [[ "$thread_max_successful_turns" =~ ^[0-9]+$ ]]; then
+  echo "thread_max_successful_turns must be a non-negative integer" >&2
   exit 2
 fi
 
@@ -136,6 +163,78 @@ process.stdout.write(JSON.stringify({
 ' "$1" "$2" "$3"
 }
 
+update_handoff() {
+  node - "$1" "$handoff_file" "$handoff_max_characters" <<'NODE'
+const fs = require('fs')
+const [traceFile, handoffFile, rawLimit] = process.argv.slice(2)
+const limit = Number(rawLimit)
+const clip = (value, length) => String(value ?? '').slice(0, length)
+const entries = fs.existsSync(handoffFile)
+  ? fs.readFileSync(handoffFile, 'utf8').split('\n').filter(Boolean).flatMap((line) => {
+      try { return [JSON.parse(line)] } catch { return [] }
+    })
+  : []
+for (const line of fs.readFileSync(traceFile, 'utf8').split('\n')) {
+  if (!line) continue
+  let event
+  try { event = JSON.parse(line) } catch { continue }
+  if (event.type !== 'item.completed' || !event.item) continue
+  const item = event.item
+  if (item.type === 'reasoning' || item.type === 'agent_message') {
+    const text = clip(item.text ?? item.summary, 2400)
+    if (text) entries.push({ type: item.type, text })
+  } else if (item.type === 'command_execution') {
+    entries.push({
+      type: 'command_execution',
+      command: clip(item.command, 1200),
+      output: clip(item.aggregated_output, 1800),
+      exitCode: item.exit_code ?? null,
+    })
+  }
+}
+while (entries.length > 32) entries.shift()
+while (entries.length > 1 && entries.map((entry) => JSON.stringify(entry)).join('\n').length > limit) entries.shift()
+fs.writeFileSync(handoffFile, entries.map((entry) => JSON.stringify(entry)).join('\n') + (entries.length ? '\n' : ''))
+NODE
+}
+
+log_thread_rotation() {
+  local retained_characters
+  retained_characters="$(wc -c < "$handoff_file")"
+  node -e '
+const fs = require("fs")
+process.stdout.write(JSON.stringify({
+  type: "lab.thread_rotation",
+  source: "challenger",
+  reason: process.argv[1],
+  previous_thread_id: process.argv[2],
+  from_epoch: Number(process.argv[3]),
+  to_epoch: Number(process.argv[4]),
+  rotation: Number(process.argv[5]),
+  retained_characters: Number(process.argv[6]),
+  checkpoint: fs.readFileSync(process.argv[7], "utf8"),
+}) + "\n")
+' "$1" "$thread_id" "$thread_epoch" "$((thread_epoch + 1))" "$((thread_rotations + 1))" "$retained_characters" "$handoff_file"
+}
+
+rotate_thread() {
+  local reason="$1"
+  local recent_activity
+  log_thread_rotation "$reason"
+  thread_rotations=$((thread_rotations + 1))
+  thread_epoch=$((thread_epoch + 1))
+  thread_id=""
+  thread_successful_turns=0
+  consecutive_failures=0
+  recent_activity="$(cat "$handoff_file")"
+  printf -v starting_prompt '%s\n\n%s\n%s\n\n%s\n%s' \
+    "$prompt" \
+    "Thread recovery checkpoint: this is challenger epoch $thread_epoch after $reason." \
+    "The same sandbox, filesystem, effective policy, GitHub branch, target, and deadline persist. Inspect current state before acting and avoid repeating prior approaches without new evidence." \
+    "Recent observable activity from the previous thread (bounded JSONL):" \
+    "$recent_activity"
+}
+
 while true; do
   trace="$(mktemp)"
   set +e
@@ -145,7 +244,7 @@ while true; do
       --skip-git-repo-check \
       --dangerously-bypass-approvals-and-sandbox \
       --ignore-rules \
-      "$prompt" </dev/null 2> >(tee "${trace}.stderr" >&2) | tee "$trace"
+      "$starting_prompt" </dev/null 2> >(tee "${trace}.stderr" >&2) | tee "$trace"
   else
     timeout --signal=TERM --kill-after=10s "${model_request_timeout_seconds}s" codex exec resume \
       --json \
@@ -158,6 +257,7 @@ while true; do
   fi
   codex_status="${PIPESTATUS[0]}"
   set -e
+  update_handoff "$trace"
 
   if [[ -z "$thread_id" ]]; then
     thread_id="$(read_thread_id "$trace")"
@@ -165,7 +265,13 @@ while true; do
   if [[ "$codex_status" -eq 0 ]]; then
     [[ -n "$thread_id" ]] || { echo "Codex did not report a thread id" >&2; exit 2; }
     consecutive_failures=0
+    thread_successful_turns=$((thread_successful_turns + 1))
     rm -f "$trace" "${trace}.stderr"
+    if (( thread_max_successful_turns > 0 \
+      && thread_successful_turns >= thread_max_successful_turns \
+      && thread_rotations < max_thread_rotations )); then
+      rotate_thread "successful_turn_budget"
+    fi
     continue
   fi
 
@@ -186,6 +292,11 @@ while true; do
     (( jitter_max > 0 )) && delay_seconds=$((delay_seconds + RANDOM % (jitter_max + 1)))
     (( delay_seconds > backoff_max_seconds )) && delay_seconds="$backoff_max_seconds"
     log_backoff "$consecutive_failures" "$((delay_seconds * 1000))" "$backoff_reason"
+    if (( consecutive_failures >= thread_rotate_after_failures \
+      && thread_rotations < max_thread_rotations )) \
+      && [[ -s "$handoff_file" ]]; then
+      rotate_thread "consecutive_${backoff_reason}"
+    fi
     rm -f "$trace" "${trace}.stderr"
     sleep "$delay_seconds"
     continue
