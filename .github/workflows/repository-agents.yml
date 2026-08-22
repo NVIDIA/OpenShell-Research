@@ -118,11 +118,12 @@ jobs:
             --tag openshell-agent-runner-pi:ci \
             projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/image
           docker run --rm \
-            --entrypoint pi \
-            --env PI_CODING_AGENT_DIR=/profile \
-            --volume "$RUNNER_TEMP/profiles/reviewer:/profile" \
+            --entrypoint bash \
+            --volume "$RUNNER_TEMP/profiles/reviewer:/profile-source:ro" \
             openshell-agent-runner-pi:ci \
-            --offline --list-models openshell | grep -F 'provider/model'
+            -c "cp -R /profile-source /tmp/profile && \
+              PI_CODING_AGENT_DIR=/tmp/profile pi --offline --list-models openshell" \
+            | grep -F 'provider/model'
 
       - name: Compile the submission extension
         if: matrix.python-version == '3.12'
