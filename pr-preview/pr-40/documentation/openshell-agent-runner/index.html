@@ -1440,38 +1440,45 @@ the sandbox. The agent exists only for that run, making OAR well suited to CI
 jobs and other automated workflows.</p>
 <h2 id="requirements">Requirements</h2>
 <ul>
-<li>A checkout of this repository and <a href="https://docs.astral.sh/uv/"><code>uv</code></a>.</li>
+<li><a href="https://docs.astral.sh/uv/"><code>uv</code></a>.</li>
 <li>OpenShell 0.0.111 or newer.</li>
 <li>A running OpenShell gateway that the host can reach.</li>
-<li>An OpenShell workspace and inference route configured for the profile's
-  model.</li>
+<li>An inference route and its model ID.</li>
 </ul>
 <p>OAR uses this existing OpenShell configuration. It does not create gateways,
-providers, inference routes, or credentials.</p>
+providers, workspaces, inference routes, or credentials. It uses the gateway's
+<code>default</code> workspace unless you select another one. An OpenShell workspace is a
+gateway-side namespace for sandboxes, inference routes, and access controls; it
+is not the <code>/workspace</code> directory inside a sandbox.</p>
 <h2 id="run-the-starter-task">Run the starter task</h2>
-<p>Start from the repository root. Ready-to-run profiles are under
-<code>projects/openshell-agent-runner/profiles/</code>; the starter commands use the
-<code>reviewer</code> profile in that directory. Repository-specific CI profiles are under
-<code>.github/openshell-agents/profiles/</code>.</p>
-<p>Install the locked development environment and check the selected gateway:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>sync<span class="w"> </span>--project<span class="w"> </span>projects/openshell-agent-runner<span class="w"> </span>--locked
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>uv<span class="w"> </span>run<span class="w"> </span>--project<span class="w"> </span>projects/openshell-agent-runner<span class="w"> </span>oar<span class="w"> </span>doctor<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--gateway<span class="w"> </span>openshell
+<p>Choose the model ID configured on your inference route. Create every profile
+packaged with OAR, then check the gateway:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MODEL_ID</span><span class="o">=</span><span class="s2">"provider/model"</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>uvx<span class="w"> </span>--from<span class="w"> </span>openshell-agent-runner<span class="w"> </span>oar<span class="w"> </span>init<span class="w"> </span>./profiles<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--model<span class="w"> </span><span class="s2">"</span><span class="nv">$MODEL_ID</span><span class="s2">"</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>uvx<span class="w"> </span>--from<span class="w"> </span>openshell-agent-runner<span class="w"> </span>oar<span class="w"> </span>doctor<span class="w"> </span>--gateway<span class="w"> </span>openshell
 </span></code></pre></div>
 <p>Validate the included profile, then preview the run without creating a sandbox:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>run<span class="w"> </span>--project<span class="w"> </span>projects/openshell-agent-runner<span class="w"> </span>oar<span class="w"> </span>validate<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>projects/openshell-agent-runner/profiles/reviewer
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>uv<span class="w"> </span>run<span class="w"> </span>--project<span class="w"> </span>projects/openshell-agent-runner<span class="w"> </span>oar<span class="w"> </span>run<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span>projects/openshell-agent-runner/profiles/reviewer<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span>--task<span class="w"> </span>review<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span>--gateway<span class="w"> </span>openshell<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span>--input<span class="w"> </span>README.md<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span>--output<span class="w"> </span>/tmp/oar-review.md<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span>--dry-run
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uvx<span class="w"> </span>--from<span class="w"> </span>openshell-agent-runner<span class="w"> </span>oar<span class="w"> </span>validate<span class="w"> </span>./profiles/reviewer
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>uvx<span class="w"> </span>--from<span class="w"> </span>openshell-agent-runner<span class="w"> </span>oar<span class="w"> </span>run<span class="w"> </span>./profiles/reviewer<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>--task<span class="w"> </span>review<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span>--gateway<span class="w"> </span>openshell<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span>--input<span class="w"> </span>README.md<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span>--output<span class="w"> </span>/tmp/oar-review.md<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span>--dry-run
 </span></code></pre></div>
 <p>Remove <code>--dry-run</code> to launch the agent. A successful run writes the review to
-<code>/tmp/oar-review.md</code>. Replace <code>openshell</code> if your gateway has a different name.</p>
+<code>/tmp/oar-review.md</code>. Replace <code>provider/model</code> with the route's model ID and
+<code>openshell</code> with your gateway name.</p>
+<p><code>init</code> copies packaged profiles into an ordinary local directory so they can be
+inspected, edited, and committed. Omit <code>--profile</code> to create all packaged
+profiles. Use repeatable <code>--profile NAME</code> options to select a subset. The
+required <code>--model</code> value is written into Pi's model registry and runtime
+selection; OAR does not read <code>MODEL_ID</code> implicitly. Use <code>--thinking LEVEL</code> to
+override the default <code>high</code> thinking level, or <code>--thinking off</code> when the model
+does not support reasoning.</p>
 <h2 id="why-oar-fits-ci">Why OAR fits CI</h2>
 <p>This bounded lifecycle is designed for CI and other automated workflows: a job
 can provide explicit inputs, run one review or transformation, consume the
@@ -1507,7 +1514,9 @@ not provision providers or credentials.</p>
 <li><code>--input FILE</code> is an optional document-task convenience. OAR uploads the file
   to <code>/workspace/input/document.md</code> and sets <code>REPOSITORY_ROOT=/workspace/input</code>.</li>
 <li><code>--env KEY=VALUE</code> adds a sandbox environment value.</li>
-<li><code>--gateway</code> and <code>--workspace</code> select existing OpenShell state.</li>
+<li><code>--gateway</code> selects an existing OpenShell gateway.</li>
+<li><code>--workspace</code> selects a gateway-side OpenShell namespace. It defaults to
+  <code>default</code> and is unrelated to the sandbox's <code>/workspace</code> directory.</li>
 <li><code>--output</code> selects the host result path.</li>
 <li><code>--timeout-seconds</code> limits the agent run.</li>
 </ul>
