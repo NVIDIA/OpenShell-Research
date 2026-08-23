@@ -24,6 +24,22 @@ def test_multiple_prompt_variables_are_rendered_literally() -> None:
     )
 
 
+def test_repeated_placeholders_render_complex_values_once() -> None:
+    template = "First: {{ value }}\nSecond: {{value}}\n"
+    value = "--flag=a=b\nUnicode: café\nLiteral: {{ oar.input_path }}"
+
+    assert render_prompt_template(template, {"value": value}) == (
+        f"First: {value}\nSecond: {value}\n"
+    )
+
+
+@pytest.mark.parametrize("template", ["", "No variables here.\n"])
+def test_templates_without_placeholders_are_unchanged(template: str) -> None:
+    validate_prompt_template(template, set(), set())
+
+    assert render_prompt_template(template, {}) == template
+
+
 def test_prompt_template_validation_rejects_unknown_and_unused_variables() -> None:
     with pytest.raises(ValueError, match="unknown.*missing"):
         validate_prompt_template("{{ missing }}", set(), set())
@@ -36,3 +52,16 @@ def test_prompt_template_rejects_missing_values_and_malformed_placeholders() -> 
         render_prompt_template("{{ focus }}", {})
     with pytest.raises(ValueError, match="malformed"):
         render_prompt_template("{{ focus-name }}", {"focus-name": "value"})
+
+
+@pytest.mark.parametrize(
+    "template",
+    [
+        "Unclosed {{ focus",
+        "Unopened focus }}",
+        "Literal syntax {{ example-name }}",
+    ],
+)
+def test_unescaped_double_braces_are_rejected(template: str) -> None:
+    with pytest.raises(ValueError, match="malformed"):
+        render_prompt_template(template, {})

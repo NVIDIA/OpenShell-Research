@@ -68,7 +68,11 @@ if operation == "create":
     if os.environ.get("FAKE_FAIL_CREATE") == "1": sys.exit(1)
     if os.environ.get("FAKE_SLEEP_CREATE") == "1":
         import time; time.sleep(5)
-elif operation in {"upload", "exec"}:
+elif operation == "upload":
+    if args[4] == "/sandbox/oar-runtime/prompt.md":
+        capture = log.with_name("uploaded-prompt.md")
+        capture.write_text(pathlib.Path(args[3]).read_text())
+elif operation == "exec":
     pass
 elif operation == "get":
     if not state.exists(): sys.exit(1)
@@ -129,6 +133,57 @@ def test_create_download_owned_delete_order(tmp_path: Path, monkeypatch) -> None
     assert operations[0] == "create"
     assert operations.count("upload") == 8
     assert operations[-4:] == ["exec", "download", "get", "delete"]
+
+
+def test_run_agent_renders_complete_prompt_variable_context(
+    tmp_path: Path, monkeypatch
+) -> None:
+    profile, executable, state, log = prepare(tmp_path, monkeypatch)
+    document = tmp_path / "brief.txt"
+    document.write_text("Review me.\n")
+    (profile / "prompt.md").write_text(
+        """Input: {{ oar.input_path }}
+Name: {{ oar.input_name }}
+Focus one: {{ focus }}
+Focus two: {{focus}}
+Context: {{ context }}
+"""
+    )
+    (profile / "profile.yaml").write_text(
+        """id: test
+description: Fake templated profile.
+sandbox:
+  policy: policy.yaml
+tasks:
+  smoke:
+    required_input: document
+    prompt: prompt.md
+    prompt_variables:
+      focus:
+        description: Required review focus.
+      context:
+        description: Optional review context.
+        default: Default context.
+    output_schema: output.schema.json
+"""
+    )
+    focus = "--src/auth\nUnicode: café = {{ context }}"
+    item = replace(
+        request(profile, executable, tmp_path / "result.json"),
+        input_path=document,
+        prompt_variables=(f"focus={focus}",),
+    )
+
+    run_agent(item)
+
+    assert not state.exists()
+    assert log.with_name("uploaded-prompt.md").read_text() == (
+        "Input: /workspace/input/document.txt\n"
+        "Name: brief.txt\n"
+        f"Focus one: {focus}\n"
+        f"Focus two: {focus}\n"
+        "Context: Default context.\n"
+    )
 
 
 def test_resolved_command_is_the_create_prefix(tmp_path: Path, monkeypatch) -> None:
