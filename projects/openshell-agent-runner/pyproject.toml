@@ -51,6 +51,7 @@ source = "uv-dynamic-versioning"
 [tool.uv-dynamic-versioning]
 vcs = "git"
 style = "pep440"
+pattern-prefix = "oar-"
 bump = true
 
 [tool.hatch.build.targets.wheel]

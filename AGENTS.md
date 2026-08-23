@@ -34,6 +34,8 @@ read `docs/development/index.md`.
   workflow is documented; regenerate exports with `uv`, never by hand.
 - Never commit credentials or populated `.env` files. Document configuration in
   `.env.example`.
+- Namespace release tags with a project label so versions from different
+  projects do not collide. OpenShell Agent Runner tags use `oar-vX.Y.Z`.
 - Do not hand-edit generated Dev Notes cards, bylines, or navigation; use
   `python3 scripts/render-dev-notes.py`.
 - Do not hand-edit generated project-documentation mirrors under
