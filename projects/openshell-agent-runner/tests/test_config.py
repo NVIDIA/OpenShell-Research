@@ -28,7 +28,40 @@ def test_packaged_profile_validates() -> None:
     assert resolved.profile.id == "reviewer"
     assert resolved.runtime.model == "MODEL_ID"
     assert resolved.runtime.thinking == "high"
-    assert resolved.profile.tasks["review"].required_input == "document"
+    assert list(resolved.profile.tasks) == ["review-document", "review-repository"]
+    assert resolved.profile.tasks["review-document"].required_input == "document"
+    assert resolved.profile.tasks["review-repository"].required_input == "repository"
+
+
+def test_unknown_required_input_is_rejected(tmp_path: Path) -> None:
+    _write_profile(tmp_path, task="required_input: archive")
+
+    with pytest.raises(ConfigurationError, match="required_input"):
+        load_profile(tmp_path)
+
+
+def test_prompt_variables_must_be_declared_and_used(tmp_path: Path) -> None:
+    _write_profile(
+        tmp_path,
+        task="""prompt_variables:
+      focus:
+        description: Review focus.""",
+    )
+
+    with pytest.raises(ConfigurationError, match="unused.*focus"):
+        load_profile(tmp_path)
+
+    (tmp_path / "prompt.md").write_text("Review {{ unknown }}.\n")
+    with pytest.raises(ConfigurationError, match="unknown.*unknown"):
+        load_profile(tmp_path)
+
+
+def test_input_prompt_builtins_require_a_task_input(tmp_path: Path) -> None:
+    _write_profile(tmp_path)
+    (tmp_path / "prompt.md").write_text("Review {{ oar.input_path }}.\n")
+
+    with pytest.raises(ConfigurationError, match="unknown.*oar.input_path"):
+        load_profile(tmp_path)
 
 
 def test_profile_argument_must_be_a_directory(tmp_path: Path) -> None:

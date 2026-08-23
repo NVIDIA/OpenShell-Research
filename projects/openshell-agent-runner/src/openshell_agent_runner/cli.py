@@ -120,9 +120,16 @@ def run(
     output: Annotated[
         Path, typer.Option("--output", help="Host path for the agent result.")
     ],
-    input_document: Annotated[
+    input_path: Annotated[
         Path | None,
-        typer.Option("--input", help="Host document required by document tasks."),
+        typer.Option("--input", help="Host input required by the selected task."),
+    ] = None,
+    prompt_variable: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--prompt-var",
+            help="Non-secret NAME=VALUE prompt variable. Repeat for several.",
+        ),
     ] = None,
     upload: Annotated[
         list[str] | None,
@@ -159,7 +166,8 @@ def run(
         profile_directory=profile,
         task_id=task,
         output=output,
-        input_document=input_document,
+        input_path=input_path,
+        prompt_variables=prompt_variable or (),
         uploads=upload or (),
         environments=environment or (),
         gateway=gateway,
@@ -227,8 +235,10 @@ def _render_task_help(
         _help_command(f"  oar run {shlex.quote(str(profile_directory))} \\"),
         _help_command(f"    --task {shlex.quote(task_id)} \\"),
     ]
-    if task.required_input == "document":
-        usage_lines.append(_help_command("    --input DOCUMENT \\"))
+    if task.required_input is not None:
+        usage_lines.append(
+            _help_command(f"    --input {task.required_input.upper()} \\")
+        )
     usage_lines.append(_help_command("    --output OUTPUT"))
 
     upload_lines = [_help_heading("Additional configured uploads:")]
@@ -244,6 +254,22 @@ def _render_task_help(
         environment_lines.append("  None. Add values with --env KEY=VALUE.")
 
     input_lines = _required_input_help(task.required_input)
+    prompt_variable_lines = [_help_heading("Prompt variables:")]
+    if task.prompt_variables:
+        for name, variable in task.prompt_variables.items():
+            requirement = (
+                f"Default: {variable.default}"
+                if variable.default is not None
+                else "Required."
+            )
+            prompt_variable_lines.extend(
+                [
+                    _help_command(f"  --prompt-var {name}=VALUE"),
+                    f"    {variable.description} {requirement}",
+                ]
+            )
+    else:
+        prompt_variable_lines.append("  None.")
 
     output_description = (
         f"JSON validated against {task.output_schema}."
@@ -260,6 +286,8 @@ def _render_task_help(
             "",
             *input_lines,
             "",
+            *prompt_variable_lines,
+            "",
             *upload_lines,
             "",
             *environment_lines,
@@ -274,10 +302,15 @@ def _render_task_help(
 def _required_input_help(required_input: str | None) -> list[str]:
     if required_input is None:
         return [_help_heading("Required input:"), "  None."]
+    description = (
+        "Host document to review."
+        if required_input == "document"
+        else "Host code repository to review."
+    )
     return [
         _help_heading("Required argument:"),
-        _help_command("  --input DOCUMENT"),
-        "    Host document to review.",
+        _help_command(f"  --input {required_input.upper()}"),
+        f"    {description}",
     ]
 
 

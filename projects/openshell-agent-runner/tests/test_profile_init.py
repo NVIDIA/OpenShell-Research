@@ -44,6 +44,9 @@ def test_omitting_profile_initializes_every_packaged_profile(tmp_path: Path) -> 
     resolved = load_profile(reviewer)
     assert resolved.runtime.model == "provider/model"
     assert resolved.runtime.thinking == "medium"
+    assert list(resolved.profile.tasks) == ["review-document", "review-repository"]
+    assert (reviewer / "prompt-document.md").is_file()
+    assert (reviewer / "prompt-repository.md").is_file()
     models = json.loads((reviewer / "models.json").read_text())
     model = models["providers"]["openshell"]["models"][0]
     assert model == {"id": "provider/model", "reasoning": True}

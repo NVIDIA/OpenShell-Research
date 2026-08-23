@@ -23,6 +23,11 @@ from pydantic import (
 )
 
 from openshell_agent_runner.errors import ConfigurationError
+from openshell_agent_runner.prompt_templates import (
+    BUILTIN_PROMPT_VARIABLES,
+    PROMPT_VARIABLE_NAME_PATTERN,
+    validate_prompt_template,
+)
 
 IDENTIFIER_PATTERN = r"^[a-z][a-z0-9-]{0,62}$"
 RESOURCE_IDENTIFIER_PATTERN = r"^[a-z][a-z0-9_-]{0,62}$"
@@ -62,6 +67,7 @@ class SandboxConfig(StrictModel):
 
 
 ToolName = Annotated[str, Field(pattern=RESOURCE_IDENTIFIER_PATTERN)]
+PromptVariableName = Annotated[str, Field(pattern=PROMPT_VARIABLE_NAME_PATTERN)]
 
 
 class ExtensionConfig(StrictModel):
@@ -76,10 +82,18 @@ class ExtensionConfig(StrictModel):
         return values
 
 
+class PromptVariableConfig(StrictModel):
+    description: str = Field(min_length=1, max_length=1000)
+    default: str | None = Field(default=None, min_length=1)
+
+
 class TaskConfig(StrictModel):
     description: str | None = Field(default=None, min_length=1, max_length=1000)
-    required_input: Literal["document"] | None = None
+    required_input: Literal["document", "repository"] | None = None
     prompt: Path
+    prompt_variables: dict[PromptVariableName, PromptVariableConfig] = Field(
+        default_factory=dict
+    )
     output_schema: Path | None = None
     tools: list[ToolName] = Field(default_factory=list)
     skills: list[Path] = Field(default_factory=list)
@@ -345,7 +359,23 @@ def _validate_profile_resources(resolved: ResolvedProfile) -> None:
     directory = resolved.profile_dir
     _inside(directory, directory / resolved.profile.sandbox.policy, "sandbox policy")
     for task_id, task in resolved.profile.tasks.items():
-        _inside(directory, directory / task.prompt, f"prompt for task {task_id}")
+        prompt = _inside(
+            directory, directory / task.prompt, f"prompt for task {task_id}"
+        )
+        available_builtins = (
+            BUILTIN_PROMPT_VARIABLES if task.required_input is not None else frozenset()
+        )
+        try:
+            template = prompt.read_text(encoding="utf-8")
+            validate_prompt_template(
+                template,
+                task.prompt_variables.keys(),
+                available_builtins,
+            )
+        except (OSError, UnicodeError, ValueError) as error:
+            raise ConfigurationError(
+                f"invalid prompt template for task {task_id}: {error}"
+            ) from error
         if task.output_schema is not None:
             schema = _inside(
                 directory,
