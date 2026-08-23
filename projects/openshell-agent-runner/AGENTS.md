@@ -15,4 +15,4 @@
   and optional JSON Schema validation are the output boundary; they do not
   attest agent-produced claims.
 - Use `apply_patch` for edits and `uv` for dependencies, builds, and execution.
-- Before handing off, run `uv sync --locked`, Ruff, ty, pytest, and `uv build`.
+- Before handing off, run `make check` and `make build`.

@@ -75,17 +75,12 @@ jobs:
         working-directory: projects/openshell-agent-runner
         run: |
           uv run pre-commit validate-config ../../.pre-commit-config.yaml
-          uv run ruff format --check .
-          uv run ruff check .
-          uv run ty check
-          uv run pytest
-          python -m compileall -q src tests
-          bash -n src/openshell_agent_runner/harnesses/pi/runtime/image/exec.sh
+          make check
 
       - name: Build distributions
         working-directory: projects/openshell-agent-runner
         run: |
-          uv build
+          make build
           wheel="$(find dist -name '*.whl' -print -quit)"
           python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/image/Dockerfile'
           python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/image/exec.sh'
@@ -136,11 +131,9 @@ jobs:
             --volume "$PWD/projects/openshell-agent-runner/tests/fixtures/tools.json:/sandbox/tools.json:ro" \
             --volume "$PWD/projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/extensions/submit-result.ts:/sandbox/oar-submit-result.ts:ro" \
             --volume "$PWD/projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/extensions/validate-tools.ts:/sandbox/oar-validate-tools.ts:ro" \
+            --volume "$PWD/projects/openshell-agent-runner/tests/fixtures/validate-pi-extensions.mjs:/sandbox/validate-pi-extensions.mjs:ro" \
             openshell-agent-runner-pi:ci \
-            -c "ln -s /usr/local/lib/node_modules /sandbox/node_modules && node \
-              --experimental-strip-types --no-warnings --input-type=module \
-              --eval \"await import('/sandbox/oar-submit-result.ts'); \
-                const validator = await import('/sandbox/oar-validate-tools.ts'); \
-                if (validator.findMissingTools(['missing'], [{name: 'read'}])[0] !== 'missing') process.exit(1); \
-                let handler; validator.default({on: (event, value) => {if (event === 'before_agent_start') handler = value;}}); \
-                await handler({}, {getAllTools: () => [{name: 'read'}], getActiveTools: () => ['read']});\""
+            -c "ln -s /usr/local/lib/node_modules /sandbox/node_modules && \
+              node \
+              --experimental-strip-types --no-warnings \
+              /sandbox/validate-pi-extensions.mjs"

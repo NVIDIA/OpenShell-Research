@@ -135,16 +135,10 @@ if [[ -z "$RETRY_ARTIFACT" && "$DRY_RUN" != true && "$TAG_PUBLIC" == true ]]; th
 fi
 
 echo "Running release checks..."
-uv sync --locked
-uv run ruff format --check .
-uv run ruff check .
-uv run ty check
-uv run pytest
-uv run python -m compileall -q src tests
-bash -n src/openshell_agent_runner/harnesses/pi/runtime/image/exec.sh
+make check
 
 echo "Building distributions..."
-uv build --clear --no-sources
+make build
 
 shopt -s nullglob
 WHEELS=(dist/openshell_agent_runner-"$VERSION"-*.whl)

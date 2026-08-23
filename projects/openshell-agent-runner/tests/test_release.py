@@ -11,6 +11,7 @@ import pytest
 
 REPOSITORY = Path(__file__).resolve().parents[3]
 PUBLISH_SCRIPT = REPOSITORY / "projects/openshell-agent-runner/scripts/publish.sh"
+PROJECT_MAKEFILE = REPOSITORY / "projects/openshell-agent-runner/Makefile"
 
 
 def test_publish_prints_tag_deletion_commands_for_existing_remote_tag(
@@ -20,6 +21,7 @@ def test_publish_prints_tag_deletion_commands_for_existing_remote_tag(
     script = project / "scripts/publish.sh"
     script.parent.mkdir(parents=True)
     shutil.copy2(PUBLISH_SCRIPT, script)
+    shutil.copy2(PROJECT_MAKEFILE, project / "Makefile")
 
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
@@ -68,6 +70,7 @@ def test_publish_retry_uploads_only_missing_artifacts(
     script = project / "scripts/publish.sh"
     script.parent.mkdir(parents=True)
     shutil.copy2(PUBLISH_SCRIPT, script)
+    shutil.copy2(PROJECT_MAKEFILE, project / "Makefile")
     entrypoint = (
         project / "src/openshell_agent_runner/harnesses/pi/runtime/image/exec.sh"
     )
@@ -154,6 +157,7 @@ def test_publish_retry_uploads_only_missing_artifacts(
     environment["FAKE_REPOSITORY_STATE"] = str(repository_state)
     environment["FAKE_FIRST_ACCEPTS_WHEEL"] = str(first_accepts_wheel).lower()
     environment["UV_PUBLISH_TOKEN"] = "test-token"
+    environment["UV"] = "uv"
 
     first_attempt = subprocess.run(
         ["bash", str(script), "0.1.0"],

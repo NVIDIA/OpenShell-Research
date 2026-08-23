@@ -41,12 +41,13 @@ uvx --from openshell-agent-runner oar doctor --gateway openshell
 Validate the included profile, then preview the run without creating a sandbox:
 
 ```bash
+printf '# Review me\n\nA short document.\n' > document.md
 uvx --from openshell-agent-runner oar validate ./profiles/reviewer
 
 uvx --from openshell-agent-runner oar run ./profiles/reviewer \
   --task review \
   --gateway openshell \
-  --input README.md \
+  --input document.md \
   --output /tmp/oar-review.md \
   --dry-run
 ```
@@ -232,6 +233,15 @@ openshell sandbox delete ...
 Use `--dry-run` to print the complete generated commands and host actions
 without creating a sandbox.
 
+## Security boundaries
+
+Use `--env` only for non-secret values. Credentials belong in OpenShell's
+provider and inference configuration, not in profiles or command arguments.
+Review uploads before sending private files to a remote gateway; uploaded files
+and sandbox changes are disposable and are not synchronized back to the host.
+OAR downloads only the task result. Its transport and optional schema checks
+validate the result's shape, not the truth of agent-produced claims.
+
 ## Failure boundaries
 
 | Exit code | Meaning |
@@ -240,3 +250,18 @@ without creating a sandbox.
 | `1` | OpenShell execution, timeout, missing remote output, download size limit, ownership inspection, or cleanup failed. |
 | `2` | CLI input or profile configuration was invalid. |
 | `3` | A downloaded result was empty, invalid, or failed its schema. |
+
+## Develop OAR
+
+From `projects/openshell-agent-runner`, run the full local checks and build both
+package distributions:
+
+```bash
+make check
+make build
+```
+
+Use `make test PYTEST_ARGS="tests/test_config.py"` for a focused test and
+`make clean` to remove generated build and cache files. The local PyPI workflow
+is documented in
+[RELEASING.md](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-agent-runner/RELEASING.md).
