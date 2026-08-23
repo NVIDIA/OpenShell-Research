@@ -1259,6 +1259,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Profile inputs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#tools-and-extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Tools and extensions
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1523,6 +1540,23 @@ not provision providers or credentials.</p>
 <p>Environment keys start with a letter or underscore and contain only letters,
 digits, and underscores. They cannot start with OpenShell's reserved
 <code>OPENSHELL_</code> prefix.</p>
+<h3 id="tools-and-extensions">Tools and extensions</h3>
+<p>Each task lists the tools Pi may use. OAR accepts Pi's built-in <code>bash</code>, <code>edit</code>,
+<code>find</code>, <code>grep</code>, <code>ls</code>, <code>read</code>, and <code>write</code> tools. Declare a custom tool alongside
+the extension that provides it:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">tasks</span><span class="p">:</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">check</span><span class="p">:</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">prompt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prompts/check.md</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">tools</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">read</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">custom_check</span><span class="p p-Indicator">]</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">extensions</span><span class="p">:</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">extensions/custom-check.ts</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">        </span><span class="nt">tools</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">custom_check</span><span class="p p-Indicator">]</span>
+</span></code></pre></div>
+<p>Validation rejects unknown tools, missing extension files, and custom tools
+without a matching extension declaration. Before inference starts, OAR checks
+the tools Pi actually registered. A misspelled built-in or an extension that
+fails to register its declared tool stops the task instead of silently removing
+the tool.</p>
 <h2 id="run-lifecycle">Run lifecycle</h2>
 <figure class="documentation-figure documentation-figure--wide">
   <img src="assets/diagrams/run-lifecycle.svg" alt="A run validates its profile, prepares runtime files, creates an OpenShell sandbox, starts Pi, downloads and validates the result, publishes it, verifies ownership, and deletes the sandbox.">
@@ -1543,7 +1577,7 @@ digits, and underscores. They cannot start with OpenShell's reserved
    to <code>REPOSITORY_ROOT</code>, and passes the prompt to <code>pi --print</code> through standard
    input:</li>
 </ol>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pi<span class="w"> </span>--print<span class="w"> </span>...<span class="w"> </span>&lt;<span class="w"> </span>/sandbox/oar-runtime/prompt.md
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pi<span class="w"> </span>--print<span class="w"> </span>...<span class="w"> </span>&lt;<span class="w"> </span>/sandbox/oar-runtime/prompt.md
 </span></code></pre></div>
 <ol>
 <li>Pi reads uploaded files, uses its declared tools, and accesses inference
@@ -1556,8 +1590,8 @@ digits, and underscores. They cannot start with OpenShell's reserved
 <h2 id="uploads">Uploads</h2>
 <p>OAR uses OpenShell's term <strong>upload</strong> for files transferred into the sandbox.
 General uploads accept files or directories:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>--upload<span class="w"> </span>./document.md:/workspace/document.md
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>--upload<span class="w"> </span>./repository:/workspace/repository
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>--upload<span class="w"> </span>./document.md:/workspace/document.md
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>--upload<span class="w"> </span>./repository:/workspace/repository
 </span></code></pre></div>
 <p>Uploads come from three places:</p>
 <table>
@@ -1609,10 +1643,10 @@ keywords such as <code>type</code>, <code>enum</code>, <code>const</code>, lengt
 task-specific result type.</p>
 <h2 id="native-command-sequence">Native command sequence</h2>
 <p>A normal run issues four native commands:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>openshell sandbox create ...
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>openshell sandbox download ...
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>openshell sandbox get ...
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>openshell sandbox delete ...
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>openshell sandbox create ...
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>openshell sandbox download ...
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>openshell sandbox get ...
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>openshell sandbox delete ...
 </span></code></pre></div>
 <p>Use <code>--dry-run</code> to print the complete generated commands and host actions
 without creating a sandbox.</p>
