@@ -192,7 +192,8 @@ def test_run_dry_run_does_not_publish_output(tmp_path: Path) -> None:
     assert "[download]" in result.stdout
     assert "[verify ownership]" in result.stdout
     assert "[delete]" in result.stdout
-    assert f"{document.resolve()}:/workspace/input/document.md" in result.stdout
+    assert str(document.resolve()) in result.stdout
+    assert "/workspace/input/document.md" in result.stdout
     assert "--env REPOSITORY_ROOT=/workspace/input" in result.stdout
     assert not output.exists()
 

@@ -66,7 +66,7 @@ jobs:
             --task editorial \
             --gateway openshell \
             --upload .:/workspace/source \
-            --upload .git:/workspace/source/.git \
+            --upload .git:/workspace/source \
             --env REVIEW_TARGET_PATH=docs/dev-notes/posts/2026-08-07-formal-methods-ai-generated-robot-actions.md \
             --output "$RUNNER_TEMP/editorial-review.json" \
             --dry-run

@@ -60,6 +60,7 @@ with log.open("a") as stream:
 args = sys.argv[1:]
 operation = args[1]
 if operation == "create":
+    if "--upload" in args and "--" in args: sys.exit(2)
     name = args[args.index("--name") + 1]
     labels = [args[index + 1] for index, item in enumerate(args) if item == "--label"]
     token = next(item.split("=", 1)[1] for item in labels if item.startswith("oar-run-id="))
@@ -67,6 +68,8 @@ if operation == "create":
     if os.environ.get("FAKE_FAIL_CREATE") == "1": sys.exit(1)
     if os.environ.get("FAKE_SLEEP_CREATE") == "1":
         import time; time.sleep(5)
+elif operation in {"upload", "exec"}:
+    pass
 elif operation == "get":
     if not state.exists(): sys.exit(1)
     document = json.loads(state.read_text())
@@ -122,12 +125,10 @@ def test_create_download_owned_delete_order(tmp_path: Path, monkeypatch) -> None
     assert json.loads(output.read_text())["status"] == "pass"
     assert not state.exists()
     commands = [json.loads(line) for line in log.read_text().splitlines()]
-    assert [command[1] for command in commands] == [
-        "create",
-        "download",
-        "get",
-        "delete",
-    ]
+    operations = [command[1] for command in commands]
+    assert operations[0] == "create"
+    assert operations.count("upload") == 8
+    assert operations[-4:] == ["exec", "download", "get", "delete"]
 
 
 def test_resolved_command_is_the_create_prefix(tmp_path: Path, monkeypatch) -> None:
@@ -141,16 +142,18 @@ def test_resolved_command_is_the_create_prefix(tmp_path: Path, monkeypatch) -> N
     assert create[: len(resolved.create_command) - 1] == list(
         resolved.create_command[1:]
     )
-    harness = create[create.index("--") :]
+    assert "--upload" not in create
+    assert create[-4:] == ["--detach", "--", "sleep", "infinity"]
+    commands = [json.loads(line) for line in log.read_text().splitlines()]
+    harness = next(command for command in commands if command[1] == "exec")
+    harness = harness[harness.index("--") :]
     assert harness[:3] == ["--", "bash", "/opt/oar/pi/exec.sh"]
     assert harness[harness.index("--provider") + 1] == "openshell"
     assert harness[harness.index("--model") + 1] == "fake-model"
     assert harness[harness.index("--thinking") + 1] == "high"
-    uploads = [
-        create[index + 1] for index, value in enumerate(create) if value == "--upload"
-    ]
+    uploads = [command for command in commands if command[1] == "upload"]
     assert any(
-        value.endswith(":/sandbox/oar-runtime/output.schema.json") for value in uploads
+        command[4] == "/sandbox/oar-runtime/output.schema.json" for command in uploads
     )
     assert not state.exists()
 
@@ -166,6 +169,10 @@ def test_dry_run_prints_every_command_without_executing(
     assert "Dry run: no commands were executed." in preview
     assert "[create]" in preview
     assert "sandbox create" in preview
+    assert "[upload]" in preview
+    assert "sandbox upload" in preview
+    assert "[execute]" in preview
+    assert "sandbox exec" in preview
     assert "[download]" in preview
     assert "sandbox download" in preview
     assert "[verify ownership]" in preview
@@ -205,6 +212,8 @@ def test_keep_sandbox_skips_inspection_and_delete(tmp_path: Path, monkeypatch) -
     assert state.exists()
     assert [json.loads(line)[1] for line in log.read_text().splitlines()] == [
         "create",
+        *(["upload"] * 8),
+        "exec",
         "download",
     ]
 

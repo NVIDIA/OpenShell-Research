@@ -38,7 +38,7 @@ def test_native_upload_and_environment_are_forwarded_exactly() -> None:
         )
     )
     assert resolved.uploads == (".:/workspace/source",)
-    assert ("--upload", ".:/workspace/source") in tuple(
+    assert ("--upload", ".:/workspace/source") not in tuple(
         zip(resolved.create_command, resolved.create_command[1:], strict=False)
     )
     assert "provider" not in resolved.create_command
@@ -52,9 +52,10 @@ def test_native_upload_and_environment_are_forwarded_exactly() -> None:
 
 def test_conflicting_and_reserved_uploads_are_rejected() -> None:
     for uploads, message in (
-        (("one:/workspace/x", "two:/workspace/x"), "conflicting upload"),
         (("evil:/sandbox/artifacts/result",), "reserved for runner resources"),
         (("evil:/sandbox/oar-runtime/schemas",), "reserved for runner resources"),
+        (("evil:/sandbox",), "reserved for runner resources"),
+        (("evil:/",), "reserved for runner resources"),
         (("evil://sandbox/oar-runtime/schemas",), "canonical absolute paths"),
         (
             ("evil:/workspace/../sandbox/oar-runtime/schemas",),
@@ -63,6 +64,12 @@ def test_conflicting_and_reserved_uploads_are_rejected() -> None:
     ):
         with pytest.raises(ConfigurationError, match=message):
             resolve_run(request(uploads=uploads))
+
+
+def test_uploads_can_merge_into_the_same_destination() -> None:
+    uploads = (".:/workspace/source", ".git:/workspace/source")
+
+    assert resolve_run(request(uploads=uploads)).uploads == uploads
 
 
 def test_environment_names_are_forwarded_to_native_openshell() -> None:

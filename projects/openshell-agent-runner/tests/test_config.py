@@ -66,13 +66,11 @@ def test_profile_resource_escape_is_rejected(tmp_path: Path) -> None:
             "must not contain '..'",
         ),
         (
-            "upload: [one:/workspace/input, two:/workspace/input]",
-            "conflicting upload destination",
-        ),
-        (
             "upload: [one:/sandbox/artifacts/result]",
             "reserved for runner resources",
         ),
+        ("upload: [one:/sandbox]", "reserved for runner resources"),
+        ("upload: [one:/]", "reserved for runner resources"),
         (
             "upload: [one://sandbox/oar-runtime/file]",
             "canonical absolute paths",
@@ -280,15 +278,13 @@ def test_output_schema_does_not_treat_instance_data_as_a_schema(
 
 
 @pytest.mark.parametrize("keyword", ["$ref", "$dynamicRef", "$recursiveRef"])
-def test_output_schema_rejects_external_references(
-    tmp_path: Path, keyword: str
-) -> None:
+def test_output_schema_rejects_reference_keywords(tmp_path: Path, keyword: str) -> None:
     _write_profile(tmp_path, task="output_schema: output.schema.json")
     (tmp_path / "output.schema.json").write_text(
-        json.dumps({keyword: "https://example.com/schema.json"})
+        json.dumps({"$defs": {"value": {"type": "string"}}, keyword: "#/$defs/value"})
     )
 
-    with pytest.raises(ConfigurationError, match="must stay inside"):
+    with pytest.raises(ConfigurationError, match="reference keywords"):
         load_profile(tmp_path)
 
 

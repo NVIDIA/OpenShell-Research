@@ -89,8 +89,6 @@ def resolve_run(request: RunRequest) -> ResolvedRun:
             str(profile.profile_dir / sandbox.policy),
         ]
     )
-    for upload in uploads:
-        command.extend(["--upload", upload])
     for environment in environments:
         command.extend(["--env", environment])
     command.extend(["--no-auto-providers", "--no-tty", "--approval-mode", "auto"])
@@ -114,13 +112,22 @@ def render_dry_run(request: RunRequest) -> str:
             commands = [
                 (
                     "create",
-                    openshell.sandbox_create(resolved, resources, name, token),
-                ),
-                (
-                    "download",
-                    openshell.sandbox_download(resolved, name, downloaded),
+                    openshell.sandbox_create(resolved, name, token),
                 ),
             ]
+            commands.extend(
+                ("upload", openshell.sandbox_upload(request, name, upload))
+                for upload in (*resolved.uploads, *resources.uploads)
+            )
+            commands.extend(
+                [
+                    ("execute", openshell.sandbox_exec(resolved, resources, name)),
+                    (
+                        "download",
+                        openshell.sandbox_download(resolved, name, downloaded),
+                    ),
+                ]
+            )
             if not request.keep_sandbox:
                 commands.extend(
                     [
@@ -161,10 +168,16 @@ def run_agent(request: RunRequest) -> str:
     resolved = resolve_run(request)
     name, token = _identity()
     resources = prepare_resources(resolved.profile, request.task_id)
-    create = openshell.sandbox_create(resolved, resources, name, token)
+    create = openshell.sandbox_create(resolved, name, token)
     primary_error: BaseException | None = None
     try:
         openshell.run(create, request.timeout_seconds)
+        for upload in (*resolved.uploads, *resources.uploads):
+            openshell.run(openshell.sandbox_upload(request, name, upload), 120)
+        openshell.run(
+            openshell.sandbox_exec(resolved, resources, name),
+            request.timeout_seconds,
+        )
         task = resolved.profile.profile.tasks[request.task_id]
         with tempfile.TemporaryDirectory(prefix="oar-output-") as directory:
             downloaded = Path(directory) / "output.download"

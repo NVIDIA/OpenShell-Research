@@ -206,7 +206,6 @@ def resolve_task(profile_directory: Path, task_id: str) -> ResolvedProfile:
 def validate_upload_mappings(values: Sequence[str]) -> tuple[str, ...]:
     if len(values) != len(set(values)):
         raise ValueError("duplicate upload mapping")
-    destinations: dict[str, str] = {}
     for value in values:
         source, separator, destination = value.rpartition(":")
         if not separator or not source or not destination.startswith("/"):
@@ -220,16 +219,11 @@ def validate_upload_mappings(values: Sequence[str]) -> tuple[str, ...]:
             PurePosixPath("/sandbox/artifacts"),
             PurePosixPath("/sandbox/oar-runtime"),
         ):
-            if path == reserved or path.is_relative_to(reserved):
+            if path.is_relative_to(reserved) or reserved.is_relative_to(path):
                 raise ValueError(
                     "upload destination is reserved for runner resources: "
                     f"{destination}"
                 )
-        normalized = str(path)
-        previous = destinations.get(normalized)
-        if previous is not None and previous != source:
-            raise ValueError(f"conflicting upload destination: {destination}")
-        destinations[normalized] = source
     return tuple(values)
 
 
@@ -390,10 +384,10 @@ def _validate_output_schema(path: Path) -> None:
         Draft202012Validator.check_schema(document)
     except (OSError, UnicodeError, json.JSONDecodeError, SchemaError) as error:
         raise ConfigurationError(f"invalid output schema {path}: {error}") from error
-    _validate_schema_references(document, path)
+    _validate_schema_references(document)
 
 
-def _validate_schema_references(document: Any, path: Path) -> None:
+def _validate_schema_references(document: Any) -> None:
     if not isinstance(document, dict):
         return
 
@@ -404,23 +398,22 @@ def _validate_schema_references(document: Any, path: Path) -> None:
                 f"({key}) because host and sandbox engines use different dialects"
             )
     for key in {"$ref", "$dynamicRef", "$recursiveRef"}:
-        if key in document and (
-            not isinstance(document[key], str) or not document[key].startswith("#")
-        ):
+        if key in document:
             raise ConfigurationError(
-                f"output schema references must stay inside {path}: {document[key]!r}"
+                "output schemas do not support reference keywords "
+                f"({key}) because the submission tool nests the schema"
             )
 
     for key in {"$defs", "definitions", "properties", "dependentSchemas"}:
         value = document.get(key)
         if isinstance(value, dict):
             for schema in value.values():
-                _validate_schema_references(schema, path)
+                _validate_schema_references(schema)
     for key in {"allOf", "anyOf", "oneOf", "prefixItems"}:
         value = document.get(key)
         if isinstance(value, list):
             for schema in value:
-                _validate_schema_references(schema, path)
+                _validate_schema_references(schema)
     for key in {
         "additionalProperties",
         "contains",
@@ -434,4 +427,4 @@ def _validate_schema_references(document: Any, path: Path) -> None:
         "unevaluatedItems",
         "unevaluatedProperties",
     }:
-        _validate_schema_references(document.get(key), path)
+        _validate_schema_references(document.get(key))

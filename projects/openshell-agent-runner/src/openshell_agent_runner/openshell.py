@@ -43,16 +43,46 @@ class NativeTarget:
 
 def sandbox_create(
     resolved: ResolvedRun,
-    resources: PreparedResources,
     name: str,
     token: str,
 ) -> list[str]:
     command = [*resolved.create_command, "--name", name]
-    for upload in resources.uploads:
-        command.extend(["--upload", upload])
     command.extend(["--label", f"{RESERVED_LABEL}={token}"])
-    command.extend(["--", "bash", "/opt/oar/pi/exec.sh", *resources.arguments])
+    command.extend(["--detach", "--", "sleep", "infinity"])
     return command
+
+
+def sandbox_upload(request: RunRequest, name: str, mapping: str) -> list[str]:
+    source, _, destination = mapping.rpartition(":")
+    return [
+        request.openshell_bin,
+        "sandbox",
+        "upload",
+        name,
+        source,
+        destination,
+        *_native_target_args(request),
+    ]
+
+
+def sandbox_exec(
+    resolved: ResolvedRun,
+    resources: PreparedResources,
+    name: str,
+) -> list[str]:
+    return [
+        resolved.request.openshell_bin,
+        "sandbox",
+        "exec",
+        "--name",
+        name,
+        "--no-tty",
+        *_native_target_args(resolved.request),
+        "--",
+        "bash",
+        "/opt/oar/pi/exec.sh",
+        *resources.arguments,
+    ]
 
 
 def sandbox_download(resolved: ResolvedRun, name: str, destination: Path) -> list[str]:
