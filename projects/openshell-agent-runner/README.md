@@ -122,7 +122,7 @@ uvx --from openshell-agent-runner oar run \
 
 ## Documentation
 
-The [OAR guide](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-agent-runner/docs/index.md)
+The [OAR guide](https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/)
 explains profile inputs, tools and extensions, uploads, the run lifecycle,
 structured results, security boundaries, and exit codes.
 

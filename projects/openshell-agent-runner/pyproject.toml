@@ -31,7 +31,7 @@ openshell-agent-runner = "openshell_agent_runner.cli:app"
 
 [project.urls]
 Repository = "https://github.com/NVIDIA/OpenShell-Research"
-Documentation = "https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-agent-runner/docs/index.md"
+Documentation = "https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/"
 
 [dependency-groups]
 dev = [
