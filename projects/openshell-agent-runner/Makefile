@@ -21,13 +21,18 @@ endif
 .PHONY: help sync test format-check lint typecheck check build clean publish
 
 help: ## Show available targets and configurable variables.
-	@awk 'BEGIN {FS = ":.*## "}; /^[a-zA-Z0-9_.-]+:.*## / {printf "  %-12s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-	@printf "\nVariables:\n"
-	@printf "  VERSION=X.Y.Z      Required package version for publish\n"
-	@printf "  DRY_RUN=1          Validate a release without tagging or uploading\n"
-	@printf "  ALLOW_NON_MAIN=1   Permit release validation or publishing off main\n"
-	@printf "  RETRY_ARTIFACT=... Retry a missing wheel, sdist, or both after a failed upload\n"
-	@printf "  PYTEST_ARGS=...    Extra pytest paths or flags\n"
+	@printf "\033[1;36mOpenShell Agent Runner\033[0m\n"
+	@printf "\033[2mUsage: make <target> [VARIABLE=value]\033[0m\n"
+	@printf "\n\033[1;33m🛠  Development\033[0m\n"
+	@awk 'BEGIN {FS = ":.*## "}; /^[a-zA-Z0-9_.-]+:.*## / && $$1 != "publish" {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@printf "\n\033[1;33m📦 Release\033[0m\n"
+	@awk 'BEGIN {FS = ":.*## "}; $$1 == "publish" {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@printf "\n\033[1;33m⚙  Configuration\033[0m\n"
+	@printf "  \033[32m%-20s\033[0m %s\n" "PYTEST_ARGS=..." "Extra pytest paths or flags"
+	@printf "  \033[32m%-20s\033[0m %s\n" "VERSION=X.Y.Z" "Required package version for publish"
+	@printf "  \033[32m%-20s\033[0m %s\n" "DRY_RUN=1" "Validate a release without tagging or uploading"
+	@printf "  \033[32m%-20s\033[0m %s\n" "ALLOW_NON_MAIN=1" "Permit release validation or publishing off main"
+	@printf "  \033[32m%-20s\033[0m %s\n" "RETRY_ARTIFACT=..." "Retry a missing wheel, sdist, or both after a failed upload"
 
 sync: ## Install locked runtime and development dependencies.
 	$(UV) sync --locked
