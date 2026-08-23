@@ -269,6 +269,7 @@ def _resolve_required_input(
         raise ConfigurationError(
             f"task {request.task_id!r} requires --input {input_label}"
         )
+    input_name = request.input_path.absolute().name
     try:
         input_path = request.input_path.resolve(strict=True)
     except OSError as error:
@@ -287,7 +288,7 @@ def _resolve_required_input(
         resolved_input = ResolvedInput(
             source=input_path,
             sandbox_path=sandbox_input,
-            name=input_path.name,
+            name=input_name,
         )
         return (
             resolved_input,
@@ -300,7 +301,7 @@ def _resolve_required_input(
     resolved_input = ResolvedInput(
         source=input_path,
         sandbox_path=repository_root,
-        name=input_path.name,
+        name=input_name,
     )
     return (
         resolved_input,

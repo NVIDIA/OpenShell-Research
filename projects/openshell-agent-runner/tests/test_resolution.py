@@ -153,6 +153,21 @@ def test_repository_input_is_uploaded_and_used_as_working_directory(
     )
 
 
+def test_input_name_preserves_the_caller_visible_symlink_name(tmp_path: Path) -> None:
+    repository = tmp_path / "actual-project"
+    repository.mkdir()
+    input_path = tmp_path / "review-me"
+    input_path.symlink_to(repository, target_is_directory=True)
+
+    resolved = resolve_run(review_request("review-repository", input_path))
+
+    assert resolved.input is not None
+    assert resolved.input.source == repository.resolve()
+    assert resolved.input.sandbox_path == "/workspace/input/actual-project"
+    assert resolved.input.name == "review-me"
+    assert dict(resolved.prompt_variables)["oar.input_name"] == "review-me"
+
+
 def test_multiple_prompt_variables_override_task_defaults(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()
