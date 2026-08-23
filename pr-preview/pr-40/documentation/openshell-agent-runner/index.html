@@ -1594,9 +1594,10 @@ the tool.</p>
    output path.</li>
 <li>Prepare a temporary Pi runtime bundle containing the prompt, model files,
    configured skills and extensions, and optional output schema.</li>
-<li>Run <code>openshell sandbox create</code> with the packaged image context, sandbox
-   policy, uploads, ownership label, and Pi command.</li>
-<li>Inside the sandbox, <code>/opt/oar/pi/exec.sh</code> installs the Pi settings, changes
+<li>Create a persistent sandbox with the packaged image context, sandbox policy,
+   and ownership label, then upload the task inputs and prepared runtime files.</li>
+<li>Run <code>/opt/oar/pi/exec.sh</code> with <code>openshell sandbox exec</code>. Inside the sandbox,
+   the script installs the Pi settings, changes
    to <code>REPOSITORY_ROOT</code>, and passes the prompt to <code>pi --print</code> through standard
    input:</li>
 </ol>
@@ -1614,8 +1615,11 @@ the tool.</p>
 <p>OAR uses OpenShell's term <strong>upload</strong> for files transferred into the sandbox.
 General uploads accept files or directories:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>--upload<span class="w"> </span>./document.md:/workspace/document.md
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>--upload<span class="w"> </span>./repository:/workspace/repository
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>--upload<span class="w"> </span>./repository:/workspace
 </span></code></pre></div>
+<p>OpenShell treats a directory destination like <code>cp</code>: it creates the source
+directory beneath that destination. Uploads run in declaration order, so more
+than one source can intentionally merge into the same destination.</p>
 <p>Uploads come from three places:</p>
 <table>
 <thead>
@@ -1661,16 +1665,22 @@ publishing it.</p>
 <p>Both validators treat extension keywords and JSON Schema <code>format</code> values as
 annotations. OAR rejects <code>pattern</code> and <code>patternProperties</code> because Python and
 JavaScript use different regular-expression dialects. Use portable structural
-keywords such as <code>type</code>, <code>enum</code>, <code>const</code>, length, and numeric bounds instead.</p>
+keywords such as <code>type</code>, <code>enum</code>, <code>const</code>, length, and numeric bounds instead.
+OAR also rejects <code>$ref</code>, <code>$dynamicRef</code>, and <code>$recursiveRef</code> because the built-in
+submission tool nests the schema under its <code>result</code> parameter. Inline the
+referenced schema definitions.</p>
 <p>The schema belongs to the profile. OAR has no built-in review or other
 task-specific result type.</p>
 <h2 id="native-command-sequence">Native command sequence</h2>
-<p>A normal run issues four native commands:</p>
+<p>A normal run uses OpenShell's native sandbox operations in this order:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>openshell sandbox create ...
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>openshell sandbox download ...
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>openshell sandbox get ...
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>openshell sandbox delete ...
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>openshell sandbox upload ...
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>openshell sandbox exec ...
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>openshell sandbox download ...
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>openshell sandbox get ...
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>openshell sandbox delete ...
 </span></code></pre></div>
+<p>The upload command is repeated for each task input and runtime file.</p>
 <p>Use <code>--dry-run</code> to print the complete generated commands and host actions
 without creating a sandbox.</p>
 <h2 id="security-boundaries">Security boundaries</h2>

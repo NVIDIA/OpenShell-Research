@@ -29,7 +29,7 @@
 
   <rect x="55" y="215" width="430" height="105" rx="16" class="open"/>
   <circle cx="90" cy="250" r="19" class="badge-open"/><text x="90" y="256" text-anchor="middle" class="number">4</text>
-  <text x="125" y="251" class="title">Create sandbox</text><text x="125" y="279" class="subtitle">image · policy · uploads · ownership label</text>
+  <text x="125" y="251" class="title">Provision sandbox</text><text x="125" y="279" class="subtitle">create · upload · ownership label</text>
 
   <rect x="55" y="375" width="430" height="105" rx="16" class="agent"/>
   <circle cx="90" cy="410" r="19" class="badge-agent"/><text x="90" y="416" text-anchor="middle" class="number">5</text>

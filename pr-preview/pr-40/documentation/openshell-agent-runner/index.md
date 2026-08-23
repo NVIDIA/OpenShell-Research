@@ -153,9 +153,10 @@ The sequence is:
    output path.
 3. Prepare a temporary Pi runtime bundle containing the prompt, model files,
    configured skills and extensions, and optional output schema.
-4. Run `openshell sandbox create` with the packaged image context, sandbox
-   policy, uploads, ownership label, and Pi command.
-5. Inside the sandbox, `/opt/oar/pi/exec.sh` installs the Pi settings, changes
+4. Create a persistent sandbox with the packaged image context, sandbox policy,
+   and ownership label, then upload the task inputs and prepared runtime files.
+5. Run `/opt/oar/pi/exec.sh` with `openshell sandbox exec`. Inside the sandbox,
+   the script installs the Pi settings, changes
    to `REPOSITORY_ROOT`, and passes the prompt to `pi --print` through standard
    input:
 
@@ -177,8 +178,12 @@ General uploads accept files or directories:
 
 ```bash
 --upload ./document.md:/workspace/document.md
---upload ./repository:/workspace/repository
+--upload ./repository:/workspace
 ```
+
+OpenShell treats a directory destination like `cp`: it creates the source
+directory beneath that destination. Uploads run in declaration order, so more
+than one source can intentionally merge into the same destination.
 
 Uploads come from three places:
 
@@ -215,20 +220,27 @@ Both validators treat extension keywords and JSON Schema `format` values as
 annotations. OAR rejects `pattern` and `patternProperties` because Python and
 JavaScript use different regular-expression dialects. Use portable structural
 keywords such as `type`, `enum`, `const`, length, and numeric bounds instead.
+OAR also rejects `$ref`, `$dynamicRef`, and `$recursiveRef` because the built-in
+submission tool nests the schema under its `result` parameter. Inline the
+referenced schema definitions.
 
 The schema belongs to the profile. OAR has no built-in review or other
 task-specific result type.
 
 ## Native command sequence
 
-A normal run issues four native commands:
+A normal run uses OpenShell's native sandbox operations in this order:
 
 ```text
 openshell sandbox create ...
+openshell sandbox upload ...
+openshell sandbox exec ...
 openshell sandbox download ...
 openshell sandbox get ...
 openshell sandbox delete ...
 ```
+
+The upload command is repeated for each task input and runtime file.
 
 Use `--dry-run` to print the complete generated commands and host actions
 without creating a sandbox.
