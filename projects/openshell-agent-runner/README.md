@@ -35,7 +35,7 @@ printf '# Review me\n\nA short document.\n' > document.md
 uvx --from openshell-agent-runner oar validate ./profiles/reviewer
 
 uvx --from openshell-agent-runner oar run ./profiles/reviewer \
-  --task review \
+  --task review-document \
   --gateway openshell \
   --input document.md \
   --output /tmp/oar-review.md \
@@ -58,7 +58,7 @@ for each run, such as the task, inputs, output path, gateway, and workspace.
 
 ```yaml
 id: reviewer
-description: Review an uploaded document.
+description: Review an uploaded document or code repository.
 
 sandbox:
   policy: policy.yaml
@@ -66,9 +66,29 @@ sandbox:
   env: []
 
 tasks:
-  review:
+  review-document:
     required_input: document
-    prompt: prompt.md
+    prompt: prompt-document.md
+    prompt_variables:
+      focus:
+        description: Areas of the document that deserve special attention.
+        default: Review the complete document.
+      context:
+        description: Additional context that should inform the review.
+        default: No additional context was provided.
+    tools: [read, grep, find, ls, bash]
+    skills: []
+    extensions: []
+  review-repository:
+    required_input: repository
+    prompt: prompt-repository.md
+    prompt_variables:
+      focus:
+        description: Files or directories that deserve special attention.
+        default: Review the entire repository.
+      context:
+        description: Additional context that should inform the review.
+        default: No additional context was provided.
     tools: [read, grep, find, ls, bash]
     skills: []
     extensions: []
@@ -92,6 +112,12 @@ tasks:
 schemas, and tools that are not built in or declared by a referenced extension.
 The runtime also verifies that Pi actually registered every selected tool before
 the first model request.
+
+Prompts support literal runtime substitution. Tasks declare named
+`prompt_variables` with optional defaults, and callers override them with a
+repeatable `--prompt-var NAME=VALUE`. Variables without defaults are required.
+OAR also supplies reserved input metadata such as `{{ oar.input_path }}` and
+`{{ oar.input_name }}`. Templates do not execute expressions or shell syntax.
 
 Add `output_schema` to a task when its result must be JSON. OAR exposes the
 built-in Pi `submit_result` extension for that task, lets Pi correct invalid
@@ -117,7 +143,19 @@ profile and task before `--help`:
 
 ```bash
 uvx --from openshell-agent-runner oar run \
-  ./profiles/reviewer --task review --help
+  ./profiles/reviewer --task review-document --help
+```
+
+The reviewer also accepts a code repository directory:
+
+```bash
+uvx --from openshell-agent-runner oar run ./profiles/reviewer \
+  --task review-repository \
+  --gateway openshell \
+  --input ./my-project \
+  --prompt-var focus="src/auth and tests/auth" \
+  --prompt-var context="Pre-release security review" \
+  --output /tmp/oar-repository-review.md
 ```
 
 ## Documentation
