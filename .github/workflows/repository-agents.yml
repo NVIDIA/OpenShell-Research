@@ -101,7 +101,7 @@ jobs:
           printf '# Review me\n\nA short document.\n' > "$RUNNER_TEMP/review-input.md"
           uvx --from "$wheel" oar run \
             "$RUNNER_TEMP/profiles/reviewer" \
-            --task review \
+            --task review-document \
             --input "$RUNNER_TEMP/review-input.md" \
             --output "$RUNNER_TEMP/review-output.md" \
             --dry-run
