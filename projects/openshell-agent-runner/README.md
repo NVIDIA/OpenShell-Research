@@ -240,6 +240,25 @@ Each profile directory must contain `profile.yaml`, `models.json`, and
 `settings.json`. Profile-owned paths resolve relative to that directory. Native
 upload sources retain OpenShell's current-directory semantics.
 
+`tools` is a strict allowlist. OAR recognizes Pi's built-in `bash`, `edit`,
+`find`, `grep`, `ls`, `read`, and `write` tools. A custom tool must be declared
+by an extension used by the same task:
+
+```yaml
+tasks:
+  check:
+    prompt: prompt.md
+    tools: [read, custom_check]
+    extensions:
+      - path: extensions/custom-check.ts
+        tools: [custom_check]
+```
+
+`oar validate` rejects unknown tools, missing extension files, duplicate tool
+declarations, and custom tools without an extension declaration. At runtime,
+OAR also checks Pi's loaded tool registry before the first model request. The
+task fails if an extension did not actually register a declared tool.
+
 `models.json` is Pi's native provider and model registry. OAR requires exactly
 one provider named `openshell` and exactly one model. `settings.json` is Pi's
 native runtime selection and must set `defaultProvider`, `defaultModel`, and

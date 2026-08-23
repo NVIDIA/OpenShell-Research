@@ -3,6 +3,7 @@
 
 """Materialize the explicit native-upload runtime bundle for Pi."""
 
+import json
 import shutil
 import tempfile
 from importlib.resources import files
@@ -66,15 +67,34 @@ def prepare_resources(resolved: ResolvedProfile, task_id: str) -> PreparedResour
         shutil.copytree(resolved.profile_dir / skill, target)
         arguments.extend(["--skill", f"{SANDBOX_RUNTIME_ROOT}/skills/{target.name}"])
     for index, extension in enumerate(task.extensions):
-        target = runtime / "extensions" / f"{index:02d}-{extension.name}"
-        shutil.copy2(resolved.profile_dir / extension, target)
+        target = runtime / "extensions" / f"{index:02d}-{extension.path.name}"
+        shutil.copy2(resolved.profile_dir / extension.path, target)
         arguments.extend(
             ["--extension", f"{SANDBOX_RUNTIME_ROOT}/extensions/{target.name}"]
         )
+    expected_tools = runtime / "tools.json"
+    expected_tools.write_text(f"{json.dumps(tools)}\n", encoding="utf-8")
+    validate_tools = Path(
+        str(
+            files("openshell_agent_runner.harnesses.pi")
+            / "runtime"
+            / "extensions"
+            / "validate-tools.ts"
+        )
+    )
+    validator_target = runtime / "extensions" / "oar-validate-tools.ts"
+    shutil.copy2(validate_tools, validator_target)
+    arguments.extend(
+        [
+            "--extension",
+            f"{SANDBOX_RUNTIME_ROOT}/extensions/{validator_target.name}",
+        ]
+    )
     uploads = [
         f"{runtime / 'prompt.md'}:{SANDBOX_RUNTIME_ROOT}/prompt.md",
         f"{runtime / 'models.json'}:{SANDBOX_RUNTIME_ROOT}/models.json",
         f"{runtime / 'settings.json'}:{SANDBOX_RUNTIME_ROOT}/settings.json",
+        f"{expected_tools}:{SANDBOX_RUNTIME_ROOT}/tools.json",
     ]
     if task.output_schema is not None:
         uploads.append(

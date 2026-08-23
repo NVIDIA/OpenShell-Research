@@ -19,6 +19,7 @@ from pydantic import (
     Field,
     ValidationError,
     field_validator,
+    model_validator,
 )
 
 from openshell_agent_runner.errors import ConfigurationError
@@ -29,6 +30,8 @@ MODEL_IDENTIFIER_PATTERN = r"^[A-Za-z0-9._:/-]{1,256}$"
 MODELS_FILENAME = "models.json"
 PROFILE_FILENAME = "profile.yaml"
 SETTINGS_FILENAME = "settings.json"
+BUILTIN_PI_TOOLS = frozenset({"bash", "edit", "find", "grep", "ls", "read", "write"})
+SUBMIT_RESULT_TOOL = "submit_result"
 _PI_RUNTIME_SETTING_KEYS = {
     "defaultProvider",
     "defaultModel",
@@ -58,23 +61,71 @@ class SandboxConfig(StrictModel):
         return values
 
 
+ToolName = Annotated[str, Field(pattern=RESOURCE_IDENTIFIER_PATTERN)]
+
+
+class ExtensionConfig(StrictModel):
+    path: Path
+    tools: list[ToolName] = Field(default_factory=list)
+
+    @field_validator("tools")
+    @classmethod
+    def require_unique_tools(cls, values: list[str]) -> list[str]:
+        if len(values) != len(set(values)):
+            raise ValueError("extension tool entries must be unique")
+        return values
+
+
 class TaskConfig(StrictModel):
     description: str | None = Field(default=None, min_length=1, max_length=1000)
     required_input: Literal["document"] | None = None
     prompt: Path
     output_schema: Path | None = None
-    tools: list[Annotated[str, Field(pattern=RESOURCE_IDENTIFIER_PATTERN)]] = Field(
-        default_factory=list
-    )
+    tools: list[ToolName] = Field(default_factory=list)
     skills: list[Path] = Field(default_factory=list)
-    extensions: list[Path] = Field(default_factory=list)
+    extensions: list[ExtensionConfig] = Field(default_factory=list)
 
-    @field_validator("tools", "skills", "extensions")
+    @field_validator("tools", "skills")
     @classmethod
     def require_unique_resources(cls, values: list[object]) -> list[object]:
         if len(values) != len(set(values)):
             raise ValueError("resource entries must be unique")
         return values
+
+    @field_validator("extensions")
+    @classmethod
+    def require_unique_extensions(
+        cls, values: list[ExtensionConfig]
+    ) -> list[ExtensionConfig]:
+        paths = [extension.path for extension in values]
+        if len(paths) != len(set(paths)):
+            raise ValueError("extension paths must be unique")
+        return values
+
+    @model_validator(mode="after")
+    def require_known_tools(self) -> TaskConfig:
+        declared_custom_tools: set[str] = set()
+        for extension in self.extensions:
+            for tool in extension.tools:
+                if tool in BUILTIN_PI_TOOLS or tool == SUBMIT_RESULT_TOOL:
+                    raise ValueError(
+                        f"extension tool {tool!r} conflicts with a reserved tool"
+                    )
+                if tool in declared_custom_tools:
+                    raise ValueError(
+                        f"custom tool {tool!r} is declared by multiple extensions"
+                    )
+                declared_custom_tools.add(tool)
+
+        available_tools = BUILTIN_PI_TOOLS | declared_custom_tools
+        unknown_tools = sorted(set(self.tools) - available_tools)
+        if unknown_tools:
+            raise ValueError(
+                f"unknown tools {unknown_tools}; Pi built-ins are "
+                f"{sorted(BUILTIN_PI_TOOLS)}; declare each custom tool under a "
+                "referenced extension"
+            )
+        return self
 
 
 class ProfileConfig(StrictModel):
@@ -326,7 +377,11 @@ def _validate_profile_resources(resolved: ResolvedProfile) -> None:
                         f"skill for task {task_id} contains a symlink: {descendant}"
                     )
         for extension in task.extensions:
-            _inside(directory, directory / extension, f"extension for task {task_id}")
+            _inside(
+                directory,
+                directory / extension.path,
+                f"extension for task {task_id}",
+            )
 
 
 def _validate_output_schema(path: Path) -> None:

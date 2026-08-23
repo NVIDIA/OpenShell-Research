@@ -121,6 +121,50 @@ def test_skill_tree_rejects_symlinks(tmp_path: Path) -> None:
         load_profile(tmp_path)
 
 
+def test_unknown_tool_is_rejected(tmp_path: Path) -> None:
+    _write_profile(tmp_path, task="tools: [not_a_real_tool]")
+
+    with pytest.raises(ConfigurationError, match="unknown tools.*not_a_real_tool"):
+        load_profile(tmp_path)
+
+
+def test_custom_tool_requires_extension_declaration(tmp_path: Path) -> None:
+    _write_profile(tmp_path, task="tools: [custom_check]")
+
+    with pytest.raises(ConfigurationError, match="declare each custom tool"):
+        load_profile(tmp_path)
+
+
+def test_custom_tool_with_existing_extension_validates(tmp_path: Path) -> None:
+    _write_profile(
+        tmp_path,
+        task="""tools: [custom_check]
+    extensions:
+      - path: extension.ts
+        tools: [custom_check]""",
+    )
+    (tmp_path / "extension.ts").write_text("export default function () {}\n")
+
+    resolved = load_profile(tmp_path)
+
+    extension = resolved.profile.tasks["check"].extensions[0]
+    assert extension.path == Path("extension.ts")
+    assert extension.tools == ["custom_check"]
+
+
+def test_custom_tool_extension_file_must_exist(tmp_path: Path) -> None:
+    _write_profile(
+        tmp_path,
+        task="""tools: [custom_check]
+    extensions:
+      - path: missing.ts
+        tools: [custom_check]""",
+    )
+
+    with pytest.raises(ConfigurationError, match="missing extension for task check"):
+        load_profile(tmp_path)
+
+
 @pytest.mark.parametrize(
     ("models", "message"),
     [

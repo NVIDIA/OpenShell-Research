@@ -115,6 +115,28 @@ Environment keys start with a letter or underscore and contain only letters,
 digits, and underscores. They cannot start with OpenShell's reserved
 `OPENSHELL_` prefix.
 
+### Tools and extensions
+
+Each task lists the tools Pi may use. OAR accepts Pi's built-in `bash`, `edit`,
+`find`, `grep`, `ls`, `read`, and `write` tools. Declare a custom tool alongside
+the extension that provides it:
+
+```yaml
+tasks:
+  check:
+    prompt: prompts/check.md
+    tools: [read, custom_check]
+    extensions:
+      - path: extensions/custom-check.ts
+        tools: [custom_check]
+```
+
+Validation rejects unknown tools, missing extension files, and custom tools
+without a matching extension declaration. Before inference starts, OAR checks
+the tools Pi actually registered. A misspelled built-in or an extension that
+fails to register its declared tool stops the task instead of silently removing
+the tool.
+
 ## Run lifecycle
 
 <figure class="documentation-figure documentation-figure--wide">
