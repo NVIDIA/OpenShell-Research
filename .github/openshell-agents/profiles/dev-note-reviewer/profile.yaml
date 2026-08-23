@@ -1,0 +1,22 @@
+id: dev-note-reviewer
+description: Review OpenShell Dev Notes for editorial and technical quality.
+
+sandbox:
+  policy: policy.yaml
+  env:
+    - REPOSITORY_ROOT=/workspace/source
+
+tasks:
+  editorial:
+    description: Review a Dev Note for editorial quality and writing clarity.
+    prompt: prompts/editorial.md
+    output_schema: schemas/review.json
+    tools: [read, grep, find, ls, bash]
+    skills: [skills/review-dev-note]
+
+  technical:
+    description: Review a Dev Note for technical quality and reader utility.
+    prompt: prompts/technical.md
+    output_schema: schemas/review.json
+    tools: [read, grep, find, ls, bash]
+    skills: [skills/review-dev-note]

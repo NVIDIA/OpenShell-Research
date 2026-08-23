@@ -1,0 +1,80 @@
+[project]
+name = "openshell-agent-runner"
+dynamic = ["version"]
+description = "Launch ephemeral agents for single tasks in OpenShell sandboxes."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+  { name = "NVIDIA CORPORATION & AFFILIATES" },
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development",
+]
+dependencies = [
+  "jsonschema>=4.25,<5",
+  "pydantic>=2.11,<3",
+  "pyyaml>=6,<7",
+  "typer>=0.16,<1",
+]
+
+[project.scripts]
+oar = "openshell_agent_runner.cli:app"
+openshell-agent-runner = "openshell_agent_runner.cli:app"
+
+[project.urls]
+Repository = "https://github.com/NVIDIA/OpenShell-Research"
+Documentation = "https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/"
+
+[dependency-groups]
+dev = [
+  "pre-commit>=4,<5",
+  "pytest>=8.4,<10",
+  "ruff==0.16.4",
+  "ty>=0.0.1a34",
+]
+
+[build-system]
+requires = ["hatchling", "uv-dynamic-versioning>=0.7.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+bump = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/openshell_agent_runner"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src/openshell_agent_runner",
+  "/LICENSE",
+  "/README.md",
+  "/pyproject.toml",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "TID252", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

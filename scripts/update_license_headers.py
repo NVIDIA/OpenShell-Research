@@ -397,7 +397,7 @@ if __name__ == "__main__":
     total_processed = total_updated = total_skipped = 0
 
     # Process root-level directories
-    for folder in ["dev-tools", "docs", "projects", "scripts", "tests_e2e"]:
+    for folder in ["docs", "projects", "scripts", "tests_e2e"]:
         folder_path = repo_path / folder
         if not folder_path.exists():
             continue
@@ -426,8 +426,8 @@ if __name__ == "__main__":
             if not package_dir.is_dir():
                 continue
 
-            # Process src/, tests/, and dev-tools/ within each package
-            for subfolder in ["src", "tests", "dev-tools"]:
+            # Process src/ and tests/ within each package
+            for subfolder in ["src", "tests"]:
                 folder_path = package_dir / subfolder
                 if not folder_path.exists():
                     continue

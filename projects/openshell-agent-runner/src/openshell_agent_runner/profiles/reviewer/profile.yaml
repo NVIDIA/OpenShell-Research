@@ -1,0 +1,12 @@
+id: reviewer
+description: Review a required input document and publish the result.
+
+sandbox:
+  policy: policy.yaml
+
+tasks:
+  review:
+    description: Review an input document and return a useful written result.
+    required_input: document
+    prompt: prompt.md
+    tools: [read, grep, find, ls, bash]
