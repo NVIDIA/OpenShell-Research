@@ -14,4 +14,6 @@ serde_json = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 uuid = { version = "1", features = ["v4", "serde"] }
+# z3 0.20 requires a newer glibc/libstdc++ baseline; the reported 0.19 build-only
+# RustCrypto transitives have no fixed release or scanner upgrade guidance.
 z3 = { version = "0.19", features = ["bundled"] }
