@@ -86,7 +86,7 @@ if [[ "$CURRENT_BRANCH" != "main" && "$ALLOW_NON_MAIN" != true ]]; then
     exit 1
 fi
 
-TAG="v$VERSION"
+TAG="oar-v$VERSION"
 git fetch origin main --tags
 
 if [[ "$ALLOW_NON_MAIN" != true ]] && \

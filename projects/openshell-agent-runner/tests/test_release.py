@@ -36,7 +36,7 @@ def test_publish_prints_tag_deletion_commands_for_existing_remote_tag(
         if [[ "$1" == "rev-parse" ]]; then printf 'abc123\\n'; exit 0; fi
         if [[ "$1" == "rev-list" ]]; then printf 'abc123\\n'; exit 0; fi
         if [[ "$1" == "ls-remote" ]]; then
-            printf 'abc123\\trefs/tags/v0.1.0\\n'
+            printf 'abc123\\trefs/tags/oar-v0.1.0\\n'
             exit 0
         fi
         exit 91
@@ -54,9 +54,9 @@ def test_publish_prints_tag_deletion_commands_for_existing_remote_tag(
     )
 
     assert result.returncode == 1
-    assert "remote tag 'v0.1.0' already exists" in result.stderr
-    assert "git tag -d 'v0.1.0'" in result.stderr
-    assert "git push origin --delete 'v0.1.0'" in result.stderr
+    assert "remote tag 'oar-v0.1.0' already exists" in result.stderr
+    assert "git tag -d 'oar-v0.1.0'" in result.stderr
+    assert "git push origin --delete 'oar-v0.1.0'" in result.stderr
 
 
 @pytest.mark.parametrize(
@@ -94,7 +94,7 @@ def test_publish_retry_uploads_only_missing_artifacts(
         if [[ "$1" == "rev-list" ]]; then printf 'abc123\\n'; exit 0; fi
         if [[ "$1" == "ls-remote" ]]; then
             if [[ -e "$FAKE_GIT_STATE/remote-tag" ]]; then
-                printf 'abc123\\trefs/tags/v0.1.0\\n'
+                printf 'abc123\\trefs/tags/oar-v0.1.0\\n'
             fi
             exit 0
         fi

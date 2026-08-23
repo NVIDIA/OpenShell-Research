@@ -1,7 +1,8 @@
 # Releasing openshell-agent-runner
 
-The release process publishes to PyPI from a local shell. A version tag supplies
-the package version, and `uv publish` uploads the built distributions.
+The release process publishes to PyPI from a local shell. An OAR-namespaced
+version tag (`oar-vX.Y.Z`) supplies the package version, and `uv publish` uploads
+the built distributions.
 
 Set a PyPI API token in the shell before publishing:
 
@@ -52,7 +53,7 @@ The script:
 1. Fetches `origin/main` and tags and confirms that local `main` is current.
 2. Runs the same checks and builds version `0.1.0` from the local tag.
 3. Checks the exact wheel and source distribution with `uv publish --dry-run`.
-4. Pushes `v0.1.0`, establishing the public source commit before publication.
+4. Pushes `oar-v0.1.0`, establishing the public source commit before publication.
 5. Uploads only those two artifacts to PyPI with `uv publish`.
 6. Prints the version-specific PyPI project link.
 
