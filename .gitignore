@@ -48,6 +48,7 @@ temp/
 *.temp
 *.bak
 .scratch/
+plans/
 
 # Local planning artifacts
 /plans/
