@@ -119,13 +119,19 @@ max_thread_rotations="${LAB_CHALLENGER_MAX_THREAD_ROTATIONS:-6}"
 thread_max_successful_turns="${LAB_CHALLENGER_THREAD_MAX_SUCCESSFUL_TURNS:-0}"
 handoff_max_characters="${LAB_CHALLENGER_HANDOFF_MAX_CHARACTERS:-24000}"
 handoff_file="$work/challenger-handoff.jsonl"
+turn_log_file="$work/challenger-turns.jsonl"
+lull_window_turns="${LAB_CHALLENGER_LULL_WINDOW_TURNS:-40}"
+lull_min_idle_turns="${LAB_CHALLENGER_LULL_MIN_IDLE_TURNS:-40}"
+lull_min_duplicate_rate="${LAB_CHALLENGER_LULL_MIN_DUPLICATE_RATE:-0.5}"
 starting_prompt="$prompt"
 
 for setting in \
   model_request_timeout_seconds \
   thread_rotate_after_failures \
   max_thread_rotations \
-  handoff_max_characters; do
+  handoff_max_characters \
+  lull_window_turns \
+  lull_min_idle_turns; do
   if ! [[ "${!setting}" =~ ^[1-9][0-9]*$ ]]; then
     echo "$setting must be a positive integer" >&2
     exit 2
@@ -198,6 +204,54 @@ fs.writeFileSync(handoffFile, entries.map((entry) => JSON.stringify(entry)).join
 NODE
 }
 
+record_turn_observation() {
+  node - "$1" "$turn_log_file" <<'NODE'
+const fs = require('fs')
+const [traceFile, turnLogFile] = process.argv.slice(2)
+let commands = 0
+let message = ''
+for (const line of fs.readFileSync(traceFile, 'utf8').split('\n')) {
+  if (!line) continue
+  let event
+  try { event = JSON.parse(line) } catch { continue }
+  if (event.type !== 'item.completed' || !event.item) continue
+  if (event.item.type === 'command_execution') commands += 1
+  else if (event.item.type === 'agent_message') message += String(event.item.text ?? '')
+}
+fs.appendFileSync(turnLogFile, JSON.stringify({ commands, message: message.slice(0, 2400) }) + '\n')
+NODE
+}
+
+# Mirrors detectLull() in src/lull.ts; keep the two in sync.
+challenger_is_stalled() {
+  [[ -s "$turn_log_file" ]] || return 1
+  local verdict
+  verdict="$(node - "$turn_log_file" "$lull_window_turns" "$lull_min_idle_turns" "$lull_min_duplicate_rate" <<'NODE'
+const fs = require('fs')
+const [turnLogFile, rawWindow, rawIdle, rawDup] = process.argv.slice(2)
+const windowTurns = Number(rawWindow)
+const turns = fs.readFileSync(turnLogFile, 'utf8').split('\n').filter(Boolean).flatMap((line) => {
+  try { return [JSON.parse(line)] } catch { return [] }
+})
+let idleTurns = 0
+for (let i = turns.length - 1; i >= 0; i -= 1) {
+  if (turns[i].commands > 0) break
+  idleTurns += 1
+}
+const window = turns.slice(-windowTurns)
+const messages = window
+  .map((turn) => String(turn.message ?? '').trim().toLowerCase().replace(/\s+/g, ' '))
+  .filter((text) => text.length > 0)
+const duplicateRate = messages.length ? 1 - new Set(messages).size / messages.length : 0
+const stalled = window.length >= windowTurns
+  && idleTurns >= Number(rawIdle)
+  && duplicateRate >= Number(rawDup)
+process.stdout.write(stalled ? 'stalled' : '')
+NODE
+)"
+  [[ "$verdict" == "stalled" ]]
+}
+
 log_thread_rotation() {
   local retained_characters
   retained_characters="$(wc -c < "$handoff_file")"
@@ -226,6 +280,7 @@ rotate_thread() {
   thread_id=""
   thread_successful_turns=0
   consecutive_failures=0
+  : > "$turn_log_file"
   recent_activity="$(cat "$handoff_file")"
   printf -v starting_prompt '%s\n\n%s\n%s\n\n%s\n%s' \
     "$prompt" \
@@ -258,6 +313,7 @@ while true; do
   codex_status="${PIPESTATUS[0]}"
   set -e
   update_handoff "$trace"
+  record_turn_observation "$trace"
 
   if [[ -z "$thread_id" ]]; then
     thread_id="$(read_thread_id "$trace")"
@@ -267,7 +323,11 @@ while true; do
     consecutive_failures=0
     thread_successful_turns=$((thread_successful_turns + 1))
     rm -f "$trace" "${trace}.stderr"
-    if (( thread_max_successful_turns > 0 \
+    if (( thread_rotations < max_thread_rotations )) \
+      && [[ -s "$handoff_file" ]] \
+      && challenger_is_stalled; then
+      rotate_thread "no_progress_lull"
+    elif (( thread_max_successful_turns > 0 \
       && thread_successful_turns >= thread_max_successful_turns \
       && thread_rotations < max_thread_rotations )); then
       rotate_thread "successful_turn_budget"
