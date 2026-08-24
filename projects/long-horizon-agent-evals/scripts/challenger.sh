@@ -175,7 +175,7 @@ const fs = require('fs')
 const [traceFile, handoffFile, rawLimit] = process.argv.slice(2)
 const limit = Number(rawLimit)
 const clip = (value, length) => String(value ?? '').slice(0, length)
-const entries = fs.existsSync(handoffFile)
+const accumulated = fs.existsSync(handoffFile)
   ? fs.readFileSync(handoffFile, 'utf8').split('\n').filter(Boolean).flatMap((line) => {
       try { return [JSON.parse(line)] } catch { return [] }
     })
@@ -188,9 +188,9 @@ for (const line of fs.readFileSync(traceFile, 'utf8').split('\n')) {
   const item = event.item
   if (item.type === 'reasoning' || item.type === 'agent_message') {
     const text = clip(item.text ?? item.summary, 2400)
-    if (text) entries.push({ type: item.type, text })
+    if (text) accumulated.push({ type: item.type, text })
   } else if (item.type === 'command_execution') {
-    entries.push({
+    accumulated.push({
       type: 'command_execution',
       command: clip(item.command, 1200),
       output: clip(item.aggregated_output, 1800),
@@ -198,8 +198,34 @@ for (const line of fs.readFileSync(traceFile, 'utf8').split('\n')) {
     })
   }
 }
-while (entries.length > 32) entries.shift()
-while (entries.length > 1 && entries.map((entry) => JSON.stringify(entry)).join('\n').length > limit) entries.shift()
+
+// Mirrors trimHandoff() in src/handoff.ts; keep the two in sync.
+const normalize = (text) => text.trim().toLowerCase().replace(/\s+/g, ' ')
+const seenProse = new Set()
+const entries = []
+for (let index = accumulated.length - 1; index >= 0; index -= 1) {
+  const entry = accumulated[index]
+  if (entry.type === 'command_execution') {
+    entries.push(entry)
+    continue
+  }
+  const normalized = normalize(String(entry.text ?? ''))
+  if (normalized && seenProse.has(normalized)) continue
+  if (normalized) seenProse.add(normalized)
+  entries.push(entry)
+}
+entries.reverse()
+const dropIndex = () => {
+  const prose = entries.findIndex((entry) => entry.type !== 'command_execution')
+  return prose === -1 ? 0 : prose
+}
+const serializedCharacters = () => entries.reduce(
+  (total, entry) => total + JSON.stringify(entry).length + 1,
+  0,
+)
+while (entries.length > 32 || serializedCharacters() > limit) {
+  entries.splice(dropIndex(), 1)
+}
 fs.writeFileSync(handoffFile, entries.map((entry) => JSON.stringify(entry)).join('\n') + (entries.length ? '\n' : ''))
 NODE
 }

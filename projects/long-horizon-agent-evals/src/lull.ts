@@ -82,7 +82,7 @@ export function detectLull(
 
   let idleTurns = 0
   for (let index = recent.length - 1; index >= 0; index -= 1) {
-    if (recent[index].commands > 0) break
+    if (recent[index]!.commands > 0) break
     idleTurns += 1
   }
 
