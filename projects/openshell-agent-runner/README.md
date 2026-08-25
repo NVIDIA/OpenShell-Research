@@ -65,6 +65,11 @@ OAR packages three focused review profiles:
 | `technical-writing-reviewer` | Document file | Review technical accuracy, clarity, completeness, and reader utility. |
 | `slop-cop` | Document file | Find material formulaic, vague, inflated, or generic prose without making AI-authorship claims. |
 
+Each reviewer returns criterion scores and an overall score from 0 to 100, where
+100 is best. The overall score is the rounded arithmetic mean of the profile's
+fixed criteria; the profile skill defines the criteria, score bands, and verdict
+thresholds.
+
 Each uses the same runtime prompt-variable mechanism. For example:
 
 ```yaml
