@@ -235,7 +235,10 @@ than one source can intentionally merge into the same destination.
 
 OAR packages three focused reviewers. `code-reviewer` accepts a repository;
 `technical-writing-reviewer` and `slop-cop` accept a document. All return JSON
-validated against their profile-local result schema:
+validated against their profile-local result schema, including criterion scores
+and an overall score from 0 to 100, where 100 is best. The overall score is the
+rounded arithmetic mean of the profile's fixed criteria. Each profile skill
+defines its criteria, score bands, and verdict thresholds:
 
 ```bash
 oar run ./profiles/technical-writing-reviewer \
