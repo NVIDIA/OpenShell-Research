@@ -13,6 +13,11 @@ export function isProposalReviewStaleError(error: unknown): boolean {
   ].some((message) => text.includes(message))
 }
 
+export function isProposalAlreadyRejectedError(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error)
+  return text.includes("chunk status is 'rejected', expected 'pending' or 'approved'")
+}
+
 export function proposalPreflightError(chunk: { applicationError?: unknown }): string | undefined {
   if (typeof chunk.applicationError !== 'string') return undefined
   return chunk.applicationError.trim() || undefined
@@ -251,6 +256,18 @@ async function main(): Promise<void> {
             status('reviewer.applied', { sandbox, decisionNumber, decision: 'reject' })
           } catch (error) {
             const applicationError = errorText(error)
+            if (isProposalAlreadyRejectedError(error)) {
+              await appendJsonl(path.join(runDir, 'decisions.jsonl'), {
+                chunkId: chunk.id,
+                decisionNumber,
+                ...decision,
+                effectiveDecision: 'reject',
+                application: 'rejection_already_satisfied',
+                applicationError,
+              })
+              status('reviewer.applied', { sandbox, decisionNumber, decision: 'reject_already_satisfied' })
+              continue
+            }
             await appendJsonl(path.join(runDir, 'decisions.jsonl'), {
               chunkId: chunk.id,
               decisionNumber,

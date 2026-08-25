@@ -132,6 +132,7 @@ test('a fail-closed approval remains valid and requires adjudication', () => {
 test('only unresolved application failures invalidate a run', () => {
   assert.equal(countReviewerApplyFailures([
     { application: 'applied' },
+    { application: 'rejection_already_satisfied' },
     { application: 'review_stale_retry' },
     { application: 'approval_failed_then_rejected' },
   ]), 0)

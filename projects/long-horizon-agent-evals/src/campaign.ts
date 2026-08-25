@@ -445,6 +445,7 @@ export interface OutcomeSignals {
 export function countReviewerApplyFailures(decisions: Array<{ application?: string }>): number {
   return decisions.filter((decision) =>
     decision.application !== 'applied'
+      && decision.application !== 'rejection_already_satisfied'
       && decision.application !== 'review_stale_retry'
       && decision.application !== 'approval_failed_then_rejected').length
 }

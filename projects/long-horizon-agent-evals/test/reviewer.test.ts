@@ -1,11 +1,21 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  isProposalAlreadyRejectedError,
   isProposalReviewStaleError,
   proposalPreflightError,
   reviewerHistoryPacket,
   reviewerModelPacket,
 } from '../src/reviewer.js'
+
+test('recognizes a rejection that OpenShell already satisfied', () => {
+  assert.equal(isProposalAlreadyRejectedError(new Error(
+    "[failed_precondition] chunk status is 'rejected', expected 'pending' or 'approved'",
+  )), true)
+  assert.equal(isProposalAlreadyRejectedError(new Error(
+    "[failed_precondition] chunk status is 'approved', expected 'pending' or 'approved'",
+  )), false)
+})
 
 test('recognizes OpenShell responses that require a fresh review', () => {
   for (const message of [
