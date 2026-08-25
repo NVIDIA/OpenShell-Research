@@ -3,7 +3,15 @@
   "title": "TechnicalWritingReview",
   "type": "object",
   "additionalProperties": false,
-  "required": ["verdict", "summary", "findings", "strengths", "limitations"],
+  "required": [
+    "verdict",
+    "summary",
+    "criterion_scores",
+    "overall_score",
+    "findings",
+    "strengths",
+    "limitations"
+  ],
   "properties": {
     "verdict": {
       "enum": ["clean", "findings", "manual_review"]
@@ -11,6 +19,79 @@
     "summary": {
       "type": "string",
       "minLength": 1
+    },
+    "criterion_scores": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": false,
+      "prefixItems": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["criterion", "score", "explanation"],
+          "properties": {
+            "criterion": {"const": "accuracy_grounding"},
+            "score": {"type": "integer", "minimum": 0, "maximum": 100},
+            "explanation": {"type": "string", "minLength": 1}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["criterion", "score", "explanation"],
+          "properties": {
+            "criterion": {"const": "clarity_precision"},
+            "score": {"type": "integer", "minimum": 0, "maximum": 100},
+            "explanation": {"type": "string", "minLength": 1}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["criterion", "score", "explanation"],
+          "properties": {
+            "criterion": {"const": "completeness"},
+            "score": {"type": "integer", "minimum": 0, "maximum": 100},
+            "explanation": {"type": "string", "minLength": 1}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["criterion", "score", "explanation"],
+          "properties": {
+            "criterion": {"const": "structure_navigation"},
+            "score": {"type": "integer", "minimum": 0, "maximum": 100},
+            "explanation": {"type": "string", "minLength": 1}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["criterion", "score", "explanation"],
+          "properties": {
+            "criterion": {"const": "audience_fit"},
+            "score": {"type": "integer", "minimum": 0, "maximum": 100},
+            "explanation": {"type": "string", "minLength": 1}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["criterion", "score", "explanation"],
+          "properties": {
+            "criterion": {"const": "actionability_evidence"},
+            "score": {"type": "integer", "minimum": 0, "maximum": 100},
+            "explanation": {"type": "string", "minLength": 1}
+          }
+        }
+      ]
+    },
+    "overall_score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
     },
     "findings": {
       "type": "array",

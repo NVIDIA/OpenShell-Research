@@ -111,6 +111,34 @@ def test_dev_note_schema_requires_each_editorial_criterion_in_order(
             {
                 "verdict": "findings",
                 "summary": "One material issue.",
+                "criterion_scores": [
+                    {
+                        "criterion": "correctness",
+                        "score": 70,
+                        "explanation": "A boundary defect affects valid requests.",
+                    },
+                    {
+                        "criterion": "robustness_security",
+                        "score": 85,
+                        "explanation": "No material robustness or security issue found.",
+                    },
+                    {
+                        "criterion": "maintainability_complexity",
+                        "score": 85,
+                        "explanation": "The affected logic remains easy to follow.",
+                    },
+                    {
+                        "criterion": "tests_verification",
+                        "score": 75,
+                        "explanation": "The boundary behavior lacks effective coverage.",
+                    },
+                    {
+                        "criterion": "usability_integration",
+                        "score": 85,
+                        "explanation": "Integration behavior is otherwise coherent.",
+                    },
+                ],
+                "overall_score": 80,
                 "findings": [
                     {
                         "severity": "high",
@@ -132,6 +160,39 @@ def test_dev_note_schema_requires_each_editorial_criterion_in_order(
             {
                 "verdict": "findings",
                 "summary": "One unclear instruction.",
+                "criterion_scores": [
+                    {
+                        "criterion": "accuracy_grounding",
+                        "score": 90,
+                        "explanation": "The claims are adequately grounded.",
+                    },
+                    {
+                        "criterion": "clarity_precision",
+                        "score": 65,
+                        "explanation": "A key instruction is ambiguous.",
+                    },
+                    {
+                        "criterion": "completeness",
+                        "score": 75,
+                        "explanation": "The working-directory context is missing.",
+                    },
+                    {
+                        "criterion": "structure_navigation",
+                        "score": 85,
+                        "explanation": "The document is otherwise easy to navigate.",
+                    },
+                    {
+                        "criterion": "audience_fit",
+                        "score": 85,
+                        "explanation": "The depth suits the intended reader.",
+                    },
+                    {
+                        "criterion": "actionability_evidence",
+                        "score": 80,
+                        "explanation": "Most instructions support the intended task.",
+                    },
+                ],
+                "overall_score": 80,
                 "findings": [
                     {
                         "severity": "medium",
@@ -152,6 +213,34 @@ def test_dev_note_schema_requires_each_editorial_criterion_in_order(
             {
                 "verdict": "polish",
                 "summary": "One formulaic opening.",
+                "criterion_scores": [
+                    {
+                        "criterion": "substance_directness",
+                        "score": 74,
+                        "explanation": "One opener delays its useful claim.",
+                    },
+                    {
+                        "criterion": "specificity",
+                        "score": 84,
+                        "explanation": "Claims are generally concrete.",
+                    },
+                    {
+                        "criterion": "structural_naturalness",
+                        "score": 82,
+                        "explanation": "The broader structure serves the content.",
+                    },
+                    {
+                        "criterion": "rhythm_style",
+                        "score": 80,
+                        "explanation": "The prose is readable outside the opening.",
+                    },
+                    {
+                        "criterion": "distinctive_voice",
+                        "score": 80,
+                        "explanation": "The document mostly retains a clear voice.",
+                    },
+                ],
+                "overall_score": 80,
                 "findings": [
                     {
                         "prevalence": "isolated",
@@ -177,6 +266,17 @@ def test_packaged_profile_schemas_accept_expected_results(
 
     validate_artifact(source, schema)
 
+    criterion_scores = result["criterion_scores"]
+    assert isinstance(criterion_scores, list)
+    first_score = criterion_scores[0]
+    assert isinstance(first_score, dict)
+    original_score = first_score["score"]
+    first_score["score"] = 101
+    source.write_text(json.dumps(result))
+    with pytest.raises(ArtifactError, match="output schema validation"):
+        validate_artifact(source, schema)
+
+    first_score["score"] = original_score
     result["unexpected"] = True
     source.write_text(json.dumps(result))
     with pytest.raises(ArtifactError, match="output schema validation"):

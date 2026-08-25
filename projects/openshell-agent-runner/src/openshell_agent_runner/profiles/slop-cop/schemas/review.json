@@ -6,6 +6,8 @@
   "required": [
     "verdict",
     "summary",
+    "criterion_scores",
+    "overall_score",
     "findings",
     "voice_to_preserve",
     "limitations"
@@ -17,6 +19,69 @@
     "summary": {
       "type": "string",
       "minLength": 1
+    },
+    "criterion_scores": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": false,
+      "prefixItems": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["criterion", "score", "explanation"],
+          "properties": {
+            "criterion": {"const": "substance_directness"},
+            "score": {"type": "integer", "minimum": 0, "maximum": 100},
+            "explanation": {"type": "string", "minLength": 1}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["criterion", "score", "explanation"],
+          "properties": {
+            "criterion": {"const": "specificity"},
+            "score": {"type": "integer", "minimum": 0, "maximum": 100},
+            "explanation": {"type": "string", "minLength": 1}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["criterion", "score", "explanation"],
+          "properties": {
+            "criterion": {"const": "structural_naturalness"},
+            "score": {"type": "integer", "minimum": 0, "maximum": 100},
+            "explanation": {"type": "string", "minLength": 1}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["criterion", "score", "explanation"],
+          "properties": {
+            "criterion": {"const": "rhythm_style"},
+            "score": {"type": "integer", "minimum": 0, "maximum": 100},
+            "explanation": {"type": "string", "minLength": 1}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["criterion", "score", "explanation"],
+          "properties": {
+            "criterion": {"const": "distinctive_voice"},
+            "score": {"type": "integer", "minimum": 0, "maximum": 100},
+            "explanation": {"type": "string", "minLength": 1}
+          }
+        }
+      ]
+    },
+    "overall_score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
     },
     "findings": {
       "type": "array",

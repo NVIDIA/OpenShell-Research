@@ -69,6 +69,33 @@ Use severity consistently:
 - `medium`: concrete defect with limited impact or reach;
 - `low`: worthwhile non-blocking issue, never a style nit.
 
+## Score the repository
+
+Score each criterion from 0 to 100 against the repository's stated purpose and
+ambition ceiling:
+
+1. `correctness`: implemented behavior matches its contracts and intended use;
+2. `robustness_security`: realistic failures and trust boundaries are handled
+   proportionately;
+3. `maintainability_complexity`: ownership is clear and complexity earns its
+   cost;
+4. `tests_verification`: important behavior and failure paths have credible
+   verification;
+5. `usability_integration`: user, operator, API, packaging, and integration
+   behavior is coherent where applicable.
+
+Use these anchors for every criterion: 90-100 is excellent with no material
+weakness; 75-89 is strong with localized non-blocking weaknesses; 60-74 needs
+substantive revision; 40-59 has major or repeated weaknesses; and 0-39 is
+fundamentally ineffective or unsafe. Do not lower a score for an inapplicable
+concern or an imagined future requirement.
+
+Set `overall_score` to the arithmetic mean of the five criterion scores, rounded
+to the nearest integer. A `clean` verdict requires an overall score of at least
+90 and no findings. Use `findings` whenever a material finding is reported. A
+`manual_review` result still includes the best evidence-based score available
+and explains its uncertainty in `limitations`.
+
 Use `manual_review` only when missing context prevents a responsible verdict.
 If no material findings remain, return `clean` with an empty findings array and
 state any meaningful limitations. Record only brief, evidence-based strengths;
