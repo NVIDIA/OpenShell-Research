@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { isProposalReviewStaleError, reviewerHistoryPacket, reviewerModelPacket } from '../src/reviewer.js'
+import {
+  isProposalReviewStaleError,
+  proposalPreflightError,
+  reviewerHistoryPacket,
+  reviewerModelPacket,
+} from '../src/reviewer.js'
 
 test('recognizes OpenShell responses that require a fresh review', () => {
   for (const message of [
@@ -16,6 +21,12 @@ test('does not retry unrelated approval failures', () => {
   assert.equal(isProposalReviewStaleError(
     new Error('[failed_precondition] proposal is not applicable: endpoint ambiguity'),
   ), false)
+})
+
+test('recognizes only non-empty OpenShell candidate preflight errors', () => {
+  assert.equal(proposalPreflightError({ applicationError: ' candidate invalid ' }), 'candidate invalid')
+  assert.equal(proposalPreflightError({ applicationError: '' }), undefined)
+  assert.equal(proposalPreflightError({}), undefined)
 })
 
 test('reviewer packet includes one authoritative candidate policy without duplicate snapshots', () => {

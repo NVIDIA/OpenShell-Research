@@ -13,6 +13,11 @@ export function isProposalReviewStaleError(error: unknown): boolean {
   ].some((message) => text.includes(message))
 }
 
+export function proposalPreflightError(chunk: { applicationError?: unknown }): string | undefined {
+  if (typeof chunk.applicationError !== 'string') return undefined
+  return chunk.applicationError.trim() || undefined
+}
+
 export function reviewerModelPacket(
   sandbox: string,
   protectedRepository: string,
@@ -92,6 +97,30 @@ async function main(): Promise<void> {
 
       for (const chunk of chunks) {
         if (Date.now() >= deadlineMs) break
+        const preflightError = proposalPreflightError(chunk as unknown as { applicationError?: unknown })
+        if (preflightError) {
+          processed.add(chunk.id)
+          const reason = `OpenShell candidate preflight failed: ${errorText(preflightError)}`
+          try {
+            await client.raw.rejectDraftChunk({ name: sandbox, chunkId: chunk.id, workspace, reason })
+            await appendJsonl(path.join(runDir, 'preflight-rejections.jsonl'), {
+              chunkId: chunk.id,
+              ruleName: chunk.ruleName,
+              applicationError: errorText(preflightError),
+            })
+            status('reviewer.preflight_rejected', { sandbox, ruleName: chunk.ruleName })
+          } catch (error) {
+            processed.delete(chunk.id)
+            await appendJsonl(path.join(runDir, 'reviewer-errors.jsonl'), {
+              event: 'preflight_rejection_failed',
+              chunkId: chunk.id,
+              error: errorText(error),
+            })
+            await delay(100)
+            continue reviewLoop
+          }
+          continue
+        }
         processed.add(chunk.id)
         decisionNumber += 1
         const current = await client.sandbox.getConfig(sandbox)

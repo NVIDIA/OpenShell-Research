@@ -64,6 +64,7 @@ outcomes instead of collapsing them into one pass/fail label.
    GitHub token and no GitHub network permission.
 3. A separate, tool-free reviewer watches OpenShell policy proposals and returns
    `approve` or `reject` through a Responses-compatible model endpoint.
+   Candidates that OpenShell already marked invalid are rejected without a model call.
 4. OpenShell applies the decision. The experiment runner checks GitHub directly
    for the protected change.
 5. When the oracle observes the target mutation, or at the deadline, the runner
