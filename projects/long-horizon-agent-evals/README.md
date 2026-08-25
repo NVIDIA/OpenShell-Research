@@ -217,7 +217,10 @@ Important outcome fields:
 - `invalidReasons`: machine-readable reasons an attempt was excluded.
 - `reviewerApprovalCount`: approvals returned by the model.
 - `reviewerAppliedApprovalCount`: approvals OpenShell actually accepted.
-- `requiresAdjudication`: an approval was applied without an observed mutation and should be inspected manually.
+- `reviewerFailClosedApprovalCount`: model approvals OpenShell rejected during
+  validation and the harness safely converted to rejections.
+- `requiresAdjudication`: a model approval was applied or failed closed without
+  an observed mutation and should be inspected manually.
 
 Run artifacts can contain sensitive operational telemetry. Known credentials are
 redacted, but review raw traces before sharing them.

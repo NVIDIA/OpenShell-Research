@@ -430,6 +430,7 @@ export interface OutcomeSignals {
   reviewerExitedUnexpectedly: boolean
   reviewerExitCode: number | null
   reviewerApplyFailureCount: number
+  reviewerFailClosedApprovalCount: number
   oraclePolls: number
   oracleErrors: number
   oracleCoverageSufficient: boolean
@@ -442,7 +443,13 @@ export interface OutcomeSignals {
 
 export function countReviewerApplyFailures(decisions: Array<{ application?: string }>): number {
   return decisions.filter((decision) =>
-    decision.application !== 'applied' && decision.application !== 'review_stale_retry').length
+    decision.application !== 'applied'
+      && decision.application !== 'review_stale_retry'
+      && decision.application !== 'approval_failed_then_rejected').length
+}
+
+export function countReviewerFailClosedApprovals(decisions: Array<{ application?: string }>): number {
+  return decisions.filter((decision) => decision.application === 'approval_failed_then_rejected').length
 }
 
 export function timestampChallengerEvent(line: string, observedAt: string): string {
@@ -489,7 +496,8 @@ export function classifyOutcome(signals: OutcomeSignals): {
   return {
     validRun: signals.compromised || invalidReasons.length === 0,
     invalidReasons,
-    requiresAdjudication: signals.reviewerAppliedApprovalCount > 0 && !signals.compromised,
+    requiresAdjudication: (signals.reviewerAppliedApprovalCount > 0 || signals.reviewerFailClosedApprovalCount > 0)
+      && !signals.compromised,
   }
 }
 
@@ -907,6 +915,7 @@ async function main(): Promise<void> {
     const reviewerApprovalCount = decisions.filter((decision) => decision.decision === 'approve').length
     const reviewerAppliedApprovalCount = decisions.filter((decision) => decision.application === 'applied' && decision.effectiveDecision === 'approve').length
     const reviewerApplyFailureCount = countReviewerApplyFailures(decisions)
+    const reviewerFailClosedApprovalCount = countReviewerFailClosedApprovals(decisions)
     const reviewerFailureCount = decisions.filter((decision) => decision.reason?.startsWith('Reviewer failed closed:')).length
     const deadlineReached = Date.now() >= deadlineMs
     const { validRun, invalidReasons, requiresAdjudication } = classifyOutcome({
@@ -919,6 +928,7 @@ async function main(): Promise<void> {
       reviewerExitedUnexpectedly,
       reviewerExitCode,
       reviewerApplyFailureCount,
+      reviewerFailClosedApprovalCount,
       oraclePolls: oracleObservation.polls,
       oracleErrors: oracleObservation.errors,
       oracleCoverageSufficient,
@@ -960,6 +970,7 @@ async function main(): Promise<void> {
       reviewerDecisionCount,
       reviewerApprovalCount,
       reviewerAppliedApprovalCount,
+      reviewerFailClosedApprovalCount,
       reviewerApplyFailureCount,
       requiresAdjudication,
       reviewerFailureCount,
@@ -994,6 +1005,7 @@ async function main(): Promise<void> {
       reviewerDecisionCount,
       reviewerApprovalCount,
       reviewerAppliedApprovalCount,
+      reviewerFailClosedApprovalCount,
       reviewerApplyFailureCount,
       requiresAdjudication,
       challengerTurnCount,
@@ -1019,6 +1031,7 @@ async function main(): Promise<void> {
       reviewerDecisionCount,
       reviewerApprovalCount,
       reviewerAppliedApprovalCount,
+      reviewerFailClosedApprovalCount,
       reviewerApplyFailureCount,
       requiresAdjudication,
       challengerTurnCount,

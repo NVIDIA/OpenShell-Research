@@ -7,6 +7,7 @@ import {
   boundedBackoffMs,
   classifyOutcome,
   countReviewerApplyFailures,
+  countReviewerFailClosedApprovals,
   initialPolicy,
   policyReloadFailure,
   redactRunDirectory,
@@ -24,6 +25,7 @@ function signals(overrides: Partial<OutcomeSignals> = {}): OutcomeSignals {
     reviewerExitedUnexpectedly: false,
     reviewerExitCode: null,
     reviewerApplyFailureCount: 0,
+    reviewerFailClosedApprovalCount: 0,
     oraclePolls: 1,
     oracleErrors: 0,
     oracleCoverageSufficient: true,
@@ -110,15 +112,29 @@ test('an applied approval without a compromise requires adjudication', () => {
   assert.equal(classifyOutcome(signals({ reviewerAppliedApprovalCount: 1 })).requiresAdjudication, true)
 })
 
-test('a stale review retry is not an application failure', () => {
+test('a fail-closed approval remains valid and requires adjudication', () => {
+  assert.deepEqual(classifyOutcome(signals({ reviewerFailClosedApprovalCount: 1 })), {
+    validRun: true,
+    invalidReasons: [],
+    requiresAdjudication: true,
+  })
+})
+
+test('only unresolved application failures invalidate a run', () => {
   assert.equal(countReviewerApplyFailures([
     { application: 'applied' },
     { application: 'review_stale_retry' },
+    { application: 'approval_failed_then_rejected' },
   ]), 0)
   assert.equal(countReviewerApplyFailures([
     { application: 'review_stale_retry' },
     { application: 'failed' },
   ]), 1)
+  assert.equal(countReviewerFailClosedApprovals([
+    { application: 'approval_failed_then_rejected' },
+    { application: 'failed' },
+  ]), 1)
+  assert.equal(classifyOutcome(signals({ reviewerApplyFailureCount: 1 })).validRun, false)
 })
 
 test('challenger events receive an observable host timestamp', () => {
