@@ -56,8 +56,10 @@ jobs:
         run: |
           uv run --project projects/openshell-agent-runner oar validate \
             .github/openshell-agents/profiles/dev-note-reviewer
-          uv run --project projects/openshell-agent-runner oar validate \
-            projects/openshell-agent-runner/src/openshell_agent_runner/profiles/reviewer
+          for profile in code-reviewer slop-cop technical-writing-reviewer; do
+            uv run --project projects/openshell-agent-runner oar validate \
+              "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/$profile"
+          done
 
       - name: Preview agent execution
         run: |
@@ -86,8 +88,9 @@ jobs:
           python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/image/exec.sh'
           python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/extensions/submit-result.ts'
           python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/extensions/validate-tools.ts'
-          python -m zipfile -l "$wheel" | grep -F 'profiles/reviewer/profile.yaml'
-          python -m zipfile -l "$wheel" | grep -F 'profiles/reviewer/models.json'
+          python -m zipfile -l "$wheel" | grep -F 'profiles/code-reviewer/profile.yaml'
+          python -m zipfile -l "$wheel" | grep -F 'profiles/slop-cop/profile.yaml'
+          python -m zipfile -l "$wheel" | grep -F 'profiles/technical-writing-reviewer/profile.yaml'
           python -m zipfile -l "$wheel" | grep -F 'dist-info/licenses/LICENSE'
 
       - name: Verify the built wheel
@@ -96,16 +99,18 @@ jobs:
           wheel="$(find dist -name '*.whl' -print -quit)"
           uvx --from "$wheel" oar init "$RUNNER_TEMP/profiles" \
             --model provider/model
-          uvx --from "$wheel" oar validate \
-            "$RUNNER_TEMP/profiles/reviewer"
+          for profile in code-reviewer slop-cop technical-writing-reviewer; do
+            uvx --from "$wheel" oar validate \
+              "$RUNNER_TEMP/profiles/$profile"
+          done
           printf '# Review me\n\nA short document.\n' > "$RUNNER_TEMP/review-input.md"
           uvx --from "$wheel" oar run \
-            "$RUNNER_TEMP/profiles/reviewer" \
+            "$RUNNER_TEMP/profiles/technical-writing-reviewer" \
             --task review-document \
             --input "$RUNNER_TEMP/review-input.md" \
-            --output "$RUNNER_TEMP/review-output.md" \
+            --output "$RUNNER_TEMP/review-output.json" \
             --dry-run
-          test ! -e "$RUNNER_TEMP/review-output.md"
+          test ! -e "$RUNNER_TEMP/review-output.json"
 
       - name: Build the Pi image
         if: matrix.python-version == '3.12'
@@ -115,7 +120,7 @@ jobs:
             projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/image
           docker run --rm \
             --entrypoint bash \
-            --volume "$RUNNER_TEMP/profiles/reviewer:/profile-source:ro" \
+            --volume "$RUNNER_TEMP/profiles/code-reviewer:/profile-source:ro" \
             openshell-agent-runner-pi:ci \
             -c "cp -R /profile-source /tmp/profile && \
               PI_CODING_AGENT_DIR=/tmp/profile pi --offline --list-models openshell" \

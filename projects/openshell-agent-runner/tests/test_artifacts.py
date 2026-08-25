@@ -18,6 +18,9 @@ DEV_NOTE_SCHEMA = (
     REPOSITORY
     / ".github/openshell-agents/profiles/dev-note-reviewer/schemas/review.json"
 )
+PACKAGED_PROFILE_SCHEMAS = (
+    REPOSITORY / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles"
+)
 
 
 def test_plain_result_is_accepted_and_published(tmp_path: Path) -> None:
@@ -98,6 +101,86 @@ def test_dev_note_schema_requires_each_editorial_criterion_in_order(
     source.write_text(json.dumps(result))
     with pytest.raises(ArtifactError, match="output schema validation"):
         validate_artifact(source, DEV_NOTE_SCHEMA)
+
+
+@pytest.mark.parametrize(
+    ("profile_name", "result"),
+    [
+        (
+            "code-reviewer",
+            {
+                "verdict": "findings",
+                "summary": "One material issue.",
+                "findings": [
+                    {
+                        "severity": "high",
+                        "category": "correctness",
+                        "title": "Wrong boundary check",
+                        "path": "src/example.py",
+                        "line": 12,
+                        "evidence": "The final valid item is rejected.",
+                        "impact": "Valid requests fail.",
+                        "recommendation": "Use an inclusive upper bound.",
+                    }
+                ],
+                "strengths": [],
+                "limitations": [],
+            },
+        ),
+        (
+            "technical-writing-reviewer",
+            {
+                "verdict": "findings",
+                "summary": "One unclear instruction.",
+                "findings": [
+                    {
+                        "severity": "medium",
+                        "category": "clarity",
+                        "title": "Unspecified command location",
+                        "quote": "Run the command.",
+                        "line": 8,
+                        "explanation": "The reader cannot tell where to run it.",
+                        "recommendation": "Name the required working directory.",
+                    }
+                ],
+                "strengths": [],
+                "limitations": [],
+            },
+        ),
+        (
+            "slop-cop",
+            {
+                "verdict": "polish",
+                "summary": "One formulaic opening.",
+                "findings": [
+                    {
+                        "prevalence": "isolated",
+                        "category": "formulaic_structure",
+                        "quote": "It is important to note that the API is stable.",
+                        "line": 3,
+                        "effect": "The opener delays the useful claim.",
+                        "suggested_rewrite": "The API is stable.",
+                    }
+                ],
+                "voice_to_preserve": [],
+                "limitations": [],
+            },
+        ),
+    ],
+)
+def test_packaged_profile_schemas_accept_expected_results(
+    tmp_path: Path, profile_name: str, result: dict[str, object]
+) -> None:
+    source = tmp_path / "review.json"
+    source.write_text(json.dumps(result))
+    schema = PACKAGED_PROFILE_SCHEMAS / profile_name / "schemas/review.json"
+
+    validate_artifact(source, schema)
+
+    result["unexpected"] = True
+    source.write_text(json.dumps(result))
+    with pytest.raises(ArtifactError, match="output schema validation"):
+        validate_artifact(source, schema)
 
 
 @pytest.mark.parametrize("content", ["", "x" * (MAX_ARTIFACT_BYTES + 1)])
