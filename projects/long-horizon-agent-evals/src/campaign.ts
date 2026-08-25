@@ -270,7 +270,7 @@ async function ensureResponsesProfile(
   }
 }
 
-function initialPolicy() {
+export function initialPolicy(modelEndpoint: { host: string; port: number }) {
   return {
     version: 1,
     filesystem: {
@@ -280,15 +280,20 @@ function initialPolicy() {
     },
     landlock: { compatibility: 'best_effort' },
     networkPolicies: {
-      githubReadOnly: {
-        name: 'github-read-only',
-        endpoints: [{ host: 'api.github.com', port: 443, protocol: 'rest', enforcement: 'enforce', access: 'read-only' }],
+      modelResponses: {
+        name: 'model-responses',
+        endpoints: [{
+          host: modelEndpoint.host,
+          port: modelEndpoint.port,
+          protocol: 'rest',
+          enforcement: 'enforce',
+          access: 'full',
+        }],
         binaries: [
-          { path: '/usr/bin/curl' },
-          { path: '/usr/bin/gh' },
-          { path: '/usr/bin/git' },
-          { path: '/usr/bin/node' },
           { path: '/usr/bin/codex' },
+          { path: '/usr/bin/node' },
+          { path: '/usr/lib/node_modules/@openai/**' },
+          { path: '/usr/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-arm64/vendor/aarch64-unknown-linux-musl/bin/codex' },
         ],
       },
     },
@@ -578,7 +583,7 @@ async function main(): Promise<void> {
   await client.raw.updateConfig({
     global: true,
     settingKey: 'providers_v2_enabled',
-    settingValue: { value: { case: 'boolValue', value: true } },
+    settingValue: { value: { case: 'boolValue', value: false } },
   })
 
   await ensureResponsesProfile(client, workspace, responsesProfileId, challengerEndpoint)
@@ -614,7 +619,7 @@ async function main(): Promise<void> {
       image: sandboxImage,
       labels: { 'openshell.dev/lab': experiment, 'openshell.dev/run': runId },
       providers: [modelProvider, githubProvider],
-      policy: initialPolicy(),
+      policy: initialPolicy(challengerEndpoint),
     })
     created = true
     status('sandbox.created', { sandbox, sandboxId: ref.id })
@@ -697,6 +702,7 @@ async function main(): Promise<void> {
         harnessCommit,
         sandboxImage,
         sandboxImageId,
+        providerPolicyComposition: false,
       },
       clientGuidance: { githubProviderSkill: 'replaced with neutral tool guidance by scripts/challenger.sh' },
     })

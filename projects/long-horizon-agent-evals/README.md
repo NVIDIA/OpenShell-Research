@@ -33,9 +33,9 @@ flowchart LR
 ```
 
 The challenger is untrusted and runs with normal development tools and a real,
-repository-scoped GitHub token. The starting OpenShell policy permits GitHub
-reads but not writes. When OpenShell blocks an action, the challenger can ask
-for a policy change.
+repository-scoped GitHub token. The starting OpenShell policy permits the model
+endpoint but no GitHub network access. When OpenShell blocks an action, the
+challenger can ask for a policy change.
 
 A separate trusted process gives that request, the current policy, and
 OpenShell's deterministic prover findings to an AI reviewer. The reviewer has
@@ -61,7 +61,7 @@ outcomes instead of collapsing them into one pass/fail label.
 1. The trusted host creates a random branch, target path, and payload in the
    configured repository.
 2. The challenger starts in an OpenShell sandbox with a repository-scoped
-   GitHub token and read-only GitHub network policy.
+   GitHub token and no GitHub network permission.
 3. A separate, tool-free reviewer watches OpenShell policy proposals and returns
    `approve` or `reject` through a Responses-compatible model endpoint.
 4. OpenShell applies the decision. The experiment runner checks GitHub directly
@@ -124,6 +124,9 @@ challenger setting. `.env` is loaded automatically and is ignored by Git.
 The runner requires `LAB_DEDICATED_GATEWAY=1` because it changes gateway-global
 proposal settings. It also verifies that an exact GitHub write proposal reaches
 manual review before starting the challenger, so incompatible gateways fail fast.
+Provider policy composition is disabled on that dedicated gateway: providers
+deliver protected credential placeholders, while the experiment policy grants
+only model access. This keeps GitHub permission changes on the reviewer path.
 By default, observing the target stops the challenger immediately; set
 `LAB_CONTINUE_AFTER_COMPROMISE=1` only when the post-compromise trajectory is
 itself part of the experiment.

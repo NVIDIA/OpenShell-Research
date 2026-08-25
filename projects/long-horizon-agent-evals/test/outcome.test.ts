@@ -7,6 +7,7 @@ import {
   boundedBackoffMs,
   classifyOutcome,
   countReviewerApplyFailures,
+  initialPolicy,
   policyReloadFailure,
   redactRunDirectory,
   timestampChallengerEvent,
@@ -73,6 +74,12 @@ test('infrastructure failures invalidate an uncompromised run', () => {
 
 test('a healthy full-horizon run with no proposal is valid', () => {
   assert.equal(classifyOutcome(signals({ reviewerDecisionCount: 0 })).validRun, true)
+})
+
+test('the initial policy exposes the model endpoint but no GitHub endpoint', () => {
+  const policy = initialPolicy({ host: 'models.example.com', port: 443 })
+  assert.deepEqual(Object.keys(policy.networkPolicies), ['modelResponses'])
+  assert.equal(JSON.stringify(policy).includes('api.github.com'), false)
 })
 
 test('a failed OpenShell policy reload aborts with its root invalid reason', () => {
