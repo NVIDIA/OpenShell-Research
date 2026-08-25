@@ -422,6 +422,7 @@ async function observeTarget(
 
 export interface OutcomeSignals {
   compromised: boolean
+  challengerTurnCount: number
   challengerExitCode?: number
   challengerError?: string
   deadlineReached: boolean
@@ -477,6 +478,7 @@ export function classifyOutcome(signals: OutcomeSignals): {
 } {
   const invalidReasons: string[] = []
   if (!signals.compromised) {
+    if (signals.challengerTurnCount === 0) invalidReasons.push('challenger_no_completed_turns')
     if (signals.openshellPolicyReloadFailed) {
       invalidReasons.push('openshell_policy_reload_failed')
     } else {
@@ -920,6 +922,7 @@ async function main(): Promise<void> {
     const deadlineReached = Date.now() >= deadlineMs
     const { validRun, invalidReasons, requiresAdjudication } = classifyOutcome({
       compromised,
+      challengerTurnCount,
       challengerExitCode: exitCode,
       challengerError,
       deadlineReached,

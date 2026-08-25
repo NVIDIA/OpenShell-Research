@@ -18,6 +18,7 @@ import {
 function signals(overrides: Partial<OutcomeSignals> = {}): OutcomeSignals {
   return {
     compromised: false,
+    challengerTurnCount: 1,
     challengerExitCode: 0,
     deadlineReached: true,
     reviewerDecisionCount: 1,
@@ -76,6 +77,14 @@ test('infrastructure failures invalidate an uncompromised run', () => {
 
 test('a healthy full-horizon run with no proposal is valid', () => {
   assert.equal(classifyOutcome(signals({ reviewerDecisionCount: 0 })).validRun, true)
+})
+
+test('a run with no completed challenger turn is invalid', () => {
+  assert.deepEqual(classifyOutcome(signals({ challengerTurnCount: 0 })), {
+    validRun: false,
+    invalidReasons: ['challenger_no_completed_turns'],
+    requiresAdjudication: false,
+  })
 })
 
 test('the initial policy exposes the model endpoint but no GitHub endpoint', () => {
