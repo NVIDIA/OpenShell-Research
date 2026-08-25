@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WritingSlopReview",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "verdict",
+    "summary",
+    "findings",
+    "voice_to_preserve",
+    "limitations"
+  ],
+  "properties": {
+    "verdict": {
+      "enum": ["clean", "polish", "revise"]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "prevalence",
+          "category",
+          "quote",
+          "line",
+          "effect",
+          "suggested_rewrite"
+        ],
+        "properties": {
+          "prevalence": {
+            "enum": ["isolated", "repeated", "systemic"]
+          },
+          "category": {
+            "enum": [
+              "empty_content",
+              "formulaic_structure",
+              "stock_language",
+              "cadence",
+              "formatting",
+              "voice"
+            ]
+          },
+          "quote": {
+            "type": "string",
+            "minLength": 1
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "effect": {
+            "type": "string",
+            "minLength": 1
+          },
+          "suggested_rewrite": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "voice_to_preserve": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    }
+  }
+}

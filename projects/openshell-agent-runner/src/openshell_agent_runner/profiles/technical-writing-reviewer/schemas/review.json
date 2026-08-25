@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TechnicalWritingReview",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "summary", "findings", "strengths", "limitations"],
+  "properties": {
+    "verdict": {
+      "enum": ["clean", "findings", "manual_review"]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "severity",
+          "category",
+          "title",
+          "quote",
+          "line",
+          "explanation",
+          "recommendation"
+        ],
+        "properties": {
+          "severity": {
+            "enum": ["high", "medium", "low"]
+          },
+          "category": {
+            "enum": [
+              "accuracy",
+              "clarity",
+              "completeness",
+              "structure",
+              "audience_fit",
+              "evidence",
+              "terminology",
+              "actionability"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quote": {
+            "type": "string",
+            "minLength": 1
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "explanation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "recommendation": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "strengths": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    }
+  }
+}

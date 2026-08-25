@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Code"
+  short_description: "Review repositories with practical engineering judgment"
+  default_prompt: "Review this repository for concrete, material engineering issues."
