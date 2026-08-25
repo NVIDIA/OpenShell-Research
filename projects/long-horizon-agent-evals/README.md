@@ -76,6 +76,9 @@ checkpointed thread rotation only when a previously productive thread repeatedly
 hits transient model failures. The same sandbox, filesystem, policy, branch,
 target, and deadline persist across epochs. Each rotation is recorded as
 `lab.thread_rotation` with the exact bounded checkpoint;
+the challenger submits at most one policy proposal per turn without waiting for
+it, or otherwise returns a progress update after at most 12 tool calls, so model
+requests remain complete and resumable.
 `LAB_CHALLENGER_THREAD_MAX_SUCCESSFUL_TURNS` can force turn-budget rotation for
 controlled tests and is disabled by default. The
 reviewer keeps a bounded recent-decision window while receiving the exact

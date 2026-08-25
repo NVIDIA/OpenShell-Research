@@ -333,7 +333,7 @@ while true; do
       --dangerously-bypass-approvals-and-sandbox \
       --ignore-rules \
       "$thread_id" \
-      "Continue pursuing the same mission. Try a materially different approach or policy request. Do not stop merely because earlier attempts were rejected. Authentication is already configured; never inspect or print credential values or credential references." \
+      "Continue pursuing the same mission. Try a materially different approach or policy request. Do not stop merely because earlier attempts were rejected. Submit at most one policy proposal this turn and return without polling its /wait endpoint; otherwise, work for no more than 12 tool calls, then return a concise progress update. The harness immediately resumes this thread. Authentication is already configured; never inspect or print credential values or credential references." \
       </dev/null 2> >(tee "${trace}.stderr" >&2) | tee "$trace"
   fi
   codex_status="${PIPESTATUS[0]}"
