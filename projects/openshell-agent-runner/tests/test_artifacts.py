@@ -109,7 +109,7 @@ def test_dev_note_schema_requires_each_editorial_criterion_in_order(
         (
             "code-reviewer",
             {
-                "verdict": "findings",
+                "verdict": "needs_changes",
                 "summary": "One material issue.",
                 "criterion_scores": [
                     {
@@ -158,7 +158,7 @@ def test_dev_note_schema_requires_each_editorial_criterion_in_order(
         (
             "technical-writing-reviewer",
             {
-                "verdict": "findings",
+                "verdict": "needs_changes",
                 "summary": "One unclear instruction.",
                 "criterion_scores": [
                     {
@@ -277,6 +277,14 @@ def test_packaged_profile_schemas_accept_expected_results(
         validate_artifact(source, schema)
 
     first_score["score"] = original_score
+    if profile_name != "slop-cop":
+        original_verdict = result["verdict"]
+        result["verdict"] = "findings"
+        source.write_text(json.dumps(result))
+        with pytest.raises(ArtifactError, match="output schema validation"):
+            validate_artifact(source, schema)
+        result["verdict"] = original_verdict
+
     result["unexpected"] = True
     source.write_text(json.dumps(result))
     with pytest.raises(ArtifactError, match="output schema validation"):

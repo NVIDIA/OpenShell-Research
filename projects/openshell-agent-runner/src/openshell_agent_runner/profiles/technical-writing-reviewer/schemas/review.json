@@ -14,7 +14,8 @@
   ],
   "properties": {
     "verdict": {
-      "enum": ["clean", "findings", "manual_review"]
+      "description": "pass means no material changes are needed; needs_changes means at least one material issue should be fixed; inconclusive means missing context prevents a responsible decision.",
+      "enum": ["pass", "needs_changes", "inconclusive"]
     },
     "summary": {
       "type": "string",

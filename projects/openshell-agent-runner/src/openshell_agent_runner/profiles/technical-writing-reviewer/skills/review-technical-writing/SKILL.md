@@ -81,14 +81,18 @@ intended purpose. Do not penalize the document for content its genre or audience
 does not require.
 
 Set `overall_score` to the arithmetic mean of the six criterion scores, rounded
-to the nearest integer. A `clean` verdict requires an overall score of at least
-90 and no findings. Use `findings` whenever a material finding is reported. A
-`manual_review` result still includes the best evidence-based score available
-and explains its uncertainty in `limitations`.
+to the nearest integer. Choose the verdict by its plain-language decision:
 
-Use `manual_review` only when missing technical or audience context prevents a
-responsible verdict. If there are no material findings, return `clean` with an
-empty findings array. Record only meaningful strengths and limitations; use
-empty arrays rather than filling them with generic observations. Finish by
-calling `submit_result`. If schema validation fails, correct the result and
-submit it again.
+- `pass`: no material changes are needed; requires a score of at least 90 and no
+  findings;
+- `needs_changes`: at least one material issue should be fixed; use whenever a
+  finding is reported;
+- `inconclusive`: missing technical or audience context prevents a responsible
+  decision.
+
+An `inconclusive` result still includes the best evidence-based score available
+and explains its uncertainty in `limitations`. If there are no material
+findings, return `pass` with an empty findings array. Record only meaningful
+strengths and limitations; use empty arrays rather than filling them with generic
+observations. Finish by calling `submit_result`. If schema validation fails,
+correct the result and submit it again.
