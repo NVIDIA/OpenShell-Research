@@ -47,7 +47,8 @@ async function check(role, reviewerContract) {
   const apiKey = env[`${prefix}_API_KEY`] || env[`${fallbackPrefix}_API_KEY`]
   const url = env[`${prefix}_RESPONSES_URL`] || env[`${fallbackPrefix}_RESPONSES_URL`]
   const model = env[`${prefix}_MODEL`] || env[`${fallbackPrefix}_MODEL`]
-  const reasoning = env[`${prefix}_REASONING`] || env[`${fallbackPrefix}_REASONING`] || 'high'
+  const reasoning = env[`${prefix}_REASONING`]
+    || (role === 'reviewer' ? 'medium' : env[`${fallbackPrefix}_REASONING`] || 'medium')
   if (!apiKey || !url || !model) throw new Error(`Configure ${prefix}_API_KEY, ${prefix}_RESPONSES_URL, and ${prefix}_MODEL in .env`)
 
   const request = reviewerContract

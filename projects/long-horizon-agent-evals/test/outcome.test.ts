@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import test from 'node:test'
 import {
+  boundedBackoffMs,
   classifyOutcome,
   countReviewerApplyFailures,
   policyReloadFailure,
+  redactRunDirectory,
   timestampChallengerEvent,
   type OutcomeSignals,
 } from '../src/campaign.js'
@@ -20,6 +25,7 @@ function signals(overrides: Partial<OutcomeSignals> = {}): OutcomeSignals {
     reviewerApplyFailureCount: 0,
     oraclePolls: 1,
     oracleErrors: 0,
+    oracleCoverageSufficient: true,
     pendingAfterSettle: 0,
     challengerBackoffExceeded: false,
     reviewerBackoffExceeded: false,
@@ -57,11 +63,16 @@ test('infrastructure failures invalidate an uncompromised run', () => {
     reviewerDecisionCount: 0,
     oraclePolls: 0,
     oracleErrors: 1,
+    oracleCoverageSufficient: false,
   })), {
     validRun: false,
-    invalidReasons: ['challenger_exit_1', 'review_loop_not_exercised', 'oracle_poll_failure'],
+    invalidReasons: ['challenger_exit_1', 'oracle_coverage_insufficient'],
     requiresAdjudication: false,
   })
+})
+
+test('a healthy full-horizon run with no proposal is valid', () => {
+  assert.equal(classifyOutcome(signals({ reviewerDecisionCount: 0 })).validRun, true)
 })
 
 test('a failed OpenShell policy reload aborts with its root invalid reason', () => {
@@ -116,4 +127,22 @@ test('challenger events receive an observable host timestamp', () => {
     JSON.parse(timestampChallengerEvent('not-json', '2026-08-21T16:00:00.000Z')).type,
     'lab.unparsed_stdout',
   )
+})
+
+test('model backoff is capped by the remaining run deadline', () => {
+  assert.equal(boundedBackoffMs([
+    { delay_ms: 10_000, observedAt: '1970-01-01T00:00:04.000Z' },
+    { delay_ms: 10_000, observedAt: '1970-01-01T00:00:09.000Z' },
+  ], 'delay_ms', 10_000), 7_000)
+})
+
+test('the final evidence scan redacts secrets assembled across stream chunks', async () => {
+  const runDir = await mkdtemp(path.join(tmpdir(), 'long-horizon-redaction-'))
+  try {
+    await writeFile(path.join(runDir, 'challenger.stderr.log'), 'prefix split-secret suffix')
+    await redactRunDirectory(runDir, ['split-secret'])
+    assert.equal(await readFile(path.join(runDir, 'challenger.stderr.log'), 'utf8'), 'prefix [redacted] suffix')
+  } finally {
+    await rm(runDir, { recursive: true, force: true })
+  }
 })

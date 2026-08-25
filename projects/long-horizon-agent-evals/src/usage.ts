@@ -36,8 +36,13 @@ const pricing = {
 
 async function jsonl(file: string): Promise<Array<Record<string, unknown>>> {
   const text = await readFile(file, 'utf8').catch(() => '')
-  return text.split('\n').filter(Boolean).flatMap((line) => {
-    try { return [JSON.parse(line) as Record<string, unknown>] } catch { return [] }
+  return text.split('\n').flatMap((line, index) => {
+    if (!line) return []
+    try {
+      return [JSON.parse(line) as Record<string, unknown>]
+    } catch (error) {
+      throw new Error(`${file}:${index + 1}: invalid JSONL: ${error instanceof Error ? error.message : String(error)}`)
+    }
   })
 }
 
@@ -98,6 +103,7 @@ export interface UsageSummary {
     reviewerComplete: boolean
     estimateIsLowerBound: boolean
     unpricedPartialChallengerTurn: boolean
+    missingReviewerUsageRequests: number
   }
   requests: { challenger: number; reviewer: number; longContext: number }
   tokens: {
@@ -132,6 +138,10 @@ export async function summarizeUsage(runDir: string): Promise<UsageSummary> {
   const lastCompletedTurnIndex = challengerEvents.findLastIndex((event) => event.type === 'turn.completed')
   const unpricedPartialChallengerTurn = challengerEvents.some((event, index) =>
     index > lastCompletedTurnIndex && (event.type === 'turn.started' || event.type === 'item.started' || event.type === 'item.completed'))
+  const reviewerRequests = reviewerEvents.filter((event) => event.event === 'review_started').length
+  const reviewerUsageRecords = reviewerEvents.filter((event) =>
+    event.event === 'review_completed' && event.usage && typeof event.usage === 'object').length
+  const missingReviewerUsageRequests = Math.max(0, reviewerRequests - reviewerUsageRecords)
   const samples: UsageSample[] = [
     ...challengerSamples,
     ...reviewerEvents.flatMap((event) => event.event === 'review_completed' && event.usage && typeof event.usage === 'object'
@@ -155,14 +165,15 @@ export async function summarizeUsage(runDir: string): Promise<UsageSummary> {
   const input = samples.reduce((sum, item) => sum + item.inputTokens, 0)
   return {
     referencePricing: pricing,
-    note: unpricedPartialChallengerTurn
-      ? 'Observable public API equivalent lower bound; the deadline interrupted an unpriced challenger turn, and configured provider billing may differ.'
+    note: unpricedPartialChallengerTurn || missingReviewerUsageRequests > 0
+      ? 'Observable public API equivalent lower bound; one or more requests lack usage, and configured provider billing may differ.'
       : 'Public API equivalent estimate; configured provider billing may differ.',
     coverage: {
       challengerComplete: !unpricedPartialChallengerTurn,
-      reviewerComplete: true,
-      estimateIsLowerBound: unpricedPartialChallengerTurn,
+      reviewerComplete: missingReviewerUsageRequests === 0,
+      estimateIsLowerBound: unpricedPartialChallengerTurn || missingReviewerUsageRequests > 0,
       unpricedPartialChallengerTurn,
+      missingReviewerUsageRequests,
     },
     requests: {
       challenger: byRole.challenger.requests,

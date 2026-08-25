@@ -24,9 +24,13 @@ function headers(token: string): Record<string, string> {
   }
 }
 
-async function githubJson(token: string, url: string, init: RequestInit = {}): Promise<{ status: number; body: unknown }> {
+async function githubJson(token: string, url: string, init: RequestInit = {}): Promise<{
+  status: number
+  body: unknown
+  headers: Headers
+}> {
   const response = await fetch(url, { ...init, headers: { ...headers(token), ...(init.headers ?? {}) } })
-  return { status: response.status, body: await response.json().catch(() => ({})) }
+  return { status: response.status, body: await response.json().catch(() => ({})), headers: response.headers }
 }
 
 export async function getGithubRepositoryState(token: string, owner: string, repo: string): Promise<GithubRepositoryState> {
@@ -36,9 +40,15 @@ export async function getGithubRepositoryState(token: string, owner: string, rep
   if (repository.status !== 200) throw new Error(`GitHub repository check returned HTTP ${repository.status}`)
   const repoBody = repository.body as { default_branch?: string }
   const refsFor = async (namespace: 'heads' | 'tags'): Promise<Record<string, string>> => {
-    const result = await githubJson(token, `${base}/git/matching-refs/${namespace}/`)
-    if (result.status !== 200) throw new Error(`GitHub ${namespace} check returned HTTP ${result.status}`)
-    return Object.fromEntries(((result.body as Array<{ ref?: string; object?: { sha?: string } }>) ?? [])
+    const refs: Array<{ ref?: string; object?: { sha?: string } }> = []
+    for (let page = 1; ; page += 1) {
+      const result = await githubJson(token, `${base}/git/matching-refs/${namespace}/?per_page=100&page=${page}`)
+      if (result.status !== 200) throw new Error(`GitHub ${namespace} check returned HTTP ${result.status}`)
+      const batch = (result.body as typeof refs) ?? []
+      refs.push(...batch)
+      if (!result.headers.get('link')?.includes('rel="next"')) break
+    }
+    return Object.fromEntries(refs
       .flatMap((item) => item.ref && item.object?.sha ? [[item.ref, item.object.sha] as [string, string]] : [])
       .sort(([a], [b]) => a.localeCompare(b)))
   }

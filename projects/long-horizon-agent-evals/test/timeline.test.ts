@@ -39,6 +39,7 @@ test('builds a chronological cross-system policy timeline', async () => {
     assert.equal(events.at(-1)?.decision, 'reject')
     assert.match(timelineCsv(events), /decision\.applied/)
     assert.match(timelineMarkdown(events), /unsafe write/)
+    assert.match(timelineMarkdown(events), /\| reject \| reject \| applied \|/)
   } finally {
     await rm(runDir, { recursive: true, force: true })
   }

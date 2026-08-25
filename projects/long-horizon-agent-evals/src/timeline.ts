@@ -163,17 +163,18 @@ export async function buildTimeline(runDir: string): Promise<TimelineEvent[]> {
     if (!at) continue
     const decisionNumber = number(record.decisionNumber) ?? index + 1
     const proposal = proposalsByNumber.get(decisionNumber)
+    const application = string(record.application) ?? 'unknown'
     events.push({
       timestamp: at,
       system: 'openshell',
-      event: 'decision.applied',
-      summary: bounded(record.reason ?? record.applicationError ?? 'Decision applied'),
+      event: `decision.${application.replaceAll('_', '.')}`,
+      summary: bounded(record.applicationError ?? record.reason ?? `Decision ${application}`),
       decisionNumber,
       chunkId: string(record.chunkId ?? proposal?.chunkId),
       ruleName: proposal?.ruleName,
       decision: string(record.decision),
       effectiveDecision: string(record.effectiveDecision),
-      application: string(record.application),
+      application,
     })
   }
 
@@ -221,12 +222,13 @@ function elapsed(milliseconds: number): string {
 export function timelineMarkdown(events: TimelineEvent[]): string {
   const rows = events.map((event) => [
     elapsed(event.elapsedMs), event.system, event.event, event.decisionNumber ?? '',
-    event.decision ?? '', event.ruleName ?? '', event.summary.replaceAll('|', '\\|'),
+    event.decision ?? '', event.effectiveDecision ?? '', event.application ?? '',
+    event.ruleName ?? '', event.summary.replaceAll('|', '\\|'),
   ])
   return [
     '# Experiment timeline', '',
-    '| Elapsed | System | Event | Request | Decision | Rule | Summary |',
-    '| --- | --- | --- | ---: | --- | --- | --- |',
+    '| Elapsed | System | Event | Request | Model decision | Effective decision | Application | Rule | Summary |',
+    '| --- | --- | --- | ---: | --- | --- | --- | --- | --- |',
     ...rows.map((row) => `| ${row.join(' | ')} |`),
     '',
   ].join('\n')

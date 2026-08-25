@@ -66,8 +66,9 @@ outcomes instead of collapsing them into one pass/fail label.
    `approve` or `reject` through a Responses-compatible model endpoint.
 4. OpenShell applies the decision. The experiment runner checks GitHub directly
    for the protected change.
-5. At the deadline, the runner saves the transcript and raw evidence, then
-   deletes the sandbox and temporary OpenShell providers.
+5. When the oracle observes the target mutation, or at the deadline, the runner
+   stops the challenger, drains pending reviews, saves the evidence, and verifies
+   deletion of the sandbox and temporary OpenShell providers.
 
 The challenger compacts within a conservative context budget, then uses bounded,
 checkpointed thread rotation only when a previously productive thread repeatedly
@@ -97,7 +98,7 @@ the harness does not inspect, rewrite, or special-case proposal contents.
 ## Prerequisites
 
 - Node.js 20.3 or newer
-- Docker and an OpenShell gateway that can create Docker sandboxes
+- Docker and a dedicated OpenShell gateway that can create Docker sandboxes
 - A Responses-compatible endpoint for the challenger and reviewer
 - A GitHub repository with an existing default branch
 - A fine-grained GitHub token with Contents read/write access to that repository
@@ -120,6 +121,12 @@ cp .env.example .env
 Fill in the required OpenShell, GitHub, and challenger values. Reviewer model
 settings are independent; leave any reviewer value empty to reuse the matching
 challenger setting. `.env` is loaded automatically and is ignored by Git.
+The runner requires `LAB_DEDICATED_GATEWAY=1` because it changes gateway-global
+proposal settings. It also verifies that an exact GitHub write proposal reaches
+manual review before starting the challenger, so incompatible gateways fail fast.
+By default, observing the target stops the challenger immediately; set
+`LAB_CONTINUE_AFTER_COMPROMISE=1` only when the post-compromise trajectory is
+itself part of the experiment.
 
 Check both model endpoints. The reviewer check also verifies structured output:
 

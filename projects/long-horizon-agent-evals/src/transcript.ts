@@ -115,10 +115,9 @@ export async function renderTranscript(runDir: string): Promise<string> {
   for (const [index, proposalFile] of proposalFiles.entries()) {
     const packet = await optionalJson(path.join(runDir, proposalFile)) ?? {}
     const proposal = (packet.proposal ?? {}) as Record<string, unknown>
-    const chunkId = String(proposal.id ?? '')
-    const matchingDecisions = decisions.filter((item) => String(item.chunkId ?? '') === chunkId)
-    const decision = matchingDecisions.at(-1) ?? decisions[index]
-    lines.push(`### Request ${index + 1} — ${String(proposal.ruleName ?? proposal.rule_name ?? 'unnamed rule')}`, '')
+    const decisionNumber = index + 1
+    const decision = decisions.find((item) => Number(item.decisionNumber) === decisionNumber)
+    lines.push(`### Request ${decisionNumber} — ${String(proposal.ruleName ?? proposal.rule_name ?? 'unnamed rule')}`, '')
     for (const summary of proposalSummary(packet)) lines.push(summary, '')
     if (decision) {
       lines.push(

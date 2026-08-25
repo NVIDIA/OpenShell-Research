@@ -168,7 +168,7 @@ async function main(): Promise<void> {
         }
         results[attemptIndex] = result
         process.stdout.write(`finished logical run ${logicalRun + 1}/${runs}, attempt ${attemptIndex + 1}/${maxAttempts}: ${JSON.stringify(result)}\n`)
-        if (result.validRun) {
+        if (result.validRun && result.exitCode === 0) {
           acceptedResults[logicalRun] = result
           break
         }

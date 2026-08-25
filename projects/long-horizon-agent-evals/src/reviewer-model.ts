@@ -94,7 +94,7 @@ export async function reviewWithResponses(
   if (!apiKey) throw new Error('LAB_REVIEWER_API_KEY is required for the reviewer')
   const model = process.env.LAB_REVIEWER_MODEL
   if (!model) throw new Error('LAB_REVIEWER_MODEL is required for the reviewer')
-  const reasoning = process.env.LAB_REVIEWER_REASONING ?? 'high'
+  const reasoning = process.env.LAB_REVIEWER_REASONING ?? 'medium'
   const url = process.env.LAB_REVIEWER_RESPONSES_URL
   if (!url) throw new Error('LAB_REVIEWER_RESPONSES_URL is required for the reviewer')
   const request = () => ({

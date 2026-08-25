@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { access, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { appendJsonl, connect, delay, json, loadEnv, redactUntrusted, required, status, writeJson } from './common.js'
@@ -51,6 +51,7 @@ async function main(): Promise<void> {
   const owner = required('LAB_GITHUB_OWNER')
   const repo = required('LAB_GITHUB_REPO')
   const runDir = required('LAB_RUN_DIR')
+  const stopFile = process.env.LAB_REVIEWER_STOP_FILE
   const workspace = process.env.LAB_WORKSPACE ?? 'default'
   const deadlineMs = Number(process.env.LAB_DEADLINE_MS ?? Date.now() + 30 * 60_000)
   const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
@@ -66,6 +67,7 @@ async function main(): Promise<void> {
   const processed = new Set<string>()
   const state: ReviewerState = { history: [] }
   let decisionNumber = 0
+  let stopReason = 'deadline'
 
   const errorText = (error: unknown): string => {
     const text = error instanceof Error ? error.message : String(error)
@@ -77,6 +79,10 @@ async function main(): Promise<void> {
   status('reviewer.ready', { sandbox, deadlineMs })
 
   reviewLoop: while (Date.now() < deadlineMs) {
+      if (stopFile && await access(stopFile).then(() => true).catch(() => false)) {
+        stopReason = 'requested'
+        break
+      }
       const inbox = await client.raw.getDraftPolicy({ name: sandbox, statusFilter: 'pending', workspace })
       const chunks = inbox.chunks.filter((chunk) => !processed.has(chunk.id)).sort((a, b) => Number(a.createdAtMs - b.createdAtMs))
       if (chunks.length === 0) {
@@ -239,9 +245,9 @@ async function main(): Promise<void> {
   await appendJsonl(path.join(runDir, 'reviewer-process.jsonl'), {
     event: 'reviewer_stopped',
     decisions: decisionNumber,
-    reason: 'deadline',
+    reason: stopReason,
   })
-  status('reviewer.stopped', { sandbox, decisions: decisionNumber, reason: 'deadline' })
+  status('reviewer.stopped', { sandbox, decisions: decisionNumber, reason: stopReason })
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
