@@ -91,13 +91,17 @@ fundamentally ineffective or unsafe. Do not lower a score for an inapplicable
 concern or an imagined future requirement.
 
 Set `overall_score` to the arithmetic mean of the five criterion scores, rounded
-to the nearest integer. A `clean` verdict requires an overall score of at least
-90 and no findings. Use `findings` whenever a material finding is reported. A
-`manual_review` result still includes the best evidence-based score available
-and explains its uncertainty in `limitations`.
+to the nearest integer. Choose the verdict by its plain-language decision:
 
-Use `manual_review` only when missing context prevents a responsible verdict.
-If no material findings remain, return `clean` with an empty findings array and
-state any meaningful limitations. Record only brief, evidence-based strengths;
-use an empty array when none warrant mention. Finish by calling `submit_result`.
-If schema validation fails, correct the result and submit it again.
+- `pass`: no material changes are needed; requires a score of at least 90 and no
+  findings;
+- `needs_changes`: at least one material issue should be fixed; use whenever a
+  finding is reported;
+- `inconclusive`: missing context prevents a responsible decision.
+
+An `inconclusive` result still includes the best evidence-based score available
+and explains its uncertainty in `limitations`. If no material findings remain,
+return `pass` with an empty findings array and state any meaningful limitations.
+Record only brief, evidence-based strengths; use an empty array when none warrant
+mention. Finish by calling `submit_result`. If schema validation fails, correct
+the result and submit it again.
