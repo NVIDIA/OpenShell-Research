@@ -1,0 +1,11 @@
+Key rotation procedure
+
+The operator MUST record the current key identifier before rotation.
+The operator MUST generate the replacement key in the approved hardware module.
+The operator MUST update `active_key_id` only after generation succeeds.
+The operator MUST keep the previous key available for 15 minutes.
+The operator MUST revoke the previous key after the overlap period.
+
+`active_key_id` is the identifier used for new signatures. `previous_key_id` is
+the identifier accepted only during the overlap period. If generation fails,
+leave `active_key_id` unchanged and stop the procedure.

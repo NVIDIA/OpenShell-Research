@@ -181,3 +181,7 @@ Run a focused test with `make test PYTEST_ARGS="tests/test_config.py"`. Use
 `make clean` to remove generated build and cache files. See
 [RELEASING.md](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-agent-runner/RELEASING.md)
 for the local PyPI release process.
+
+The repeatable [reviewer profile QA suite](qa/reviewer_profiles/README.md)
+exercises clean, defective, focused, adversarial, Markdown, and plain-text inputs
+through the real CLI and produces a standalone HTML report.
