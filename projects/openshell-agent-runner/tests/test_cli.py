@@ -10,9 +10,17 @@ import openshell_agent_runner.cli as cli
 from openshell_agent_runner.cli import app
 
 REPOSITORY = Path(__file__).resolve().parents[3]
-PACKAGED_PROFILE = (
+CODE_REVIEWER = (
     REPOSITORY
-    / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/reviewer"
+    / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/code-reviewer"
+)
+TECHNICAL_WRITING_REVIEWER = (
+    REPOSITORY
+    / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/technical-writing-reviewer"
+)
+SLOP_COP = (
+    REPOSITORY
+    / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/slop-cop"
 )
 
 
@@ -57,7 +65,7 @@ def test_init_command_creates_a_valid_profile(tmp_path: Path) -> None:
             "init",
             str(destination),
             "--profile",
-            "reviewer",
+            "code-reviewer",
             "--model",
             "provider/model",
             "--thinking",
@@ -66,8 +74,10 @@ def test_init_command_creates_a_valid_profile(tmp_path: Path) -> None:
     )
 
     assert result.exit_code == 0, result.output
-    assert f"  {destination / 'reviewer'}" in result.stdout
-    validation = CliRunner().invoke(app, ["validate", str(destination / "reviewer")])
+    assert f"  {destination / 'code-reviewer'}" in result.stdout
+    validation = CliRunner().invoke(
+        app, ["validate", str(destination / "code-reviewer")]
+    )
     assert validation.exit_code == 0, validation.output
 
 
@@ -124,14 +134,18 @@ def test_doctor_separates_native_output_with_blank_lines(monkeypatch) -> None:
 def test_run_help_describes_selected_profile_task() -> None:
     result = CliRunner().invoke(
         app,
-        ["run", str(PACKAGED_PROFILE), "--task", "review-document", "--help"],
+        [
+            "run",
+            str(TECHNICAL_WRITING_REVIEWER),
+            "--task",
+            "review-document",
+            "--help",
+        ],
     )
 
     assert result.exit_code == 0
-    assert "reviewer:review-document" in result.stdout
-    assert (
-        "Review an input document and return a useful written result." in result.stdout
-    )
+    assert "technical-writing-reviewer:review-document" in result.stdout
+    assert "Review an input technical document" in result.stdout
     assert "--input DOCUMENT" in result.stdout
     assert "Required argument:" in result.stdout
     assert "Host document to review." in result.stdout
@@ -141,7 +155,7 @@ def test_run_help_describes_selected_profile_task() -> None:
     assert "Additional configured uploads:" in result.stdout
     assert "Configured environment:" in result.stdout
     assert "None. Add values with --env KEY=VALUE." in result.stdout
-    assert "The agent's final response." in result.stdout
+    assert "JSON validated against schemas/review.json." in result.stdout
     assert "Usage: oar run [OPTIONS]" not in result.stdout
     assert "Options" not in result.stdout
 
@@ -149,28 +163,50 @@ def test_run_help_describes_selected_profile_task() -> None:
 def test_run_help_describes_repository_input() -> None:
     result = CliRunner().invoke(
         app,
-        ["run", str(PACKAGED_PROFILE), "--task", "review-repository", "--help"],
+        ["run", str(CODE_REVIEWER), "--task", "review-repository", "--help"],
     )
 
     assert result.exit_code == 0
-    assert "reviewer:review-repository" in result.stdout
+    assert "code-reviewer:review-repository" in result.stdout
     assert "Review an input code repository" in result.stdout
     assert "--input REPOSITORY" in result.stdout
     assert "Host code repository to review." in result.stdout
     assert "--prompt-var focus=VALUE" in result.stdout
     assert "--prompt-var context=VALUE" in result.stdout
-    assert "Default: Review the entire repository." in result.stdout
+    assert "Default: Review the complete repository." in result.stdout
+
+
+def test_run_help_describes_slop_cop() -> None:
+    result = CliRunner().invoke(
+        app,
+        ["run", str(SLOP_COP), "--task", "review-document", "--help"],
+    )
+
+    assert result.exit_code == 0
+    assert "slop-cop:review-document" in result.stdout
+    assert "material writing-slop patterns" in result.stdout
+    assert "--input DOCUMENT" in result.stdout
+    assert "JSON validated against schemas/review.json." in result.stdout
 
 
 def test_run_help_colors_selected_profile_task() -> None:
     result = CliRunner().invoke(
         app,
-        ["run", str(PACKAGED_PROFILE), "--task", "review-document", "--help"],
+        [
+            "run",
+            str(TECHNICAL_WRITING_REVIEWER),
+            "--task",
+            "review-document",
+            "--help",
+        ],
         color=True,
     )
 
     assert result.exit_code == 0
-    assert "\x1b[36m\x1b[1mreviewer:review-document\x1b[0m" in result.stdout
+    assert (
+        "\x1b[36m\x1b[1mtechnical-writing-reviewer:review-document\x1b[0m"
+        in result.stdout
+    )
     assert "\x1b[33m\x1b[1mUsage:\x1b[0m" in result.stdout
     assert "\x1b[32m  oar run " in result.stdout
 
@@ -178,11 +214,11 @@ def test_run_help_colors_selected_profile_task() -> None:
 def test_run_help_rejects_unknown_profile_task() -> None:
     result = CliRunner().invoke(
         app,
-        ["run", str(PACKAGED_PROFILE), "--task", "inspect", "--help"],
+        ["run", str(CODE_REVIEWER), "--task", "inspect", "--help"],
     )
 
     assert result.exit_code == 2
-    assert "unknown task 'inspect' for profile 'reviewer'" in result.stderr
+    assert "unknown task 'inspect' for profile 'code-reviewer'" in result.stderr
     assert "Launch or preview an ephemeral agent" not in result.stdout
     assert "Options" not in result.stdout
 
@@ -195,7 +231,7 @@ def test_run_dry_run_does_not_publish_output(tmp_path: Path) -> None:
         app,
         [
             "run",
-            str(PACKAGED_PROFILE),
+            str(TECHNICAL_WRITING_REVIEWER),
             "--task",
             "review-document",
             "--output",
@@ -223,7 +259,7 @@ def test_document_task_requires_input() -> None:
         app,
         [
             "run",
-            str(PACKAGED_PROFILE),
+            str(TECHNICAL_WRITING_REVIEWER),
             "--task",
             "review-document",
             "--output",
@@ -246,7 +282,7 @@ def test_repository_task_uploads_directory_and_sets_working_directory(
         app,
         [
             "run",
-            str(PACKAGED_PROFILE),
+            str(CODE_REVIEWER),
             "--task",
             "review-repository",
             "--output",
@@ -272,7 +308,7 @@ def test_repository_task_requires_input() -> None:
         app,
         [
             "run",
-            str(PACKAGED_PROFILE),
+            str(CODE_REVIEWER),
             "--task",
             "review-repository",
             "--output",
@@ -288,7 +324,7 @@ def test_repository_task_requires_input() -> None:
 def test_removed_review_task_is_unknown() -> None:
     result = CliRunner().invoke(
         app,
-        ["run", str(PACKAGED_PROFILE), "--task", "review", "--help"],
+        ["run", str(CODE_REVIEWER), "--task", "review", "--help"],
     )
 
     assert result.exit_code == 2

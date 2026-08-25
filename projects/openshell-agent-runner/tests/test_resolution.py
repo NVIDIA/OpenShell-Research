@@ -13,9 +13,13 @@ from openshell_agent_runner.runner import RunRequest, resolve_run
 
 REPOSITORY = Path(__file__).resolve().parents[3]
 PROFILE = REPOSITORY / ".github/openshell-agents/profiles/dev-note-reviewer"
-PACKAGED_PROFILE = (
+CODE_REVIEWER = (
     REPOSITORY
-    / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/reviewer"
+    / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/code-reviewer"
+)
+TECHNICAL_WRITING_REVIEWER = (
+    REPOSITORY
+    / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/technical-writing-reviewer"
 )
 
 
@@ -43,7 +47,11 @@ def review_request(
     prompt_variables: Sequence[str] = (),
 ) -> RunRequest:
     return RunRequest(
-        profile_directory=PACKAGED_PROFILE,
+        profile_directory=(
+            CODE_REVIEWER
+            if task_id == "review-repository"
+            else TECHNICAL_WRITING_REVIEWER
+        ),
         task_id=task_id,
         output=Path("/tmp/review.md"),
         input_path=input_path,
@@ -215,8 +223,8 @@ def test_invalid_prompt_variable_assignments_are_rejected(
 
 
 def test_prompt_variable_without_default_is_required(tmp_path: Path) -> None:
-    profile = tmp_path / "reviewer"
-    shutil.copytree(PACKAGED_PROFILE, profile)
+    profile = tmp_path / "code-reviewer"
+    shutil.copytree(CODE_REVIEWER, profile)
     document = yaml.safe_load((profile / "profile.yaml").read_text())
     del document["tasks"]["review-repository"]["prompt_variables"]["context"]["default"]
     (profile / "profile.yaml").write_text(yaml.safe_dump(document, sort_keys=False))
