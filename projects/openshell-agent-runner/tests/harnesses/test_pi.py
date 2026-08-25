@@ -122,15 +122,39 @@ def test_plain_task_uses_final_response_without_submission_tool() -> None:
         REPOSITORY
         / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/reviewer"
     )
-    prepared = prepare_resources(resolved, "review")
-    try:
-        assert "submit_result" not in prepared.arguments
-        assert not any("output.schema.json" in upload for upload in prepared.uploads)
-        assert "/sandbox/oar-runtime/extensions/oar-validate-tools.ts" in (
-            prepared.arguments
+    for task_id in ("review-document", "review-repository"):
+        input_name = "document.txt" if task_id == "review-document" else "repository"
+        input_path = f"/workspace/input/{input_name}"
+        prepared = prepare_resources(
+            resolved,
+            task_id,
+            {
+                "focus": "Focus on authentication.",
+                "context": "Pre-release review.",
+                "oar.input_name": input_name,
+                "oar.input_path": input_path,
+            },
         )
-    finally:
-        prepared.close()
+        try:
+            assert "submit_result" not in prepared.arguments
+            assert not any(
+                "output.schema.json" in upload for upload in prepared.uploads
+            )
+            assert "/sandbox/oar-runtime/extensions/oar-validate-tools.ts" in (
+                prepared.arguments
+            )
+            prompt_upload = next(
+                item
+                for item in prepared.uploads
+                if item.endswith(":/sandbox/oar-runtime/prompt.md")
+            )
+            prompt = Path(prompt_upload.rpartition(":")[0]).read_text()
+            assert input_path in prompt
+            assert "Focus on authentication." in prompt
+            assert "Pre-release review." in prompt
+            assert "{{" not in prompt
+        finally:
+            prepared.close()
 
 
 def test_custom_extension_and_declared_tool_are_staged(tmp_path: Path) -> None:
@@ -143,12 +167,21 @@ def test_custom_extension_and_declared_tool_are_staged(tmp_path: Path) -> None:
     extension_path = profile / "custom-check.ts"
     extension_path.write_text("export default function () {}\n")
     document = yaml.safe_load((profile / "profile.yaml").read_text())
-    task = document["tasks"]["review"]
+    task = document["tasks"]["review-document"]
     task["tools"].append("custom_check")
     task["extensions"] = [{"path": "custom-check.ts", "tools": ["custom_check"]}]
     (profile / "profile.yaml").write_text(yaml.safe_dump(document, sort_keys=False))
 
-    prepared = prepare_resources(load_profile(profile), "review")
+    prepared = prepare_resources(
+        load_profile(profile),
+        "review-document",
+        {
+            "focus": "Review the complete document.",
+            "context": "No additional context was provided.",
+            "oar.input_name": "document.md",
+            "oar.input_path": "/workspace/input/document.md",
+        },
+    )
     try:
         assert "/sandbox/oar-runtime/extensions/00-custom-check.ts" in (
             prepared.arguments

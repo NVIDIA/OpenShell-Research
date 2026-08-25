@@ -45,7 +45,7 @@ printf '# Review me\n\nA short document.\n' > document.md
 uvx --from openshell-agent-runner oar validate ./profiles/reviewer
 
 uvx --from openshell-agent-runner oar run ./profiles/reviewer \
-  --task review \
+  --task review-document \
   --gateway openshell \
   --input document.md \
   --output /tmp/oar-review.md \
@@ -103,8 +103,13 @@ The CLI supplies run-specific values:
 - `--task` selects a task from `profile.yaml`.
 - `--upload SOURCE:DESTINATION` uploads a file or directory using OpenShell's
   native mapping format. It may be repeated.
-- `--input FILE` is an optional document-task convenience. OAR uploads the file
-  to `/workspace/input/document.md` and sets `REPOSITORY_ROOT=/workspace/input`.
+- `--input PATH` supplies the file or directory required by the selected task.
+  A `document` input is uploaded beneath `/workspace/input` with its ordinary
+  file extension preserved. A `repository` input is uploaded beneath the same
+  directory. OAR sets `REPOSITORY_ROOT` to the resulting document or repository
+  directory.
+- `--prompt-var NAME=VALUE` supplies a non-secret runtime prompt variable. It
+  may be repeated for tasks that declare more than one variable.
 - `--env KEY=VALUE` adds a sandbox environment value.
 - `--gateway` selects an existing OpenShell gateway.
 - `--workspace` selects a gateway-side OpenShell namespace. It defaults to
@@ -115,6 +120,47 @@ The CLI supplies run-specific values:
 Environment keys start with a letter or underscore and contain only letters,
 digits, and underscores. They cannot start with OpenShell's reserved
 `OPENSHELL_` prefix.
+
+### Prompt variables
+
+Tasks can declare string variables used by their prompt template:
+
+```yaml
+tasks:
+  review-repository:
+    required_input: repository
+    prompt: prompt-repository.md
+    prompt_variables:
+      focus:
+        description: Files or directories that deserve special attention.
+        default: Review the entire repository.
+      context:
+        description: Additional context that should inform the review.
+```
+
+Variables with defaults are optional; variables without defaults are required.
+Callers can supply several independent values by repeating the option:
+
+```bash
+--prompt-var focus="src/auth and tests/auth" \
+--prompt-var context="Pre-release security review"
+```
+
+Templates reference declared variables by name and OAR metadata through the
+reserved `oar` namespace:
+
+```markdown
+Inspect `{{ oar.input_path }}`, originally provided as
+`{{ oar.input_name }}`.
+
+Focus: {{ focus }}
+Context: {{ context }}
+```
+
+Tasks with required inputs receive `oar.input_path` and `oar.input_name`.
+Substitution is literal: prompt templates do not support expressions,
+conditionals, loops, or shell evaluation. Unknown, duplicated, missing, unused,
+and malformed variables are rejected before the sandbox starts.
 
 ### Tools and extensions
 
@@ -185,12 +231,33 @@ OpenShell treats a directory destination like `cp`: it creates the source
 directory beneath that destination. Uploads run in declaration order, so more
 than one source can intentionally merge into the same destination.
 
+The packaged reviewer uses task-specific required inputs:
+
+```bash
+oar run ./profiles/reviewer \
+  --task review-document \
+  --input ./document.md \
+  --output ./document-review.md
+
+oar run ./profiles/reviewer \
+  --task review-repository \
+  --input ./repository \
+  --prompt-var focus="src/auth and tests/auth" \
+  --prompt-var context="Pre-release security review" \
+  --output ./repository-review.md
+```
+
+Document tasks require a file and repository tasks require a directory. For a
+repository task, OAR makes the uploaded repository the agent's working
+directory. The repository is an uploaded snapshot; changes inside the sandbox
+are disposable and are not synchronized back to the host.
+
 Uploads come from three places:
 
 | Source | Contents |
 | --- | --- |
 | Profile | `sandbox.upload` mappings shared by every run |
-| CLI | Repeatable `--upload` mappings and the optional `--input` document |
+| CLI | Repeatable `--upload` mappings and the task's required `--input` |
 | OAR | Prompt, Pi model settings, skills, extensions, and optional schema |
 
 Caller uploads normally live under `/workspace`. OAR runtime uploads live under

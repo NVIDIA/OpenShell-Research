@@ -6,6 +6,7 @@
 import json
 import shutil
 import tempfile
+from collections.abc import Mapping
 from importlib.resources import files
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from openshell_agent_runner.config import (
     ResolvedProfile,
 )
 from openshell_agent_runner.harnesses.resources import PreparedResources
+from openshell_agent_runner.prompt_templates import render_prompt_template
 
 SANDBOX_RUNTIME_ROOT = "/sandbox/oar-runtime"
 
@@ -23,13 +25,19 @@ def image_directory() -> Path:
     return Path(str(files("openshell_agent_runner.harnesses.pi") / "runtime" / "image"))
 
 
-def prepare_resources(resolved: ResolvedProfile, task_id: str) -> PreparedResources:
+def prepare_resources(
+    resolved: ResolvedProfile,
+    task_id: str,
+    prompt_variables: Mapping[str, str] | None = None,
+) -> PreparedResources:
     temporary = tempfile.TemporaryDirectory(prefix="oar-pi-")
     runtime = Path(temporary.name) / "runtime"
     (runtime / "skills").mkdir(parents=True, exist_ok=True)
     (runtime / "extensions").mkdir(parents=True, exist_ok=True)
     task = resolved.profile.tasks[task_id]
-    shutil.copy2(resolved.profile_dir / task.prompt, runtime / "prompt.md")
+    template = (resolved.profile_dir / task.prompt).read_text(encoding="utf-8")
+    rendered_prompt = render_prompt_template(template, prompt_variables or {})
+    (runtime / "prompt.md").write_text(rendered_prompt, encoding="utf-8")
     shutil.copy2(resolved.profile_dir / MODELS_FILENAME, runtime / MODELS_FILENAME)
     shutil.copy2(resolved.profile_dir / SETTINGS_FILENAME, runtime / SETTINGS_FILENAME)
     arguments = [
