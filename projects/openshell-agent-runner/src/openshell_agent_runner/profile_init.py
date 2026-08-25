@@ -17,7 +17,7 @@ from pathlib import Path
 from openshell_agent_runner.config import MODEL_IDENTIFIER_PATTERN, load_profile
 from openshell_agent_runner.errors import ConfigurationError
 
-PACKAGED_PROFILES = ("reviewer",)
+PACKAGED_PROFILES = ("code-reviewer", "slop-cop", "technical-writing-reviewer")
 
 
 class ThinkingLevel(StrEnum):

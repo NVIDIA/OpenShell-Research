@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CodeReview",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "summary", "findings", "strengths", "limitations"],
+  "properties": {
+    "verdict": {
+      "enum": ["clean", "findings", "manual_review"]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "severity",
+          "category",
+          "title",
+          "path",
+          "evidence",
+          "impact",
+          "recommendation"
+        ],
+        "properties": {
+          "severity": {
+            "enum": ["blocker", "high", "medium", "low"]
+          },
+          "category": {
+            "enum": [
+              "correctness",
+              "robustness",
+              "security",
+              "maintainability",
+              "tests",
+              "performance",
+              "data",
+              "api_contract",
+              "dependency",
+              "operations",
+              "user_experience",
+              "documentation",
+              "integration"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 1
+          },
+          "impact": {
+            "type": "string",
+            "minLength": 1
+          },
+          "recommendation": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "strengths": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "limitations": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    }
+  }
+}

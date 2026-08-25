@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review Technical Writing"
+  short_description: "Review technical prose for accuracy, clarity, and utility"
+  default_prompt: "Review this technical document for concrete improvements."
