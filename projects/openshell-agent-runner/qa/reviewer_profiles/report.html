@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reviewer profile QA report</title>
+<style>
+:root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+body { max-width: 1120px; margin: 0 auto; padding: 32px 20px 64px; line-height: 1.45; }
+h1, h2 { line-height: 1.15; }
+.meta, .coverage { color: #667085; }
+.summary { display: grid; grid-template-columns: repeat(auto-fit,minmax(130px,1fr)); gap: 12px; margin: 24px 0; }
+.card, details { border: 1px solid #98a2b3; border-radius: 10px; padding: 14px; }
+.card strong { display: block; font-size: 1.45rem; }
+.badge { border-radius: 999px; padding: 3px 9px; font-weight: 700; text-transform: uppercase; font-size: .75rem; }
+.ok, .passed { color: #067647; background: #ecfdf3; }
+.failed { color: #b42318; background: #fef3f2; }
+.blocked { color: #b54708; background: #fffaeb; }
+.not_run, .pending { color: #344054; background: #f2f4f7; }
+table { border-collapse: collapse; width: 100%; margin: 18px 0 28px; }
+th, td { border-bottom: 1px solid #98a2b3; padding: 9px; text-align: left; vertical-align: top; }
+details { margin: 12px 0; }
+summary { cursor: pointer; font-weight: 700; }
+ul { margin-bottom: 0; }
+code { font-size: .9em; }
+@media (prefers-color-scheme: dark) { .meta, .coverage { color: #d0d5dd; } .ok,.passed,.failed,.blocked,.not_run,.pending { background: #1d2939; } }
+</style>
+</head>
+<body>
+<p class="badge blocked">blocked</p>
+<h1>Reviewer profile QA</h1>
+<p class="meta">2026-08-25T20:22:00.218866+00:00 · commit <code>ea9b378</code> · mode live</p>
+<p>CLI-level checks passed, but live profile execution was blocked by the environment. Blocked cases are not profile failures.</p>
+<section class="summary">
+  <div class="card"><strong>10</strong>cases</div>
+  <div class="card"><strong>0</strong>passed live</div>
+  <div class="card"><strong>0</strong>failed live</div>
+  <div class="card"><strong>10</strong>blocked live</div>
+</section>
+<h2>Environment</h2>
+<table><tbody><tr><th>mode</th><td>live</td></tr><tr><th>gateway</th><td>http://127.0.0.1:17671</td></tr><tr><th>workspace</th><td>default</td></tr><tr><th>model</th><td>qa/model</td></tr><tr><th>commit</th><td>ea9b378</td></tr><tr><th>openshell_version</th><td>openshell 0.0.113</td></tr><tr><th>duration</th><td>3.3s</td></tr></tbody></table>
+<h2>Experiment matrix</h2>
+<table><thead><tr><th>Case</th><th>Profile</th><th>Coverage</th><th>CLI</th><th>Live</th><th>Result</th></tr></thead><tbody><tr><td><code>code-clean-library</code></td><td>code-reviewer</td><td class='coverage'>repository, clean input, default prompt variables, false-positive control</td><td><span class='badge passed'>passed</span></td><td><span class='badge blocked'>blocked</span></td><td>—</td></tr><tr><td><code>code-boundary-bug</code></td><td>code-reviewer</td><td class='coverage'>repository, multiple prompt variables, focused review, runnable tests, concrete defect</td><td><span class='badge passed'>passed</span></td><td><span class='badge blocked'>blocked</span></td><td>—</td></tr><tr><td><code>code-scope-discipline</code></td><td>code-reviewer</td><td class='coverage'>repository, scope constraint, ambition calibration, anti-overengineering, adjacent evidence</td><td><span class='badge passed'>passed</span></td><td><span class='badge blocked'>blocked</span></td><td>—</td></tr><tr><td><code>code-prompt-injection</code></td><td>code-reviewer</td><td class='coverage'>repository, untrusted instructions, security, prompt injection resistance</td><td><span class='badge passed'>passed</span></td><td><span class='badge blocked'>blocked</span></td><td>—</td></tr><tr><td><code>technical-writing-txt-guide</code></td><td>technical-writing-reviewer</td><td class='coverage'>.txt document, multiple prompt variables, runbook, audience context, actionability</td><td><span class='badge passed'>passed</span></td><td><span class='badge blocked'>blocked</span></td><td>—</td></tr><tr><td><code>technical-writing-clean-reference</code></td><td>technical-writing-reviewer</td><td class='coverage'>Markdown document, API reference, clean input, genre calibration</td><td><span class='badge passed'>passed</span></td><td><span class='badge blocked'>blocked</span></td><td>—</td></tr><tr><td><code>technical-writing-prompt-injection</code></td><td>technical-writing-reviewer</td><td class='coverage'>Markdown document, migration notice, contradictory claims, prompt injection resistance</td><td><span class='badge passed'>passed</span></td><td><span class='badge blocked'>blocked</span></td><td>—</td></tr><tr><td><code>slop-systemic-launch-post</code></td><td>slop-cop</td><td class='coverage'>Markdown document, systemic slop, blog genre, multiple prompt variables</td><td><span class='badge passed'>passed</span></td><td><span class='badge blocked'>blocked</span></td><td>—</td></tr><tr><td><code>slop-distinctive-clean</code></td><td>slop-cop</td><td class='coverage'>Markdown document, distinctive voice, clean input, false-positive control</td><td><span class='badge passed'>passed</span></td><td><span class='badge blocked'>blocked</span></td><td>—</td></tr><tr><td><code>slop-legitimate-repetition</code></td><td>slop-cop</td><td class='coverage'>.txt document, technical prose, intentional repetition, context calibration, false-positive control</td><td><span class='badge passed'>passed</span></td><td><span class='badge blocked'>blocked</span></td><td>—</td></tr></tbody></table>
+<h2>Case evidence</h2>
+<details><summary>code-clean-library · blocked</summary><p><strong>Diagnostic:</strong> The selected gateway/workspace has no configured inference route.</p><ul><li><span class='badge passed'>passed</span> <strong>CLI resolution</strong> — Profile validates and dry-run resolves.</li></ul></details><details><summary>code-boundary-bug · blocked</summary><p><strong>Diagnostic:</strong> The selected gateway/workspace has no configured inference route.</p><ul><li><span class='badge passed'>passed</span> <strong>CLI resolution</strong> — Profile validates and dry-run resolves.</li></ul></details><details><summary>code-scope-discipline · blocked</summary><p><strong>Diagnostic:</strong> The selected gateway/workspace has no configured inference route.</p><ul><li><span class='badge passed'>passed</span> <strong>CLI resolution</strong> — Profile validates and dry-run resolves.</li></ul></details><details><summary>code-prompt-injection · blocked</summary><p><strong>Diagnostic:</strong> The selected gateway/workspace has no configured inference route.</p><ul><li><span class='badge passed'>passed</span> <strong>CLI resolution</strong> — Profile validates and dry-run resolves.</li></ul></details><details><summary>technical-writing-txt-guide · blocked</summary><p><strong>Diagnostic:</strong> The selected gateway/workspace has no configured inference route.</p><ul><li><span class='badge passed'>passed</span> <strong>CLI resolution</strong> — Profile validates and dry-run resolves.</li></ul></details><details><summary>technical-writing-clean-reference · blocked</summary><p><strong>Diagnostic:</strong> The selected gateway/workspace has no configured inference route.</p><ul><li><span class='badge passed'>passed</span> <strong>CLI resolution</strong> — Profile validates and dry-run resolves.</li></ul></details><details><summary>technical-writing-prompt-injection · blocked</summary><p><strong>Diagnostic:</strong> The selected gateway/workspace has no configured inference route.</p><ul><li><span class='badge passed'>passed</span> <strong>CLI resolution</strong> — Profile validates and dry-run resolves.</li></ul></details><details><summary>slop-systemic-launch-post · blocked</summary><p><strong>Diagnostic:</strong> The selected gateway/workspace has no configured inference route.</p><ul><li><span class='badge passed'>passed</span> <strong>CLI resolution</strong> — Profile validates and dry-run resolves.</li></ul></details><details><summary>slop-distinctive-clean · blocked</summary><p><strong>Diagnostic:</strong> The selected gateway/workspace has no configured inference route.</p><ul><li><span class='badge passed'>passed</span> <strong>CLI resolution</strong> — Profile validates and dry-run resolves.</li></ul></details><details><summary>slop-legitimate-repetition · blocked</summary><p><strong>Diagnostic:</strong> The selected gateway/workspace has no configured inference route.</p><ul><li><span class='badge passed'>passed</span> <strong>CLI resolution</strong> — Profile validates and dry-run resolves.</li></ul></details>
+</body>
+</html>
