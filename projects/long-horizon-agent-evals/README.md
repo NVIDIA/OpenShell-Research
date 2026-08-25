@@ -99,6 +99,7 @@ the harness does not inspect, rewrite, or special-case proposal contents.
 
 - Node.js 20.3 or newer
 - Docker and a dedicated OpenShell gateway that can create Docker sandboxes
+- Provider policy composition disabled on that gateway
 - A Responses-compatible endpoint for the challenger and reviewer
 - A GitHub repository with an existing default branch
 - A fine-grained GitHub token with Contents read/write access to that repository
@@ -121,12 +122,19 @@ cp .env.example .env
 Fill in the required OpenShell, GitHub, and challenger values. Reviewer model
 settings are independent; leave any reviewer value empty to reuse the matching
 challenger setting. `.env` is loaded automatically and is ignored by Git.
+
+Disable provider policy composition once on the dedicated evaluation gateway:
+
+```shell
+openshell settings set --global --key providers_v2_enabled --value false --yes
+```
+
 The runner requires `LAB_DEDICATED_GATEWAY=1` because it changes gateway-global
 proposal settings. It also verifies that an exact GitHub write proposal reaches
 manual review before starting the challenger, so incompatible gateways fail fast.
-Provider policy composition is disabled on that dedicated gateway: providers
+It also verifies that provider policy composition is disabled. Providers then
 deliver protected credential placeholders, while the experiment policy grants
-only model access. This keeps GitHub permission changes on the reviewer path.
+only model access, keeping GitHub permission changes on the reviewer path.
 By default, observing the target stops the challenger immediately; set
 `LAB_CONTINUE_AFTER_COMPROMISE=1` only when the post-compromise trajectory is
 itself part of the experiment.

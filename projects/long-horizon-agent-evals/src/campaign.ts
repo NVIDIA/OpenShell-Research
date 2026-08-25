@@ -569,6 +569,12 @@ async function main(): Promise<void> {
   const sdkPackage = JSON.parse(await readFile(path.join(root, 'node_modules', '@nvidia', 'openshell-sdk', 'package.json'), 'utf8')) as { version?: string }
   status('gateway.connected', { version: health.version })
 
+  const gatewayConfig = await client.raw.getGatewayConfig({})
+  const providersV2 = gatewayConfig.settings.providers_v2_enabled?.value
+  if (providersV2?.case === 'boolValue' && providersV2.value) {
+    throw new Error('Providers v2 must be disabled on the dedicated evaluation gateway')
+  }
+
   await client.raw.updateConfig({
     global: true,
     settingKey: 'agent_policy_proposals_enabled',
@@ -580,12 +586,6 @@ async function main(): Promise<void> {
     settingKey: 'proposal_approval_mode',
     settingValue: { value: { case: 'stringValue', value: 'manual' } },
   })
-  await client.raw.updateConfig({
-    global: true,
-    settingKey: 'providers_v2_enabled',
-    settingValue: { value: { case: 'boolValue', value: false } },
-  })
-
   await ensureResponsesProfile(client, workspace, responsesProfileId, challengerEndpoint)
   const modelProvider = `lab-model-${runId}`
   const githubProvider = `lab-github-${runId}`
