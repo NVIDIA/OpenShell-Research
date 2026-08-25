@@ -28,22 +28,23 @@ uvx --from openshell-agent-runner oar init ./profiles \
 uvx --from openshell-agent-runner oar doctor --gateway openshell
 ```
 
-Validate the included reviewer profile and preview its task:
+Validate the included technical-writing reviewer and preview its task:
 
 ```bash
 printf '# Review me\n\nA short document.\n' > document.md
-uvx --from openshell-agent-runner oar validate ./profiles/reviewer
+uvx --from openshell-agent-runner oar validate \
+  ./profiles/technical-writing-reviewer
 
-uvx --from openshell-agent-runner oar run ./profiles/reviewer \
+uvx --from openshell-agent-runner oar run ./profiles/technical-writing-reviewer \
   --task review-document \
   --gateway openshell \
   --input document.md \
-  --output /tmp/oar-review.md \
+  --output /tmp/oar-review.json \
   --dry-run
 ```
 
 Replace `openshell` with your gateway name. Remove `--dry-run` to launch the
-agent and write its result to `/tmp/oar-review.md`.
+agent and write its structured result to `/tmp/oar-review.json`.
 
 `oar init` copies the packaged profiles into an ordinary directory so you can
 inspect, edit, and commit them. Omit `--profile` to create all packaged profiles,
@@ -56,9 +57,19 @@ OpenShell policy, and the prompts or other files referenced by its tasks. The
 profile owns stable behavior and permissions; the CLI supplies values that vary
 for each run, such as the task, inputs, output path, gateway, and workspace.
 
+OAR packages three focused review profiles:
+
+| Profile | Input | Purpose |
+| --- | --- | --- |
+| `code-reviewer` | Repository directory | Find concrete engineering issues without scope creep or speculative hardening. |
+| `technical-writing-reviewer` | Document file | Review technical accuracy, clarity, completeness, and reader utility. |
+| `slop-cop` | Document file | Find material formulaic, vague, inflated, or generic prose without making AI-authorship claims. |
+
+Each uses the same runtime prompt-variable mechanism. For example:
+
 ```yaml
-id: reviewer
-description: Review an uploaded document or code repository.
+id: code-reviewer
+description: Review an input code repository for concrete engineering issues.
 
 sandbox:
   policy: policy.yaml
@@ -66,31 +77,19 @@ sandbox:
   env: []
 
 tasks:
-  review-document:
-    required_input: document
-    prompt: prompt-document.md
-    prompt_variables:
-      focus:
-        description: Areas of the document that deserve special attention.
-        default: Review the complete document.
-      context:
-        description: Additional context that should inform the review.
-        default: No additional context was provided.
-    tools: [read, grep, find, ls, bash]
-    skills: []
-    extensions: []
   review-repository:
     required_input: repository
     prompt: prompt-repository.md
     prompt_variables:
       focus:
-        description: Files or directories that deserve special attention.
-        default: Review the entire repository.
+        description: Files, directories, behavior, or risks that deserve special attention.
+        default: Review the complete repository.
       context:
-        description: Additional context that should inform the review.
+        description: Intent, constraints, non-goals, or maturity that should calibrate the review.
         default: No additional context was provided.
+    output_schema: schemas/review.json
     tools: [read, grep, find, ls, bash]
-    skills: []
+    skills: [skills/review-code]
     extensions: []
 ```
 
@@ -143,19 +142,19 @@ profile and task before `--help`:
 
 ```bash
 uvx --from openshell-agent-runner oar run \
-  ./profiles/reviewer --task review-document --help
+  ./profiles/technical-writing-reviewer --task review-document --help
 ```
 
-The reviewer also accepts a code repository directory:
+Review a code repository with runtime focus and context:
 
 ```bash
-uvx --from openshell-agent-runner oar run ./profiles/reviewer \
+uvx --from openshell-agent-runner oar run ./profiles/code-reviewer \
   --task review-repository \
   --gateway openshell \
   --input ./my-project \
   --prompt-var focus="src/auth and tests/auth" \
   --prompt-var context="Pre-release security review" \
-  --output /tmp/oar-repository-review.md
+  --output /tmp/oar-repository-review.json
 ```
 
 ## Documentation
