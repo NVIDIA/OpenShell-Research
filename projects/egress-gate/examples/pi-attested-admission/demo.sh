@@ -81,7 +81,7 @@ require_branch() {
 	fi
 }
 
-sync() {
+sync_forks() {
 	if ! $print_only; then
 		require_directory "$pi_repo" "Pi checkout"
 		require_directory "$openshell_repo" "OpenShell checkout"
@@ -100,9 +100,8 @@ pi_tarball() {
 }
 
 prepare() {
+	sync_forks
 	if ! $print_only; then
-		require_directory "$pi_repo" "Pi checkout"
-		require_branch "$pi_repo" "$pi_branch"
 		require_value "${EGRESS_GATE_HOST_IP:-}" EGRESS_GATE_HOST_IP
 	fi
 	local tarball
@@ -199,8 +198,7 @@ usage() {
 Usage: ./demo.sh [--print] ACTION
 
 Actions:
-  sync     Update the Pi and OpenShell fork branches with fast-forward pulls
-  prepare  Build and package Pi, then register Egress Gate with OpenShell
+  prepare  Update the forks, package Pi, and register Egress Gate with OpenShell
   serve    Start Egress Gate
   gateway  Start the forked OpenShell gateway
   launch   Create the OpenAI provider and launch Pi in a managed sandbox
@@ -209,14 +207,12 @@ Actions:
   all      Print every action in order (requires --print)
 
 Use --print to show exact commands without running them:
-  ./demo.sh --print sync
   ./demo.sh --print prepare
   ./demo.sh --print all
 EOF
 }
 
 case "$action" in
-	sync) sync ;;
 	prepare) prepare ;;
 	serve) serve ;;
 	gateway) gateway ;;
@@ -228,7 +224,7 @@ case "$action" in
 			printf 'The all action is print-only. Run: ./demo.sh --print all\n' >&2
 			exit 1
 		fi
-		for step in sync prepare serve gateway launch verify cleanup; do
+		for step in prepare serve gateway launch verify cleanup; do
 			printf '\n# %s\n' "$step"
 			"$step"
 		done

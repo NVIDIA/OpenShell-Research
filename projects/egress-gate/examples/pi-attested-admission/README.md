@@ -51,22 +51,16 @@ You can inspect every command before running anything:
 ./demo.sh --print all
 ```
 
-Update both fork checkouts to the latest commits on those branches:
-
-```shell
-./demo.sh sync
-```
-
-`sync` uses fast-forward-only pulls and stops instead of merging divergent local
-work.
-
 ## Try it
 
-Build the Pi fork and register Egress Gate with OpenShell:
+Update both fork branches, build Pi, and register Egress Gate with OpenShell:
 
 ```shell
 ./demo.sh prepare
 ```
+
+The updates use fast-forward-only pulls and stop instead of merging divergent
+local work.
 
 Keep Egress Gate running in one terminal:
 
@@ -120,21 +114,6 @@ The output must contain `[REDACTED]` and must not contain `DENY_THIS` or
 5. OpenShell checks the receipt before the model request leaves the sandbox and
    injects `OPENAI_API_KEY`; the key is never copied into the sandbox.
 
-## Inspect individual commands
-
-The helper never requires you to trust hidden orchestration. Add `--print` to
-any action to show its exact commands without executing them:
-
-```shell
-./demo.sh --print prepare
-./demo.sh --print launch
-```
-
-The actions are deliberately small: `sync` updates the two fork branches;
-`prepare` builds and packages the Pi fork; `serve` runs Egress Gate; `gateway`
-runs the matching OpenShell fork; and `launch` creates the credential provider
-and sandbox.
-
 ## Current scope
 
 This initial integration supports idle, text-only, direct OpenAI Chat
@@ -153,4 +132,4 @@ sandbox and provider:
 ```
 
 Then stop the OpenShell gateway and Egress Gate with `Ctrl-C`. To run the
-example again, start from `./demo.sh sync`.
+example again, start from `./demo.sh prepare`.
