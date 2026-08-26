@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DevNoteReview",
+  "type": "object",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {"reviewer_id": {"const": "editorial"}},
+        "required": ["reviewer_id"]
+      },
+      "then": {
+        "properties": {
+          "criterion_scores": {
+            "minItems": 7,
+            "maxItems": 7,
+            "prefixItems": [
+              {"properties": {"criterion": {"const": "formulaic_language"}}},
+              {"properties": {"criterion": {"const": "empty_emphasis"}}},
+              {"properties": {"criterion": {"const": "repetitive_cadence"}}},
+              {"properties": {"criterion": {"const": "unnecessary_summary"}}},
+              {"properties": {"criterion": {"const": "inflated_claims"}}},
+              {"properties": {"criterion": {"const": "vague_attribution"}}},
+              {"properties": {"criterion": {"const": "directness"}}}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"reviewer_id": {"const": "technical_note"}},
+        "required": ["reviewer_id"]
+      },
+      "then": {
+        "properties": {
+          "criterion_scores": {
+            "minItems": 5,
+            "maxItems": 5,
+            "prefixItems": [
+              {"properties": {"criterion": {"const": "directness"}}},
+              {"properties": {"criterion": {"const": "technical_grounding"}}},
+              {"properties": {"criterion": {"const": "proportionality"}}},
+              {"properties": {"criterion": {"const": "reader_utility"}}},
+              {"properties": {"criterion": {"const": "evidence_quality"}}}
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "required": [
+    "reviewer_id",
+    "model_id",
+    "source_revision",
+    "source_content_digest",
+    "criterion_scores",
+    "overall_score",
+    "verdict",
+    "confidence",
+    "findings",
+    "overall_assessment"
+  ],
+  "properties": {
+    "reviewer_id": {
+      "enum": ["editorial", "technical_note"]
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_content_digest": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "criterion_scores": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["criterion", "score", "explanation"],
+        "properties": {
+          "criterion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4
+          },
+          "explanation": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "overall_score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "verdict": {
+      "enum": ["pass", "revise", "manual_review"]
+    },
+    "confidence": {
+      "enum": ["low", "medium", "high"]
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "severity",
+          "quote",
+          "source_path",
+          "line",
+          "column",
+          "explanation",
+          "recommended_action"
+        ],
+        "properties": {
+          "severity": {
+            "enum": ["advisory", "warning", "blocking"]
+          },
+          "quote": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "column": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "explanation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "recommended_action": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "overall_assessment": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

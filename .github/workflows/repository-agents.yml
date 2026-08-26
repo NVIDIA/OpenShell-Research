@@ -1,0 +1,139 @@
+name: Repository agents
+
+"on":
+  pull_request:
+    paths:
+      - .pre-commit-config.yaml
+      - .github/workflows/repository-agents.yml
+      - .github/openshell-agents/**
+      - projects/openshell-agent-runner/**
+  push:
+    branches:
+      - main
+    paths:
+      - .pre-commit-config.yaml
+      - .github/workflows/repository-agents.yml
+      - .github/openshell-agents/**
+      - projects/openshell-agent-runner/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-agents-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check repository agents (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.5"
+          python-version: ${{ matrix.python-version }}
+
+      - name: Configure isolated uv paths
+        run: |
+          echo "UV_CACHE_DIR=$RUNNER_TEMP/repository-agents-uv-cache" >> "$GITHUB_ENV"
+          echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/repository-agents-venv" >> "$GITHUB_ENV"
+
+      - name: Install locked dependencies
+        run: uv sync --project projects/openshell-agent-runner --locked
+
+      - name: Validate agent profiles
+        run: |
+          uv run --project projects/openshell-agent-runner oar validate \
+            .github/openshell-agents/profiles/dev-note-reviewer
+          uv run --project projects/openshell-agent-runner oar validate \
+            projects/openshell-agent-runner/src/openshell_agent_runner/profiles/reviewer
+
+      - name: Preview agent execution
+        run: |
+          uv run --project projects/openshell-agent-runner oar run \
+            .github/openshell-agents/profiles/dev-note-reviewer \
+            --task editorial \
+            --gateway openshell \
+            --upload .:/workspace/source \
+            --upload .git:/workspace/source \
+            --env REVIEW_TARGET_PATH=docs/dev-notes/posts/2026-08-07-formal-methods-ai-generated-robot-actions.md \
+            --output "$RUNNER_TEMP/editorial-review.json" \
+            --dry-run
+
+      - name: Run project checks
+        working-directory: projects/openshell-agent-runner
+        run: |
+          uv run pre-commit validate-config ../../.pre-commit-config.yaml
+          make check
+
+      - name: Build distributions
+        working-directory: projects/openshell-agent-runner
+        run: |
+          make build
+          wheel="$(find dist -name '*.whl' -print -quit)"
+          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/image/Dockerfile'
+          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/image/exec.sh'
+          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/extensions/submit-result.ts'
+          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/extensions/validate-tools.ts'
+          python -m zipfile -l "$wheel" | grep -F 'profiles/reviewer/profile.yaml'
+          python -m zipfile -l "$wheel" | grep -F 'profiles/reviewer/models.json'
+          python -m zipfile -l "$wheel" | grep -F 'dist-info/licenses/LICENSE'
+
+      - name: Verify the built wheel
+        working-directory: projects/openshell-agent-runner
+        run: |
+          wheel="$(find dist -name '*.whl' -print -quit)"
+          uvx --from "$wheel" oar init "$RUNNER_TEMP/profiles" \
+            --model provider/model
+          uvx --from "$wheel" oar validate \
+            "$RUNNER_TEMP/profiles/reviewer"
+          printf '# Review me\n\nA short document.\n' > "$RUNNER_TEMP/review-input.md"
+          uvx --from "$wheel" oar run \
+            "$RUNNER_TEMP/profiles/reviewer" \
+            --task review-document \
+            --input "$RUNNER_TEMP/review-input.md" \
+            --output "$RUNNER_TEMP/review-output.md" \
+            --dry-run
+          test ! -e "$RUNNER_TEMP/review-output.md"
+
+      - name: Build the Pi image
+        if: matrix.python-version == '3.12'
+        run: |
+          docker build \
+            --tag openshell-agent-runner-pi:ci \
+            projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/image
+          docker run --rm \
+            --entrypoint bash \
+            --volume "$RUNNER_TEMP/profiles/reviewer:/profile-source:ro" \
+            openshell-agent-runner-pi:ci \
+            -c "cp -R /profile-source /tmp/profile && \
+              PI_CODING_AGENT_DIR=/tmp/profile pi --offline --list-models openshell" \
+            | grep -F 'provider/model'
+
+      - name: Validate the Pi extensions
+        if: matrix.python-version == '3.12'
+        run: |
+          docker run --rm \
+            --entrypoint bash \
+            --env OAR_RUNTIME_ROOT=/sandbox \
+            --volume "$PWD/projects/openshell-agent-runner/tests/fixtures/format-output.schema.json:/sandbox/output.schema.json:ro" \
+            --volume "$PWD/projects/openshell-agent-runner/tests/fixtures/tools.json:/sandbox/tools.json:ro" \
+            --volume "$PWD/projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/extensions/submit-result.ts:/sandbox/oar-submit-result.ts:ro" \
+            --volume "$PWD/projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/extensions/validate-tools.ts:/sandbox/oar-validate-tools.ts:ro" \
+            --volume "$PWD/projects/openshell-agent-runner/tests/fixtures/validate-pi-extensions.mjs:/sandbox/validate-pi-extensions.mjs:ro" \
+            openshell-agent-runner-pi:ci \
+            -c "ln -s /usr/local/lib/node_modules /sandbox/node_modules && \
+              node \
+              --experimental-strip-types --no-warnings \
+              /sandbox/validate-pi-extensions.mjs"

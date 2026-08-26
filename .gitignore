@@ -123,6 +123,7 @@ lib/
 public/
 site/
 docs/documentation/egress-gate/
+docs/documentation/openshell-agent-runner/
 .docusaurus/
 .vitepress/cache/
 .vitepress/dist/

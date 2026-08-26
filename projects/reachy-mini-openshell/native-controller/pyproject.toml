@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=84,<85"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,12 +9,24 @@ description = "Trusted Reachy Mini media and OpenShell lifecycle controller."
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = [
+  "aiohttp>=3.14.3,<4", # 3.14.3 fixes advisories pulled in by reachy-mini.
   "fastapi>=0.115,<1",
+  "gstreamer-bundle>=1.28.6,<1.29; sys_platform != 'linux'", # Latest macOS-compatible release; 1.29.2a0 has no gstreamer-python macOS wheel.
   "numpy>=1.26,<3",
-  "pillow>=10,<13",
+  "pillow>=12.3,<13",
+  "pip>=26.2.1,<27", # 26.2.1 fixes advisories pulled in by reachy-mini.
   "reachy-mini>=1.8,<1.9",
+  "starlette>=1.6,<2", # 1.6.0 fixes advisories pulled in by reachy-mini.
   "uvicorn>=0.34,<1",
   "websockets>=15,<16",
+]
+
+[tool.uv]
+# reachy-mini 1.8.x still carries obsolete upper/exact transitive pins. Keep
+# the audited versions authoritative until its published metadata catches up.
+override-dependencies = [
+  "gstreamer-bundle>=1.28.6,<1.29; sys_platform != 'linux'",
+  "starlette>=1.6,<2",
 ]
 
 [project.entry-points.reachy_mini_apps]

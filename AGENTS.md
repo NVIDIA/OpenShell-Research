@@ -26,11 +26,16 @@ read `docs/development/index.md`.
 - Use `uv` for Python dependency management, environments, locking, builds, and
   command execution unless a project explicitly documents an exception. Treat
   `pyproject.toml` and the committed `uv.lock` as the dependency sources of truth.
+- Use absolute imports in Python code. Do not use relative imports.
+- At Python module scope, place public constants, classes, and functions before
+  private underscore-prefixed definitions. Keep entry-point guards last.
 - Do not add `requirements.txt` or another generated dependency export by
   default. Commit one only when a named non-uv consumer requires it and that
   workflow is documented; regenerate exports with `uv`, never by hand.
 - Never commit credentials or populated `.env` files. Document configuration in
   `.env.example`.
+- Namespace release tags with a project label so versions from different
+  projects do not collide. OpenShell Agent Runner tags use `oar-vX.Y.Z`.
 - Do not hand-edit generated Dev Notes cards, bylines, or navigation; use
   `python3 scripts/render-dev-notes.py`.
 - Do not hand-edit generated project-documentation mirrors under
