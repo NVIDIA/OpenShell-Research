@@ -10,10 +10,10 @@ incur provider charges.
 
 ## Before you start
 
-Use the matching branches:
+Use these matching fork branches:
 
-- [Pi user-message append hook PR](https://github.com/johnnygreco/pi/pull/1)
-- [OpenShell managed admission PR](https://github.com/johnnygreco/OpenShell/pull/1)
+- [Pi `johnny/before-user-message-commit`](https://github.com/johnnygreco/pi/tree/johnny/before-user-message-commit)
+- [OpenShell `openshell/pi-egress-admission`](https://github.com/johnnygreco/OpenShell/tree/openshell/pi-egress-admission)
 - [OpenShell Research integration branch](https://github.com/NVIDIA/OpenShell-Research/tree/johnny/pi-attested-admission)
 
 Install each repository's development prerequisites and export:
@@ -31,6 +31,13 @@ The helper expects sibling checkouts named `pi`, `OpenShell`, and
 `OpenShell-Research`. For another layout, set `PI_REPO` and `OPENSHELL_REPO` to
 absolute paths.
 
+If you do not already have the fork checkouts, clone them beside this repository:
+
+```shell
+git clone --branch johnny/before-user-message-commit https://github.com/johnnygreco/pi.git ../pi
+git clone --branch openshell/pi-egress-admission https://github.com/johnnygreco/OpenShell.git ../OpenShell
+```
+
 From the `OpenShell-Research` checkout, change to the example directory. Run
 all remaining commands there:
 
@@ -43,6 +50,15 @@ You can inspect every command before running anything:
 ```shell
 ./demo.sh --print all
 ```
+
+Update both fork checkouts to the latest commits on those branches:
+
+```shell
+./demo.sh sync
+```
+
+`sync` uses fast-forward-only pulls and stops instead of merging divergent local
+work.
 
 ## Try it
 
@@ -114,9 +130,10 @@ any action to show its exact commands without executing them:
 ./demo.sh --print launch
 ```
 
-The actions are deliberately small: `prepare` builds and packages the Pi fork;
-`serve` runs Egress Gate; `gateway` runs the matching OpenShell fork; and
-`launch` creates the credential provider and sandbox.
+The actions are deliberately small: `sync` updates the two fork branches;
+`prepare` builds and packages the Pi fork; `serve` runs Egress Gate; `gateway`
+runs the matching OpenShell fork; and `launch` creates the credential provider
+and sandbox.
 
 ## Current scope
 
@@ -136,4 +153,4 @@ sandbox and provider:
 ```
 
 Then stop the OpenShell gateway and Egress Gate with `Ctrl-C`. To run the
-example again, start from `./demo.sh prepare`.
+example again, start from `./demo.sh sync`.

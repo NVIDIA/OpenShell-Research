@@ -18,6 +18,8 @@ workspace_dir=$(cd -- "$egress_gate_dir/../../.." && pwd)
 
 pi_repo=${PI_REPO:-$workspace_dir/pi}
 openshell_repo=${OPENSHELL_REPO:-$workspace_dir/OpenShell}
+pi_branch=johnny/before-user-message-commit
+openshell_branch=openshell/pi-egress-admission
 host_ip=${EGRESS_GATE_HOST_IP:-YOUR_HOST_IPV4}
 pack_dir=${PI_EGRESS_PACK_DIR:-/tmp/pi-egress-pack}
 runtime_dir=${PI_EGRESS_RUNTIME_DIR:-/tmp/pi-egress-runtime}
@@ -68,6 +70,28 @@ require_value() {
 	fi
 }
 
+require_branch() {
+	local repository=$1
+	local expected=$2
+	local actual
+	actual=$(git -C "$repository" branch --show-current)
+	if [[ $actual != "$expected" ]]; then
+		printf 'Expected %s to be on branch %s, but found %s.\n' "$repository" "$expected" "${actual:-detached HEAD}" >&2
+		exit 1
+	fi
+}
+
+sync() {
+	if ! $print_only; then
+		require_directory "$pi_repo" "Pi checkout"
+		require_directory "$openshell_repo" "OpenShell checkout"
+		require_branch "$pi_repo" "$pi_branch"
+		require_branch "$openshell_repo" "$openshell_branch"
+	fi
+	run_in "$pi_repo" git pull --ff-only origin "$pi_branch"
+	run_in "$openshell_repo" git pull --ff-only origin "$openshell_branch"
+}
+
 pi_tarball() {
 	require_file "$pi_repo/packages/coding-agent/package.json" "Pi coding-agent package"
 	local version
@@ -78,6 +102,7 @@ pi_tarball() {
 prepare() {
 	if ! $print_only; then
 		require_directory "$pi_repo" "Pi checkout"
+		require_branch "$pi_repo" "$pi_branch"
 		require_value "${EGRESS_GATE_HOST_IP:-}" EGRESS_GATE_HOST_IP
 	fi
 	local tarball
@@ -100,6 +125,7 @@ serve() {
 gateway() {
 	if ! $print_only; then
 		require_directory "$openshell_repo" "OpenShell checkout"
+		require_branch "$openshell_repo" "$openshell_branch"
 	fi
 	run_in "$openshell_repo" mise trust
 	run_in "$openshell_repo" mise run gateway
@@ -173,6 +199,7 @@ usage() {
 Usage: ./demo.sh [--print] ACTION
 
 Actions:
+  sync     Update the Pi and OpenShell fork branches with fast-forward pulls
   prepare  Build and package Pi, then register Egress Gate with OpenShell
   serve    Start Egress Gate
   gateway  Start the forked OpenShell gateway
@@ -182,12 +209,14 @@ Actions:
   all      Print every action in order (requires --print)
 
 Use --print to show exact commands without running them:
+  ./demo.sh --print sync
   ./demo.sh --print prepare
   ./demo.sh --print all
 EOF
 }
 
 case "$action" in
+	sync) sync ;;
 	prepare) prepare ;;
 	serve) serve ;;
 	gateway) gateway ;;
@@ -199,7 +228,7 @@ case "$action" in
 			printf 'The all action is print-only. Run: ./demo.sh --print all\n' >&2
 			exit 1
 		fi
-		for step in prepare serve gateway launch verify cleanup; do
+		for step in sync prepare serve gateway launch verify cleanup; do
 			printf '\n# %s\n' "$step"
 			"$step"
 		done
