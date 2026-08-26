@@ -37,6 +37,10 @@ def test_pi_example_can_print_every_command_without_running_it(
     )
 
     assert "npm run build" in result.stdout
+    assert (
+        "git pull --ff-only origin johnny/before-user-message-commit" in result.stdout
+    )
+    assert "git pull --ff-only origin openshell/pi-egress-admission" in result.stdout
     assert "add-gateway-registration" in result.stdout
     assert "egress-gate --debug serve" in result.stdout
     assert "mise run gateway" in result.stdout
