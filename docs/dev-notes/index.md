@@ -31,10 +31,44 @@ hide:
       <h2 id="featured-note-title">Featured note</h2>
       <span>Latest from the team</span>
     </div>
-    <article class="dev-note-card dev-note-card--featured dev-note-card--physical-ai dev-note-card--has-image">
+    <article class="dev-note-card dev-note-card--featured dev-note-card--openshell dev-note-card--has-image">
+      <a class="dev-note-card__link" href="posts/2026-08-27-adversarial-policy-review-long-horizon-agents/">
+      <div class="dev-note-card__visual dev-note-card__visual--openshell dev-note-card__visual--image" aria-hidden="true">
+        <img class="dev-note-card__visual-image" src="../assets/long-horizon-agent-evals/back-and-forth-by-session.png" alt="" loading="eager" fetchpriority="high">
+      </div>
+      <div class="dev-note-card__copy">
+        <div class="dev-note-card__meta">
+          <time datetime="2026-08-27">August 27, 2026</time>
+          <span>OpenShell</span>
+        </div>
+        <h3>Adversarial prototype: AI policy auto-approval for long-horizon agents in OpenShell</h3>
+        <p class="dev-note-card__summary">Can an attacker agent convince an equally capable reviewer agent to grant a capability that is explicitly prohibited?</p>
+        <div class="dev-note-card__tags" aria-label="Tags">
+          <span>agents</span>
+          <span>policy</span>
+          <span>security</span>
+        </div>
+        <div class="dev-note-card__footer">
+        <span class="dev-note-card__authors" aria-label="Author: Alex Watson">
+          <img src="https://github.com/zredlined.png?size=64" alt="" loading="lazy">
+          <span class="dev-note-card__author-names">Alex Watson</span>
+        </span>
+          <span class="dev-note-card__read">Read note</span>
+        </div>
+      </div>
+      </a>
+    </article>
+  </section>
+  <section class="journal-section dev-notes-recent" aria-labelledby="recent-notes-title">
+    <div class="journal-section__head">
+      <h2 id="recent-notes-title">Recent notes</h2>
+      <span>The working archive</span>
+    </div>
+    <div class="dev-notes-recent-list">
+    <article class="dev-note-card dev-note-card--recent dev-note-card--physical-ai dev-note-card--has-image">
       <a class="dev-note-card__link" href="posts/2026-08-07-formal-methods-ai-generated-robot-actions/">
       <div class="dev-note-card__visual dev-note-card__visual--physical-ai dev-note-card__visual--image" aria-hidden="true">
-        <img class="dev-note-card__visual-image" src="../assets/robotics-policy-prover/robotics-policy-prover-hero.png" alt="" loading="eager" fetchpriority="high">
+        <img class="dev-note-card__visual-image" src="../assets/robotics-policy-prover/robotics-policy-prover-hero.png" alt="" loading="lazy">
       </div>
       <div class="dev-note-card__copy">
         <div class="dev-note-card__meta">
@@ -58,13 +92,6 @@ hide:
       </div>
       </a>
     </article>
-  </section>
-  <section class="journal-section dev-notes-recent" aria-labelledby="recent-notes-title">
-    <div class="journal-section__head">
-      <h2 id="recent-notes-title">Recent notes</h2>
-      <span>The working archive</span>
-    </div>
-    <div class="dev-notes-recent-list">
     <article class="dev-note-card dev-note-card--recent dev-note-card--edge-ai dev-note-card--has-image">
       <a class="dev-note-card__link" href="posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/">
       <div class="dev-note-card__visual dev-note-card__visual--edge-ai dev-note-card__visual--image" aria-hidden="true">
