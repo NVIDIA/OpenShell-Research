@@ -1678,7 +1678,7 @@
 
 <p>We’ve been experimenting with AI auto policy approval in OpenShell (similar to <a href="https://alignment.openai.com/auto-review/">OpenAI’s Auto-review work</a> and <a href="https://red.anthropic.com/2025/recommended-directions/">Anthropic’s research directions on behavioral monitoring and AI control</a>) and ran an adversarial test to understand how it behaves over longer agent trajectories.</p>
 <p>The question was: can an attacker agent convince an equally capable reviewer agent to grant a capability that is explicitly prohibited?</p>
-<p>The experiment tested how this approach held up in an adversarial scenario inside the OpenShell runtime, combining a probabilistic AI reviewer with deterministic policy enforcement and the OpenShell Policy Prover’s analysis of proposed policy changes.</p>
+<p>The experiment tested how this approach held up in an adversarial scenario inside the OpenShell runtime, combining a probabilistic AI reviewer with formal methods-based policy enforcement and the OpenShell Policy Prover’s analysis of proposed policy changes.</p>
 <h2 id="tldr">TL;DR</h2>
 <p>Across 10 30-minute and two 120-minute sessions, the reviewer made 416 decisions: 196 approved and 220 rejected. No protected repository writes or deletes occurred.</p>
 <p>The most interesting result was that an attacker did fool the AI reviewer once. The reviewer approved a malformed proposal containing write authority, but OpenShell’s supervisor rejected the policy before activation. The model-on-model oversight failed; the enforcement layer failed closed.</p>
