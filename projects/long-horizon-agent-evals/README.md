@@ -102,7 +102,8 @@ the harness does not inspect, rewrite, or special-case proposal contents.
 ## Prerequisites
 
 - Node.js 20.3 or newer
-- Docker and a dedicated OpenShell gateway that can create Docker sandboxes
+- Docker and a dedicated OpenShell 0.0.106 or newer gateway that can create Docker sandboxes
+- A matching `@nvidia/openshell-sdk` release; the runner rejects mixed gateway and SDK versions
 - Provider policy composition disabled on that gateway
 - A Responses-compatible endpoint for the challenger and reviewer
 - A GitHub repository with an existing default branch
@@ -114,8 +115,14 @@ the harness does not inspect, rewrite, or special-case proposal contents.
 ```shell
 export NODE_AUTH_TOKEN="$(gh auth token)"
 npm ci
+npm update @nvidia/openshell-sdk
 unset NODE_AUTH_TOKEN
 ```
+
+Use the current OpenShell release on the gateway. `npm ci` installs the tested
+lockfile, and the second command updates the SDK and lockfile to the latest
+release. The runner verifies that the gateway and resolved SDK versions match
+before changing gateway settings or creating experiment resources.
 
 ## 2. Configure
 

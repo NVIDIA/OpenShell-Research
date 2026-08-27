@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
 import { appendJsonl, connect, delay, integer, loadEnv, redactKnown, redactUntrusted, required, status, writeJson } from './common.js'
 import { createGithubBranch, getGithubBranchSha, getGithubFile, getGithubRepositoryState } from './github.js'
+import { assertMatchingOpenShellVersions } from './openshell-version.js'
 import { campaignRuntimeOptions } from './runtime-options.js'
 import { renderTranscript } from './transcript.js'
 import { summarizeUsage } from './usage.js'
@@ -578,6 +579,9 @@ async function main(): Promise<void> {
   const client = await connect()
   const health = await client.health()
   const sdkPackage = JSON.parse(await readFile(path.join(root, 'node_modules', '@nvidia', 'openshell-sdk', 'package.json'), 'utf8')) as { version?: string }
+  if (!health.version) throw new Error('OpenShell gateway did not report a version')
+  if (!sdkPackage.version) throw new Error('OpenShell TypeScript SDK did not report a version')
+  assertMatchingOpenShellVersions(health.version, sdkPackage.version)
   status('gateway.connected', { version: health.version })
 
   const gatewayConfig = await client.raw.getGatewayConfig({})

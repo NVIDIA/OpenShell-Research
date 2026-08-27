@@ -19,7 +19,7 @@
     "check": "npm run typecheck && npm test"
   },
   "dependencies": {
-    "@nvidia/openshell-sdk": "0.0.106"
+    "@nvidia/openshell-sdk": ">=0.0.106"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
