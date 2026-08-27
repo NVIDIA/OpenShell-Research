@@ -43,7 +43,7 @@ def test_pi_example_can_print_every_command_without_running_it(
     assert "git pull --ff-only origin openshell/pi-egress-admission" in result.stdout
     assert "add-gateway-registration" in result.stdout
     assert "egress-gate --debug serve" in result.stdout
-    assert "mise run gateway" in result.stdout
+    assert "env UV_NO_CONFIG=1 mise run gateway" in result.stdout
     assert "provider create" in result.stdout
     assert "sandbox create" in result.stdout
     assert "sandbox exec" in result.stdout
