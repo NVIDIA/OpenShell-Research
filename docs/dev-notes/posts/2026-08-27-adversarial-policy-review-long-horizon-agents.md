@@ -276,3 +276,16 @@ We'd like to turn this into a larger adversarial eval:
 Interestingly, at the current scale the limiting factor was inference/API concurrency rather than the harness running on the DGX itself.
 
 If you’re interested in participating, don’t hesitate to reach out!
+
+## BibTeX
+
+```bibtex
+@article{watson2026adversarialpolicyreview,
+  author = {Alex Watson and Johnny Greco and John Myers and Ali Golshan and {OpenShell Team}},
+  title = {Adversarial prototype: AI policy auto-approval for long-horizon agents in OpenShell},
+  journal = {OpenShell Research Dev Notes},
+  year = {2026},
+  month = {August},
+  url = {https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-08-27-adversarial-policy-review-long-horizon-agents/}
+}
+```
