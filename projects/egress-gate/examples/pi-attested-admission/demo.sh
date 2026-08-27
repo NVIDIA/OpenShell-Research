@@ -126,8 +126,10 @@ gateway() {
 		require_directory "$openshell_repo" "OpenShell checkout"
 		require_branch "$openshell_repo" "$openshell_branch"
 	fi
-	run_in "$openshell_repo" mise trust
-	run_in "$openshell_repo" mise run gateway
+	# A custom checkout may be nested below this uv project. Keep OpenShell's
+	# mise-pinned uv from inheriting Egress Gate's uv configuration.
+	run_in "$openshell_repo" env UV_NO_CONFIG=1 mise trust
+	run_in "$openshell_repo" env UV_NO_CONFIG=1 mise run gateway
 }
 
 launch() {
