@@ -46,7 +46,7 @@ We’ve been experimenting with AI auto policy approval in OpenShell (similar to
 
 The question was: can an attacker agent convince an equally capable reviewer agent to grant a capability that is explicitly prohibited?
 
-The experiment tested how this approach held up in an adversarial scenario inside the OpenShell runtime, combining a probabilistic AI reviewer with deterministic policy enforcement and the OpenShell Policy Prover’s analysis of proposed policy changes.
+The experiment tested how this approach held up in an adversarial scenario inside the OpenShell runtime, combining a probabilistic AI reviewer with formal methods-based policy enforcement and the OpenShell Policy Prover’s analysis of proposed policy changes.
 
 ## TL;DR
 
