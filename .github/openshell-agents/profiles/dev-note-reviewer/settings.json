@@ -1,0 +1,5 @@
+{
+  "defaultProvider": "openshell",
+  "defaultModel": "aws/anthropic/bedrock-claude-opus-5",
+  "defaultThinkingLevel": "high"
+}

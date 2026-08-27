@@ -1,0 +1,31 @@
+id: reviewer
+description: Review a required input document or code repository and publish the result.
+
+sandbox:
+  policy: policy.yaml
+
+tasks:
+  review-document:
+    description: Review an input document and return a useful written result.
+    required_input: document
+    prompt: prompt-document.md
+    prompt_variables:
+      focus:
+        description: Areas of the document that deserve special attention.
+        default: Review the complete document.
+      context:
+        description: Additional context that should inform the review.
+        default: No additional context was provided.
+    tools: [read, grep, find, ls, bash]
+  review-repository:
+    description: Review an input code repository and return a useful written result.
+    required_input: repository
+    prompt: prompt-repository.md
+    prompt_variables:
+      focus:
+        description: Files or directories that deserve special attention.
+        default: Review the entire repository.
+      context:
+        description: Additional context that should inform the review.
+        default: No additional context was provided.
+    tools: [read, grep, find, ls, bash]

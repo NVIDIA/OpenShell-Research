@@ -1,5 +1,5 @@
 [build-system]
-requires = [ "setuptools",]
+requires = [ "setuptools>=84,<85",]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,11 +9,16 @@ description = "Reachy Mini conversation demo for OpenShell."
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = [
+ "aiohttp>=3.14.3,<4", # 3.14.3 fixes aiohttp security advisories pulled in by reachy-mini.
  "aiortc>=1.13.0",
  "fastrtc>=0.0.34",
  "gradio==5.50.1.dev1",
- "huggingface-hub==1.3.0",
+ "gstreamer-bundle>=1.28.6,<1.29; sys_platform != 'linux'", # Latest macOS-compatible release; 1.29.2a0 has no gstreamer-python macOS wheel.
+ "huggingface-hub>=1.5,<2",
  "opencv-python>=4.12.0.88",
+ "pillow>=12.3,<13", # 12.3.0 fixes Pillow security advisories pulled in by Gradio.
+ "pip>=26.2.1,<27", # 26.2.1 fixes pip security advisories pulled in by reachy-mini.
+ "protobuf>=7.36,<8", # 7.36.0 fixes protobuf security advisories pulled in by ONNX Runtime.
  "python-dotenv",
  "openai>=2.1",
  "httpx>=0.27",
@@ -22,6 +27,8 @@ dependencies = [
  "reachy-mini[mujoco]==1.8.0",
  "eclipse-zenoh~=1.7.0",
  "gradio_client>=1.13.3",
+ "setuptools>=84,<85", # 84.0.0 fixes setuptools security advisories pulled in by torch.
+ "starlette>=1.6,<2", # 1.6.0 fixes Starlette security advisories pulled in by Gradio and reachy-mini.
 ]
 [[project.authors]]
 name = "Pollen Robotics"
@@ -42,12 +49,20 @@ dev = [
 environments = [
     "sys_platform == 'darwin'",
 ]
+# reachy-mini 1.8.0 still carries obsolete upper/exact transitive pins. Keep
+# the audited versions authoritative until its published metadata catches up.
+override-dependencies = [
+    "gstreamer-bundle>=1.28.6,<1.29; sys_platform != 'linux'",
+    "huggingface-hub>=1.5,<2",
+    "pillow>=12.3,<13",
+    "starlette>=1.6,<2",
+]
 
 [project.optional-dependencies]
-local_vision = [ "torch>=2.1", "transformers==5.0.0rc2", "num2words",]
+local_vision = [ "torch>=2.13,<3", "transformers>=5.15.1,<6", "num2words",]
 yolo_vision = [ "ultralytics", "supervision", "onnxruntime",]
-mediapipe_vision = [ "mediapipe==0.10.14",]
-all_vision = [ "torch>=2.1", "transformers==5.0.0rc2", "num2words", "ultralytics", "supervision", "onnxruntime", "mediapipe==0.10.14",]
+mediapipe_vision = [ "mediapipe>=0.10.35,<0.11",]
+all_vision = [ "torch>=2.13,<3", "transformers>=5.15.1,<6", "num2words", "ultralytics", "supervision", "onnxruntime", "mediapipe>=0.10.35,<0.11",]
 
 [project.scripts]
 reachy-mini-conversation-app = "reachy_mini_conversation_app.main:main"

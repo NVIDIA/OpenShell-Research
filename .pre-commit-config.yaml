@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-format-openshell-agent-runner
+        name: Format OpenShell Agent Runner Python with Ruff
+        entry: uv run --project projects/openshell-agent-runner ruff format
+        language: system
+        files: ^projects/openshell-agent-runner/.*\.py$
+        types: [python]

@@ -47,6 +47,9 @@ nav = [
       {"Reference" = [
         {"Limits and failure behavior" = "documentation/egress-gate/reference/limits-and-failures.md"}
       ]}
+    ]},
+    {"OpenShell Agent Runner" = [
+      "documentation/openshell-agent-runner/index.md"
     ]}
   ]}
 ]
