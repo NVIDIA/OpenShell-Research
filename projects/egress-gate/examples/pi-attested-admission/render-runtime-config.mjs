@@ -78,7 +78,7 @@ writeFileSync(
 name = "pi-egress"
 grpc_endpoint = "${middlewareEndpoint}"
 allow_insecure_transport = true
-max_payload_bytes = 32768
+max_payload_bytes = 4194304
 timeout = "30s"
 `,
 );
