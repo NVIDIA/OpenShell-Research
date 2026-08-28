@@ -108,25 +108,25 @@ test("activates queued prompts only when Pi delivers them", async () => {
 	}
 });
 
-test("redacts the model credential from tool output before Pi records it", async () => {
-	const credentialName = "MODEL_PROVIDER_API_KEY";
-	const originalCredential = process.env[credentialName];
-	const credential = "test-model-credential-123456";
-	process.env[credentialName] = credential;
+test("redacts the OpenShell credential placeholder before Pi records it", async () => {
+	const credentialName = "PI_MODEL_API_KEY";
+	const originalPlaceholder = process.env[credentialName];
+	const placeholder = "openshell:resolve:env:PI_MODEL_API_KEY:test-handle";
+	process.env[credentialName] = placeholder;
 
 	try {
 		const handlers = createHarness();
 		const result = await handlers.get("tool_result")({
-			content: [{ type: "text", text: `MODEL_PROVIDER_API_KEY=${credential}\nPI_SESSION_ID=session-1` }],
+			content: [{ type: "text", text: `PI_MODEL_API_KEY=${placeholder}\nPI_SESSION_ID=session-1` }],
 		});
 		assert.deepEqual(result.content, [
 			{
 				type: "text",
-				text: "MODEL_PROVIDER_API_KEY=[REDACTED_MODEL_CREDENTIAL]\nPI_SESSION_ID=session-1",
+				text: "PI_MODEL_API_KEY=[REDACTED_OPENSHELL_CREDENTIAL_PLACEHOLDER]\nPI_SESSION_ID=session-1",
 			},
 		]);
 	} finally {
-		if (originalCredential === undefined) delete process.env[credentialName];
-		else process.env[credentialName] = originalCredential;
+		if (originalPlaceholder === undefined) delete process.env[credentialName];
+		else process.env[credentialName] = originalPlaceholder;
 	}
 });
