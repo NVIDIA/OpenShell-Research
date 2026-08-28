@@ -161,13 +161,13 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                 pb2.MiddlewareBinding(
                     operation=pb2.SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_REQUEST,
                     phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS,
-                    max_body_bytes=MAX_BODY_BYTES,
+                    max_payload_bytes=MAX_BODY_BYTES,
                 ),
                 *(
                     pb2.MiddlewareBinding(
                         operation=pb2.SUPERVISOR_MIDDLEWARE_OPERATION_AGENT_CONVERSATION,
                         phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_AGENT_CONTEXT,
-                        max_body_bytes=MAX_ADMISSION_BODY_BYTES,
+                        max_payload_bytes=MAX_ADMISSION_BODY_BYTES,
                         harness="pi",
                         hook=hook.value,
                         schema_version="openshell.pi-input.v1",

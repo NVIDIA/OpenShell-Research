@@ -46,12 +46,8 @@ class ReceiptClaimsV1(StrictDomainModel):
     submission_id: BoundedMetadataString
     receipt_id: str = Field(pattern=r"^[0-9a-f]{32}$")
     provider_adapter_schema: Literal["openai.chat-completions.v1"]
-    scheme: ScalarString
     host: ScalarString
     port: int = Field(ge=0, le=2**32 - 1)
-    method: ScalarString
-    path: ScalarString
-    query: ScalarString
     rendered_prompt_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     issued_at: int = Field(ge=0)
     expires_at: int = Field(ge=0)
@@ -123,12 +119,8 @@ class ReceiptAuthority:
             submission_id=provenance.submission_id,
             receipt_id=secrets.token_hex(16),
             provider_adapter_schema=context.provider_adapter_schema,
-            scheme=target.scheme,
             host=target.host,
             port=target.port,
-            method=target.method,
-            path=target.path,
-            query=target.query,
             rendered_prompt_hash=_prompt_hash(rendered_prompt),
             issued_at=issued_at,
             expires_at=issued_at + self._lifetime_seconds,
@@ -178,12 +170,8 @@ class ReceiptAuthority:
             policy_fingerprint,
             context.sandbox_id,
             context.provider_adapter_schema,
-            target.scheme,
             target.host,
             target.port,
-            target.method,
-            target.path,
-            target.query,
             _prompt_hash(rendered_prompt),
         )
         actual = (
@@ -195,12 +183,8 @@ class ReceiptAuthority:
             claims.policy_fingerprint,
             claims.sandbox_id,
             claims.provider_adapter_schema,
-            claims.scheme,
             claims.host,
             claims.port,
-            claims.method,
-            claims.path,
-            claims.query,
             claims.rendered_prompt_hash,
         )
         if actual != expected:

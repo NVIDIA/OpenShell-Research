@@ -11,10 +11,10 @@ process:
   run_as_group: sandbox
 
 network_policies:
-  openai:
-    name: OpenAI Chat Completions
+  model_provider:
+    name: Configured model endpoint
     endpoints:
-      - host: api.openai.com
+      - host: provider.example.com
         port: 443
         protocol: rest
         enforcement: enforce
@@ -61,4 +61,4 @@ network_middlewares:
     on_error: fail_closed
     endpoints:
       include:
-        - api.openai.com
+        - provider.example.com
