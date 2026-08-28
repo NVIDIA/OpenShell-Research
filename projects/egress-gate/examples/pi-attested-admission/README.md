@@ -116,10 +116,11 @@ Each launch replaces the example's `pi-egress-demo` sandbox, provider, and
 custom provider profile so the current Pi runtime, extension, policy, endpoint,
 and OpenShell supervisor are used together.
 
-The example registers an endpoint-specific provider profile and stores
-`PI_MODEL_API_KEY` as its credential. Pi sees only an opaque placeholder;
-OpenShell resolves it only when the admitted request is sent to the configured
-model host and port.
+The example registers an endpoint-specific provider profile using the host-side
+`PI_MODEL_API_KEY`. Inside the sandbox it uses the distinct
+`MODEL_PROVIDER_API_KEY` name so Pi's own `PI_*` diagnostics do not capture the
+credential. The extension redacts accidental appearances in tool output, and
+OpenShell blocks any credential-bearing request body from leaving the sandbox.
 
 At the Pi prompt, submit both of these in the same session:
 

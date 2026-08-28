@@ -14,6 +14,8 @@ const RECEIPT_HEADER = "x-openshell-middleware-egress-receipt";
 const SCHEMA_VERSION = "openshell.pi-input.v1";
 const MAX_RESPONSE_BYTES = 256 * 1024;
 const MAX_RECEIPT_BYTES = 8 * 1024;
+const REDACTED_CREDENTIAL = "[REDACTED_MODEL_CREDENTIAL]";
+const CREDENTIAL_ENV_NAMES = ["MODEL_PROVIDER_API_KEY", "PI_MODEL_API_KEY"];
 
 type BridgeResponse =
 	| { decision: "allow"; replacement_body?: number[]; receipt: number[] }
@@ -43,6 +45,24 @@ export default function (pi: ExtensionAPI) {
 	let activeAdmission: ActiveAdmission | undefined;
 	let pendingReceipt: string | undefined;
 	const queuedAdmissions: PendingAdmission[] = [];
+	const credentialValues = CREDENTIAL_ENV_NAMES.map((name) => process.env[name]).filter(
+		(value): value is string => typeof value === "string" && value.length >= 12,
+	);
+
+	pi.on("tool_result", (event) => {
+		let changed = false;
+		const content = event.content.map((part) => {
+			if (part.type !== "text") return part;
+			let text = part.text;
+			for (const credential of credentialValues) {
+				const redacted = text.replaceAll(credential, REDACTED_CREDENTIAL);
+				changed ||= redacted !== text;
+				text = redacted;
+			}
+			return text === part.text ? part : { ...part, text };
+		});
+		return changed ? { content } : undefined;
+	});
 
 	pi.on("before_user_message_append", async (event, ctx) => {
 		const isIdle = ctx.isIdle();

@@ -107,3 +107,26 @@ test("activates queued prompts only when Pi delivers them", async () => {
 		else process.env[BRIDGE_URL_ENV] = originalBridgeUrl;
 	}
 });
+
+test("redacts the model credential from tool output before Pi records it", async () => {
+	const credentialName = "MODEL_PROVIDER_API_KEY";
+	const originalCredential = process.env[credentialName];
+	const credential = "test-model-credential-123456";
+	process.env[credentialName] = credential;
+
+	try {
+		const handlers = createHarness();
+		const result = await handlers.get("tool_result")({
+			content: [{ type: "text", text: `MODEL_PROVIDER_API_KEY=${credential}\nPI_SESSION_ID=session-1` }],
+		});
+		assert.deepEqual(result.content, [
+			{
+				type: "text",
+				text: "MODEL_PROVIDER_API_KEY=[REDACTED_MODEL_CREDENTIAL]\nPI_SESSION_ID=session-1",
+			},
+		]);
+	} finally {
+		if (originalCredential === undefined) delete process.env[credentialName];
+		else process.env[credentialName] = originalCredential;
+	}
+});
