@@ -351,24 +351,27 @@ gateway() {
 ensure_model_provider() {
 	if $print_only; then
 		run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
+			provider delete pi-model
+		run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
+			provider profile delete pi-attested-model
+		run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
 			provider profile import --file "$runtime_provider_profile"
 		run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" provider create \
 			--name pi-model --type pi-attested-model --credential PI_MODEL_API_KEY
 		return
 	fi
 	if (cd -- "$openshell_repo" && "$openshell_cli" --gateway "$gateway_name" \
-		provider profile export pi-attested-model >/dev/null 2>&1); then
-		run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
-			provider profile update pi-attested-model --file "$runtime_provider_profile"
-	else
-		run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
-			provider profile import --file "$runtime_provider_profile"
-	fi
-	if (cd -- "$openshell_repo" && "$openshell_cli" --gateway "$gateway_name" \
 		provider get pi-model >/dev/null 2>&1); then
 		run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
 			provider delete pi-model
 	fi
+	if (cd -- "$openshell_repo" && "$openshell_cli" --gateway "$gateway_name" \
+		provider profile export pi-attested-model >/dev/null 2>&1); then
+		run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
+			provider profile delete pi-attested-model
+	fi
+	run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
+		provider profile import --file "$runtime_provider_profile"
 	run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" provider create \
 		--name pi-model --type pi-attested-model --credential PI_MODEL_API_KEY
 }
