@@ -20,7 +20,7 @@ const models = {
     "attested-provider": {
       baseUrl: baseUrl.toString().replace(/\/$/, ""),
       api: "openai-completions",
-      apiKey: "$MODEL_PROVIDER_API_KEY",
+      apiKey: "$PI_MODEL_API_KEY",
       models: [
         {
           id: modelId,
@@ -56,7 +56,7 @@ inference_capable: true
 credentials:
   - name: api_key
     description: Model provider API key
-    env_vars: [MODEL_PROVIDER_API_KEY]
+    env_vars: [PI_MODEL_API_KEY]
     required: true
     auth_style: bearer
     header_name: authorization

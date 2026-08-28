@@ -69,7 +69,7 @@ def test_pi_example_can_print_each_action_without_running_it(
     assert "provider delete pi-model" in output
     assert "provider profile update" not in output
     assert "--type pi-attested-model" in output
-    assert "MODEL_PROVIDER_API_KEY" in output
+    assert "PI_MODEL_API_KEY" in output
     assert "OPENAI_API_KEY" not in output
     assert "api.openai.com" not in output
     assert "sandbox create" in output
@@ -202,12 +202,12 @@ def test_pi_example_renders_provider_specific_runtime_configuration(
     provider = models["providers"]["attested-provider"]
     assert provider["baseUrl"] == "https://gateway.example.test:8443/models/v1"
     assert provider["api"] == "openai-completions"
-    assert provider["apiKey"] == "$MODEL_PROVIDER_API_KEY"
+    assert provider["apiKey"] == "$PI_MODEL_API_KEY"
     assert provider["models"][0]["id"] == "custom-model"
 
     provider_profile = yaml.safe_load(provider_profile_output.read_text())
     assert provider_profile["id"] == "pi-attested-model"
-    assert provider_profile["credentials"][0]["env_vars"] == ["MODEL_PROVIDER_API_KEY"]
+    assert provider_profile["credentials"][0]["env_vars"] == ["PI_MODEL_API_KEY"]
     assert provider_profile["endpoints"][0]["host"] == "gateway.example.test"
     assert provider_profile["endpoints"][0]["port"] == 8443
 

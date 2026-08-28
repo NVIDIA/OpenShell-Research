@@ -117,10 +117,11 @@ custom provider profile so the current Pi runtime, extension, policy, endpoint,
 and OpenShell supervisor are used together.
 
 The example registers an endpoint-specific provider profile using the host-side
-`PI_MODEL_API_KEY`. Inside the sandbox it uses the distinct
-`MODEL_PROVIDER_API_KEY` name so Pi's own `PI_*` diagnostics do not capture the
-credential. The extension redacts accidental appearances in tool output, and
-OpenShell blocks any credential-bearing request body from leaving the sandbox.
+`PI_MODEL_API_KEY`. The real credential remains in OpenShell. Pi receives an
+environment variable with the same name whose value is an opaque,
+endpoint-bound OpenShell resolver placeholder. The extension redacts accidental
+appearances of that placeholder in tool output; OpenShell resolves it in the
+authorization header only for the configured model endpoint.
 
 At the Pi prompt, submit both of these in the same session:
 
