@@ -28,7 +28,8 @@ if _version_not_supported:
 
 class SupervisorMiddlewareStub:
     """SupervisorMiddleware lets an operator-run service inspect and transform
-    sandbox HTTP egress or evaluate a supported agent-harness request.
+    sandbox HTTP requests and client WebSocket text messages before OpenShell
+    injects credentials, or evaluate a supported agent-harness request.
     """
 
     def __init__(self, channel):
@@ -57,11 +58,17 @@ class SupervisorMiddlewareStub:
                 request_serializer=supervisor__middleware__pb2.AgentConversationEvaluation.SerializeToString,
                 response_deserializer=supervisor__middleware__pb2.AgentConversationResult.FromString,
                 _registered_method=True)
+        self.EvaluateWebSocketSession = channel.stream_stream(
+                '/openshell.middleware.v1.SupervisorMiddleware/EvaluateWebSocketSession',
+                request_serializer=supervisor__middleware__pb2.WebSocketSessionEvent.SerializeToString,
+                response_deserializer=supervisor__middleware__pb2.WebSocketSessionEventResult.FromString,
+                _registered_method=True)
 
 
 class SupervisorMiddlewareServicer:
     """SupervisorMiddleware lets an operator-run service inspect and transform
-    sandbox HTTP egress or evaluate a supported agent-harness request.
+    sandbox HTTP requests and client WebSocket text messages before OpenShell
+    injects credentials, or evaluate a supported agent-harness request.
     """
 
     def Describe(self, request, context):
@@ -94,6 +101,19 @@ class SupervisorMiddlewareServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def EvaluateWebSocketSession(self, request_iterator, context):
+        """EvaluateWebSocketSession opens one ordered, phase-specific stream for a
+        single middleware stage and WebSocket upgrade attempt. The current
+        implementation supports client-to-upstream text messages at
+        PRE_CREDENTIALS; PRE_RETURN is reserved for upstream-to-client messages.
+        A request may go unanswered when the session terminates. For every opened
+        stage stream, OpenShell attempts at most one session_end before closing the
+        stream when its transport is still writable.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_SupervisorMiddlewareServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -117,6 +137,11 @@ def add_SupervisorMiddlewareServicer_to_server(servicer, server):
                     request_deserializer=supervisor__middleware__pb2.AgentConversationEvaluation.FromString,
                     response_serializer=supervisor__middleware__pb2.AgentConversationResult.SerializeToString,
             ),
+            'EvaluateWebSocketSession': grpc.stream_stream_rpc_method_handler(
+                    servicer.EvaluateWebSocketSession,
+                    request_deserializer=supervisor__middleware__pb2.WebSocketSessionEvent.FromString,
+                    response_serializer=supervisor__middleware__pb2.WebSocketSessionEventResult.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'openshell.middleware.v1.SupervisorMiddleware', rpc_method_handlers)
@@ -127,7 +152,8 @@ def add_SupervisorMiddlewareServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class SupervisorMiddleware:
     """SupervisorMiddleware lets an operator-run service inspect and transform
-    sandbox HTTP egress or evaluate a supported agent-harness request.
+    sandbox HTTP requests and client WebSocket text messages before OpenShell
+    injects credentials, or evaluate a supported agent-harness request.
     """
 
     @staticmethod
@@ -228,6 +254,33 @@ class SupervisorMiddleware:
             '/openshell.middleware.v1.SupervisorMiddleware/EvaluateAgentConversation',
             supervisor__middleware__pb2.AgentConversationEvaluation.SerializeToString,
             supervisor__middleware__pb2.AgentConversationResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def EvaluateWebSocketSession(request_iterator,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.stream_stream(
+            request_iterator,
+            target,
+            '/openshell.middleware.v1.SupervisorMiddleware/EvaluateWebSocketSession',
+            supervisor__middleware__pb2.WebSocketSessionEvent.SerializeToString,
+            supervisor__middleware__pb2.WebSocketSessionEventResult.FromString,
             options,
             channel_credentials,
             insecure,

@@ -126,6 +126,7 @@ def _admit_body(
     body: bytes,
     *,
     timeout: Timeout | None = None,
+    provider_target: HttpTarget | None = None,
 ):
     result = processor.process(
         HarnessAdmissionRequest(
@@ -144,7 +145,7 @@ def _admit_body(
             harness_version="extension-v1",
             hook=AdmissionHook.RENDERED_PROMPT,
             schema_version="openshell.pi-input.v1",
-            provider_target=_target(),
+            provider_target=provider_target or _target(),
             provider_adapter_schema="openai.chat-completions.v1",
         ),
         timeout=timeout or Timeout.from_seconds(1),
@@ -152,7 +153,12 @@ def _admit_body(
     return result
 
 
-def _provider_request(prompt: str, receipt: bytes | None) -> HttpRequest:
+def _provider_request(
+    prompt: str,
+    receipt: bytes | None,
+    *,
+    target: HttpTarget | None = None,
+) -> HttpRequest:
     body = json.dumps(
         {
             "model": "fixture-model",
@@ -178,7 +184,7 @@ def _provider_request(prompt: str, receipt: bytes | None) -> HttpRequest:
         headers.append(HttpHeader(name=RECEIPT_HEADER, value=receipt.decode("ascii")))
     return HttpRequest(
         context=RequestContext(request_id="network-1", sandbox_id="sandbox-1"),
-        target=_target(),
+        target=target or _target(),
         headers=tuple(headers),
         body=body,
     )
@@ -201,6 +207,52 @@ def test_safe_rendered_prompt_receipt_authorizes_first_request_and_is_stripped()
     assert [
         mutation.name for mutation in result.request_mutations.header_mutations
     ] == [RECEIPT_HEADER]
+
+
+def test_receipt_uses_stable_destination_across_tls_proxy_normalization() -> None:
+    admission, egress = _processors()
+    body = canonical_json_bytes(
+        PiInputV1(schema_version="openshell.pi-input.v1", text="safe rendered prompt")
+    )
+    admitted = _admit_body(
+        admission,
+        body,
+        provider_target=HttpTarget(
+            scheme="https",
+            host="provider.test",
+            port=443,
+            method="POST",
+            path="",
+            query="",
+        ),
+    )
+    assert admitted.receipt is not None
+
+    normalized_target = HttpTarget(
+        scheme="http",
+        host="provider.test",
+        port=443,
+        method="POST",
+        path="/v1/chat/completions",
+        query="",
+    )
+    wrong_host = egress.process(
+        _provider_request(
+            "safe rendered prompt",
+            admitted.receipt,
+            target=normalized_target.model_copy(update={"host": "other.test"}),
+        ),
+        timeout=Timeout.from_seconds(1),
+    )
+    result = egress.process(
+        _provider_request(
+            "safe rendered prompt", admitted.receipt, target=normalized_target
+        ),
+        timeout=Timeout.from_seconds(1),
+    )
+
+    assert wrong_host.reason_code == "receipt_context_mismatch"
+    assert result.decision.value == "allow"
 
 
 def test_rendered_prompt_receipt_is_consumed_after_first_request() -> None:

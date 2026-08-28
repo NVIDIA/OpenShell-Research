@@ -1,12 +1,18 @@
-# Managed Pi deny-or-redact example
+# Managed Pi attested-admission example
 
-This example runs the forked Pi CLI inside OpenShell and sends its rendered
-user submissions through Egress Gate. It makes real OpenAI API calls and may
-incur provider charges.
+This example runs the forked Pi CLI inside OpenShell and sends admitted user
+submissions to a model endpoint you choose. The endpoint may be a hosted
+provider, an internal gateway, or a local server. It must accept the OpenAI Chat
+Completions request shape used by the current attestation adapter; it does not
+need to be OpenAI.
 
-- `DENY_THIS` is rejected before Pi writes it to session history or starts a
-  model turn.
-- `REDACT_THIS` becomes `[REDACTED]` before Pi writes or sends it.
+The example demonstrates two outcomes:
+
+- `DENY_THIS` is rejected before Pi records it or starts a model request.
+- `REDACT_THIS` becomes `[REDACTED]` before Pi records or sends it.
+
+The redaction case makes one real request to your configured endpoint and may
+incur charges from that provider.
 
 ## Before you start
 
@@ -16,27 +22,18 @@ Use these matching fork branches:
 - [OpenShell `openshell/pi-egress-admission`](https://github.com/johnnygreco/OpenShell/tree/openshell/pi-egress-admission)
 - [OpenShell Research integration branch](https://github.com/NVIDIA/OpenShell-Research/tree/johnny/pi-attested-admission)
 
-Install each repository's development prerequisites and export:
+You do not need to clone the Pi or OpenShell forks manually. The first
+`./demo.sh prepare` clones both into the ignored local workspace
+`projects/egress-gate/.workspaces/pi-attested-admission/`. Later runs update
+them with fast-forward-only pulls, so the fork contents never appear as
+OpenShell Research changes. To reuse a checkout elsewhere, set `PI_REPO` or
+`OPENSHELL_REPO` to its absolute path.
 
-```shell
-export OPENAI_API_KEY=your-key
-export EGRESS_GATE_HOST_IP=192.168.1.20
-```
-
-`EGRESS_GATE_HOST_IP` must be a non-loopback IPv4 address reachable by the
-gateway and sandbox supervisors. `hostname -I` usually shows the available
-addresses; choose the address for the host network shared with OpenShell.
-
-The helper expects sibling checkouts named `pi`, `OpenShell`, and
-`OpenShell-Research`. For another layout, set `PI_REPO` and `OPENSHELL_REPO` to
-absolute paths.
-
-If you do not already have the fork checkouts, clone them beside this repository:
-
-```shell
-git clone --branch johnny/before-user-message-commit https://github.com/johnnygreco/pi.git ../pi
-git clone --branch openshell/pi-egress-admission https://github.com/johnnygreco/OpenShell.git ../OpenShell
-```
+The OpenShell gateway needs a running compute backend. On macOS, start Docker
+Desktop and wait until `docker info` succeeds before running the gateway;
+Podman is also supported. Building the gateway also requires Z3 (`brew install
+z3` on macOS or `libz3-dev` on Debian and Ubuntu). The fork recommends `mise`
+2026.4.25 or newer.
 
 From the `OpenShell-Research` checkout, change to the example directory. Run
 all remaining commands there:
@@ -45,15 +42,46 @@ all remaining commands there:
 cd projects/egress-gate/examples/pi-attested-admission
 ```
 
-You can inspect every command before running anything:
+Create the local configuration file, replace every example value, and load it
+into the current shell:
+
+```shell
+cp .env.example .env
+# Edit .env before continuing.
+set -a
+source .env
+set +a
+```
+
+If the model endpoint does not require authentication, set
+`PI_MODEL_API_KEY=unused`. Source `.env` again in each new terminal that runs
+`demo.sh`.
+
+`EGRESS_GATE_HOST_IP` is the address OpenShell uses to reach Egress Gate on this
+machine. It must be a reachable, non-loopback IPv4 address; do not use
+`127.0.0.1`. `PI_MODEL_BASE_URL` is separate: it is the model endpoint Pi will
+call. A model server running on this machine must likewise use a hostname or
+address reachable from the sandbox rather than `localhost`.
+
+`demo.sh prepare` derives the endpoint policy and Pi model configuration from
+these values. You do not need to edit `policy.yaml`. If required values are
+missing or still contain placeholders, the script prints the configuration
+steps and stops before performing any work.
+
+Preview the complete workflow before running anything:
 
 ```shell
 ./demo.sh --print all
 ```
 
-## Try it
+The walkthrough lists the terminal sequence and configuration visible to the
+current shell. To inspect the exact commands for one action, use its name—for
+example, `./demo.sh --print prepare` or `./demo.sh --print launch`.
 
-Update both fork branches, build Pi, and register Egress Gate with OpenShell:
+## Run the example
+
+Prepare the forks, build Pi, generate the endpoint-specific runtime
+configuration, and generate the Egress Gate registration used by Terminal 2:
 
 ```shell
 ./demo.sh prepare
@@ -74,12 +102,23 @@ Start the matching OpenShell gateway in a second terminal:
 ./demo.sh gateway
 ```
 
-After the gateway reports that it is ready, launch the real Pi CLI from a
-third terminal:
+The example uses its own gateway name and passes it explicitly to every
+OpenShell command. It does not depend on or change your globally selected
+OpenShell gateway.
+
+After the gateway reports that it is ready, launch Pi from a third terminal:
 
 ```shell title="Terminal 3: managed Pi"
 ./demo.sh launch
 ```
+
+Each launch replaces the example's `pi-egress-demo` sandbox so the current Pi
+runtime, extension, policy, and OpenShell supervisor are used together.
+
+The example registers an endpoint-specific provider profile and stores
+`PI_MODEL_API_KEY` as its credential. Pi sees only an opaque placeholder;
+OpenShell resolves it only when the admitted request is sent to the configured
+model host and port.
 
 At the Pi prompt, submit both of these in the same session:
 
@@ -91,8 +130,8 @@ Reply with exactly: DENY_THIS
 Reply with exactly: REDACT_THIS
 ```
 
-The first submission is denied without starting a model turn. The second makes
-a real model call using `[REDACTED]`. Exit Pi, then inspect its persisted
+The first submission is denied without starting a model request. The second
+makes a request containing `[REDACTED]`. Exit Pi, then inspect its persisted
 session:
 
 ```shell
@@ -110,17 +149,20 @@ The output must contain `[REDACTED]` and must not contain `DENY_THIS` or
    bridge.
 3. Egress Gate applies `policy.yaml`: it either denies the submission or
    returns replacement text plus a short-lived receipt.
-4. Pi appends only admitted or replacement text to session history.
-5. OpenShell checks the receipt before the model request leaves the sandbox and
-   injects `OPENAI_API_KEY`; the key is never copied into the sandbox.
+4. Pi records only admitted or replacement text.
+5. Before each model request in that turn, including automatic requests after
+   tool calls, the extension obtains a fresh receipt for the active admitted
+   text.
+6. As each request leaves the sandbox, Egress Gate verifies that its final user
+   text matches the receipt and OpenShell resolves the credential.
 
 ## Current scope
 
-This initial integration supports idle, text-only, direct OpenAI Chat
-Completions submissions. Images, queued input, retries, compaction, and
-automatic continuations after tool calls are unsupported and fail closed. The
-next comprehensive boundary is one receipt per provider request; it does not
-require one Pi hook per message role.
+The attestation adapter supports normal text turns, including tools, queued
+steering and follow-up messages, and the automatic model continuations they
+produce, using the OpenAI Chat Completions wire format. Providers with a
+different native protocol and image inputs are not covered by this example and
+fail closed.
 
 ## Cleanup
 
