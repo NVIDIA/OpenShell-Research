@@ -29,6 +29,7 @@ pack_dir=${PI_EGRESS_PACK_DIR:-/tmp/pi-egress-pack}
 runtime_dir=${PI_EGRESS_RUNTIME_DIR:-/tmp/pi-egress-runtime}
 openshell_cli=$openshell_repo/scripts/bin/openshell
 gateway_name=${PI_EGRESS_GATEWAY_NAME:-pi-egress-demo-gateway}
+model_credential_env=MODEL_PROVIDER_API_KEY
 runtime_models=$runtime_dir/models.json
 runtime_policy=$runtime_dir/policy.yaml
 runtime_provider_profile=$runtime_dir/provider-profile.yaml
@@ -357,7 +358,7 @@ ensure_model_provider() {
 		run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
 			provider profile import --file "$runtime_provider_profile"
 		run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" provider create \
-			--name pi-model --type pi-attested-model --credential PI_MODEL_API_KEY
+			--name pi-model --type pi-attested-model --credential "$model_credential_env"
 		return
 	fi
 	if (cd -- "$openshell_repo" && "$openshell_cli" --gateway "$gateway_name" \
@@ -372,8 +373,11 @@ ensure_model_provider() {
 	fi
 	run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
 		provider profile import --file "$runtime_provider_profile"
-	run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" provider create \
-		--name pi-model --type pi-attested-model --credential PI_MODEL_API_KEY
+	(
+		export MODEL_PROVIDER_API_KEY=$PI_MODEL_API_KEY
+		run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" provider create \
+			--name pi-model --type pi-attested-model --credential "$model_credential_env"
+	)
 }
 
 delete_demo_sandbox_if_present() {
