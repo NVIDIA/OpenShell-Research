@@ -39,7 +39,7 @@ def test_pi_example_can_print_each_action_without_running_it(
             env=environment,
             text=True,
         )
-        for action in ("prepare", "serve", "gateway", "launch", "verify", "cleanup")
+        for action in ("prepare", "serve", "gateway", "launch", "cleanup")
     ]
     output = "\n".join(result.stdout for result in results)
 
@@ -81,9 +81,11 @@ def test_pi_example_can_print_each_action_without_running_it(
     assert "sandbox exec --tty" in output
     assert "PI_OFFLINE=1" in output
     assert "OPENSHELL_AGENT_CONVERSATION_URL=" in output
-    assert "REDACTED" in output
-    assert "DENY_THIS" in output
-    assert "REDACT_THIS" in output
+    assert "managed-pi.ts:/sandbox/pi-runtime/managed-pi.ts" in output
+    assert (
+        "managed-pi-admission.ts:/sandbox/pi-runtime/managed-pi-admission.ts" in output
+    )
+    assert "--extension" not in output
     assert "sandbox delete" in output
     assert all(result.stderr == "" for result in results)
     assert not pi_repo.exists()
@@ -114,7 +116,7 @@ def test_pi_example_print_all_is_a_concise_walkthrough() -> None:
     assert "Configuration visible to this shell" in result.stdout
     assert "Model credential:  set (value hidden)" in result.stdout
     assert "1. prepare" in result.stdout
-    assert "7. cleanup" in result.stdout
+    assert "6. cleanup" in result.stdout
     assert "secret-not-printed" not in result.stdout
     assert "working directory:" not in result.stdout
 

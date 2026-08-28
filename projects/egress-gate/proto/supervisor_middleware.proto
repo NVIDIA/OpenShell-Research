@@ -122,6 +122,9 @@ message HttpRequestEvaluation {
   bytes body = 6;
   // Built-in middleware name or operator-owned registration name.
   string middleware_name = 7;
+  // Supervisor-resolved agent attestation for this middleware stage. The
+  // workload cannot set or observe these bytes. Limited to 8 KiB.
+  bytes agent_attestation = 8;
 }
 
 // HttpHeader is one request header line.

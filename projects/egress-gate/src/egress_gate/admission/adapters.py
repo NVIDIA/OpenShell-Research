@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import json
-from typing import Literal, Protocol
+from typing import Literal, Protocol, TypeAlias
 
 from pydantic import (
     Field,
@@ -52,10 +52,43 @@ class ProviderShapeError(ValueError):
 
 
 class PiInputV1(StrictDomainModel):
-    """Rendered text submitted by the pinned Pi extension."""
+    """Rendered text submitted by the managed Pi harness."""
 
     schema_version: Literal["openshell.pi-input.v1"]
     text: ScalarString
+
+
+class PiTextContentV1(StrictDomainModel):
+    """One Pi text content block."""
+
+    type: Literal["text"]
+    text: ScalarString
+
+
+class PiImageContentV1(StrictDomainModel):
+    """One Pi image content block."""
+
+    type: Literal["image"]
+    data: ScalarString
+    mimeType: ScalarString
+
+
+class PiToolResultV1(StrictDomainModel):
+    """Provider-relevant fields from one Pi tool-result message."""
+
+    schema_version: Literal["openshell.pi-tool-result.v1"]
+    tool_call_id: ScalarString
+    tool_name: ScalarString
+    content: tuple[PiTextContentV1 | PiImageContentV1, ...]
+    is_error: bool
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def _content_is_a_tuple(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+
+AttestedCandidate: TypeAlias = PiInputV1 | CanonicalMessageV1
 
 
 class PreparedHarnessRequest:
@@ -64,7 +97,7 @@ class PreparedHarnessRequest:
     def __init__(
         self,
         *,
-        native: PiInputV1,
+        native: PiInputV1 | PiToolResultV1,
         projected_body: bytes,
         original_body: bytes,
     ) -> None:
@@ -89,7 +122,7 @@ class HarnessAdapter(Protocol):
         projected_body: bytes,
         context: HarnessAdmissionContext,
         timeout: Timeout,
-    ) -> tuple[bytes | None, PiInputV1]: ...
+    ) -> tuple[bytes | None, AttestedCandidate]: ...
 
 
 class PiV1Adapter:
@@ -123,6 +156,54 @@ class PiV1Adapter:
             else encoded
         )
         return replacement, updated
+
+
+class PiToolResultV1Adapter:
+    """Strict adapter for Pi tool-result content blocks."""
+
+    def prepare(
+        self,
+        request: HarnessAdmissionRequest,
+        context: HarnessAdmissionContext,
+        timeout: Timeout,
+    ) -> PreparedHarnessRequest:
+        native = _parse_pi_tool_result(request.request_body, timeout)
+        _tool_result_attested_candidate(native)
+        return PreparedHarnessRequest(
+            native=native,
+            projected_body=canonical_json_bytes(native),
+            original_body=request.request_body,
+        )
+
+    def validate_result(
+        self,
+        prepared: PreparedHarnessRequest,
+        projected_body: bytes,
+        context: HarnessAdmissionContext,
+        timeout: Timeout,
+    ) -> tuple[bytes | None, AttestedCandidate]:
+        updated = _parse_pi_tool_result(projected_body, timeout)
+        if not isinstance(prepared.native, PiToolResultV1):
+            raise AdmissionMutationError("tool-result admission state is invalid")
+        immutable_before = (
+            prepared.native.schema_version,
+            prepared.native.tool_call_id,
+            prepared.native.tool_name,
+            prepared.native.is_error,
+        )
+        immutable_after = (
+            updated.schema_version,
+            updated.tool_call_id,
+            updated.tool_name,
+            updated.is_error,
+        )
+        if immutable_after != immutable_before:
+            raise AdmissionMutationError("admission changed tool-result metadata")
+        encoded = canonical_json_bytes(updated)
+        replacement = (
+            None if encoded == canonical_json_bytes(prepared.native) else encoded
+        )
+        return replacement, _tool_result_attested_candidate(updated)
 
 
 class HarnessAdapterRegistry:
@@ -248,7 +329,9 @@ class ProviderRequestAdapter(Protocol):
         self, request: HttpRequest, timeout: Timeout
     ) -> ModelRequestV1: ...
 
-    def rendered_prompt(self, request: HttpRequest, timeout: Timeout) -> PiInputV1: ...
+    def latest_attested_candidate(
+        self, request: HttpRequest, timeout: Timeout
+    ) -> AttestedCandidate: ...
 
 
 class OpenAIChatCompletionsV1Adapter:
@@ -304,8 +387,10 @@ class OpenAIChatCompletionsV1Adapter:
             ),
         )
 
-    def rendered_prompt(self, request: HttpRequest, timeout: Timeout) -> PiInputV1:
-        """Extract the last user text from the first provider request."""
+    def latest_attested_candidate(
+        self, request: HttpRequest, timeout: Timeout
+    ) -> AttestedCandidate:
+        """Extract the latest user or tool context addition."""
         canonical = self.canonicalize(request, timeout)
         for message in reversed(canonical.messages):
             if message.role is CanonicalRole.USER and message.content is not None:
@@ -313,7 +398,11 @@ class OpenAIChatCompletionsV1Adapter:
                     schema_version="openshell.pi-input.v1",
                     text=message.content,
                 )
-        raise ProviderShapeError("provider request has no user prompt")
+            if message.role is CanonicalRole.TOOL and message.content is not None:
+                if message.tool_call_id is None:
+                    raise ProviderShapeError("provider tool result has no call ID")
+                return message
+        raise ProviderShapeError("provider request has no attested context addition")
 
 
 class ProviderAdapterRegistry:
@@ -343,6 +432,12 @@ def create_pi_adapter_registry() -> HarnessAdapterRegistry:
         "openshell.pi-input.v1",
         PiV1Adapter(),
     )
+    registry.register(
+        "pi",
+        AdmissionHook.TOOL_RESULT,
+        "openshell.pi-tool-result.v1",
+        PiToolResultV1Adapter(),
+    )
     return registry
 
 
@@ -364,6 +459,32 @@ def _parse_pi_body(body: bytes, timeout: Timeout) -> PiInputV1:
     if canonical_json_bytes(parsed) != body:
         raise AdmissionShapeError("Pi request body is not canonical JSON")
     return parsed
+
+
+def _parse_pi_tool_result(body: bytes, timeout: Timeout) -> PiToolResultV1:
+    value = _load_json(body, AdmissionShapeError, timeout)
+    try:
+        parsed = _PI_TOOL_RESULT_ADAPTER.validate_python(value, strict=True)
+    except ValidationError:
+        raise AdmissionShapeError("Pi tool-result body is unsupported") from None
+    if not isinstance(parsed, PiToolResultV1):
+        raise AdmissionShapeError("Pi tool-result body is unsupported")
+    return parsed
+
+
+def _tool_result_attested_candidate(
+    result: PiToolResultV1,
+) -> CanonicalMessageV1:
+    if any(block.type == "image" for block in result.content):
+        raise AdmissionShapeError("Pi tool-result images are unsupported")
+    text = "\n".join(
+        block.text for block in result.content if isinstance(block, PiTextContentV1)
+    )
+    return CanonicalMessageV1(
+        role=CanonicalRole.TOOL,
+        content=text or "(no tool output)",
+        tool_call_id=result.tool_call_id,
+    )
 
 
 def _load_json(body: bytes, error_type: type[ValueError], timeout: Timeout) -> object:
@@ -411,16 +532,22 @@ def _provider_message_to_canonical(item: _ProviderMessage) -> CanonicalMessageV1
 
 
 _PI_ADAPTER = TypeAdapter(PiInputV1)
+_PI_TOOL_RESULT_ADAPTER = TypeAdapter(PiToolResultV1)
 _PROVIDER_ADAPTER = TypeAdapter(_ProviderRequest)
 
 
 __all__ = [
     "AdmissionMutationError",
     "AdmissionShapeError",
+    "AttestedCandidate",
     "HarnessAdapter",
     "HarnessAdapterRegistry",
     "OpenAIChatCompletionsV1Adapter",
     "PiInputV1",
+    "PiImageContentV1",
+    "PiTextContentV1",
+    "PiToolResultV1",
+    "PiToolResultV1Adapter",
     "PiV1Adapter",
     "PreparedHarnessRequest",
     "ProviderAdapterRegistry",

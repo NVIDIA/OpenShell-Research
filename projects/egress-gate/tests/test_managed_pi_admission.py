@@ -7,11 +7,10 @@ import subprocess
 from pathlib import Path
 
 
-def test_pi_admission_extension_renews_receipts_for_provider_continuations() -> None:
+def test_managed_pi_admission_maps_handles_to_exact_provider_context() -> None:
     project_dir = Path(__file__).parents[1]
     test_file = (
-        project_dir
-        / "examples/pi-attested-admission/openshell-input-admission.test.mjs"
+        project_dir / "examples/pi-attested-admission/managed-pi-admission.test.mjs"
     )
 
     subprocess.run(

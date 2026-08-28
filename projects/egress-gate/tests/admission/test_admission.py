@@ -1,23 +1,30 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Conformance tests for rendered-prompt admission and attested egress."""
+"""Conformance tests for managed Pi context admission and attested egress."""
 
 from __future__ import annotations
 
 import json
+from typing import Literal
+
+import pytest
 
 from egress_gate.admission import (
+    MAX_ADMISSION_BODY_BYTES,
     RECEIPT_HEADER,
     AdmissionDecision,
     AdmissionHook,
+    AdmissionProvenance,
     AttestedEgressProcessor,
     HarnessAdmissionContext,
     HarnessAdmissionProcessor,
     HarnessAdmissionRequest,
     PiInputV1,
-    PromptProvenance,
+    PiTextContentV1,
+    PiToolResultV1,
     ReceiptAuthority,
+    ReceiptVerificationError,
     canonical_json_bytes,
     create_pi_adapter_registry,
     create_provider_adapter_registry,
@@ -32,7 +39,7 @@ REDACT_TEXT = "REDACT_THIS"
 
 def _processors(
     *, replacement_template: str = "[REDACTED]"
-) -> tuple[HarnessAdmissionProcessor, AttestedEgressProcessor]:
+) -> tuple[HarnessAdmissionProcessor, AttestedEgressProcessor, ReceiptAuthority]:
     registry = create_builtin_registry()
     config = registry.validate_config(
         {
@@ -98,15 +105,16 @@ def _processors(
             create_provider_adapter_registry(),
             authority,
             middleware_name="pi-egress",
-            harness_version="extension-v1",
+            harness_version="sdk-v1",
         ),
+        authority,
     )
 
 
-def _target() -> HttpTarget:
+def _target(*, host: str = "provider.test") -> HttpTarget:
     return HttpTarget(
         scheme="https",
-        host="provider.test",
+        host=host,
         port=443,
         method="POST",
         path="/v1/chat/completions",
@@ -114,58 +122,112 @@ def _target() -> HttpTarget:
     )
 
 
-def _admit(processor: HarnessAdmissionProcessor, text: str):
-    body = canonical_json_bytes(
-        PiInputV1(schema_version="openshell.pi-input.v1", text=text)
-    )
-    return body, _admit_body(processor, body)
-
-
-def _admit_body(
-    processor: HarnessAdmissionProcessor,
-    body: bytes,
+def _context(
+    hook: AdmissionHook,
     *,
+    harness_version: Literal["extension-v1", "sdk-v1"] = "sdk-v1",
+    target: HttpTarget | None = None,
+) -> HarnessAdmissionContext:
+    schema = (
+        "openshell.pi-input.v1"
+        if hook is AdmissionHook.RENDERED_PROMPT
+        else "openshell.pi-tool-result.v1"
+    )
+    return HarnessAdmissionContext(
+        request_id="admission-1",
+        sandbox_id="sandbox-1",
+        middleware_name="pi-egress",
+        harness="pi",
+        harness_version=harness_version,
+        hook=hook,
+        schema_version=schema,
+        provider_target=target or _target(),
+        provider_adapter_schema="openai.chat-completions.v1",
+    )
+
+
+def _admit(
+    processor: HarnessAdmissionProcessor,
+    value: PiInputV1 | PiToolResultV1,
+    *,
+    target: HttpTarget | None = None,
     timeout: Timeout | None = None,
-    provider_target: HttpTarget | None = None,
 ):
-    result = processor.process(
+    hook = (
+        AdmissionHook.RENDERED_PROMPT
+        if isinstance(value, PiInputV1)
+        else AdmissionHook.TOOL_RESULT
+    )
+    return processor.process(
         HarnessAdmissionRequest(
-            request_body=body,
-            provenance=PromptProvenance(
-                kind="rendered_prompt",
-                session_id="session-1",
-                submission_id="submission-1",
+            request_body=canonical_json_bytes(value),
+            provenance=AdmissionProvenance(
+                session_id="session-1", submission_id="submission-1"
             ),
         ),
-        HarnessAdmissionContext(
-            request_id="admission-1",
-            sandbox_id="sandbox-1",
-            middleware_name="pi-egress",
-            harness="pi",
-            harness_version="extension-v1",
-            hook=AdmissionHook.RENDERED_PROMPT,
-            schema_version="openshell.pi-input.v1",
-            provider_target=provider_target or _target(),
-            provider_adapter_schema="openai.chat-completions.v1",
-        ),
+        _context(hook, target=target),
         timeout=timeout or Timeout.from_seconds(1),
     )
-    return result
+
+
+def _user(text: str) -> PiInputV1:
+    return PiInputV1(schema_version="openshell.pi-input.v1", text=text)
+
+
+def _tool_result(text: str, *, image: bool = False) -> PiToolResultV1:
+    content: list[dict[str, object]] = (
+        [{"type": "image", "data": "AA==", "mimeType": "image/png"}]
+        if image
+        else [{"type": "text", "text": text}]
+    )
+    return PiToolResultV1.model_validate(
+        {
+            "schema_version": "openshell.pi-tool-result.v1",
+            "tool_call_id": "call-1",
+            "tool_name": "read",
+            "content": content,
+            "is_error": False,
+        },
+        strict=True,
+    )
 
 
 def _provider_request(
     prompt: str,
-    receipt: bytes | None,
     *,
+    tool_result: str | None = None,
+    headers: tuple[HttpHeader, ...] = (),
     target: HttpTarget | None = None,
 ) -> HttpRequest:
+    messages: list[dict[str, object]] = [
+        {"role": "system", "content": "fixture system prompt"},
+        {"role": "user", "content": prompt},
+    ]
+    if tool_result is not None:
+        messages.extend(
+            [
+                {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call-1",
+                            "type": "function",
+                            "function": {"name": "read", "arguments": "{}"},
+                        }
+                    ],
+                },
+                {
+                    "role": "tool",
+                    "content": tool_result,
+                    "tool_call_id": "call-1",
+                },
+            ]
+        )
     body = json.dumps(
         {
             "model": "fixture-model",
-            "messages": [
-                {"role": "system", "content": "fixture system prompt"},
-                {"role": "user", "content": prompt},
-            ],
+            "messages": messages,
             "tools": [],
             "tool_choice": "auto",
             "temperature": 0,
@@ -179,45 +241,59 @@ def _provider_request(
         separators=(",", ":"),
         sort_keys=True,
     ).encode()
-    headers = [HttpHeader(name="content-type", value="application/json")]
-    if receipt is not None:
-        headers.append(HttpHeader(name=RECEIPT_HEADER, value=receipt.decode("ascii")))
     return HttpRequest(
         context=RequestContext(request_id="network-1", sandbox_id="sandbox-1"),
         target=target or _target(),
-        headers=tuple(headers),
+        headers=(HttpHeader(name="content-type", value="application/json"),) + headers,
         body=body,
     )
 
 
-def test_safe_rendered_prompt_receipt_authorizes_first_request_and_is_stripped() -> (
-    None
+def _egress(
+    processor: AttestedEgressProcessor,
+    request: HttpRequest,
+    attestation: bytes | None,
 ):
-    admission, egress = _processors()
-    _, admitted = _admit(admission, "safe rendered prompt")
-
-    assert admitted.decision is AdmissionDecision.ALLOW
-    assert admitted.receipt is not None
-    result = egress.process(
-        _provider_request("safe rendered prompt", admitted.receipt),
+    return processor.process(
+        request,
+        agent_attestation=attestation or b"",
         timeout=Timeout.from_seconds(1),
     )
 
-    assert result.decision.value == "allow"
-    assert [
-        mutation.name for mutation in result.request_mutations.header_mutations
-    ] == [RECEIPT_HEADER]
+
+def test_user_attestation_authorizes_retries_without_entering_request_headers() -> None:
+    admission, egress, _ = _processors()
+    admitted = _admit(admission, _user("safe rendered prompt"))
+
+    assert admitted.decision is AdmissionDecision.ALLOW
+    assert admitted.attestation is not None
+    request = _provider_request("safe rendered prompt")
+    first = _egress(egress, request, admitted.attestation)
+    retry = _egress(egress, request, admitted.attestation)
+
+    assert first.decision.value == "allow"
+    assert retry.decision.value == "allow"
+    assert first.request_mutations.header_mutations == ()
 
 
-def test_receipt_uses_stable_destination_across_tls_proxy_normalization() -> None:
-    admission, egress = _processors()
-    body = canonical_json_bytes(
-        PiInputV1(schema_version="openshell.pi-input.v1", text="safe rendered prompt")
-    )
-    admitted = _admit_body(
+def test_changed_or_unattested_user_context_fails_closed() -> None:
+    admission, egress, _ = _processors()
+    admitted = _admit(admission, _user("safe rendered prompt"))
+    assert admitted.attestation is not None
+
+    changed = _egress(egress, _provider_request("changed prompt"), admitted.attestation)
+    missing = _egress(egress, _provider_request("safe rendered prompt"), None)
+
+    assert changed.reason_code == "attestation_context_mismatch"
+    assert missing.reason_code == "attestation_missing"
+
+
+def test_attestation_uses_stable_destination_across_tls_proxy_normalization() -> None:
+    admission, egress, _ = _processors()
+    admitted = _admit(
         admission,
-        body,
-        provider_target=HttpTarget(
+        _user("safe"),
+        target=HttpTarget(
             scheme="https",
             host="provider.test",
             port=443,
@@ -226,9 +302,8 @@ def test_receipt_uses_stable_destination_across_tls_proxy_normalization() -> Non
             query="",
         ),
     )
-    assert admitted.receipt is not None
-
-    normalized_target = HttpTarget(
+    assert admitted.attestation is not None
+    normalized = HttpTarget(
         scheme="http",
         host="provider.test",
         port=443,
@@ -236,150 +311,152 @@ def test_receipt_uses_stable_destination_across_tls_proxy_normalization() -> Non
         path="/v1/chat/completions",
         query="",
     )
-    wrong_host = egress.process(
-        _provider_request(
-            "safe rendered prompt",
-            admitted.receipt,
-            target=normalized_target.model_copy(update={"host": "other.test"}),
-        ),
-        timeout=Timeout.from_seconds(1),
+
+    allowed = _egress(
+        egress,
+        _provider_request("safe", target=normalized),
+        admitted.attestation,
     )
-    result = egress.process(
+    wrong_host = _egress(
+        egress,
         _provider_request(
-            "safe rendered prompt", admitted.receipt, target=normalized_target
+            "safe", target=normalized.model_copy(update={"host": "other.test"})
         ),
-        timeout=Timeout.from_seconds(1),
+        admitted.attestation,
     )
 
-    assert wrong_host.reason_code == "receipt_context_mismatch"
-    assert result.decision.value == "allow"
+    assert allowed.decision.value == "allow"
+    assert wrong_host.reason_code == "attestation_context_mismatch"
 
 
-def test_rendered_prompt_receipt_is_consumed_after_first_request() -> None:
-    admission, egress = _processors()
-    _, admitted = _admit(admission, "safe rendered prompt")
-    assert admitted.receipt is not None
-    request = _provider_request("safe rendered prompt", admitted.receipt)
-
-    first = egress.process(request, timeout=Timeout.from_seconds(1))
-    replay = egress.process(request, timeout=Timeout.from_seconds(1))
-
-    assert first.decision.value == "allow"
-    assert replay.decision.value == "deny"
-    assert replay.reason_code == "receipt_replayed"
-
-
-def test_denial_returns_no_receipt_or_replacement() -> None:
-    admission, _ = _processors()
-    _, denied = _admit(admission, f"do not persist {DENY_TEXT}")
-
-    assert denied.decision is AdmissionDecision.DENY
-    assert denied.receipt is None
-    assert denied.replacement_body is None
-
-
-def test_redaction_receipt_binds_only_the_replacement() -> None:
-    admission, egress = _processors()
-    original = f"hide {REDACT_TEXT} please"
-    _, admitted = _admit(admission, original)
+def test_user_redaction_attests_only_the_replacement() -> None:
+    admission, egress, _ = _processors()
+    admitted = _admit(admission, _user(f"hide {REDACT_TEXT} please"))
 
     assert admitted.decision is AdmissionDecision.REPLACE
-    assert admitted.receipt is not None
+    assert admitted.attestation is not None
     assert admitted.replacement_body is not None
     replacement = PiInputV1.model_validate_json(
         admitted.replacement_body, strict=True
     ).text
+
     assert replacement == "hide [REDACTED] please"
     assert (
-        egress.process(
-            _provider_request(original, admitted.receipt),
-            timeout=Timeout.from_seconds(1),
-        ).reason_code
-        == "receipt_context_mismatch"
-    )
-    assert (
-        egress.process(
-            _provider_request(replacement, admitted.receipt),
-            timeout=Timeout.from_seconds(1),
+        _egress(
+            egress, _provider_request(replacement), admitted.attestation
         ).decision.value
         == "allow"
     )
+    assert (
+        _egress(
+            egress,
+            _provider_request(f"hide {REDACT_TEXT} please"),
+            admitted.attestation,
+        ).reason_code
+        == "attestation_context_mismatch"
+    )
 
 
-def test_oversized_redaction_fails_before_receipt_issuance() -> None:
-    admission, _ = _processors(replacement_template="x" * 1024)
+def test_tool_result_is_admitted_before_persistence_and_attested_at_egress() -> None:
+    admission, egress, _ = _processors()
+    admitted = _admit(admission, _tool_result("safe tool output"))
 
-    _, denied = _admit(admission, REDACT_TEXT * 33)
+    assert admitted.decision is AdmissionDecision.ALLOW
+    assert admitted.attestation is not None
+    matching = _egress(
+        egress,
+        _provider_request("inspect", tool_result="safe tool output"),
+        admitted.attestation,
+    )
+    changed = _egress(
+        egress,
+        _provider_request("inspect", tool_result="changed tool output"),
+        admitted.attestation,
+    )
+
+    assert matching.decision.value == "allow"
+    assert changed.reason_code == "attestation_context_mismatch"
+
+
+def test_tool_result_denial_redaction_and_images_fail_closed() -> None:
+    admission, _, _ = _processors()
+
+    denied = _admit(admission, _tool_result(DENY_TEXT))
+    redacted = _admit(admission, _tool_result(REDACT_TEXT))
+    image = _admit(admission, _tool_result("", image=True))
 
     assert denied.decision is AdmissionDecision.DENY
-    assert denied.reason_code == "admission_contract_invalid"
-    assert denied.receipt is None
-
-
-def test_changed_prompt_and_unattested_continuation_fail_closed() -> None:
-    admission, egress = _processors()
-    _, admitted = _admit(admission, "safe rendered prompt")
-    assert admitted.receipt is not None
-
-    changed = egress.process(
-        _provider_request("changed prompt", admitted.receipt),
-        timeout=Timeout.from_seconds(1),
+    assert denied.attestation is None
+    assert redacted.decision is AdmissionDecision.REPLACE
+    assert redacted.replacement_body is not None
+    redacted_tool_result = PiToolResultV1.model_validate_json(
+        redacted.replacement_body, strict=True
     )
-    continuation = egress.process(
-        _provider_request("safe rendered prompt", None),
-        timeout=Timeout.from_seconds(1),
-    )
-
-    assert changed.reason_code == "receipt_context_mismatch"
-    assert continuation.reason_code == "receipt_missing"
+    assert isinstance(redacted_tool_result.content[0], PiTextContentV1)
+    assert redacted_tool_result.content[0].text == "[REDACTED]"
+    assert image.decision is AdmissionDecision.DENY
+    assert image.reason_code == "admission_contract_invalid"
 
 
-def test_malformed_and_duplicate_admission_json_are_contract_errors() -> None:
-    admission, _ = _processors()
+def test_denial_returns_no_attestation_or_replacement() -> None:
+    admission, _, _ = _processors()
 
-    malformed = _admit_body(admission, b"{")
-    duplicate = _admit_body(
+    denied = _admit(admission, _user(f"do not persist {DENY_TEXT}"))
+
+    assert denied.decision is AdmissionDecision.DENY
+    assert denied.attestation is None
+    assert denied.replacement_body is None
+
+
+def test_oversized_redaction_attempt_fails_before_attestation_issuance() -> None:
+    admission, _, _ = _processors(replacement_template="x" * 1024)
+
+    denied = _admit(
         admission,
-        b'{"schema_version":"openshell.pi-input.v1",'
-        b'"schema_version":"openshell.pi-input.v1","text":"safe"}',
+        _user(REDACT_TEXT * (MAX_ADMISSION_BODY_BYTES // 1024 + 1)),
     )
+
+    assert denied.decision is AdmissionDecision.DENY
+    assert denied.reason_code == "egress_gate_limit_exceeded"
+    assert denied.attestation is None
+
+
+def test_malformed_duplicate_and_expired_admission_fail_closed() -> None:
+    admission, _, _ = _processors()
+    provenance = AdmissionProvenance(
+        session_id="session-1", submission_id="submission-1"
+    )
+
+    def admit_body(body: bytes, timeout: Timeout | None = None):
+        return admission.process(
+            HarnessAdmissionRequest(request_body=body, provenance=provenance),
+            _context(AdmissionHook.RENDERED_PROMPT),
+            timeout=timeout or Timeout.from_seconds(1),
+        )
+
+    malformed = admit_body(b"{")
+    duplicate = admit_body(
+        b'{"schema_version":"openshell.pi-input.v1",'
+        b'"schema_version":"openshell.pi-input.v1","text":"safe"}'
+    )
+    over_depth = admit_body(b"[" * 129 + b"0" + b"]" * 129)
+    expired = admit_body(b"{}", Timeout(deadline=0.0))
 
     assert malformed.reason_code == "admission_contract_invalid"
     assert duplicate.reason_code == "admission_contract_invalid"
-
-
-def test_admission_json_limits_and_deadlines_remain_availability_errors() -> None:
-    admission, _ = _processors()
-    over_depth = b"[" * 129 + b"0" + b"]" * 129
-
-    limited = _admit_body(admission, over_depth)
-    expired = _admit_body(admission, b"{}", timeout=Timeout(deadline=0.0))
-
-    assert limited.reason_code == "admission_unavailable"
+    assert over_depth.reason_code == "admission_unavailable"
     assert expired.reason_code == "admission_unavailable"
 
 
-def test_provider_malformed_json_is_an_unsupported_shape() -> None:
-    admission, egress = _processors()
-    _, admitted = _admit(admission, "safe rendered prompt")
-    assert admitted.receipt is not None
-    malformed = _provider_request("safe rendered prompt", admitted.receipt).model_copy(
-        update={"body": b"{"}
-    )
-
-    result = egress.process(malformed, timeout=Timeout.from_seconds(1))
-
-    assert result.reason_code == "provider_shape_unsupported"
-
-
-def test_direct_openai_reasoning_effort_is_supported() -> None:
-    admission, egress = _processors()
-    _, admitted = _admit(admission, "safe rendered prompt")
-    assert admitted.receipt is not None
-    request = _provider_request("safe rendered prompt", admitted.receipt)
+def test_provider_shape_validation_and_optional_reasoning_field_are_preserved() -> None:
+    admission, egress, _ = _processors()
+    admitted = _admit(admission, _user("safe"))
+    assert admitted.attestation is not None
+    request = _provider_request("safe")
+    malformed = request.model_copy(update={"body": b"{"})
     provider_body = json.loads(request.body)
     provider_body["reasoning_effort"] = "medium"
-    request = request.model_copy(
+    with_reasoning = request.model_copy(
         update={
             "body": json.dumps(
                 provider_body,
@@ -390,6 +467,38 @@ def test_direct_openai_reasoning_effort_is_supported() -> None:
         }
     )
 
-    result = egress.process(request, timeout=Timeout.from_seconds(1))
+    malformed_result = _egress(egress, malformed, admitted.attestation)
+    reasoning_result = _egress(egress, with_reasoning, admitted.attestation)
 
-    assert result.decision.value == "allow"
+    assert malformed_result.reason_code == "provider_shape_unsupported"
+    assert reasoning_result.decision.value == "allow"
+
+
+def test_workload_receipt_header_is_reserved_in_managed_flow() -> None:
+    admission, egress, _ = _processors()
+    admitted = _admit(admission, _user("safe"))
+    assert admitted.attestation is not None
+    request = _provider_request(
+        "safe",
+        headers=(HttpHeader(name=RECEIPT_HEADER, value="eg1.untrusted"),),
+    )
+
+    result = _egress(egress, request, admitted.attestation)
+
+    assert result.reason_code == "reserved_receipt_header"
+
+
+def test_legacy_workload_receipts_remain_one_use() -> None:
+    _, _, authority = _processors()
+    context = _context(AdmissionHook.RENDERED_PROMPT, harness_version="extension-v1")
+    provenance = AdmissionProvenance(
+        session_id="session-1", submission_id="submission-1"
+    )
+    prompt = _user("safe")
+    receipt = authority.issue(
+        prompt, context, provenance, policy_fingerprint="policy", now=100
+    )
+
+    authority.verify(receipt, prompt, context, policy_fingerprint="policy", now=100)
+    with pytest.raises(ReceiptVerificationError, match="receipt_replayed"):
+        authority.verify(receipt, prompt, context, policy_fingerprint="policy", now=100)

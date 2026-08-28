@@ -24,11 +24,11 @@ from egress_gate.admission import (
     RECEIPT_HEADER,
     AdmissionDecision,
     AdmissionHook,
+    AdmissionProvenance,
     AttestedEgressProcessor,
     HarnessAdmissionContext,
     HarnessAdmissionProcessor,
     HarnessAdmissionRequest,
-    PromptProvenance,
     ReceiptAuthority,
     create_pi_adapter_registry,
     create_provider_adapter_registry,
@@ -41,6 +41,7 @@ from egress_gate.constants import (
     DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING,
     LIMIT_REASON,
     LIMIT_REASON_CODE,
+    MAX_AGENT_ATTESTATION_BYTES,
     MAX_BODY_BYTES,
     MAX_CONCURRENT_PROCESSING,
     MAX_PROTO_CONFIG_BYTES,
@@ -97,13 +98,17 @@ def _require_pi_harness(value: str) -> Literal["pi"]:
     raise ValueError("invalid admission harness")
 
 
-def _require_pi_schema(value: str) -> Literal["openshell.pi-input.v1"]:
-    if value == "openshell.pi-input.v1":
+def _require_pi_schema(
+    value: str, hook: AdmissionHook
+) -> Literal["openshell.pi-input.v1", "openshell.pi-tool-result.v1"]:
+    if hook is AdmissionHook.RENDERED_PROMPT and value == "openshell.pi-input.v1":
+        return value
+    if hook is AdmissionHook.TOOL_RESULT and value == "openshell.pi-tool-result.v1":
         return value
     raise ValueError("invalid admission schema")
 
 
-def _require_pi_harness_version(value: str) -> Literal["extension-v1"]:
+def _require_pi_harness_version(value: str) -> Literal["sdk-v1"]:
     if value == PI_HARNESS_VERSION:
         return value
     raise ValueError("invalid Pi harness version")
@@ -117,7 +122,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         registry: GateRegistry,
         *,
         timeout_middleware_processing: float = DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING,
-        require_pi_receipt: bool = False,
+        require_pi_attestation: bool = False,
     ) -> None:
         registry.configuration_json_schema()
         self._registry = registry
@@ -126,7 +131,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         )
         self._policy = _ActivePolicy(registry)
         self._receipt_authority = ReceiptAuthority()
-        self._require_pi_receipt = require_pi_receipt
+        self._require_pi_attestation = require_pi_attestation
         self._processing_slots = asyncio.Semaphore(MAX_CONCURRENT_PROCESSING)
         self._processing_executor = ThreadPoolExecutor(
             max_workers=MAX_CONCURRENT_PROCESSING,
@@ -170,10 +175,14 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                         max_payload_bytes=MAX_ADMISSION_BODY_BYTES,
                         harness="pi",
                         hook=hook.value,
-                        schema_version="openshell.pi-input.v1",
+                        schema_version=(
+                            "openshell.pi-input.v1"
+                            if hook is AdmissionHook.RENDERED_PROMPT
+                            else "openshell.pi-tool-result.v1"
+                        ),
                     )
                     for hook in AdmissionHook
-                    if self._require_pi_receipt
+                    if self._require_pi_attestation
                 ),
             ],
         )
@@ -221,7 +230,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         timeout: Timeout,
     ) -> pb2.AgentConversationResult:
         try:
-            if not self._require_pi_receipt:
+            if not self._require_pi_attestation:
                 raise ValueError("agent admission is disabled")
             if request.phase != pb2.SUPERVISOR_MIDDLEWARE_PHASE_AGENT_CONTEXT:
                 raise ValueError("invalid admission phase")
@@ -236,8 +245,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                 path=request.target.path,
                 query="",
             )
-            provenance = PromptProvenance(
-                kind="rendered_prompt",
+            provenance = AdmissionProvenance(
                 session_id=request.session_id,
                 submission_id=request.turn_id,
             )
@@ -262,7 +270,9 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                         request.target.harness_version
                     ),
                     hook=hook,
-                    schema_version=_require_pi_schema(request.target.schema_version),
+                    schema_version=_require_pi_schema(
+                        request.target.schema_version, hook
+                    ),
                     provider_target=target,
                     provider_adapter_schema="openai.chat-completions.v1",
                 ),
@@ -275,7 +285,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                     else pb2.DECISION_ALLOW
                 ),
                 reason_code=result.reason_code or "",
-                attestation=result.receipt or b"",
+                attestation=result.attestation or b"",
                 replacement_body=result.replacement_body or b"",
                 has_replacement_body=result.replacement_body is not None,
             )
@@ -399,14 +409,18 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
             values,
             timeout=timeout,
         )
-        if self._require_pi_receipt:
+        if self._require_pi_attestation:
             return AttestedEgressProcessor(
                 processor,
                 create_provider_adapter_registry(),
                 self._receipt_authority,
                 middleware_name=request.middleware_name,
                 harness_version=PI_HARNESS_VERSION,
-            ).process(domain_request, timeout=timeout)
+            ).process(
+                domain_request,
+                agent_attestation=request.agent_attestation,
+                timeout=timeout,
+            )
         if any(
             header.name.lower() == RECEIPT_HEADER for header in domain_request.headers
         ):
@@ -622,6 +636,7 @@ def _validate_evaluation_envelope(request: pb2.HttpRequestEvaluation) -> None:
         or request.target.ByteSize() > MAX_PROTO_TARGET_BYTES
         or len(request.headers) > MAX_PROTO_HEADERS
         or _encoded_headers_size(request.headers) > MAX_PROTO_HEADERS_BYTES
+        or len(request.agent_attestation) > MAX_AGENT_ATTESTATION_BYTES
     ):
         raise EgressGateError(ErrorCode.REQUEST_ENVELOPE_INVALID)
 

@@ -1,15 +1,16 @@
 # Managed Pi attested-admission example
 
-This example runs the forked Pi CLI inside OpenShell and sends admitted user
-submissions to a model endpoint you choose. The endpoint may be a hosted
+This example runs a normal interactive Pi TUI inside OpenShell and sends
+admitted conversation context to a model endpoint you choose. The endpoint may be a hosted
 provider, an internal gateway, or a local server. It must accept the OpenAI Chat
 Completions request shape used by the current attestation adapter; it does not
 need to be OpenAI.
 
-The example demonstrates two outcomes:
+The example demonstrates the same policy at both context boundaries:
 
-- `DENY_THIS` is rejected before Pi records it or starts a model request.
-- `REDACT_THIS` becomes `[REDACTED]` before Pi records or sends it.
+- `DENY_THIS` is rejected before Pi adds a user message or tool result to its
+  live context.
+- `REDACT_THIS` becomes `[REDACTED]` before Pi adds or sends it.
 
 The redaction case makes one real request to your configured endpoint and may
 incur charges from that provider.
@@ -113,15 +114,13 @@ After the gateway reports that it is ready, launch Pi from a third terminal:
 ```
 
 Each launch replaces the example's `pi-egress-demo` sandbox, provider, and
-custom provider profile so the current Pi runtime, extension, policy, endpoint,
-and OpenShell supervisor are used together.
+custom provider profile so the current Pi runtime, managed harness, policy,
+endpoint, and OpenShell supervisor are used together.
 
 The example registers an endpoint-specific provider profile using the host-side
-`PI_MODEL_API_KEY`. The real credential remains in OpenShell. Pi receives an
-environment variable with the same name whose value is an opaque,
-endpoint-bound OpenShell resolver placeholder. The extension redacts accidental
-appearances of that placeholder in tool output; OpenShell resolves it in the
-authorization header only for the configured model endpoint.
+`PI_MODEL_API_KEY`. The real credential remains in OpenShell. Pi receives only
+an opaque, endpoint-bound resolver placeholder; OpenShell resolves it in the
+authorization header for the configured model endpoint.
 
 At the Pi prompt, submit both of these in the same session:
 
@@ -134,38 +133,52 @@ Reply with exactly: REDACT_THIS
 ```
 
 The first submission is denied without starting a model request. The second
-makes a request containing `[REDACTED]`. Exit Pi, then inspect its persisted
-session:
+makes a request containing `[REDACTED]`.
 
-```shell
-./demo.sh verify
+To exercise tool-result admission without putting the marker in the user
+message, ask Pi:
+
+```text
+Use bash to print the concatenation of DENY_ and THIS, then tell me the output.
 ```
 
-The output must contain `[REDACTED]` and must not contain `DENY_THIS` or
-`REDACT_THIS`. The command exits with an error if either check fails.
+The tool runs, but its result is replaced by Pi's protocol-safe blocked result
+before it enters live context. Repeat with `REDACT_` and `THIS` to see the tool
+result admitted as `[REDACTED]`.
+
+This example deliberately uses Pi's in-memory session manager. The interactive
+TUI, tools, queued messages, retries, and `/new` work normally during the run,
+but the session is not written inside the sandbox and cannot be resumed after
+Pi exits. That is the minimal isolation guarantee: unadmitted context cannot be
+recovered from a workload-owned session file.
 
 ## How it works
 
-1. Pi renders the user submission and calls its general-purpose
-   `before_user_message_append` extension hook.
-2. The example extension sends that text to OpenShell's sandbox-local admission
-   bridge.
-3. Egress Gate applies `policy.yaml`: it either denies the submission or
-   returns replacement text plus a short-lived receipt.
-4. Pi records only admitted or replacement text.
-5. Before each model request in that turn, including automatic requests after
-   tool calls, the extension obtains a fresh receipt for the active admitted
-   text.
-6. As each request leaves the sandbox, Egress Gate verifies that its final user
-   text matches the receipt and OpenShell resolves the credential.
+1. `managed-pi.ts` creates the regular Pi `InteractiveMode` with a mandatory SDK
+   `ContextAdmission` boundary and an in-memory session manager. It disables
+   dynamically loaded extensions, so project or user extensions cannot replace
+   this boundary.
+2. Pi calls that boundary for each rendered user message and finalized tool
+   result before it queues, appends, or persists the value.
+3. The adapter sends the exact context addition to OpenShell's sandbox-local
+   bridge. Egress Gate applies `policy.yaml` and returns allow, deny, or a
+   complete replacement.
+4. OpenShell keeps the signed attestation and gives Pi only an opaque handle.
+   The adapter keeps handles in its private closure, outside Pi messages.
+5. For each provider request or retry, Pi passes the exact outbound context to
+   the adapter. It selects the handle for the newest admitted user message or
+   tool result in that context.
+6. OpenShell strips the handle, resolves the supervisor-held attestation, and
+   supplies it only to the configured Egress Gate middleware stage. Egress Gate
+   verifies the latest context addition and scans the complete provider request
+   before OpenShell resolves the model credential.
 
 ## Current scope
 
-The attestation adapter supports normal text turns, including tools, queued
-steering and follow-up messages, and the automatic model continuations they
-produce, using the OpenAI Chat Completions wire format. Providers with a
-different native protocol and image inputs are not covered by this example and
-fail closed.
+The attestation adapter supports normal text turns, text tool results, queued
+steering and follow-up messages, retries, and automatic model continuations,
+using the OpenAI Chat Completions wire format. Providers with a different native
+protocol and image inputs are not covered by this example and fail closed.
 
 ## Cleanup
 
