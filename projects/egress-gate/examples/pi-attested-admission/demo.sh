@@ -317,7 +317,7 @@ prepare() {
 serve() {
 	describe_printed_commands "Run Egress Gate and keep it open:"
 	run_in "$egress_gate_dir" uv run egress-gate --debug serve \
-		--listen 0.0.0.0:50051 --timeout 4s --require-pi-receipt
+		--listen 0.0.0.0:50051 --timeout 4s --require-pi-attestation
 }
 
 gateway() {
@@ -392,7 +392,8 @@ create_demo_sandbox() {
 		--provider pi-model \
 		--policy "$runtime_policy" \
 		--upload "$runtime_dir/node_modules:/sandbox/pi-runtime" \
-		--upload "$script_dir/openshell-input-admission.ts:/sandbox/openshell-input-admission.ts" \
+		--upload "$script_dir/managed-pi.ts:/sandbox/pi-runtime/managed-pi.ts" \
+		--upload "$script_dir/managed-pi-admission.ts:/sandbox/pi-runtime/managed-pi-admission.ts" \
 		--upload "$runtime_models:/sandbox/pi-agent/models.json" \
 		--no-git-ignore \
 		--detach
@@ -403,8 +404,10 @@ launch() {
 		require_example_configuration
 		require_file "$openshell_cli" "OpenShell CLI wrapper"
 		require_file "$(pi_tarball)" "packed Pi coding-agent"
-		require_file "$runtime_dir/node_modules/@earendil-works/pi-coding-agent/dist/cli.js" \
-			"installed Pi CLI"
+		require_file "$runtime_dir/node_modules/@earendil-works/pi-coding-agent/dist/index.js" \
+			"installed Pi SDK"
+		require_file "$script_dir/managed-pi.ts" "managed Pi harness"
+		require_file "$script_dir/managed-pi-admission.ts" "managed Pi admission adapter"
 	fi
 
 	describe_printed_commands "Refresh the endpoint-specific model, policy, and provider profile:"
@@ -427,46 +430,10 @@ launch() {
 		env \
 		PI_CODING_AGENT_DIR=/sandbox/pi-agent \
 		PI_OFFLINE=1 \
+		PI_MANAGED_PROVIDER=attested-provider \
+		PI_MANAGED_MODEL="$model_id" \
 		OPENSHELL_AGENT_CONVERSATION_URL=http://127.0.0.1:8193/v1/agent/conversation \
-		node /sandbox/pi-runtime/node_modules/@earendil-works/pi-coding-agent/dist/cli.js \
-		--provider attested-provider \
-		--model "$model_id" \
-		--extension /sandbox/openshell-input-admission.ts \
-		--session-dir /sandbox/pi-sessions
-}
-
-verify() {
-	if ! $print_only; then
-		require_file "$openshell_cli" "OpenShell CLI wrapper"
-	fi
-	local redacted='\[REDACTED\]'
-	local forbidden='DENY_THIS|REDACT_THIS'
-
-	if $print_only; then
-		describe_printed_commands "Confirm that Pi saved the redacted text:"
-		print_command "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
-			sandbox exec -n pi-egress-demo -- \
-			grep -R -n -E "$redacted" /sandbox/pi-sessions
-		describe_printed_commands "Confirm that Pi did not save either original marker (this command must find no matches):"
-		print_command "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
-			sandbox exec -n pi-egress-demo -- \
-			grep -R -n -E "$forbidden" /sandbox/pi-sessions
-		return
-	fi
-
-	if ! run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
-		sandbox exec -n pi-egress-demo -- \
-		grep -R -n -E "$redacted" /sandbox/pi-sessions; then
-		printf 'Verification failed: [REDACTED] was not found in Pi session history.\n' >&2
-		exit 1
-	fi
-	if run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
-		sandbox exec -n pi-egress-demo -- \
-		grep -R -n -E "$forbidden" /sandbox/pi-sessions; then
-		printf 'Verification failed: denied or unredacted input was found in Pi session history.\n' >&2
-		exit 1
-	fi
-	printf 'Verified: session history contains [REDACTED] and no original test markers.\n'
+		node --experimental-strip-types /sandbox/pi-runtime/managed-pi.ts
 }
 
 cleanup() {
@@ -492,7 +459,6 @@ usage() {
   serve    Start Egress Gate
   gateway  Start the forked OpenShell gateway
   launch   Attach the configured model credential and launch managed Pi
-  verify   Confirm redaction and absence of original text in Pi session history
   cleanup  Delete the example sandbox and credential provider
   all      Show the concise workflow walkthrough (requires --print)
 EOF
@@ -558,15 +524,13 @@ ${bold}${blue}Workflow${reset}
   ${green}5. test${reset}     At the Pi prompt, submit:
                 Reply with exactly: DENY_THIS
                 Reply with exactly: REDACT_THIS
-  ${green}6. verify${reset}   After exiting Pi, confirm only [REDACTED] was persisted.
-  ${green}7. cleanup${reset}  Delete the sandbox and credential provider.
+  ${green}6. cleanup${reset}  Delete the sandbox and credential provider.
 
 ${bold}${blue}Inspect exact commands${reset}
   ./demo.sh --print prepare
   ./demo.sh --print serve
   ./demo.sh --print gateway
   ./demo.sh --print launch
-  ./demo.sh --print verify
   ./demo.sh --print cleanup
 
 Run an action without --print when you are ready.
@@ -578,7 +542,6 @@ case "$action" in
 	serve) serve ;;
 	gateway) gateway ;;
 	launch) launch ;;
-	verify) verify ;;
 	cleanup) cleanup ;;
 	all)
 		if ! $print_only; then

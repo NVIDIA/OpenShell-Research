@@ -134,7 +134,7 @@ class ValidateConfigResponse(_message.Message):
     def __init__(self, valid: _Optional[bool] = ..., reason: _Optional[str] = ...) -> None: ...
 
 class HttpRequestEvaluation(_message.Message):
-    __slots__ = ("phase", "context", "config", "target", "headers", "body", "middleware_name")
+    __slots__ = ("phase", "context", "config", "target", "headers", "body", "middleware_name", "agent_attestation")
     PHASE_FIELD_NUMBER: _ClassVar[int]
     CONTEXT_FIELD_NUMBER: _ClassVar[int]
     CONFIG_FIELD_NUMBER: _ClassVar[int]
@@ -142,6 +142,7 @@ class HttpRequestEvaluation(_message.Message):
     HEADERS_FIELD_NUMBER: _ClassVar[int]
     BODY_FIELD_NUMBER: _ClassVar[int]
     MIDDLEWARE_NAME_FIELD_NUMBER: _ClassVar[int]
+    AGENT_ATTESTATION_FIELD_NUMBER: _ClassVar[int]
     phase: SupervisorMiddlewarePhase
     context: RequestContext
     config: _struct_pb2.Struct
@@ -149,7 +150,8 @@ class HttpRequestEvaluation(_message.Message):
     headers: _containers.RepeatedCompositeFieldContainer[HttpHeader]
     body: bytes
     middleware_name: str
-    def __init__(self, phase: _Optional[_Union[SupervisorMiddlewarePhase, str]] = ..., context: _Optional[_Union[RequestContext, _Mapping]] = ..., config: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., target: _Optional[_Union[HttpRequestTarget, _Mapping]] = ..., headers: _Optional[_Iterable[_Union[HttpHeader, _Mapping]]] = ..., body: _Optional[bytes] = ..., middleware_name: _Optional[str] = ...) -> None: ...
+    agent_attestation: bytes
+    def __init__(self, phase: _Optional[_Union[SupervisorMiddlewarePhase, str]] = ..., context: _Optional[_Union[RequestContext, _Mapping]] = ..., config: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., target: _Optional[_Union[HttpRequestTarget, _Mapping]] = ..., headers: _Optional[_Iterable[_Union[HttpHeader, _Mapping]]] = ..., body: _Optional[bytes] = ..., middleware_name: _Optional[str] = ..., agent_attestation: _Optional[bytes] = ...) -> None: ...
 
 class HttpHeader(_message.Message):
     __slots__ = ("name", "value")

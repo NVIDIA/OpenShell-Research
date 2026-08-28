@@ -24,6 +24,7 @@ from egress_gate.constants import (
     DEFAULT_DENY_REASON_CODE,
     LIMIT_REASON,
     LIMIT_REASON_CODE,
+    MAX_AGENT_ATTESTATION_BYTES,
     MAX_BODY_BYTES,
     MAX_PROTO_CONFIG_BYTES,
     MAX_PROTO_CONTEXT_BYTES,
@@ -130,6 +131,29 @@ def test_manifest_leaves_the_gateway_rpc_timeout_to_the_operator() -> None:
     assert manifest.bindings[0].timeout == ""
 
 
+def test_managed_manifest_advertises_exact_user_and_tool_result_bindings() -> None:
+    middleware = EgressGateMiddleware(
+        create_builtin_registry(), require_pi_attestation=True
+    )
+    try:
+        manifest = asyncio.run(middleware.Describe(object(), Mock()))
+    finally:
+        asyncio.run(middleware.close())
+
+    agent_bindings = [
+        binding
+        for binding in manifest.bindings
+        if binding.operation == pb2.SUPERVISOR_MIDDLEWARE_OPERATION_AGENT_CONVERSATION
+    ]
+    assert [
+        (binding.harness, binding.hook, binding.schema_version)
+        for binding in agent_bindings
+    ] == [
+        ("pi", "rendered_prompt_admission", "openshell.pi-input.v1"),
+        ("pi", "tool_result_admission", "openshell.pi-tool-result.v1"),
+    ]
+
+
 def test_copied_proto_remains_the_current_five_field_finding_contract() -> None:
     evaluation = pb2.HttpRequestEvaluation()
     finding = pb2.Finding()
@@ -217,6 +241,13 @@ def test_evaluation_enforces_exact_encoded_transport_boundaries() -> None:
         request.headers.add()
     servicer_module._validate_evaluation_envelope(request)
     request.headers.add()
+    with pytest.raises(EgressGateError):
+        servicer_module._validate_evaluation_envelope(request)
+
+    request = _request(body=b"")
+    request.agent_attestation = b"x" * MAX_AGENT_ATTESTATION_BYTES
+    servicer_module._validate_evaluation_envelope(request)
+    request.agent_attestation += b"x"
     with pytest.raises(EgressGateError):
         servicer_module._validate_evaluation_envelope(request)
 

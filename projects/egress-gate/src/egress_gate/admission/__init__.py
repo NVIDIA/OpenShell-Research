@@ -4,10 +4,15 @@
 """First-class harness admission and attested-egress APIs."""
 
 from egress_gate.admission.adapters import (
+    AttestedCandidate,
     HarnessAdapter,
     HarnessAdapterRegistry,
     OpenAIChatCompletionsV1Adapter,
+    PiImageContentV1,
     PiInputV1,
+    PiTextContentV1,
+    PiToolResultV1,
+    PiToolResultV1Adapter,
     PiV1Adapter,
     PreparedHarnessRequest,
     ProviderAdapterRegistry,
@@ -30,21 +35,29 @@ from egress_gate.admission.models import (
     PI_HARNESS_VERSION,
     AdmissionDecision,
     AdmissionHook,
+    AdmissionProvenance,
     HarnessAdmissionContext,
     HarnessAdmissionRequest,
     HarnessAdmissionResult,
-    PromptProvenance,
 )
 from egress_gate.admission.processor import (
     RECEIPT_HEADER,
     AttestedEgressProcessor,
     HarnessAdmissionProcessor,
 )
-from egress_gate.admission.receipts import ReceiptAuthority, ReceiptClaimsV1
+from egress_gate.admission.receipts import (
+    AgentAttestationClaimsV1,
+    ReceiptAuthority,
+    ReceiptClaimsV1,
+    ReceiptVerificationError,
+)
 
 __all__ = [
     "AdmissionDecision",
     "AdmissionHook",
+    "AdmissionProvenance",
+    "AgentAttestationClaimsV1",
+    "AttestedCandidate",
     "AttestedEgressProcessor",
     "CanonicalFunctionCallV1",
     "CanonicalGenerationV1",
@@ -59,11 +72,14 @@ __all__ = [
     "HarnessAdmissionRequest",
     "HarnessAdmissionResult",
     "MAX_ADMISSION_BODY_BYTES",
-    "PromptProvenance",
     "PI_HARNESS_VERSION",
     "ModelRequestV1",
     "OpenAIChatCompletionsV1Adapter",
     "PiInputV1",
+    "PiImageContentV1",
+    "PiTextContentV1",
+    "PiToolResultV1",
+    "PiToolResultV1Adapter",
     "PiV1Adapter",
     "PreparedHarnessRequest",
     "ProviderAdapterRegistry",
@@ -71,6 +87,7 @@ __all__ = [
     "RECEIPT_HEADER",
     "ReceiptAuthority",
     "ReceiptClaimsV1",
+    "ReceiptVerificationError",
     "canonical_json_bytes",
     "create_pi_adapter_registry",
     "create_provider_adapter_registry",

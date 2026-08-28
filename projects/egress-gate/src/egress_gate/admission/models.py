@@ -16,14 +16,15 @@ from egress_gate.request import HttpTarget
 from egress_gate.result import ReasonCode, SourcedFinding
 from egress_gate.string_validators import BoundedMetadataString, ScalarString
 
-MAX_ADMISSION_BODY_BYTES = 32 * 1024
-PI_HARNESS_VERSION = "extension-v1"
+MAX_ADMISSION_BODY_BYTES = 4 * 1024 * 1024
+PI_HARNESS_VERSION = "sdk-v1"
 
 
 class AdmissionHook(StrEnum):
     """Supported Pi admission boundaries."""
 
     RENDERED_PROMPT = "rendered_prompt_admission"
+    TOOL_RESULT = "tool_result_admission"
 
 
 class AdmissionDecision(StrEnum):
@@ -34,19 +35,18 @@ class AdmissionDecision(StrEnum):
     DENY = "deny"
 
 
-class PromptProvenance(StrictDomainModel):
-    """Request-local correlation assertions for one rendered submission."""
+class AdmissionProvenance(StrictDomainModel):
+    """Request-local correlation assertions for one context addition."""
 
-    kind: Literal["rendered_prompt"]
     session_id: BoundedMetadataString
     submission_id: BoundedMetadataString
 
 
 class HarnessAdmissionRequest(StrictDomainModel):
-    """One complete harness-native rendered prompt."""
+    """One complete harness-native context addition."""
 
     request_body: bytes = Field(max_length=MAX_ADMISSION_BODY_BYTES, repr=False)
-    provenance: PromptProvenance
+    provenance: AdmissionProvenance
 
 
 class HarnessAdmissionContext(StrictDomainModel):
@@ -56,9 +56,9 @@ class HarnessAdmissionContext(StrictDomainModel):
     sandbox_id: BoundedMetadataString
     middleware_name: BoundedMetadataString
     harness: Literal["pi"]
-    harness_version: Literal["extension-v1"]
+    harness_version: Literal["extension-v1", "sdk-v1"]
     hook: AdmissionHook
-    schema_version: Literal["openshell.pi-input.v1"]
+    schema_version: Literal["openshell.pi-input.v1", "openshell.pi-tool-result.v1"]
     provider_target: HttpTarget
     provider_adapter_schema: Literal["openai.chat-completions.v1"]
 
@@ -73,7 +73,7 @@ class HarnessAdmissionResult(StrictDomainModel):
         max_length=MAX_ADMISSION_BODY_BYTES,
         repr=False,
     )
-    receipt: bytes | None = Field(
+    attestation: bytes | None = Field(
         default=None,
         min_length=1,
         max_length=8 * 1024,
@@ -90,8 +90,8 @@ class HarnessAdmissionResult(StrictDomainModel):
         if self.decision is AdmissionDecision.DENY:
             if self.reason_code is None:
                 raise ValueError("denial requires a reason code")
-            if self.replacement_body is not None or self.receipt is not None:
-                raise ValueError("denial cannot carry a replacement or receipt")
+            if self.replacement_body is not None or self.attestation is not None:
+                raise ValueError("denial cannot carry a replacement or attestation")
         else:
             if self.reason_code is not None:
                 raise ValueError("allow decisions cannot carry a reason code")
@@ -105,18 +105,18 @@ class HarnessAdmissionResult(StrictDomainModel):
                 and self.replacement_body is not None
             ):
                 raise ValueError("allow decisions cannot carry a replacement body")
-            if self.receipt is None:
-                raise ValueError("admission requires a receipt")
+            if self.attestation is None:
+                raise ValueError("admission requires an attestation")
         return self
 
 
 __all__ = [
     "AdmissionDecision",
     "AdmissionHook",
+    "AdmissionProvenance",
     "HarnessAdmissionContext",
     "HarnessAdmissionRequest",
     "HarnessAdmissionResult",
     "MAX_ADMISSION_BODY_BYTES",
-    "PromptProvenance",
     "PI_HARNESS_VERSION",
 ]

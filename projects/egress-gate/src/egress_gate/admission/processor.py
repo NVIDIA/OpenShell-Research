@@ -13,10 +13,15 @@ from egress_gate.admission.adapters import (
     AdmissionMutationError,
     AdmissionShapeError,
     HarnessAdapterRegistry,
+    PiInputV1,
     ProviderAdapterRegistry,
     ProviderShapeError,
 )
-from egress_gate.admission.canonical import canonical_json_bytes
+from egress_gate.admission.canonical import (
+    CanonicalMessageV1,
+    CanonicalRole,
+    canonical_json_bytes,
+)
 from egress_gate.admission.models import (
     MAX_ADMISSION_BODY_BYTES,
     AdmissionDecision,
@@ -31,9 +36,7 @@ from egress_gate.request import (
     EnforcementPoint,
     HarnessAdmissionMetadata,
     HttpRequest,
-    RemoveHeaderMutation,
     RequestContext,
-    RequestMutations,
 )
 from egress_gate.request_processor import RequestProcessor, apply_request_mutations
 from egress_gate.result import (
@@ -71,7 +74,7 @@ class HarnessAdmissionProcessor:
             "admission_schema": "openshell.pi-input.v1",
             "canonicalization": "canonical-json.v1",
             "provider_adapter": "openai.chat-completions.v1",
-            "receipt_version": "egress-receipt.v1",
+            "attestation_version": "agent-attestation.v1",
             "key_id": self._receipt_authority.key_id,
             "policy_fingerprint": self._policy_fingerprint,
         }
@@ -124,7 +127,7 @@ class HarnessAdmissionProcessor:
             if replacement is not None and len(replacement) > MAX_ADMISSION_BODY_BYTES:
                 raise AdmissionMutationError("admission replacement body is too large")
             timeout.raise_if_expired()
-            receipt = self._receipt_authority.issue(
+            attestation = self._receipt_authority.issue_attestation(
                 rendered_prompt,
                 context,
                 request.provenance,
@@ -139,7 +142,7 @@ class HarnessAdmissionProcessor:
                     else AdmissionDecision.ALLOW
                 ),
                 replacement_body=replacement,
-                receipt=receipt,
+                attestation=attestation,
                 findings=gate_result.findings,
                 policy_fingerprint=self._policy_fingerprint,
             )
@@ -162,7 +165,7 @@ class HarnessAdmissionProcessor:
 
 
 class AttestedEgressProcessor:
-    """Verify a receipt, run network Gates, and reject prompt divergence."""
+    """Verify trusted agent attestation and reject context divergence."""
 
     def __init__(
         self,
@@ -171,7 +174,7 @@ class AttestedEgressProcessor:
         receipt_authority: ReceiptAuthority,
         *,
         middleware_name: str,
-        harness_version: Literal["extension-v1"],
+        harness_version: Literal["sdk-v1"],
     ) -> None:
         fingerprint = request_processor.policy_fingerprint
         if not fingerprint:
@@ -184,70 +187,65 @@ class AttestedEgressProcessor:
         self._provider_adapter_schema = "openai.chat-completions.v1"
         self._policy_fingerprint = fingerprint
 
-    def process(self, request: HttpRequest, *, timeout: Timeout) -> EgressResult:
+    def process(
+        self,
+        request: HttpRequest,
+        *,
+        agent_attestation: bytes,
+        timeout: Timeout,
+    ) -> EgressResult:
         """Deny any unattested or semantically changed provider request."""
         if request.context.enforcement_point is not EnforcementPoint.NETWORK_EGRESS:
             return self._deny("network_context_invalid")
-        receipt_headers = tuple(
-            header
-            for header in request.headers
-            if header.name.lower() == RECEIPT_HEADER
-        )
-        if len(receipt_headers) != 1:
-            reason = "receipt_missing" if not receipt_headers else "receipt_duplicate"
-            return self._deny(reason)
-        stripped = request.model_copy(
-            update={
-                "headers": tuple(
-                    header
-                    for header in request.headers
-                    if header.name.lower() != RECEIPT_HEADER
-                )
-            }
-        )
+        if any(header.name.lower() == RECEIPT_HEADER for header in request.headers):
+            return self._deny("reserved_receipt_header")
+        if not agent_attestation:
+            return self._deny("attestation_missing")
         try:
             adapter = self._provider_adapters.resolve(self._provider_adapter_schema)
-            rendered_prompt = adapter.rendered_prompt(stripped, timeout)
+            candidate = adapter.latest_attested_candidate(request, timeout)
             timeout.raise_if_expired()
+            if isinstance(candidate, PiInputV1):
+                hook = AdmissionHook.RENDERED_PROMPT
+                schema_version = "openshell.pi-input.v1"
+            elif (
+                isinstance(candidate, CanonicalMessageV1)
+                and candidate.role is CanonicalRole.TOOL
+            ):
+                hook = AdmissionHook.TOOL_RESULT
+                schema_version = "openshell.pi-tool-result.v1"
+            else:
+                raise ProviderShapeError("provider context addition is unsupported")
             context = HarnessAdmissionContext(
                 request_id=request.context.request_id,
                 sandbox_id=request.context.sandbox_id,
                 middleware_name=self._middleware_name,
                 harness="pi",
                 harness_version=self._harness_version,
-                hook=AdmissionHook.RENDERED_PROMPT,
-                schema_version="openshell.pi-input.v1",
+                hook=hook,
+                schema_version=schema_version,
                 provider_target=request.target,
                 provider_adapter_schema="openai.chat-completions.v1",
             )
-            self._receipt_authority.verify(
-                receipt_headers[0].value.encode("ascii"),
-                rendered_prompt,
+            self._receipt_authority.verify_attestation(
+                agent_attestation,
+                candidate,
                 context,
                 policy_fingerprint=self._policy_fingerprint,
             )
             timeout.raise_if_expired()
-            gate_result = self._request_processor.process(stripped, timeout=timeout)
+            gate_result = self._request_processor.process(request, timeout=timeout)
             timeout.raise_if_expired()
             if gate_result.decision is EgressDecision.DENY:
                 return gate_result
             final_request = apply_request_mutations(
-                stripped, gate_result.request_mutations
+                request, gate_result.request_mutations
             )
-            final_prompt = adapter.rendered_prompt(final_request, timeout)
-            if canonical_json_bytes(final_prompt) != canonical_json_bytes(
-                rendered_prompt
-            ):
+            final_candidate = adapter.latest_attested_candidate(final_request, timeout)
+            if canonical_json_bytes(final_candidate) != canonical_json_bytes(candidate):
                 return self._deny("semantic_mutation_denied")
             timeout.raise_if_expired()
-            mutations = RequestMutations(
-                replacement_body=gate_result.request_mutations.replacement_body,
-                header_mutations=gate_result.request_mutations.header_mutations
-                + (RemoveHeaderMutation(kind="remove", name=RECEIPT_HEADER),),
-            )
-            return gate_result.model_copy(update={"request_mutations": mutations})
-        except UnicodeEncodeError:
-            return self._deny("receipt_malformed")
+            return gate_result
         except ReceiptVerificationError as error:
             return self._deny(error.reason_code)
         except TimeoutExpiredError:
@@ -264,8 +262,8 @@ class AttestedEgressProcessor:
             decision=EgressDecision.DENY,
             decision_source=GateDecisionSource(
                 kind=DecisionSourceKind.GATE,
-                gate_name="receipt-verifier",
-                gate_type="receipt-verifier",
+                gate_name="agent-attestation-verifier",
+                gate_type="agent-attestation-verifier",
             ),
             reason_code=reason_code,
             policy_fingerprint=self._policy_fingerprint,
