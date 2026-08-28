@@ -223,7 +223,7 @@ def test_pi_example_renders_provider_specific_runtime_configuration(
     assert registration["name"] == "pi-egress"
     assert registration["grpc_endpoint"] == "http://192.0.2.10:50051"
     assert registration["allow_insecure_transport"] is True
-    assert registration["max_payload_bytes"] == 32 * 1024
+    assert registration["max_payload_bytes"] == 4 * 1024 * 1024
 
 
 def test_pi_example_reports_all_missing_configuration_before_work(
