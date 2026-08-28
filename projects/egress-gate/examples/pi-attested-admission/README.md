@@ -112,8 +112,9 @@ After the gateway reports that it is ready, launch Pi from a third terminal:
 ./demo.sh launch
 ```
 
-Each launch replaces the example's `pi-egress-demo` sandbox so the current Pi
-runtime, extension, policy, and OpenShell supervisor are used together.
+Each launch replaces the example's `pi-egress-demo` sandbox, provider, and
+custom provider profile so the current Pi runtime, extension, policy, endpoint,
+and OpenShell supervisor are used together.
 
 The example registers an endpoint-specific provider profile and stores
 `PI_MODEL_API_KEY` as its credential. Pi sees only an opaque placeholder;

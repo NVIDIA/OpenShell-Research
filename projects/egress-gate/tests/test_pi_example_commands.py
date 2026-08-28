@@ -65,6 +65,9 @@ def test_pi_example_can_print_each_action_without_running_it(
     assert "--gateway pi-egress-demo-gateway" in output
     assert "provider create" in output
     assert "provider profile import" in output
+    assert "provider profile delete pi-attested-model" in output
+    assert "provider delete pi-model" in output
+    assert "provider profile update" not in output
     assert "--type pi-attested-model" in output
     assert "PI_MODEL_API_KEY" in output
     assert "OPENAI_API_KEY" not in output
