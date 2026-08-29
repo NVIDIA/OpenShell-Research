@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 
 
 def _optional(name: str) -> str | None:
@@ -19,6 +21,14 @@ def _positive_int(name: str, default: int) -> int:
     value = int(raw)
     if value <= 0:
         raise ValueError(f"{name} must be greater than zero")
+    return value
+
+
+def _log_level(name: str, default: str) -> str:
+    value = os.environ.get(name, default).strip().upper()
+    if value not in LOG_LEVELS:
+        choices = ", ".join(sorted(LOG_LEVELS))
+        raise ValueError(f"{name} must be one of: {choices}")
     return value
 
 
@@ -44,6 +54,11 @@ class Settings:
     delete_timeout_seconds: int = 60
     host: str = "0.0.0.0"
     port: int = 8765
+    log_level: str = "INFO"
+    policy_review_base_url: str = "https://inference-api.nvidia.com/v1"
+    policy_review_api_key: str = field(default="", repr=False)
+    policy_review_model: str = "azure/openai/gpt-5.6-sol"
+    policy_review_timeout_seconds: int = 120
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -57,6 +72,9 @@ class Settings:
         gateway_endpoint = _optional("OPENSHELL_GATEWAY_ENDPOINT")
         if gateway and gateway_endpoint:
             raise ValueError("set only one of OPENSHELL_GATEWAY or OPENSHELL_GATEWAY_ENDPOINT")
+        policy_review_api_key = _optional("NVIDIA_API_KEY")
+        if not policy_review_api_key:
+            raise ValueError("NVIDIA_API_KEY is required")
 
         return cls(
             token=token,
@@ -82,4 +100,16 @@ class Settings:
             delete_timeout_seconds=_positive_int("OPENSHELL_DELETE_TIMEOUT_SECONDS", 60),
             host=os.environ.get("OPENSHELL_TOOL_SERVICE_HOST", "0.0.0.0"),
             port=_positive_int("OPENSHELL_TOOL_SERVICE_PORT", 8765),
+            log_level=_log_level("OPENSHELL_TOOL_SERVICE_LOG_LEVEL", "INFO"),
+            policy_review_base_url=os.environ.get(
+                "OPENSHELL_POLICY_REVIEW_BASE_URL",
+                "https://inference-api.nvidia.com/v1",
+            ).rstrip("/"),
+            policy_review_api_key=policy_review_api_key,
+            policy_review_model=os.environ.get(
+                "OPENSHELL_POLICY_REVIEW_MODEL", "azure/openai/gpt-5.6-sol"
+            ),
+            policy_review_timeout_seconds=_positive_int(
+                "OPENSHELL_POLICY_REVIEW_TIMEOUT_SECONDS", 120
+            ),
         )

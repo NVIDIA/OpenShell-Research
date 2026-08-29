@@ -1,24 +1,29 @@
+import { createHash } from "node:crypto";
+
 const TASK_MARKER = "\n<Task>\n";
 const POLICY_START = "<openshell-policy>";
 const POLICY_END = "</openshell-policy>";
-const GITHUB_URL =
-  /https:\/\/github\.com\/([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))\/([A-Za-z0-9_.-]{1,100})(?=[/#?\s),.;:]|$)/g;
 
-export function githubRepositoriesFromPrompt(prompt: string): string[] {
-  const markerIndex = prompt.lastIndexOf(TASK_MARKER);
-  const task = markerIndex >= 0 ? prompt.slice(markerIndex + TASK_MARKER.length) : prompt;
-  const repositories = new Set<string>();
-
-  for (const match of task.matchAll(GITHUB_URL)) {
-    const repository = match[2].replace(/[.,;:]+$/, "").replace(/\.git$/, "");
-    repositories.add(`${match[1]}/${repository}`);
-  }
-  return [...repositories];
+export interface OpenShellChildRequest {
+  prompt: string;
+  childPolicy: string;
 }
 
-export function childPolicyFromPrompt(prompt: string): string | undefined {
+export function idempotencyKeyFromPi(input: {
+  runId: string;
+  stepIndex: number;
+  agent: string;
+  promptDigest: string;
+}): string {
+  return createHash("sha256")
+    .update(JSON.stringify([input.runId, input.stepIndex, input.agent, input.promptDigest]))
+    .digest("hex");
+}
+
+export function childRequestFromPrompt(prompt: string): OpenShellChildRequest | undefined {
   const markerIndex = prompt.lastIndexOf(TASK_MARKER);
-  const task = markerIndex >= 0 ? prompt.slice(markerIndex + TASK_MARKER.length) : prompt;
+  const taskStart = markerIndex >= 0 ? markerIndex + TASK_MARKER.length : 0;
+  const task = prompt.slice(taskStart);
   const start = task.indexOf(POLICY_START);
   if (start < 0) {
     return undefined;
@@ -29,5 +34,19 @@ export function childPolicyFromPrompt(prompt: string): string | undefined {
     return undefined;
   }
   const policy = task.slice(policyStart, end).trim();
-  return policy || undefined;
+  if (!policy) {
+    return undefined;
+  }
+
+  const absoluteStart = taskStart + start;
+  const absoluteEnd = taskStart + end + POLICY_END.length;
+  const before = prompt.slice(taskStart, absoluteStart);
+  let after = prompt.slice(absoluteEnd);
+  if (before.endsWith("\n") && after.startsWith("\n")) {
+    after = after.slice(1);
+  }
+  return {
+    prompt: `${before}${after}`.trim(),
+    childPolicy: policy,
+  };
 }

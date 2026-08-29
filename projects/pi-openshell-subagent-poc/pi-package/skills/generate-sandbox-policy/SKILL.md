@@ -46,14 +46,18 @@ Add only the network access required by the assigned task:
 - Use `protocol: rest` with explicit `rules` when method or path restrictions
   matter. Do not combine `access` and `rules` on one endpoint.
 - Omit `tls`; OpenShell detects TLS automatically.
-- Do not add gateway access, OpenShell credentials, Git write operations, or
-  unrelated endpoints.
+- Do not add permissions unrelated to the assigned task.
+- Do not impose blanket task-category restrictions. If the task requires Git
+  writes, a gateway endpoint, or another capability, author the narrowest valid
+  policy that permits that capability. The Tool Service reviewer decides
+  whether the proposed child policy exceeds the live parent policy.
 - Inference access is configured separately by the Tool Service and does not
   belong in this policy.
 
 For read-only clone or fetch of one public GitHub repository, replace the empty
 `network_policies` map with the block below. Substitute the exact `OWNER/REPO`;
-do not use wildcards:
+do not use wildcards. This is an example for a read-only task, not a restriction
+on other Git operations:
 
 ```yaml
 network_policies:
@@ -86,9 +90,31 @@ network_policies:
       - path: /usr/local/bin/git
 ```
 
-Before returning the policy, check that it contains `version: 1`, the complete
-Pi worker baseline, and only task-required network access. Present the policy;
-do not write it to a file and do not invoke OpenShell CLI commands.
+For Git push, add only the repository-scoped smart-HTTP operations required by
+the task. Smart-HTTP push uses `GET /OWNER/REPO.git/info/refs` with
+`service: git-receive-pack` and `POST /OWNER/REPO.git/git-receive-pack`.
+Include the repository-scoped `git-upload-pack` operations too when the worker
+must clone or fetch before pushing. GitHub Contents API writes instead use the
+exact required `api.github.com` `PUT /repos/OWNER/REPO/contents/...` paths.
+Avoid broad `access: read-write` when explicit REST rules can describe the
+task. Network policy does not itself supply a GitHub credential;
+credential/provider attachment is a separate Tool Service resource decision.
+Do not invent credentials or embed secrets in the policy.
 
-This POC does not yet prove that the child policy is a subset of the parent
-policy. Do not claim that attenuation has been verified.
+Before returning the policy, check that it contains `version: 1`, the complete
+Pi worker baseline, and only task-required authority. Present the policy; do
+not write it to a file and do not invoke OpenShell CLI commands.
+
+Do not reject a requested capability merely because the parent policy may not
+contain it. Author the least-privilege child policy required by the task. The
+Tool Service retrieves the live parent policy and makes the allow-or-deny
+attenuation decision before creating the child sandbox.
+
+If that review returns `POLICY_ADVISOR_ACTION_REQUIRED`, use OpenShell Policy
+Advisor only for the missing network `addRule` operations. Read
+`/etc/openshell/skills/policy-advisor/SKILL.md`, submit the minimal proposal from
+the parent sandbox, wait for human approval and `policy_reloaded: true`, then
+launch a new worker request with the same child policy. Policy Advisor does not
+cover filesystem, process, provider attachment, credential binding, or every
+advanced network-policy field; report those as requiring a manual parent-policy
+update.

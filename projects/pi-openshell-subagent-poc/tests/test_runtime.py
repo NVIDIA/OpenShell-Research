@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
@@ -7,7 +8,12 @@ from pathlib import Path
 import pytest
 
 from openshell_tool_service.config import Settings
-from openshell_tool_service.runtime import OpenShellCliRuntime, RuntimeExecutionError
+from openshell_tool_service.runtime import (
+    OpenShellCliParentPolicySource,
+    OpenShellCliRuntime,
+    ParentPolicyUnavailableError,
+    RuntimeExecutionError,
+)
 from openshell_tool_service.store import Job
 
 
@@ -49,7 +55,9 @@ def settings(tmp_path: Path) -> Settings:
     )
 
 
-def test_runtime_creates_executes_and_deletes(tmp_path: Path) -> None:
+def test_runtime_creates_executes_and_deletes(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     calls: list[tuple[list[str], str | None, int]] = []
 
     def runner(
@@ -60,6 +68,7 @@ def test_runtime_creates_executes_and_deletes(tmp_path: Path) -> None:
         stdout = "OPEN_SHELL_CHILD_OK\n" if "exec" in argv else ""
         return subprocess.CompletedProcess(argv, 0, stdout=stdout, stderr="")
 
+    caplog.set_level(logging.DEBUG, logger="openshell_tool_service.runtime")
     result = OpenShellCliRuntime(settings(tmp_path), runner).run(job())
     assert result.output == "OPEN_SHELL_CHILD_OK"
     assert [call[0][2] for call in calls] == ["create", "exec", "delete"]
@@ -71,6 +80,61 @@ def test_runtime_creates_executes_and_deletes(tmp_path: Path) -> None:
     assert "PI_CODING_AGENT_DIR=/home/sandbox/.pi/agent" in calls[0][0]
     assert "--detach" in calls[0][0]
     assert "/bin/true" not in calls[0][0]
+    assert "job 12345678 creating sandbox pi-child-1234567890" in caplog.text
+    assert "job 12345678 sandbox ready" in caplog.text
+    assert "job 12345678 running Pi" in caplog.text
+    assert "job 12345678 Pi completed" in caplog.text
+    assert "job 12345678 sandbox deleted" in caplog.text
+    assert "prompt_sha256=" in caplog.text
+    assert "policy_sha256=" in caplog.text
+    assert "Return OPEN_SHELL_CHILD_OK" not in caplog.text
+    assert "version: 1" not in caplog.text
+
+
+def test_parent_policy_source_reads_active_policy_from_openshell(tmp_path: Path) -> None:
+    calls: list[list[str]] = []
+
+    def runner(
+        command: Sequence[str], _input_text: str | None, _timeout: int
+    ) -> subprocess.CompletedProcess[str]:
+        argv = list(command)
+        calls.append(argv)
+        return subprocess.CompletedProcess(
+            argv,
+            0,
+            stdout='{"version":1,"config_revision":9,"policy":{"version":1,'
+            '"network_policies":{}}}\n',
+            stderr="",
+        )
+
+    policy = OpenShellCliParentPolicySource(settings(tmp_path), runner).get("pi-parent")
+
+    assert policy == '{"network_policies":{},"version":1}'
+    assert calls == [
+        [
+            "openshell",
+            "policy",
+            "get",
+            "pi-parent",
+            "--workspace",
+            "workspace",
+            "--gateway",
+            "gateway",
+            "--full",
+            "--output",
+            "json",
+        ]
+    ]
+
+
+def test_parent_policy_source_fails_on_openshell_error(tmp_path: Path) -> None:
+    def runner(
+        command: Sequence[str], _input_text: str | None, _timeout: int
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(list(command), 1, stdout="", stderr="not found")
+
+    with pytest.raises(ParentPolicyUnavailableError, match="not found"):
+        OpenShellCliParentPolicySource(settings(tmp_path), runner).get("pi-parent")
 
 
 def test_runtime_deletes_after_child_failure(tmp_path: Path) -> None:

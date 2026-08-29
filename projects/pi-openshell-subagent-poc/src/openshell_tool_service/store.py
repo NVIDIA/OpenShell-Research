@@ -9,7 +9,10 @@ import time
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+
+
+class IdempotencyConflictError(ValueError):
+    """The caller reused a key for a different prompt or policy."""
 
 
 @dataclass(frozen=True)
@@ -96,48 +99,43 @@ class JobStore:
         self,
         *,
         caller_id: str,
-        run_id: str,
-        step_index: int,
-        agent: str,
+        idempotency_key: str,
         prompt: str,
-        prompt_digest: str,
-        options: dict[str, Any],
-        profile: str,
-        github_repositories: tuple[str, ...],
         child_policy: str,
     ) -> tuple[Job, bool]:
-        canonical = json.dumps(
+        canonical_request = json.dumps(
             {
-                "caller_id": caller_id,
-                "run_id": run_id,
-                "step_index": step_index,
-                "agent": agent,
                 "prompt": prompt,
-                "prompt_digest": prompt_digest,
-                "options": options,
-                "github_repositories": github_repositories,
                 "child_policy": child_policy,
             },
             sort_keys=True,
             separators=(",", ":"),
         )
-        idempotency_key = hashlib.sha256(canonical.encode()).hexdigest()
+        request_digest = hashlib.sha256(canonical_request.encode()).hexdigest()
+        scoped_key = hashlib.sha256(
+            json.dumps(
+                {"caller_id": caller_id, "idempotency_key": idempotency_key},
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
 
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
-                "SELECT * FROM jobs WHERE idempotency_key = ?", (idempotency_key,)
+                "SELECT * FROM jobs WHERE idempotency_key = ?", (scoped_key,)
             ).fetchone()
             if row is not None:
+                if row["prompt_digest"] != request_digest:
+                    raise IdempotencyConflictError(
+                        "idempotencyKey was already used with a different prompt or child policy"
+                    )
                 return self._job(row), False
 
             job_id = uuid.uuid4().hex
             now = time.time()
             resources_json = json.dumps(
-                {
-                    "githubRepositories": github_repositories,
-                    "childPolicy": child_policy,
-                },
+                {"childPolicy": child_policy},
                 separators=(",", ":"),
             )
             # OpenShell sandbox names are currently limited to 19 characters.
@@ -152,14 +150,14 @@ class JobStore:
                 """,
                 (
                     job_id,
-                    idempotency_key,
+                    scoped_key,
                     caller_id,
-                    run_id,
-                    step_index,
-                    agent,
+                    "",
+                    0,
+                    "openshell-worker",
                     prompt,
-                    prompt_digest,
-                    profile,
+                    request_digest,
+                    "worker",
                     resources_json,
                     sandbox_name,
                     now,

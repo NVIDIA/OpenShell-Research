@@ -1,6 +1,6 @@
 ---
 name: openshell-worker
-description: Run an arbitrary one-shot task in a dedicated OpenShell sandbox. The caller must put a complete parent-authored OpenShell YAML policy in one <openshell-policy> block. For GitHub work, give this worker exactly one full public https://github.com/OWNER/REPO URL.
+description: Run an arbitrary one-shot task in a dedicated OpenShell sandbox. The caller must put a complete parent-authored OpenShell YAML policy in one <openshell-policy> block.
 runner:
   type: external-job
   provider: openshell-tool-service
@@ -8,7 +8,6 @@ runner:
     profile: worker
 async: true
 timeoutMs: 360000
-acceptance: {"level":"none","reason":"The external OpenShell worker returns the task result directly."}
 ---
 
 Complete the assigned task in the dedicated OpenShell sandbox. Work only with

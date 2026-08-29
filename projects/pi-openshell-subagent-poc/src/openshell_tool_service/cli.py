@@ -11,12 +11,18 @@ from openshell_tool_service.config import Settings
 
 
 def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    )
     settings = Settings.from_env()
-    uvicorn.run(create_app(settings), host=settings.host, port=settings.port)
+    logging.basicConfig(
+        level=getattr(logging, settings.log_level),
+        format="%(asctime)s %(levelname)s %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    uvicorn.run(
+        create_app(settings),
+        host=settings.host,
+        port=settings.port,
+        access_log=False,
+    )
 
 
 if __name__ == "__main__":

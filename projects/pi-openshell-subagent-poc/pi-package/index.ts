@@ -5,20 +5,21 @@ import {
   type ExternalJobResult,
   type ExternalJobStartInput,
 } from "pi-subagents/external-job-provider";
-import { childPolicyFromPrompt, githubRepositoriesFromPrompt } from "./resources.ts";
+import { childRequestFromPrompt, idempotencyKeyFromPi } from "./resources.ts";
 
 const PROVIDER_NAME = "openshell-tool-service";
 
-function configuration(): { baseUrl: string; token: string } {
+function configuration(): { baseUrl: string; token: string; sandboxName: string } {
   const baseUrl = process.env.POC_TOOL_SERVICE_URL?.replace(/\/$/, "");
   const token = process.env.POC_TOOL_SERVICE_TOKEN;
-  if (!baseUrl || !token) {
+  const sandboxName = process.env.POC_CALLER_SANDBOX_NAME?.trim();
+  if (!baseUrl || !token || !sandboxName) {
     throw new ExternalJobProviderError(
-      "POC_TOOL_SERVICE_URL and POC_TOOL_SERVICE_TOKEN are required",
+      "POC_TOOL_SERVICE_URL, POC_TOOL_SERVICE_TOKEN, and POC_CALLER_SANDBOX_NAME are required",
       { code: "tool-service-config" },
     );
   }
-  return { baseUrl, token };
+  return { baseUrl, token, sandboxName };
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -52,25 +53,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 async function start(input: ExternalJobStartInput): Promise<ExternalJobHandle> {
-  const childPolicy = childPolicyFromPrompt(input.prompt);
-  if (!childPolicy) {
+  const { sandboxName } = configuration();
+  const childRequest = childRequestFromPrompt(input.prompt);
+  if (!childRequest) {
     throw new ExternalJobProviderError(
       "The openshell-worker task must contain one non-empty <openshell-policy> block",
       { code: "child-policy-missing" },
     );
   }
+  const idempotencyKey = idempotencyKeyFromPi(input);
   return request<ExternalJobHandle>("/v1/jobs", {
     method: "POST",
     body: JSON.stringify({
-      runId: input.runId,
-      stepIndex: input.stepIndex,
-      agent: input.agent,
-      prompt: input.prompt,
-      promptDigest: input.promptDigest,
-      options: input.options,
+      idempotencyKey,
+      caller: {
+        sandboxName,
+      },
+      prompt: childRequest.prompt,
       resources: {
-        githubRepositories: githubRepositoriesFromPrompt(input.prompt),
-        childPolicy,
+        childPolicy: childRequest.childPolicy,
       },
     }),
   });

@@ -3,38 +3,42 @@
 import hmac
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from openshell_tool_service.config import Settings
-from openshell_tool_service.runtime import OpenShellCliRuntime
-from openshell_tool_service.service import Runtime, ToolService
-from openshell_tool_service.store import Job, JobStore
+from openshell_tool_service.policy_reviewer import LlmPolicyReviewer, PolicyReviewer
+from openshell_tool_service.runtime import OpenShellCliParentPolicySource, OpenShellCliRuntime
+from openshell_tool_service.service import ParentPolicySource, Runtime, ToolService
+from openshell_tool_service.store import IdempotencyConflictError, Job, JobStore
 
 
 class JobResources(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    github_repositories: list[str] = Field(
-        default_factory=list,
-        alias="githubRepositories",
-        max_length=1,
-    )
     child_policy: str = Field(alias="childPolicy", min_length=1, max_length=65_536)
+
+
+class JobCaller(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    sandbox_name: str = Field(
+        alias="sandboxName",
+        min_length=1,
+        max_length=63,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+    )
 
 
 class JobCreate(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    run_id: str = Field(alias="runId", min_length=1, max_length=256)
-    step_index: int = Field(alias="stepIndex", ge=0)
-    agent: str = Field(min_length=1, max_length=128)
+    idempotency_key: str = Field(alias="idempotencyKey", min_length=1, max_length=256)
+    caller: JobCaller
     prompt: str = Field(min_length=1, max_length=65_536)
-    prompt_digest: str = Field(alias="promptDigest", min_length=1, max_length=256)
-    options: dict[str, Any]
-    resources: JobResources = Field(default_factory=JobResources)
+    resources: JobResources
 
 
 def _handle(job: Job, *, include_output: bool = False) -> dict[str, object]:
@@ -56,10 +60,29 @@ def _handle(job: Job, *, include_output: bool = False) -> dict[str, object]:
     return result
 
 
-def create_app(settings: Settings | None = None, runtime: Runtime | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    runtime: Runtime | None = None,
+    policy_reviewer: PolicyReviewer | None = None,
+    parent_policy_source: ParentPolicySource | None = None,
+) -> FastAPI:
     settings = settings or Settings.from_env()
+    if policy_reviewer is None:
+        if not settings.policy_review_api_key:
+            raise ValueError("policy reviewer API key is required")
+        policy_reviewer = LlmPolicyReviewer(
+            base_url=settings.policy_review_base_url,
+            api_key=settings.policy_review_api_key,
+            model=settings.policy_review_model,
+            timeout_seconds=settings.policy_review_timeout_seconds,
+        )
     store = JobStore(settings.database_path)
-    service = ToolService(store, runtime or OpenShellCliRuntime(settings))
+    service = ToolService(
+        store,
+        runtime or OpenShellCliRuntime(settings),
+        policy_reviewer,
+        parent_policy_source or OpenShellCliParentPolicySource(settings),
+    )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -88,21 +111,18 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
     @app.post("/v1/jobs", status_code=status.HTTP_202_ACCEPTED)
     def create_job(
         request: JobCreate,
-        caller: Annotated[str, Depends(caller_id)],
+        _authenticated: Annotated[str, Depends(caller_id)],
         tool_service: Annotated[ToolService, Depends(current_service)],
     ) -> dict[str, object]:
         try:
             job = tool_service.submit(
-                caller_id=caller,
-                run_id=request.run_id,
-                step_index=request.step_index,
-                agent=request.agent,
+                caller_id=request.caller.sandbox_name,
+                idempotency_key=request.idempotency_key,
                 prompt=request.prompt,
-                prompt_digest=request.prompt_digest,
-                options=request.options,
-                github_repositories=request.resources.github_repositories,
                 child_policy=request.resources.child_policy,
             )
+        except IdempotencyConflictError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
         return _handle(job)

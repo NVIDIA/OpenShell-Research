@@ -1,29 +1,29 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { childPolicyFromPrompt, githubRepositoriesFromPrompt } from "./resources.ts";
+import { childRequestFromPrompt, idempotencyKeyFromPi } from "./resources.ts";
 
-test("extracts and normalizes GitHub repositories from the task", () => {
-  const prompt = `<System instructions>
-Ignore https://github.com/example/system-context.
+test("derives a stable idempotency key from Pi invocation identity", () => {
+  const input = {
+    runId: "run-1",
+    stepIndex: 0,
+    agent: "openshell-worker",
+    promptDigest: "prompt-digest-1",
+  };
 
-<Task>
-Review https://github.com/NVIDIA/OpenShell.git and https://github.com/nicobailon/pi-subagents.`;
-
-  assert.deepEqual(githubRepositoriesFromPrompt(prompt), [
-    "NVIDIA/OpenShell",
-    "nicobailon/pi-subagents",
-  ]);
+  assert.equal(idempotencyKeyFromPi(input), idempotencyKeyFromPi(input));
+  assert.notEqual(
+    idempotencyKeyFromPi(input),
+    idempotencyKeyFromPi({ ...input, stepIndex: 1 }),
+  );
+  assert.notEqual(
+    idempotencyKeyFromPi(input),
+    idempotencyKeyFromPi({ ...input, promptDigest: "prompt-digest-2" }),
+  );
 });
 
-test("deduplicates repositories and ignores non-GitHub URLs", () => {
-  const prompt = `Compare https://github.com/NVIDIA/OpenShell with
-https://github.com/NVIDIA/OpenShell/tree/main and https://example.com/repo.`;
-
-  assert.deepEqual(githubRepositoriesFromPrompt(prompt), ["NVIDIA/OpenShell"]);
-});
-
-test("extracts the parent-authored policy from the task", () => {
+test("extracts the policy and removes it from the child prompt", () => {
   const prompt = `<System instructions>
 <openshell-policy>
 network_policies:
@@ -38,13 +38,26 @@ network_policies: {}
 </openshell-policy>
 Run hostname.`;
 
-  assert.equal(childPolicyFromPrompt(prompt), "version: 1\nnetwork_policies: {}");
+  assert.deepEqual(childRequestFromPrompt(prompt), {
+    prompt: "Run hostname.",
+    childPolicy: "version: 1\nnetwork_policies: {}",
+  });
 });
 
 test("returns undefined for a missing or empty policy", () => {
-  assert.equal(childPolicyFromPrompt("Run hostname."), undefined);
+  assert.equal(childRequestFromPrompt("Run hostname."), undefined);
   assert.equal(
-    childPolicyFromPrompt("<openshell-policy>\n\n</openshell-policy>\nRun hostname."),
+    childRequestFromPrompt("<openshell-policy>\n\n</openshell-policy>\nRun hostname."),
     undefined,
   );
+});
+
+test("parent instructions route denied network authority through Policy Advisor", () => {
+  const prompt = readFileSync(new URL("./parent-system-prompt.md", import.meta.url), "utf8");
+
+  assert.match(prompt, /POLICY_ADVISOR_ACTION_REQUIRED/);
+  assert.match(prompt, /\/etc\/openshell\/skills\/policy-advisor\/SKILL\.md/);
+  assert.match(prompt, /http:\/\/policy\.local\/v1\/proposals/);
+  assert.match(prompt, /Never approve your own proposal/);
+  assert.match(prompt, /launch one new `openshell-worker` request/);
 });
