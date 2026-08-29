@@ -1,0 +1,23 @@
+# syntax=docker/dockerfile:1.4
+
+ARG BASE_IMAGE=ghcr.io/nvidia/openshell-community/sandboxes/pi:latest
+FROM ${BASE_IMAGE}
+
+USER root
+RUN npm install --global @earendil-works/pi-coding-agent@0.81.0
+COPY --chown=sandbox:sandbox config/models.json /home/sandbox/.pi/agent/models.json
+COPY --chown=sandbox:sandbox pi-package /opt/pi-openshell-poc
+
+USER sandbox
+ENV PI_CODING_AGENT_DIR=/home/sandbox/.pi/agent
+RUN cd /opt/pi-openshell-poc \
+    && npm ci --omit=dev --ignore-scripts \
+    && pi install npm:pi-subagents@0.58.0 \
+    && pi install /opt/pi-openshell-poc \
+    && mkdir -p /home/sandbox/.pi/agent/extensions/subagent \
+    && cp /opt/pi-openshell-poc/config/pi-subagents.json \
+      /home/sandbox/.pi/agent/extensions/subagent/config.json
+
+ENV PI_OFFLINE=1
+ENV PI_SKIP_VERSION_CHECK=1
+ENV PI_TELEMETRY=0

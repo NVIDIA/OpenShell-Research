@@ -1,0 +1,8 @@
+.env
+.git
+.state
+.venv
+dist
+node_modules
+tests
+
