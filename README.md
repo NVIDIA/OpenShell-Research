@@ -17,3 +17,9 @@ Try this prompt:
 > Help me work on `<your goal>`. Orient me to the relevant parts of the
 > repository, explain the smallest useful next step, and verify any changes you
 > make.
+
+## Projects
+
+- [Pi subagents in OpenShell sandboxes](projects/pi-openshell-subagent-poc/README.md) —
+  run a Pi subagent in a dedicated, parent-policy-scoped OpenShell sandbox and
+  exercise human approval through OpenShell Policy Advisor.

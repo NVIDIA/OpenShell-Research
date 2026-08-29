@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.4
 
-ARG BASE_IMAGE=ghcr.io/nvidia/openshell-community/sandboxes/pi:latest
+ARG BASE_IMAGE=ghcr.io/nvidia/openshell-community/sandboxes/pi@sha256:00d0c5e9e733f94f6db3eaa2ab70d4fd75bcc4aace6b13a54535cbf2dd20dfcd
 FROM ${BASE_IMAGE}
 
 USER root
