@@ -58,7 +58,7 @@ jobs:
         run: |
           uv run --project projects/openshell-agent-runner oar validate \
             .github/openshell-agents/profiles/dev-note-reviewer
-          for profile in code-reviewer slop-cop technical-writing-reviewer; do
+          for profile in code-reviewer technical-writing-reviewer; do
             uv run --project projects/openshell-agent-runner oar validate \
               "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/$profile"
           done
@@ -91,7 +91,6 @@ jobs:
           python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/extensions/submit-result.ts'
           python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/extensions/validate-tools.ts'
           python -m zipfile -l "$wheel" | grep -F 'profiles/code-reviewer/profile.yaml'
-          python -m zipfile -l "$wheel" | grep -F 'profiles/slop-cop/profile.yaml'
           python -m zipfile -l "$wheel" | grep -F 'profiles/technical-writing-reviewer/profile.yaml'
           python -m zipfile -l "$wheel" | grep -F 'dist-info/licenses/LICENSE'
 
@@ -101,7 +100,7 @@ jobs:
           wheel="$(find dist -name '*.whl' -print -quit)"
           uvx --from "$wheel" oar init "$RUNNER_TEMP/profiles" \
             --model provider/model
-          for profile in code-reviewer slop-cop technical-writing-reviewer; do
+          for profile in code-reviewer technical-writing-reviewer; do
             uvx --from "$wheel" oar validate \
               "$RUNNER_TEMP/profiles/$profile"
           done

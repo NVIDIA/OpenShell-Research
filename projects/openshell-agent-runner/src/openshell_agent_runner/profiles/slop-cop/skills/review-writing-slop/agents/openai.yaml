@@ -1,4 +1,0 @@
-interface:
-  display_name: "Review Writing Slop"
-  short_description: "Find formulaic, vague, inflated, or generic prose"
-  default_prompt: "Review this document for concrete writing-slop patterns."

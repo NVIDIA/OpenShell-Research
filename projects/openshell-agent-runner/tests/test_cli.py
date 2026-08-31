@@ -18,10 +18,6 @@ TECHNICAL_WRITING_REVIEWER = (
     REPOSITORY
     / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/technical-writing-reviewer"
 )
-SLOP_COP = (
-    REPOSITORY
-    / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/slop-cop"
-)
 
 
 def test_root_help_exposes_only_supported_commands() -> None:
@@ -174,19 +170,6 @@ def test_run_help_describes_repository_input() -> None:
     assert "--prompt-var focus=VALUE" in result.stdout
     assert "--prompt-var context=VALUE" in result.stdout
     assert "Default: Review the complete repository." in result.stdout
-
-
-def test_run_help_describes_slop_cop() -> None:
-    result = CliRunner().invoke(
-        app,
-        ["run", str(SLOP_COP), "--task", "review-document", "--help"],
-    )
-
-    assert result.exit_code == 0
-    assert "slop-cop:review-document" in result.stdout
-    assert "material writing-slop patterns" in result.stdout
-    assert "--input DOCUMENT" in result.stdout
-    assert "JSON validated against schemas/review.json." in result.stdout
 
 
 def test_run_help_colors_selected_profile_task() -> None:

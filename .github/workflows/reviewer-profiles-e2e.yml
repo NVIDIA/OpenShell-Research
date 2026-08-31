@@ -87,7 +87,7 @@ jobs:
           uv run --project projects/openshell-agent-runner oar init \
             "$PROFILES_DIR" \
             --model "$REVIEW_MODEL"
-          for profile in code-reviewer technical-writing-reviewer slop-cop; do
+          for profile in code-reviewer technical-writing-reviewer; do
             uv run --project projects/openshell-agent-runner oar validate \
               "$PROFILES_DIR/$profile"
           done
@@ -111,15 +111,6 @@ jobs:
             --prompt-var focus="Check whether the installation steps are clear and actionable." \
             --prompt-var context="The audience is developers installing the library for the first time." \
             --output "$RESULTS_DIR/technical-writing-review.json"
-          uv run --project projects/openshell-agent-runner oar run \
-            "$PROFILES_DIR/slop-cop" \
-            --task review-document \
-            --gateway openshell \
-            --input projects/openshell-agent-runner/tests/fixtures/reviewer-e2e/prose-sample.md \
-            --prompt-var focus="Identify material formulaic or generic prose." \
-            --prompt-var context="This is a short release-process blog post for engineering teams." \
-            --output "$RESULTS_DIR/slop-cop-review.json"
-
       - name: Summarize results
         if: always()
         run: |

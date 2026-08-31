@@ -233,12 +233,12 @@ OpenShell treats a directory destination like `cp`: it creates the source
 directory beneath that destination. Uploads run in declaration order, so more
 than one source can intentionally merge into the same destination.
 
-OAR packages three focused reviewers. `code-reviewer` accepts a repository;
-`technical-writing-reviewer` and `slop-cop` accept a document. All return JSON
-validated against their profile-local result schema, including criterion scores
-and an overall score from 0 to 100, where 100 is best. The overall score is the
-rounded arithmetic mean of the profile's fixed criteria. Each profile skill
-defines its criteria, score bands, and verdict thresholds:
+OAR packages two focused reviewers. `code-reviewer` accepts a repository and
+`technical-writing-reviewer` accepts a document. Both return JSON validated
+against their profile-local result schema, including criterion scores and an
+overall score from 0 to 100, where 100 is best. The overall score is the rounded
+arithmetic mean of the profile's fixed criteria. Each profile skill defines its
+criteria, score bands, and verdict thresholds:
 
 ```bash
 oar run ./profiles/technical-writing-reviewer \
@@ -253,11 +253,6 @@ oar run ./profiles/code-reviewer \
   --prompt-var context="Pre-release security review" \
   --output ./repository-review.json
 
-oar run ./profiles/slop-cop \
-  --task review-document \
-  --input ./blog-post.md \
-  --prompt-var context="A first-person engineering blog post" \
-  --output ./slop-review.json
 ```
 
 Document tasks require a file and repository tasks require a directory. For a
