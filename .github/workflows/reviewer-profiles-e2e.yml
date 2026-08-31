@@ -1,6 +1,10 @@
 name: Reviewer profiles end to end
 
 "on":
+  pull_request:
+    paths:
+      - .github/workflows/reviewer-profiles-e2e.yml
+      - projects/openshell-agent-runner/**
   push:
     branches:
       - main
@@ -19,6 +23,9 @@ concurrency:
 jobs:
   reviewer-e2e:
     name: Run reviewer profiles through OAR
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 75
     env:
