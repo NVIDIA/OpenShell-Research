@@ -38,22 +38,24 @@ uvx --from openshell-agent-runner oar init ./profiles \
 uvx --from openshell-agent-runner oar doctor --gateway openshell
 ```
 
-Validate the included profile, then preview the run without creating a sandbox:
+Validate the included technical-writing profile, then preview the run without
+creating a sandbox:
 
 ```bash
 printf '# Review me\n\nA short document.\n' > document.md
-uvx --from openshell-agent-runner oar validate ./profiles/reviewer
+uvx --from openshell-agent-runner oar validate \
+  ./profiles/technical-writing-reviewer
 
-uvx --from openshell-agent-runner oar run ./profiles/reviewer \
+uvx --from openshell-agent-runner oar run ./profiles/technical-writing-reviewer \
   --task review-document \
   --gateway openshell \
   --input document.md \
-  --output /tmp/oar-review.md \
+  --output /tmp/oar-review.json \
   --dry-run
 ```
 
 Remove `--dry-run` to launch the agent. A successful run writes the review to
-`/tmp/oar-review.md`. Replace `provider/model` with the route's model ID and
+`/tmp/oar-review.json`. Replace `provider/model` with the route's model ID and
 `openshell` with your gateway name.
 
 `init` copies packaged profiles into an ordinary local directory so they can be
@@ -231,20 +233,26 @@ OpenShell treats a directory destination like `cp`: it creates the source
 directory beneath that destination. Uploads run in declaration order, so more
 than one source can intentionally merge into the same destination.
 
-The packaged reviewer uses task-specific required inputs:
+OAR packages two focused reviewers. `code-reviewer` accepts a repository and
+`technical-writing-reviewer` accepts a document. Both return JSON validated
+against their profile-local result schema, including criterion scores and an
+overall score from 0 to 100, where 100 is best. The overall score is the rounded
+arithmetic mean of the profile's fixed criteria. Each profile skill defines its
+criteria, score bands, and verdict thresholds:
 
 ```bash
-oar run ./profiles/reviewer \
+oar run ./profiles/technical-writing-reviewer \
   --task review-document \
   --input ./document.md \
-  --output ./document-review.md
+  --output ./document-review.json
 
-oar run ./profiles/reviewer \
+oar run ./profiles/code-reviewer \
   --task review-repository \
   --input ./repository \
   --prompt-var focus="src/auth and tests/auth" \
   --prompt-var context="Pre-release security review" \
-  --output ./repository-review.md
+  --output ./repository-review.json
+
 ```
 
 Document tasks require a file and repository tasks require a directory. For a

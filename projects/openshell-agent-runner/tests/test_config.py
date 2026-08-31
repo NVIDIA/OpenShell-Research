@@ -11,9 +11,8 @@ from openshell_agent_runner.errors import ConfigurationError
 
 REPOSITORY = Path(__file__).resolve().parents[3]
 PROFILE = REPOSITORY / ".github/openshell-agents/profiles/dev-note-reviewer"
-PACKAGED_PROFILE = (
-    REPOSITORY
-    / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/reviewer"
+PACKAGED_PROFILES = REPOSITORY / (
+    "projects/openshell-agent-runner/src/openshell_agent_runner/profiles"
 )
 
 
@@ -23,14 +22,30 @@ def test_repository_profile_validates() -> None:
     assert list(resolved.profile.tasks) == ["editorial", "technical"]
 
 
-def test_packaged_profile_validates() -> None:
-    resolved = load_profile(PACKAGED_PROFILE)
-    assert resolved.profile.id == "reviewer"
+@pytest.mark.parametrize(
+    ("profile_name", "task_id", "required_input", "skill_name"),
+    [
+        ("code-reviewer", "review-repository", "repository", "review-code"),
+        (
+            "technical-writing-reviewer",
+            "review-document",
+            "document",
+            "review-technical-writing",
+        ),
+    ],
+)
+def test_packaged_profiles_validate(
+    profile_name: str, task_id: str, required_input: str, skill_name: str
+) -> None:
+    resolved = load_profile(PACKAGED_PROFILES / profile_name)
+    assert resolved.profile.id == profile_name
     assert resolved.runtime.model == "MODEL_ID"
     assert resolved.runtime.thinking == "high"
-    assert list(resolved.profile.tasks) == ["review-document", "review-repository"]
-    assert resolved.profile.tasks["review-document"].required_input == "document"
-    assert resolved.profile.tasks["review-repository"].required_input == "repository"
+    assert list(resolved.profile.tasks) == [task_id]
+    task = resolved.profile.tasks[task_id]
+    assert task.required_input == required_input
+    assert task.output_schema == Path("schemas/review.json")
+    assert task.skills == [Path(f"skills/{skill_name}")]
 
 
 def test_unknown_required_input_is_rejected(tmp_path: Path) -> None:

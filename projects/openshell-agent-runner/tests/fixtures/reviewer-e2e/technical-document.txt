@@ -1,0 +1,13 @@
+Installing Totals
+
+Totals requires Python 3.12 or newer.
+
+Create an environment and install the project:
+
+    uv sync --locked
+
+Run the tests:
+
+    uv run pytest
+
+The installation is ready when the test command exits successfully.

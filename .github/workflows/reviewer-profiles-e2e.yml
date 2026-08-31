@@ -1,0 +1,282 @@
+name: Reviewer profiles end to end
+
+"on":
+  pull_request:
+    paths:
+      - .github/workflows/reviewer-profiles-e2e.yml
+      - projects/openshell-agent-runner/**
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/reviewer-profiles-e2e.yml
+      - projects/openshell-agent-runner/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: reviewer-profiles-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reviewer-e2e:
+    name: Run reviewer profiles through OAR
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      OPENAI_API_KEY: ${{ secrets.INFERENCE_API_KEY }}
+      OPENAI_BASE_URL: ${{ secrets.INFERENCE_BASE_URL }}
+      REVIEW_MODEL: ${{ secrets.MODEL_ID_TOP }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.5"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: projects/openshell-agent-runner/uv.lock
+
+      - name: Configure isolated paths
+        run: |
+          echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/reviewer-e2e-venv" >> "$GITHUB_ENV"
+          echo "RESULTS_DIR=$RUNNER_TEMP/reviewer-results" >> "$GITHUB_ENV"
+          echo "PROFILES_DIR=$RUNNER_TEMP/reviewer-profiles" >> "$GITHUB_ENV"
+
+      - name: Check inference configuration
+        run: |
+          test -n "$OPENAI_API_KEY"
+          test -n "$OPENAI_BASE_URL"
+          test -n "$REVIEW_MODEL"
+
+      - name: Install OAR dependencies
+        run: uv sync --project projects/openshell-agent-runner --locked
+
+      - name: Install OpenShell
+        run: |
+          curl -LsSf \
+            https://raw.githubusercontent.com/NVIDIA/OpenShell/v0.0.116/install.sh \
+            | OPENSHELL_VERSION=v0.0.116 sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Wait for the gateway
+        run: |
+          for attempt in {1..30}; do
+            if openshell status; then
+              exit 0
+            fi
+            sleep 2
+          done
+          openshell status
+
+      - name: Configure inference
+        run: |
+          openshell provider create \
+            --name reviewer-ci \
+            --type openai \
+            --credential OPENAI_API_KEY \
+            --config "OPENAI_BASE_URL=$OPENAI_BASE_URL"
+          openshell inference set \
+            --provider reviewer-ci \
+            --model "$REVIEW_MODEL"
+
+      - name: Initialize and validate reviewer profiles
+        run: |
+          uv run --project projects/openshell-agent-runner oar init \
+            "$PROFILES_DIR" \
+            --model "$REVIEW_MODEL"
+          for profile in code-reviewer technical-writing-reviewer; do
+            uv run --project projects/openshell-agent-runner oar validate \
+              "$PROFILES_DIR/$profile"
+          done
+
+      - name: Run reviewer profiles
+        run: |
+          mkdir -p "$RESULTS_DIR"
+          uv run --project projects/openshell-agent-runner oar run \
+            "$PROFILES_DIR/code-reviewer" \
+            --task review-repository \
+            --gateway openshell \
+            --input projects/openshell-agent-runner/tests/fixtures/reviewer-e2e/repository \
+            --prompt-var focus="Review the implementation and its documented contract." \
+            --prompt-var context="This is a deliberately small example library." \
+            --output "$RESULTS_DIR/code-review.json"
+          uv run --project projects/openshell-agent-runner oar run \
+            "$PROFILES_DIR/technical-writing-reviewer" \
+            --task review-document \
+            --gateway openshell \
+            --input projects/openshell-agent-runner/tests/fixtures/reviewer-e2e/technical-document.txt \
+            --prompt-var focus="Check whether the installation steps are clear and actionable." \
+            --prompt-var context="The audience is developers installing the library for the first time." \
+            --output "$RESULTS_DIR/technical-writing-review.json"
+      - name: Summarize results
+        if: always()
+        run: |
+          {
+            echo "## Reviewer profile results"
+            echo
+            echo "| Profile | Verdict | Score |"
+            echo "| --- | --- | ---: |"
+            for result in "$RESULTS_DIR"/*.json; do
+              if test -f "$result"; then
+                profile="$(basename "$result" .json)"
+                verdict="$(jq -r '.verdict' "$result")"
+                score="$(jq -r '.overall_score' "$result")"
+                echo "| $profile | $verdict | $score |"
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Add or update PR report
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v8
+        env:
+          RESULTS_DIR: ${{ runner.temp }}/reviewer-results
+        with:
+          script: |
+            const fs = require('node:fs');
+            const path = require('node:path');
+
+            const marker = '<!-- reviewer-profiles-e2e -->';
+            const profiles = [
+              { label: 'Code reviewer', file: 'code-review.json' },
+              { label: 'Technical writing reviewer', file: 'technical-writing-review.json' },
+            ].map((profile) => {
+              const resultPath = path.join(process.env.RESULTS_DIR, profile.file);
+              return {
+                ...profile,
+                result: fs.existsSync(resultPath)
+                  ? JSON.parse(fs.readFileSync(resultPath, 'utf8'))
+                  : null,
+              };
+            });
+            const complete = profiles.every(({ result }) => result !== null);
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
+              `/actions/runs/${context.runId}`;
+            const words = (value) => value.replaceAll('_', ' ')
+              .replace(/\b\w/g, (letter) => letter.toUpperCase());
+            const tableText = (value) => String(value).replaceAll('|', '\\|').replaceAll('\n', ' ');
+            const verdictIcon = {
+              pass: '✅',
+              needs_changes: '⚠️',
+              inconclusive: '❔',
+            };
+
+            const lines = [
+              marker,
+              '## Reviewer profile smoke test',
+              '',
+              complete
+                ? `✅ The full OAR pipeline completed successfully. [View workflow run](${runUrl}).`
+                : `❌ The workflow did not produce every expected result. [View workflow run](${runUrl}).`,
+              '',
+              '| Profile | Verdict | Score | Findings |',
+              '| --- | --- | ---: | ---: |',
+            ];
+            for (const { label, result } of profiles) {
+              if (result) {
+                const icon = verdictIcon[result.verdict] || '•';
+                lines.push(
+                  `| ${label} | ${icon} ${words(result.verdict)} | **${result.overall_score}/100** | ${result.findings.length} |`,
+                );
+              } else {
+                lines.push(`| ${label} | ❌ No result | — | — |`);
+              }
+            }
+
+            for (const { label, result } of profiles) {
+              if (!result) continue;
+              const icon = verdictIcon[result.verdict] || '•';
+              lines.push(
+                '',
+                '<details>',
+                `<summary><strong>${label}</strong> — ${result.overall_score}/100 · ${icon} ${words(result.verdict)}</summary>`,
+                '',
+                '### Summary',
+                '',
+                result.summary,
+                '',
+                '### Rubric',
+                '',
+                '| Criterion | Score | Rationale |',
+                '| --- | ---: | --- |',
+              );
+              for (const criterion of result.criterion_scores) {
+                lines.push(
+                  `| ${words(criterion.criterion)} | **${criterion.score}** | ${tableText(criterion.explanation)} |`,
+                );
+              }
+              lines.push('', '### Findings', '');
+              if (result.findings.length === 0) {
+                lines.push('No findings.');
+              } else {
+                for (const finding of result.findings) {
+                  const location = finding.path
+                    ? ` · \`${finding.path}${finding.line ? `:${finding.line}` : ''}\``
+                    : finding.line ? ` · line ${finding.line}` : '';
+                  lines.push(
+                    `- **${finding.severity.toUpperCase()} — ${finding.title}**${location}`,
+                    `  - ${finding.recommendation}`,
+                  );
+                }
+              }
+              if (result.strengths.length > 0) {
+                lines.push('', '### Strengths', '');
+                for (const strength of result.strengths) lines.push(`- ${strength}`);
+              }
+              lines.push('', '</details>');
+            }
+            lines.push(
+              '',
+              `Tested PR head \`${context.payload.pull_request.head.sha.slice(0, 7)}\`. ` +
+                `Full JSON results are available from the workflow run's artifacts.`,
+            );
+            const body = lines.join('\n');
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const existing = comments.find(
+              (comment) => comment.user?.type === 'Bot' && comment.body?.includes(marker),
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body,
+              });
+            }
+
+      - name: Upload reviewer results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: reviewer-profile-results
+          path: ${{ runner.temp }}/reviewer-results
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop the gateway
+        if: always()
+        run: systemctl --user stop openshell-gateway.service || true
