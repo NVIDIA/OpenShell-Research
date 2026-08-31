@@ -15,6 +15,7 @@ name: Reviewer profiles end to end
 
 permissions:
   contents: read
+  pull-requests: write
 
 concurrency:
   group: reviewer-profiles-e2e-${{ github.ref }}
@@ -136,6 +137,135 @@ jobs:
               fi
             done
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Add or update PR report
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v8
+        env:
+          RESULTS_DIR: ${{ runner.temp }}/reviewer-results
+        with:
+          script: |
+            const fs = require('node:fs');
+            const path = require('node:path');
+
+            const marker = '<!-- reviewer-profiles-e2e -->';
+            const profiles = [
+              { label: 'Code reviewer', file: 'code-review.json' },
+              { label: 'Technical writing reviewer', file: 'technical-writing-review.json' },
+            ].map((profile) => {
+              const resultPath = path.join(process.env.RESULTS_DIR, profile.file);
+              return {
+                ...profile,
+                result: fs.existsSync(resultPath)
+                  ? JSON.parse(fs.readFileSync(resultPath, 'utf8'))
+                  : null,
+              };
+            });
+            const complete = profiles.every(({ result }) => result !== null);
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
+              `/actions/runs/${context.runId}`;
+            const words = (value) => value.replaceAll('_', ' ')
+              .replace(/\b\w/g, (letter) => letter.toUpperCase());
+            const tableText = (value) => String(value).replaceAll('|', '\\|').replaceAll('\n', ' ');
+            const verdictIcon = {
+              pass: '✅',
+              needs_changes: '⚠️',
+              inconclusive: '❔',
+            };
+
+            const lines = [
+              marker,
+              '## Reviewer profile smoke test',
+              '',
+              complete
+                ? `✅ The full OAR pipeline completed successfully. [View workflow run](${runUrl}).`
+                : `❌ The workflow did not produce every expected result. [View workflow run](${runUrl}).`,
+              '',
+              '| Profile | Verdict | Score | Findings |',
+              '| --- | --- | ---: | ---: |',
+            ];
+            for (const { label, result } of profiles) {
+              if (result) {
+                const icon = verdictIcon[result.verdict] || '•';
+                lines.push(
+                  `| ${label} | ${icon} ${words(result.verdict)} | **${result.overall_score}/100** | ${result.findings.length} |`,
+                );
+              } else {
+                lines.push(`| ${label} | ❌ No result | — | — |`);
+              }
+            }
+
+            for (const { label, result } of profiles) {
+              if (!result) continue;
+              const icon = verdictIcon[result.verdict] || '•';
+              lines.push(
+                '',
+                '<details>',
+                `<summary><strong>${label}</strong> — ${result.overall_score}/100 · ${icon} ${words(result.verdict)}</summary>`,
+                '',
+                '### Summary',
+                '',
+                result.summary,
+                '',
+                '### Rubric',
+                '',
+                '| Criterion | Score | Rationale |',
+                '| --- | ---: | --- |',
+              );
+              for (const criterion of result.criterion_scores) {
+                lines.push(
+                  `| ${words(criterion.criterion)} | **${criterion.score}** | ${tableText(criterion.explanation)} |`,
+                );
+              }
+              lines.push('', '### Findings', '');
+              if (result.findings.length === 0) {
+                lines.push('No findings.');
+              } else {
+                for (const finding of result.findings) {
+                  const location = finding.path
+                    ? ` · \`${finding.path}${finding.line ? `:${finding.line}` : ''}\``
+                    : finding.line ? ` · line ${finding.line}` : '';
+                  lines.push(
+                    `- **${finding.severity.toUpperCase()} — ${finding.title}**${location}`,
+                    `  - ${finding.recommendation}`,
+                  );
+                }
+              }
+              if (result.strengths.length > 0) {
+                lines.push('', '### Strengths', '');
+                for (const strength of result.strengths) lines.push(`- ${strength}`);
+              }
+              lines.push('', '</details>');
+            }
+            lines.push(
+              '',
+              `Tested commit \`${context.sha.slice(0, 7)}\`. Full JSON results are available from the workflow run's artifacts.`,
+            );
+            const body = lines.join('\n');
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const existing = comments.find(
+              (comment) => comment.user?.type === 'Bot' && comment.body?.includes(marker),
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body,
+              });
+            }
 
       - name: Upload reviewer results
         if: always()
