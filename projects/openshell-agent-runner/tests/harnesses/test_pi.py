@@ -45,6 +45,7 @@ def test_pi_entrypoint_disables_automatic_resources() -> None:
     assert "agent_workdir=${REPOSITORY_ROOT:-/sandbox}" in script
     assert 'cd "$agent_workdir"' in script
     assert 'export OAR_MODEL_ID="$model_id"' in script
+    assert 'ln -s /usr/local/lib/node_modules "$payload/node_modules"' in script
     assert "REPOSITORY_ROOT is not a directory" in script
     assert '[[ ! "$model_id" =~ ^[A-Za-z0-9._:/-]{1,256}$ ]]' in script
     assert '"${arguments[$index]}" == "--model"' in script
