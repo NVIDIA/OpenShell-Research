@@ -5,6 +5,7 @@ name: Repository agents
     paths:
       - .pre-commit-config.yaml
       - .github/workflows/repository-agents.yml
+      - .github/workflows/reviewer-profiles-e2e.yml
       - .github/openshell-agents/**
       - projects/openshell-agent-runner/**
   push:
@@ -13,6 +14,7 @@ name: Repository agents
     paths:
       - .pre-commit-config.yaml
       - .github/workflows/repository-agents.yml
+      - .github/workflows/reviewer-profiles-e2e.yml
       - .github/openshell-agents/**
       - projects/openshell-agent-runner/**
   workflow_dispatch:
