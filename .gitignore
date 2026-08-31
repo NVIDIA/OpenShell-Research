@@ -48,6 +48,7 @@ temp/
 *.temp
 *.bak
 .scratch/
+plans/
 
 # Python
 __pycache__/

@@ -1,0 +1,93 @@
+[[benchmark]]
+name = "2026-07-13 initial draft"
+revision = "2b8ae6ef4b74a1eeafa767f9d9f0238af17bdcd5"
+path = "docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md"
+source_url = "https://github.com/NVIDIA/OpenShell-Research/blob/2b8ae6ef4b74a1eeafa767f9d9f0238af17bdcd5/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md"
+expected_decision = "fail"
+min_score = 70
+max_score = 79
+
+[[benchmark]]
+name = "2026-07-14 revised draft"
+revision = "808336e88d418e36364d57d6fda87e47e21dba82"
+path = "docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md"
+source_url = "https://github.com/NVIDIA/OpenShell-Research/blob/808336e88d418e36364d57d6fda87e47e21dba82/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md"
+expected_decision = "pass"
+min_score = 88
+max_score = 93
+
+[[benchmark]]
+name = "2026-07-16 revised draft"
+revision = "95a17f58c65df19166d92e70346cb7574ec84871"
+path = "docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md"
+source_url = "https://github.com/NVIDIA/OpenShell-Research/blob/95a17f58c65df19166d92e70346cb7574ec84871/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md"
+expected_decision = "pass"
+min_score = 84
+max_score = 91
+
+[[benchmark]]
+name = "2026-07-17 revised draft"
+revision = "be515c9c2684e1e3febec058f1a9e0e90da16a72"
+path = "docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md"
+source_url = "https://github.com/NVIDIA/OpenShell-Research/blob/be515c9c2684e1e3febec058f1a9e0e90da16a72/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md"
+expected_decision = "pass"
+min_score = 88
+max_score = 94
+
+[[benchmark]]
+name = "2026-07-18 revised draft"
+revision = "069696b0a28ffd0cd77e1e043a532f81b9cec3e2"
+path = "docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md"
+source_url = "https://github.com/NVIDIA/OpenShell-Research/blob/069696b0a28ffd0cd77e1e043a532f81b9cec3e2/docs/dev-notes/posts/2026-07-13-policy-controlling-reachy-mini-with-openshell.md"
+expected_decision = "pass"
+min_score = 94
+max_score = 100
+
+[[benchmark]]
+name = "2026-07-20 published draft"
+revision = "b0d481796b8a0492053c7b3cac0c65444a2e99be"
+path = "docs/dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell.md"
+source_url = "https://github.com/NVIDIA/OpenShell-Research/blob/b0d481796b8a0492053c7b3cac0c65444a2e99be/docs/dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell.md"
+expected_decision = "pass"
+min_score = 97
+max_score = 100
+
+[[benchmark]]
+name = "clean technical prose"
+path = "docs/dev-notes/posts/benchmark-clean.md"
+fixture_path = "dev-tools/slop-cop/benchmarks/fixtures/clean-technical.md"
+expected_decision = "pass"
+min_score = 100
+max_score = 100
+
+[[benchmark]]
+name = "legitimate contrast and citation"
+path = "docs/dev-notes/posts/benchmark-contrast.md"
+fixture_path = "dev-tools/slop-cop/benchmarks/fixtures/legitimate-contrast-and-citation.md"
+expected_decision = "pass"
+min_score = 100
+max_score = 100
+
+[[benchmark]]
+name = "normal technical structure"
+path = "docs/dev-notes/posts/benchmark-structure.md"
+fixture_path = "dev-tools/slop-cop/benchmarks/fixtures/normal-technical-structure.md"
+expected_decision = "pass"
+min_score = 100
+max_score = 100
+
+[[benchmark]]
+name = "dense multi-family prose"
+path = "docs/dev-notes/posts/benchmark-dense.md"
+fixture_path = "dev-tools/slop-cop/benchmarks/fixtures/dense-formulaic.md"
+expected_decision = "fail"
+min_score = 0
+max_score = 79
+
+[[benchmark]]
+name = "blocking assistant residue"
+path = "docs/dev-notes/posts/benchmark-blocking.md"
+fixture_path = "dev-tools/slop-cop/benchmarks/fixtures/blocking-residue.md"
+expected_decision = "fail"
+min_score = 0
+max_score = 0

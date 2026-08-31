@@ -1,0 +1,259 @@
+from __future__ import annotations
+
+import base64
+import json
+import re
+from pathlib import Path
+from typing import Any, cast
+
+import pytest
+
+from slop_cop.document import build_document
+from slop_cop.report import (
+    ReportError,
+    html_report,
+    json_report,
+    terminal_report,
+    write_report_directory,
+)
+
+
+def sample_result() -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "analysis_state": "complete",
+        "decision": "fail",
+        "score": 76,
+        "threshold": 80,
+        "base_sha": "b" * 40,
+        "head_sha": "a" * 40,
+        "tool_version": "0.1.0",
+        "config_digest": "d" * 64,
+        "files": [
+            {
+                "path": "docs/dev-notes/posts/example.md",
+                "analysis_state": "complete",
+                "decision": "fail",
+                "score": 76,
+                "threshold": 80,
+                "hard_fail": False,
+                "metrics": {
+                    "source_bytes": 61,
+                    "source_code_points": 61,
+                    "analyzable_words": 40,
+                    "analyzable_sentences": 1,
+                    "analyzable_paragraphs": 1,
+                    "masked_code_points": 5,
+                },
+                "category_costs": [
+                    {
+                        "category": "rhetoric",
+                        "rule_cost": 24,
+                        "density": None,
+                        "cap": 24,
+                        "charged_cost": 24,
+                    }
+                ],
+                "rule_costs": [
+                    {
+                        "rule_id": "rhetoric.not-just",
+                        "deduplicated_units": 2,
+                        "allowance": 1,
+                        "document_excess": 1,
+                        "base_cost": 2,
+                        "density": {
+                            "unit": "paragraph",
+                            "window": 3,
+                            "allowed_units": 1,
+                            "peak_units": 2,
+                            "peak_excess": 1,
+                            "cost": 3,
+                            "window_span": {"start": 0, "end": 61},
+                        },
+                        "cap": 5,
+                        "charged_cost": 5,
+                    }
+                ],
+                "findings": [
+                    {
+                        "rule_id": "rhetoric.not-just",
+                        "category": "rhetoric",
+                        "severity": "warning",
+                        "source_path": "docs/dev-notes/posts/example.md",
+                        "span": {"start": 41, "end": 49},
+                        "line": 1,
+                        "column": 40,
+                        "excerpt": "<img src=x onerror=alert(1)>",
+                        "normalized_key": "not just",
+                        "score_group": "not-but",
+                        "explanation": "Formulaic contrast.",
+                        "advice": "State the concrete distinction.",
+                        "units": 1,
+                    }
+                ],
+                "errors": [],
+                "suppressions": [],
+                "base": {
+                    "score": 83,
+                    "delta": -7,
+                    "analysis_state": "complete",
+                    "findings": {"added": [], "removed": [], "persistent": []},
+                    "errors": [],
+                },
+            }
+        ],
+        "rule_errors": [],
+        "external_audits": [
+            {
+                "rule_id": "custom.judge",
+                "rule_version": 1,
+                "service": "judge.example",
+                "endpoint_hostname": "judge.example",
+                "content_digest": "c" * 64,
+                "request_schema_version": "1",
+                "judge_revision": "v1",
+                "attempts": 1,
+                "latency_ms": 42,
+                "outcome": "success",
+                "response_digest": "e" * 64,
+            }
+        ],
+    }
+
+
+def test_json_report_is_stable_and_versioned() -> None:
+    rendered = json_report(sample_result())
+    assert rendered.endswith("\n")
+    assert json.loads(rendered)["schema_version"] == 1
+    assert rendered.index('"analysis_state"') < rendered.index('"decision"')
+
+
+def test_terminal_report_includes_decision_score_density_and_location() -> None:
+    rendered = terminal_report(sample_result())
+    assert "Slop Cop: FAIL  score=76  threshold=80" in rendered
+    assert "delta=-7" in rendered
+    assert "category rhetoric: -24 points" in rendered
+    assert "docs/dev-notes/posts/example.md:1:40 [rhetoric.not-just]" in rendered
+
+
+def test_html_report_is_self_contained_and_escapes_all_result_text() -> None:
+    source = "A <script>alert(1)</script> note that is not just vague."
+    rendered = html_report(sample_result(), sources={"docs/dev-notes/posts/example.md": source})
+    assert "Content-Security-Policy" in rendered
+    assert "default-src &#x27;none&#x27;" in rendered
+    assert "<script>alert(1)</script>" not in rendered
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in rendered
+    assert "<img src=x onerror=alert(1)>" not in rendered
+    fallback = html_report(sample_result())
+    assert "&lt;img src=x onerror=alert(1)&gt;" in fallback
+    assert "https://" not in rendered
+    assert "External rule audit" in rendered
+    assert "Passage density" in rendered
+    assert "<mark>not just</mark>" in rendered
+    assert "note that is <mark>not just</mark> vague." in rendered
+    assert "chargeable signal" not in rendered
+
+
+def test_html_finding_context_uses_the_analyzed_projection() -> None:
+    source = (
+        '<img\n alt="Not just meaningful alt text"\n src="chart.png">\n'
+        "Direct prose is not just vague."
+    )
+    document = build_document("docs/dev-notes/posts/example.md", source)
+    result = sample_result()
+    file_result = cast(list[dict[str, Any]], result["files"])[0]
+    finding = cast(list[dict[str, Any]], file_result["findings"])[0]
+    start = source.index("not just vague")
+    finding["span"] = {"start": start, "end": start + len("not just")}
+
+    rendered = html_report(
+        result,
+        sources={document.path: document.source},
+        projections={document.path: document.prose_projection},
+    )
+
+    context = re.search(r'<blockquote class="context">(.*?)</blockquote>', rendered)
+    assert context is not None
+    assert "meaningful alt text" not in context.group(1)
+    assert "Direct prose is <mark>not just</mark> vague." in context.group(1)
+
+
+def test_html_report_embeds_the_logo() -> None:
+    rendered = html_report(sample_result())
+    match = re.search(r'<img class="report-logo" src="data:image/png;base64,([^"]+)"', rendered)
+    assert match is not None
+    logo = base64.b64decode(match.group(1), validate=True)
+    assert logo.startswith(b"\x89PNG\r\n\x1a\n")
+    assert len(logo) > 1_000_000
+
+
+def test_html_report_separates_allowed_signals_from_score_deductions() -> None:
+    result = sample_result()
+    file_result = cast(list[dict[str, Any]], result["files"])[0]
+    file_result["score"] = 100
+    file_result["decision"] = "pass"
+    rule_cost = cast(list[dict[str, Any]], file_result["rule_costs"])[0]
+    rule_cost["charged_cost"] = 0
+    rule_cost["base_cost"] = 0
+    density = cast(dict[str, Any], rule_cost["density"])
+    density["cost"] = 0
+    density["peak_excess"] = 0
+    cast(list[dict[str, Any]], file_result["category_costs"])[0]["charged_cost"] = 0
+    result["score"] = 100
+    result["decision"] = "pass"
+    source = "A <script>alert(1)</script> note that is not just vague."
+
+    rendered = html_report(result, sources={"docs/dev-notes/posts/example.md": source})
+
+    assert "Score deductions</h3><p>None." in rendered
+    assert "Unscored signals (1 across 1 rules; no score effect)" in rendered
+    assert "Within allowance" in rendered
+    assert "No findings affect the score." in rendered
+    terminal = terminal_report(result)
+    assert "unscored signals: within_allowance=1 advisory=0 suppressed=0" in terminal
+    assert "[rhetoric.not-just]" not in terminal
+
+
+def test_report_directory_contains_canonical_pair(tmp_path: Path) -> None:
+    html_path, json_path = write_report_directory(sample_result(), tmp_path / "artifact")
+    assert html_path.name == "index.html"
+    assert json_path.name == "report.json"
+    assert json.loads(json_path.read_text())["decision"] == "fail"
+
+
+def test_html_size_limit_is_enforced(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("slop_cop.report.MAX_HTML_BYTES", 100)
+    with pytest.raises(ReportError, match="exceeds"):
+        html_report(sample_result())
+
+
+def test_incomplete_analysis_cannot_be_overridden() -> None:
+    result = sample_result()
+    result["analysis_state"] = "incomplete"
+    result["decision"] = "overridden"
+    result["override"] = {
+        "reviewer": "maintainer",
+        "reason": "Reviewed manually",
+        "review_id": 1,
+        "review_url": "https://github.com/example/repository/pull/1#pullrequestreview-1",
+        "head_sha": "a" * 40,
+    }
+
+    with pytest.raises(ReportError, match="overrides require complete analysis"):
+        html_report(result)
+
+
+def test_not_applicable_has_no_synthetic_score() -> None:
+    result = {
+        "schema_version": 1,
+        "analysis_state": "not_applicable",
+        "decision": "not_applicable",
+        "score": None,
+        "threshold": 80,
+        "tool_version": "0.1.0",
+        "config_digest": "d" * 64,
+        "files": [],
+    }
+    rendered = html_report(result)
+    assert "No changed Dev Note required analysis." in rendered
+    assert "Score</dt><dd>—" in rendered

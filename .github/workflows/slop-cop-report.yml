@@ -1,0 +1,302 @@
+name: Slop Cop report
+
+"on":
+  workflow_run:
+    workflows: [Slop Cop]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: slop-cop-report-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: true
+
+jobs:
+  comment:
+    name: Publish Slop Cop report
+    if: >-
+      github.event.workflow_run.event == 'pull_request' ||
+      github.event.workflow_run.event == 'pull_request_review'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve trusted artifact
+        id: artifact
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const { data: trustedWorkflow } = await github.rest.actions.getWorkflow({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: '.github/workflows/slop-cop.yml',
+            });
+            if (run.workflow_id !== trustedWorkflow.id || run.path !== trustedWorkflow.path) {
+              core.setFailed('Workflow run did not originate from the authoritative Slop Cop workflow.');
+              return;
+            }
+            const { data } = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: run.id,
+              per_page: 100,
+            });
+            const matches = data.artifacts.flatMap((artifact) => {
+              const match = artifact.name.match(/^slop-cop-pr-([1-9][0-9]*)-([0-9a-f]{40})$/);
+              return match ? [{artifact, number: Number(match[1]), head: match[2]}] : [];
+            });
+            if (matches.length !== 1) {
+              core.setFailed(`Expected one Slop Cop PR artifact, found ${matches.length}.`);
+              return;
+            }
+            const selected = matches[0];
+            if (selected.artifact.size_in_bytes > 11 * 1024 * 1024) {
+              core.setFailed('Slop Cop artifact exceeds its size limit.');
+              return;
+            }
+            const { data: pullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: selected.number,
+            });
+            if (run.pull_requests.length !== 1 || run.pull_requests[0].number !== selected.number) {
+              core.setFailed('Artifact PR is not the workflow run pull request.');
+              return;
+            }
+            if (selected.head !== pullRequest.head.sha) {
+              core.notice('Ignoring a stale Slop Cop run.');
+              core.setOutput('stale', 'true');
+              return;
+            }
+            core.setOutput('name', selected.artifact.name);
+            core.setOutput('id', String(selected.artifact.id));
+            core.setOutput('number', String(selected.number));
+            core.setOutput('head_sha', pullRequest.head.sha);
+            core.setOutput('stale', 'false');
+
+      - name: Download report artifact
+        if: steps.artifact.outputs.stale == 'false'
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: report
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Validate report and update sticky comment
+        if: steps.artifact.outputs.stale == 'false'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          ARTIFACT_ID: ${{ steps.artifact.outputs.id }}
+          HEAD_SHA: ${{ steps.artifact.outputs.head_sha }}
+          PR_NUMBER: ${{ steps.artifact.outputs.number }}
+          REPORT_JSON: report/report.json
+        with:
+          script: |
+            const fs = require('fs');
+            const raw = fs.readFileSync(process.env.REPORT_JSON, 'utf8');
+            if (Buffer.byteLength(raw, 'utf8') > 5 * 1024 * 1024) {
+              core.setFailed('report.json exceeds its size limit.');
+              return;
+            }
+            const report = JSON.parse(raw);
+            const number = Number(process.env.PR_NUMBER);
+            const run = context.payload.workflow_run;
+            const headSha = process.env.HEAD_SHA;
+            const { data: currentPullRequest } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: number,
+            });
+            if (currentPullRequest.head.sha !== headSha) {
+              core.notice('Ignoring a Slop Cop report superseded by a newer revision.');
+              return;
+            }
+            const controls = /[\u0000-\u001f\u007f-\u009f]/u;
+            const plainObject = (value, label) => {
+              if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+                throw new Error(`Invalid ${label}.`);
+              }
+              return value;
+            };
+            const text = (value, label, limit = 1000, pattern = null) => {
+              if (typeof value !== 'string' || value.length < 1 || value.length > limit ||
+                  controls.test(value) || (pattern && !pattern.test(value))) {
+                throw new Error(`Invalid ${label}.`);
+              }
+              return value;
+            };
+            const integer = (value, label, minimum, maximum) => {
+              if (!Number.isInteger(value) || value < minimum || value > maximum) {
+                throw new Error(`Invalid ${label}.`);
+              }
+              return value;
+            };
+            const optionalScore = (value, label) => value === null
+              ? null : integer(value, label, 0, 100);
+            const bool = (value, label) => {
+              if (typeof value !== 'boolean') throw new Error(`Invalid ${label}.`);
+              return value;
+            };
+            const markdown = (value, label, limit = 1000) => text(value, label, limit)
+              .replaceAll('\\', '\\\\').replaceAll('`', '\\`')
+              .replaceAll('*', '\\*').replaceAll('_', '\\_')
+              .replaceAll('[', '\\[').replaceAll(']', '\\]')
+              .replaceAll('(', '\\(').replaceAll(')', '\\)')
+              .replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+              .replaceAll('|', '\\|').replaceAll('@', '&#64;');
+            plainObject(report, 'report');
+            if (report.schema_version !== 1 || report.pull_request_number !== number ||
+                report.head_sha !== headSha) throw new Error('Report identity is invalid.');
+            text(report.head_sha, 'head SHA', 40, /^[0-9a-f]{40}$/);
+            text(report.base_sha, 'base SHA', 40, /^[0-9a-f]{40}$/);
+            if (!['complete', 'incomplete', 'error', 'not_applicable'].includes(report.analysis_state) ||
+                !['pass', 'fail', 'overridden', 'not_applicable'].includes(report.decision)) {
+              throw new Error('Report state is invalid.');
+            }
+            integer(report.threshold, 'threshold', 0, 100);
+            optionalScore(report.score, 'score');
+            if (!Array.isArray(report.files) || report.files.length > 100 ||
+                !Array.isArray(report.rule_errors) || report.rule_errors.length > 20000 ||
+                !Array.isArray(report.external_audits) || report.external_audits.length > 20000) {
+              throw new Error('Report collection is invalid.');
+            }
+            let findingCount = 0;
+            for (const file of report.files) {
+              plainObject(file, 'file result');
+              text(file.path, 'file path', 4096,
+                /^docs\/dev-notes\/posts\/[A-Za-z0-9][A-Za-z0-9._/-]*\.md$/);
+              if (file.path.includes('..') || file.path.includes('//')) throw new Error('Invalid path.');
+              if (!['complete', 'incomplete', 'error'].includes(file.analysis_state) ||
+                  !['pass', 'fail'].includes(file.decision)) {
+                throw new Error('File result state is invalid.');
+              }
+              optionalScore(file.score, 'file score');
+              if (file.base !== null) {
+                plainObject(file.base, 'base comparison');
+                optionalScore(file.base.score, 'base score');
+              }
+              if (!Array.isArray(file.findings)) throw new Error('Report findings are invalid.');
+              findingCount += file.findings.length;
+              for (const finding of file.findings) {
+                plainObject(finding, 'finding');
+                text(finding.rule_id, 'rule ID', 128,
+                  /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$/);
+                if (finding.line !== null) integer(finding.line, 'finding line', 1, 10000000);
+                if (finding.column !== null) integer(finding.column, 'finding column', 1, 10000000);
+                bool(finding.suppressed, 'suppressed state');
+                bool(finding.blocking, 'blocking state');
+                bool(finding.chargeable, 'chargeable state');
+              }
+            }
+            if (findingCount > 20000) throw new Error('Report has too many findings.');
+            if (report.decision === 'not_applicable') {
+              if (report.analysis_state !== 'not_applicable' || report.score !== null ||
+                  report.files.length !== 0) {
+                throw new Error('Not-applicable report fields disagree.');
+              }
+            } else if (report.files.length === 0 || report.score === null) {
+              throw new Error('Applicable report is missing scored files.');
+            }
+
+            if ((report.decision === 'overridden') !== (report.override !== null)) {
+              throw new Error('Override decision and metadata disagree.');
+            }
+            if (report.override !== null) {
+              if (report.analysis_state !== 'complete' ||
+                  !report.files.some((file) => file.decision === 'fail')) {
+                throw new Error('Override requires a completed policy failure.');
+              }
+              const override = plainObject(report.override, 'override');
+              const reviewer = text(override.reviewer, 'override reviewer', 256,
+                /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/);
+              const reason = text(override.reason, 'override reason', 1000);
+              const reviewId = integer(override.review_id, 'override review ID', 1, Number.MAX_SAFE_INTEGER);
+              const reviewUrl = text(override.review_url, 'override review URL', 2048,
+                /^https:\/\/github\.com\//);
+              if (override.head_sha !== headSha) throw new Error('Override is stale.');
+              const { data: review } = await github.rest.pulls.getReview({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: number,
+                review_id: reviewId,
+              });
+              const marker = String(review.body || '').match(/^Slop-Cop-Override:\s*(\S.*)$/mi);
+              if (review.state !== 'APPROVED' || review.commit_id !== headSha ||
+                  review.user?.login !== reviewer || review.html_url !== reviewUrl ||
+                  !marker || marker[1].trim() !== reason) {
+                throw new Error('Override review is invalid or stale.');
+              }
+              const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                username: reviewer,
+              });
+              if (!['write', 'maintain', 'admin'].includes(permission.permission)) {
+                throw new Error('Override reviewer is not currently authorized.');
+              }
+            }
+
+            const marker = '<!-- slop-cop-report -->';
+            const shortSha = headSha.slice(0, 7);
+            const displayScore = (value) => value === null ? '—' : String(value);
+            let body;
+            if (report.decision === 'not_applicable') {
+              body = `${marker}\n### Slop Cop\n\nNo Dev Note required analysis for \`${shortSha}\`.`;
+            } else {
+              const rows = report.files.map((file) =>
+                `| ${markdown(file.path, 'file path', 4096)} | ${displayScore(file.score)} | ` +
+                `${displayScore(file.base?.score ?? null)} |`);
+              const findings = report.files.flatMap((file) => {
+                const chargedRuleIds = new Set((file.rule_costs || [])
+                  .filter((cost) => Number(cost.charged_cost) > 0)
+                  .map((cost) => cost.rule_id));
+                return (file.findings || [])
+                  .filter((finding) => !finding.suppressed &&
+                    (finding.blocking || (finding.chargeable && chargedRuleIds.has(finding.rule_id))))
+                  .map((finding) => ({file, finding}));
+              }).slice(0, 5);
+              const top = findings.length
+                ? '\n\nTop findings:\n' + findings.map(({file, finding}) =>
+                    `- \`${markdown(finding.rule_id, 'rule ID', 128)}\` at ` +
+                    `${markdown(file.path, 'file path', 4096)}:${String(finding.line ?? 1)}`)
+                    .join('\n')
+                : '';
+              const override = report.override
+                ? `\n\nOverride by **${markdown(report.override.reviewer, 'reviewer', 256)}**: ` +
+                  markdown(report.override.reason, 'override reason')
+                : '';
+              const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${run.id}/artifacts/${process.env.ARTIFACT_ID}`;
+              body = `${marker}\n### Slop Cop: ${report.decision.toUpperCase()}\n\n` +
+                `Score **${displayScore(report.score)}**, threshold **${String(report.threshold)}**.\n\n` +
+                '| Dev Note | Head | Base |\n| --- | ---: | ---: |\n' + rows.join('\n') + top + override +
+                `\n\n[Download the HTML report artifact](${artifactUrl}). Built from \`${shortSha}\`; retained for 14 days.`;
+            }
+            if (body.length > 60000) throw new Error('Comment exceeds its size limit.');
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) =>
+              comment.user?.type === 'Bot' && comment.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else if (report.decision !== 'not_applicable') {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: number,
+                body,
+              });
+            }
