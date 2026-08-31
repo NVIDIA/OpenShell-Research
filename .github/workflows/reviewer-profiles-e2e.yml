@@ -239,7 +239,8 @@ jobs:
             }
             lines.push(
               '',
-              `Tested commit \`${context.sha.slice(0, 7)}\`. Full JSON results are available from the workflow run's artifacts.`,
+              `Tested PR head \`${context.payload.pull_request.head.sha.slice(0, 7)}\`. ` +
+                `Full JSON results are available from the workflow run's artifacts.`,
             );
             const body = lines.join('\n');
             const comments = await github.paginate(github.rest.issues.listComments, {
