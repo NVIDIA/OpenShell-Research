@@ -182,6 +182,6 @@ Run a focused test with `make test PYTEST_ARGS="tests/test_config.py"`. Use
 [RELEASING.md](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-agent-runner/RELEASING.md)
 for the local PyPI release process.
 
-The repeatable [reviewer profile QA suite](qa/reviewer_profiles/README.md)
-exercises clean, defective, focused, adversarial, Markdown, and plain-text inputs
-through the real CLI and produces a standalone HTML report.
+The `Reviewer profiles end to end` workflow starts an ephemeral OpenShell
+gateway and runs each packaged reviewer directly through the OAR CLI against a
+representative repository or document input.
