@@ -32,8 +32,6 @@ jobs:
       OPENAI_API_KEY: ${{ secrets.INFERENCE_API_KEY }}
       OPENAI_BASE_URL: ${{ secrets.INFERENCE_BASE_URL }}
       REVIEW_MODEL: ${{ secrets.MODEL_ID_TOP }}
-      RESULTS_DIR: ${{ runner.temp }}/reviewer-results
-      PROFILES_DIR: ${{ runner.temp }}/reviewer-profiles
 
     steps:
       - name: Checkout
@@ -49,8 +47,11 @@ jobs:
           enable-cache: true
           cache-dependency-glob: projects/openshell-agent-runner/uv.lock
 
-      - name: Configure isolated uv environment
-        run: echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/reviewer-e2e-venv" >> "$GITHUB_ENV"
+      - name: Configure isolated paths
+        run: |
+          echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/reviewer-e2e-venv" >> "$GITHUB_ENV"
+          echo "RESULTS_DIR=$RUNNER_TEMP/reviewer-results" >> "$GITHUB_ENV"
+          echo "PROFILES_DIR=$RUNNER_TEMP/reviewer-profiles" >> "$GITHUB_ENV"
 
       - name: Check inference configuration
         run: |
