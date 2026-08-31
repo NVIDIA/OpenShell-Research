@@ -26,7 +26,6 @@ def test_repository_profile_validates() -> None:
     ("profile_name", "task_id", "required_input", "skill_name"),
     [
         ("code-reviewer", "review-repository", "repository", "review-code"),
-        ("slop-cop", "review-document", "document", "review-writing-slop"),
         (
             "technical-writing-reviewer",
             "review-document",

@@ -120,7 +120,6 @@ def test_schema_task_receives_generic_submission_protocol() -> None:
 def test_packaged_review_tasks_stage_schema_skill_and_render_prompt() -> None:
     profiles = (
         ("code-reviewer", "review-repository", "repository", "review-code"),
-        ("slop-cop", "review-document", "document.txt", "review-writing-slop"),
         (
             "technical-writing-reviewer",
             "review-document",
@@ -257,7 +256,6 @@ def test_supplied_policies_allow_no_ordinary_network_egress() -> None:
             / "policy.yaml"
             for profile_name in (
                 "code-reviewer",
-                "slop-cop",
                 "technical-writing-reviewer",
             )
         ),

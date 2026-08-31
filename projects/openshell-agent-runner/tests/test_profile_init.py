@@ -69,12 +69,14 @@ def test_thinking_off_disables_model_reasoning(tmp_path: Path) -> None:
 
     initialize_profiles(
         destination,
-        ("slop-cop",),
+        ("technical-writing-reviewer",),
         "provider/model",
         ThinkingLevel.OFF,
     )
 
-    models = json.loads((destination / "slop-cop/models.json").read_text())
+    models = json.loads(
+        (destination / "technical-writing-reviewer/models.json").read_text()
+    )
     assert models["providers"]["openshell"]["models"][0]["reasoning"] is False
 
 

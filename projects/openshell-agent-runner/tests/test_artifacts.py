@@ -208,53 +208,6 @@ def test_dev_note_schema_requires_each_editorial_criterion_in_order(
                 "limitations": [],
             },
         ),
-        (
-            "slop-cop",
-            {
-                "verdict": "polish",
-                "summary": "One formulaic opening.",
-                "criterion_scores": [
-                    {
-                        "criterion": "substance_directness",
-                        "score": 74,
-                        "explanation": "One opener delays its useful claim.",
-                    },
-                    {
-                        "criterion": "specificity",
-                        "score": 84,
-                        "explanation": "Claims are generally concrete.",
-                    },
-                    {
-                        "criterion": "structural_naturalness",
-                        "score": 82,
-                        "explanation": "The broader structure serves the content.",
-                    },
-                    {
-                        "criterion": "rhythm_style",
-                        "score": 80,
-                        "explanation": "The prose is readable outside the opening.",
-                    },
-                    {
-                        "criterion": "distinctive_voice",
-                        "score": 80,
-                        "explanation": "The document mostly retains a clear voice.",
-                    },
-                ],
-                "overall_score": 80,
-                "findings": [
-                    {
-                        "prevalence": "isolated",
-                        "category": "formulaic_structure",
-                        "quote": "It is important to note that the API is stable.",
-                        "line": 3,
-                        "effect": "The opener delays the useful claim.",
-                        "suggested_rewrite": "The API is stable.",
-                    }
-                ],
-                "voice_to_preserve": [],
-                "limitations": [],
-            },
-        ),
     ],
 )
 def test_packaged_profile_schemas_accept_expected_results(
@@ -277,13 +230,12 @@ def test_packaged_profile_schemas_accept_expected_results(
         validate_artifact(source, schema)
 
     first_score["score"] = original_score
-    if profile_name != "slop-cop":
-        original_verdict = result["verdict"]
-        result["verdict"] = "findings"
-        source.write_text(json.dumps(result))
-        with pytest.raises(ArtifactError, match="output schema validation"):
-            validate_artifact(source, schema)
-        result["verdict"] = original_verdict
+    original_verdict = result["verdict"]
+    result["verdict"] = "findings"
+    source.write_text(json.dumps(result))
+    with pytest.raises(ArtifactError, match="output schema validation"):
+        validate_artifact(source, schema)
+    result["verdict"] = original_verdict
 
     result["unexpected"] = True
     source.write_text(json.dumps(result))

@@ -57,13 +57,12 @@ OpenShell policy, and the prompts or other files referenced by its tasks. The
 profile owns stable behavior and permissions; the CLI supplies values that vary
 for each run, such as the task, inputs, output path, gateway, and workspace.
 
-OAR packages three focused review profiles:
+OAR packages two focused review profiles:
 
 | Profile | Input | Purpose |
 | --- | --- | --- |
 | `code-reviewer` | Repository directory | Find concrete engineering issues without scope creep or speculative hardening. |
 | `technical-writing-reviewer` | Document file | Review technical accuracy, clarity, completeness, and reader utility. |
-| `slop-cop` | Document file | Find material formulaic, vague, inflated, or generic prose without making AI-authorship claims. |
 
 Each reviewer returns criterion scores and an overall score from 0 to 100, where
 100 is best. The overall score is the rounded arithmetic mean of the profile's
