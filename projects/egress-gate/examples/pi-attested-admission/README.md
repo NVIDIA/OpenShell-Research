@@ -185,9 +185,8 @@ the run.
 ## How it works
 
 1. The forked `pi` entrypoint sees `PI_OPENSHELL_CONTEXT_ADMISSION=1` and installs
-   its built-in mandatory `ContextAdmission` boundary. The launch command uses
-   Pi's standard `--no-extensions` option, so project or user extensions cannot
-   replace this boundary.
+   its built-in mandatory `ContextAdmission` boundary. Pi otherwise starts
+   normally, including its standard project and user extension discovery.
 2. Pi calls that boundary for each rendered user message and finalized tool
    result before it queues, appends, or persists the value.
 3. The adapter sends the exact context addition to OpenShell's sandbox-local

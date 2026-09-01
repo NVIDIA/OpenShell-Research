@@ -451,7 +451,7 @@ launch() {
 		PI_OFFLINE=1 \
 		PI_OPENSHELL_CONTEXT_ADMISSION=1 \
 		OPENSHELL_AGENT_CONVERSATION_URL=http://127.0.0.1:8193/v1/agent/conversation \
-		/sandbox/pi-runtime/node_modules/.bin/pi --no-extensions
+		/sandbox/pi-runtime/node_modules/.bin/pi
 }
 
 cleanup() {
