@@ -1,0 +1,5 @@
+{
+  "defaultProvider": "attested-provider",
+  "defaultModel": "azure/anthropic/claude-opus-5",
+  "defaultThinkingLevel": "high"
+}

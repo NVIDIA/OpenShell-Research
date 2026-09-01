@@ -29,16 +29,15 @@ if [[ $models_path_value == /* || $models_path_value == YOUR_MODELS_PATH ]]; the
 else
 	models_path=$script_dir/${models_path_value#./}
 fi
-model_provider=MODEL_PROVIDER_FROM_CONFIG
-model_id=FIRST_MODEL_FROM_CONFIG
 pack_dir=${PI_EGRESS_PACK_DIR:-/tmp/pi-egress-pack}
 runtime_dir=${PI_EGRESS_RUNTIME_DIR:-/tmp/pi-egress-runtime}
 openshell_cli=$openshell_repo/scripts/bin/openshell
 gateway_name=${PI_EGRESS_GATEWAY_NAME:-pi-egress-demo-gateway}
-runtime_policy=$runtime_dir/policy.yaml
-runtime_provider_profile=$runtime_dir/provider-profile.yaml
+runtime_policy=$script_dir/policy.yaml
+runtime_provider_profile=$script_dir/provider-profile.yaml
 runtime_gateway_fragment=$runtime_dir/gateway-middleware.toml
-runtime_model_selection=$runtime_dir/model-selection.json
+gateway_fragment_template=$script_dir/gateway-middleware.toml.example
+pi_settings=$script_dir/settings.json
 z3_library_path_override=${Z3_LIBRARY_PATH_OVERRIDE:-}
 
 bold=""
@@ -302,26 +301,17 @@ pi_package_tarball() {
 	printf '%s/%s-%s.tgz' "$pack_dir" "$archive_name" "$version"
 }
 
-render_runtime_configuration() {
-	run_in "$script_dir" mkdir -p "$runtime_dir"
-	run_in "$script_dir" node render-runtime-config.mjs \
-		--models-path "$models_path" \
-		--policy-output "$runtime_policy" \
-		--provider-profile-output "$runtime_provider_profile" \
-		--middleware-endpoint "http://$host_ip:50051" \
-		--gateway-output "$runtime_gateway_fragment" \
-		--selection-output "$runtime_model_selection"
-}
-
-load_model_selection() {
+prepare_gateway_configuration() {
 	if $print_only; then
+		describe_printed_commands "Write the one host-specific gateway setting:"
+		printf '  %bsource%b: %s\n' "$cyan" "$reset" "$gateway_fragment_template"
+		printf '  %boutput%b: %s\n' "$green" "$reset" "$runtime_gateway_fragment"
+		printf '  Replace YOUR_HOST_IPV4 with %s.\n' "$host_ip"
 		return
 	fi
-	require_file "$runtime_model_selection" "generated model selection"
-	model_provider=$(node -p "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).providerId" \
-		"$runtime_model_selection")
-	model_id=$(node -p "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).modelId" \
-		"$runtime_model_selection")
+	require_file "$gateway_fragment_template" "gateway middleware configuration template"
+	mkdir -p "$runtime_dir"
+	sed "s/YOUR_HOST_IPV4/$host_ip/" "$gateway_fragment_template" >"$runtime_gateway_fragment"
 }
 
 prepare() {
@@ -341,8 +331,6 @@ prepare() {
 	run_in "$pi_repo" npm pack --workspace @earendil-works/pi-agent-core --pack-destination "$pack_dir"
 	run_in "$pi_repo" npm pack --workspace @earendil-works/pi-coding-agent --pack-destination "$pack_dir"
 	run_in "$pi_repo" npm install --prefix "$runtime_dir" --ignore-scripts "$agent_tarball" "$coding_agent_tarball"
-	describe_printed_commands "Generate the endpoint policy from the Pi model configuration:"
-	render_runtime_configuration
 }
 
 serve() {
@@ -360,8 +348,7 @@ gateway() {
 		require_directory "$openshell_repo" "OpenShell checkout"
 		require_branch "$openshell_repo" "$openshell_branch"
 	fi
-	describe_printed_commands "Refresh the gateway middleware registration fragment:"
-	render_runtime_configuration
+	prepare_gateway_configuration
 	# A custom checkout may be nested below this uv project. Keep OpenShell's
 	# mise-pinned uv from inheriting Egress Gate's uv configuration.
 	describe_printed_commands "Start the matching OpenShell gateway and keep it open:"
@@ -423,9 +410,8 @@ create_demo_sandbox() {
 		--provider pi-model \
 		--policy "$runtime_policy" \
 		--upload "$runtime_dir/node_modules:/sandbox/pi-runtime" \
-		--upload "$script_dir/managed-pi.ts:/sandbox/pi-runtime/managed-pi.ts" \
-		--upload "$script_dir/managed-pi-admission.ts:/sandbox/pi-runtime/managed-pi-admission.ts" \
 		--upload "$models_path:/sandbox/pi-agent/models.json" \
+		--upload "$pi_settings:/sandbox/pi-agent/settings.json" \
 		--no-git-ignore \
 		--detach
 }
@@ -442,27 +428,14 @@ launch() {
 			"$runtime_dir/node_modules/@earendil-works/pi-agent-core/dist/agent-loop.js" \
 			"beforeToolResultAppend" \
 			"installed Pi agent core"
-		require_file "$runtime_dir/node_modules/@earendil-works/pi-coding-agent/dist/index.js" \
-			"installed Pi SDK"
 		require_file_contains \
-			"$runtime_dir/node_modules/@earendil-works/pi-coding-agent/dist/main.js" \
-			"configureModelRuntime" \
+			"$runtime_dir/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js" \
+			"PI_OPENSHELL_CONTEXT_ADMISSION" \
 			"installed Pi CLI"
-		require_file_contains \
-			"$runtime_dir/node_modules/@earendil-works/pi-coding-agent/dist/main.js" \
-			"createContextAdmission" \
-			"installed Pi CLI"
-		require_file "$script_dir/managed-pi.ts" "Pi launcher"
-		require_file "$script_dir/managed-pi-admission.ts" "Pi admission adapter"
+		require_file "$pi_settings" "Pi settings"
+		require_file "$runtime_policy" "OpenShell sandbox policy"
+		require_file "$runtime_provider_profile" "OpenShell provider profile"
 	fi
-
-	describe_printed_commands "Refresh the endpoint policy and provider profile from models.json:"
-	render_runtime_configuration
-	if ! $print_only; then
-		require_file "$runtime_policy" "generated OpenShell policy"
-		require_file "$runtime_provider_profile" "generated OpenShell provider profile"
-	fi
-	load_model_selection
 
 	describe_printed_commands "Remove an earlier example sandbox, if present:"
 	delete_demo_sandbox_if_present
@@ -476,10 +449,9 @@ launch() {
 		env \
 		PI_CODING_AGENT_DIR=/sandbox/pi-agent \
 		PI_OFFLINE=1 \
-		PI_MANAGED_PROVIDER=attested-provider \
-		PI_MANAGED_MODEL="$model_id" \
+		PI_OPENSHELL_CONTEXT_ADMISSION=1 \
 		OPENSHELL_AGENT_CONVERSATION_URL=http://127.0.0.1:8193/v1/agent/conversation \
-		bash -c 'exec env -u PI_MODEL_API_KEY node --experimental-strip-types /sandbox/pi-runtime/managed-pi.ts --no-extensions --provider "$PI_MANAGED_PROVIDER" --model "$PI_MANAGED_MODEL" 3<<<"$PI_MODEL_API_KEY"'
+		/sandbox/pi-runtime/node_modules/.bin/pi --no-extensions
 }
 
 cleanup() {
@@ -501,7 +473,7 @@ usage() {
 	printf '%bActions%b:\n' "$bold$blue" "$reset"
 	cat <<'EOF'
 
-  prepare  Update the forks, package Pi, and generate the runtime configuration
+  prepare  Update the forks and package Pi
   serve    Start Egress Gate
   gateway  Start the forked OpenShell gateway
   launch   Attach the configured model credential and launch Pi
@@ -556,8 +528,7 @@ ${bold}${blue}Local fork workspace${reset}
   prepare clones missing Pi and OpenShell forks here. The directory is ignored by Git.
 
 ${bold}${blue}Workflow${reset}
-  ${green}1. prepare${reset}  Clone or update the forks, build Pi, and derive the endpoint policy
-              and gateway middleware configuration from models.json.
+  ${green}1. prepare${reset}  Clone or update the forks and build the configured Pi fork.
   ${green}2. serve${reset}    Start Egress Gate in Terminal 1 and leave it running.
   ${green}3. gateway${reset}  Start the OpenShell gateway in Terminal 2 and leave it running.
   ${green}4. launch${reset}   Create the credential provider and launch Pi in Terminal 3.

@@ -1,9 +1,8 @@
 # Pi attested-admission example
 
-This example runs a normal interactive Pi TUI inside OpenShell and sends
-admitted conversation context to one model endpoint. The endpoint may be a
-hosted provider, an internal gateway, or a local server. One endpoint-scoped
-provider and credential serve all configured models.
+This example runs the normal forked Pi CLI inside OpenShell and sends admitted
+conversation context to the configured NVIDIA inference endpoint. One
+endpoint-scoped provider and credential serve all configured models.
 
 The example demonstrates the same policy at both context boundaries:
 
@@ -71,15 +70,17 @@ these models:
 | `azure/openai/gpt-5.6-sol` | OpenAI Responses |
 | `nvidia/qwen/qwen3.8-flash-next` | OpenAI Chat Completions |
 
-Pi starts with the first model in the file. Use Pi's normal model picker to
-switch among all three without creating another OpenShell provider. Qwen uses
+Pi starts with the default in [settings.json](settings.json). Use Pi's normal
+model picker to switch among all three without creating another OpenShell provider. Qwen uses
 Chat Completions reasoning controls, and GPT-5.6 Sol uses Responses reasoning.
 The endpoint's Opus 5 alias currently rejects explicit adaptive-thinking
 controls, so it runs with the endpoint's default thinking behavior.
 
-To use another compatible endpoint or catalog, copy `models.json`, edit it using
-Pi's documented JSON format, and set `PI_MODELS_PATH` to that file. Keep all
-models under the one provider used by this example.
+To use another catalog for the same endpoint, copy `models.json`, edit it using
+Pi's documented JSON format, and set `PI_MODELS_PATH` to that file. OpenShell
+pins network and credential access independently of Pi. To change endpoints,
+update the matching host and port explicitly in `models.json`, `policy.yaml`,
+and `provider-profile.yaml`.
 
 `EGRESS_GATE_HOST_IP` is the address OpenShell uses to reach Egress Gate on this
 machine. It must be a reachable, non-loopback IPv4 address; do not use
@@ -87,10 +88,11 @@ machine. It must be a reachable, non-loopback IPv4 address; do not use
 will call. A model server running on this machine must likewise use a hostname
 or address reachable from the sandbox rather than `localhost`.
 
-`demo.sh prepare` uploads the model file unchanged and derives the endpoint
-policy from its provider `baseUrl`. You do not need to edit `policy.yaml`. If
-required values are missing or still contain placeholders, the script prints
-the configuration steps and stops before performing any work.
+The example checks in ordinary Pi and OpenShell configuration files. It uploads
+`models.json` and `settings.json` unchanged. The only host-specific output is a
+copy of `gateway-middleware.toml.example` with `EGRESS_GATE_HOST_IP` substituted
+for its documented placeholder. If required values are missing, the script
+prints the configuration steps and stops before performing any work.
 
 Preview the complete workflow before running anything:
 
@@ -104,9 +106,8 @@ example, `./demo.sh --print prepare` or `./demo.sh --print launch`.
 
 ## Run the example
 
-Prepare the forks, build and package the locally modified Pi agent core and
-coding agent, and generate the endpoint-specific OpenShell and Egress Gate
-configuration used by Terminal 2:
+Prepare the forks and build and package the locally modified Pi agent core and
+coding agent:
 
 ```shell
 ./demo.sh prepare
@@ -137,21 +138,19 @@ After the gateway reports that it is ready, launch Pi from a third terminal:
 ./demo.sh launch
 ```
 
-This starts the standard Pi CLI, with OpenShell admission inserted immediately
-before each provider request. Each launch replaces the example's
+This executes the fork's normal `pi` entrypoint. The explicit
+`PI_OPENSHELL_CONTEXT_ADMISSION=1` setting makes its built-in OpenShell
+admission boundary mandatory for the session. Each launch replaces the example's
 `pi-egress-demo` sandbox, provider, and custom provider profile so the current
 Pi runtime, admission adapter, policy, endpoint, and OpenShell supervisor are
 used together.
 
 The example registers an endpoint-specific provider profile using the host-side
-`PI_MODEL_API_KEY`. The real credential remains in OpenShell. Pi receives only
-an opaque, endpoint-bound resolver placeholder. The launcher removes that
-placeholder before starting Pi and passes it once over a private file
-descriptor. The thin launcher reads and closes the descriptor before the TUI or
-tools start, supplies the resolver to Pi's non-persistent runtime credential
-store, installs mandatory admission, and delegates the rest of startup to Pi's
-standard CLI. OpenShell resolves the placeholder in the authorization header
-for the configured model endpoint.
+`PI_MODEL_API_KEY`. Its `delivery: proxy` setting keeps the credential and any
+resolver placeholder out of the sandbox. Pi sends the non-secret placeholder
+declared by `models.json`; after admission and middleware processing succeed,
+the OpenShell supervisor replaces that authorization header with the real,
+endpoint-bound credential immediately before forwarding the request.
 
 At the Pi prompt, submit both of these in the same session:
 
@@ -185,11 +184,10 @@ the run.
 
 ## How it works
 
-1. `managed-pi.ts` calls Pi's standard `main()` with two runtime hooks: one
-   installs the opaque credential resolver and one creates the mandatory SDK
-   `ContextAdmission` boundary for each normal Pi session. The launch command
-   uses Pi's standard `--no-extensions` option, so project or user extensions
-   cannot replace this boundary.
+1. The forked `pi` entrypoint sees `PI_OPENSHELL_CONTEXT_ADMISSION=1` and installs
+   its built-in mandatory `ContextAdmission` boundary. The launch command uses
+   Pi's standard `--no-extensions` option, so project or user extensions cannot
+   replace this boundary.
 2. Pi calls that boundary for each rendered user message and finalized tool
    result before it queues, appends, or persists the value.
 3. The adapter sends the exact context addition to OpenShell's sandbox-local
@@ -205,7 +203,7 @@ the run.
 6. OpenShell strips the handle, resolves the supervisor-held attestation, and
    supplies it only to the configured Egress Gate middleware stage. Egress Gate
    verifies the latest context addition and scans the complete provider request
-   before OpenShell resolves the model credential.
+   before OpenShell injects the proxy-delivered model credential.
 
 ## Current scope
 
