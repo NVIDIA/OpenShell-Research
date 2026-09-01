@@ -15,24 +15,78 @@ const middlewareEndpoint = parseMiddlewareEndpoint(
 );
 const endpointPort = baseUrl.port || (baseUrl.protocol === "https:" ? "443" : "80");
 
+const configuredModels = [
+  {
+    id: "azure/anthropic/claude-opus-5",
+    name: "Claude Opus 5",
+    api: "openai-completions",
+    reasoning: false,
+    input: ["text"],
+    contextWindow: 1000000,
+    maxTokens: 128000,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    compat: {
+      maxTokensField: "max_tokens",
+      supportsDeveloperRole: false,
+      supportsReasoningEffort: false,
+    },
+  },
+  {
+    id: "azure/openai/gpt-5.6-sol",
+    name: "GPT-5.6 Sol",
+    api: "openai-responses",
+    reasoning: true,
+    thinkingLevelMap: {
+      off: "none",
+      minimal: "low",
+      low: "low",
+      medium: "medium",
+      high: "high",
+      xhigh: "xhigh",
+      max: "max",
+    },
+    input: ["text"],
+    contextWindow: 1050000,
+    maxTokens: 128000,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  },
+  {
+    id: "nvidia/qwen/qwen3.8-flash-next",
+    name: "Qwen3.8 Flash Next",
+    api: "openai-completions",
+    reasoning: true,
+    thinkingLevelMap: {
+      minimal: "low",
+      low: "low",
+      medium: "medium",
+      high: "high",
+      xhigh: "high",
+      max: "high",
+    },
+    input: ["text"],
+    contextWindow: 262144,
+    maxTokens: 32768,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    compat: {
+      maxTokensField: "max_tokens",
+      supportsDeveloperRole: false,
+      supportsReasoningEffort: true,
+      thinkingFormat: "qwen",
+    },
+  },
+];
+
+if (!configuredModels.some((model) => model.id === modelId)) {
+  const configuredModelIds = configuredModels.map((model) => model.id).join(", ");
+  fail(`--model-id must select one of: ${configuredModelIds}`);
+}
+
 const models = {
   providers: {
     "attested-provider": {
       baseUrl: baseUrl.toString().replace(/\/$/, ""),
-      api: "openai-completions",
       apiKey: "$PI_MODEL_API_KEY",
-      models: [
-        {
-          id: modelId,
-          name: modelId,
-          reasoning: true,
-          input: ["text"],
-          contextWindow: 262144,
-          maxTokens: 32768,
-          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-          compat: { supportsReasoningEffort: true },
-        },
-      ],
+      models: configuredModels,
     },
   },
 };
