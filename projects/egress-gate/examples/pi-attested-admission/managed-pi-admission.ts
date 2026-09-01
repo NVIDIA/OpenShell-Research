@@ -6,7 +6,7 @@ import type {
 	ToolResultMessage,
 	UserMessage,
 } from "@earendil-works/pi-ai/compat";
-import type { ContextAdmission } from "@earendil-works/pi-coding-agent";
+import type { ContextAdmission, ContextAdmissionResult } from "@earendil-works/pi-coding-agent";
 
 const HANDLE_HEADER = "x-openshell-agent-admission-handle";
 const MAX_ADMISSION_BYTES = 4 * 1024 * 1024;
@@ -61,42 +61,60 @@ export function createOpenShellContextAdmission(
 		return parseBridgeResult(JSON.parse(new TextDecoder().decode(encoded)));
 	}
 
-	return {
-		async admitUserMessage(message) {
-			const envelope = userEnvelope(message);
-			if (!envelope) {
-				return { action: "deny", reason: "Image inputs are not supported by this managed Pi example" };
-			}
-			const result = await requestAdmission("rendered_prompt_admission", envelope);
-			if (result.decision === "deny") return denied(result.reason_code);
-			const admittedEnvelope = result.replacement_body
-				? parseUserEnvelope(new Uint8Array(result.replacement_body))
-				: envelope;
-			const admittedMessage: UserMessage = {
-				...message,
-				content: replaceUserText(message.content, admittedEnvelope.text),
-			};
-			rememberHandle(handles, messageKey(admittedMessage), result.handle);
-			return admittedEnvelope.text === envelope.text
-				? { action: "allow" }
-				: { action: "allow", message: admittedMessage };
-		},
+	async function admitUserMessage(message: UserMessage): Promise<ContextAdmissionResult<UserMessage>> {
+		const envelope = userEnvelope(message);
+		if (!envelope) {
+			return { action: "deny", reason: "Image inputs are not supported by this managed Pi example" };
+		}
+		const result = await requestAdmission("rendered_prompt_admission", envelope);
+		if (result.decision === "deny") return denied(result.reason_code);
+		const admittedEnvelope = result.replacement_body
+			? parseUserEnvelope(new Uint8Array(result.replacement_body))
+			: envelope;
+		const admittedMessage: UserMessage = {
+			...message,
+			content: replaceUserText(message.content, admittedEnvelope.text),
+		};
+		rememberHandle(handles, messageKey(admittedMessage), result.handle);
+		return admittedEnvelope.text === envelope.text
+			? { action: "allow" }
+			: { action: "allow", message: admittedMessage };
+	}
 
-		async admitToolResult(message) {
-			const envelope = toolResultEnvelope(message);
-			const result = await requestAdmission("tool_result_admission", envelope);
-			if (result.decision === "deny") return denied(result.reason_code);
-			const admittedEnvelope = result.replacement_body
-				? parseToolResultEnvelope(new Uint8Array(result.replacement_body))
-				: envelope;
-			const admittedMessage: ToolResultMessage = {
-				...message,
-				content: admittedEnvelope.content,
-			};
-			rememberHandle(handles, messageKey(admittedMessage), result.handle);
-			return result.replacement_body
-				? { action: "allow", message: admittedMessage }
-				: { action: "allow" };
+	async function admitToolResult(message: ToolResultMessage): Promise<ContextAdmissionResult<ToolResultMessage>> {
+		const envelope = toolResultEnvelope(message);
+		const result = await requestAdmission("tool_result_admission", envelope);
+		if (result.decision === "deny") return denied(result.reason_code);
+		const admittedEnvelope = result.replacement_body
+			? parseToolResultEnvelope(new Uint8Array(result.replacement_body))
+			: envelope;
+		const admittedMessage: ToolResultMessage = {
+			...message,
+			content: admittedEnvelope.content,
+		};
+		rememberHandle(handles, messageKey(admittedMessage), result.handle);
+		return result.replacement_body
+			? { action: "allow", message: admittedMessage }
+			: { action: "allow" };
+	}
+
+	return {
+		admitUserMessage,
+		admitToolResult,
+
+		async admitProviderContext(context) {
+			for (let index = context.messages.length - 1; index >= 0; index -= 1) {
+				const message = context.messages[index];
+				if (message.role !== "user" && message.role !== "toolResult") continue;
+				const result =
+					message.role === "user" ? await admitUserMessage(message) : await admitToolResult(message);
+				if (result.action === "deny") return result;
+				if (!result.message) return { action: "allow" };
+				const messages = [...context.messages];
+				messages[index] = result.message;
+				return { action: "allow", context: { ...context, messages } };
+			}
+			return { action: "deny", reason: "Provider context has no user message or tool result to admit" };
 		},
 
 		async transformProviderHeaders(headers: ProviderHeaders, context: Context) {

@@ -1,65 +1,28 @@
-/** Normal interactive Pi with mandatory OpenShell context admission. */
-import {
-	type CreateAgentSessionRuntimeFactory,
-	InteractiveMode,
-	ModelRuntime,
-	SessionManager,
-	createAgentSessionFromServices,
-	createAgentSessionRuntime,
-	createAgentSessionServices,
-} from "@earendil-works/pi-coding-agent";
+/** Standard Pi CLI with mandatory OpenShell context admission. */
+import { closeSync, readFileSync } from "node:fs";
+import { main } from "@earendil-works/pi-coding-agent";
 import { createOpenShellContextAdmission } from "./managed-pi-admission.ts";
 
-async function main(): Promise<void> {
+async function run(): Promise<void> {
 	const bridgeUrl = process.env.OPENSHELL_AGENT_CONVERSATION_URL;
-	const agentDir = process.env.PI_CODING_AGENT_DIR;
 	const provider = process.env.PI_MANAGED_PROVIDER;
-	const modelId = process.env.PI_MANAGED_MODEL;
-	if (!bridgeUrl || !agentDir || !provider || !modelId) {
-		throw new Error(
-			"OPENSHELL_AGENT_CONVERSATION_URL, PI_CODING_AGENT_DIR, PI_MANAGED_PROVIDER, and PI_MANAGED_MODEL are required",
-		);
+	if (!bridgeUrl || !provider) {
+		throw new Error("OPENSHELL_AGENT_CONVERSATION_URL and PI_MANAGED_PROVIDER are required");
 	}
 
-	const sessionManager = SessionManager.inMemory(process.cwd());
-	const contextAdmission = createOpenShellContextAdmission(bridgeUrl, () => sessionManager.getSessionId());
-	const modelRuntime = await ModelRuntime.create({
-		authPath: `${agentDir}/auth.json`,
-		modelsPath: `${agentDir}/models.json`,
-		refreshOnCreate: false,
-	});
-	const model = modelRuntime.getModel(provider, modelId);
-	if (!model) throw new Error(`Model ${provider}/${modelId} was not found`);
+	const modelApiKey = readFileSync(3, "utf8").replace(/\n$/u, "");
+	closeSync(3);
 
-	const createRuntime: CreateAgentSessionRuntimeFactory = async ({ cwd, sessionManager, sessionStartEvent }) => {
-		const services = await createAgentSessionServices({
-			cwd,
-			agentDir,
-			modelRuntime,
-			resourceLoaderOptions: { noExtensions: true },
-		});
-		return {
-			...(await createAgentSessionFromServices({
-				services,
-				sessionManager,
-				sessionStartEvent,
-				model,
-				thinkingLevel: "off",
-				contextAdmission,
-			})),
-			services,
-			diagnostics: services.diagnostics,
-		};
-	};
-	const runtime = await createAgentSessionRuntime(createRuntime, {
-		cwd: process.cwd(),
-		agentDir,
-		sessionManager,
+	await main(process.argv.slice(2), {
+		configureModelRuntime: async (modelRuntime) => {
+			await modelRuntime.setRuntimeApiKey(provider, modelApiKey);
+		},
+		createContextAdmission: (sessionManager) =>
+			createOpenShellContextAdmission(bridgeUrl, () => sessionManager.getSessionId()),
 	});
-	await new InteractiveMode(runtime, { startupDiagnostics: [...runtime.diagnostics] }).run();
 }
 
-main().catch((error: unknown) => {
+run().catch((error: unknown) => {
 	console.error(error);
 	process.exitCode = 1;
 });
