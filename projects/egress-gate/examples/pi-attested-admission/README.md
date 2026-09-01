@@ -56,8 +56,14 @@ set +a
 from this shell; `set +a` restores the shell's default behavior afterward.
 
 If the model endpoint does not require authentication, set
-`PI_MODEL_API_KEY=unused`. Source `.env` again in each new terminal that runs
-`demo.sh`.
+`PI_MODEL_API_KEY=unused`. Source `.env` in the terminals that run `gateway` and
+`reset`; the other actions do not consume the credential.
+
+`PI_WORKSPACE_PATH` is the absolute path of the project you want Pi to work on.
+The reset step uploads its contents to `/sandbox/workspace` using the project's normal
+`.gitignore` rules. Pi starts in that directory, so project instructions,
+extensions, skills, prompts, and session grouping follow its ordinary
+current-directory behavior.
 
 `PI_MODELS_PATH` points to a standard Pi `models.json`. Relative paths are
 resolved from this example directory. The checked-in [models.json](models.json)
@@ -70,9 +76,10 @@ these models:
 | `azure/openai/gpt-5.6-sol` | OpenAI Responses |
 | `nvidia/qwen/qwen3.8-flash-next` | OpenAI Chat Completions |
 
-Pi starts with the default in [settings.json](settings.json). Use Pi's normal
-model picker to switch among all three without creating another OpenShell provider. Qwen uses
-Chat Completions reasoning controls, and GPT-5.6 Sol uses Responses reasoning.
+Pi starts with the reasoning-capable Qwen model and `high` thinking from
+[settings.json](settings.json). Use Pi's normal model picker to switch among all
+three without creating another OpenShell provider. Qwen uses Chat Completions
+reasoning controls, and GPT-5.6 Sol uses Responses reasoning.
 The endpoint's Opus 5 alias currently rejects explicit adaptive-thinking
 controls, so it runs with the endpoint's default thinking behavior.
 
@@ -89,10 +96,11 @@ will call. A model server running on this machine must likewise use a hostname
 or address reachable from the sandbox rather than `localhost`.
 
 The example checks in ordinary Pi and OpenShell configuration files. It uploads
-`models.json` and `settings.json` unchanged. The only host-specific output is a
-copy of `gateway-middleware.toml.example` with `EGRESS_GATE_HOST_IP` substituted
-for its documented placeholder. If required values are missing, the script
-prints the configuration steps and stops before performing any work.
+`models.json` and `settings.json` unchanged to Pi's standard
+`~/.pi/agent` directory. The only generated configuration is a copy of
+`gateway-middleware.toml.example` with `EGRESS_GATE_HOST_IP` substituted for its
+documented placeholder. If an action needs configuration that is missing, the
+script prints the values required by that action and stops before doing work.
 
 Preview the complete workflow before running anything:
 
@@ -132,7 +140,16 @@ The example uses its own gateway name and passes it explicitly to every
 OpenShell command. It does not depend on or change your globally selected
 OpenShell gateway.
 
-After the gateway reports that it is ready, launch Pi from a third terminal:
+After the gateway reports that it is ready, create the demo sandbox from a
+third terminal. `reset` is deliberately named: it deletes any prior demo
+sandbox and its sessions before uploading the current runtime, configuration,
+and workspace.
+
+```shell title="Terminal 3: Pi"
+./demo.sh reset
+```
+
+Then launch Pi:
 
 ```shell title="Terminal 3: Pi"
 ./demo.sh launch
@@ -140,10 +157,19 @@ After the gateway reports that it is ready, launch Pi from a third terminal:
 
 This executes the fork's normal `pi` entrypoint. The explicit
 `PI_OPENSHELL_CONTEXT_ADMISSION=1` setting makes its built-in OpenShell
-admission boundary mandatory for the session. Each launch replaces the example's
-`pi-egress-demo` sandbox, provider, and custom provider profile so the current
-Pi runtime, admission adapter, policy, endpoint, and OpenShell supervisor are
-used together.
+admission boundary mandatory for the session. `launch` only enters the existing
+sandbox; it does not replace the sandbox or Pi's state. Exit and run `launch`
+again to use Pi's normal `/resume` flow and persistent JSONL sessions. Run
+`reset` only when you intentionally want a fresh sandbox or need to apply a new
+runtime, policy, model configuration, credential, or workspace snapshot.
+
+The sandbox image adds the `fd` and `rg` executables used by Pi's standard
+`find` and `grep` tools. Pi itself still comes from the prepared fork package,
+and starts without a wrapper or restrictive CLI flags. Its standard user and
+project resource discovery, extension loading, tools, model picker, thinking
+controls, compaction, and session manager remain active. OpenShell's filesystem
+and network policy still apply to every process in the sandbox; arbitrary
+package downloads are intentionally outside this endpoint-focused example.
 
 The example registers an endpoint-specific provider profile using the host-side
 `PI_MODEL_API_KEY`. Its `delivery: proxy` setting keeps the credential and any
@@ -178,9 +204,8 @@ result admitted as `[REDACTED]`.
 
 Pi uses its standard session manager and JSONL session location, and exposes
 the active path to tools as `PI_SESSION_FILE`. Admission runs before a user
-message or tool result reaches that history. Each `launch` replaces the
-disposable demo sandbox, so copy out anything you want to retain before ending
-the run.
+message or tool result reaches that history. `launch` preserves the history;
+`reset` and `cleanup` delete it with the sandbox.
 
 ## How it works
 
@@ -209,10 +234,8 @@ the run.
 The attestation adapter supports normal text turns, text tool results, queued
 steering and follow-up messages, retries, automatic model continuations,
 compaction, branch summaries, and restored sessions using the OpenAI Chat
-Completions wire format. The catalog includes GPT-5.6 Sol so the shared-provider
-configuration is complete, but its Responses requests are not yet covered by
-the attestation adapter and fail closed. Image inputs are likewise outside this
-example's current scope.
+Completions and Responses wire formats. Image inputs are outside this example's
+current scope and fail closed.
 
 ## Cleanup
 
@@ -223,5 +246,5 @@ sandbox and provider:
 ./demo.sh cleanup
 ```
 
-Then stop the OpenShell gateway and Egress Gate with `Ctrl-C`. To run the
-example again, start from `./demo.sh prepare`.
+Then stop the OpenShell gateway and Egress Gate with `Ctrl-C`. For another
+session in the same prepared sandbox, use `./demo.sh launch` instead of cleanup.

@@ -1,5 +1,5 @@
 {
   "defaultProvider": "attested-provider",
-  "defaultModel": "azure/anthropic/claude-opus-5",
+  "defaultModel": "nvidia/qwen/qwen3.8-flash-next",
   "defaultThinkingLevel": "high"
 }

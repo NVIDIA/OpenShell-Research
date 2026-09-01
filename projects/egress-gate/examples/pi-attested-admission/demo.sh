@@ -29,6 +29,7 @@ if [[ $models_path_value == /* || $models_path_value == YOUR_MODELS_PATH ]]; the
 else
 	models_path=$script_dir/${models_path_value#./}
 fi
+workspace_path=${PI_WORKSPACE_PATH:-YOUR_WORKSPACE_PATH}
 pack_dir=${PI_EGRESS_PACK_DIR:-/tmp/pi-egress-pack}
 runtime_dir=${PI_EGRESS_RUNTIME_DIR:-/tmp/pi-egress-runtime}
 openshell_cli=$openshell_repo/scripts/bin/openshell
@@ -210,7 +211,16 @@ require_gateway_z3() {
 	exit 1
 }
 
-require_example_configuration() {
+require_host_configuration() {
+	if [[ -n ${EGRESS_GATE_HOST_IP:-} && ${EGRESS_GATE_HOST_IP:-} != YOUR_HOST_IPV4 ]]; then
+		return
+	fi
+	printf 'Set EGRESS_GATE_HOST_IP in %s and source it before starting the gateway.\n' \
+		"$script_dir/.env" >&2
+	exit 1
+}
+
+require_setup_configuration() {
 	local missing=()
 	if [[ -z ${EGRESS_GATE_HOST_IP:-} || ${EGRESS_GATE_HOST_IP:-} == YOUR_HOST_IPV4 ]]; then
 		missing+=(EGRESS_GATE_HOST_IP)
@@ -221,8 +231,12 @@ require_example_configuration() {
 	if [[ -z ${PI_MODEL_API_KEY:-} || ${PI_MODEL_API_KEY:-} == your-provider-key ]]; then
 		missing+=(PI_MODEL_API_KEY)
 	fi
+	if [[ -z ${PI_WORKSPACE_PATH:-} || ${PI_WORKSPACE_PATH:-} == /absolute/path/to/your/project ]]; then
+		missing+=(PI_WORKSPACE_PATH)
+	fi
 	if ((${#missing[@]} == 0)); then
 		require_file "$models_path" "Pi model configuration"
+		require_directory "$workspace_path" "Pi workspace"
 		return
 	fi
 
@@ -315,9 +329,6 @@ prepare_gateway_configuration() {
 }
 
 prepare() {
-	if ! $print_only; then
-		require_example_configuration
-	fi
 	sync_forks
 	local agent_tarball
 	local coding_agent_tarball
@@ -326,7 +337,7 @@ prepare() {
 
 	describe_printed_commands "Build and package Pi:"
 	run_in "$pi_repo" npm install --ignore-scripts
-	run_in "$pi_repo" npm run build
+	run_in "$pi_repo" npm run build:offline
 	run_in "$pi_repo" mkdir -p "$pack_dir" "$runtime_dir"
 	run_in "$pi_repo" npm pack --workspace @earendil-works/pi-agent-core --pack-destination "$pack_dir"
 	run_in "$pi_repo" npm pack --workspace @earendil-works/pi-coding-agent --pack-destination "$pack_dir"
@@ -341,7 +352,7 @@ serve() {
 
 gateway() {
 	if ! $print_only; then
-		require_example_configuration
+		require_host_configuration
 		require_compute_backend
 		raise_gateway_open_file_limit
 		require_gateway_z3
@@ -395,6 +406,11 @@ ensure_model_provider() {
 }
 
 delete_demo_sandbox_if_present() {
+	if $print_only; then
+		run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
+			sandbox delete pi-egress-demo
+		return
+	fi
 	if ! $print_only && (cd -- "$openshell_repo" && "$openshell_cli" --gateway "$gateway_name" \
 		sandbox list --names | grep -Fxq pi-egress-demo); then
 		printf 'Replacing existing sandbox pi-egress-demo with the current example runtime.\n'
@@ -406,19 +422,22 @@ delete_demo_sandbox_if_present() {
 create_demo_sandbox() {
 	run_in "$script_dir" "$openshell_cli" --gateway "$gateway_name" sandbox create \
 		--name pi-egress-demo \
-		--from base \
+		--from "$script_dir/sandbox" \
 		--provider pi-model \
 		--policy "$runtime_policy" \
 		--upload "$runtime_dir/node_modules:/sandbox/pi-runtime" \
-		--upload "$models_path:/sandbox/pi-agent/models.json" \
-		--upload "$pi_settings:/sandbox/pi-agent/settings.json" \
+		--upload "$models_path:/sandbox/.pi/agent/models.json" \
+		--upload "$pi_settings:/sandbox/.pi/agent/settings.json" \
 		--no-git-ignore \
 		--detach
+	describe_printed_commands "Upload the selected workspace with its .gitignore rules:"
+	run_in "$workspace_path" "$openshell_cli" --gateway "$gateway_name" sandbox upload \
+		pi-egress-demo . /sandbox/workspace
 }
 
-launch() {
+reset_demo() {
 	if ! $print_only; then
-		require_example_configuration
+		require_setup_configuration
 		require_file "$openshell_cli" "OpenShell CLI wrapper"
 		require_file "$(pi_package_tarball "$pi_repo/packages/agent" "earendil-works-pi-agent-core")" \
 			"packed Pi agent core"
@@ -443,12 +462,27 @@ launch() {
 	ensure_model_provider
 	describe_printed_commands "Create a fresh sandbox and upload the Pi runtime:"
 	create_demo_sandbox
+	printf 'The demo sandbox is ready. Run: ./demo.sh launch\n'
+}
+
+require_demo_sandbox() {
+	if (cd -- "$openshell_repo" && "$openshell_cli" --gateway "$gateway_name" \
+		sandbox list --names | grep -Fxq pi-egress-demo); then
+		return
+	fi
+	printf 'The pi-egress-demo sandbox does not exist. Create it with: ./demo.sh reset\n' >&2
+	exit 1
+}
+
+launch() {
+	if ! $print_only; then
+		require_file "$openshell_cli" "OpenShell CLI wrapper"
+		require_demo_sandbox
+	fi
 	describe_printed_commands "Launch Pi interactively in the prepared sandbox:"
 	run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
-		sandbox exec --tty -n pi-egress-demo -- \
+		sandbox exec --tty -n pi-egress-demo --workdir /sandbox/workspace -- \
 		env \
-		PI_CODING_AGENT_DIR=/sandbox/pi-agent \
-		PI_OFFLINE=1 \
 		PI_OPENSHELL_CONTEXT_ADMISSION=1 \
 		OPENSHELL_AGENT_CONVERSATION_URL=http://127.0.0.1:8193/v1/agent/conversation \
 		/sandbox/pi-runtime/node_modules/.bin/pi
@@ -476,7 +510,8 @@ usage() {
   prepare  Update the forks and package Pi
   serve    Start Egress Gate
   gateway  Start the forked OpenShell gateway
-  launch   Attach the configured model credential and launch Pi
+  reset    Recreate the demo sandbox and configure its model credential
+  launch   Start Pi in the existing sandbox without deleting its sessions
   cleanup  Delete the example sandbox and credential provider
   all      Show the concise workflow walkthrough (requires --print)
 EOF
@@ -494,6 +529,7 @@ print_plan() {
 	local credential_status="not set"
 	local displayed_host="$host_ip"
 	local displayed_models_path="$models_path"
+	local displayed_workspace="not set"
 	if [[ $displayed_host == YOUR_HOST_IPV4 ]]; then
 		displayed_host="not set"
 		configuration_status="incomplete — edit and source .env"
@@ -504,6 +540,11 @@ print_plan() {
 	fi
 	if [[ -n ${PI_MODEL_API_KEY:-} && ${PI_MODEL_API_KEY:-} != your-provider-key ]]; then
 		credential_status="set (value hidden)"
+	else
+		configuration_status="incomplete — edit and source .env"
+	fi
+	if [[ $workspace_path != YOUR_WORKSPACE_PATH && $workspace_path != /absolute/path/to/your/project ]]; then
+		displayed_workspace="$workspace_path"
 	else
 		configuration_status="incomplete — edit and source .env"
 	fi
@@ -521,6 +562,7 @@ ${bold}${blue}Configuration visible to this shell${reset}
   Status:             ${status_color}${configuration_status}${reset}
   Egress Gate host:   $displayed_host
   Pi models file:     $displayed_models_path
+  Pi workspace:       $displayed_workspace
   Model credential:  $credential_status
 
 ${bold}${blue}Local fork workspace${reset}
@@ -531,16 +573,18 @@ ${bold}${blue}Workflow${reset}
   ${green}1. prepare${reset}  Clone or update the forks and build the configured Pi fork.
   ${green}2. serve${reset}    Start Egress Gate in Terminal 1 and leave it running.
   ${green}3. gateway${reset}  Start the OpenShell gateway in Terminal 2 and leave it running.
-  ${green}4. launch${reset}   Create the credential provider and launch Pi in Terminal 3.
-  ${green}5. test${reset}     At the Pi prompt, submit:
+  ${green}4. reset${reset}    Recreate the sandbox once and upload the selected workspace.
+  ${green}5. launch${reset}   Start Pi in Terminal 3. Later launches preserve its sessions.
+  ${green}6. test${reset}     At the Pi prompt, submit:
                 Reply with exactly: DENY_THIS
                 Reply with exactly: REDACT_THIS
-  ${green}6. cleanup${reset}  Delete the sandbox and credential provider.
+  ${green}7. cleanup${reset}  Delete the sandbox and credential provider.
 
 ${bold}${blue}Inspect exact commands${reset}
   ./demo.sh --print prepare
   ./demo.sh --print serve
   ./demo.sh --print gateway
+  ./demo.sh --print reset
   ./demo.sh --print launch
   ./demo.sh --print cleanup
 
@@ -552,6 +596,7 @@ case "$action" in
 	prepare) prepare ;;
 	serve) serve ;;
 	gateway) gateway ;;
+	reset) reset_demo ;;
 	launch) launch ;;
 	cleanup) cleanup ;;
 	all)
