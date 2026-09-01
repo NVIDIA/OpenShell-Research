@@ -213,7 +213,7 @@ def test_pi_example_renders_provider_specific_runtime_configuration(
             "--base-url",
             "https://gateway.example.test:8443/models/v1",
             "--model-id",
-            "custom-model",
+            "nvidia/qwen/qwen3.8-flash-next",
             "--models-output",
             str(models_output),
             "--policy-output",
@@ -231,11 +231,38 @@ def test_pi_example_renders_provider_specific_runtime_configuration(
     models = json.loads(models_output.read_text())
     provider = models["providers"]["attested-provider"]
     assert provider["baseUrl"] == "https://gateway.example.test:8443/models/v1"
-    assert provider["api"] == "openai-completions"
     assert provider["apiKey"] == "$PI_MODEL_API_KEY"
-    assert provider["models"][0]["id"] == "custom-model"
-    assert provider["models"][0]["reasoning"] is True
-    assert provider["models"][0]["compat"] == {"supportsReasoningEffort": True}
+    assert "api" not in provider
+    configured_models = {model["id"]: model for model in provider["models"]}
+    assert set(configured_models) == {
+        "azure/anthropic/claude-opus-5",
+        "azure/openai/gpt-5.6-sol",
+        "nvidia/qwen/qwen3.8-flash-next",
+    }
+
+    opus = configured_models["azure/anthropic/claude-opus-5"]
+    assert opus["api"] == "openai-completions"
+    assert opus["reasoning"] is False
+    assert opus["contextWindow"] == 1_000_000
+    assert opus["maxTokens"] == 128_000
+
+    gpt = configured_models["azure/openai/gpt-5.6-sol"]
+    assert gpt["api"] == "openai-responses"
+    assert gpt["reasoning"] is True
+    assert gpt["contextWindow"] == 1_050_000
+    assert gpt["maxTokens"] == 128_000
+
+    qwen = configured_models["nvidia/qwen/qwen3.8-flash-next"]
+    assert qwen["api"] == "openai-completions"
+    assert qwen["reasoning"] is True
+    assert qwen["contextWindow"] == 262_144
+    assert qwen["maxTokens"] == 32_768
+    assert qwen["compat"] == {
+        "maxTokensField": "max_tokens",
+        "supportsDeveloperRole": False,
+        "supportsReasoningEffort": True,
+        "thinkingFormat": "qwen",
+    }
 
     provider_profile = yaml.safe_load(provider_profile_output.read_text())
     assert provider_profile["id"] == "pi-attested-model"

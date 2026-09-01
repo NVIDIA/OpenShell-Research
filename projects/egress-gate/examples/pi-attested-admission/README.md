@@ -1,10 +1,9 @@
 # Pi attested-admission example
 
 This example runs a normal interactive Pi TUI inside OpenShell and sends
-admitted conversation context to a model endpoint you choose. The endpoint may be a hosted
-provider, an internal gateway, or a local server. It must accept the OpenAI Chat
-Completions request shape used by the current attestation adapter; it does not
-need to be OpenAI.
+admitted conversation context to one model endpoint. The endpoint may be a
+hosted provider, an internal gateway, or a local server. One endpoint-scoped
+provider and credential serve all configured models.
 
 The example demonstrates the same policy at both context boundaries:
 
@@ -61,8 +60,20 @@ If the model endpoint does not require authentication, set
 `PI_MODEL_API_KEY=unused`. Source `.env` again in each new terminal that runs
 `demo.sh`.
 
-The generated Pi model enables Pi's normal reasoning controls and sends the
-OpenAI-compatible `reasoning_effort` request field to the configured endpoint.
+The generated Pi catalog contains these models:
+
+| Model ID | Pi transport |
+| --- | --- |
+| `azure/anthropic/claude-opus-5` | OpenAI Chat Completions |
+| `azure/openai/gpt-5.6-sol` | OpenAI Responses |
+| `nvidia/qwen/qwen3.8-flash-next` | OpenAI Chat Completions |
+
+`PI_MODEL_ID` selects the model Pi starts with and must be one of those IDs.
+Use Pi's normal model picker to switch among all three without creating another
+OpenShell provider. Qwen uses Chat Completions reasoning controls, and GPT-5.6
+Sol uses Responses reasoning. The endpoint's Opus 5 alias currently rejects
+explicit adaptive-thinking controls, so it runs with the endpoint's default
+thinking behavior.
 
 `EGRESS_GATE_HOST_IP` is the address OpenShell uses to reach Egress Gate on this
 machine. It must be a reachable, non-loopback IPv4 address; do not use
@@ -195,8 +206,10 @@ the run.
 The attestation adapter supports normal text turns, text tool results, queued
 steering and follow-up messages, retries, automatic model continuations,
 compaction, branch summaries, and restored sessions using the OpenAI Chat
-Completions wire format. Providers with a different native protocol and image
-inputs are not covered by this example and fail closed.
+Completions wire format. The catalog includes GPT-5.6 Sol so the shared-provider
+configuration is complete, but its Responses requests are not yet covered by
+the attestation adapter and fail closed. Image inputs are likewise outside this
+example's current scope.
 
 ## Cleanup
 
