@@ -1,0 +1,22 @@
+id: pi-attested-model
+display_name: Pi attested-admission model
+description: Endpoint-scoped model credential for the Pi attested-admission example
+category: inference
+inference_capable: true
+credentials:
+  - name: api_key
+    description: Model provider API key
+    env_vars: [PI_MODEL_API_KEY]
+    required: true
+    delivery: proxy
+    auth_style: bearer
+    header_name: authorization
+discovery:
+  credentials: [api_key]
+endpoints:
+  - host: inference-api.nvidia.com
+    port: 443
+    protocol: rest
+    access: read-write
+    enforcement: enforce
+binaries: [/usr/bin/node, /usr/local/bin/node]

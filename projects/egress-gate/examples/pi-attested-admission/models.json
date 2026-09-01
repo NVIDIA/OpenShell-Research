@@ -2,7 +2,7 @@
   "providers": {
     "attested-provider": {
       "baseUrl": "https://inference-api.nvidia.com/v1",
-      "apiKey": "$PI_MODEL_API_KEY",
+      "apiKey": "openshell-proxy",
       "models": [
         {
           "id": "azure/anthropic/claude-opus-5",

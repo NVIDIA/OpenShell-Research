@@ -14,7 +14,7 @@ network_policies:
   model_provider:
     name: Configured model endpoint
     endpoints:
-      - host: provider.example.com
+      - host: inference-api.nvidia.com
         port: 443
         protocol: rest
         enforcement: enforce
@@ -61,4 +61,4 @@ network_middlewares:
     on_error: fail_closed
     endpoints:
       include:
-        - provider.example.com
+        - inference-api.nvidia.com

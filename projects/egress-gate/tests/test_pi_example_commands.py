@@ -59,7 +59,8 @@ def test_pi_example_can_print_each_action_without_running_it(
     )
     assert "gateway-middleware.toml" in output
     assert "OPENSHELL_GATEWAY_CONFIG_FRAGMENT=" in output
-    assert "render-runtime-config.mjs" in output
+    assert "gateway-middleware.toml.example" in output
+    assert "render-runtime-config.mjs" not in output
     assert str(models_path) in output
     assert "egress-gate --debug serve" in output
     assert "CARGO_BUILD_JOBS=4" in output
@@ -79,17 +80,16 @@ def test_pi_example_can_print_each_action_without_running_it(
     assert "--no-git-ignore" in output
     assert f"{runtime_dir}/node_modules:/sandbox/pi-runtime" in output
     assert f"{runtime_dir}:/sandbox/pi-runtime" not in output
+    assert f"{models_path}:/sandbox/pi-agent/models.json" in output
+    assert "settings.json:/sandbox/pi-agent/settings.json" in output
     assert "sandbox exec" in output
     assert "sandbox exec --tty" in output
     assert "PI_OFFLINE=1" in output
     assert "--no-extensions" in output
-    assert "--provider" in output
-    assert "--model" in output
+    assert "/sandbox/pi-runtime/node_modules/.bin/pi --no-extensions" in output
+    assert "PI_OPENSHELL_CONTEXT_ADMISSION=1" in output
     assert "OPENSHELL_AGENT_CONVERSATION_URL=" in output
-    assert "managed-pi.ts:/sandbox/pi-runtime/managed-pi.ts" in output
-    assert (
-        "managed-pi-admission.ts:/sandbox/pi-runtime/managed-pi-admission.ts" in output
-    )
+    assert "managed-pi" not in output
     assert "--extension " not in output
     assert "sandbox delete" in output
     assert all(result.stderr == "" for result in results)
@@ -98,27 +98,11 @@ def test_pi_example_can_print_each_action_without_running_it(
     assert not pack_dir.exists()
     assert not runtime_dir.exists()
 
-    managed_pi = (
-        project_dir / "examples/pi-attested-admission/managed-pi.ts"
-    ).read_text()
-    assert "main(process.argv.slice(2)" in managed_pi
-    assert "SessionManager" not in managed_pi
-    assert "ModelRuntime.create" not in managed_pi
-    assert "InteractiveMode" not in managed_pi
-    assert "thinkingLevel" not in managed_pi
-    assert 'readFileSync(3, "utf8")' in managed_pi
-    assert "closeSync(3)" in managed_pi
-    assert "process.env.PI_MODEL_API_KEY" not in managed_pi
-    assert "await modelRuntime.setRuntimeApiKey(provider, modelApiKey)" in managed_pi
-    assert "configureModelRuntime" in managed_pi
-    assert "createContextAdmission" in managed_pi
-
     demo_script = (project_dir / "examples/pi-attested-admission/demo.sh").read_text()
     assert '"beforeToolResultAppend"' in demo_script
-    assert "exec env -u PI_MODEL_API_KEY node" in demo_script
-    assert '3<<<"$PI_MODEL_API_KEY"' in demo_script
-    assert '"configureModelRuntime"' in demo_script
-    assert '"createContextAdmission"' in demo_script
+    assert "exec env -u PI_MODEL_API_KEY node" not in demo_script
+    assert '3<<<"$PI_MODEL_API_KEY"' not in demo_script
+    assert "render-runtime-config.mjs" not in demo_script
 
 
 def test_pi_example_print_all_is_a_concise_walkthrough() -> None:
@@ -196,48 +180,13 @@ def test_pi_example_defaults_to_an_ignored_external_workspace() -> None:
     assert ".workspaces/" in (project_dir / ".gitignore").read_text().splitlines()
 
 
-def test_pi_example_renders_provider_specific_runtime_configuration(
-    tmp_path: Path,
-) -> None:
+def test_pi_example_uses_standard_checked_in_configuration() -> None:
     project_dir = Path(__file__).parents[1]
     example_dir = project_dir / "examples/pi-attested-admission"
-    models_path = tmp_path / "models.json"
-    policy_output = tmp_path / "policy.yaml"
-    provider_profile_output = tmp_path / "provider-profile.yaml"
-    gateway_output = tmp_path / "gateway-middleware.toml"
-    selection_output = tmp_path / "model-selection.json"
     models = json.loads((example_dir / "models.json").read_text())
-    models["providers"]["attested-provider"]["baseUrl"] = (
-        "https://gateway.example.test:8443/models/v1"
-    )
-    models_path.write_text(json.dumps(models))
-    original_models = models_path.read_text()
-
-    subprocess.run(
-        [
-            "node",
-            str(example_dir / "render-runtime-config.mjs"),
-            "--models-path",
-            str(models_path),
-            "--policy-output",
-            str(policy_output),
-            "--provider-profile-output",
-            str(provider_profile_output),
-            "--middleware-endpoint",
-            "http://192.0.2.10:50051",
-            "--gateway-output",
-            str(gateway_output),
-            "--selection-output",
-            str(selection_output),
-        ],
-        check=True,
-    )
-
-    assert models_path.read_text() == original_models
-    models = json.loads(models_path.read_text())
     provider = models["providers"]["attested-provider"]
-    assert provider["baseUrl"] == "https://gateway.example.test:8443/models/v1"
-    assert provider["apiKey"] == "$PI_MODEL_API_KEY"
+    assert provider["baseUrl"] == "https://inference-api.nvidia.com/v1"
+    assert provider["apiKey"] == "openshell-proxy"
     assert "api" not in provider
     configured_models = {model["id"]: model for model in provider["models"]}
     assert set(configured_models) == {
@@ -270,26 +219,33 @@ def test_pi_example_renders_provider_specific_runtime_configuration(
         "thinkingFormat": "qwen",
     }
 
-    selection = json.loads(selection_output.read_text())
-    assert selection == {
-        "providerId": "attested-provider",
-        "modelId": "azure/anthropic/claude-opus-5",
+    settings = json.loads((example_dir / "settings.json").read_text())
+    assert settings == {
+        "defaultProvider": "attested-provider",
+        "defaultModel": "azure/anthropic/claude-opus-5",
+        "defaultThinkingLevel": "high",
     }
 
-    provider_profile = yaml.safe_load(provider_profile_output.read_text())
+    provider_profile = yaml.safe_load(
+        (example_dir / "provider-profile.yaml").read_text()
+    )
     assert provider_profile["id"] == "pi-attested-model"
     assert provider_profile["credentials"][0]["env_vars"] == ["PI_MODEL_API_KEY"]
-    assert provider_profile["endpoints"][0]["host"] == "gateway.example.test"
-    assert provider_profile["endpoints"][0]["port"] == 8443
+    assert provider_profile["credentials"][0]["delivery"] == "proxy"
+    assert provider_profile["endpoints"][0]["host"] == "inference-api.nvidia.com"
+    assert provider_profile["endpoints"][0]["port"] == 443
 
-    policy = yaml.safe_load(policy_output.read_text())
+    policy = yaml.safe_load((example_dir / "policy.yaml").read_text())
     endpoint = policy["network_policies"]["model_provider"]["endpoints"][0]
-    assert endpoint["host"] == "gateway.example.test"
-    assert endpoint["port"] == 8443
+    assert endpoint["host"] == "inference-api.nvidia.com"
+    assert endpoint["port"] == 443
     middleware = policy["network_middlewares"]["pi_egress_gate"]
-    assert middleware["endpoints"]["include"] == ["gateway.example.test"]
+    assert middleware["endpoints"]["include"] == ["inference-api.nvidia.com"]
 
-    gateway_fragment = tomllib.loads(gateway_output.read_text())
+    gateway_template = (example_dir / "gateway-middleware.toml.example").read_text()
+    gateway_fragment = tomllib.loads(
+        gateway_template.replace("YOUR_HOST_IPV4", "192.0.2.10")
+    )
     registration = gateway_fragment["openshell"]["supervisor"]["middleware"][0]
     assert registration["name"] == "pi-egress"
     assert registration["grpc_endpoint"] == "http://192.0.2.10:50051"
