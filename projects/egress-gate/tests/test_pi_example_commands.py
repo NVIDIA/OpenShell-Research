@@ -85,8 +85,8 @@ def test_pi_example_can_print_each_action_without_running_it(
     assert "sandbox exec" in output
     assert "sandbox exec --tty" in output
     assert "PI_OFFLINE=1" in output
-    assert "--no-extensions" in output
-    assert "/sandbox/pi-runtime/node_modules/.bin/pi --no-extensions" in output
+    assert "--no-extensions" not in output
+    assert "/sandbox/pi-runtime/node_modules/.bin/pi" in output
     assert "PI_OPENSHELL_CONTEXT_ADMISSION=1" in output
     assert "OPENSHELL_AGENT_CONVERSATION_URL=" in output
     assert "managed-pi" not in output
