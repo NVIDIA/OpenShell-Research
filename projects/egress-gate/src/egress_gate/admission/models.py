@@ -60,7 +60,7 @@ class HarnessAdmissionContext(StrictDomainModel):
     hook: AdmissionHook
     schema_version: Literal["openshell.pi-input.v1", "openshell.pi-tool-result.v1"]
     provider_target: HttpTarget
-    provider_adapter_schema: Literal["openai.chat-completions.v1"]
+    provider_adapter_schema: Literal["openai.request.v1"]
 
 
 class HarnessAdmissionResult(StrictDomainModel):

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Literal
 
 import pytest
@@ -35,6 +36,15 @@ from egress_gate.timeout import Timeout
 
 DENY_TEXT = "DENY_THIS"
 REDACT_TEXT = "REDACT_THIS"
+_PI_RESPONSES_FIXTURES = json.loads(
+    (Path(__file__).parent / "fixtures/pi-openai-responses.json").read_text()
+)
+_PI_CHAT_FIXTURES = json.loads(
+    (Path(__file__).parent / "fixtures/pi-openai-completions.json").read_text()
+)
+# These payloads were captured at Pi's fake-fetch boundary from its native
+# openai-responses and openai-completions stream functions. They intentionally
+# preserve the serializer output rather than restating it through test builders.
 
 
 def _processors(
@@ -142,7 +152,7 @@ def _context(
         hook=hook,
         schema_version=schema,
         provider_target=target or _target(),
-        provider_adapter_schema="openai.chat-completions.v1",
+        provider_adapter_schema="openai.request.v1",
     )
 
 
@@ -174,7 +184,9 @@ def _user(text: str) -> PiInputV1:
     return PiInputV1(schema_version="openshell.pi-input.v1", text=text)
 
 
-def _tool_result(text: str, *, image: bool = False) -> PiToolResultV1:
+def _tool_result(
+    text: str, *, image: bool = False, tool_call_id: str = "call-1"
+) -> PiToolResultV1:
     content: list[dict[str, object]] = (
         [{"type": "image", "data": "AA==", "mimeType": "image/png"}]
         if image
@@ -183,7 +195,7 @@ def _tool_result(text: str, *, image: bool = False) -> PiToolResultV1:
     return PiToolResultV1.model_validate(
         {
             "schema_version": "openshell.pi-tool-result.v1",
-            "tool_call_id": "call-1",
+            "tool_call_id": tool_call_id,
             "tool_name": "read",
             "content": content,
             "is_error": False,
@@ -199,12 +211,10 @@ def _provider_request(
     headers: tuple[HttpHeader, ...] = (),
     target: HttpTarget | None = None,
 ) -> HttpRequest:
-    messages: list[dict[str, object]] = [
-        {"role": "system", "content": "fixture system prompt"},
-        {"role": "user", "content": prompt},
-    ]
+    provider_body = json.loads(json.dumps(_PI_CHAT_FIXTURES["opus"]))
+    provider_body["messages"][1]["content"] = prompt
     if tool_result is not None:
-        messages.extend(
+        provider_body["messages"].extend(
             [
                 {
                     "role": "assistant",
@@ -225,18 +235,7 @@ def _provider_request(
             ]
         )
     body = json.dumps(
-        {
-            "model": "fixture-model",
-            "messages": messages,
-            "tools": [],
-            "tool_choice": "auto",
-            "temperature": 0,
-            "max_completion_tokens": 128,
-            "stream": True,
-            "stream_options": {"include_usage": True},
-            "store": False,
-            "prompt_cache_key": "session-1",
-        },
+        provider_body,
         ensure_ascii=False,
         separators=(",", ":"),
         sort_keys=True,
@@ -245,6 +244,30 @@ def _provider_request(
         context=RequestContext(request_id="network-1", sandbox_id="sandbox-1"),
         target=target or _target(),
         headers=(HttpHeader(name="content-type", value="application/json"),) + headers,
+        body=body,
+    )
+
+
+def _responses_request(
+    prompt: str,
+    *,
+    tool_result: str | None = None,
+) -> HttpRequest:
+    fixture_name = "tool_result_request" if tool_result is not None else "user_request"
+    provider_body = json.loads(json.dumps(_PI_RESPONSES_FIXTURES[fixture_name]))
+    provider_body["input"][1]["content"][0]["text"] = prompt
+    if tool_result is not None:
+        provider_body["input"][-1]["output"] = tool_result
+    body = json.dumps(
+        provider_body,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode()
+    return HttpRequest(
+        context=RequestContext(request_id="network-1", sandbox_id="sandbox-1"),
+        target=_target().model_copy(update={"path": "/v1/responses"}),
+        headers=(HttpHeader(name="content-type", value="application/json"),),
         body=body,
     )
 
@@ -274,6 +297,100 @@ def test_user_attestation_authorizes_retries_without_entering_request_headers() 
     assert first.decision.value == "allow"
     assert retry.decision.value == "allow"
     assert first.request_mutations.header_mutations == ()
+
+
+@pytest.mark.parametrize("fixture_name", ["opus", "qwen"])
+def test_configured_pi_chat_serializations_are_attested(fixture_name: str) -> None:
+    admission, egress, _ = _processors()
+    admitted = _admit(admission, _user("safe"))
+    assert admitted.attestation is not None
+    request = _provider_request("safe").model_copy(
+        update={
+            "body": json.dumps(
+                _PI_CHAT_FIXTURES[fixture_name],
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode()
+        }
+    )
+
+    result = _egress(egress, request, admitted.attestation)
+
+    assert result.decision.value == "allow"
+
+
+def test_user_attestation_authorizes_responses_requests_and_retries() -> None:
+    admission, egress, _ = _processors()
+    admitted = _admit(admission, _user("safe"))
+    assert admitted.attestation is not None
+    request = _responses_request("safe")
+
+    first = _egress(egress, request, admitted.attestation)
+    retry = _egress(egress, request, admitted.attestation)
+
+    assert first.decision.value == "allow"
+    assert retry.decision.value == "allow"
+
+
+def test_changed_responses_context_fails_closed() -> None:
+    admission, egress, _ = _processors()
+    admitted = _admit(admission, _user("safe"))
+    assert admitted.attestation is not None
+
+    result = _egress(egress, _responses_request("changed prompt"), admitted.attestation)
+
+    assert result.reason_code == "attestation_context_mismatch"
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda body: body.update({"messages": []}),
+        lambda body: body["input"].append(
+            {"role": "user", "content": [{"type": "input_image"}]}
+        ),
+        lambda body: body.pop("max_output_tokens"),
+    ],
+)
+def test_mixed_or_malformed_responses_shapes_fail_closed(mutation) -> None:
+    admission, egress, _ = _processors()
+    admitted = _admit(admission, _user("safe"))
+    assert admitted.attestation is not None
+    request = _responses_request("safe")
+    body = json.loads(request.body)
+    mutation(body)
+    malformed = request.model_copy(
+        update={
+            "body": json.dumps(
+                body,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode()
+        }
+    )
+
+    result = _egress(egress, malformed, admitted.attestation)
+
+    assert result.reason_code == "provider_shape_unsupported"
+
+
+def test_tool_result_attestation_authorizes_responses_call_id_projection() -> None:
+    admission, egress, _ = _processors()
+    admitted = _admit(
+        admission,
+        _tool_result("safe tool output", tool_call_id="call-1|fc-1"),
+    )
+    assert admitted.attestation is not None
+
+    result = _egress(
+        egress,
+        _responses_request("use the tool", tool_result="safe tool output"),
+        admitted.attestation,
+    )
+
+    assert result.decision.value == "allow"
 
 
 def test_changed_or_unattested_user_context_fails_closed() -> None:
@@ -472,6 +589,37 @@ def test_provider_shape_validation_and_optional_reasoning_field_are_preserved() 
 
     assert malformed_result.reason_code == "provider_shape_unsupported"
     assert reasoning_result.decision.value == "allow"
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda body: body.update({"max_completion_tokens": 128}),
+        lambda body: body.update({"store": None}),
+        lambda body: body["tools"][0]["function"].update({"strict": None}),
+    ],
+)
+def test_mixed_or_null_chat_compatibility_fields_fail_closed(mutation) -> None:
+    admission, egress, _ = _processors()
+    admitted = _admit(admission, _user("safe"))
+    assert admitted.attestation is not None
+    request = _provider_request("safe")
+    body = json.loads(request.body)
+    mutation(body)
+    malformed = request.model_copy(
+        update={
+            "body": json.dumps(
+                body,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode()
+        }
+    )
+
+    result = _egress(egress, malformed, admitted.attestation)
+
+    assert result.reason_code == "provider_shape_unsupported"
 
 
 def test_workload_receipt_header_is_reserved_in_managed_flow() -> None:
