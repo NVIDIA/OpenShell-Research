@@ -279,7 +279,13 @@ class _ProviderFunctionDefinition(StrictDomainModel):
     name: ScalarString
     description: ScalarString
     parameters: dict[str, object]
-    strict: bool
+    strict: bool | None = None
+
+    @model_validator(mode="after")
+    def _optional_strict_is_not_null(self) -> _ProviderFunctionDefinition:
+        if "strict" in self.model_fields_set and self.strict is None:
+            raise ValueError("provider function strict cannot be null")
+        return self
 
 
 class _ProviderTool(StrictDomainModel):
@@ -306,17 +312,184 @@ class _ProviderRequest(StrictDomainModel):
     tools: tuple[_ProviderTool, ...] = ()
     tool_choice: Literal["auto", "none", "required"] | _ProviderNamedToolChoice = "auto"
     temperature: int | float | None = Field(default=None, allow_inf_nan=False)
-    max_completion_tokens: int = Field(ge=1)
+    max_completion_tokens: int | None = Field(default=None, ge=1)
+    max_tokens: int | None = Field(default=None, ge=1)
     stream: Literal[True]
     stream_options: _ProviderStreamOptions
-    store: Literal[False]
+    store: Literal[False] | None = None
     prompt_cache_key: ScalarString | None = None
     prompt_cache_retention: Literal["24h"] | None = None
     reasoning_effort: ScalarString | None = None
+    enable_thinking: bool | None = None
 
     @field_validator("messages", "tools", mode="before")
     @classmethod
     def _provider_collections_are_tuples(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list | tuple) else value
+
+    @model_validator(mode="after")
+    def _compatibility_fields_have_one_representation(self) -> _ProviderRequest:
+        if (self.max_completion_tokens is None) == (self.max_tokens is None):
+            raise ValueError("provider request requires exactly one max-token field")
+        for field_name in ("store", "enable_thinking"):
+            if (
+                field_name in self.model_fields_set
+                and getattr(self, field_name) is None
+            ):
+                raise ValueError(f"provider request {field_name} cannot be null")
+        return self
+
+    @property
+    def output_token_limit(self) -> int:
+        value = self.max_completion_tokens or self.max_tokens
+        if value is None:
+            raise ValueError("provider request has no max-token field")
+        return value
+
+
+class _ResponsesInputText(StrictDomainModel):
+    type: Literal["input_text"]
+    text: ScalarString
+
+
+class _ResponsesOutputText(StrictDomainModel):
+    type: Literal["output_text"]
+    text: ScalarString
+    annotations: tuple[object, ...]
+
+    @field_validator("annotations", mode="before")
+    @classmethod
+    def _annotations_are_a_tuple(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+
+class _ResponsesInputMessage(StrictDomainModel):
+    role: Literal["system", "developer", "user"]
+    content: ScalarString | tuple[_ResponsesInputText, ...]
+    type: Literal["message"] | None = None
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def _content_is_a_tuple(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+    @model_validator(mode="after")
+    def _optional_type_is_not_null(self) -> _ResponsesInputMessage:
+        if "type" in self.model_fields_set and self.type is None:
+            raise ValueError("Responses input message type cannot be null")
+        return self
+
+
+class _ResponsesAssistantMessage(StrictDomainModel):
+    type: Literal["message"]
+    role: Literal["assistant"]
+    content: tuple[_ResponsesOutputText, ...]
+    status: Literal["completed"]
+    id: ScalarString
+    phase: Literal["commentary", "final_answer"] | None = None
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def _content_is_a_tuple(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+
+class _ResponsesFunctionCall(StrictDomainModel):
+    type: Literal["function_call"]
+    call_id: ScalarString
+    name: ScalarString
+    arguments: ScalarString
+    id: ScalarString | None = None
+    namespace: ScalarString | None = None
+
+
+class _ResponsesFunctionCallOutput(StrictDomainModel):
+    type: Literal["function_call_output"]
+    call_id: ScalarString
+    output: ScalarString | tuple[_ResponsesInputText, ...]
+
+    @field_validator("output", mode="before")
+    @classmethod
+    def _output_is_a_tuple(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+
+class _ResponsesReasoningSummary(StrictDomainModel):
+    type: Literal["summary_text"]
+    text: ScalarString
+
+
+class _ResponsesReasoningContent(StrictDomainModel):
+    type: Literal["reasoning_text"]
+    text: ScalarString
+
+
+class _ResponsesReasoning(StrictDomainModel):
+    type: Literal["reasoning"]
+    id: ScalarString
+    summary: tuple[_ResponsesReasoningSummary, ...]
+    content: tuple[_ResponsesReasoningContent, ...] | None = None
+    encrypted_content: ScalarString | None = None
+    status: Literal["in_progress", "completed", "incomplete"] | None = None
+
+    @field_validator("summary", "content", mode="before")
+    @classmethod
+    def _sequences_are_tuples(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+
+_ResponsesInputItem: TypeAlias = (
+    _ResponsesInputMessage
+    | _ResponsesAssistantMessage
+    | _ResponsesFunctionCall
+    | _ResponsesFunctionCallOutput
+    | _ResponsesReasoning
+)
+
+
+class _ResponsesTool(StrictDomainModel):
+    type: Literal["function"]
+    name: ScalarString
+    description: ScalarString
+    parameters: dict[str, object]
+    strict: bool | None = None
+
+
+class _ResponsesNamedToolChoice(StrictDomainModel):
+    type: Literal["function"]
+    name: ScalarString
+
+
+class _ResponsesReasoningOptions(StrictDomainModel):
+    effort: ScalarString
+    summary: Literal["auto", "detailed", "concise"] | None = None
+
+
+class _ResponsesPromptCacheOptions(StrictDomainModel):
+    mode: Literal["explicit"]
+
+
+class _ResponsesRequest(StrictDomainModel):
+    model: ScalarString
+    input: tuple[_ResponsesInputItem, ...]
+    stream: Literal[True]
+    store: Literal[False]
+    max_output_tokens: int = Field(ge=1)
+    tools: tuple[_ResponsesTool, ...] = ()
+    tool_choice: Literal["auto", "none", "required"] | _ResponsesNamedToolChoice = (
+        "auto"
+    )
+    temperature: int | float | None = Field(default=None, allow_inf_nan=False)
+    prompt_cache_key: ScalarString | None = None
+    prompt_cache_retention: Literal["24h"] | None = None
+    prompt_cache_options: _ResponsesPromptCacheOptions | None = None
+    reasoning: _ResponsesReasoningOptions | None = None
+    include: tuple[Literal["reasoning.encrypted_content"], ...] = ()
+    service_tier: Literal["auto", "default", "flex", "scale", "priority"] | None = None
+
+    @field_validator("input", "tools", "include", mode="before")
+    @classmethod
+    def _collections_are_tuples(cls, value: object) -> object:
         return tuple(value) if isinstance(value, list | tuple) else value
 
 
@@ -383,7 +556,7 @@ class OpenAIChatCompletionsV1Adapter:
             tool_choice=tool_choice,
             generation=CanonicalGenerationV1(
                 temperature=provider.temperature,
-                max_tokens=provider.max_completion_tokens,
+                max_tokens=provider.output_token_limit,
             ),
         )
 
@@ -405,6 +578,97 @@ class OpenAIChatCompletionsV1Adapter:
         raise ProviderShapeError("provider request has no attested context addition")
 
 
+class OpenAIResponsesV1Adapter:
+    """Pinned OpenAI-compatible Responses request adapter."""
+
+    schema_version = "openai.responses.v1"
+
+    def canonicalize(self, request: HttpRequest, timeout: Timeout) -> ModelRequestV1:
+        provider = self._parse(request, timeout)
+        messages: list[CanonicalMessageV1] = []
+        for item in provider.input:
+            if isinstance(item, _ResponsesInputMessage):
+                messages.append(
+                    CanonicalMessageV1(
+                        role=CanonicalRole(item.role),
+                        content=_responses_text(item.content),
+                    )
+                )
+            elif isinstance(item, _ResponsesAssistantMessage):
+                messages.append(
+                    CanonicalMessageV1(
+                        role=CanonicalRole.ASSISTANT,
+                        content="\n".join(block.text for block in item.content),
+                    )
+                )
+            elif isinstance(item, _ResponsesFunctionCall):
+                messages.append(
+                    CanonicalMessageV1(
+                        role=CanonicalRole.ASSISTANT,
+                        content=None,
+                        tool_calls=(
+                            CanonicalFunctionCallV1(
+                                id=item.call_id,
+                                name=item.name,
+                                arguments=item.arguments,
+                            ),
+                        ),
+                    )
+                )
+            elif isinstance(item, _ResponsesFunctionCallOutput):
+                messages.append(_responses_tool_result(item))
+        tools = tuple(
+            CanonicalToolV1(
+                name=item.name,
+                description=item.description,
+                input_schema=item.parameters,
+            )
+            for item in provider.tools
+        )
+        if isinstance(provider.tool_choice, str):
+            tool_choice = CanonicalToolChoiceV1(mode=provider.tool_choice)
+        else:
+            tool_choice = CanonicalToolChoiceV1(
+                mode="function", function_name=provider.tool_choice.name
+            )
+        return ModelRequestV1(
+            model=provider.model,
+            messages=tuple(messages),
+            tools=tools,
+            tool_choice=tool_choice,
+            generation=CanonicalGenerationV1(
+                temperature=provider.temperature,
+                max_tokens=provider.max_output_tokens,
+            ),
+        )
+
+    def latest_attested_candidate(
+        self, request: HttpRequest, timeout: Timeout
+    ) -> AttestedCandidate:
+        """Extract the latest user or function-call output context addition."""
+        provider = self._parse(request, timeout)
+        for item in reversed(provider.input):
+            if isinstance(item, _ResponsesInputMessage) and item.role == "user":
+                return PiInputV1(
+                    schema_version="openshell.pi-input.v1",
+                    text=_responses_text(item.content),
+                )
+            if isinstance(item, _ResponsesFunctionCallOutput):
+                return _responses_tool_result(item)
+        raise ProviderShapeError("provider request has no attested context addition")
+
+    def _parse(self, request: HttpRequest, timeout: Timeout) -> _ResponsesRequest:
+        _validate_json_request(request)
+        value = _load_json(request.body, ProviderShapeError, timeout)
+        try:
+            provider = _RESPONSES_PROVIDER_ADAPTER.validate_python(value, strict=True)
+        except ValidationError:
+            raise ProviderShapeError("provider request body is unsupported") from None
+        if not isinstance(provider, _ResponsesRequest):
+            raise ProviderShapeError("provider request body is unsupported")
+        return provider
+
+
 class ProviderAdapterRegistry:
     """Explicit versioned provider-adapter registry."""
 
@@ -421,6 +685,19 @@ class ProviderAdapterRegistry:
             return self._adapters[schema_version]
         except KeyError:
             raise ProviderShapeError("provider adapter is unsupported") from None
+
+    def resolve_request(
+        self, request: HttpRequest, timeout: Timeout
+    ) -> ProviderRequestAdapter:
+        """Select the adapter from the mutually exclusive top-level request shape."""
+        value = _load_json(request.body, ProviderShapeError, timeout)
+        if not isinstance(value, dict):
+            raise ProviderShapeError("provider request body is unsupported")
+        if "messages" in value and "input" not in value:
+            return self.resolve(OpenAIChatCompletionsV1Adapter.schema_version)
+        if "input" in value and "messages" not in value:
+            return self.resolve(OpenAIResponsesV1Adapter.schema_version)
+        raise ProviderShapeError("provider request body is unsupported")
 
 
 def create_pi_adapter_registry() -> HarnessAdapterRegistry:
@@ -442,9 +719,10 @@ def create_pi_adapter_registry() -> HarnessAdapterRegistry:
 
 
 def create_provider_adapter_registry() -> ProviderAdapterRegistry:
-    """Return the built-in OpenAI Chat Completions provider registry."""
+    """Return the built-in OpenAI provider-request registry."""
     registry = ProviderAdapterRegistry()
     registry.register(OpenAIChatCompletionsV1Adapter())
+    registry.register(OpenAIResponsesV1Adapter())
     return registry
 
 
@@ -483,8 +761,44 @@ def _tool_result_attested_candidate(
     return CanonicalMessageV1(
         role=CanonicalRole.TOOL,
         content=text or "(no tool output)",
-        tool_call_id=result.tool_call_id,
+        tool_call_id=_provider_tool_call_id(result.tool_call_id),
     )
+
+
+def _validate_json_request(request: HttpRequest) -> None:
+    if request.target.method.upper() != "POST":
+        raise ProviderShapeError("provider request method is unsupported")
+    content_types = [
+        header.value.strip().lower()
+        for header in request.headers
+        if header.name.lower() == "content-type"
+    ]
+    if content_types != ["application/json"]:
+        raise ProviderShapeError("provider request requires one JSON content type")
+    if any(header.name.lower() == "content-encoding" for header in request.headers):
+        raise ProviderShapeError("provider request content encoding is unsupported")
+
+
+def _responses_text(value: ScalarString | tuple[_ResponsesInputText, ...]) -> str:
+    if isinstance(value, str):
+        return value
+    if not value:
+        raise ProviderShapeError("provider message content cannot be empty")
+    return "\n".join(block.text for block in value)
+
+
+def _responses_tool_result(
+    item: _ResponsesFunctionCallOutput,
+) -> CanonicalMessageV1:
+    return CanonicalMessageV1(
+        role=CanonicalRole.TOOL,
+        content=_responses_text(item.output),
+        tool_call_id=_provider_tool_call_id(item.call_id),
+    )
+
+
+def _provider_tool_call_id(value: str) -> str:
+    return value.split("|", 1)[0]
 
 
 def _load_json(body: bytes, error_type: type[ValueError], timeout: Timeout) -> object:
@@ -519,7 +833,11 @@ def _provider_message_to_canonical(item: _ProviderMessage) -> CanonicalMessageV1
         role=CanonicalRole(item.role),
         content=content,
         name=item.name,
-        tool_call_id=item.tool_call_id,
+        tool_call_id=(
+            _provider_tool_call_id(item.tool_call_id)
+            if item.tool_call_id is not None
+            else None
+        ),
         tool_calls=tuple(
             CanonicalFunctionCallV1(
                 id=call.id,
@@ -534,6 +852,7 @@ def _provider_message_to_canonical(item: _ProviderMessage) -> CanonicalMessageV1
 _PI_ADAPTER = TypeAdapter(PiInputV1)
 _PI_TOOL_RESULT_ADAPTER = TypeAdapter(PiToolResultV1)
 _PROVIDER_ADAPTER = TypeAdapter(_ProviderRequest)
+_RESPONSES_PROVIDER_ADAPTER = TypeAdapter(_ResponsesRequest)
 
 
 __all__ = [
@@ -543,6 +862,7 @@ __all__ = [
     "HarnessAdapter",
     "HarnessAdapterRegistry",
     "OpenAIChatCompletionsV1Adapter",
+    "OpenAIResponsesV1Adapter",
     "PiInputV1",
     "PiImageContentV1",
     "PiTextContentV1",

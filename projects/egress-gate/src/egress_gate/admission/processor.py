@@ -73,7 +73,7 @@ class HarnessAdmissionProcessor:
         return {
             "admission_schema": "openshell.pi-input.v1",
             "canonicalization": "canonical-json.v1",
-            "provider_adapter": "openai.chat-completions.v1",
+            "provider_adapter": "openai.request.v1",
             "attestation_version": "agent-attestation.v1",
             "key_id": self._receipt_authority.key_id,
             "policy_fingerprint": self._policy_fingerprint,
@@ -184,7 +184,6 @@ class AttestedEgressProcessor:
         self._receipt_authority = receipt_authority
         self._middleware_name = middleware_name
         self._harness_version = harness_version
-        self._provider_adapter_schema = "openai.chat-completions.v1"
         self._policy_fingerprint = fingerprint
 
     def process(
@@ -202,7 +201,7 @@ class AttestedEgressProcessor:
         if not agent_attestation:
             return self._deny("attestation_missing")
         try:
-            adapter = self._provider_adapters.resolve(self._provider_adapter_schema)
+            adapter = self._provider_adapters.resolve_request(request, timeout)
             candidate = adapter.latest_attested_candidate(request, timeout)
             timeout.raise_if_expired()
             if isinstance(candidate, PiInputV1):
@@ -225,7 +224,7 @@ class AttestedEgressProcessor:
                 hook=hook,
                 schema_version=schema_version,
                 provider_target=request.target,
-                provider_adapter_schema="openai.chat-completions.v1",
+                provider_adapter_schema="openai.request.v1",
             )
             self._receipt_authority.verify_attestation(
                 agent_attestation,

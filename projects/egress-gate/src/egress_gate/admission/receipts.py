@@ -45,7 +45,7 @@ class ReceiptClaimsV1(StrictDomainModel):
     session_id: BoundedMetadataString
     submission_id: BoundedMetadataString
     receipt_id: str = Field(pattern=r"^[0-9a-f]{32}$")
-    provider_adapter_schema: Literal["openai.chat-completions.v1"]
+    provider_adapter_schema: Literal["openai.request.v1"]
     host: ScalarString
     port: int = Field(ge=0, le=2**32 - 1)
     rendered_prompt_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -69,7 +69,7 @@ class AgentAttestationClaimsV1(StrictDomainModel):
     session_id: BoundedMetadataString
     submission_id: BoundedMetadataString
     attestation_id: str = Field(pattern=r"^[0-9a-f]{32}$")
-    provider_adapter_schema: Literal["openai.chat-completions.v1"]
+    provider_adapter_schema: Literal["openai.request.v1"]
     host: ScalarString
     port: int = Field(ge=0, le=2**32 - 1)
     candidate_hash: str = Field(pattern=r"^[0-9a-f]{64}$")

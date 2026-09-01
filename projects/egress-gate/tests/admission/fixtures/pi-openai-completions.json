@@ -1,0 +1,44 @@
+{
+  "opus": {
+    "model": "azure/anthropic/claude-opus-5",
+    "messages": [
+      {"role": "system", "content": "fixture system prompt"},
+      {"role": "user", "content": "safe"}
+    ],
+    "stream": true,
+    "stream_options": {"include_usage": true},
+    "max_tokens": 128000,
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "read",
+          "description": "Read a file",
+          "parameters": {"type": "object", "properties": {}}
+        }
+      }
+    ]
+  },
+  "qwen": {
+    "model": "nvidia/qwen/qwen3.8-flash-next",
+    "messages": [
+      {"role": "system", "content": "fixture system prompt"},
+      {"role": "user", "content": "safe"}
+    ],
+    "stream": true,
+    "stream_options": {"include_usage": true},
+    "max_tokens": 32768,
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "read",
+          "description": "Read a file",
+          "parameters": {"type": "object", "properties": {}}
+        }
+      }
+    ],
+    "enable_thinking": true,
+    "reasoning_effort": "high"
+  }
+}

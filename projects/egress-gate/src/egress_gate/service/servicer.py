@@ -274,7 +274,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                         request.target.schema_version, hook
                     ),
                     provider_target=target,
-                    provider_adapter_schema="openai.chat-completions.v1",
+                    provider_adapter_schema="openai.request.v1",
                 ),
                 timeout=timeout,
             )
