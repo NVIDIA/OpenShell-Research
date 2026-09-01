@@ -21,12 +21,12 @@ def test_pi_example_can_print_each_action_without_running_it(
     openshell_repo = tmp_path / "OpenShell"
     pack_dir = tmp_path / "pack"
     runtime_dir = tmp_path / "runtime"
+    models_path = project_dir / "examples/pi-attested-admission/models.json"
     environment = os.environ | {
         "PI_REPO": str(pi_repo),
         "OPENSHELL_REPO": str(openshell_repo),
         "EGRESS_GATE_HOST_IP": "192.0.2.10",
-        "PI_MODEL_BASE_URL": "https://models.example.test/v1",
-        "PI_MODEL_ID": "example-model",
+        "PI_MODELS_PATH": str(models_path),
         "PI_EGRESS_PACK_DIR": str(pack_dir),
         "PI_EGRESS_RUNTIME_DIR": str(runtime_dir),
     }
@@ -60,8 +60,7 @@ def test_pi_example_can_print_each_action_without_running_it(
     assert "gateway-middleware.toml" in output
     assert "OPENSHELL_GATEWAY_CONFIG_FRAGMENT=" in output
     assert "render-runtime-config.mjs" in output
-    assert "https://models.example.test/v1" in output
-    assert "example-model" in output
+    assert str(models_path) in output
     assert "egress-gate --debug serve" in output
     assert "CARGO_BUILD_JOBS=4" in output
     assert "OPENSHELL_GATEWAY_NAME=pi-egress-demo-gateway" in output
@@ -133,8 +132,9 @@ def test_pi_example_print_all_is_a_concise_walkthrough() -> None:
         env=os.environ
         | {
             "EGRESS_GATE_HOST_IP": "192.0.2.10",
-            "PI_MODEL_BASE_URL": "https://models.example.test/v1",
-            "PI_MODEL_ID": "example-model",
+            "PI_MODELS_PATH": str(
+                project_dir / "examples/pi-attested-admission/models.json"
+            ),
             "PI_MODEL_API_KEY": "secret-not-printed",
         },
         text=True,
@@ -201,21 +201,24 @@ def test_pi_example_renders_provider_specific_runtime_configuration(
 ) -> None:
     project_dir = Path(__file__).parents[1]
     example_dir = project_dir / "examples/pi-attested-admission"
-    models_output = tmp_path / "models.json"
+    models_path = tmp_path / "models.json"
     policy_output = tmp_path / "policy.yaml"
     provider_profile_output = tmp_path / "provider-profile.yaml"
     gateway_output = tmp_path / "gateway-middleware.toml"
+    selection_output = tmp_path / "model-selection.json"
+    models = json.loads((example_dir / "models.json").read_text())
+    models["providers"]["attested-provider"]["baseUrl"] = (
+        "https://gateway.example.test:8443/models/v1"
+    )
+    models_path.write_text(json.dumps(models))
+    original_models = models_path.read_text()
 
     subprocess.run(
         [
             "node",
             str(example_dir / "render-runtime-config.mjs"),
-            "--base-url",
-            "https://gateway.example.test:8443/models/v1",
-            "--model-id",
-            "nvidia/qwen/qwen3.8-flash-next",
-            "--models-output",
-            str(models_output),
+            "--models-path",
+            str(models_path),
             "--policy-output",
             str(policy_output),
             "--provider-profile-output",
@@ -224,11 +227,14 @@ def test_pi_example_renders_provider_specific_runtime_configuration(
             "http://192.0.2.10:50051",
             "--gateway-output",
             str(gateway_output),
+            "--selection-output",
+            str(selection_output),
         ],
         check=True,
     )
 
-    models = json.loads(models_output.read_text())
+    assert models_path.read_text() == original_models
+    models = json.loads(models_path.read_text())
     provider = models["providers"]["attested-provider"]
     assert provider["baseUrl"] == "https://gateway.example.test:8443/models/v1"
     assert provider["apiKey"] == "$PI_MODEL_API_KEY"
@@ -264,6 +270,12 @@ def test_pi_example_renders_provider_specific_runtime_configuration(
         "thinkingFormat": "qwen",
     }
 
+    selection = json.loads(selection_output.read_text())
+    assert selection == {
+        "providerId": "attested-provider",
+        "modelId": "azure/anthropic/claude-opus-5",
+    }
+
     provider_profile = yaml.safe_load(provider_profile_output.read_text())
     assert provider_profile["id"] == "pi-attested-model"
     assert provider_profile["credentials"][0]["env_vars"] == ["PI_MODEL_API_KEY"]
@@ -296,8 +308,7 @@ def test_pi_example_reports_all_missing_configuration_before_work(
         if name
         not in {
             "EGRESS_GATE_HOST_IP",
-            "PI_MODEL_BASE_URL",
-            "PI_MODEL_ID",
+            "PI_MODELS_PATH",
             "PI_MODEL_API_KEY",
         }
     }
@@ -314,8 +325,7 @@ def test_pi_example_reports_all_missing_configuration_before_work(
     assert result.stdout == ""
     assert "The Pi attested-admission example is not configured." in result.stderr
     assert "EGRESS_GATE_HOST_IP" in result.stderr
-    assert "PI_MODEL_BASE_URL" in result.stderr
-    assert "PI_MODEL_ID" in result.stderr
+    assert "PI_MODELS_PATH" in result.stderr
     assert "PI_MODEL_API_KEY" in result.stderr
     assert "source .env" in result.stderr
     assert "git pull" not in result.stderr
@@ -339,8 +349,9 @@ def test_pi_example_reports_a_missing_compute_backend_before_mise(
             "PATH": f"{tmp_path}:{os.environ['PATH']}",
             "OPENSHELL_DRIVERS": "",
             "EGRESS_GATE_HOST_IP": "192.0.2.10",
-            "PI_MODEL_BASE_URL": "https://models.example.test/v1",
-            "PI_MODEL_ID": "example-model",
+            "PI_MODELS_PATH": str(
+                project_dir / "examples/pi-attested-admission/models.json"
+            ),
             "PI_MODEL_API_KEY": "test-key",
         },
         text=True,

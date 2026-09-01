@@ -60,7 +60,10 @@ If the model endpoint does not require authentication, set
 `PI_MODEL_API_KEY=unused`. Source `.env` again in each new terminal that runs
 `demo.sh`.
 
-The generated Pi catalog contains these models:
+`PI_MODELS_PATH` points to a standard Pi `models.json`. Relative paths are
+resolved from this example directory. The checked-in [models.json](models.json)
+defines one `attested-provider`, its endpoint and credential reference, and
+these models:
 
 | Model ID | Pi transport |
 | --- | --- |
@@ -68,23 +71,26 @@ The generated Pi catalog contains these models:
 | `azure/openai/gpt-5.6-sol` | OpenAI Responses |
 | `nvidia/qwen/qwen3.8-flash-next` | OpenAI Chat Completions |
 
-`PI_MODEL_ID` selects the model Pi starts with and must be one of those IDs.
-Use Pi's normal model picker to switch among all three without creating another
-OpenShell provider. Qwen uses Chat Completions reasoning controls, and GPT-5.6
-Sol uses Responses reasoning. The endpoint's Opus 5 alias currently rejects
-explicit adaptive-thinking controls, so it runs with the endpoint's default
-thinking behavior.
+Pi starts with the first model in the file. Use Pi's normal model picker to
+switch among all three without creating another OpenShell provider. Qwen uses
+Chat Completions reasoning controls, and GPT-5.6 Sol uses Responses reasoning.
+The endpoint's Opus 5 alias currently rejects explicit adaptive-thinking
+controls, so it runs with the endpoint's default thinking behavior.
+
+To use another compatible endpoint or catalog, copy `models.json`, edit it using
+Pi's documented JSON format, and set `PI_MODELS_PATH` to that file. Keep all
+models under the one provider used by this example.
 
 `EGRESS_GATE_HOST_IP` is the address OpenShell uses to reach Egress Gate on this
 machine. It must be a reachable, non-loopback IPv4 address; do not use
-`127.0.0.1`. `PI_MODEL_BASE_URL` is separate: it is the model endpoint Pi will
-call. A model server running on this machine must likewise use a hostname or
-address reachable from the sandbox rather than `localhost`.
+`127.0.0.1`. The provider's `baseUrl` in `models.json` is the model endpoint Pi
+will call. A model server running on this machine must likewise use a hostname
+or address reachable from the sandbox rather than `localhost`.
 
-`demo.sh prepare` derives the endpoint policy and Pi model configuration from
-these values. You do not need to edit `policy.yaml`. If required values are
-missing or still contain placeholders, the script prints the configuration
-steps and stops before performing any work.
+`demo.sh prepare` uploads the model file unchanged and derives the endpoint
+policy from its provider `baseUrl`. You do not need to edit `policy.yaml`. If
+required values are missing or still contain placeholders, the script prints
+the configuration steps and stops before performing any work.
 
 Preview the complete workflow before running anything:
 
@@ -99,8 +105,8 @@ example, `./demo.sh --print prepare` or `./demo.sh --print launch`.
 ## Run the example
 
 Prepare the forks, build and package the locally modified Pi agent core and
-coding agent, generate the endpoint-specific runtime configuration, and
-generate the Egress Gate registration used by Terminal 2:
+coding agent, and generate the endpoint-specific OpenShell and Egress Gate
+configuration used by Terminal 2:
 
 ```shell
 ./demo.sh prepare
