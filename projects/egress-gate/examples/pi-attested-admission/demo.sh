@@ -29,7 +29,7 @@ if [[ $models_path_value == /* || $models_path_value == YOUR_MODELS_PATH ]]; the
 else
 	models_path=$script_dir/${models_path_value#./}
 fi
-workspace_path=${PI_WORKSPACE_PATH:-YOUR_WORKSPACE_PATH}
+workspace_path=${PI_WORKSPACE_PATH:-}
 pack_dir=${PI_EGRESS_PACK_DIR:-/tmp/pi-egress-pack}
 runtime_dir=${PI_EGRESS_RUNTIME_DIR:-/tmp/pi-egress-runtime}
 openshell_cli=$openshell_repo/scripts/bin/openshell
@@ -231,12 +231,11 @@ require_setup_configuration() {
 	if [[ -z ${PI_MODEL_API_KEY:-} || ${PI_MODEL_API_KEY:-} == your-provider-key ]]; then
 		missing+=(PI_MODEL_API_KEY)
 	fi
-	if [[ -z ${PI_WORKSPACE_PATH:-} || ${PI_WORKSPACE_PATH:-} == /absolute/path/to/your/project ]]; then
-		missing+=(PI_WORKSPACE_PATH)
-	fi
 	if ((${#missing[@]} == 0)); then
 		require_file "$models_path" "Pi model configuration"
-		require_directory "$workspace_path" "Pi workspace"
+		if [[ -n $workspace_path ]]; then
+			require_directory "$workspace_path" "Pi workspace"
+		fi
 		return
 	fi
 
@@ -430,9 +429,13 @@ create_demo_sandbox() {
 		--upload "$pi_settings:/sandbox/.pi/agent/settings.json" \
 		--no-git-ignore \
 		--detach
-	describe_printed_commands "Upload the selected workspace with its .gitignore rules:"
-	run_in "$workspace_path" "$openshell_cli" --gateway "$gateway_name" sandbox upload \
-		pi-egress-demo . /sandbox/workspace
+	if [[ -n $workspace_path ]]; then
+		describe_printed_commands "Upload the selected workspace with its .gitignore rules:"
+		run_in "$workspace_path" "$openshell_cli" --gateway "$gateway_name" sandbox upload \
+			pi-egress-demo . /sandbox/workspace
+	elif $print_only; then
+		describe_printed_commands "No workspace selected; Pi starts in an empty /sandbox/workspace."
+	fi
 }
 
 reset_demo() {
@@ -529,7 +532,7 @@ print_plan() {
 	local credential_status="not set"
 	local displayed_host="$host_ip"
 	local displayed_models_path="$models_path"
-	local displayed_workspace="not set"
+	local displayed_workspace="empty /sandbox/workspace"
 	if [[ $displayed_host == YOUR_HOST_IPV4 ]]; then
 		displayed_host="not set"
 		configuration_status="incomplete — edit and source .env"
@@ -543,10 +546,8 @@ print_plan() {
 	else
 		configuration_status="incomplete — edit and source .env"
 	fi
-	if [[ $workspace_path != YOUR_WORKSPACE_PATH && $workspace_path != /absolute/path/to/your/project ]]; then
+	if [[ -n $workspace_path ]]; then
 		displayed_workspace="$workspace_path"
-	else
-		configuration_status="incomplete — edit and source .env"
 	fi
 	if [[ $configuration_status != ready ]]; then
 		status_color="$yellow"
@@ -573,7 +574,7 @@ ${bold}${blue}Workflow${reset}
   ${green}1. prepare${reset}  Clone or update the forks and build the configured Pi fork.
   ${green}2. serve${reset}    Start Egress Gate in Terminal 1 and leave it running.
   ${green}3. gateway${reset}  Start the OpenShell gateway in Terminal 2 and leave it running.
-  ${green}4. reset${reset}    Recreate the sandbox once and upload the selected workspace.
+  ${green}4. reset${reset}    Recreate the sandbox; upload a workspace only when one is selected.
   ${green}5. launch${reset}   Start Pi in Terminal 3. Later launches preserve its sessions.
   ${green}6. test${reset}     At the Pi prompt, submit:
                 Reply with exactly: DENY_THIS

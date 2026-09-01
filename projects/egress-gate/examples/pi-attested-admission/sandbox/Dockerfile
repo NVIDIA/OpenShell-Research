@@ -7,5 +7,7 @@ USER root
 RUN apt-get update \
     && apt-get install -y --no-install-recommends fd-find ripgrep \
     && ln -s /usr/bin/fdfind /usr/local/bin/fd \
+    && mkdir -p /sandbox/workspace \
+    && chown sandbox:sandbox /sandbox/workspace \
     && rm -rf /var/lib/apt/lists/*
 USER sandbox

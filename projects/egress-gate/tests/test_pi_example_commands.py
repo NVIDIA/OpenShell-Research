@@ -151,6 +151,40 @@ def test_pi_example_print_all_is_a_concise_walkthrough() -> None:
     assert "working directory:" not in result.stdout
 
 
+def test_pi_example_uses_an_empty_workspace_when_no_path_is_configured() -> None:
+    project_dir = Path(__file__).parents[1]
+    script = project_dir / "examples/pi-attested-admission/demo.sh"
+    environment = {
+        name: value for name, value in os.environ.items() if name != "PI_WORKSPACE_PATH"
+    } | {
+        "EGRESS_GATE_HOST_IP": "192.0.2.10",
+        "PI_MODELS_PATH": str(
+            project_dir / "examples/pi-attested-admission/models.json"
+        ),
+        "PI_MODEL_API_KEY": "secret-not-printed",
+    }
+
+    reset = subprocess.run(
+        ["bash", str(script), "--print", "reset"],
+        check=True,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+    walkthrough = subprocess.run(
+        ["bash", str(script), "--print", "all"],
+        check=True,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert "sandbox upload" not in reset.stdout
+    assert "empty /sandbox/workspace" in reset.stdout
+    assert "Status:             ready" in walkthrough.stdout
+    assert "Pi workspace:       empty /sandbox/workspace" in walkthrough.stdout
+
+
 def test_pi_example_launch_preserves_the_prepared_sandbox() -> None:
     project_dir = Path(__file__).parents[1]
     script = project_dir / "examples/pi-attested-admission/demo.sh"
@@ -328,7 +362,7 @@ def test_pi_example_reports_all_missing_configuration_before_work(
     assert "EGRESS_GATE_HOST_IP" in result.stderr
     assert "PI_MODELS_PATH" in result.stderr
     assert "PI_MODEL_API_KEY" in result.stderr
-    assert "PI_WORKSPACE_PATH" in result.stderr
+    assert "PI_WORKSPACE_PATH" not in result.stderr
     assert "source .env" in result.stderr
     assert "git pull" not in result.stderr
 
