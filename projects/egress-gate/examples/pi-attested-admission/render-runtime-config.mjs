@@ -4,93 +4,18 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 const options = parseOptions(process.argv.slice(2));
-const baseUrl = parseBaseUrl(options.get("base-url"));
-const modelId = requireOption(options, "model-id");
-const modelsOutput = requireOption(options, "models-output");
+const modelsPath = requireOption(options, "models-path");
 const policyOutput = requireOption(options, "policy-output");
 const providerProfileOutput = requireOption(options, "provider-profile-output");
 const gatewayOutput = requireOption(options, "gateway-output");
+const selectionOutput = requireOption(options, "selection-output");
 const middlewareEndpoint = parseMiddlewareEndpoint(
   options.get("middleware-endpoint"),
 );
+const { providerId, modelId, baseUrl } = readModelSelection(modelsPath);
 const endpointPort = baseUrl.port || (baseUrl.protocol === "https:" ? "443" : "80");
 
-const configuredModels = [
-  {
-    id: "azure/anthropic/claude-opus-5",
-    name: "Claude Opus 5",
-    api: "openai-completions",
-    reasoning: false,
-    input: ["text"],
-    contextWindow: 1000000,
-    maxTokens: 128000,
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    compat: {
-      maxTokensField: "max_tokens",
-      supportsDeveloperRole: false,
-      supportsReasoningEffort: false,
-    },
-  },
-  {
-    id: "azure/openai/gpt-5.6-sol",
-    name: "GPT-5.6 Sol",
-    api: "openai-responses",
-    reasoning: true,
-    thinkingLevelMap: {
-      off: "none",
-      minimal: "low",
-      low: "low",
-      medium: "medium",
-      high: "high",
-      xhigh: "xhigh",
-      max: "max",
-    },
-    input: ["text"],
-    contextWindow: 1050000,
-    maxTokens: 128000,
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-  },
-  {
-    id: "nvidia/qwen/qwen3.8-flash-next",
-    name: "Qwen3.8 Flash Next",
-    api: "openai-completions",
-    reasoning: true,
-    thinkingLevelMap: {
-      minimal: "low",
-      low: "low",
-      medium: "medium",
-      high: "high",
-      xhigh: "high",
-      max: "high",
-    },
-    input: ["text"],
-    contextWindow: 262144,
-    maxTokens: 32768,
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    compat: {
-      maxTokensField: "max_tokens",
-      supportsDeveloperRole: false,
-      supportsReasoningEffort: true,
-      thinkingFormat: "qwen",
-    },
-  },
-];
-
-if (!configuredModels.some((model) => model.id === modelId)) {
-  const configuredModelIds = configuredModels.map((model) => model.id).join(", ");
-  fail(`--model-id must select one of: ${configuredModelIds}`);
-}
-
-const models = {
-  providers: {
-    "attested-provider": {
-      baseUrl: baseUrl.toString().replace(/\/$/, ""),
-      apiKey: "$PI_MODEL_API_KEY",
-      models: configuredModels,
-    },
-  },
-};
-writeFileSync(modelsOutput, `${JSON.stringify(models, null, 2)}\n`);
+writeFileSync(selectionOutput, `${JSON.stringify({ providerId, modelId }, null, 2)}\n`);
 
 const policyTemplate = readFileSync(new URL("policy.yaml", import.meta.url), "utf8");
 const policy = replaceExpected(
@@ -161,19 +86,42 @@ function requireOption(parsed, name) {
   return value;
 }
 
+function readModelSelection(path) {
+  let config;
+  try {
+    config = JSON.parse(readFileSync(path, "utf8"));
+  } catch (error) {
+    fail(`Unable to read Pi model configuration ${path}: ${error.message}`);
+  }
+  const providers = Object.entries(config?.providers || {});
+  if (providers.length !== 1) {
+    fail("The example requires exactly one provider in the Pi model configuration.");
+  }
+  const [providerId, provider] = providers[0];
+  const modelId = provider?.models?.[0]?.id;
+  if (!modelId) {
+    fail(`Provider ${providerId} must contain at least one model.`);
+  }
+  return {
+    providerId,
+    modelId,
+    baseUrl: parseBaseUrl(provider.baseUrl),
+  };
+}
+
 function parseBaseUrl(value) {
-  const raw = value || fail("Missing --base-url.");
+  const raw = value || fail("The Pi model provider must define baseUrl.");
   let parsed;
   try {
     parsed = new URL(raw);
   } catch {
-    fail("--base-url must be an absolute HTTP or HTTPS URL.");
+    fail("The Pi model provider baseUrl must be an absolute HTTP or HTTPS URL.");
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    fail("--base-url must use HTTP or HTTPS.");
+    fail("The Pi model provider baseUrl must use HTTP or HTTPS.");
   }
   if (parsed.username || parsed.password || parsed.search || parsed.hash) {
-    fail("--base-url must not contain credentials, a query, or a fragment.");
+    fail("The Pi model provider baseUrl must not contain credentials, a query, or a fragment.");
   }
   return parsed;
 }
