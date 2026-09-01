@@ -1,4 +1,4 @@
-# Managed Pi attested-admission example
+# Pi attested-admission example
 
 This example runs a normal interactive Pi TUI inside OpenShell and sends
 admitted conversation context to a model endpoint you choose. The endpoint may be a hosted
@@ -54,9 +54,15 @@ source .env
 set +a
 ```
 
+`set -a` makes assignments loaded by `source .env` available to commands run
+from this shell; `set +a` restores the shell's default behavior afterward.
+
 If the model endpoint does not require authentication, set
 `PI_MODEL_API_KEY=unused`. Source `.env` again in each new terminal that runs
 `demo.sh`.
+
+The generated Pi model enables Pi's normal reasoning controls and sends the
+OpenAI-compatible `reasoning_effort` request field to the configured endpoint.
 
 `EGRESS_GATE_HOST_IP` is the address OpenShell uses to reach Egress Gate on this
 machine. It must be a reachable, non-loopback IPv4 address; do not use
@@ -81,8 +87,9 @@ example, `./demo.sh --print prepare` or `./demo.sh --print launch`.
 
 ## Run the example
 
-Prepare the forks, build Pi, generate the endpoint-specific runtime
-configuration, and generate the Egress Gate registration used by Terminal 2:
+Prepare the forks, build and package the locally modified Pi agent core and
+coding agent, generate the endpoint-specific runtime configuration, and
+generate the Egress Gate registration used by Terminal 2:
 
 ```shell
 ./demo.sh prepare
@@ -109,18 +116,25 @@ OpenShell gateway.
 
 After the gateway reports that it is ready, launch Pi from a third terminal:
 
-```shell title="Terminal 3: managed Pi"
+```shell title="Terminal 3: Pi"
 ./demo.sh launch
 ```
 
-Each launch replaces the example's `pi-egress-demo` sandbox, provider, and
-custom provider profile so the current Pi runtime, managed harness, policy,
-endpoint, and OpenShell supervisor are used together.
+This starts the standard Pi CLI, with OpenShell admission inserted immediately
+before each provider request. Each launch replaces the example's
+`pi-egress-demo` sandbox, provider, and custom provider profile so the current
+Pi runtime, admission adapter, policy, endpoint, and OpenShell supervisor are
+used together.
 
 The example registers an endpoint-specific provider profile using the host-side
 `PI_MODEL_API_KEY`. The real credential remains in OpenShell. Pi receives only
-an opaque, endpoint-bound resolver placeholder; OpenShell resolves it in the
-authorization header for the configured model endpoint.
+an opaque, endpoint-bound resolver placeholder. The launcher removes that
+placeholder before starting Pi and passes it once over a private file
+descriptor. The thin launcher reads and closes the descriptor before the TUI or
+tools start, supplies the resolver to Pi's non-persistent runtime credential
+store, installs mandatory admission, and delegates the rest of startup to Pi's
+standard CLI. OpenShell resolves the placeholder in the authorization header
+for the configured model endpoint.
 
 At the Pi prompt, submit both of these in the same session:
 
@@ -146,18 +160,19 @@ The tool runs, but its result is replaced by Pi's protocol-safe blocked result
 before it enters live context. Repeat with `REDACT_` and `THIS` to see the tool
 result admitted as `[REDACTED]`.
 
-This example deliberately uses Pi's in-memory session manager. The interactive
-TUI, tools, queued messages, retries, and `/new` work normally during the run,
-but the session is not written inside the sandbox and cannot be resumed after
-Pi exits. That is the minimal isolation guarantee: unadmitted context cannot be
-recovered from a workload-owned session file.
+Pi uses its standard session manager and JSONL session location, and exposes
+the active path to tools as `PI_SESSION_FILE`. Admission runs before a user
+message or tool result reaches that history. Each `launch` replaces the
+disposable demo sandbox, so copy out anything you want to retain before ending
+the run.
 
 ## How it works
 
-1. `managed-pi.ts` creates the regular Pi `InteractiveMode` with a mandatory SDK
-   `ContextAdmission` boundary and an in-memory session manager. It disables
-   dynamically loaded extensions, so project or user extensions cannot replace
-   this boundary.
+1. `managed-pi.ts` calls Pi's standard `main()` with two runtime hooks: one
+   installs the opaque credential resolver and one creates the mandatory SDK
+   `ContextAdmission` boundary for each normal Pi session. The launch command
+   uses Pi's standard `--no-extensions` option, so project or user extensions
+   cannot replace this boundary.
 2. Pi calls that boundary for each rendered user message and finalized tool
    result before it queues, appends, or persists the value.
 3. The adapter sends the exact context addition to OpenShell's sandbox-local
@@ -165,9 +180,11 @@ recovered from a workload-owned session file.
    complete replacement.
 4. OpenShell keeps the signed attestation and gives Pi only an opaque handle.
    The adapter keeps handles in its private closure, outside Pi messages.
-5. For each provider request or retry, Pi passes the exact outbound context to
-   the adapter. It selects the handle for the newest admitted user message or
-   tool result in that context.
+5. Immediately before every provider request, Pi passes the exact outbound
+   context through admission. This includes normal turns, retries, compaction,
+   branch summaries, and contexts restored from a prior session. The adapter
+   applies any replacement and obtains a fresh handle for the newest user
+   message or tool result in that exact context.
 6. OpenShell strips the handle, resolves the supervisor-held attestation, and
    supplies it only to the configured Egress Gate middleware stage. Egress Gate
    verifies the latest context addition and scans the complete provider request
@@ -176,9 +193,10 @@ recovered from a workload-owned session file.
 ## Current scope
 
 The attestation adapter supports normal text turns, text tool results, queued
-steering and follow-up messages, retries, and automatic model continuations,
-using the OpenAI Chat Completions wire format. Providers with a different native
-protocol and image inputs are not covered by this example and fail closed.
+steering and follow-up messages, retries, automatic model continuations,
+compaction, branch summaries, and restored sessions using the OpenAI Chat
+Completions wire format. Providers with a different native protocol and image
+inputs are not covered by this example and fail closed.
 
 ## Cleanup
 

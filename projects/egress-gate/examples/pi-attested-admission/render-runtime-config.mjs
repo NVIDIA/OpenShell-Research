@@ -25,11 +25,12 @@ const models = {
         {
           id: modelId,
           name: modelId,
-          reasoning: false,
+          reasoning: true,
           input: ["text"],
           contextWindow: 128000,
           maxTokens: 16384,
           cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+          compat: { supportsReasoningEffort: true },
         },
       ],
     },

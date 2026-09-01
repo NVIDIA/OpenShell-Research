@@ -44,7 +44,10 @@ def test_pi_example_can_print_each_action_without_running_it(
     output = "\n".join(result.stdout for result in results)
 
     assert "npm run build" in output
+    assert "earendil-works-pi-agent-core-VERSION.tgz" in output
     assert "earendil-works-pi-coding-agent-VERSION.tgz" in output
+    assert "npm pack --workspace @earendil-works/pi-agent-core" in output
+    assert "npm pack --workspace @earendil-works/pi-coding-agent" in output
     assert "git clone --branch johnny/before-user-message-commit" in output
     assert "git clone --branch openshell/pi-egress-admission" in output
     assert (
@@ -80,18 +83,43 @@ def test_pi_example_can_print_each_action_without_running_it(
     assert "sandbox exec" in output
     assert "sandbox exec --tty" in output
     assert "PI_OFFLINE=1" in output
+    assert "--no-extensions" in output
+    assert "--provider" in output
+    assert "--model" in output
     assert "OPENSHELL_AGENT_CONVERSATION_URL=" in output
     assert "managed-pi.ts:/sandbox/pi-runtime/managed-pi.ts" in output
     assert (
         "managed-pi-admission.ts:/sandbox/pi-runtime/managed-pi-admission.ts" in output
     )
-    assert "--extension" not in output
+    assert "--extension " not in output
     assert "sandbox delete" in output
     assert all(result.stderr == "" for result in results)
     assert not pi_repo.exists()
     assert not openshell_repo.exists()
     assert not pack_dir.exists()
     assert not runtime_dir.exists()
+
+    managed_pi = (
+        project_dir / "examples/pi-attested-admission/managed-pi.ts"
+    ).read_text()
+    assert "main(process.argv.slice(2)" in managed_pi
+    assert "SessionManager" not in managed_pi
+    assert "ModelRuntime.create" not in managed_pi
+    assert "InteractiveMode" not in managed_pi
+    assert "thinkingLevel" not in managed_pi
+    assert 'readFileSync(3, "utf8")' in managed_pi
+    assert "closeSync(3)" in managed_pi
+    assert "process.env.PI_MODEL_API_KEY" not in managed_pi
+    assert "await modelRuntime.setRuntimeApiKey(provider, modelApiKey)" in managed_pi
+    assert "configureModelRuntime" in managed_pi
+    assert "createContextAdmission" in managed_pi
+
+    demo_script = (project_dir / "examples/pi-attested-admission/demo.sh").read_text()
+    assert '"beforeToolResultAppend"' in demo_script
+    assert "exec env -u PI_MODEL_API_KEY node" in demo_script
+    assert '3<<<"$PI_MODEL_API_KEY"' in demo_script
+    assert '"configureModelRuntime"' in demo_script
+    assert '"createContextAdmission"' in demo_script
 
 
 def test_pi_example_print_all_is_a_concise_walkthrough() -> None:
@@ -206,6 +234,8 @@ def test_pi_example_renders_provider_specific_runtime_configuration(
     assert provider["api"] == "openai-completions"
     assert provider["apiKey"] == "$PI_MODEL_API_KEY"
     assert provider["models"][0]["id"] == "custom-model"
+    assert provider["models"][0]["reasoning"] is True
+    assert provider["models"][0]["compat"] == {"supportsReasoningEffort": True}
 
     provider_profile = yaml.safe_load(provider_profile_output.read_text())
     assert provider_profile["id"] == "pi-attested-model"

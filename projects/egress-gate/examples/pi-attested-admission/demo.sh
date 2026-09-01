@@ -99,6 +99,18 @@ require_file() {
 	fi
 }
 
+require_file_contains() {
+	local path=$1
+	local expected_text=$2
+	local description=$3
+	require_file "$path" "$description"
+	if ! grep -Fq -- "$expected_text" "$path"; then
+		printf '%s is missing the required admission hook: %s\n' "$description" "$path" >&2
+		printf 'Run `./demo.sh prepare` to rebuild the local Pi runtime.\n' >&2
+		exit 1
+	fi
+}
+
 require_directory() {
 	local path=$1
 	local description=$2
@@ -273,15 +285,17 @@ sync_forks() {
 	run_in "$openshell_repo" git pull --no-rebase --ff-only origin "$openshell_branch"
 }
 
-pi_tarball() {
+pi_package_tarball() {
+	local package_directory=$1
+	local archive_name=$2
 	if $print_only; then
-		printf '%s/earendil-works-pi-coding-agent-VERSION.tgz' "$pack_dir"
+		printf '%s/%s-VERSION.tgz' "$pack_dir" "$archive_name"
 		return
 	fi
-	require_file "$pi_repo/packages/coding-agent/package.json" "Pi coding-agent package"
+	require_file "$package_directory/package.json" "Pi package"
 	local version
-	version=$(node -p "require(process.argv[1]).version" "$pi_repo/packages/coding-agent/package.json")
-	printf '%s/earendil-works-pi-coding-agent-%s.tgz' "$pack_dir" "$version"
+	version=$(node -p "require(process.argv[1]).version" "$package_directory/package.json")
+	printf '%s/%s-%s.tgz' "$pack_dir" "$archive_name" "$version"
 }
 
 render_runtime_configuration() {
@@ -301,15 +315,18 @@ prepare() {
 		require_example_configuration
 	fi
 	sync_forks
-	local tarball
-	tarball=$(pi_tarball)
+	local agent_tarball
+	local coding_agent_tarball
+	agent_tarball=$(pi_package_tarball "$pi_repo/packages/agent" "earendil-works-pi-agent-core")
+	coding_agent_tarball=$(pi_package_tarball "$pi_repo/packages/coding-agent" "earendil-works-pi-coding-agent")
 
 	describe_printed_commands "Build and package Pi:"
 	run_in "$pi_repo" npm install --ignore-scripts
 	run_in "$pi_repo" npm run build
 	run_in "$pi_repo" mkdir -p "$pack_dir" "$runtime_dir"
+	run_in "$pi_repo" npm pack --workspace @earendil-works/pi-agent-core --pack-destination "$pack_dir"
 	run_in "$pi_repo" npm pack --workspace @earendil-works/pi-coding-agent --pack-destination "$pack_dir"
-	run_in "$pi_repo" npm install --prefix "$runtime_dir" --ignore-scripts "$tarball"
+	run_in "$pi_repo" npm install --prefix "$runtime_dir" --ignore-scripts "$agent_tarball" "$coding_agent_tarball"
 	describe_printed_commands "Generate the Pi model configuration and endpoint policy:"
 	render_runtime_configuration
 }
@@ -403,11 +420,26 @@ launch() {
 	if ! $print_only; then
 		require_example_configuration
 		require_file "$openshell_cli" "OpenShell CLI wrapper"
-		require_file "$(pi_tarball)" "packed Pi coding-agent"
+		require_file "$(pi_package_tarball "$pi_repo/packages/agent" "earendil-works-pi-agent-core")" \
+			"packed Pi agent core"
+		require_file "$(pi_package_tarball "$pi_repo/packages/coding-agent" "earendil-works-pi-coding-agent")" \
+			"packed Pi coding-agent"
+		require_file_contains \
+			"$runtime_dir/node_modules/@earendil-works/pi-agent-core/dist/agent-loop.js" \
+			"beforeToolResultAppend" \
+			"installed Pi agent core"
 		require_file "$runtime_dir/node_modules/@earendil-works/pi-coding-agent/dist/index.js" \
 			"installed Pi SDK"
-		require_file "$script_dir/managed-pi.ts" "managed Pi harness"
-		require_file "$script_dir/managed-pi-admission.ts" "managed Pi admission adapter"
+		require_file_contains \
+			"$runtime_dir/node_modules/@earendil-works/pi-coding-agent/dist/main.js" \
+			"configureModelRuntime" \
+			"installed Pi CLI"
+		require_file_contains \
+			"$runtime_dir/node_modules/@earendil-works/pi-coding-agent/dist/main.js" \
+			"createContextAdmission" \
+			"installed Pi CLI"
+		require_file "$script_dir/managed-pi.ts" "Pi launcher"
+		require_file "$script_dir/managed-pi-admission.ts" "Pi admission adapter"
 	fi
 
 	describe_printed_commands "Refresh the endpoint-specific model, policy, and provider profile:"
@@ -433,7 +465,7 @@ launch() {
 		PI_MANAGED_PROVIDER=attested-provider \
 		PI_MANAGED_MODEL="$model_id" \
 		OPENSHELL_AGENT_CONVERSATION_URL=http://127.0.0.1:8193/v1/agent/conversation \
-		node --experimental-strip-types /sandbox/pi-runtime/managed-pi.ts
+		bash -c 'exec env -u PI_MODEL_API_KEY node --experimental-strip-types /sandbox/pi-runtime/managed-pi.ts --no-extensions --provider "$PI_MANAGED_PROVIDER" --model "$PI_MANAGED_MODEL" 3<<<"$PI_MODEL_API_KEY"'
 }
 
 cleanup() {
@@ -458,7 +490,7 @@ usage() {
   prepare  Update the forks, package Pi, and generate the runtime configuration
   serve    Start Egress Gate
   gateway  Start the forked OpenShell gateway
-  launch   Attach the configured model credential and launch managed Pi
+  launch   Attach the configured model credential and launch Pi
   cleanup  Delete the example sandbox and credential provider
   all      Show the concise workflow walkthrough (requires --print)
 EOF
@@ -520,7 +552,7 @@ ${bold}${blue}Workflow${reset}
               and gateway middleware configuration.
   ${green}2. serve${reset}    Start Egress Gate in Terminal 1 and leave it running.
   ${green}3. gateway${reset}  Start the OpenShell gateway in Terminal 2 and leave it running.
-  ${green}4. launch${reset}   Create the credential provider and launch managed Pi in Terminal 3.
+  ${green}4. launch${reset}   Create the credential provider and launch Pi in Terminal 3.
   ${green}5. test${reset}     At the Pi prompt, submit:
                 Reply with exactly: DENY_THIS
                 Reply with exactly: REDACT_THIS
