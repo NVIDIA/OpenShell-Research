@@ -29,6 +29,7 @@ def test_pi_example_can_print_each_action_without_running_it(
         "PI_MODELS_PATH": str(models_path),
         "PI_EGRESS_PACK_DIR": str(pack_dir),
         "PI_EGRESS_RUNTIME_DIR": str(runtime_dir),
+        "PI_WORKSPACE_PATH": str(tmp_path / "workspace"),
     }
 
     results = [
@@ -39,11 +40,11 @@ def test_pi_example_can_print_each_action_without_running_it(
             env=environment,
             text=True,
         )
-        for action in ("prepare", "serve", "gateway", "launch", "cleanup")
+        for action in ("prepare", "serve", "gateway", "reset", "launch", "cleanup")
     ]
     output = "\n".join(result.stdout for result in results)
 
-    assert "npm run build" in output
+    assert "npm run build:offline" in output
     assert "earendil-works-pi-agent-core-VERSION.tgz" in output
     assert "earendil-works-pi-coding-agent-VERSION.tgz" in output
     assert "npm pack --workspace @earendil-works/pi-agent-core" in output
@@ -76,15 +77,20 @@ def test_pi_example_can_print_each_action_without_running_it(
     assert "OPENAI_API_KEY" not in output
     assert "api.openai.com" not in output
     assert "sandbox create" in output
+    assert "--from" in output
+    assert "pi-attested-admission/sandbox" in output
     assert "--detach" in output
     assert "--no-git-ignore" in output
     assert f"{runtime_dir}/node_modules:/sandbox/pi-runtime" in output
     assert f"{runtime_dir}:/sandbox/pi-runtime" not in output
-    assert f"{models_path}:/sandbox/pi-agent/models.json" in output
-    assert "settings.json:/sandbox/pi-agent/settings.json" in output
+    assert f"{models_path}:/sandbox/.pi/agent/models.json" in output
+    assert "settings.json:/sandbox/.pi/agent/settings.json" in output
+    assert "sandbox upload" in output
+    assert "/sandbox/workspace" in output
     assert "sandbox exec" in output
     assert "sandbox exec --tty" in output
-    assert "PI_OFFLINE=1" in output
+    assert "PI_OFFLINE=1" not in output
+    assert "PI_CODING_AGENT_DIR=" not in output
     assert "--no-extensions" not in output
     assert "/sandbox/pi-runtime/node_modules/.bin/pi" in output
     assert "PI_OPENSHELL_CONTEXT_ADMISSION=1" in output
@@ -97,6 +103,17 @@ def test_pi_example_can_print_each_action_without_running_it(
     assert not openshell_repo.exists()
     assert not pack_dir.exists()
     assert not runtime_dir.exists()
+
+    reset_output = results[3].stdout
+    normalized_reset_output = " ".join(reset_output.replace("\\\n", " ").split())
+    assert f"working directory: {tmp_path / 'workspace'}" in reset_output
+    assert (
+        "sandbox upload pi-egress-demo . /sandbox/workspace" in normalized_reset_output
+    )
+    assert (
+        f"sandbox upload pi-egress-demo {tmp_path / 'workspace'}"
+        not in normalized_reset_output
+    )
 
     demo_script = (project_dir / "examples/pi-attested-admission/demo.sh").read_text()
     assert '"beforeToolResultAppend"' in demo_script
@@ -120,6 +137,7 @@ def test_pi_example_print_all_is_a_concise_walkthrough() -> None:
                 project_dir / "examples/pi-attested-admission/models.json"
             ),
             "PI_MODEL_API_KEY": "secret-not-printed",
+            "PI_WORKSPACE_PATH": "/tmp/example-workspace",
         },
         text=True,
     )
@@ -128,9 +146,30 @@ def test_pi_example_print_all_is_a_concise_walkthrough() -> None:
     assert "Configuration visible to this shell" in result.stdout
     assert "Model credential:  set (value hidden)" in result.stdout
     assert "1. prepare" in result.stdout
-    assert "6. cleanup" in result.stdout
+    assert "7. cleanup" in result.stdout
     assert "secret-not-printed" not in result.stdout
     assert "working directory:" not in result.stdout
+
+
+def test_pi_example_launch_preserves_the_prepared_sandbox() -> None:
+    project_dir = Path(__file__).parents[1]
+    script = project_dir / "examples/pi-attested-admission/demo.sh"
+
+    result = subprocess.run(
+        ["bash", str(script), "--print", "launch"],
+        check=True,
+        capture_output=True,
+        env=os.environ,
+        text=True,
+    )
+
+    normalized_output = " ".join(result.stdout.replace("\\\n", " ").split())
+    assert "sandbox exec --tty" in normalized_output
+    assert "--workdir /sandbox/workspace" in normalized_output
+    assert "sandbox delete" not in result.stdout
+    assert "sandbox create" not in result.stdout
+    assert "provider delete" not in result.stdout
+    assert "provider create" not in result.stdout
 
 
 def test_pi_example_uses_terminal_colors_without_leaking_them_to_redirects() -> None:
@@ -222,7 +261,7 @@ def test_pi_example_uses_standard_checked_in_configuration() -> None:
     settings = json.loads((example_dir / "settings.json").read_text())
     assert settings == {
         "defaultProvider": "attested-provider",
-        "defaultModel": "azure/anthropic/claude-opus-5",
+        "defaultModel": "nvidia/qwen/qwen3.8-flash-next",
         "defaultThinkingLevel": "high",
     }
 
@@ -241,6 +280,11 @@ def test_pi_example_uses_standard_checked_in_configuration() -> None:
     assert endpoint["port"] == 443
     middleware = policy["network_middlewares"]["pi_egress_gate"]
     assert middleware["endpoints"]["include"] == ["inference-api.nvidia.com"]
+    assert set(policy["network_policies"]) == {"model_provider"}
+
+    sandbox_dockerfile = (example_dir / "sandbox/Dockerfile").read_text()
+    assert "openshell-community/sandboxes/pi:latest" in sandbox_dockerfile
+    assert "fd-find ripgrep" in sandbox_dockerfile
 
     gateway_template = (example_dir / "gateway-middleware.toml.example").read_text()
     gateway_fragment = tomllib.loads(
@@ -266,11 +310,12 @@ def test_pi_example_reports_all_missing_configuration_before_work(
             "EGRESS_GATE_HOST_IP",
             "PI_MODELS_PATH",
             "PI_MODEL_API_KEY",
+            "PI_WORKSPACE_PATH",
         }
     }
 
     result = subprocess.run(
-        ["bash", str(script), "prepare"],
+        ["bash", str(script), "reset"],
         capture_output=True,
         cwd=tmp_path,
         env=environment,
@@ -283,6 +328,7 @@ def test_pi_example_reports_all_missing_configuration_before_work(
     assert "EGRESS_GATE_HOST_IP" in result.stderr
     assert "PI_MODELS_PATH" in result.stderr
     assert "PI_MODEL_API_KEY" in result.stderr
+    assert "PI_WORKSPACE_PATH" in result.stderr
     assert "source .env" in result.stderr
     assert "git pull" not in result.stderr
 
