@@ -59,11 +59,12 @@ If the model endpoint does not require authentication, set
 `PI_MODEL_API_KEY=unused`. Source `.env` in the terminals that run `gateway` and
 `reset`; the other actions do not consume the credential.
 
-`PI_WORKSPACE_PATH` is the absolute path of the project you want Pi to work on.
-The reset step uploads its contents to `/sandbox/workspace` using the project's normal
-`.gitignore` rules. Pi starts in that directory, so project instructions,
-extensions, skills, prompts, and session grouping follow its ordinary
-current-directory behavior.
+`PI_WORKSPACE_PATH` is optional. Set it to the absolute path of a project you
+want Pi to work on. The reset step uploads its contents to `/sandbox/workspace`
+using the project's normal `.gitignore` rules. If you omit it, Pi starts in an
+empty `/sandbox/workspace`; no local files are copied. In either case, Pi starts
+there, so project instructions, extensions, skills, prompts, and session
+grouping follow its ordinary current-directory behavior.
 
 `PI_MODELS_PATH` points to a standard Pi `models.json`. Relative paths are
 resolved from this example directory. The checked-in [models.json](models.json)
