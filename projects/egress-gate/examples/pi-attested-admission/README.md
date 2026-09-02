@@ -156,21 +156,24 @@ Then launch Pi:
 ./demo.sh launch
 ```
 
-This executes the fork's normal `pi` entrypoint. The explicit
-`PI_OPENSHELL_CONTEXT_ADMISSION=1` setting makes its built-in OpenShell
-admission boundary mandatory for the session. `launch` only enters the existing
-sandbox; it does not replace the sandbox or Pi's state. Exit and run `launch`
-again to use Pi's normal `/resume` flow and persistent JSONL sessions. Run
-`reset` only when you intentionally want a fresh sandbox or need to apply a new
-runtime, policy, model configuration, credential, or workspace snapshot.
+This runs Pi's standard CLI with a trusted runtime extension. Unlike ordinary
+user and project extensions, a runtime extension is installed by the launcher,
+supplies mandatory runtime boundaries, and is not affected by
+`--no-extensions`. Pi still owns argument parsing, the TUI, settings, ordinary
+extensions, tools, model selection, compaction, and session storage. `launch`
+only enters the existing sandbox; it does not replace the sandbox or Pi's
+state. Exit and run `launch` again to use Pi's normal `/resume` flow and
+persistent JSONL sessions. Run `reset` only when you intentionally want a fresh
+sandbox or need to apply a new runtime, policy, model configuration, credential,
+or workspace snapshot.
 
 The sandbox image adds the `fd` and `rg` executables used by Pi's standard
-`find` and `grep` tools. Pi itself still comes from the prepared fork package,
-and starts without a wrapper or restrictive CLI flags. Its standard user and
-project resource discovery, extension loading, tools, model picker, thinking
-controls, compaction, and session manager remain active. OpenShell's filesystem
-and network policy still apply to every process in the sandbox; arbitrary
-package downloads are intentionally outside this endpoint-focused example.
+`find` and `grep` tools. Pi itself still comes from the prepared fork package
+and starts without restrictive CLI flags. Its standard user and project
+resource discovery, extension loading, tools, model picker, thinking controls,
+compaction, and session manager remain active. OpenShell's filesystem and
+network policy still apply to every process in the sandbox; arbitrary package
+downloads are intentionally outside this endpoint-focused example.
 
 The example registers an endpoint-specific provider profile using the host-side
 `PI_MODEL_API_KEY`. Its `delivery: proxy` setting keeps the credential and any
@@ -210,14 +213,19 @@ message or tool result reaches that history. `launch` preserves the history;
 
 ## How it works
 
-1. The forked `pi` entrypoint sees `PI_OPENSHELL_CONTEXT_ADMISSION=1` and installs
-   its built-in mandatory `ContextAdmission` boundary. Pi otherwise starts
-   normally, including its standard project and user extension discovery.
+1. Pi exposes a provider-neutral `runCli()` entrypoint and a `RuntimeExtension`
+   interface for mandatory `ContextAdmission` hooks. The TypeScript
+   [openshell-pi.ts](runtime-extension/openshell-pi.ts) launcher calls that
+   entrypoint with the OpenShell adapter from
+   [openshell-context-admission.ts](runtime-extension/openshell-context-admission.ts).
+   `prepare` type-checks both files against the packaged Pi API and compiles
+   them to JavaScript for the sandbox. Pi otherwise starts normally, including
+   standard project and user extension discovery.
 2. Pi calls that boundary for each rendered user message and finalized tool
    result before it queues, appends, or persists the value.
-3. The adapter sends the exact context addition to OpenShell's sandbox-local
-   bridge. Egress Gate applies `policy.yaml` and returns allow, deny, or a
-   complete replacement.
+3. The external adapter sends the exact context addition to OpenShell's
+   sandbox-local bridge. Egress Gate applies `policy.yaml` and returns allow,
+   deny, or a complete replacement.
 4. OpenShell keeps the signed attestation and gives Pi only an opaque handle.
    The adapter keeps handles in its private closure, outside Pi messages.
 5. Immediately before every provider request, Pi passes the exact outbound
@@ -229,6 +237,25 @@ message or tool result reaches that history. `launch` preserves the history;
    supplies it only to the configured Egress Gate middleware stage. Egress Gate
    verifies the latest context addition and scans the complete provider request
    before OpenShell injects the proxy-delivered model credential.
+
+This division is intentional. The Pi fork contributes only reusable harness
+primitives: mandatory admission of user messages and finalized tool results,
+admission of the exact provider context, an outbound-header transformation, and
+a standard-CLI entrypoint that accepts those hooks. OpenShell contributes the
+sandbox-local bridge, signed receipts, receipt-to-request binding, middleware
+enforcement, and post-policy credential delivery. The TypeScript files under
+`runtime-extension/` are the reusable integration layer that translates between
+those generic Pi hooks and the OpenShell protocol; no OpenShell-specific code is
+built into Pi.
+
+The current OpenShell bridge is supervisor-owned but reachable by every process
+inside the sandbox over loopback; it does not yet authenticate the calling
+process. Receipt binding still prevents an unadmitted provider request from
+passing the egress middleware. However, OpenShell cannot prove that the
+designated harness invoked admission before changing its own local memory or
+session files. A stronger runtime needs one additional OpenShell primitive: a
+process-scoped admission capability, or a supervisor-owned adapter channel that
+only the designated harness can invoke.
 
 ## Current scope
 
