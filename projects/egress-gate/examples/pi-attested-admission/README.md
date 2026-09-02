@@ -290,9 +290,10 @@ built into Pi.
 The supervisor mints a separate admission token for each `sandbox exec`, accepts
 it only while that process is running, and rejects bridge calls without a valid
 token. Because the launcher consumes the descriptor before starting Pi, tool
-subprocesses receive neither the descriptor nor its environment name. The
-OpenShell middleware field `require_caller_token: false` disables this check for
-debugging; this example keeps the secure default.
+subprocesses receive neither the descriptor nor its environment name. Setting
+`OPENSHELL_AGENT_ADMISSION_REQUIRE_CALLER_TOKEN=false` when starting the
+OpenShell supervisor disables this check for debugging; this example keeps the
+secure default.
 
 ## Current scope
 
