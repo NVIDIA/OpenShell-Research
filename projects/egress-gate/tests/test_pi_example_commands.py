@@ -114,7 +114,7 @@ def test_pi_example_can_print_each_action_without_running_it(
     assert "sandbox exec --tty" in output
     assert "sandbox exec --no-tty" in output
     assert "DENY_THIS" in output
-    assert "/usr/local/bin/pi" in output
+    assert "/usr/bin/pi" in output
     assert "PI_OFFLINE=1" not in output
     assert "PI_CODING_AGENT_DIR=" not in output
     assert "--no-extensions" not in output

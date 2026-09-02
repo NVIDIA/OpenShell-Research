@@ -167,7 +167,8 @@ Run the complete non-interactive verification:
 ```
 
 `verify` runs the real packaged Pi and OpenShell sandbox. It checks a denied
-prompt without a session write, a persisted redaction, an unauthenticated call
+prompt without a session write, a persisted redaction with a successful model
+response, an unauthenticated call
 to the admission bridge, a raw provider request without an admission handle,
 the stock Pi binary without the runtime adapter, and best-effort tool-result
 cases. Each case uses a fresh session and prints one `PASS` or `SKIP` line. Tool
