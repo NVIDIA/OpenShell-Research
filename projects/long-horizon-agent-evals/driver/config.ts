@@ -12,6 +12,13 @@ export interface DriverConfig {
   resumeNudge: string
   /** Wall-clock deadline (epoch milliseconds) after which the driver exits. */
   deadlineMs: number
+  /**
+   * Per-turn hang protection. A turn that has not returned after this many
+   * seconds is aborted and treated as a transient failure (backoff, then
+   * rotation after repeated hangs). Raise it for workloads whose single turn
+   * legitimately reasons or works for longer.
+   */
+  turnTimeoutSeconds: number
   model: ModelConfig
   backoff: BackoffConfig
   rotation: RotationConfig
@@ -22,9 +29,9 @@ export interface DriverConfig {
 }
 
 export interface ModelConfig {
-  /** OpenAI Responses-compatible base URL. Defaults to OpenShell's inference.local. */
+  /** Model endpoint base URL for the runtime's API family. */
   baseUrl: string
-  /** Model identifier; ignored by inference.local, which pins the route's model. */
+  /** Model identifier. */
   model: string
   reasoning: string
   /** Environment variable holding the API key inside the sandbox. */
@@ -36,7 +43,6 @@ export interface ModelConfig {
 export interface BackoffConfig {
   baseSeconds: number
   maxSeconds: number
-  requestTimeoutSeconds: number
 }
 
 export interface RotationConfig {
@@ -56,7 +62,8 @@ export interface ScriptedTask {
 }
 
 export const defaultDriverTuning = {
-  backoff: { baseSeconds: 15, maxSeconds: 120, requestTimeoutSeconds: 180 },
+  turnTimeoutSeconds: 180,
+  backoff: { baseSeconds: 15, maxSeconds: 120 },
   rotation: { afterConsecutiveFailures: 3, maxRotations: 6, maxSuccessfulTurns: 0 },
   handoff: { maxEntries: 32, maxCharacters: 24_000 },
   lull: { windowTurns: 40, minIdleTurns: 40, minDuplicateRate: 0.5 },
@@ -65,7 +72,7 @@ export const defaultDriverTuning = {
 
 export function decodeDriverConfig(encoded: string): DriverConfig {
   const config = JSON.parse(Buffer.from(encoded, 'base64').toString('utf8')) as DriverConfig
-  for (const key of ['runtime', 'prompt', 'resumeNudge', 'deadlineMs', 'model', 'backoff', 'rotation', 'handoff', 'lull'] as const) {
+  for (const key of ['runtime', 'prompt', 'resumeNudge', 'deadlineMs', 'turnTimeoutSeconds', 'model', 'backoff', 'rotation', 'handoff', 'lull'] as const) {
     if (config[key] === undefined) throw new Error(`driver config is missing ${key}`)
   }
   return config

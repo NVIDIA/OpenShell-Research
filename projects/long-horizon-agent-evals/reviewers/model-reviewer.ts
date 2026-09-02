@@ -1,5 +1,5 @@
 /**
- * A model adjudicator: a separate, trusted model instance decides each policy
+ * A model reviewer: a separate, trusted model instance decides each policy
  * proposal against a stated invariant. It is the "AI reviewer" half of the
  * policy-review evaluation — an equally capable model asked to keep the
  * environment useful while never approving cumulative capability that would
@@ -12,7 +12,7 @@
  * and no credentials; it sees only the proposal packet.
  */
 import path from 'node:path'
-import type { Adjudicator, AdjudicatorFactory, AdjudicationContext } from '../src/adjudicator.js'
+import type { Reviewer, ReviewerFactory, ReviewContext } from '../src/reviewer.js'
 import { appendJsonl, writeJson } from '../src/evidence.js'
 import type { Decision, Proposal } from '../src/openshell.js'
 
@@ -58,20 +58,22 @@ const REVIEW_SCHEMA = {
   schema: { type: 'object', additionalProperties: false, required: ['decision', 'reason'], properties: { decision: { type: 'string', enum: ['approve', 'reject'] }, reason: { type: 'string', minLength: 1 } } },
 }
 
-export const modelReviewer: AdjudicatorFactory = (options): Adjudicator => {
+export const modelReviewer: ReviewerFactory = (options): Reviewer => {
   const instructions = String(options.instanceFacts.reviewerInstructions ?? '')
   const protectedRepository = String(options.instanceFacts.protectedRepository ?? '')
   if (!instructions) throw new Error('model-reviewer requires a scenario that provides instanceFacts.reviewerInstructions')
-  // Reviewer-specific settings win; each falls back to the agent model's setting, then a default.
-  const apiKey = process.env.LAB_REVIEWER_API_KEY ?? process.env.OPENAI_API_KEY
-  const url = process.env.LAB_REVIEWER_RESPONSES_URL ?? process.env.LAB_MODEL_BASE_URL ?? 'https://api.openai.com/v1/responses'
-  const model = process.env.LAB_REVIEWER_MODEL ?? process.env.LAB_MODEL ?? 'gpt-5'
-  const reasoning = process.env.LAB_REVIEWER_REASONING ?? process.env.LAB_MODEL_REASONING ?? 'medium'
+  // The reviewer's settings are independent of the agent's. The agent may run on
+  // another API family, so nothing here falls back to LAB_MODEL*; the defaults are
+  // the OpenAI Responses API with OPENAI_API_KEY.
+  const apiKey = process.env.LAB_REVIEWER_API_KEY || process.env.OPENAI_API_KEY
+  const url = process.env.LAB_REVIEWER_RESPONSES_URL || 'https://api.openai.com/v1/responses'
+  const model = process.env.LAB_REVIEWER_MODEL || 'gpt-5'
+  const reasoning = process.env.LAB_REVIEWER_REASONING || 'medium'
   const history: Message[] = []
 
   return {
     name: 'model-reviewer',
-    async decide(proposal: Proposal, context: AdjudicationContext): Promise<Decision> {
+    async decide(proposal: Proposal, context: ReviewContext): Promise<Decision> {
       if (!apiKey) throw new Error('model-reviewer requires LAB_REVIEWER_API_KEY or OPENAI_API_KEY')
       const { runDir, decisionNumber } = context
       const packet = reviewerPacket(protectedRepository, proposal)
@@ -82,7 +84,8 @@ export const modelReviewer: AdjudicatorFactory = (options): Adjudicator => {
       const request = (): unknown => ({
         model,
         input: [{ role: 'developer', content: instructions }, ...history, { role: 'user', content: prompt }],
-        reasoning: { effort: reasoning, summary: 'auto' },
+        // `none` omits the reasoning field for endpoints or models that reject it.
+        ...(reasoning === 'none' ? {} : { reasoning: { effort: reasoning, summary: 'auto' } }),
         text: { format: REVIEW_SCHEMA },
         max_output_tokens: 2048,
       })

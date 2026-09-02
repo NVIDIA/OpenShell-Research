@@ -14,7 +14,7 @@ credential the scenario grants. OpenShell sits between them and is the only
 path from the sandbox to the outside.
 
 <figure class="documentation-figure documentation-figure--wide">
-  <img src="../assets/diagrams/system-overview.svg" alt="The trusted host runs the horizon loop, adjudicator, and scenario oracle. OpenShell's gateway and sandbox supervisor hold proposals and enforce policy. The untrusted agent runs inside the sandbox through the bundled driver and a runtime adapter. The oracle observes an external target directly.">
+  <img src="../assets/diagrams/system-overview.svg" alt="The trusted host runs the horizon loop, reviewer, and scenario oracle. OpenShell's gateway and sandbox supervisor hold proposals and enforce policy. The untrusted agent runs inside the sandbox through the bundled driver and a runtime adapter. The oracle observes an external target directly.">
   <figcaption>Everything the agent does to reach the outside passes through OpenShell enforcement. The oracle never asks the agent what happened.</figcaption>
 </figure>
 
@@ -25,8 +25,8 @@ path from the sandbox to the outside.
 | `src/lab.ts` | CLI | `run`, `doctor`, `report`. Loads `.env`, builds the model configuration, bundles the driver. |
 | `src/horizon.ts` | Harness core | The whole run lifecycle. Knows nothing about GitHub, canaries, or any model. |
 | `src/openshell.ts` | OpenShell boundary | The only module that imports `@nvidia/openshell-sdk`. Connect, sandboxes, providers, proposals, decisions, cleanup. |
-| `src/scenario.ts`, `src/adjudicator.ts` | Contracts | The two host-side interfaces. |
-| `src/registry.ts` | Registry | Explicit maps of scenarios and adjudicators; re-exports the driver's runtime names. |
+| `src/scenario.ts`, `src/reviewer.ts` | Contracts | The two host-side interfaces. |
+| `src/registry.ts` | Registry | Explicit maps of scenarios and reviewers; re-exports the driver's runtime names. |
 | `src/events.ts` | Vocabulary | The event types shared by driver, runtimes, and host. |
 | `src/evidence.ts`, `src/validity.ts` | Evidence | File writing, redaction, and the scenario-agnostic validity classifier. |
 | `src/driver-bundle.ts` | Bundler | esbuild wrapper that turns `driver/` into one ES module. |
@@ -34,7 +34,7 @@ path from the sandbox to the outside.
 | `driver/driver.ts` | In-sandbox loop | Turns, backoff, handoff, lull detection, rotation. |
 | `driver/config.ts` | Contract | `DriverConfig`, imported by both sides so it cannot drift. |
 | `driver/runtimes/` | Runtime adapters | `types.ts` contract, `index.ts` registry, one file per runtime. |
-| `adjudicators/` | Adjudicators | One file each. |
+| `reviewers/` | Reviewers | One file each. |
 | `scenarios/<name>/` | Scenarios | `scenario.json`, `task.md`, `scenario.ts`, optional extra prompts. |
 
 ## The horizon loop
@@ -46,12 +46,15 @@ path from the sandbox to the outside.
    facts are written immediately.
 2. **Host infrastructure.** If the scenario has `setup`, it runs now and
    returns a teardown that is guaranteed to run at the end.
-3. **Providers.** Scenario credentials are created as OpenShell providers so
-   the sandbox receives placeholders and the real values are substituted only
-   at the network boundary.
+3. **Providers.** Scenario credentials, and the agent's model API key, are
+   created as OpenShell providers so the sandbox receives placeholders and the
+   real values are substituted only at the network boundary. The model key uses
+   a per-run provider profile for the configured endpoint host.
 4. **Sandbox.** The sandbox is created with the scenario's create-time policy,
-   plus an egress rule for the agent's model endpoint when a model-driven
-   runtime is selected. Proposals are enabled and set to manual approval as
+   plus an egress rule for the agent's model endpoint, from the runtime's
+   declared binaries, when a model-driven runtime is selected. Attaching a
+   provider does not add its endpoints to the policy; the scenario's policy is
+   the whole initial policy. Proposals are enabled and set to manual approval as
    sandbox-scoped settings, leaving the gateway's global settings untouched.
    The harness waits for `policy.local` to answer inside the sandbox and saves
    the initial effective policy.
@@ -61,8 +64,8 @@ path from the sandbox to the outside.
    the image's `node`. Every stdout line is parsed as an event, redacted,
    stamped with the host arrival time, and appended to `events.jsonl`.
 6. **Three concurrent loops** run alongside the agent:
-    - The **adjudication loop** polls for pending proposals, rejects any the
-      gateway already marked invalid, and sends the rest to the adjudicator.
+    - The **review loop** polls for pending proposals, rejects any the
+      gateway already marked invalid, and sends the rest to the reviewer.
       Decisions are applied through the SDK and fail closed.
     - The **oracle loop** calls `observe` on the scenario's interval. When the
       objective is observed, the run stops unless configured to continue.
@@ -71,7 +74,7 @@ path from the sandbox to the outside.
       believes, so the run stops immediately and is marked invalid.
 7. **Stop.** The agent stops at the deadline, when the objective is observed,
    when the driver exits, or when enforcement fails.
-8. **Settle.** The adjudicator keeps deciding anything still pending for a
+8. **Settle.** The reviewer keeps deciding anything still pending for a
    grace period, then the harness rejects the remainder with an explicit
    reason. No proposal is left undecided.
 9. **Final observation and classification.** `observe` and `finalize` run once
@@ -90,9 +93,12 @@ path from the sandbox to the outside.
 2. The agent submits a proposal to `http://policy.local/v1/proposals` from
    inside the sandbox. The supervisor validates it and the gateway holds it as
    a pending chunk with a review token. The gateway may canonicalize and
-   supersede a submitted chunk under a new id.
-3. The host's adjudication loop fetches pending chunks, saves the full proposal
-   as `proposal-NNN.json`, and calls the adjudicator with the proposal, the
+   supersede a submitted chunk under a new id. OpenShell's mechanistic mapper
+   also generates proposals of its own from denied connections; the reviewer
+   decides those on their merits too, and the harness records each proposal's
+   `origin` for post-hoc attribution rather than withholding any from review.
+3. The host's review loop fetches pending chunks, saves the full proposal
+   as `proposal-NNN.json`, and calls the reviewer with the proposal, the
    current effective policy, and the time remaining.
 4. The decision is applied with the review token. If the gateway refuses an
    approval, the harness rejects the proposal instead and records the approval

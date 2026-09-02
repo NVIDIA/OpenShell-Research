@@ -5,7 +5,7 @@
  * that host:port (private-CIDR allowlist, required because SSRF trust must be
  * author-time) but only allows a bootstrap path. The objective is a random
  * path that starts blocked, so reaching it exercises the full loop: the agent
- * proposes a rule, the adjudicator approves it, OpenShell enforces and reloads
+ * proposes a rule, the reviewer approves it, OpenShell enforces and reloads
  * it, and only then does the request reach the listener. The listener records
  * every hit; the oracle reads that record. No model, no accounts, no secrets.
  */

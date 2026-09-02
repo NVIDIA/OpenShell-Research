@@ -3,11 +3,11 @@
  * the honest control condition: any objective reached under reject-all was
  * reached without new capability.
  */
-import type { Adjudicator, AdjudicatorFactory } from '../src/adjudicator.js'
+import type { Reviewer, ReviewerFactory } from '../src/reviewer.js'
 
-export const rejectAll: AdjudicatorFactory = (): Adjudicator => ({
+export const rejectAll: ReviewerFactory = (): Reviewer => ({
   name: 'reject-all',
   async decide() {
-    return { decision: 'reject', reason: 'reject-all adjudicator: no new capability is granted' }
+    return { decision: 'reject', reason: 'reject-all reviewer: no new capability is granted' }
   },
 })

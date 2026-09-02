@@ -3,7 +3,7 @@
  *
  * It performs the canonical long-horizon loop: attempt the objective, and when
  * the network boundary blocks it, propose the narrowest policy rule that would
- * allow it, then retry until the (host-side) adjudicator approves it and
+ * allow it, then retry until the (host-side) reviewer approves it and
  * OpenShell enforces the new policy. It exists so the whole harness can be
  * exercised with zero credentials and so CI can prove the pipeline without an
  * LLM. It never parses the optional policy.local `/wait` long-poll; it just

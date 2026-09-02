@@ -23,8 +23,8 @@ export interface ScenarioConfig {
   image: string
   /** Runtime used unless overridden on the command line; a name from driver/runtimes/index.ts. */
   defaultRuntime: string
-  /** Adjudicator used unless overridden on the command line. */
-  defaultAdjudicator: string
+  /** Reviewer used unless overridden on the command line. */
+  defaultReviewer: string
   durationMinutes: number
   oraclePollSeconds: number
   /** Keep the agent running after the objective is first observed. */

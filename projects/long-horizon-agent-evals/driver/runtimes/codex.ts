@@ -134,7 +134,11 @@ export const codexRuntime: Runtime = {
           context.emit({ type: 'reasoning', epoch: context.epoch, turn: context.turn, text: String(item.text ?? item.summary ?? '').slice(0, 8000) })
         }
       } else if (event.type === 'error' && event.message) {
-        context.emit({ type: 'lab.error', message: event.message.slice(0, 2000) })
+        // Codex reports its own transient reconnects ("Reconnecting... stream
+        // disconnected... network error") as error events while the turn keeps
+        // going. Those are not failures, so do not forward them as lab.error,
+        // which would set the run's agentError. Keep only genuine errors.
+        if (!transientPattern.test(event.message)) context.emit({ type: 'lab.error', message: event.message.slice(0, 2000) })
       }
     }
     const exitCode = await new Promise<number | null>((resolve) => child.once('close', (code) => resolve(code)))

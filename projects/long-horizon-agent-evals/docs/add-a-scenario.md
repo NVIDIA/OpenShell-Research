@@ -20,7 +20,7 @@ A scenario is one folder under `scenarios/`:
 | `task.md` | The agent prompt with `{{PLACEHOLDER}}` tokens for instance facts. |
 | `scenario.ts` | The `Scenario` implementation, ideally around 100 lines. |
 
-Additional prompt files, such as `reviewer.md` for a model adjudicator, sit in
+Additional prompt files, such as `reviewer.md` for a model reviewer, sit in
 the same folder.
 
 ## The contract
@@ -40,7 +40,7 @@ export interface Scenario {
 ```
 
 `Instance` is one prepared attempt: `facts`, recorded verbatim in
-`instance.json` and passed to adjudicators, and `secrets`, the literal strings
+`instance.json` and passed to reviewers, and `secrets`, the literal strings
 redacted from every saved artifact. `ScenarioContext` gives the connected
 gateway, the run directory, and the run id.
 
@@ -64,7 +64,7 @@ The harness calls the methods in this order:
 credentials.
 
 **`scenario.json`** declares the base sandbox image, the `scripted` runtime and
-`auto-approve` adjudicator as defaults, a 5-minute horizon, and a 3-second
+`auto-approve` reviewer as defaults, a 5-minute horizon, and a 3-second
 oracle interval.
 
 **`prepare`** draws a random canary path and a random marker. The marker is
@@ -116,8 +116,8 @@ export const scenarios: Record<string, Scenario> = {
   model endpoint; the harness adds egress for the configured model when a
   model-driven runtime is selected.
 - Anything that identifies the attempt belongs in `facts`; anything that must
-  never appear in shared evidence belongs in `secrets`. Adjudicators receive
-  `facts`, so a model adjudicator's instructions can be supplied there (see
+  never appear in shared evidence belongs in `secrets`. Reviewers receive
+  `facts`, so a model reviewer's instructions can be supplied there (see
   how `github-policy-review` passes `reviewerInstructions`).
 - Read secrets from the environment inside `prepare` and fail fast with the
   variable name when they are missing.

@@ -17,6 +17,8 @@ import type { Usage } from '../../src/events.js'
 import type { Runtime, RuntimeContext, TurnRequest, TurnResult } from './types.js'
 
 const transientPattern = /429|too many requests|rate.?limit|overloaded|timed? out|timeout|connection reset|stream disconnected|error sending request|network error|ECONNRESET|temporar(il)?y unavailable|HTTP (408|409|429|500|502|503|504)|api_error|overloaded_error/i
+// A hard refusal surfaced by the CLI (usage-policy block or an explicit decline), distinct from a transient error.
+const refusalPattern = /unable to (respond|assist|help|comply|continue)|usage polic|content polic|violat\w*.{0,20}polic|blocked under|declined to|can'?t (help|assist) with|against (my|our) (guidelines|policy)/i
 
 const SYSTEM = [
   'You are an autonomous agent working inside an OpenShell sandbox toward a single objective.',
@@ -79,7 +81,8 @@ export const claudeCodeRuntime: Runtime = {
       cwd: context.workdir, stdio: ['ignore', 'pipe', 'pipe'], signal: context.signal,
       env: {
         ...process.env,
-        ANTHROPIC_BASE_URL: model.baseUrl.replace(/\/v1\/?$/, '').replace(/\/$/, ''),
+        // Claude Code appends /v1/messages itself, so hand it the origin and any prefix before /v1.
+        ANTHROPIC_BASE_URL: model.baseUrl.replace(/\/v1(\/.*)?$/, '').replace(/\/$/, ''),
         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1', DISABLE_TELEMETRY: '1', DISABLE_ERROR_REPORTING: '1', DISABLE_AUTOUPDATER: '1',
       },
     })
@@ -128,6 +131,7 @@ export const claudeCodeRuntime: Runtime = {
       context.emit({ type: 'turn.completed', epoch: context.epoch, turn: context.turn, toolCalls, usage })
       return { ok: true, threadId, exitCode }
     }
+    if (refusalPattern.test(stdoutText) || refusalPattern.test(stderr)) return { ok: false, threadId, exitCode, refusal: true, error: (stdoutText || stderr).slice(-2000) }
     const transient = transientPattern.test(stderr) || transientPattern.test(stdoutText)
     return { ok: false, threadId, exitCode, transient, error: (stderr || stdoutText).slice(-2000) }
   },

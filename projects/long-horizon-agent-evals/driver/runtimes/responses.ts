@@ -21,6 +21,8 @@ const MAX_TOOL_CALLS_PER_TURN = 12
 const transientStatus = (status: number): boolean => status === 429 || status === 500 || status === 502 || status === 503 || status === 504
 const isContextLengthExceeded = (status: number, body: ResponsesBody): boolean =>
   status === 400 && (((body.error?.code ?? body.error?.type ?? '') === 'context_length_exceeded') || /context (?:window|length)|input exceeds/i.test(body.error?.message ?? ''))
+const isContentPolicy = (status: number, body: ResponsesBody): boolean =>
+  status === 400 && /policy|refus|moderation|safety|disallowed/i.test(`${body.error?.code ?? ''} ${body.error?.type ?? ''} ${body.error?.message ?? ''}`)
 
 const SYSTEM = [
   'You are an autonomous agent working inside an OpenShell sandbox toward a single objective.',
@@ -37,6 +39,7 @@ interface OutputItem {
   call_id?: string
   summary?: Array<{ text?: string }>
   content?: Array<{ type?: string; text?: string }>
+  refusal?: string
 }
 interface ResponsesBody { id?: string; model?: string; status?: string; output?: OutputItem[]; usage?: Record<string, unknown>; error?: { type?: string; code?: string; message?: string } }
 
@@ -88,7 +91,12 @@ export const responsesRuntime: Runtime = {
         response = await fetch(model.baseUrl, {
           method: 'POST', signal: context.signal,
           headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: model.model, input, tools: [SHELL_TOOL], reasoning: { effort: model.reasoning, summary: 'auto' }, max_output_tokens: 4000, store: true, ...(previousId ? { previous_response_id: previousId } : {}) }),
+          body: JSON.stringify({
+            model: model.model, input, tools: [SHELL_TOOL], max_output_tokens: 4000, store: true,
+            // Some Responses-compatible gateways reject the reasoning field for models that do not take it; `none` omits it.
+            ...(model.reasoning === 'none' ? {} : { reasoning: { effort: model.reasoning, summary: 'auto' } }),
+            ...(previousId ? { previous_response_id: previousId } : {}),
+          }),
         })
       } catch (error) {
         if (context.signal.aborted) return { ok: false, threadId: previousId, exitCode: null, timedOut: true, transient: true, error: 'request timed out' }
@@ -98,19 +106,26 @@ export const responsesRuntime: Runtime = {
       if (!response.ok) {
         const error = `Responses HTTP ${response.status}: ${body.error?.message ?? 'unknown error'}`
         if (isContextLengthExceeded(response.status, body)) return { ok: false, threadId: previousId, exitCode: 1, rotate: 'context_length_exceeded', error }
+        if (isContentPolicy(response.status, body)) return { ok: false, threadId: previousId, exitCode: 1, refusal: true, error }
         return { ok: false, threadId: previousId, exitCode: 1, transient: transientStatus(response.status), error }
       }
       previousId = body.id
       if (body.usage) usage = usageFrom(body.usage)
 
       const calls: OutputItem[] = []
+      let refusedText = ''
       for (const item of body.output ?? []) {
         if (item.type === 'reasoning') { const text = (item.summary ?? []).map((s) => s.text ?? '').join('\n').trim(); if (text) context.emit({ type: 'reasoning', epoch: context.epoch, turn: context.turn, text: text.slice(0, 8000) }) }
         else if (item.type === 'message') { const text = (item.content ?? []).filter((c) => c.type === 'output_text').map((c) => c.text ?? '').join('\n').trim(); if (text) context.emit({ type: 'message', epoch: context.epoch, turn: context.turn, text: text.slice(0, 8000) }) }
+        else if (item.type === 'refusal') { refusedText = item.refusal ?? 'model refused'; context.emit({ type: 'message', epoch: context.epoch, turn: context.turn, text: refusedText.slice(0, 8000) }) }
         else if (item.type === 'function_call' && item.name === 'shell') calls.push(item)
       }
 
-      if (calls.length === 0) { context.emit({ type: 'turn.completed', epoch: context.epoch, turn: context.turn, toolCalls, usage }); return { ok: true, threadId: previousId, exitCode: 0, rotate: rotateIfOverBudget() } }
+      if (calls.length === 0) {
+        if (refusedText) return { ok: false, threadId: previousId, exitCode: 1, refusal: true, error: refusedText.slice(0, 2000) }
+        context.emit({ type: 'turn.completed', epoch: context.epoch, turn: context.turn, toolCalls, usage })
+        return { ok: true, threadId: previousId, exitCode: 0, rotate: rotateIfOverBudget() }
+      }
 
       const outputs: unknown[] = []
       for (const call of calls) {

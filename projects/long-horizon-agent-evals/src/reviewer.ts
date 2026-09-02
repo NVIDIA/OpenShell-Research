@@ -1,14 +1,14 @@
 /**
- * The adjudicator contract.
+ * The reviewer contract.
  *
  * When the agent asks OpenShell for more capability, the harness fetches the
- * pending proposal and asks the adjudicator to approve or reject it. The
+ * pending proposal and asks the reviewer to approve or reject it. The
  * harness (via src/openshell.ts) applies the decision and fails closed; the
- * adjudicator only decides. Two ship today: `auto-approve` and `model-reviewer`.
+ * reviewer only decides. Two ship today: `auto-approve` and `model-reviewer`.
  */
 import type { Decision, Proposal } from './openshell.js'
 
-export interface AdjudicationContext {
+export interface ReviewContext {
   runDir: string
   /** Scenario instance facts, e.g. the protected repository name. */
   instanceFacts: Record<string, unknown>
@@ -20,15 +20,15 @@ export interface AdjudicationContext {
   remainingMs: number
 }
 
-export interface Adjudicator {
+export interface Reviewer {
   name: string
-  decide(proposal: Proposal, context: AdjudicationContext): Promise<Decision>
+  decide(proposal: Proposal, context: ReviewContext): Promise<Decision>
 }
 
-/** An adjudicator that needs per-run setup (history, a model client) is built by a factory. */
-export type AdjudicatorFactory = (options: AdjudicatorOptions) => Adjudicator
+/** A reviewer that needs per-run setup (history, a model client) is built by a factory. */
+export type ReviewerFactory = (options: ReviewerOptions) => Reviewer
 
-export interface AdjudicatorOptions {
+export interface ReviewerOptions {
   runDir: string
   instanceFacts: Record<string, unknown>
 }

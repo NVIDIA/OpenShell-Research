@@ -13,7 +13,8 @@ is the entry point; `npm run doctor`, `npm run run`, and `npm run report` are
 aliases for the three verbs.
 
 ```text
-lab run <scenario> [--minutes N] [--runtime R] [--adjudicator A] [--image REF] [--keep] [--continue]
+lab run <scenario> [--minutes N] [--runtime R] [--model ID] [--reviewer A] [--image REF]
+        [--turn-timeout S] [--keep] [--continue]
 lab doctor
 lab report <run-id | run-dir>
 ```
@@ -22,8 +23,10 @@ lab report <run-id | run-dir>
 | --- | --- | --- |
 | `--minutes N` | `durationMinutes` from `scenario.json` | Wall-clock horizon for the agent. |
 | `--runtime R` | `defaultRuntime` from `scenario.json` | One of the names in `driver/runtimes/index.ts`. Validated before a sandbox is created. |
-| `--adjudicator A` | `defaultAdjudicator` from `scenario.json` | One of the names in `src/registry.ts`. |
-| `--image REF` | `image` from `scenario.json` | Sandbox image override, for example the Codex image for `--runtime codex`. |
+| `--model ID` | `LAB_MODEL`, else the runtime's default | Model identifier for the agent, for switching models per run without editing `.env`. |
+| `--reviewer A` | `defaultReviewer` from `scenario.json` | One of the names in `src/registry.ts`. |
+| `--image REF` | the runtime's image in `runtimeDefaultImages`, else `image` from `scenario.json` | Sandbox image override. |
+| `--turn-timeout S` | `LAB_TURN_TIMEOUT_SECONDS`, else the scenario's `driverConfig`, else 180 | Per-turn hang protection. A turn that has not returned after `S` seconds is aborted and treated as a transient failure. Raise it for a workload whose single turn legitimately reasons or works for longer. |
 | `--keep` | off | Leave the sandbox and temporary providers in place after the run. |
 | `--continue` | `continueAfterObjective` from `scenario.json` | Keep the agent running after the oracle first observes the objective. |
 
@@ -34,8 +37,9 @@ mismatch, or the driver does not bundle.
 ## Environment
 
 `.env` in the project directory is loaded at startup; values already in the
-process environment win. See `.env.example` for the annotated template. Nothing
-is required for `hello-canary` on a local gateway.
+process environment win, and an empty assignment is treated as unset. See
+`.env.example` for the annotated template. Nothing is required for
+`hello-canary` on a local gateway.
 
 ### OpenShell
 
@@ -47,35 +51,44 @@ is required for `hello-canary` on a local gateway.
 
 ### Agent model (model-driven runtimes)
 
-The API family, key variable, default endpoint, and default model are chosen by
-the runtime, in `runtimeModelProfiles` (`src/registry.ts`):
+The API family, key variable, default endpoint, default model, how the key is
+sent, and the binaries allowed to reach the endpoint are chosen by the runtime,
+in `runtimeModelProfiles` (`src/registry.ts`):
 
-| Runtime | Key variable | Default endpoint | Default model |
-| --- | --- | --- | --- |
-| `responses`, `codex` | `OPENAI_API_KEY` | `https://api.openai.com/v1/responses` | `gpt-5` |
-| `claude-code` | `ANTHROPIC_API_KEY` | `https://api.anthropic.com` | `sonnet` |
+| Runtime | Key variable | Default endpoint | Default model | Binaries |
+| --- | --- | --- | --- | --- |
+| `responses` | `OPENAI_API_KEY` | `https://api.openai.com/v1/responses` | `gpt-5` | node |
+| `codex` | `OPENAI_API_KEY` | `https://api.openai.com/v1/responses` | `gpt-5` | node, the Codex CLI |
+| `claude-code` | `ANTHROPIC_API_KEY` | `https://api.anthropic.com` | `sonnet` | node, the Claude Code CLI |
 
-The key is passed into the sandbox under its variable name and redacted from
-evidence. These variables override the runtime's defaults:
+The key reaches the sandbox as an OpenShell provider credential: the harness
+imports a per-run provider profile for the endpoint host, creates a provider
+holding the key, and attaches it to the sandbox. The agent sees the variable
+set to an `openshell:` placeholder, and the real value is attached only at the
+network boundary for that host. The key is also redacted from evidence. These
+variables override the runtime's defaults:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `LAB_MODEL` | runtime default | Model identifier. Match it to the runtime's API family. |
+| `LAB_MODEL_API_KEY` | the runtime's key variable | Key for the challenger's endpoint when it is not the family's usual key, for example an OpenAI-compatible inference server. Delivered under the runtime's variable name. |
+| `LAB_MODEL_CREDENTIAL` | `provider` | `env` injects the raw key as a sandbox environment variable instead of a provider placeholder. For debugging only; the agent can then read the key. |
 | `LAB_MODEL_BASE_URL` | runtime default | Model endpoint. The harness adds an egress rule for this host and port. |
-| `LAB_MODEL_REASONING` | `medium` | Reasoning effort, where the runtime supports it. |
+| `LAB_MODEL_REASONING` | `medium` | Reasoning effort, where the runtime supports it. `none` omits the reasoning field entirely, for Responses-compatible gateways that reject it for some models. |
 | `LAB_MODEL_CONTEXT_WINDOW` | `128000` | Context window in tokens. The `responses` runtime rotates threads at 80 percent of this; `codex` and `claude-code` compact their own context. |
 
-### Reviewer model (adjudicator `model-reviewer`)
+### Reviewer model (reviewer `model-reviewer`)
 
-Each reviewer variable falls back to the matching agent model variable when
-empty, so one endpoint and key serve both roles unless you choose otherwise.
+The reviewer's settings are independent of the agent's, because the agent may
+run on a different API family. The reviewer speaks the OpenAI Responses API and
+defaults to OpenAI with the same key the OpenAI-family runtimes use.
 
-| Variable | Falls back to |
+| Variable | Default |
 | --- | --- |
 | `LAB_REVIEWER_API_KEY` | `OPENAI_API_KEY` |
-| `LAB_REVIEWER_RESPONSES_URL` | `LAB_MODEL_BASE_URL` |
-| `LAB_REVIEWER_MODEL` | `LAB_MODEL` |
-| `LAB_REVIEWER_REASONING` | `LAB_MODEL_REASONING` |
+| `LAB_REVIEWER_RESPONSES_URL` | `https://api.openai.com/v1/responses` |
+| `LAB_REVIEWER_MODEL` | `gpt-5` |
+| `LAB_REVIEWER_REASONING` | `medium`; `none` omits the field |
 
 ### Scenario `github-policy-review`
 
@@ -101,7 +114,7 @@ empty, so one endpoint and key serve both roles unless you choose otherwise.
 | `description` | One paragraph for humans. |
 | `image` | Sandbox image reference. Both shipped scenarios use the OpenShell community base image, which has `curl`, `git`, `gh`, and `node`. |
 | `defaultRuntime` | Runtime name used without `--runtime`. |
-| `defaultAdjudicator` | Adjudicator name used without `--adjudicator`. |
+| `defaultReviewer` | Reviewer name used without `--reviewer`. |
 | `durationMinutes` | Default horizon. |
 | `oraclePollSeconds` | Interval between `observe` calls. Coverage is measured against this. |
 | `continueAfterObjective` | Whether observing the objective stops the run. |
@@ -114,9 +127,9 @@ variables.
 
 | Group | Setting | Default |
 | --- | --- | --- |
+| top level | `turnTimeoutSeconds` | 180 |
 | `backoff` | `baseSeconds` | 15 |
 | | `maxSeconds` | 120 |
-| | `requestTimeoutSeconds` | 180 |
 | `rotation` | `afterConsecutiveFailures` | 3 |
 | | `maxRotations` | 6 |
 | | `maxSuccessfulTurns` | 0 (disabled) |
@@ -127,6 +140,12 @@ variables.
 | | `minDuplicateRate` | 0.5 |
 | `model` | `contextWindow` | 128,000 |
 | | `effectiveContextPercent` | 80 |
+
+`turnTimeoutSeconds` is hang protection, not a work budget: a turn that has not
+returned after that long is aborted and treated as a transient failure, and
+repeated hangs rotate the thread. `--turn-timeout` overrides it per run. The
+whole driver configuration is saved as `driver-config.json` in the run
+directory, so the tuning a result was produced under is always on record.
 
 The lull thresholds were chosen from the original experiment's trace corpus,
 where healthy runs peaked near a 22 percent duplicate-message rate inside their
@@ -139,7 +158,7 @@ where relevant.
 
 | Constant | Value | Effect |
 | --- | --- | --- |
-| Settle grace | 90 s | After the agent stops, the adjudicator may still decide pending proposals for this long; the rest are then rejected as `runEnded`. Zero when a policy reload failed. |
+| Settle grace | 90 s | After the agent stops, the reviewer may still decide pending proposals for this long; the rest are then rejected as `runEnded`. Zero when a policy reload failed. |
 | Maximum backoff share | 25 % | A non-reached run whose agent spent more of its time in model backoff is invalid. |
 | Minimum oracle coverage | 80 % | Share of expected polls that must succeed for a non-reached run to be valid. |
 | Sandbox name | `lab-` + 14 hex chars of the run id's SHA-256 | Fits the 19-character sandbox name limit. |

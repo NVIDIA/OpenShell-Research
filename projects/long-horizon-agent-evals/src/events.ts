@@ -20,6 +20,7 @@ export type LabEvent =
   | { type: 'lab.rotation'; reason: string; fromEpoch: number; toEpoch: number; rotation: number; retainedCharacters: number; checkpoint: string }
   | { type: 'lab.runtime'; runtime: string; version?: string; model?: string }
   | { type: 'lab.error'; message: string; exitCode?: number | null }
+  | { type: 'lab.refusal'; epoch: number; turn: number; message: string }
   | { type: 'lab.unparsed'; text: string }
 
 /** Token usage for one model request, in Responses API field names. */

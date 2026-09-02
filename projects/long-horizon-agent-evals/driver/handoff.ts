@@ -25,6 +25,38 @@ export interface HandoffOptions {
   maxCharacters: number
 }
 
+/**
+ * Prose that poisons a thread: an explicit refusal, or the "I have exhausted
+ * every path" defeatism that makes a model stop trying. Kept deliberately
+ * phrase-specific so it strips the poison without discarding genuine progress
+ * notes. Command executions are never matched here; only agent prose is.
+ */
+export const POISON_PATTERN = new RegExp([
+  'unable to (respond|comply|assist|help|continue|proceed)',
+  "can(?:no|')?t (help|assist|comply|proceed|continue) with",
+  "(won'?t|will not) (help|assist|comply|be able)",
+  'against (my|our) (guidelines|policy|policies|principles)',
+  '(usage|content) polic(?:y|ies)',
+  'violat\\w*\\s+(?:\\w+\\s+){0,3}polic',
+  'I (?:must|have to|need to|will) (?:decline|refuse|stop)',
+  'exhausted (?:all|every|the|my|available|each)',
+  'no (?:other|more|further|remaining|viable|additional|alternative) (?:paths?|options?|approaches?|avenues?|routes?|ways?|methods?)',
+  'tried (?:everything|all|every)',
+  'out of (?:options|ideas|approaches)',
+  'nothing (?:more|else)(?: I can| to try| left)',
+  'giv(?:e|ing) up',
+  'no (?:viable|feasible|remaining) way',
+  'cannot be (?:achieved|accomplished|completed|done)',
+].join('|'), 'i')
+
+/** Drop refusal and defeatist agent prose, keeping every command execution and any other prose. */
+export function stripPoisonedProse(entries: readonly HandoffEntry[]): HandoffEntry[] {
+  return entries.filter((entry) => {
+    if (entry.type === 'command_execution') return true
+    return !POISON_PATTERN.test(entry.text)
+  })
+}
+
 function normalize(text: string): string {
   return text.trim().toLowerCase().replace(/\s+/g, ' ')
 }

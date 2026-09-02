@@ -17,9 +17,9 @@ npm run lab -- run hello-canary
 ## Design rules
 
 - Four roles, nothing else: scenario (task, initial policy, credentials,
-  oracle), agent runtime, adjudicator, and the harness core that runs them.
+  oracle), agent runtime, reviewer, and the harness core that runs them.
 - `src/openshell.ts` is the only module that imports the OpenShell SDK.
-- Scenarios, adjudicators, and runtimes are listed in explicit maps
+- Scenarios, reviewers, and runtimes are listed in explicit maps
   (`src/registry.ts`, `driver/runtimes/index.ts`). No filesystem discovery.
 - Do not add an interface, option, or event type for a hypothetical third
   implementation. Two real implementations in the same change, or nothing.

@@ -1,14 +1,14 @@
 /**
- * The explicit host registries. Adding a scenario or adjudicator is one import
+ * The explicit host registries. Adding a scenario or reviewer is one import
  * and one map entry here — no filesystem discovery, so the whole set of
  * experiments is legible in one place.
  */
-import { autoApprove } from '../adjudicators/auto-approve.js'
-import { modelReviewer } from '../adjudicators/model-reviewer.js'
-import { rejectAll } from '../adjudicators/reject-all.js'
+import { autoApprove } from '../reviewers/auto-approve.js'
+import { modelReviewer } from '../reviewers/model-reviewer.js'
+import { rejectAll } from '../reviewers/reject-all.js'
 import { githubPolicyReview } from '../scenarios/github-policy-review/scenario.js'
 import { helloCanary } from '../scenarios/hello-canary/scenario.js'
-import type { AdjudicatorFactory } from './adjudicator.js'
+import type { ReviewerFactory } from './reviewer.js'
 import type { Scenario } from './scenario.js'
 
 export const scenarios: Record<string, Scenario> = {
@@ -16,7 +16,7 @@ export const scenarios: Record<string, Scenario> = {
   'github-policy-review': githubPolicyReview,
 }
 
-export const adjudicators: Record<string, AdjudicatorFactory> = {
+export const reviewers: Record<string, ReviewerFactory> = {
   'auto-approve': autoApprove,
   'reject-all': rejectAll,
   'model-reviewer': modelReviewer,
@@ -28,10 +28,10 @@ export function selectScenario(name: string): Scenario {
   return scenario
 }
 
-export function selectAdjudicator(name: string): AdjudicatorFactory {
-  const adjudicator = adjudicators[name]
-  if (!adjudicator) throw new Error(`unknown adjudicator: ${name} (have: ${Object.keys(adjudicators).join(', ')})`)
-  return adjudicator
+export function selectReviewer(name: string): ReviewerFactory {
+  const reviewer = reviewers[name]
+  if (!reviewer) throw new Error(`unknown reviewer: ${name} (have: ${Object.keys(reviewers).join(', ')})`)
+  return reviewer
 }
 
 /** Runtime names live in the driver bundle; re-exported so the CLI can validate and list them. */
@@ -45,6 +45,15 @@ export interface RuntimeModelProfile {
   defaultBaseUrl: string
   /** Default model identifier when LAB_MODEL is unset. */
   defaultModel: string
+  /**
+   * Binaries allowed to reach the model endpoint: the runtime's own executables
+   * plus node for the driver. Mirrors OpenShell's provider profile for the same
+   * harness (`providers/<harness>.yaml` in the OpenShell repository).
+   */
+  binaries: string[]
+  /** How the runtime presents the key to the endpoint, so the network boundary can substitute it. */
+  authStyle: 'bearer' | 'header'
+  headerName: string
 }
 
 /**
@@ -54,9 +63,18 @@ export interface RuntimeModelProfile {
  * one entry here so the CLI knows which key and endpoint to supply.
  */
 export const runtimeModelProfiles: Record<string, RuntimeModelProfile> = {
-  responses: { apiKeyEnv: 'OPENAI_API_KEY', defaultBaseUrl: 'https://api.openai.com/v1/responses', defaultModel: 'gpt-5' },
-  codex: { apiKeyEnv: 'OPENAI_API_KEY', defaultBaseUrl: 'https://api.openai.com/v1/responses', defaultModel: 'gpt-5' },
-  'claude-code': { apiKeyEnv: 'ANTHROPIC_API_KEY', defaultBaseUrl: 'https://api.anthropic.com', defaultModel: 'sonnet' },
+  responses: {
+    apiKeyEnv: 'OPENAI_API_KEY', defaultBaseUrl: 'https://api.openai.com/v1/responses', defaultModel: 'gpt-5',
+    binaries: ['/usr/bin/node'], authStyle: 'bearer', headerName: 'authorization',
+  },
+  codex: {
+    apiKeyEnv: 'OPENAI_API_KEY', defaultBaseUrl: 'https://api.openai.com/v1/responses', defaultModel: 'gpt-5',
+    binaries: ['/usr/bin/node', '/usr/bin/codex', '/usr/local/bin/codex', '/usr/lib/node_modules/@openai/**'], authStyle: 'bearer', headerName: 'authorization',
+  },
+  'claude-code': {
+    apiKeyEnv: 'ANTHROPIC_API_KEY', defaultBaseUrl: 'https://api.anthropic.com', defaultModel: 'sonnet',
+    binaries: ['/usr/bin/node', '/usr/bin/claude', '/usr/local/bin/claude'], authStyle: 'header', headerName: 'x-api-key',
+  },
 }
 
 /**

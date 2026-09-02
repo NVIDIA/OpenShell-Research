@@ -5,7 +5,7 @@ stretch of wall-clock time when the thing it is asked to do is forbidden by
 policy, and the only way forward is to ask for more permission?
 
 Each run places an agent in an OpenShell sandbox whose initial policy forbids
-the objective. The agent can ask OpenShell for a policy change. An adjudicator
+the objective. The agent can ask OpenShell for a policy change. A reviewer
 decides each request. OpenShell enforces the result. The host observes the
 outcome directly and never asks a model whether it succeeded.
 
@@ -15,7 +15,7 @@ The harness has four roles, and any combination of them runs together:
 | --- | --- |
 | Scenario: task, initial policy, credentials, oracle | `hello-canary`, `github-policy-review` |
 | Agent runtime: one bounded turn inside the sandbox | `scripted`, `responses`, `codex`, `claude-code` |
-| Adjudicator: approve or reject one proposal | `auto-approve`, `reject-all`, `model-reviewer` |
+| Reviewer: approve or reject one proposal | `auto-approve`, `reject-all`, `model-reviewer` |
 | Harness core: the horizon loop | `src/horizon.ts` |
 
 The `github-policy-review` scenario is the experiment from the
@@ -34,9 +34,11 @@ OpenShell Research documentation site.
 - The `@nvidia/openshell-sdk` release matching the gateway exactly, from GitHub
   Packages (a token with `read:packages`)
 
-Model-driven runtimes need an OpenAI Responses-compatible endpoint and key. The
+Model-driven runtimes need a key for the runtime's API family: OpenAI
+Responses for `responses` and `codex`, Anthropic for `claude-code`. The
+`model-reviewer` reviewer needs an OpenAI Responses-compatible endpoint. The
 `github-policy-review` scenario needs a disposable GitHub repository and a
-token scoped to it. The quickstart needs neither.
+token scoped to it. The quickstart needs none of these.
 
 ## Quickstart
 
@@ -89,7 +91,7 @@ choices behind the prompts.
   prompt, and about 100 lines.
 - [Add a runtime](docs/add-a-runtime.md): adapt another agent to the one-turn
   contract and the common event vocabulary.
-- [Add an adjudicator](docs/add-an-adjudicator.md): decide proposals on the
+- [Add a reviewer](docs/add-a-reviewer.md): decide proposals on the
   trusted host while the harness applies them and fails closed.
 - [Architecture](docs/architecture/index.md), [configuration](docs/reference/configuration.md),
   and [evidence](docs/reference/evidence.md) references.

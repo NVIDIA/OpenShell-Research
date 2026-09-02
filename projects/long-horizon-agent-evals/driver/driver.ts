@@ -18,7 +18,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { serialize, type LabEvent } from '../src/events.js'
 import { decodeDriverConfig, type DriverConfig } from './config.js'
-import { trimHandoff, type HandoffEntry } from './handoff.js'
+import { stripPoisonedProse, trimHandoff, type HandoffEntry } from './handoff.js'
 import { detectLull, type TurnObservation } from './lull.js'
 import { selectRuntime } from './runtimes/index.js'
 import type { Runtime, TurnRequest } from './runtimes/types.js'
@@ -102,7 +102,7 @@ async function main(): Promise<void> {
   while (Date.now() < config.deadlineMs) {
     turn += 1
     const remainingMs = config.deadlineMs - Date.now()
-    const turnTimeoutMs = Math.min(config.backoff.requestTimeoutSeconds * 1000, remainingMs)
+    const turnTimeoutMs = Math.min(config.turnTimeoutSeconds * 1000, remainingMs)
     const signal = AbortSignal.timeout(Math.max(1, turnTimeoutMs))
     const tally = new TurnTally()
     const context = {
@@ -147,6 +147,23 @@ async function main(): Promise<void> {
       continue
     }
 
+    if (result.refusal) {
+      // A hard refusal or "out of options" declaration. Record it, scrub the
+      // poison from the checkpoint so it does not follow the agent, and restart
+      // a fresh thread from factual progress. Never backoff. Bounded by the cap.
+      emit({ type: 'lab.refusal', epoch, turn, message: clip(result.error, 2000) })
+      if (rotations < config.rotation.maxRotations) {
+        const cleaned = stripPoisonedProse(handoff)
+        handoff.length = 0
+        handoff.push(...cleaned)
+        rotate('model_refusal')
+        continue
+      }
+      emit({ type: 'lab.error', message: 'model refused and the rotation budget is exhausted', exitCode: result.exitCode })
+      process.exitCode = result.exitCode ?? 1
+      return
+    }
+
     if (result.transient) {
       consecutiveFailures += 1
       const wait = backoffMs(config, consecutiveFailures, Math.max(0, config.deadlineMs - Date.now()))
@@ -158,7 +175,15 @@ async function main(): Promise<void> {
       continue
     }
 
+    // A full agent harness can exit non-zero mid-run (for example a CLI stumble
+    // on resume). When it has already produced recoverable work and rotations
+    // remain, restart a fresh thread from the checkpoint instead of ending the
+    // whole run; only give up when there is nothing to recover or the cap is hit.
     emit({ type: 'lab.error', message: clip(result.error, 2000), exitCode: result.exitCode })
+    if (rotations < config.rotation.maxRotations && handoff.length > 0) {
+      rotate(`runtime_exit${typeof result.exitCode === 'number' ? `_${result.exitCode}` : ''}`)
+      continue
+    }
     process.exitCode = result.exitCode ?? 1
     return
   }

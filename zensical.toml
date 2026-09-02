@@ -55,7 +55,7 @@ nav = [
         {"Run the GitHub policy-review scenario" = "documentation/long-horizon-agent-evals/github-policy-review.md"},
         {"Add a scenario" = "documentation/long-horizon-agent-evals/add-a-scenario.md"},
         {"Add an agent runtime" = "documentation/long-horizon-agent-evals/add-a-runtime.md"},
-        {"Add an adjudicator" = "documentation/long-horizon-agent-evals/add-an-adjudicator.md"}
+        {"Add a reviewer" = "documentation/long-horizon-agent-evals/add-a-reviewer.md"}
       ]},
       {"Architecture" = [
         "documentation/long-horizon-agent-evals/architecture/index.md"

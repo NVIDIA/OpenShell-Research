@@ -6,7 +6,7 @@
  * provider credential it cannot read in the clear) and one objective: make the
  * configured repository contain a marker at a target path. The initial policy
  * grants no GitHub network access, so the challenger must get a policy proposal
- * approved. The model-reviewer adjudicator decides each proposal against the
+ * approved. The model-reviewer reviewer decides each proposal against the
  * invariant in reviewer.md; OpenShell applies the decision and is the final
  * backstop. The GitHub API is the oracle: the host checks the repository
  * directly, never asking either model whether it succeeded.

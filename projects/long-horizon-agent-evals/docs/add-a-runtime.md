@@ -20,7 +20,7 @@ A runtime is one file under `driver/runtimes/` plus one line in
 | `scripted` | A deterministic agent with no model that attempts a GET, proposes the narrowest rule when blocked, and retries. | Nothing. Used by `hello-canary` and CI. |
 | `responses` | A minimal agent speaking the OpenAI Responses API directly with a single `shell` tool. | `OPENAI_API_KEY`. Base sandbox image. |
 | `codex` | OpenAI Codex CLI under `codex exec --json`, mapped onto the common events. | `OPENAI_API_KEY` and the pinned Codex image (`npm run image:build`), selected automatically. The base image's older Codex has an incompatible model-catalog schema. |
-| `claude-code` | Anthropic Claude Code CLI under `claude -p --output-format stream-json`, mapped onto the common events. | `ANTHROPIC_API_KEY`. Runs on the base image; pin a version for evidence runs. |
+| `claude-code` | Anthropic Claude Code CLI under `claude -p --output-format stream-json`, mapped onto the common events. | A key for an Anthropic-format endpoint: `api.anthropic.com`, or any gateway that serves `/v1/messages`, set through `LAB_MODEL_BASE_URL` and `LAB_MODEL_API_KEY`. Runs on the base image; pin a version for evidence runs. |
 
 A runtime whose CLI is not in the base image, or whose version must be pinned,
 defines a Dockerfile under `images/<runtime>/` built on the base image and
@@ -37,8 +37,11 @@ headline experiment and a raw-model runtime for controlled model comparison.
 
 A model-driven runtime declares its API family once in
 `runtimeModelProfiles` (`src/registry.ts`): the environment variable holding
-its key, its default endpoint, and its default model. The CLI reads that to
-supply the right key and to add the model egress rule.
+its key, its default endpoint and model, how the key is sent (bearer token or
+header), and the binaries allowed to reach the endpoint. The CLI reads that to
+add the model egress rule and to deliver the key as an OpenShell provider
+credential, so the agent holds an `openshell:` placeholder and never the real
+key. The binaries mirror OpenShell's own provider profile for the same harness.
 
 ## The contract
 
@@ -61,6 +64,7 @@ export interface TurnResult {
   timedOut?: boolean
   error?: string
   rotate?: string
+  refusal?: boolean
 }
 ```
 
@@ -82,22 +86,31 @@ processes and `fetch`.
 The runtime does one turn. The driver owns everything else, so a runtime never
 implements retries, backoff, or context recovery:
 
-- **Timeouts.** Each turn gets `min(requestTimeoutSeconds, time remaining)`.
+- **Timeouts.** Each turn gets `min(turnTimeoutSeconds, time remaining)`. The
+  default of 180 seconds is hang protection; `--turn-timeout` raises it for a
+  workload whose turns legitimately run longer.
 - **Transient failures.** A result with `ok: false` and `transient: true`
   triggers exponential backoff with jitter, capped, and a retry of the same
   thread. Every wait is recorded as `lab.backoff`.
 - **Rotation.** The driver starts a fresh thread with a bounded checkpoint of
   recent activity when any of these hold: the runtime returns `rotate` with a
   reason; a configured number of consecutive transient failures occurred; the
-  lull detector sees a window of idle, repetitive turns; or an optional
-  successful-turn budget is reached. Rotation is capped, and each one is
-  recorded as `lab.rotation` with the exact checkpoint text.
+  lull detector sees a window of idle, repetitive turns; an optional
+  successful-turn budget is reached; the runtime returns `refusal`; or a
+  non-transient exit still has recoverable progress. Rotation is capped, and
+  each one is recorded as `lab.rotation` with the exact checkpoint text.
 - **Handoff checkpoint.** The driver accumulates the `tool.call`, `message`,
   and `reasoning` events a runtime emits, deduplicates repeated prose, and
   trims to entry and character budgets, preferring to keep command executions.
   The checkpoint is appended to the original prompt when a new thread starts.
-- **Fatal failures.** A result with `ok: false` that is neither transient nor
-  rotatable ends the run with `lab.error` and the given exit code.
+- **Refusals.** A result with `refusal: true` records `lab.refusal`, strips the
+  refusal and any "out of options" defeatism from the checkpoint, and rotates
+  to a fresh thread reseeded from factual progress only. It is never counted as
+  backoff, so a recoverable refusal does not invalidate the run.
+- **Fatal failures.** A result with `ok: false` that is neither transient,
+  rotatable, nor a refusal rotates to a fresh thread when it still has
+  recoverable progress and the rotation budget remains; otherwise it ends the
+  run with `lab.error` and the given exit code.
 
 Use `rotate` when the thread cannot usefully continue but a fresh one could.
 The `responses` runtime returns `rotate: 'context_budget'` when the last
@@ -132,11 +145,11 @@ image's `node`. There is no `npm install` in the sandbox. A runtime may import
 Node built-ins, `driver/*`, and `src/events.ts`, and nothing else. Anything the
 agent framework itself needs must already be in the sandbox image.
 
-The host adds an egress rule for the configured model endpoint, allowing
-`/usr/bin/node` to reach that host and port, and injects the API key into the
-driver's environment under the configured variable name. A runtime that shells
-out to another binary to reach the model would need that binary allowed in the
-scenario policy as well.
+The host adds an egress rule for the configured model endpoint, allowing the
+profile's binaries to reach that host and port, and attaches a provider that
+sets the configured variable to a placeholder the network boundary substitutes.
+A runtime that reaches the model through a binary not in its profile must add
+it there.
 
 ## Walkthrough: responses
 

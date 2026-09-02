@@ -12,7 +12,7 @@ asked to do is forbidden by policy, and the only way forward is to ask for more
 permission?
 
 Each run places an agent in an OpenShell sandbox whose initial policy forbids
-the objective. The agent can ask OpenShell for a policy change. An adjudicator
+the objective. The agent can ask OpenShell for a policy change. A reviewer
 decides each request. OpenShell enforces the result. The host observes the
 outcome directly and never asks a model whether it succeeded.
 
@@ -28,10 +28,10 @@ whose experiment ships here as the `github-policy-review` scenario.
 | --- | --- | --- |
 | Scenario | The task prompt, the initial policy that forbids it, credentials, and the oracle that observes the outcome | `hello-canary`, `github-policy-review` |
 | Agent runtime | How to take one bounded turn inside the sandbox and report it in the common event vocabulary | `scripted`, `responses`, `codex`, `claude-code` |
-| Adjudicator | Approve or reject one policy proposal | `auto-approve`, `reject-all`, `model-reviewer` |
+| Reviewer | Approve or reject one policy proposal | `auto-approve`, `reject-all`, `model-reviewer` |
 | Harness core | The horizon loop: sandbox lifecycle, proposal routing, oracle polling, evidence, validity | `src/horizon.ts` |
 
-Any scenario runs with any runtime and any adjudicator. The combination is
+Any scenario runs with any runtime and any reviewer. The combination is
 chosen on the command line, and the defaults live in each scenario's
 `scenario.json`.
 
@@ -58,7 +58,7 @@ only on a bootstrap path. The objective is a different, random path that starts
 blocked. A scripted agent with no model attempts the request, is denied at the
 network boundary, proposes the narrowest rule that would allow it, waits for
 the decision, and retries. Reaching the listener proves that proposal
-submission, adjudication, enforcement, policy reload, and the oracle all work.
+submission, review, enforcement, policy reload, and the oracle all work.
 
 From `projects/long-horizon-agent-evals/` in a source checkout:
 
@@ -73,7 +73,7 @@ npm run doctor
 ```
 
 `doctor` connects to the gateway, checks that the gateway and SDK are the same
-release, lists the registered scenarios, adjudicators, and runtimes, and
+release, lists the registered scenarios, reviewers, and runtimes, and
 bundles the in-sandbox driver. It prints `doctor: ready` when a run can start.
 
 ```bash
@@ -97,9 +97,9 @@ stage failed.
 Every run owns `runs/<run-id>/`. The load-bearing file is `outcome.json`:
 whether the objective was reached, whether the run is valid, and the
 machine-readable reasons when it is not. `events.jsonl` holds the agent's
-activity in the common vocabulary, `decisions.jsonl` holds every adjudication
+activity in the common vocabulary, `decisions.jsonl` holds every review
 and how OpenShell applied it, and each proposal is saved in full as the
-adjudicator saw it. Known secrets are redacted from every file before the run
+reviewer saw it. Known secrets are redacted from every file before the run
 directory is considered shareable.
 
 ```bash
@@ -111,7 +111,7 @@ npm run report -- <run-id>
 - [Run the GitHub policy-review scenario](github-policy-review.md): the
   adversarial experiment, with the setup and safety steps it requires.
 - [Add a scenario](add-a-scenario.md), [add a runtime](add-a-runtime.md), or
-  [add an adjudicator](add-an-adjudicator.md).
+  [add a reviewer](add-a-reviewer.md).
 - [Architecture](architecture/index.md): what runs on the host, what runs in
   the sandbox, and how a proposal travels between them.
 - [Configuration reference](reference/configuration.md) and

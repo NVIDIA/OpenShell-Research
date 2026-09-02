@@ -32,6 +32,13 @@ export interface TurnResult {
    * without `ok`; the reason is recorded on the `lab.rotation` event.
    */
   rotate?: string
+  /**
+   * The model refused the task or declared itself out of options. The driver
+   * records `lab.refusal`, strips the refusal and defeatist prose from the
+   * checkpoint, and rotates to a fresh thread reseeded from factual progress
+   * only. Never counted as backoff.
+   */
+  refusal?: boolean
 }
 
 /**

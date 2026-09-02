@@ -32,6 +32,25 @@ export interface ProviderSpec {
   type: string
   credentials: Record<string, string>
   config?: Record<string, string>
+  /**
+   * Workspace that owns the provider profile when it is workspace-scoped (a
+   * profile this lab imported). Leave unset for a builtin platform profile such
+   * as `github`. Without it the gateway resolves no profile and injects nothing.
+   */
+  profileWorkspace?: string
+}
+
+/** A per-run provider profile that delivers one model API key as a placeholder. */
+export interface ModelProviderProfileSpec {
+  /** Profile id; also used as the provider name. */
+  id: string
+  host: string
+  port: number
+  /** Sandbox environment variable the placeholder is exposed under. */
+  apiKeyEnv: string
+  authStyle: 'bearer' | 'header'
+  headerName: string
+  binaries: string[]
 }
 
 export interface SandboxRequest {
@@ -63,7 +82,23 @@ export interface Proposal {
   proposedRule: unknown
   currentEffectivePolicy: unknown
   candidateEffectivePolicy: unknown
+  /** Denial summaries this chunk was aggregated from. Empty on every chunk in 0.0.116; recorded for later releases. */
+  denialSummaryIds: string[]
+  /** Times the mechanistic mapper re-observed the same denied host, port, and binary. */
+  hitCount: number
+  supersedesChunkId: string
+  firstSeenMs: number
+  lastSeenMs: number
 }
+
+/**
+ * Who wrote the proposal. OpenShell's mechanistic mapper aggregates denied connections
+ * into `mechanistic` chunks on its own (`mechanistic`); an in-sandbox agent
+ * submits `agent_authored` chunks through policy.local (`agent`). The harness
+ * resolves this in src/horizon.ts from the chunk ids the agent received back
+ * from policy.local, falling back to `isMechanisticRationale`.
+ */
+export type ProposalOrigin = 'agent_authored' | 'mechanistic'
 
 export interface Decision {
   decision: 'approve' | 'reject'
@@ -216,6 +251,7 @@ export async function ensureProviders(gateway: Gateway, providers: ProviderSpec[
         type: provider.type,
         credentials: provider.credentials,
         ...(provider.config ? { config: provider.config } : {}),
+        ...(provider.profileWorkspace ? { profileWorkspace: provider.profileWorkspace } : {}),
       },
     })
   }
@@ -229,19 +265,58 @@ async function existingProviderNames(gateway: Gateway): Promise<Set<string>> {
 // ---------------------------------------------------------------------------
 // Model egress: a model-driven runtime needs to reach its inference endpoint.
 // The scenario policy stays model-agnostic; the harness adds this egress rule
-// for the configured endpoint when a model runtime is used.
+// for the configured endpoint, from the binaries the runtime profile declares.
 
-export function withModelEgress(policy: Policy, baseUrl: string): Policy {
-  const url = new URL(baseUrl)
-  const port = url.port ? Number(url.port) : url.protocol === 'https:' ? 443 : 80
+export function withModelEgress(policy: Policy, baseUrl: string, binaries: string[]): Policy {
+  const { host, port } = endpointOf(baseUrl)
   const base = policy as Record<string, unknown>
   const networkPolicies = { ...((base.networkPolicies as Record<string, unknown>) ?? {}) }
   networkPolicies.model = {
     name: 'model',
-    endpoints: [{ host: url.hostname, port, protocol: 'rest', enforcement: 'enforce', access: 'full' }],
-    binaries: [{ path: '/usr/bin/node' }],
+    endpoints: [{ host, port, protocol: 'rest', enforcement: 'enforce', access: 'full' }],
+    binaries: binaries.map((path) => ({ path })),
   }
   return { ...base, networkPolicies } as Policy
+}
+
+/** The host and port a model base URL resolves to at the network boundary. */
+export function endpointOf(baseUrl: string): { host: string; port: number } {
+  const url = new URL(baseUrl)
+  return { host: url.hostname, port: url.port ? Number(url.port) : url.protocol === 'https:' ? 443 : 80 }
+}
+
+/** openshell.v1.ProviderProfileCategory.INFERENCE; the SDK root does not re-export the enum. */
+const PROVIDER_PROFILE_CATEGORY_INFERENCE = 2
+
+/**
+ * Import a per-run provider profile so the model API key reaches the sandbox as
+ * an `openshell:` placeholder that the network boundary substitutes only at the
+ * model endpoint host. Attaching the provider does not add its endpoint to the
+ * policy; `withModelEgress` still does that. Verified on 0.0.116: a bearer
+ * placeholder sent to the allowed host is substituted and the request succeeds.
+ */
+export async function importModelProviderProfile(gateway: Gateway, spec: ModelProviderProfileSpec): Promise<void> {
+  const response = await gateway.client.raw.importProviderProfiles({
+    workspace: gateway.workspace,
+    profiles: [{
+      source: 'long-horizon-agent-evals',
+      profile: {
+        id: spec.id,
+        displayName: `Lab model key for ${spec.host}`,
+        description: 'Per-run model API key for a long-horizon-agent-evals sandbox, substituted at the model endpoint only.',
+        category: PROVIDER_PROFILE_CATEGORY_INFERENCE,
+        inferenceCapable: false,
+        credentials: [{ name: 'api_key', description: 'Model API key', envVars: [spec.apiKeyEnv], required: true, authStyle: spec.authStyle, headerName: spec.headerName }],
+        discovery: { credentials: ['api_key'] },
+        endpoints: [{ host: spec.host, port: spec.port, protocol: 'rest', access: 'read-write', enforcement: 'enforce' }],
+        binaries: spec.binaries.map((path) => ({ path })),
+      },
+    }],
+  })
+  if (!response.imported) {
+    const diagnostics = response.diagnostics.map((item) => JSON.stringify(item, (_key, value) => (typeof value === 'bigint' ? value.toString() : value))).join('; ')
+    throw new Error(`provider profile import failed for ${spec.id}: ${diagnostics || 'no diagnostics'}`)
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -320,10 +395,11 @@ export function policyReloadFailure(status: PolicyStatus): PolicyReloadFailure |
 }
 
 /**
- * Delete the sandbox and providers, then verify they are gone. Returns the
- * list of resources that still exist so the caller can mark the run invalid.
+ * Delete the sandbox, providers, and per-run provider profiles, then verify the
+ * sandbox and providers are gone. Returns the list of resources that still exist
+ * so the caller can mark the run invalid.
  */
-export async function cleanup(gateway: Gateway, sandbox: string | undefined, providers: string[]): Promise<string[]> {
+export async function cleanup(gateway: Gateway, sandbox: string | undefined, providers: string[], profiles: string[] = []): Promise<string[]> {
   const { client, workspace } = gateway
   for (let attempt = 0; attempt < 3; attempt += 1) {
     if (sandbox) {
@@ -353,11 +429,18 @@ export async function cleanup(gateway: Gateway, sandbox: string | undefined, pro
   } catch (error) {
     errors.push(`could not verify provider deletion: ${message(error)}`)
   }
+  for (const id of profiles) {
+    try {
+      await client.raw.deleteProviderProfile({ id, workspace })
+    } catch (error) {
+      errors.push(`could not delete provider profile ${id}: ${message(error)}`)
+    }
+  }
   return errors
 }
 
 // ---------------------------------------------------------------------------
-// Proposals: the agent asks for policy; the adjudicator decides; this applies.
+// Proposals: the agent asks for policy; the reviewer decides; this applies.
 
 export async function proposals(gateway: Gateway, sandbox: string, status: 'pending' | 'all' = 'pending'): Promise<Proposal[]> {
   const response = await gateway.client.raw.getDraftPolicy({ name: sandbox, statusFilter: status === 'all' ? '' : status, workspace: gateway.workspace })
@@ -381,6 +464,11 @@ export async function proposals(gateway: Gateway, sandbox: string, status: 'pend
       proposedRule: chunk.proposedRule,
       currentEffectivePolicy: chunk.currentEffectivePolicy,
       candidateEffectivePolicy: chunk.candidateEffectivePolicy,
+      denialSummaryIds: chunk.denialSummaryIds,
+      hitCount: chunk.hitCount,
+      supersedesChunkId: chunk.supersedesChunkId,
+      firstSeenMs: Number(chunk.firstSeenMs),
+      lastSeenMs: Number(chunk.lastSeenMs),
     }))
     .sort((a, b) => a.createdAtMs - b.createdAtMs)
 }
@@ -400,7 +488,7 @@ export async function rejectProposal(gateway: Gateway, sandbox: string, proposal
 }
 
 /**
- * Apply an adjudicator decision, failing closed. An approval the gateway
+ * Apply a reviewer decision, failing closed. An approval the gateway
  * cannot apply becomes a rejection; a stale review token asks the caller to
  * refetch; an already-rejected proposal is treated as satisfied.
  */
@@ -446,6 +534,20 @@ export function isProposalReviewStaleError(error: unknown): boolean {
 
 export function isProposalAlreadyRejectedError(error: unknown): boolean {
   return message(error).includes("chunk status is 'rejected', expected 'pending' or 'approved'")
+}
+
+/** The mechanistic mapper's rationale template for a chunk aggregated from denied connections. */
+const MECHANISTIC_RATIONALE = /^Allow \S+ to connect to \S+:\d+(?: \(HTTPS\))?\.$/
+
+/**
+ * Whether a rationale is the mechanistic mapper's template for a chunk aggregated from
+ * denied connections. OpenShell 0.0.116 exposes no origin field on a chunk and
+ * leaves `denialSummaryIds` empty for every chunk, so this is the only marker a
+ * client can read without seeing the agent's own submission. Agents write
+ * template-shaped rationales too, so it is a fallback, not ground truth.
+ */
+export function isMechanisticRationale(rationale: string): boolean {
+  return MECHANISTIC_RATIONALE.test(rationale.trim())
 }
 
 /** Gateway-side candidate validation failure; such a proposal can never be approved. */

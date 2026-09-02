@@ -1,7 +1,7 @@
 /**
  * The lab CLI. Three verbs, no framework:
  *
- *   lab run <scenario> [--minutes N] [--runtime R] [--adjudicator A] [--image REF] [--keep] [--continue]
+ *   lab run <scenario> [--minutes N] [--runtime R] [--model ID] [--reviewer A] [--image REF] [--turn-timeout S]
  *   lab doctor
  *   lab report <run-id | run-dir>
  *
@@ -18,7 +18,7 @@ import { bundleDriver } from './driver-bundle.js'
 import { json, readJsonl, status } from './evidence.js'
 import { runHorizon } from './horizon.js'
 import { connectGateway, message, minimumOpenShellVersion } from './openshell.js'
-import { adjudicators, runtimeDefaultImages, runtimeModelProfiles, runtimeNames, scenarios, selectAdjudicator, selectScenario } from './registry.js'
+import { reviewers, runtimeDefaultImages, runtimeModelProfiles, runtimeNames, scenarios, selectReviewer, selectScenario } from './registry.js'
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 /** Share of expected oracle polls that must succeed for a non-reached run to count as valid. */
@@ -32,7 +32,8 @@ async function loadEnv(): Promise<void> {
     const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/)
     if (!match) continue
     const value = match[2]?.replace(/^["']|["']$/g, '') ?? ''
-    if (process.env[match[1] as string] === undefined) process.env[match[1] as string] = value
+    // An empty assignment means "unset": the runtime or scenario default applies.
+    if (value && process.env[match[1] as string] === undefined) process.env[match[1] as string] = value
   }
 }
 
@@ -44,7 +45,8 @@ async function run(argv: string[]): Promise<number> {
   const { values, positionals } = parseArgs({
     args: argv, allowPositionals: true,
     options: {
-      minutes: { type: 'string' }, runtime: { type: 'string' }, adjudicator: { type: 'string' }, image: { type: 'string' },
+      minutes: { type: 'string' }, runtime: { type: 'string' }, model: { type: 'string' }, reviewer: { type: 'string' }, image: { type: 'string' },
+      'turn-timeout': { type: 'string' },
       keep: { type: 'boolean' }, 'continue': { type: 'boolean' },
     },
   })
@@ -53,35 +55,40 @@ async function run(argv: string[]): Promise<number> {
   const scenario = selectScenario(scenarioName)
   const runtime = values.runtime ?? scenario.config.defaultRuntime
   if (!runtimeNames.includes(runtime)) throw new Error(`unknown runtime: ${runtime} (have: ${runtimeNames.join(', ')})`)
-  const adjudicatorName = values.adjudicator ?? scenario.config.defaultAdjudicator
+  const reviewerName = values.reviewer ?? scenario.config.defaultReviewer
   const minutes = values.minutes ? Number(values.minutes) : scenario.config.durationMinutes
   if (!Number.isFinite(minutes) || minutes <= 0) throw new Error('--minutes must be a positive number')
 
-  const modelDriven = runtime !== 'scripted'
+  // A runtime is model-driven exactly when it declares a model profile.
   const profile = runtimeModelProfiles[runtime]
-  if (modelDriven && !profile) throw new Error(`runtime "${runtime}" is model-driven but has no model profile in src/registry.ts`)
-  const agentApiKey = profile ? process.env[profile.apiKeyEnv] : undefined
-  if (modelDriven && !agentApiKey) throw new Error(`runtime "${runtime}" needs ${profile!.apiKeyEnv} in .env`)
-  const model = modelDriven ? {
-    baseUrl: process.env.LAB_MODEL_BASE_URL ?? profile!.defaultBaseUrl,
-    model: process.env.LAB_MODEL ?? profile!.defaultModel,
-    reasoning: process.env.LAB_MODEL_REASONING ?? 'medium',
-    apiKeyEnv: profile!.apiKeyEnv,
-    contextWindow: Number(process.env.LAB_MODEL_CONTEXT_WINDOW ?? defaultDriverTuning.model.contextWindow),
+  const agentApiKey = profile ? (process.env.LAB_MODEL_API_KEY || process.env[profile.apiKeyEnv]) : undefined
+  if (profile && !agentApiKey) throw new Error(`runtime "${runtime}" needs ${profile.apiKeyEnv} (or LAB_MODEL_API_KEY) in .env`)
+  const model = profile ? {
+    baseUrl: process.env.LAB_MODEL_BASE_URL || profile.defaultBaseUrl,
+    model: values.model || process.env.LAB_MODEL || profile.defaultModel,
+    reasoning: process.env.LAB_MODEL_REASONING || 'medium',
+    apiKeyEnv: profile.apiKeyEnv,
+    contextWindow: Number(process.env.LAB_MODEL_CONTEXT_WINDOW || defaultDriverTuning.model.contextWindow),
     effectiveContextPercent: defaultDriverTuning.model.effectiveContextPercent,
   } : undefined
   if (model && (!Number.isFinite(model.contextWindow) || model.contextWindow <= 0)) throw new Error('LAB_MODEL_CONTEXT_WINDOW must be a positive number')
+  const turnTimeoutRaw = values['turn-timeout'] ?? process.env.LAB_TURN_TIMEOUT_SECONDS
+  const turnTimeoutSeconds = turnTimeoutRaw ? Number(turnTimeoutRaw) : undefined
+  if (turnTimeoutSeconds !== undefined && (!Number.isFinite(turnTimeoutSeconds) || turnTimeoutSeconds <= 0)) throw new Error('--turn-timeout must be a positive number of seconds')
+  const modelCredential = process.env.LAB_MODEL_CREDENTIAL || 'provider'
+  if (modelCredential !== 'provider' && modelCredential !== 'env') throw new Error('LAB_MODEL_CREDENTIAL must be provider or env')
 
   const gateway = await connectGateway()
   status('gateway.connected', { version: gateway.version, sdkVersion: gateway.sdkVersion })
   const driverBundle = await bundleDriver()
 
   const result = await runHorizon(gateway, {
-    scenario, adjudicator: selectAdjudicator(adjudicatorName), adjudicatorName, runtime, minutes, image: values.image ?? runtimeDefaultImages[runtime],
+    scenario, reviewer: selectReviewer(reviewerName), reviewerName, runtime, minutes, image: values.image ?? runtimeDefaultImages[runtime],
     runId: process.env.LAB_RUN_ID ?? newRunId(), workspace: gateway.workspace,
     runsDir: process.env.LAB_RUNS_DIR ?? path.join(root, 'runs'), driverBundle,
     keepSandbox: values.keep === true, continueAfterObjective: values['continue'] === true || scenario.config.continueAfterObjective,
-    oracleMinSuccessPercent: ORACLE_MIN_SUCCESS_PERCENT, model, agentApiKey,
+    oracleMinSuccessPercent: ORACLE_MIN_SUCCESS_PERCENT, model, agentApiKey, modelProfile: profile, modelCredential,
+    turnTimeoutSeconds,
   })
   process.stdout.write(`\n${result.objectiveReached ? 'OBJECTIVE REACHED' : 'objective not reached'} — validRun=${result.validRun}${result.invalidReasons.length ? ` (${result.invalidReasons.join(', ')})` : ''}\n${result.runDir}\n`)
   return result.objectiveReached || result.validRun ? 0 : 1
@@ -99,7 +106,7 @@ async function doctor(): Promise<number> {
     lines.push(`gateway:     ERROR — ${message(error)}`)
   }
   lines.push(`scenarios:   ${Object.keys(scenarios).join(', ')}`)
-  lines.push(`adjudicators:${Object.keys(adjudicators).join(', ')}`)
+  lines.push(`reviewers:${Object.keys(reviewers).join(', ')}`)
   lines.push(`runtimes:    ${runtimeNames.join(', ')}`)
   try { await bundleDriver(); lines.push('driver:      bundles cleanly') } catch (error) { ok = false; lines.push(`driver:      ERROR — ${message(error)}`) }
   process.stdout.write(`${lines.join('\n')}\n${ok ? 'doctor: ready' : 'doctor: not ready'}\n`)

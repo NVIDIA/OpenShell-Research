@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 560" role="img" aria-labelledby="title description">
   <title id="title">Long-Horizon Agent Evals system overview</title>
-  <desc id="description">The trusted host runs the horizon loop, the adjudicator, and the scenario oracle. OpenShell's gateway and sandbox supervisor hold proposals and enforce policy. The untrusted agent runs inside the sandbox through the bundled driver and a runtime adapter. The oracle observes an external target directly.</desc>
+  <desc id="description">The trusted host runs the horizon loop, the reviewer, and the scenario oracle. OpenShell's gateway and sandbox supervisor hold proposals and enforce policy. The untrusted agent runs inside the sandbox through the bundled driver and a runtime adapter. The oracle observes an external target directly.</desc>
   <defs>
     <style>
       text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#1f2933}
@@ -31,7 +31,7 @@
   <text class="subtitle" x="56" y="122">src/lab.ts, src/horizon.ts</text>
   <text class="subtitle" x="56" y="142">sandbox lifecycle, evidence, validity</text>
   <rect class="host" x="40" y="180" width="290" height="88" rx="10"/>
-  <text class="title" x="56" y="210">Adjudicator</text>
+  <text class="title" x="56" y="210">Reviewer</text>
   <text class="subtitle" x="56" y="232">auto-approve, reject-all, model-reviewer</text>
   <text class="subtitle" x="56" y="252">decides; never applies</text>
   <rect class="host" x="40" y="290" width="290" height="88" rx="10"/>
@@ -104,7 +104,7 @@
   <!-- oracle -> target -->
   <path class="arrow" d="M330 334 C 370 334, 370 40, 780 40 L780 90"/>
   <text class="label" x="530" y="34">oracle observes directly</text>
-  <!-- adjudicator -> gateway (decision) -->
+  <!-- reviewer -> gateway (decision) -->
   <path class="arrow" d="M330 224 C 360 224, 360 128, 410 128"/>
   <!-- host -> evidence -->
   <path class="arrow" d="M330 444 C 400 444, 700 540, 780 374" style="stroke-dasharray:6 5"/>
