@@ -6,6 +6,8 @@ layout.
 
 Current projects:
 
+- `long-horizon-agent-evals`: Persistent agent experiments over configurable time
+  horizons and repeated parallel attempts, starting with GitHub policy review.
 - `openshell-middleware-manager`: `omm` CLI that creates and updates version-matched
   Python and Rust OpenShell supervisor middleware projects.
 - `egress-gate`: Extensible OpenShell middleware for provider-bound HTTP
