@@ -631,6 +631,28 @@ def test_assistant_message_allows_text_replacement_and_denial() -> None:
     assert denied.decision is AdmissionDecision.DENY
 
 
+def test_assistant_message_accepts_javascript_number_serialization() -> None:
+    admission, _, _ = _processors()
+    body = (
+        b'{"schema_version":"openshell.pi-assistant-message.v1","text":"safe",'
+        b'"tool_calls":[{"arguments":{"threshold":1e-7},"id":"call-1",'
+        b'"name":"read"}]}'
+    )
+
+    result = admission.process(
+        HarnessAdmissionRequest(
+            request_body=body,
+            provenance=AdmissionProvenance(
+                session_id="session-1", submission_id="submission-1"
+            ),
+        ),
+        _context(AdmissionHook.ASSISTANT_MESSAGE),
+        timeout=Timeout.from_seconds(1),
+    )
+
+    assert result.decision is AdmissionDecision.ALLOW
+
+
 def test_assistant_message_rejects_tool_call_mutation() -> None:
     admission, _, _ = _processors()
 
