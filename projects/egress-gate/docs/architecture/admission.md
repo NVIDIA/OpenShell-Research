@@ -70,7 +70,9 @@ may instead return its own deny reason.
 
 An Egress Gate started with `--require-agent-attestation` is dedicated to
 managed harness traffic: unattested matching provider requests fail closed.
-The current loopback bridge is supervisor-owned but, until caller capabilities
-are added, any process in the sandbox can invoke it. That does not let an
-unattested request pass egress, but it means OpenShell cannot yet prove which
-process requested admission.
+The supervisor-owned loopback bridge requires a per-exec capability delivered
+to the launched harness on an inherited file descriptor. The launcher reads and
+closes that descriptor and deletes its environment name before Pi starts, so
+tool subprocesses do not receive the capability. The token remains in Pi's
+memory; a same-user process able to read that memory could copy it, though the
+sandbox's process isolation and ptrace restrictions reduce this residual risk.
