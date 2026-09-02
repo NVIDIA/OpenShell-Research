@@ -1141,9 +1141,7 @@ def _unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
 
 def _provider_message_to_canonical(item: _ProviderMessage) -> CanonicalMessageV1:
     if isinstance(item.content, tuple):
-        if len(item.content) != 1:
-            raise ProviderShapeError("multipart text requires exactly one block")
-        content = item.content[0].text
+        content = "\n".join(block.text for block in item.content)
     else:
         content = item.content
     return CanonicalMessageV1(

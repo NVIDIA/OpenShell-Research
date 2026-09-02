@@ -391,12 +391,30 @@ def test_provider_adapters_match_shared_context_entry_vectors() -> None:
         },
         strict=True,
     ).entries
+    source_messages = [
+        message
+        for message in _CONTEXT_ENTRY_VECTORS["cases"][0]["context"]["messages"]
+        if message["role"] in {"user", "toolResult"}
+    ]
     messages = [{"role": "system", "content": "system"}]
     responses_input = [{"role": "developer", "content": "system"}]
-    for entry in expected:
+    for entry, source in zip(expected, source_messages, strict=True):
         if entry.role == "user":
-            messages.append({"role": "user", "content": entry.text})
-            responses_input.append({"role": "user", "content": entry.text})
+            messages.append({"role": "user", "content": source["content"]})
+            content = source["content"]
+            responses_input.append(
+                {
+                    "role": "user",
+                    "content": (
+                        content
+                        if isinstance(content, str)
+                        else [
+                            {"type": "input_text", "text": block["text"]}
+                            for block in content
+                        ]
+                    ),
+                }
+            )
         else:
             messages.append(
                 {
