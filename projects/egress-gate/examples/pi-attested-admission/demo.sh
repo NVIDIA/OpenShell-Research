@@ -654,14 +654,25 @@ verify() {
 		copy_session "$session" "$temporary_dir/tool-$marker_lower.jsonl" \
 			"$temporary_dir/tool-$marker_lower-session.err"
 		if ! $print_only; then
-			if grep -Fq '"role":"toolResult"' "$temporary_dir/tool-$marker_lower.jsonl"; then
-				if ! grep -Fq "$expected" "$temporary_dir/tool-$marker_lower.jsonl"; then
-					printf 'Tool %s result was present without the expected admitted text.\n' "$marker_lower" >&2
-					exit 1
-				fi
+			status=0
+			awk -v expected="$expected" -v forbidden="${marker}_THIS" '
+				index($0, "\"role\":\"toolResult\"") {
+					found = 1
+					if (index($0, expected)) admitted = 1
+					if (index($0, forbidden)) leaked = 1
+				}
+				END {
+					if (!found) exit 2
+					if (!admitted || leaked) exit 1
+				}
+			' "$temporary_dir/tool-$marker_lower.jsonl" || status=$?
+			if ((status == 0)); then
 				printf 'PASS %-18s tool result contains %s\n' "tool $marker_lower" "$expected"
-			else
+			elif ((status == 2)); then
 				printf 'SKIP %-18s model did not call bash\n' "tool $marker_lower"
+			else
+				printf 'Tool %s result was not safely admitted.\n' "$marker_lower" >&2
+				exit 1
 			fi
 		fi
 	done
