@@ -200,7 +200,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
             pb2.AgentConversationResult,
         ],
     ) -> pb2.AgentConversationResult:
-        """Evaluate one supervisor-stamped Pi admission request."""
+        """Evaluate one supervisor-stamped agent admission request."""
         timeout = Timeout.from_seconds(self._timeout_middleware_processing_seconds)
         return await self._run_in_worker(
             lambda: self._evaluate_agent_admission(request, timeout),
