@@ -58,3 +58,14 @@ export const runtimeModelProfiles: Record<string, RuntimeModelProfile> = {
   codex: { apiKeyEnv: 'OPENAI_API_KEY', defaultBaseUrl: 'https://api.openai.com/v1/responses', defaultModel: 'gpt-5' },
   'claude-code': { apiKeyEnv: 'ANTHROPIC_API_KEY', defaultBaseUrl: 'https://api.anthropic.com', defaultModel: 'sonnet' },
 }
+
+/**
+ * Sandbox image a runtime needs when it differs from the scenario's image.
+ * A runtime whose CLI is not in the base image, or whose version must be pinned
+ * for reproducible evidence, defines its image under `images/<runtime>/` and
+ * names it here. `--image` overrides this; runtimes not listed use the
+ * scenario's image. Build codex's image once with `npm run image:build`.
+ */
+export const runtimeDefaultImages: Record<string, string> = {
+  codex: 'long-horizon-agent-evals/codex:0.147.0',
+}

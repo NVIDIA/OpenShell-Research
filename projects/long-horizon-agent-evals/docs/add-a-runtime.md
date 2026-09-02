@@ -19,8 +19,14 @@ A runtime is one file under `driver/runtimes/` plus one line in
 | --- | --- | --- |
 | `scripted` | A deterministic agent with no model that attempts a GET, proposes the narrowest rule when blocked, and retries. | Nothing. Used by `hello-canary` and CI. |
 | `responses` | A minimal agent speaking the OpenAI Responses API directly with a single `shell` tool. | `OPENAI_API_KEY`. Base sandbox image. |
-| `codex` | OpenAI Codex CLI under `codex exec --json`, mapped onto the common events. | `OPENAI_API_KEY`. Ships in the base image; `npm run image:build` only pins a newer version. |
-| `claude-code` | Anthropic Claude Code CLI under `claude -p --output-format stream-json`, mapped onto the common events. | `ANTHROPIC_API_KEY`. Ships in the base image. |
+| `codex` | OpenAI Codex CLI under `codex exec --json`, mapped onto the common events. | `OPENAI_API_KEY` and the pinned Codex image (`npm run image:build`), selected automatically. The base image's older Codex has an incompatible model-catalog schema. |
+| `claude-code` | Anthropic Claude Code CLI under `claude -p --output-format stream-json`, mapped onto the common events. | `ANTHROPIC_API_KEY`. Runs on the base image; pin a version for evidence runs. |
+
+A runtime whose CLI is not in the base image, or whose version must be pinned,
+defines a Dockerfile under `images/<runtime>/` built on the base image and
+names it in `runtimeDefaultImages` (`src/registry.ts`). The CLI selects that
+image automatically; `--image` overrides it. Codex does this; `npm run
+image:build` builds `images/codex`.
 
 The `scripted` and `responses` runtimes isolate a model behind a minimal loop;
 they are the reproducible baseline and the second implementation that keeps the

@@ -107,31 +107,27 @@ initial policy, so any objective reached under it was reached without new
 capability.
 
 For a realistic long-horizon result, run a full agent harness as the
-challenger. Both ship in the base sandbox image, so no image build is needed:
-
-```bash
-npm run lab -- run github-policy-review --runtime codex
-```
+challenger. Claude Code reads `ANTHROPIC_API_KEY` and runs on the base image:
 
 ```bash
 npm run lab -- run github-policy-review --runtime claude-code
 ```
 
-Claude Code reads `ANTHROPIC_API_KEY` and Codex reads `OPENAI_API_KEY`; set the
-one for the runtime you choose. To pin a specific Codex version instead of the
-base image's, build the image and override with `--image`:
+Codex reads `OPENAI_API_KEY` and needs its pinned image, which the CLI selects
+automatically once you build it. The base image's older Codex has an
+incompatible model-catalog schema, so build the image once:
 
 ```bash
 npm run image:build
 ```
 
 ```bash
-npm run lab -- run github-policy-review --runtime codex --image long-horizon-agent-evals/codex:0.147.0
+npm run lab -- run github-policy-review --runtime codex
 ```
 
-The reviewer adjudicator speaks the OpenAI Responses API, so a Claude Code
-challenger currently runs against a GPT reviewer. That model asymmetry is a
-valid condition; a Claude reviewer would be a second adjudicator.
+The reviewer adjudicator speaks the OpenAI Responses API, so it works with any
+Responses-compatible endpoint (GPT, or a Claude model behind a Responses
+route). A Claude Code challenger against a GPT reviewer is a valid asymmetry.
 
 ## What happens during a run
 
@@ -213,9 +209,10 @@ policy, including chunks the gateway superseded during canonicalization.
 !!! note "Validation status on this branch (September 2026)"
     The `model-reviewer` adjudicator has been validated against a live model
     on real proposals (approving a repository read, rejecting a contents
-    write). The `responses` runtime has completed model-driven hello-canary
-    runs. The `codex` and `claude-code` adapters are mechanically validated
-    against the base-image CLIs (flags accepted, stream parsed, thread id
-    captured) but have not yet completed a full model-driven run. A
-    full-horizon `github-policy-review` run against a disposable repository is
-    still pending.
+    write). The `responses` and `codex` runtimes have completed model-driven
+    `hello-canary` runs end to end (real agent, blocked request, proposal,
+    approval, enforcement, target reached); codex ran on its pinned image
+    against gpt-5. The `claude-code` adapter is mechanically validated against
+    the base-image CLI (flags accepted, stream parsed, session id captured); a
+    full model-driven run is pending a live Anthropic key. A full-horizon
+    `github-policy-review` run against a disposable repository is still pending.

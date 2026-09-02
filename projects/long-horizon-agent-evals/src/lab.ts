@@ -18,7 +18,7 @@ import { bundleDriver } from './driver-bundle.js'
 import { json, readJsonl, status } from './evidence.js'
 import { runHorizon } from './horizon.js'
 import { connectGateway, message, minimumOpenShellVersion } from './openshell.js'
-import { adjudicators, runtimeModelProfiles, runtimeNames, scenarios, selectAdjudicator, selectScenario } from './registry.js'
+import { adjudicators, runtimeDefaultImages, runtimeModelProfiles, runtimeNames, scenarios, selectAdjudicator, selectScenario } from './registry.js'
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 /** Share of expected oracle polls that must succeed for a non-reached run to count as valid. */
@@ -77,7 +77,7 @@ async function run(argv: string[]): Promise<number> {
   const driverBundle = await bundleDriver()
 
   const result = await runHorizon(gateway, {
-    scenario, adjudicator: selectAdjudicator(adjudicatorName), adjudicatorName, runtime, minutes, image: values.image,
+    scenario, adjudicator: selectAdjudicator(adjudicatorName), adjudicatorName, runtime, minutes, image: values.image ?? runtimeDefaultImages[runtime],
     runId: process.env.LAB_RUN_ID ?? newRunId(), workspace: gateway.workspace,
     runsDir: process.env.LAB_RUNS_DIR ?? path.join(root, 'runs'), driverBundle,
     keepSandbox: values.keep === true, continueAfterObjective: values['continue'] === true || scenario.config.continueAfterObjective,

@@ -62,7 +62,7 @@ export const codexRuntime: Runtime = {
         display_name: model.model,
         description: 'Model configured for this long-horizon run.',
         default_reasoning_level: model.reasoning,
-        supported_reasoning_levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'].map((effort) => ({ effort, description: effort })),
+        supported_reasoning_levels: ['low', 'medium', 'high', 'xhigh'].map((effort) => ({ effort, description: effort })),
         shell_type: 'shell_command',
         visibility: 'list',
         supported_in_api: true,
@@ -82,8 +82,7 @@ export const codexRuntime: Runtime = {
         effective_context_window_percent: model.effectiveContextPercent,
         experimental_supported_tools: [],
         input_modalities: ['text', 'image'],
-        use_responses_lite: true,
-        tool_mode: 'code_mode_only',
+        use_responses_lite: false,
       }],
     }, null, 2), { mode: 0o600 })
     const baseUrl = model.baseUrl.replace(/\/responses\/?$/, '').replace(/\/$/, '')
@@ -106,7 +105,7 @@ export const codexRuntime: Runtime = {
   },
 
   async turn(context: RuntimeContext, request: TurnRequest): Promise<TurnResult> {
-    const common = ['--json', '--skip-git-repo-check', '--dangerously-bypass-approvals-and-sandbox', '--ignore-rules']
+    const common = ['--json', '--skip-git-repo-check', '--dangerously-bypass-approvals-and-sandbox']
     const args = request.kind === 'start'
       ? ['exec', ...common, request.prompt]
       : ['exec', 'resume', ...common, request.threadId, request.nudge]
