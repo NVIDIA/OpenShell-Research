@@ -1,7 +1,8 @@
 {
-  "openshell_version": "v0.0.97",
-  "proto_source": "https://raw.githubusercontent.com/NVIDIA/OpenShell/v0.0.97/proto/supervisor_middleware.proto",
-  "proto_sha256": "e9d5a992ff5b50a33e9625176aaf6df8496d6774aa2ef3afe5cae7bc83c01105",
+  "openshell_version": "johnnygreco/OpenShell@8332c459c89124499e76da0a4095af9661aec10f",
+  "proto_source": "https://raw.githubusercontent.com/johnnygreco/OpenShell/8332c459c89124499e76da0a4095af9661aec10f/proto/supervisor_middleware.proto",
+  "proto_sha256": "2bda09fcbabc37663fbddfb8c49b6ae2689b25f3315912b0e8416a6bd2ac8e50",
+  "contract_note": "EvaluateAgentConversation is fork-only until the agent-conversation contract is upstreamed.",
   "languages": [
     "python"
   ],

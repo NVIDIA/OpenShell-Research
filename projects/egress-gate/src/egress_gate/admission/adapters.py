@@ -51,10 +51,11 @@ class ProviderShapeError(ValueError):
     """A content-safe signal that a provider request is unsupported."""
 
 
-class PiInputV1(StrictDomainModel):
+class PiMessageV1(StrictDomainModel):
     """Rendered text submitted by the managed Pi harness."""
 
-    schema_version: Literal["openshell.pi-input.v1"]
+    schema_version: Literal["openshell.pi-message.v1"]
+    origin: Literal["user"]
     text: ScalarString
 
 
@@ -88,7 +89,7 @@ class PiToolResultV1(StrictDomainModel):
         return tuple(value) if isinstance(value, list) else value
 
 
-AttestedCandidate: TypeAlias = PiInputV1 | CanonicalMessageV1
+AttestedCandidate: TypeAlias = PiMessageV1 | CanonicalMessageV1
 
 
 class PreparedHarnessRequest:
@@ -97,7 +98,7 @@ class PreparedHarnessRequest:
     def __init__(
         self,
         *,
-        native: PiInputV1 | PiToolResultV1,
+        native: PiMessageV1 | PiToolResultV1,
         projected_body: bytes,
         original_body: bytes,
     ) -> None:
@@ -125,8 +126,8 @@ class HarnessAdapter(Protocol):
     ) -> tuple[bytes | None, AttestedCandidate]: ...
 
 
-class PiV1Adapter:
-    """Strict rendered-prompt adapter."""
+class PiMessageV1Adapter:
+    """Strict user-message adapter."""
 
     def prepare(
         self,
@@ -147,7 +148,7 @@ class PiV1Adapter:
         projected_body: bytes,
         context: HarnessAdmissionContext,
         timeout: Timeout,
-    ) -> tuple[bytes | None, PiInputV1]:
+    ) -> tuple[bytes | None, PiMessageV1]:
         updated = _parse_pi_body(projected_body, timeout)
         encoded = canonical_json_bytes(updated)
         replacement = (
@@ -233,6 +234,11 @@ class HarnessAdapterRegistry:
                 "harness admission shape is unsupported"
             ) from None
 
+    @property
+    def bindings(self) -> tuple[tuple[str, str, str], ...]:
+        """Return registered harness, hook, and schema bindings."""
+        return tuple(self._adapters)
+
 
 class _ProviderTextBlock(StrictDomainModel):
     type: Literal["text"]
@@ -256,6 +262,7 @@ class _ProviderMessage(StrictDomainModel):
     name: ScalarString | None = None
     tool_call_id: ScalarString | None = None
     tool_calls: tuple[_ProviderToolCall, ...] = ()
+    reasoning_content: ScalarString | None = None
 
     @field_validator("content", "tool_calls", mode="before")
     @classmethod
@@ -272,6 +279,11 @@ class _ProviderMessage(StrictDomainModel):
             raise ValueError("provider tool-call ID cannot be null")
         if "tool_calls" in self.model_fields_set and not self.tool_calls:
             raise ValueError("provider tool calls cannot be empty")
+        if (
+            "reasoning_content" in self.model_fields_set
+            and self.reasoning_content is None
+        ):
+            raise ValueError("provider reasoning content cannot be null")
         return self
 
 
@@ -567,8 +579,9 @@ class OpenAIChatCompletionsV1Adapter:
         canonical = self.canonicalize(request, timeout)
         for message in reversed(canonical.messages):
             if message.role is CanonicalRole.USER and message.content is not None:
-                return PiInputV1(
-                    schema_version="openshell.pi-input.v1",
+                return PiMessageV1(
+                    schema_version="openshell.pi-message.v1",
+                    origin="user",
                     text=message.content,
                 )
             if message.role is CanonicalRole.TOOL and message.content is not None:
@@ -649,8 +662,9 @@ class OpenAIResponsesV1Adapter:
         provider = self._parse(request, timeout)
         for item in reversed(provider.input):
             if isinstance(item, _ResponsesInputMessage) and item.role == "user":
-                return PiInputV1(
-                    schema_version="openshell.pi-input.v1",
+                return PiMessageV1(
+                    schema_version="openshell.pi-message.v1",
+                    origin="user",
                     text=_responses_text(item.content),
                 )
             if isinstance(item, _ResponsesFunctionCallOutput):
@@ -705,9 +719,9 @@ def create_pi_adapter_registry() -> HarnessAdapterRegistry:
     registry = HarnessAdapterRegistry()
     registry.register(
         "pi",
-        AdmissionHook.RENDERED_PROMPT,
-        "openshell.pi-input.v1",
-        PiV1Adapter(),
+        AdmissionHook.USER_MESSAGE,
+        "openshell.pi-message.v1",
+        PiMessageV1Adapter(),
     )
     registry.register(
         "pi",
@@ -726,13 +740,13 @@ def create_provider_adapter_registry() -> ProviderAdapterRegistry:
     return registry
 
 
-def _parse_pi_body(body: bytes, timeout: Timeout) -> PiInputV1:
+def _parse_pi_body(body: bytes, timeout: Timeout) -> PiMessageV1:
     value = _load_json(body, AdmissionShapeError, timeout)
     try:
         parsed = _PI_ADAPTER.validate_python(value, strict=True)
     except ValidationError:
         raise AdmissionShapeError("Pi request body is unsupported") from None
-    if not isinstance(parsed, PiInputV1):
+    if not isinstance(parsed, PiMessageV1):
         raise AdmissionShapeError("Pi request body is unsupported")
     if canonical_json_bytes(parsed) != body:
         raise AdmissionShapeError("Pi request body is not canonical JSON")
@@ -849,7 +863,7 @@ def _provider_message_to_canonical(item: _ProviderMessage) -> CanonicalMessageV1
     )
 
 
-_PI_ADAPTER = TypeAdapter(PiInputV1)
+_PI_ADAPTER = TypeAdapter(PiMessageV1)
 _PI_TOOL_RESULT_ADAPTER = TypeAdapter(PiToolResultV1)
 _PROVIDER_ADAPTER = TypeAdapter(_ProviderRequest)
 _RESPONSES_PROVIDER_ADAPTER = TypeAdapter(_ResponsesRequest)
@@ -863,12 +877,12 @@ __all__ = [
     "HarnessAdapterRegistry",
     "OpenAIChatCompletionsV1Adapter",
     "OpenAIResponsesV1Adapter",
-    "PiInputV1",
+    "PiMessageV1",
     "PiImageContentV1",
     "PiTextContentV1",
     "PiToolResultV1",
     "PiToolResultV1Adapter",
-    "PiV1Adapter",
+    "PiMessageV1Adapter",
     "PreparedHarnessRequest",
     "ProviderAdapterRegistry",
     "ProviderRequestAdapter",

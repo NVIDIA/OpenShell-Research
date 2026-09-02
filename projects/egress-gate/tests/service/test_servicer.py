@@ -133,7 +133,7 @@ def test_manifest_leaves_the_gateway_rpc_timeout_to_the_operator() -> None:
 
 def test_managed_manifest_advertises_exact_user_and_tool_result_bindings() -> None:
     middleware = EgressGateMiddleware(
-        create_builtin_registry(), require_pi_attestation=True
+        create_builtin_registry(), require_agent_attestation=True
     )
     try:
         manifest = asyncio.run(middleware.Describe(object(), Mock()))
@@ -149,8 +149,8 @@ def test_managed_manifest_advertises_exact_user_and_tool_result_bindings() -> No
         (binding.harness, binding.hook, binding.schema_version)
         for binding in agent_bindings
     ] == [
-        ("pi", "rendered_prompt_admission", "openshell.pi-input.v1"),
-        ("pi", "tool_result_admission", "openshell.pi-tool-result.v1"),
+        ("pi", "user_message", "openshell.pi-message.v1"),
+        ("pi", "tool_result", "openshell.pi-tool-result.v1"),
     ]
 
 

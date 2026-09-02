@@ -242,8 +242,9 @@ This division is intentional. The Pi fork contributes only reusable harness
 primitives: mandatory admission of user messages and finalized tool results,
 admission of the exact provider context, an outbound-header transformation, and
 a standard-CLI entrypoint that accepts those hooks. OpenShell contributes the
-sandbox-local bridge, signed receipts, receipt-to-request binding, middleware
-enforcement, and post-policy credential delivery. The TypeScript files under
+sandbox-local bridge, signed attestations, attestation-to-request binding,
+middleware enforcement, and post-policy credential delivery. The TypeScript
+files under
 `runtime-extension/` are the reusable integration layer that translates between
 those generic Pi hooks and the OpenShell protocol; no OpenShell-specific code is
 built into Pi.

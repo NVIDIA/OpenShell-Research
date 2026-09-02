@@ -92,26 +92,10 @@ from egress_gate.timeout import (
 )
 
 
-def _require_pi_harness(value: str) -> Literal["pi"]:
-    if value == "pi":
-        return value
-    raise ValueError("invalid admission harness")
-
-
-def _require_pi_schema(
-    value: str, hook: AdmissionHook
-) -> Literal["openshell.pi-input.v1", "openshell.pi-tool-result.v1"]:
-    if hook is AdmissionHook.RENDERED_PROMPT and value == "openshell.pi-input.v1":
-        return value
-    if hook is AdmissionHook.TOOL_RESULT and value == "openshell.pi-tool-result.v1":
-        return value
-    raise ValueError("invalid admission schema")
-
-
-def _require_pi_harness_version(value: str) -> Literal["sdk-v1"]:
+def _require_harness_version(value: str) -> Literal["sdk-v1"]:
     if value == PI_HARNESS_VERSION:
         return value
-    raise ValueError("invalid Pi harness version")
+    raise ValueError("invalid admission harness version")
 
 
 class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
@@ -122,7 +106,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         registry: GateRegistry,
         *,
         timeout_middleware_processing: float = DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING,
-        require_pi_attestation: bool = False,
+        require_agent_attestation: bool = False,
     ) -> None:
         registry.configuration_json_schema()
         self._registry = registry
@@ -131,7 +115,8 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         )
         self._policy = _ActivePolicy(registry)
         self._receipt_authority = ReceiptAuthority()
-        self._require_pi_attestation = require_pi_attestation
+        self._admission_adapters = create_pi_adapter_registry()
+        self._require_agent_attestation = require_agent_attestation
         self._processing_slots = asyncio.Semaphore(MAX_CONCURRENT_PROCESSING)
         self._processing_executor = ThreadPoolExecutor(
             max_workers=MAX_CONCURRENT_PROCESSING,
@@ -173,16 +158,14 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                         operation=pb2.SUPERVISOR_MIDDLEWARE_OPERATION_AGENT_CONVERSATION,
                         phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_AGENT_CONTEXT,
                         max_payload_bytes=MAX_ADMISSION_BODY_BYTES,
-                        harness="pi",
-                        hook=hook.value,
-                        schema_version=(
-                            "openshell.pi-input.v1"
-                            if hook is AdmissionHook.RENDERED_PROMPT
-                            else "openshell.pi-tool-result.v1"
-                        ),
+                        harness=harness,
+                        hook=hook,
+                        schema_version=schema_version,
                     )
-                    for hook in AdmissionHook
-                    if self._require_pi_attestation
+                    for harness, hook, schema_version in (
+                        self._admission_adapters.bindings
+                    )
+                    if self._require_agent_attestation
                 ),
             ],
         )
@@ -230,7 +213,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         timeout: Timeout,
     ) -> pb2.AgentConversationResult:
         try:
-            if not self._require_pi_attestation:
+            if not self._require_agent_attestation:
                 raise ValueError("agent admission is disabled")
             if request.phase != pb2.SUPERVISOR_MIDDLEWARE_PHASE_AGENT_CONTEXT:
                 raise ValueError("invalid admission phase")
@@ -253,7 +236,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                 self._policy.processor_for(
                     _mapping_from_proto(request.config), timeout=timeout
                 ),
-                create_pi_adapter_registry(),
+                self._admission_adapters,
                 self._receipt_authority,
             )
             result = processor.process(
@@ -265,14 +248,12 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                     request_id=request.context.request_id,
                     sandbox_id=request.context.sandbox_id,
                     middleware_name=request.middleware_name,
-                    harness=_require_pi_harness(request.target.harness),
-                    harness_version=_require_pi_harness_version(
+                    harness=request.target.harness,
+                    harness_version=_require_harness_version(
                         request.target.harness_version
                     ),
                     hook=hook,
-                    schema_version=_require_pi_schema(
-                        request.target.schema_version, hook
-                    ),
+                    schema_version=request.target.schema_version,
                     provider_target=target,
                     provider_adapter_schema="openai.request.v1",
                 ),
@@ -409,7 +390,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
             values,
             timeout=timeout,
         )
-        if self._require_pi_attestation:
+        if self._require_agent_attestation:
             return AttestedEgressProcessor(
                 processor,
                 create_provider_adapter_registry(),
@@ -431,7 +412,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                     gate_name="reserved-receipt-header",
                     gate_type="reserved-receipt-header",
                 ),
-                reason_code="reserved_receipt_header",
+                reason_code="reserved_header_present",
                 policy_fingerprint=processor.policy_fingerprint,
             )
         return processor.process(domain_request, timeout=timeout)

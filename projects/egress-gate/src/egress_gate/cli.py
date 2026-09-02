@@ -167,12 +167,12 @@ def serve(
             ),
         ),
     ] = f"{DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING:g}s",
-    require_pi_attestation: Annotated[
+    require_agent_attestation: Annotated[
         bool,
         typer.Option(
-            "--require-pi-attestation/--no-require-pi-attestation",
+            "--require-agent-attestation/--no-require-agent-attestation",
             help=(
-                "Require a supervisor-held Pi context attestation on HTTP "
+                "Require a supervisor-held agent context attestation on HTTP "
                 "egress. Enabled by default; disable only for an "
                 "explicitly unmanaged deployment."
             ),
@@ -220,7 +220,7 @@ def serve(
         EgressGateServer(
             options.registry,
             timeout_middleware_processing=timeout_middleware_processing,
-            require_pi_attestation=require_pi_attestation,
+            require_agent_attestation=require_agent_attestation,
         ).serve_sync(listen)
     except EgressGateError as error:
         _render_egress_error("Egress Gate could not start", error)

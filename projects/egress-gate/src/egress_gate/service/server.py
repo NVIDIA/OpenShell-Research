@@ -34,12 +34,12 @@ class EgressGateServer:
         registry: GateRegistry,
         *,
         timeout_middleware_processing: float = DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING,
-        require_pi_attestation: bool = False,
+        require_agent_attestation: bool = False,
     ) -> None:
         self._middleware = EgressGateMiddleware(
             registry,
             timeout_middleware_processing=timeout_middleware_processing,
-            require_pi_attestation=require_pi_attestation,
+            require_agent_attestation=require_agent_attestation,
         )
 
     def serve_sync(self, listen: str = DEFAULT_LISTEN_ADDRESS) -> None:
