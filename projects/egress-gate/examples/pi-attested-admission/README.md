@@ -229,9 +229,11 @@ before it enters live context. Repeat with `REDACT_` and `THIS` to see the tool
 result admitted as `[REDACTED]`.
 
 Pi uses its standard session manager and JSONL session location, and exposes
-the active path to tools as `PI_SESSION_FILE`. Admission runs before a user
-message or tool result reaches that history. `launch` preserves the history;
-`reset` and `cleanup` delete it with the sandbox.
+the active path to tools as `PI_SESSION_FILE`. Every supported history origin
+passes the same generic append boundary before it reaches that history: user
+messages, tool results, finalized assistant output, summaries, extension
+messages, and bash executions. `launch` preserves the history; `reset` and
+`cleanup` delete it with the sandbox.
 
 ## How it works
 
@@ -270,12 +272,13 @@ The egress checkpoint is the enforcement boundary: without a matching fresh
 attestation, OpenShell does not attach the credential or forward the request.
 
 This division is intentional. The Pi fork contributes only reusable harness
-primitives: mandatory admission of user messages and finalized tool results,
-admission of the exact provider context, an outbound-header transformation, and
-a standard-CLI entrypoint that accepts those hooks. OpenShell contributes the
-sandbox-local bridge, signed attestations, attestation-to-request binding,
-middleware enforcement, and post-policy credential delivery. The TypeScript
-files under
+primitives: generic append admission for every supported history origin,
+including finalized assistant output, summaries, extension messages, and bash
+executions; admission of the exact provider context; an outbound-header
+transformation; and a standard-CLI entrypoint that accepts those hooks.
+OpenShell contributes the sandbox-local bridge, signed attestations,
+attestation-to-request binding, middleware enforcement, and post-policy
+credential delivery. The TypeScript files under
 `runtime-extension/` are the reusable integration layer that translates between
 those generic Pi hooks and the OpenShell protocol; no OpenShell-specific code is
 built into Pi.
