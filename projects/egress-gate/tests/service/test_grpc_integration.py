@@ -16,6 +16,8 @@ from google.protobuf.message import Message
 
 from egress_gate.admission import (
     PiMessageV1,
+    PiProviderContextV1,
+    UserContextEntryV1,
     canonical_json_bytes,
 )
 from egress_gate.bindings import supervisor_middleware_pb2 as pb2
@@ -159,7 +161,7 @@ async def test_generated_stub_round_trip_covers_manifest_and_gate_actions() -> N
 
 
 @pytest.mark.asyncio
-async def test_generated_stub_issues_a_user_message_attestation() -> None:
+async def test_generated_stub_returns_no_attestation_for_append_time_allow() -> None:
     body = canonical_json_bytes(
         PiMessageV1(
             schema_version="openshell.pi-message.v1", origin="user", text="safe"
@@ -191,7 +193,7 @@ async def test_generated_stub_issues_a_user_message_attestation() -> None:
         response = await stub.EvaluateAgentConversation(request)
 
     assert response.decision == pb2.DECISION_ALLOW
-    assert response.attestation.startswith(b"ag1.")
+    assert response.attestation == b""
     assert response.has_replacement_body is False
     assert response.metadata["admission_schema"] == "openshell.pi-message.v1"
 
@@ -212,8 +214,9 @@ async def test_agent_admission_is_unavailable_when_managed_mode_is_off() -> None
 @pytest.mark.asyncio
 async def test_trusted_agent_attestation_is_verified_for_http_egress() -> None:
     pi_body = canonical_json_bytes(
-        PiMessageV1(
-            schema_version="openshell.pi-message.v1", origin="user", text="safe"
+        PiProviderContextV1(
+            schema_version="openshell.pi-provider-context.v1",
+            entries=(UserContextEntryV1(role="user", text="safe"),),
         )
     )
     admission = pb2.AgentConversationEvaluation(
@@ -223,8 +226,8 @@ async def test_trusted_agent_attestation_is_verified_for_http_egress() -> None:
         target=pb2.AgentConversationTarget(
             harness="pi",
             harness_version="sdk-v1",
-            hook="user_message",
-            schema_version="openshell.pi-message.v1",
+            hook="provider_context",
+            schema_version="openshell.pi-provider-context.v1",
             scheme="https",
             host="provider.invalid",
             port=443,

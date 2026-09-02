@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Literal, Protocol, TypeAlias
 
@@ -124,10 +125,44 @@ class PiBashExecutionV1(StrictDomainModel):
     exit_code: int | None
 
 
+class UserContextEntryV1(StrictDomainModel):
+    """One ordered user entry sent to a provider."""
+
+    role: Literal["user"]
+    text: ScalarString
+
+
+class ToolContextEntryV1(StrictDomainModel):
+    """One ordered tool entry sent to a provider."""
+
+    role: Literal["tool"]
+    tool_call_id: ScalarString
+    text: ScalarString
+
+
+ContextEntryV1: TypeAlias = UserContextEntryV1 | ToolContextEntryV1
+
+
+class PiProviderContextV1(StrictDomainModel):
+    """Every provider-visible user and tool entry in order."""
+
+    schema_version: Literal["openshell.pi-provider-context.v1"]
+    entries: tuple[ContextEntryV1, ...] = Field(min_length=1)
+
+    @field_validator("entries", mode="before")
+    @classmethod
+    def _entries_are_a_tuple(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+
 HarnessNative: TypeAlias = (
-    PiMessageV1 | PiToolResultV1 | PiAssistantMessageV1 | PiBashExecutionV1
+    PiMessageV1
+    | PiToolResultV1
+    | PiAssistantMessageV1
+    | PiBashExecutionV1
+    | PiProviderContextV1
 )
-AttestedCandidate: TypeAlias = HarnessNative | CanonicalMessageV1
+AttestedEntries: TypeAlias = tuple[ContextEntryV1, ...]
 
 
 class PreparedHarnessRequest:
@@ -161,10 +196,25 @@ class HarnessAdapter(Protocol):
         projected_body: bytes,
         context: HarnessAdmissionContext,
         timeout: Timeout,
-    ) -> tuple[bytes | None, AttestedCandidate]: ...
+    ) -> tuple[bytes | None, HarnessNative]: ...
+
+    def attestation_subject(
+        self,
+        prepared: PreparedHarnessRequest,
+        final: HarnessNative,
+    ) -> tuple[str, int] | None: ...
 
 
-class PiMessageV1Adapter:
+class _AppendHarnessAdapter:
+    def attestation_subject(
+        self,
+        prepared: PreparedHarnessRequest,
+        final: HarnessNative,
+    ) -> None:
+        return None
+
+
+class PiMessageV1Adapter(_AppendHarnessAdapter):
     """Strict adapter for one text-bearing Pi origin."""
 
     def __init__(self, accepted_origin: PiMessageOrigin) -> None:
@@ -204,7 +254,7 @@ class PiMessageV1Adapter:
         return replacement, updated
 
 
-class PiAssistantMessageV1Adapter:
+class PiAssistantMessageV1Adapter(_AppendHarnessAdapter):
     """Strict adapter for Pi assistant text and tool calls."""
 
     def prepare(
@@ -239,7 +289,7 @@ class PiAssistantMessageV1Adapter:
         return replacement, updated
 
 
-class PiBashExecutionV1Adapter:
+class PiBashExecutionV1Adapter(_AppendHarnessAdapter):
     """Strict adapter for Pi bash output."""
 
     def prepare(
@@ -276,7 +326,7 @@ class PiBashExecutionV1Adapter:
         return replacement, updated
 
 
-class PiToolResultV1Adapter:
+class PiToolResultV1Adapter(_AppendHarnessAdapter):
     """Strict adapter for Pi tool-result content blocks."""
 
     def prepare(
@@ -286,7 +336,7 @@ class PiToolResultV1Adapter:
         timeout: Timeout,
     ) -> PreparedHarnessRequest:
         native = _parse_pi_tool_result(request.request_body, timeout)
-        _tool_result_attested_candidate(native)
+        _tool_result_entry(native)
         return PreparedHarnessRequest(
             native=native,
             projected_body=canonical_json_bytes(native),
@@ -299,7 +349,7 @@ class PiToolResultV1Adapter:
         projected_body: bytes,
         context: HarnessAdmissionContext,
         timeout: Timeout,
-    ) -> tuple[bytes | None, AttestedCandidate]:
+    ) -> tuple[bytes | None, PiToolResultV1]:
         updated = _parse_pi_tool_result(projected_body, timeout)
         if not isinstance(prepared.native, PiToolResultV1):
             raise AdmissionMutationError("tool-result admission state is invalid")
@@ -321,7 +371,59 @@ class PiToolResultV1Adapter:
         replacement = (
             None if encoded == canonical_json_bytes(prepared.native) else encoded
         )
-        return replacement, _tool_result_attested_candidate(updated)
+        return replacement, updated
+
+
+class PiProviderContextV1Adapter:
+    """Strict adapter for the complete ordered provider context."""
+
+    def prepare(
+        self,
+        request: HarnessAdmissionRequest,
+        context: HarnessAdmissionContext,
+        timeout: Timeout,
+    ) -> PreparedHarnessRequest:
+        native = _parse_pi_provider_context(request.request_body, timeout)
+        return PreparedHarnessRequest(
+            native=native,
+            projected_body=canonical_json_bytes(native),
+            original_body=request.request_body,
+        )
+
+    def validate_result(
+        self,
+        prepared: PreparedHarnessRequest,
+        projected_body: bytes,
+        context: HarnessAdmissionContext,
+        timeout: Timeout,
+    ) -> tuple[bytes | None, PiProviderContextV1]:
+        updated = _parse_pi_provider_context(projected_body, timeout)
+        if not isinstance(prepared.native, PiProviderContextV1):
+            raise AdmissionMutationError("provider-context admission state is invalid")
+        before = tuple(
+            (entry.role, getattr(entry, "tool_call_id", None))
+            for entry in prepared.native.entries
+        )
+        after = tuple(
+            (entry.role, getattr(entry, "tool_call_id", None))
+            for entry in updated.entries
+        )
+        if after != before:
+            raise AdmissionMutationError("admission changed provider-context structure")
+        encoded = canonical_json_bytes(updated)
+        replacement = (
+            None if encoded == canonical_json_bytes(prepared.native) else encoded
+        )
+        return replacement, updated
+
+    def attestation_subject(
+        self,
+        prepared: PreparedHarnessRequest,
+        final: HarnessNative,
+    ) -> tuple[str, int]:
+        if not isinstance(final, PiProviderContextV1):
+            raise AdmissionMutationError("provider-context admission state is invalid")
+        return context_entries_subject(final.entries)
 
 
 class HarnessAdapterRegistry:
@@ -631,9 +733,9 @@ class ProviderRequestAdapter(Protocol):
         self, request: HttpRequest, timeout: Timeout
     ) -> ModelRequestV1: ...
 
-    def latest_attested_candidate(
+    def attested_entries(
         self, request: HttpRequest, timeout: Timeout
-    ) -> AttestedCandidate: ...
+    ) -> AttestedEntries: ...
 
 
 class OpenAIChatCompletionsV1Adapter:
@@ -689,23 +791,28 @@ class OpenAIChatCompletionsV1Adapter:
             ),
         )
 
-    def latest_attested_candidate(
+    def attested_entries(
         self, request: HttpRequest, timeout: Timeout
-    ) -> AttestedCandidate:
-        """Extract the latest user or tool context addition."""
+    ) -> AttestedEntries:
+        """Extract every user and tool entry in provider order."""
         canonical = self.canonicalize(request, timeout)
-        for message in reversed(canonical.messages):
+        entries: list[ContextEntryV1] = []
+        for message in canonical.messages:
             if message.role is CanonicalRole.USER and message.content is not None:
-                return PiMessageV1(
-                    schema_version="openshell.pi-message.v1",
-                    origin="user",
-                    text=message.content,
-                )
+                entries.append(UserContextEntryV1(role="user", text=message.content))
             if message.role is CanonicalRole.TOOL and message.content is not None:
                 if message.tool_call_id is None:
                     raise ProviderShapeError("provider tool result has no call ID")
-                return message
-        raise ProviderShapeError("provider request has no attested context addition")
+                entries.append(
+                    ToolContextEntryV1(
+                        role="tool",
+                        tool_call_id=message.tool_call_id,
+                        text=message.content,
+                    )
+                )
+        if not entries:
+            raise ProviderShapeError("provider request has no attested context entries")
+        return tuple(entries)
 
 
 class OpenAIResponsesV1Adapter:
@@ -772,21 +879,31 @@ class OpenAIResponsesV1Adapter:
             ),
         )
 
-    def latest_attested_candidate(
+    def attested_entries(
         self, request: HttpRequest, timeout: Timeout
-    ) -> AttestedCandidate:
-        """Extract the latest user or function-call output context addition."""
+    ) -> AttestedEntries:
+        """Extract every user and function-call output entry in provider order."""
         provider = self._parse(request, timeout)
-        for item in reversed(provider.input):
+        entries: list[ContextEntryV1] = []
+        for item in provider.input:
             if isinstance(item, _ResponsesInputMessage) and item.role == "user":
-                return PiMessageV1(
-                    schema_version="openshell.pi-message.v1",
-                    origin="user",
-                    text=_responses_text(item.content),
+                entries.append(
+                    UserContextEntryV1(role="user", text=_responses_text(item.content))
                 )
             if isinstance(item, _ResponsesFunctionCallOutput):
-                return _responses_tool_result(item)
-        raise ProviderShapeError("provider request has no attested context addition")
+                message = _responses_tool_result(item)
+                if message.tool_call_id is None or message.content is None:
+                    raise ProviderShapeError("provider tool result is incomplete")
+                entries.append(
+                    ToolContextEntryV1(
+                        role="tool",
+                        tool_call_id=message.tool_call_id,
+                        text=message.content,
+                    )
+                )
+        if not entries:
+            raise ProviderShapeError("provider request has no attested context entries")
+        return tuple(entries)
 
     def _parse(self, request: HttpRequest, timeout: Timeout) -> _ResponsesRequest:
         _validate_json_request(request)
@@ -864,6 +981,12 @@ def create_pi_adapter_registry() -> HarnessAdapterRegistry:
         "openshell.pi-bash-execution.v1",
         PiBashExecutionV1Adapter(),
     )
+    registry.register(
+        "pi",
+        AdmissionHook.PROVIDER_CONTEXT,
+        "openshell.pi-provider-context.v1",
+        PiProviderContextV1Adapter(),
+    )
     return registry
 
 
@@ -923,19 +1046,40 @@ def _parse_pi_tool_result(body: bytes, timeout: Timeout) -> PiToolResultV1:
     return parsed
 
 
-def _tool_result_attested_candidate(
-    result: PiToolResultV1,
-) -> CanonicalMessageV1:
+def _parse_pi_provider_context(body: bytes, timeout: Timeout) -> PiProviderContextV1:
+    value = _load_json(body, AdmissionShapeError, timeout)
+    try:
+        parsed = _PI_PROVIDER_CONTEXT_ADAPTER.validate_python(value, strict=True)
+    except ValidationError:
+        raise AdmissionShapeError("Pi provider-context body is unsupported") from None
+    if canonical_json_bytes(parsed) != body:
+        raise AdmissionShapeError("Pi provider-context body is not canonical JSON")
+    return parsed
+
+
+def _tool_result_entry(result: PiToolResultV1) -> ToolContextEntryV1:
     if any(block.type == "image" for block in result.content):
         raise AdmissionShapeError("Pi tool-result images are unsupported")
     text = "\n".join(
         block.text for block in result.content if isinstance(block, PiTextContentV1)
     )
-    return CanonicalMessageV1(
-        role=CanonicalRole.TOOL,
-        content=text or "(no tool output)",
+    return ToolContextEntryV1(
+        role="tool",
+        text=text or "(no tool output)",
         tool_call_id=_provider_tool_call_id(result.tool_call_id),
     )
+
+
+def context_entries_subject(entries: AttestedEntries) -> tuple[str, int]:
+    """Return the v2 hash and count for one ordered entry list."""
+    body = json.dumps(
+        [entry.model_dump(mode="json") for entry in entries],
+        allow_nan=False,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(body).hexdigest(), len(entries)
 
 
 def _validate_json_request(request: HttpRequest) -> None:
@@ -1026,6 +1170,7 @@ _PI_ADAPTER = TypeAdapter(PiMessageV1)
 _PI_TOOL_RESULT_ADAPTER = TypeAdapter(PiToolResultV1)
 _PI_ASSISTANT_MESSAGE_ADAPTER = TypeAdapter(PiAssistantMessageV1)
 _PI_BASH_EXECUTION_ADAPTER = TypeAdapter(PiBashExecutionV1)
+_PI_PROVIDER_CONTEXT_ADAPTER = TypeAdapter(PiProviderContextV1)
 _PROVIDER_ADAPTER = TypeAdapter(_ProviderRequest)
 _RESPONSES_PROVIDER_ADAPTER = TypeAdapter(_ResponsesRequest)
 
@@ -1033,7 +1178,8 @@ _RESPONSES_PROVIDER_ADAPTER = TypeAdapter(_ResponsesRequest)
 __all__ = [
     "AdmissionMutationError",
     "AdmissionShapeError",
-    "AttestedCandidate",
+    "AttestedEntries",
+    "ContextEntryV1",
     "HarnessAdapter",
     "HarnessAdapterRegistry",
     "OpenAIChatCompletionsV1Adapter",
@@ -1049,10 +1195,15 @@ __all__ = [
     "PiToolResultV1",
     "PiToolResultV1Adapter",
     "PiMessageV1Adapter",
+    "PiProviderContextV1",
+    "PiProviderContextV1Adapter",
     "PreparedHarnessRequest",
     "ProviderAdapterRegistry",
     "ProviderRequestAdapter",
     "ProviderShapeError",
+    "ToolContextEntryV1",
+    "UserContextEntryV1",
+    "context_entries_subject",
     "create_pi_adapter_registry",
     "create_provider_adapter_registry",
 ]

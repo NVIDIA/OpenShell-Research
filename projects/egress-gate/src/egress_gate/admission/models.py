@@ -30,6 +30,7 @@ class AdmissionHook(StrEnum):
     BRANCH_SUMMARY = "branch_summary"
     EXTENSION_MESSAGE = "extension_message"
     BASH_EXECUTION = "bash_execution"
+    PROVIDER_CONTEXT = "provider_context"
 
 
 class AdmissionDecision(StrEnum):
@@ -110,8 +111,12 @@ class HarnessAdmissionResult(StrictDomainModel):
                 and self.replacement_body is not None
             ):
                 raise ValueError("allow decisions cannot carry a replacement body")
-            if self.attestation is None:
-                raise ValueError("admission requires an attestation")
+            if (self.hook is AdmissionHook.PROVIDER_CONTEXT) != (
+                self.attestation is not None
+            ):
+                raise ValueError(
+                    "only provider-context admission carries an attestation"
+                )
         return self
 
 

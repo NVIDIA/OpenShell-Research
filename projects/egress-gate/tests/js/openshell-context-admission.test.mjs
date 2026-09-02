@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
 import { createOpenShellContextAdmission } from "../../examples/pi-attested-admission/runtime-extension/openshell-context-admission.ts";
 
 const HANDLE_HEADER = "x-openshell-agent-admission-handle";
+const ENTRY_VECTORS = JSON.parse(
+	readFileSync(new URL("../admission/fixtures/context-entries.json", import.meta.url), "utf8"),
+);
 
 function user(text, timestamp) {
 	return { role: "user", content: [{ type: "text", text }], timestamp };
@@ -39,6 +43,7 @@ async function admittedContext(admission, context) {
 
 describe("OpenShell context admission adapter", () => {
 	it("selects the handle for the exact provider context", async () => {
+		let providerCalls = 0;
 		const admission = createOpenShellContextAdmission(
 			"http://bridge.test/admit",
 			() => "session-123",
@@ -46,14 +51,12 @@ describe("OpenShell context admission adapter", () => {
 				const request = JSON.parse(String(init?.body));
 				const requestBody = new TextDecoder().decode(new Uint8Array(request.request_body));
 				const envelope = JSON.parse(requestBody);
-				assert.equal(request.hook, "user_message");
-				assert.equal(envelope.schema_version, "openshell.pi-message.v1");
-				assert.equal(envelope.origin, "user");
-				assert.equal(
-					requestBody,
-					`{"origin":"user","schema_version":"openshell.pi-message.v1","text":${JSON.stringify(envelope.text)}}`,
-				);
-				return new Response(JSON.stringify({ decision: "allow", handle: `handle:${envelope.text}` }));
+				if (request.hook !== "provider_context") {
+					return new Response(JSON.stringify({ decision: "allow" }));
+				}
+				providerCalls += 1;
+				assert.equal(envelope.schema_version, "openshell.pi-provider-context.v1");
+				return new Response(JSON.stringify({ decision: "allow", handle: `handle:${envelope.entries.length}` }));
 			},
 		);
 		const current = user("current", 1);
@@ -71,13 +74,20 @@ describe("OpenShell context admission adapter", () => {
 			await admittedContext(admission, { messages: [current, queued], tools: [] }),
 		);
 
-		assert.equal(currentHeaders[HANDLE_HEADER], "handle:current");
-		assert.equal(queuedHeaders[HANDLE_HEADER], "handle:queued");
+		assert.equal(currentHeaders[HANDLE_HEADER], "handle:1");
+		assert.equal(queuedHeaders[HANDLE_HEADER], "handle:2");
+		assert.equal(providerCalls, 2);
 	});
 
 	it("uses an admitted replacement for the outbound handle", async () => {
 		const replacement = new TextEncoder().encode(
-			JSON.stringify({ schema_version: "openshell.pi-message.v1", origin: "user", text: "[REDACTED]" }),
+			JSON.stringify({
+				schema_version: "openshell.pi-provider-context.v1",
+				entries: [
+					{ role: "user", text: "[REDACTED]" },
+					{ role: "tool", tool_call_id: "call-1", text: "[TOOL REDACTED]" },
+				],
+			}),
 		);
 		const admission = createOpenShellContextAdmission(
 			"http://bridge.test/admit",
@@ -87,14 +97,14 @@ describe("OpenShell context admission adapter", () => {
 					JSON.stringify({ decision: "allow", handle: "replacement-handle", replacement_body: [...replacement] }),
 				),
 		);
-		const admitted = await admission.admitMessage(user("secret", 1), { origin: "user", source: "interactive" });
-
-		assert.equal(admitted.action, "allow");
-		assert.ok(admitted.message);
-		const context = await admittedContext(admission, { messages: [admitted.message], tools: [] });
+		const context = await admittedContext(admission, {
+			messages: [user("secret", 1), toolResult("tool secret")],
+			tools: [],
+		});
 		const headers = await admission.transformProviderHeaders({}, context);
 
-		assert.deepEqual(admitted.message.content, [{ type: "text", text: "[REDACTED]" }]);
+		assert.deepEqual(context.messages[0].content, [{ type: "text", text: "[REDACTED]" }]);
+		assert.deepEqual(context.messages[1].content, [{ type: "text", text: "[TOOL REDACTED]" }]);
 		assert.equal(headers[HANDLE_HEADER], "replacement-handle");
 	});
 
@@ -106,7 +116,10 @@ describe("OpenShell context admission adapter", () => {
 			async (_url, init) => {
 				const request = JSON.parse(String(init?.body));
 				hooks.push(request.hook);
-				return new Response(JSON.stringify({ decision: "allow", handle: `handle:${request.hook}` }));
+				return new Response(JSON.stringify({
+					decision: "allow",
+					...(request.hook === "provider_context" ? { handle: "context-handle" } : {}),
+				}));
 			},
 		);
 		const prompt = user("run command", 1);
@@ -119,8 +132,8 @@ describe("OpenShell context admission adapter", () => {
 			await admittedContext(admission, { messages: [prompt, failed], tools: [] }),
 		);
 
-		assert.equal(headers[HANDLE_HEADER], "handle:tool_result");
-		assert.deepEqual(hooks, ["user_message", "tool_result", "tool_result"]);
+		assert.equal(headers[HANDLE_HEADER], "context-handle");
+		assert.deepEqual(hooks, ["user_message", "tool_result", "provider_context"]);
 	});
 
 	it("maps every Pi message origin to its exact hook and envelope", async () => {
@@ -183,7 +196,7 @@ describe("OpenShell context admission adapter", () => {
 				const request = JSON.parse(String(init?.body));
 				const envelope = JSON.parse(new TextDecoder().decode(new Uint8Array(request.request_body)));
 				observed.push({ request, envelope });
-				return new Response(JSON.stringify({ decision: "allow", handle: `handle:${request.hook}` }));
+				return new Response(JSON.stringify({ decision: "allow" }));
 			},
 		);
 
@@ -216,7 +229,6 @@ describe("OpenShell context admission adapter", () => {
 				return new Response(
 					JSON.stringify({
 						decision: "allow",
-						handle: `handle:${request.hook}`,
 						replacement_body: [...new TextEncoder().encode(JSON.stringify(envelope))],
 					}),
 				);
@@ -243,6 +255,41 @@ describe("OpenShell context admission adapter", () => {
 			{ type: "text", text: "[REDACTED]" },
 			{ type: "toolCall", id: "call-1", name: "read", arguments: { path: "safe" } },
 		]);
+	});
+
+	it("matches the shared context-entry vectors", async () => {
+		for (const vector of ENTRY_VECTORS.cases) {
+			let observed;
+			const admission = createOpenShellContextAdmission(
+				"http://bridge.test/admit",
+				() => "session-123",
+				async (_url, init) => {
+					const request = JSON.parse(String(init?.body));
+					observed = JSON.parse(new TextDecoder().decode(new Uint8Array(request.request_body)));
+					return new Response(JSON.stringify({ decision: "allow", handle: "context-handle" }));
+				},
+			);
+
+			await admission.admitProviderContext(vector.context);
+
+			assert.equal(observed.schema_version, "openshell.pi-provider-context.v1");
+			assert.deepEqual(observed.entries, vector.entries, vector.name);
+		}
+	});
+
+	it("denies provider contexts containing images before calling the bridge", async () => {
+		const admission = createOpenShellContextAdmission(
+			"http://bridge.test/admit",
+			() => "session-123",
+			async () => { throw new Error("bridge should not be called"); },
+		);
+
+		const result = await admission.admitProviderContext({
+			messages: [{ role: "user", content: [{ type: "image", data: "AA==", mimeType: "image/png" }] }],
+			tools: [],
+		});
+
+		assert.equal(result.action, "deny");
 	});
 
 	it("fails closed when provider-only context is denied", async () => {
