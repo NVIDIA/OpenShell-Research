@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -20,6 +21,9 @@ from egress_gate.admission import (
     HarnessAdmissionContext,
     HarnessAdmissionProcessor,
     HarnessAdmissionRequest,
+    PiAssistantMessageV1,
+    PiAssistantToolCallV1,
+    PiBashExecutionV1,
     PiMessageV1,
     PiTextContentV1,
     PiToolResultV1,
@@ -135,11 +139,15 @@ def _context(
     *,
     target: HttpTarget | None = None,
 ) -> HarnessAdmissionContext:
-    schema = (
-        "openshell.pi-message.v1"
-        if hook is AdmissionHook.USER_MESSAGE
-        else "openshell.pi-tool-result.v1"
-    )
+    schema = {
+        AdmissionHook.USER_MESSAGE: "openshell.pi-message.v1",
+        AdmissionHook.COMPACTION_SUMMARY: "openshell.pi-message.v1",
+        AdmissionHook.BRANCH_SUMMARY: "openshell.pi-message.v1",
+        AdmissionHook.EXTENSION_MESSAGE: "openshell.pi-message.v1",
+        AdmissionHook.TOOL_RESULT: "openshell.pi-tool-result.v1",
+        AdmissionHook.ASSISTANT_MESSAGE: "openshell.pi-assistant-message.v1",
+        AdmissionHook.BASH_EXECUTION: "openshell.pi-bash-execution.v1",
+    }[hook]
     return HarnessAdmissionContext(
         request_id="admission-1",
         sandbox_id="sandbox-1",
@@ -155,16 +163,24 @@ def _context(
 
 def _admit(
     processor: HarnessAdmissionProcessor,
-    value: PiMessageV1 | PiToolResultV1,
+    value: PiMessageV1 | PiToolResultV1 | PiAssistantMessageV1 | PiBashExecutionV1,
     *,
     target: HttpTarget | None = None,
     timeout: Timeout | None = None,
 ):
-    hook = (
-        AdmissionHook.USER_MESSAGE
-        if isinstance(value, PiMessageV1)
-        else AdmissionHook.TOOL_RESULT
-    )
+    if isinstance(value, PiMessageV1):
+        hook = {
+            "user": AdmissionHook.USER_MESSAGE,
+            "compaction_summary": AdmissionHook.COMPACTION_SUMMARY,
+            "branch_summary": AdmissionHook.BRANCH_SUMMARY,
+            "extension_message": AdmissionHook.EXTENSION_MESSAGE,
+        }[value.origin]
+    elif isinstance(value, PiToolResultV1):
+        hook = AdmissionHook.TOOL_RESULT
+    elif isinstance(value, PiAssistantMessageV1):
+        hook = AdmissionHook.ASSISTANT_MESSAGE
+    else:
+        hook = AdmissionHook.BASH_EXECUTION
     return processor.process(
         HarnessAdmissionRequest(
             request_body=canonical_json_bytes(value),
@@ -177,9 +193,42 @@ def _admit(
     )
 
 
-def _user(text: str) -> PiMessageV1:
+def _message(
+    text: str,
+    *,
+    origin: Literal[
+        "user", "compaction_summary", "branch_summary", "extension_message"
+    ] = "user",
+) -> PiMessageV1:
     return PiMessageV1(
-        schema_version="openshell.pi-message.v1", origin="user", text=text
+        schema_version="openshell.pi-message.v1", origin=origin, text=text
+    )
+
+
+def _user(text: str) -> PiMessageV1:
+    return _message(text)
+
+
+def _assistant(
+    text: str, *, arguments: dict[str, object] | None = None
+) -> PiAssistantMessageV1:
+    return PiAssistantMessageV1(
+        schema_version="openshell.pi-assistant-message.v1",
+        text=text,
+        tool_calls=(
+            PiAssistantToolCallV1(
+                id="call-1", name="read", arguments=arguments or {"path": "safe"}
+            ),
+        ),
+    )
+
+
+def _bash(output: str, *, command: str = "printf safe") -> PiBashExecutionV1:
+    return PiBashExecutionV1(
+        schema_version="openshell.pi-bash-execution.v1",
+        command=command,
+        output=output,
+        exit_code=0,
     )
 
 
@@ -522,6 +571,100 @@ def test_tool_result_denial_redaction_and_images_fail_closed() -> None:
     assert redacted_tool_result.content[0].text == "[REDACTED]"
     assert image.decision is AdmissionDecision.DENY
     assert image.reason_code == "admission_contract_invalid"
+
+
+@pytest.mark.parametrize(
+    "origin",
+    ["user", "compaction_summary", "branch_summary", "extension_message"],
+)
+def test_text_message_origins_allow_replace_and_deny(origin) -> None:
+    admission, _, _ = _processors()
+
+    allowed = _admit(admission, _message("safe", origin=origin))
+    redacted = _admit(admission, _message(REDACT_TEXT, origin=origin))
+    denied = _admit(admission, _message(DENY_TEXT, origin=origin))
+
+    assert allowed.decision is AdmissionDecision.ALLOW
+    assert redacted.decision is AdmissionDecision.REPLACE
+    assert redacted.replacement_body is not None
+    replacement = PiMessageV1.model_validate_json(
+        redacted.replacement_body, strict=True
+    )
+    assert replacement.origin == origin
+    assert replacement.text == "[REDACTED]"
+    assert denied.decision is AdmissionDecision.DENY
+
+
+def test_text_message_binding_rejects_a_different_origin() -> None:
+    admission, _, _ = _processors()
+    value = _message("safe", origin="branch_summary")
+
+    result = admission.process(
+        HarnessAdmissionRequest(
+            request_body=canonical_json_bytes(value),
+            provenance=AdmissionProvenance(
+                session_id="session-1", submission_id="submission-1"
+            ),
+        ),
+        _context(AdmissionHook.COMPACTION_SUMMARY),
+        timeout=Timeout.from_seconds(1),
+    )
+
+    assert result.reason_code == "admission_contract_invalid"
+
+
+def test_assistant_message_allows_text_replacement_and_denial() -> None:
+    admission, _, _ = _processors()
+
+    allowed = _admit(admission, _assistant("safe"))
+    redacted = _admit(admission, _assistant(REDACT_TEXT))
+    denied = _admit(admission, _assistant(DENY_TEXT))
+
+    assert allowed.decision is AdmissionDecision.ALLOW
+    assert redacted.decision is AdmissionDecision.REPLACE
+    assert redacted.replacement_body is not None
+    replacement = PiAssistantMessageV1.model_validate_json(
+        redacted.replacement_body, strict=True
+    )
+    assert replacement.text == "[REDACTED]"
+    assert replacement.tool_calls == _assistant("safe").tool_calls
+    assert denied.decision is AdmissionDecision.DENY
+
+
+def test_assistant_message_rejects_tool_call_mutation() -> None:
+    admission, _, _ = _processors()
+
+    result = _admit(admission, _assistant("safe", arguments={"path": REDACT_TEXT}))
+
+    assert result.decision is AdmissionDecision.DENY
+    assert result.reason_code == "admission_contract_invalid"
+
+
+def test_bash_execution_allows_output_replacement_and_denial() -> None:
+    admission, _, _ = _processors()
+
+    allowed = _admit(admission, _bash("safe"))
+    redacted = _admit(admission, _bash(REDACT_TEXT))
+    denied = _admit(admission, _bash(DENY_TEXT))
+
+    assert allowed.decision is AdmissionDecision.ALLOW
+    assert redacted.decision is AdmissionDecision.REPLACE
+    assert redacted.replacement_body is not None
+    replacement = PiBashExecutionV1.model_validate_json(
+        redacted.replacement_body, strict=True
+    )
+    assert replacement.output == "[REDACTED]"
+    assert (replacement.command, replacement.exit_code) == ("printf safe", 0)
+    assert denied.decision is AdmissionDecision.DENY
+
+
+def test_bash_execution_rejects_command_mutation() -> None:
+    admission, _, _ = _processors()
+
+    result = _admit(admission, _bash("safe", command=f"printf {REDACT_TEXT}"))
+
+    assert result.decision is AdmissionDecision.DENY
+    assert result.reason_code == "admission_contract_invalid"
 
 
 def test_denial_returns_no_attestation_or_replacement() -> None:

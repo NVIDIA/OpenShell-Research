@@ -36,7 +36,15 @@ class AgentAttestationClaimsV1(StrictDomainModel):
     harness: ScalarString
     harness_version: Literal["sdk-v1"]
     harness_schema: ScalarString
-    hook: Literal["user_message", "tool_result"]
+    hook: Literal[
+        "user_message",
+        "tool_result",
+        "assistant_message",
+        "compaction_summary",
+        "branch_summary",
+        "extension_message",
+        "bash_execution",
+    ]
     middleware_binding: BoundedMetadataString
     policy_fingerprint: ScalarString
     sandbox_id: BoundedMetadataString

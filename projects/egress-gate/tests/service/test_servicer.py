@@ -131,7 +131,7 @@ def test_manifest_leaves_the_gateway_rpc_timeout_to_the_operator() -> None:
     assert manifest.bindings[0].timeout == ""
 
 
-def test_managed_manifest_advertises_exact_user_and_tool_result_bindings() -> None:
+def test_managed_manifest_advertises_every_pi_admission_binding() -> None:
     middleware = EgressGateMiddleware(
         create_builtin_registry(), require_agent_attestation=True
     )
@@ -150,7 +150,12 @@ def test_managed_manifest_advertises_exact_user_and_tool_result_bindings() -> No
         for binding in agent_bindings
     ] == [
         ("pi", "user_message", "openshell.pi-message.v1"),
+        ("pi", "compaction_summary", "openshell.pi-message.v1"),
+        ("pi", "branch_summary", "openshell.pi-message.v1"),
+        ("pi", "extension_message", "openshell.pi-message.v1"),
         ("pi", "tool_result", "openshell.pi-tool-result.v1"),
+        ("pi", "assistant_message", "openshell.pi-assistant-message.v1"),
+        ("pi", "bash_execution", "openshell.pi-bash-execution.v1"),
     ]
 
 
