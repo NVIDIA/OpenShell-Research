@@ -74,6 +74,7 @@ type BashMessage = AgentMessage & { command: string; output: string; exitCode: n
 export function createOpenShellContextAdmission(
 	bridgeUrl: string,
 	getSessionId: () => string,
+	admissionToken: string,
 	fetchRequest: typeof fetch = fetch,
 ): ContextAdmission {
 	const handles = new Map<string, string>();
@@ -85,7 +86,10 @@ export function createOpenShellContextAdmission(
 		}
 		const response = await fetchRequest(bridgeUrl, {
 			method: "POST",
-			headers: { "content-type": "application/json" },
+			headers: {
+				authorization: `Bearer ${admissionToken}`,
+				"content-type": "application/json",
+			},
 			body: JSON.stringify({
 				harness_version: "sdk-v1",
 				hook,

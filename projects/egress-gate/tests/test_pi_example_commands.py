@@ -121,6 +121,7 @@ def test_pi_example_can_print_each_action_without_running_it(
     assert "node /sandbox/pi-runtime/integration/openshell-pi.js" in normalized_output
     assert "PI_OPENSHELL_CONTEXT_ADMISSION" not in output
     assert "OPENSHELL_AGENT_CONVERSATION_URL=" in output
+    assert "/usr/bin/curl --silent --show-error" in normalized_output
     assert "managed-pi" not in output
     assert "--extension " not in output
     assert "integration/openshell-context-admission.js" in output
@@ -145,10 +146,19 @@ def test_pi_example_can_print_each_action_without_running_it(
     )
 
     demo_script = (project_dir / "examples/pi-attested-admission/demo.sh").read_text()
+    launcher = (
+        project_dir / "examples/pi-attested-admission/runtime-extension/openshell-pi.ts"
+    ).read_text()
     assert '"beforeToolResultAppend"' in demo_script
+    assert "caller_not_authorized" in demo_script
     assert "exec env -u PI_MODEL_API_KEY node" not in demo_script
     assert '3<<<"$PI_MODEL_API_KEY"' not in demo_script
     assert "render-runtime-config.mjs" not in demo_script
+    assert "OPENSHELL_AGENT_ADMISSION_TOKEN_FD" in launcher
+    assert "delete process.env.OPENSHELL_AGENT_ADMISSION_TOKEN_FD" in launcher
+    assert 'readFileSync(tokenFd, "utf8")' in launcher
+    assert "closeSync(tokenFd)" in launcher
+    assert "/^[A-Za-z0-9_-]{43}$/" in launcher
 
 
 def test_pi_example_print_all_is_a_concise_walkthrough() -> None:
