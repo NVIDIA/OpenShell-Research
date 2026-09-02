@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Pi attested-admission integration QA — 2026-09-02</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.5; }
+    body { max-width: 960px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+    h1, h2 { line-height: 1.2; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #8888; padding: .55rem; text-align: left; vertical-align: top; }
+    th { background: #8882; }
+    code { overflow-wrap: anywhere; }
+    .pass { color: #087f5b; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Pi attested-admission integration QA</h1>
+    <p><strong>Date:</strong> 2026-09-02 UTC</p>
+    <p>
+      This report records the final proof-of-concept integration state across
+      Pi, OpenShell, and OpenShell Research. It contains only sanitized command
+      summaries: no credentials, request bodies, model output, environment
+      values, or local workspace paths.
+    </p>
+
+    <h2>Reviewed revisions</h2>
+    <table>
+      <thead><tr><th>Repository</th><th>Integration head</th><th>Upstream base</th></tr></thead>
+      <tbody>
+        <tr><td>Pi</td><td><code>abb462d677fa1039a68518deb5b8d998ca0b0a28</code></td><td><code>e266507b606b9552fa277252644054afd4384b11</code></td></tr>
+        <tr><td>OpenShell</td><td><code>25fb8a635c6df749cab50b73270dc30ebbef5c8e</code></td><td><code>a6b757d35f983fe4415427484ad06533d32e9e4b</code></td></tr>
+        <tr><td>OpenShell Research</td><td><code>4d99082b199b07136a9c93558d95c73d07b929d8</code> (pre-report)</td><td><code>743839dae47621c13a3bc339bad2a2c8d0167591</code></td></tr>
+      </tbody>
+    </table>
+
+    <h2>Validation</h2>
+    <table>
+      <thead><tr><th>Repository</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>Pi</td><td><span class="pass">Focused suites passed:</span> agent 24/24 and coding-agent 51/51. <code>npm run check</code> passed its preliminary gates and reported only unchanged upstream <code>packages/ai</code> catalog TypeScript drift.</td></tr>
+        <tr><td>OpenShell</td><td><span class="pass">Passed:</span> pre-commit, test, and the Phase 4 Docker end-to-end lane. <code>mise run ci</code> reported only the known existing Go converter coverage gap for <code>ProviderProfileCredential.delivery</code>.</td></tr>
+        <tr><td>OpenShell Research</td><td><span class="pass">Passed:</span> <code>make check</code> and <code>make check-py311</code>, 377/377 tests in each environment after the upstream merge, plus formatting, lint, typing, dependency audit, 11/11 documentation-renderer tests, the clean strict documentation build, and an HTTP 200 artifact preview.</td></tr>
+        <tr><td>Independent review</td><td><span class="pass">Pi and OpenShell clean:</span> no blocker, high, or medium findings at either integration head. Final Research merge-head review was still pending when this report was prepared; earlier Research phase reviews were clean after their findings were resolved.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>External end-to-end blocker</h2>
+    <p>
+      The real <code>./demo.sh verify</code> run was not substituted with a mock.
+      This checkout does not contain the ignored prepared fork/runtime, local
+      <code>.env</code>, JSON log, or provider credential required to run the
+      live sandbox and model request. The verifier reports those prerequisites;
+      a configured environment must run the clean reset and verification before
+      the proof of concept is promoted beyond draft status.
+    </p>
+
+    <h2>Verified design boundary</h2>
+    <p>
+      One policy fingerprint connects append-time admission, provider-context
+      admission, and provider egress. The attestation binds one hash of the
+      complete ordered user/tool context. System/developer and assistant content
+      is scanned by the request policy at egress but is not included in that
+      hash. Denied additions do not enter Pi's live or persisted history.
+    </p>
+
+    <h2>Known limits</h2>
+    <ul>
+      <li>Image inputs are unsupported by this example and fail closed.</li>
+      <li>Provider-context admission precedes transport-specific history rewrites; switching transports with existing tool history or sending orphaned tool calls may fail closed.</li>
+      <li>Admission payloads are limited to 4 MiB and attestations expire after 300 seconds.</li>
+      <li>The per-exec bridge token remains in Pi process memory; a same-user process able to read that memory could copy it.</li>
+      <li>This is a proof of concept. Phase 2b provenance-ledger work, additional message hashing, and production deployment automation remain out of scope.</li>
+    </ul>
+  </main>
+</body>
+</html>

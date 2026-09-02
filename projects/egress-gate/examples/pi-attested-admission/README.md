@@ -4,9 +4,10 @@ This example runs the normal forked Pi CLI inside OpenShell and sends admitted
 conversation context to the configured NVIDIA inference endpoint. One
 endpoint-scoped provider and credential serve all configured models.
 
-The example demonstrates the same policy at three checkpoints: before Pi
-appends history, immediately before Pi sends its complete provider context, and
-again at provider egress before OpenShell attaches credentials.
+The example demonstrates the same policy, identified by the same fingerprint,
+at three checkpoints: before Pi appends history, immediately before Pi sends
+its complete provider context, and again at provider egress before OpenShell
+attaches credentials.
 
 - `DENY_THIS` is rejected before Pi adds a user message or tool result to its
   live context.
@@ -259,8 +260,10 @@ messages, and bash executions. `launch` preserves the history; `reset` and
 4. Immediately before every provider request, Pi passes the exact outbound
    context through admission. This includes normal turns, retries, compaction,
    branch summaries, and contexts restored from a prior session. The adapter
-   applies per-entry replacements and obtains one fresh handle for the complete
-   ordered user/tool context.
+   applies per-entry replacements and obtains one fresh handle bound to one hash
+   of the complete ordered user/tool context. System/developer and assistant
+   content is scanned by request policy at egress but is not included in that
+   attested context hash.
 5. OpenShell keeps the signed whole-context attestation and gives Pi only the
    opaque handle, which the adapter keeps outside Pi messages. At egress,
    OpenShell strips the handle and supplies the attestation only to the
