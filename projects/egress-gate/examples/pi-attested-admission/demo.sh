@@ -613,7 +613,13 @@ verify() {
 			printf 'Redacted-prompt verification failed for %s.\n' "$session" >&2
 			exit 1
 		fi
-		printf 'PASS %-18s session contains only [REDACTED]\n' "redacted prompt"
+		if ! grep -Fq '"role":"assistant"' "$temporary_dir/redact.jsonl" || \
+			grep -Fq '"stopReason":"error"' "$temporary_dir/redact.jsonl"; then
+			printf 'Provider-response verification failed for %s.\n' "$session" >&2
+			exit 1
+		fi
+		printf 'PASS %-18s provider answered; session contains only [REDACTED]\n' \
+			"redacted prompt"
 	fi
 
 	capture_sandbox_command "$temporary_dir/bridge.out" "$temporary_dir/bridge.err" \
@@ -635,7 +641,7 @@ verify() {
 	first_log_line=$(( $(log_line_count) + 1 ))
 	status=0
 	capture_sandbox_command "$temporary_dir/raw.out" "$temporary_dir/raw.err" \
-		/usr/local/bin/node -e "$raw_request_script" || status=$?
+		/usr/bin/node -e "$raw_request_script" || status=$?
 	if ! $print_only; then
 		if ((status == 0)); then
 			printf 'Raw provider request unexpectedly succeeded.\n' >&2
@@ -647,7 +653,7 @@ verify() {
 	first_log_line=$(( $(log_line_count) + 1 ))
 	status=0
 	capture_sandbox_command "$temporary_dir/stock.out" "$temporary_dir/stock.err" \
-		/usr/local/bin/pi --session "$verify_dir/stock.jsonl" -p hello || status=$?
+		/usr/bin/pi --session "$verify_dir/stock.jsonl" -p hello || status=$?
 	if ! $print_only; then
 		if ((status == 0)); then
 			printf 'Stock Pi unexpectedly reached the provider.\n' >&2
