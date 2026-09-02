@@ -5,6 +5,7 @@ import { describe, it } from "node:test";
 import { createOpenShellContextAdmission } from "../../examples/pi-attested-admission/runtime-extension/openshell-context-admission.ts";
 
 const HANDLE_HEADER = "x-openshell-agent-admission-handle";
+const ADMISSION_TOKEN = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const ENTRY_VECTORS = JSON.parse(
 	readFileSync(new URL("../admission/fixtures/context-entries.json", import.meta.url), "utf8"),
 );
@@ -47,7 +48,9 @@ describe("OpenShell context admission adapter", () => {
 		const admission = createOpenShellContextAdmission(
 			"http://bridge.test/admit",
 			() => "session-123",
+			ADMISSION_TOKEN,
 			async (_url, init) => {
+				assert.equal(new Headers(init?.headers).get("authorization"), `Bearer ${ADMISSION_TOKEN}`);
 				const request = JSON.parse(String(init?.body));
 				const requestBody = Buffer.from(request.request_body_b64, "base64").toString();
 				const envelope = JSON.parse(requestBody);
@@ -92,6 +95,7 @@ describe("OpenShell context admission adapter", () => {
 		const admission = createOpenShellContextAdmission(
 			"http://bridge.test/admit",
 			() => "session-123",
+			ADMISSION_TOKEN,
 			async () =>
 				new Response(
 					JSON.stringify({
@@ -117,6 +121,7 @@ describe("OpenShell context admission adapter", () => {
 		const admission = createOpenShellContextAdmission(
 			"http://bridge.test/admit",
 			() => "session-123",
+			ADMISSION_TOKEN,
 			async (_url, init) => {
 				const request = JSON.parse(String(init?.body));
 				hooks.push(request.hook);
@@ -196,6 +201,7 @@ describe("OpenShell context admission adapter", () => {
 		const admission = createOpenShellContextAdmission(
 			"http://bridge.test/admit",
 			() => "session-123",
+			ADMISSION_TOKEN,
 			async (_url, init) => {
 				const request = JSON.parse(String(init?.body));
 				const envelope = JSON.parse(Buffer.from(request.request_body_b64, "base64").toString());
@@ -225,6 +231,7 @@ describe("OpenShell context admission adapter", () => {
 		const admission = createOpenShellContextAdmission(
 			"http://bridge.test/admit",
 			() => "session-123",
+			ADMISSION_TOKEN,
 			async (_url, init) => {
 				const request = JSON.parse(String(init?.body));
 				const envelope = JSON.parse(Buffer.from(request.request_body_b64, "base64").toString());
@@ -267,6 +274,7 @@ describe("OpenShell context admission adapter", () => {
 			const admission = createOpenShellContextAdmission(
 				"http://bridge.test/admit",
 				() => "session-123",
+				ADMISSION_TOKEN,
 				async (_url, init) => {
 					const request = JSON.parse(String(init?.body));
 					observed = JSON.parse(Buffer.from(request.request_body_b64, "base64").toString());
@@ -285,6 +293,7 @@ describe("OpenShell context admission adapter", () => {
 		const admission = createOpenShellContextAdmission(
 			"http://bridge.test/admit",
 			() => "session-123",
+			ADMISSION_TOKEN,
 			async () => { throw new Error("bridge should not be called"); },
 		);
 
@@ -300,6 +309,7 @@ describe("OpenShell context admission adapter", () => {
 		const admission = createOpenShellContextAdmission(
 			"http://bridge.test/admit",
 			() => "session-123",
+			ADMISSION_TOKEN,
 			async () => new Response(JSON.stringify({ decision: "deny", reason_code: "policy_denied" })),
 		);
 

@@ -164,12 +164,13 @@ Run the complete non-interactive verification:
 ```
 
 `verify` runs the real packaged Pi and OpenShell sandbox. It checks a denied
-prompt without a session write, a persisted redaction, a raw provider request
-without an admission handle, the stock Pi binary without the runtime adapter,
-and best-effort tool-result cases. Each case uses a fresh session and prints one
-`PASS` or `SKIP` line. Tool cases can skip because choosing to call a tool is
-model-dependent; the other cases are required. There is no mock fallback. Run
-`./demo.sh --print verify` to inspect every underlying sandbox command.
+prompt without a session write, a persisted redaction, an unauthenticated call
+to the admission bridge, a raw provider request without an admission handle,
+the stock Pi binary without the runtime adapter, and best-effort tool-result
+cases. Each case uses a fresh session and prints one `PASS` or `SKIP` line. Tool
+cases can skip because choosing to call a tool is model-dependent; the other
+cases are required. There is no mock fallback. Run `./demo.sh --print verify`
+to inspect every underlying sandbox command.
 
 To explore interactively afterward, launch Pi:
 
@@ -248,7 +249,10 @@ messages, and bash executions. `launch` preserves the history; `reset` and
 2. Pi calls that boundary before each supported message reaches live or
    persisted history. Assistant output is admitted when the complete assistant
    message is finalized, after streamed output has already been displayed.
-3. The external adapter sends the exact context addition to OpenShell's
+3. OpenShell gives the launched runtime an inherited descriptor containing its
+   per-exec bridge token. The launcher reads and closes the descriptor and
+   deletes its environment name before Pi or its extensions start. The external
+   adapter sends the token with the exact context addition to OpenShell's
    sandbox-local bridge. Egress Gate applies `policy.yaml` and returns allow,
    deny, or a complete replacement. This append-time checkpoint returns no
    attestation or handle.
@@ -283,15 +287,12 @@ credential delivery. The TypeScript files under
 those generic Pi hooks and the OpenShell protocol; no OpenShell-specific code is
 built into Pi.
 
-The current OpenShell bridge is supervisor-owned but reachable by every process
-inside the sandbox over loopback; it does not yet authenticate the calling
-process. Whole-context attestation binding still prevents an unadmitted
-provider request from passing the egress middleware. However, OpenShell cannot
-prove that the designated harness invoked admission before changing its own
-local memory or session files. A stronger runtime needs one additional
-OpenShell primitive: a
-process-scoped admission capability, or a supervisor-owned adapter channel that
-only the designated harness can invoke.
+The supervisor mints a separate admission token for each `sandbox exec`, accepts
+it only while that process is running, and rejects bridge calls without a valid
+token. Because the launcher consumes the descriptor before starting Pi, tool
+subprocesses receive neither the descriptor nor its environment name. The
+OpenShell middleware field `require_caller_token: false` disables this check for
+debugging; this example keeps the secure default.
 
 ## Current scope
 
@@ -311,6 +312,10 @@ them immediately before ordinary requests, but a provider retry that begins
 more than five minutes later is denied. An Egress Gate started with
 `--require-agent-attestation` serves managed harnesses only; an ordinary client
 using the same middleware registration is denied because it has no attestation.
+
+The per-exec token remains in the Pi process's memory. A same-user process that
+can read that memory could copy it; the sandbox's process isolation and ptrace
+restrictions reduce this residual risk but do not make the token hardware-bound.
 
 ## Cleanup
 

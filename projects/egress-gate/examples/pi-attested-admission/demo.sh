@@ -616,6 +616,22 @@ verify() {
 		printf 'PASS %-18s session contains only [REDACTED]\n' "redacted prompt"
 	fi
 
+	capture_sandbox_command "$temporary_dir/bridge.out" "$temporary_dir/bridge.err" \
+		/usr/bin/curl --silent --show-error \
+		--header "content-type: application/json" \
+		--data '{}' \
+		--write-out $'\n%{http_code}\n' \
+		"$bridge_url"
+	if ! $print_only; then
+		if ! grep -Fq '"error":"caller_not_authorized"' "$temporary_dir/bridge.out" || \
+			! tail -n 1 "$temporary_dir/bridge.out" | grep -Fxq 401; then
+			printf 'Unauthenticated bridge request was not rejected. See %s and %s.\n' \
+				"$temporary_dir/bridge.out" "$temporary_dir/bridge.err" >&2
+			exit 1
+		fi
+		printf 'PASS %-18s caller_not_authorized\n' "raw bridge"
+	fi
+
 	first_log_line=$(( $(log_line_count) + 1 ))
 	status=0
 	capture_sandbox_command "$temporary_dir/raw.out" "$temporary_dir/raw.err" \
