@@ -71,4 +71,6 @@ the shared deadline checks. A failed candidate leaves the existing policy
 unchanged. Gate instances are reused across worker threads, so per-request
 state must remain local to `evaluate`.
 
-See [Request lifecycle](request-lifecycle.md) and [Service boundary](service-boundary.md).
+See [Request lifecycle](request-lifecycle.md),
+[Service boundary](service-boundary.md), and
+[Managed harness admission](admission.md).

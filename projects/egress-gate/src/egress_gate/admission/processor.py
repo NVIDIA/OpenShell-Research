@@ -62,18 +62,6 @@ class HarnessAdmissionProcessor:
         self._receipt_authority = receipt_authority
         self._policy_fingerprint = fingerprint
 
-    @property
-    def readiness(self) -> dict[str, str]:
-        """Return content-safe compatibility metadata for a managed launcher."""
-        return {
-            "admission_schema": "openshell.pi-message.v1",
-            "canonicalization": "canonical-json.v1",
-            "provider_adapter": "openai.request.v1",
-            "attestation_version": "agent-attestation.v2",
-            "key_id": self._receipt_authority.key_id,
-            "policy_fingerprint": self._policy_fingerprint,
-        }
-
     def process(
         self,
         request: HarnessAdmissionRequest,

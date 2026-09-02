@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import { createHash } from "node:crypto";
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type {
@@ -64,7 +65,7 @@ type AppendAdmissionHook =
 type AdmissionHook = AppendAdmissionHook | "provider_context";
 type BridgeResult =
 	| { decision: "deny"; reason_code?: string }
-	| { decision: "allow"; handle?: string; replacement_body?: number[] };
+	| { decision: "allow"; handle?: string; replacement_body?: Uint8Array };
 
 type SummaryMessage = AgentMessage & { summary: string };
 type CustomMessage = AgentMessage & { content: string | ContentBlock[] };
@@ -91,7 +92,7 @@ export function createOpenShellContextAdmission(
 				schema_version: envelope.schema_version,
 				session_id: getSessionId(),
 				submission_id: crypto.randomUUID(),
-				request_body: Array.from(requestBody),
+				request_body_b64: Buffer.from(requestBody).toString("base64"),
 			}),
 		});
 		if (!response.ok) throw new Error("OpenShell admission is unavailable");
@@ -113,7 +114,7 @@ export function createOpenShellContextAdmission(
 		const result = await requestAdmission(prepared.hook, prepared.envelope);
 		if (result.decision === "deny") return denied(result.reason_code);
 		const admittedEnvelope = result.replacement_body
-			? parseReplacement(prepared.hook, new Uint8Array(result.replacement_body))
+			? parseReplacement(prepared.hook, result.replacement_body)
 			: prepared.envelope;
 		const admittedMessage = applyReplacement(message, meta.origin, admittedEnvelope);
 		return result.replacement_body ? { action: "allow", message: admittedMessage } : { action: "allow" };
@@ -130,7 +131,7 @@ export function createOpenShellContextAdmission(
 			if (result.decision === "deny") return denied(result.reason_code);
 			if (!result.handle) throw new Error("OpenShell admission returned no provider-context handle");
 			const admittedEnvelope = result.replacement_body
-				? parseProviderContextReplacement(new Uint8Array(result.replacement_body), envelope)
+				? parseProviderContextReplacement(result.replacement_body, envelope)
 				: envelope;
 			const admittedContext = applyProviderContextReplacement(context, admittedEnvelope.entries);
 			rememberHandle(handles, contextKey(admittedEnvelope), result.handle);
@@ -367,13 +368,18 @@ function parseBridgeResult(value: unknown): BridgeResult {
 	) {
 		throw new Error("OpenShell admission returned an invalid handle");
 	}
-	if (
-		value.replacement_body !== undefined &&
-		(!isByteArray(value.replacement_body) || value.replacement_body.length > MAX_ADMISSION_BYTES)
-	) {
-		throw new Error("OpenShell admission returned an invalid replacement");
+	let replacementBody: Uint8Array | undefined;
+	if (value.replacement_body_b64 !== undefined) {
+		if (typeof value.replacement_body_b64 !== "string") {
+			throw new Error("OpenShell admission returned an invalid replacement");
+		}
+		const decoded = Buffer.from(value.replacement_body_b64, "base64");
+		if (decoded.toString("base64") !== value.replacement_body_b64 || decoded.byteLength > MAX_ADMISSION_BYTES) {
+			throw new Error("OpenShell admission returned an invalid replacement");
+		}
+		replacementBody = decoded;
 	}
-	return { decision: "allow", handle: value.handle, replacement_body: value.replacement_body };
+	return { decision: "allow", handle: value.handle, replacement_body: replacementBody };
 }
 
 function parseProviderContextReplacement(
@@ -447,10 +453,6 @@ function parseReplacement(hook: AppendAdmissionHook, body: Uint8Array): Admissio
 			) throw new Error("OpenShell admission returned an invalid bash replacement");
 			return value as BashEnvelope;
 	}
-}
-
-function isByteArray(value: unknown): value is number[] {
-	return Array.isArray(value) && value.every((byte) => Number.isInteger(byte) && byte >= 0 && byte <= 255);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

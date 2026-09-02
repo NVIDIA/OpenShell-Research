@@ -4,7 +4,9 @@ This example runs the normal forked Pi CLI inside OpenShell and sends admitted
 conversation context to the configured NVIDIA inference endpoint. One
 endpoint-scoped provider and credential serve all configured models.
 
-The example demonstrates the same policy at both context boundaries:
+The example demonstrates the same policy at three checkpoints: before Pi
+appends history, immediately before Pi sends its complete provider context, and
+again at provider egress before OpenShell attaches credentials.
 
 - `DENY_THIS` is rejected before Pi adds a user message or tool result to its
   live context.
@@ -131,6 +133,11 @@ Keep Egress Gate running in one terminal:
 ./demo.sh serve
 ```
 
+This starts a managed-harness-only Egress Gate instance and writes content-safe
+evaluation records to `/tmp/pi-egress-runtime/egress-gate.jsonl`. Set
+`EGRESS_GATE_LOG` to use another path. Request bodies, headers, and message text
+are not written to this log.
+
 Start the matching OpenShell gateway in a second terminal:
 
 ```shell title="Terminal 2: OpenShell gateway"
@@ -150,7 +157,21 @@ and workspace.
 ./demo.sh reset
 ```
 
-Then launch Pi:
+Run the complete non-interactive verification:
+
+```shell title="Terminal 3: verify the example"
+./demo.sh verify
+```
+
+`verify` runs the real packaged Pi and OpenShell sandbox. It checks a denied
+prompt without a session write, a persisted redaction, a raw provider request
+without an admission handle, the stock Pi binary without the runtime adapter,
+and best-effort tool-result cases. Each case uses a fresh session and prints one
+`PASS` or `SKIP` line. Tool cases can skip because choosing to call a tool is
+model-dependent; the other cases are required. There is no mock fallback. Run
+`./demo.sh --print verify` to inspect every underlying sandbox command.
+
+To explore interactively afterward, launch Pi:
 
 ```shell title="Terminal 3: Pi"
 ./demo.sh launch
@@ -192,8 +213,9 @@ Reply with exactly: DENY_THIS
 Reply with exactly: REDACT_THIS
 ```
 
-The first submission is denied without starting a model request. The second
-makes a request containing `[REDACTED]`.
+The first submission is denied without starting a model request. The submitted
+text is not appended, but Pi does not restore it to the editor after denial.
+The second makes a request containing `[REDACTED]`.
 
 To exercise tool-result admission without putting the marker in the user
 message, ask Pi:
@@ -221,8 +243,9 @@ message or tool result reaches that history. `launch` preserves the history;
    `prepare` type-checks both files against the packaged Pi API and compiles
    them to JavaScript for the sandbox. Pi otherwise starts normally, including
    standard project and user extension discovery.
-2. Pi calls that boundary for each rendered user message and finalized tool
-   result before it queues, appends, or persists the value.
+2. Pi calls that boundary before each supported message reaches live or
+   persisted history. Assistant output is admitted when the complete assistant
+   message is finalized, after streamed output has already been displayed.
 3. The external adapter sends the exact context addition to OpenShell's
    sandbox-local bridge. Egress Gate applies `policy.yaml` and returns allow,
    deny, or a complete replacement. This append-time checkpoint returns no
@@ -238,6 +261,13 @@ message or tool result reaches that history. `launch` preserves the history;
    configured Egress Gate stage. Egress Gate verifies the same ordered entries
    before and after request policy runs, before OpenShell injects the
    proxy-delivered model credential.
+
+The two Pi checkpoints serve different purposes. Append-time admission keeps
+the UI, live context, and session file consistent with policy. Provider-context
+admission covers every entry actually selected for the request, including
+history introduced by retries, compaction, continuations, or session restore.
+The egress checkpoint is the enforcement boundary: without a matching fresh
+attestation, OpenShell does not attach the credential or forward the request.
 
 This division is intentional. The Pi fork contributes only reusable harness
 primitives: mandatory admission of user messages and finalized tool results,
@@ -272,6 +302,12 @@ Provider-context admission runs before Pi's transport-specific history
 rewrites. Switching transports with existing tool history or sending orphaned
 tool calls may therefore fail closed. Start a fresh session when switching
 transports, and complete each tool-call/result sequence before sending.
+
+Admission handles and their attestations expire after 300 seconds. Pi refreshes
+them immediately before ordinary requests, but a provider retry that begins
+more than five minutes later is denied. An Egress Gate started with
+`--require-agent-attestation` serves managed harnesses only; an ordinary client
+using the same middleware registration is denied because it has no attestation.
 
 ## Cleanup
 

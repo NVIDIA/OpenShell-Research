@@ -64,7 +64,12 @@ from egress_gate.gateway_config import (
     validate_gateway_timeout,
     validate_middleware_name,
 )
-from egress_gate.logging import LoggingConfig, configure_logging, get_logger
+from egress_gate.logging import (
+    LoggingConfig,
+    configure_json_log,
+    configure_logging,
+    get_logger,
+)
 from egress_gate.request import HttpHeader, HttpRequest, HttpTarget, RequestContext
 from egress_gate.result import EgressResult, GateDecisionSource
 from egress_gate.string_validators import BoundedMetadataString
@@ -167,6 +172,13 @@ def serve(
             ),
         ),
     ] = f"{DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING:g}s",
+    json_log: Annotated[
+        Path | None,
+        typer.Option(
+            "--json-log",
+            help="Write content-safe evaluation records as newline-delimited JSON.",
+        ),
+    ] = None,
     require_agent_attestation: Annotated[
         bool,
         typer.Option(
@@ -216,6 +228,8 @@ def serve(
             remembered.middleware_name,
             remembered.config_path,
         )
+    if json_log is not None:
+        configure_json_log(json_log)
     try:
         EgressGateServer(
             options.registry,
