@@ -21,10 +21,15 @@ PI_HARNESS_VERSION = "sdk-v1"
 
 
 class AdmissionHook(StrEnum):
-    """Supported Pi admission boundaries."""
+    """Supported harness admission boundaries."""
 
     USER_MESSAGE = "user_message"
     TOOL_RESULT = "tool_result"
+    ASSISTANT_MESSAGE = "assistant_message"
+    COMPACTION_SUMMARY = "compaction_summary"
+    BRANCH_SUMMARY = "branch_summary"
+    EXTENSION_MESSAGE = "extension_message"
+    BASH_EXECUTION = "bash_execution"
 
 
 class AdmissionDecision(StrEnum):

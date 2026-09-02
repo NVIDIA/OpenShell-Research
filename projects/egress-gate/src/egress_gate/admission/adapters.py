@@ -51,11 +51,16 @@ class ProviderShapeError(ValueError):
     """A content-safe signal that a provider request is unsupported."""
 
 
+PiMessageOrigin: TypeAlias = Literal[
+    "user", "compaction_summary", "branch_summary", "extension_message"
+]
+
+
 class PiMessageV1(StrictDomainModel):
-    """Rendered text submitted by the managed Pi harness."""
+    """Text-bearing message submitted by the managed Pi harness."""
 
     schema_version: Literal["openshell.pi-message.v1"]
-    origin: Literal["user"]
+    origin: PiMessageOrigin
     text: ScalarString
 
 
@@ -89,7 +94,40 @@ class PiToolResultV1(StrictDomainModel):
         return tuple(value) if isinstance(value, list) else value
 
 
-AttestedCandidate: TypeAlias = PiMessageV1 | CanonicalMessageV1
+class PiAssistantToolCallV1(StrictDomainModel):
+    """One immutable Pi assistant tool call."""
+
+    id: ScalarString
+    name: ScalarString
+    arguments: dict[str, object]
+
+
+class PiAssistantMessageV1(StrictDomainModel):
+    """Replaceable assistant text and immutable tool calls."""
+
+    schema_version: Literal["openshell.pi-assistant-message.v1"]
+    text: ScalarString
+    tool_calls: tuple[PiAssistantToolCallV1, ...]
+
+    @field_validator("tool_calls", mode="before")
+    @classmethod
+    def _tool_calls_are_a_tuple(cls, value: object) -> object:
+        return tuple(value) if isinstance(value, list) else value
+
+
+class PiBashExecutionV1(StrictDomainModel):
+    """Replaceable bash output and immutable execution metadata."""
+
+    schema_version: Literal["openshell.pi-bash-execution.v1"]
+    command: ScalarString
+    output: ScalarString
+    exit_code: int | None
+
+
+HarnessNative: TypeAlias = (
+    PiMessageV1 | PiToolResultV1 | PiAssistantMessageV1 | PiBashExecutionV1
+)
+AttestedCandidate: TypeAlias = HarnessNative | CanonicalMessageV1
 
 
 class PreparedHarnessRequest:
@@ -98,7 +136,7 @@ class PreparedHarnessRequest:
     def __init__(
         self,
         *,
-        native: PiMessageV1 | PiToolResultV1,
+        native: HarnessNative,
         projected_body: bytes,
         original_body: bytes,
     ) -> None:
@@ -127,7 +165,10 @@ class HarnessAdapter(Protocol):
 
 
 class PiMessageV1Adapter:
-    """Strict user-message adapter."""
+    """Strict adapter for one text-bearing Pi origin."""
+
+    def __init__(self, accepted_origin: PiMessageOrigin) -> None:
+        self._accepted_origin = accepted_origin
 
     def prepare(
         self,
@@ -135,7 +176,9 @@ class PiMessageV1Adapter:
         context: HarnessAdmissionContext,
         timeout: Timeout,
     ) -> PreparedHarnessRequest:
-        native = _parse_pi_body(request.request_body, timeout)
+        native = _parse_pi_body(
+            request.request_body, timeout, accepted_origin=self._accepted_origin
+        )
         return PreparedHarnessRequest(
             native=native,
             projected_body=canonical_json_bytes(native),
@@ -149,12 +192,86 @@ class PiMessageV1Adapter:
         context: HarnessAdmissionContext,
         timeout: Timeout,
     ) -> tuple[bytes | None, PiMessageV1]:
-        updated = _parse_pi_body(projected_body, timeout)
+        updated = _parse_pi_body(
+            projected_body, timeout, accepted_origin=self._accepted_origin
+        )
         encoded = canonical_json_bytes(updated)
         replacement = (
             None
             if canonical_json_bytes(updated) == canonical_json_bytes(prepared.native)
             else encoded
+        )
+        return replacement, updated
+
+
+class PiAssistantMessageV1Adapter:
+    """Strict adapter for Pi assistant text and tool calls."""
+
+    def prepare(
+        self,
+        request: HarnessAdmissionRequest,
+        context: HarnessAdmissionContext,
+        timeout: Timeout,
+    ) -> PreparedHarnessRequest:
+        native = _parse_pi_assistant_message(request.request_body, timeout)
+        return PreparedHarnessRequest(
+            native=native,
+            projected_body=canonical_json_bytes(native),
+            original_body=request.request_body,
+        )
+
+    def validate_result(
+        self,
+        prepared: PreparedHarnessRequest,
+        projected_body: bytes,
+        context: HarnessAdmissionContext,
+        timeout: Timeout,
+    ) -> tuple[bytes | None, PiAssistantMessageV1]:
+        updated = _parse_pi_assistant_message(projected_body, timeout)
+        if not isinstance(prepared.native, PiAssistantMessageV1):
+            raise AdmissionMutationError("assistant admission state is invalid")
+        if updated.tool_calls != prepared.native.tool_calls:
+            raise AdmissionMutationError("admission changed assistant tool calls")
+        encoded = canonical_json_bytes(updated)
+        replacement = (
+            None if encoded == canonical_json_bytes(prepared.native) else encoded
+        )
+        return replacement, updated
+
+
+class PiBashExecutionV1Adapter:
+    """Strict adapter for Pi bash output."""
+
+    def prepare(
+        self,
+        request: HarnessAdmissionRequest,
+        context: HarnessAdmissionContext,
+        timeout: Timeout,
+    ) -> PreparedHarnessRequest:
+        native = _parse_pi_bash_execution(request.request_body, timeout)
+        return PreparedHarnessRequest(
+            native=native,
+            projected_body=canonical_json_bytes(native),
+            original_body=request.request_body,
+        )
+
+    def validate_result(
+        self,
+        prepared: PreparedHarnessRequest,
+        projected_body: bytes,
+        context: HarnessAdmissionContext,
+        timeout: Timeout,
+    ) -> tuple[bytes | None, PiBashExecutionV1]:
+        updated = _parse_pi_bash_execution(projected_body, timeout)
+        if not isinstance(prepared.native, PiBashExecutionV1):
+            raise AdmissionMutationError("bash admission state is invalid")
+        immutable_before = (prepared.native.command, prepared.native.exit_code)
+        immutable_after = (updated.command, updated.exit_code)
+        if immutable_after != immutable_before:
+            raise AdmissionMutationError("admission changed bash execution metadata")
+        encoded = canonical_json_bytes(updated)
+        replacement = (
+            None if encoded == canonical_json_bytes(prepared.native) else encoded
         )
         return replacement, updated
 
@@ -717,17 +834,35 @@ class ProviderAdapterRegistry:
 def create_pi_adapter_registry() -> HarnessAdapterRegistry:
     """Return the built-in Pi v1 admission registry."""
     registry = HarnessAdapterRegistry()
-    registry.register(
-        "pi",
-        AdmissionHook.USER_MESSAGE,
-        "openshell.pi-message.v1",
-        PiMessageV1Adapter(),
-    )
+    for hook, origin in (
+        (AdmissionHook.USER_MESSAGE, "user"),
+        (AdmissionHook.COMPACTION_SUMMARY, "compaction_summary"),
+        (AdmissionHook.BRANCH_SUMMARY, "branch_summary"),
+        (AdmissionHook.EXTENSION_MESSAGE, "extension_message"),
+    ):
+        registry.register(
+            "pi",
+            hook,
+            "openshell.pi-message.v1",
+            PiMessageV1Adapter(origin),
+        )
     registry.register(
         "pi",
         AdmissionHook.TOOL_RESULT,
         "openshell.pi-tool-result.v1",
         PiToolResultV1Adapter(),
+    )
+    registry.register(
+        "pi",
+        AdmissionHook.ASSISTANT_MESSAGE,
+        "openshell.pi-assistant-message.v1",
+        PiAssistantMessageV1Adapter(),
+    )
+    registry.register(
+        "pi",
+        AdmissionHook.BASH_EXECUTION,
+        "openshell.pi-bash-execution.v1",
+        PiBashExecutionV1Adapter(),
     )
     return registry
 
@@ -740,7 +875,9 @@ def create_provider_adapter_registry() -> ProviderAdapterRegistry:
     return registry
 
 
-def _parse_pi_body(body: bytes, timeout: Timeout) -> PiMessageV1:
+def _parse_pi_body(
+    body: bytes, timeout: Timeout, *, accepted_origin: PiMessageOrigin = "user"
+) -> PiMessageV1:
     value = _load_json(body, AdmissionShapeError, timeout)
     try:
         parsed = _PI_ADAPTER.validate_python(value, strict=True)
@@ -748,8 +885,32 @@ def _parse_pi_body(body: bytes, timeout: Timeout) -> PiMessageV1:
         raise AdmissionShapeError("Pi request body is unsupported") from None
     if not isinstance(parsed, PiMessageV1):
         raise AdmissionShapeError("Pi request body is unsupported")
+    if parsed.origin != accepted_origin:
+        raise AdmissionShapeError("Pi message origin is unsupported")
     if canonical_json_bytes(parsed) != body:
         raise AdmissionShapeError("Pi request body is not canonical JSON")
+    return parsed
+
+
+def _parse_pi_assistant_message(body: bytes, timeout: Timeout) -> PiAssistantMessageV1:
+    value = _load_json(body, AdmissionShapeError, timeout)
+    try:
+        parsed = _PI_ASSISTANT_MESSAGE_ADAPTER.validate_python(value, strict=True)
+    except ValidationError:
+        raise AdmissionShapeError("Pi assistant-message body is unsupported") from None
+    if canonical_json_bytes(parsed) != body:
+        raise AdmissionShapeError("Pi assistant-message body is not canonical JSON")
+    return parsed
+
+
+def _parse_pi_bash_execution(body: bytes, timeout: Timeout) -> PiBashExecutionV1:
+    value = _load_json(body, AdmissionShapeError, timeout)
+    try:
+        parsed = _PI_BASH_EXECUTION_ADAPTER.validate_python(value, strict=True)
+    except ValidationError:
+        raise AdmissionShapeError("Pi bash-execution body is unsupported") from None
+    if canonical_json_bytes(parsed) != body:
+        raise AdmissionShapeError("Pi bash-execution body is not canonical JSON")
     return parsed
 
 
@@ -865,6 +1026,8 @@ def _provider_message_to_canonical(item: _ProviderMessage) -> CanonicalMessageV1
 
 _PI_ADAPTER = TypeAdapter(PiMessageV1)
 _PI_TOOL_RESULT_ADAPTER = TypeAdapter(PiToolResultV1)
+_PI_ASSISTANT_MESSAGE_ADAPTER = TypeAdapter(PiAssistantMessageV1)
+_PI_BASH_EXECUTION_ADAPTER = TypeAdapter(PiBashExecutionV1)
 _PROVIDER_ADAPTER = TypeAdapter(_ProviderRequest)
 _RESPONSES_PROVIDER_ADAPTER = TypeAdapter(_ResponsesRequest)
 
@@ -879,6 +1042,11 @@ __all__ = [
     "OpenAIResponsesV1Adapter",
     "PiMessageV1",
     "PiImageContentV1",
+    "PiAssistantMessageV1",
+    "PiAssistantMessageV1Adapter",
+    "PiAssistantToolCallV1",
+    "PiBashExecutionV1",
+    "PiBashExecutionV1Adapter",
     "PiTextContentV1",
     "PiToolResultV1",
     "PiToolResultV1Adapter",
