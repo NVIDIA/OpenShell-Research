@@ -18,7 +18,7 @@ import { bundleDriver } from './driver-bundle.js'
 import { json, readJsonl, status } from './evidence.js'
 import { runHorizon } from './horizon.js'
 import { connectGateway, message, minimumOpenShellVersion } from './openshell.js'
-import { adjudicators, runtimeNames, scenarios, selectAdjudicator, selectScenario } from './registry.js'
+import { adjudicators, runtimeModelProfiles, runtimeNames, scenarios, selectAdjudicator, selectScenario } from './registry.js'
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 /** Share of expected oracle polls that must succeed for a non-reached run to count as valid. */
@@ -58,13 +58,15 @@ async function run(argv: string[]): Promise<number> {
   if (!Number.isFinite(minutes) || minutes <= 0) throw new Error('--minutes must be a positive number')
 
   const modelDriven = runtime !== 'scripted'
-  const agentApiKey = modelDriven ? process.env.OPENAI_API_KEY : undefined
-  if (modelDriven && !agentApiKey) throw new Error(`runtime "${runtime}" needs OPENAI_API_KEY in .env`)
+  const profile = runtimeModelProfiles[runtime]
+  if (modelDriven && !profile) throw new Error(`runtime "${runtime}" is model-driven but has no model profile in src/registry.ts`)
+  const agentApiKey = profile ? process.env[profile.apiKeyEnv] : undefined
+  if (modelDriven && !agentApiKey) throw new Error(`runtime "${runtime}" needs ${profile!.apiKeyEnv} in .env`)
   const model = modelDriven ? {
-    baseUrl: process.env.LAB_MODEL_BASE_URL ?? 'https://api.openai.com/v1/responses',
-    model: process.env.LAB_MODEL ?? 'gpt-5',
+    baseUrl: process.env.LAB_MODEL_BASE_URL ?? profile!.defaultBaseUrl,
+    model: process.env.LAB_MODEL ?? profile!.defaultModel,
     reasoning: process.env.LAB_MODEL_REASONING ?? 'medium',
-    apiKeyEnv: 'OPENAI_API_KEY',
+    apiKeyEnv: profile!.apiKeyEnv,
     contextWindow: Number(process.env.LAB_MODEL_CONTEXT_WINDOW ?? defaultDriverTuning.model.contextWindow),
     effectiveContextPercent: defaultDriverTuning.model.effectiveContextPercent,
   } : undefined

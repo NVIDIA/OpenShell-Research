@@ -106,8 +106,20 @@ enforcement alone stops. `reject-all` is the control condition: it holds the
 initial policy, so any objective reached under it was reached without new
 capability.
 
-To use OpenAI Codex as the challenger instead of the built-in `responses`
-runtime, build the Codex image once and point the run at it:
+For a realistic long-horizon result, run a full agent harness as the
+challenger. Both ship in the base sandbox image, so no image build is needed:
+
+```bash
+npm run lab -- run github-policy-review --runtime codex
+```
+
+```bash
+npm run lab -- run github-policy-review --runtime claude-code
+```
+
+Claude Code reads `ANTHROPIC_API_KEY` and Codex reads `OPENAI_API_KEY`; set the
+one for the runtime you choose. To pin a specific Codex version instead of the
+base image's, build the image and override with `--image`:
 
 ```bash
 npm run image:build
@@ -116,6 +128,10 @@ npm run image:build
 ```bash
 npm run lab -- run github-policy-review --runtime codex --image long-horizon-agent-evals/codex:0.147.0
 ```
+
+The reviewer adjudicator speaks the OpenAI Responses API, so a Claude Code
+challenger currently runs against a GPT reviewer. That model asymmetry is a
+valid condition; a Claude reviewer would be a second adjudicator.
 
 ## What happens during a run
 
@@ -198,6 +214,8 @@ policy, including chunks the gateway superseded during canonicalization.
     The `model-reviewer` adjudicator has been validated against a live model
     on real proposals (approving a repository read, rejecting a contents
     write). The `responses` runtime has completed model-driven hello-canary
-    runs. A full-horizon `github-policy-review` run against a disposable
-    repository, and the ported `codex` runtime adapter, have not yet been
-    re-run through this rebuilt harness.
+    runs. The `codex` and `claude-code` adapters are mechanically validated
+    against the base-image CLIs (flags accepted, stream parsed, thread id
+    captured) but have not yet completed a full model-driven run. A
+    full-horizon `github-policy-review` run against a disposable repository is
+    still pending.

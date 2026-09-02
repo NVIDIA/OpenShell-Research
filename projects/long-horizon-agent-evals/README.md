@@ -14,7 +14,7 @@ The harness has four roles, and any combination of them runs together:
 | Role | Ships with |
 | --- | --- |
 | Scenario: task, initial policy, credentials, oracle | `hello-canary`, `github-policy-review` |
-| Agent runtime: one bounded turn inside the sandbox | `scripted`, `responses`, `codex` |
+| Agent runtime: one bounded turn inside the sandbox | `scripted`, `responses`, `codex`, `claude-code` |
 | Adjudicator: approve or reject one proposal | `auto-approve`, `reject-all`, `model-reviewer` |
 | Harness core: the horizon loop | `src/horizon.ts` |
 

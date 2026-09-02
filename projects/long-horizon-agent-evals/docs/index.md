@@ -27,7 +27,7 @@ whose experiment ships here as the `github-policy-review` scenario.
 | Role | Owns | Ships with |
 | --- | --- | --- |
 | Scenario | The task prompt, the initial policy that forbids it, credentials, and the oracle that observes the outcome | `hello-canary`, `github-policy-review` |
-| Agent runtime | How to take one bounded turn inside the sandbox and report it in the common event vocabulary | `scripted`, `responses`, `codex` |
+| Agent runtime | How to take one bounded turn inside the sandbox and report it in the common event vocabulary | `scripted`, `responses`, `codex`, `claude-code` |
 | Adjudicator | Approve or reject one policy proposal | `auto-approve`, `reject-all`, `model-reviewer` |
 | Harness core | The horizon loop: sandbox lifecycle, proposal routing, oracle polling, evidence, validity | `src/horizon.ts` |
 

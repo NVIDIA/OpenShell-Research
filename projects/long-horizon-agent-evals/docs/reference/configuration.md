@@ -45,15 +45,25 @@ is required for `hello-canary` on a local gateway.
 | `LAB_WORKSPACE` | `default` | Workspace for sandboxes and providers. |
 | `OPENSHELL_TOKEN`, `OPENSHELL_CA_CERT`, `OPENSHELL_CLIENT_CERT`, `OPENSHELL_CLIENT_KEY`, `OPENSHELL_INSECURE` | unset | Authentication for an explicitly configured gateway that does not use the CLI's local files. |
 
-### Agent model (runtimes `responses` and `codex`)
+### Agent model (model-driven runtimes)
+
+The API family, key variable, default endpoint, and default model are chosen by
+the runtime, in `runtimeModelProfiles` (`src/registry.ts`):
+
+| Runtime | Key variable | Default endpoint | Default model |
+| --- | --- | --- | --- |
+| `responses`, `codex` | `OPENAI_API_KEY` | `https://api.openai.com/v1/responses` | `gpt-5` |
+| `claude-code` | `ANTHROPIC_API_KEY` | `https://api.anthropic.com` | `sonnet` |
+
+The key is passed into the sandbox under its variable name and redacted from
+evidence. These variables override the runtime's defaults:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `OPENAI_API_KEY` | required | Passed into the sandbox under the same name and redacted from evidence. |
-| `LAB_MODEL` | `gpt-5` | Model identifier. |
-| `LAB_MODEL_BASE_URL` | `https://api.openai.com/v1/responses` | Responses endpoint. The harness adds an egress rule for this host and port. |
-| `LAB_MODEL_REASONING` | `medium` | Reasoning effort. |
-| `LAB_MODEL_CONTEXT_WINDOW` | `128000` | Context window in tokens. The `responses` runtime rotates threads at 80 percent of this. |
+| `LAB_MODEL` | runtime default | Model identifier. Match it to the runtime's API family. |
+| `LAB_MODEL_BASE_URL` | runtime default | Model endpoint. The harness adds an egress rule for this host and port. |
+| `LAB_MODEL_REASONING` | `medium` | Reasoning effort, where the runtime supports it. |
+| `LAB_MODEL_CONTEXT_WINDOW` | `128000` | Context window in tokens. The `responses` runtime rotates threads at 80 percent of this; `codex` and `claude-code` compact their own context. |
 
 ### Reviewer model (adjudicator `model-reviewer`)
 

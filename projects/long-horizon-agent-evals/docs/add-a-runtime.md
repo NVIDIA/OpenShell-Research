@@ -13,13 +13,26 @@ harness on the host never learns which agent ran; it reads the common event
 vocabulary.
 
 A runtime is one file under `driver/runtimes/` plus one line in
-`driver/runtimes/index.ts`. Three ship today:
+`driver/runtimes/index.ts`. Four ship today:
 
 | Runtime | What it is | Needs |
 | --- | --- | --- |
 | `scripted` | A deterministic agent with no model that attempts a GET, proposes the narrowest rule when blocked, and retries. | Nothing. Used by `hello-canary` and CI. |
-| `responses` | A minimal agent speaking the OpenAI Responses API directly with a single `shell` tool. | An API key and the base sandbox image. |
-| `codex` | OpenAI Codex CLI under `codex exec --json`, mapped onto the common events. | The Codex image built by `npm run image:build`. |
+| `responses` | A minimal agent speaking the OpenAI Responses API directly with a single `shell` tool. | `OPENAI_API_KEY`. Base sandbox image. |
+| `codex` | OpenAI Codex CLI under `codex exec --json`, mapped onto the common events. | `OPENAI_API_KEY`. Ships in the base image; `npm run image:build` only pins a newer version. |
+| `claude-code` | Anthropic Claude Code CLI under `claude -p --output-format stream-json`, mapped onto the common events. | `ANTHROPIC_API_KEY`. Ships in the base image. |
+
+The `scripted` and `responses` runtimes isolate a model behind a minimal loop;
+they are the reproducible baseline and the second implementation that keeps the
+Runtime contract honest. The `codex` and `claude-code` runtimes are full agent
+harnesses that bring their own tools, planning, and context compaction, so they
+are the realistic choice for a long-horizon result. Prefer a full harness for a
+headline experiment and a raw-model runtime for controlled model comparison.
+
+A model-driven runtime declares its API family once in
+`runtimeModelProfiles` (`src/registry.ts`): the environment variable holding
+its key, its default endpoint, and its default model. The CLI reads that to
+supply the right key and to add the model egress rule.
 
 ## The contract
 
@@ -136,6 +149,12 @@ new adapter.
   `turn.completed` and returns the latest response id as `threadId`.
 - HTTP 429 and 5xx are `transient`. A context-length error requests rotation.
   Any other error is fatal for the run.
+
+`driver/runtimes/claude-code.ts` is the same shape for a full harness: one
+`claude -p` process per turn, stream-json parsed into the common events,
+`--resume <session-id>` for continuity. Because Claude Code compacts its own
+context, it never requests rotation on a context budget, exactly as Codex does
+not.
 
 ## Register it
 

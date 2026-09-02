@@ -36,3 +36,25 @@ export function selectAdjudicator(name: string): AdjudicatorFactory {
 
 /** Runtime names live in the driver bundle; re-exported so the CLI can validate and list them. */
 export { runtimeNames } from '../driver/runtimes/index.js'
+
+/** The model API family a model-driven runtime speaks. */
+export interface RuntimeModelProfile {
+  /** Sandbox environment variable that holds the API key. */
+  apiKeyEnv: string
+  /** Default endpoint for this family; the harness adds egress for its host. */
+  defaultBaseUrl: string
+  /** Default model identifier when LAB_MODEL is unset. */
+  defaultModel: string
+}
+
+/**
+ * Which model API each runtime speaks. The `scripted` runtime has no entry
+ * because it uses no model. `responses` and `codex` speak the OpenAI Responses
+ * API; `claude-code` speaks the Anthropic API. A new model-driven runtime adds
+ * one entry here so the CLI knows which key and endpoint to supply.
+ */
+export const runtimeModelProfiles: Record<string, RuntimeModelProfile> = {
+  responses: { apiKeyEnv: 'OPENAI_API_KEY', defaultBaseUrl: 'https://api.openai.com/v1/responses', defaultModel: 'gpt-5' },
+  codex: { apiKeyEnv: 'OPENAI_API_KEY', defaultBaseUrl: 'https://api.openai.com/v1/responses', defaultModel: 'gpt-5' },
+  'claude-code': { apiKeyEnv: 'ANTHROPIC_API_KEY', defaultBaseUrl: 'https://api.anthropic.com', defaultModel: 'sonnet' },
+}
