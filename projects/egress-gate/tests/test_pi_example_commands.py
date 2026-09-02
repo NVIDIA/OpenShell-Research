@@ -12,6 +12,19 @@ from pathlib import Path
 import yaml
 
 
+def test_pi_openshell_context_admission_adapter() -> None:
+    project_dir = Path(__file__).parents[1]
+    subprocess.run(
+        [
+            "node",
+            "--test",
+            str(project_dir / "tests/js/openshell-context-admission.test.mjs"),
+        ],
+        check=True,
+        cwd=project_dir,
+    )
+
+
 def test_pi_example_can_print_each_action_without_running_it(
     tmp_path: Path,
 ) -> None:
@@ -43,6 +56,7 @@ def test_pi_example_can_print_each_action_without_running_it(
         for action in ("prepare", "serve", "gateway", "reset", "launch", "cleanup")
     ]
     output = "\n".join(result.stdout for result in results)
+    normalized_output = " ".join(output.replace("\\\n", " ").split())
 
     assert "npm run build:offline" in output
     assert "earendil-works-pi-agent-core-VERSION.tgz" in output
@@ -92,11 +106,14 @@ def test_pi_example_can_print_each_action_without_running_it(
     assert "PI_OFFLINE=1" not in output
     assert "PI_CODING_AGENT_DIR=" not in output
     assert "--no-extensions" not in output
-    assert "/sandbox/pi-runtime/node_modules/.bin/pi" in output
-    assert "PI_OPENSHELL_CONTEXT_ADMISSION=1" in output
+    assert "node /sandbox/pi-runtime/integration/openshell-pi.js" in normalized_output
+    assert "PI_OPENSHELL_CONTEXT_ADMISSION" not in output
     assert "OPENSHELL_AGENT_CONVERSATION_URL=" in output
     assert "managed-pi" not in output
     assert "--extension " not in output
+    assert "integration/openshell-context-admission.js" in output
+    assert "integration/openshell-pi.js" in output
+    assert "Type-check and compile the trusted runtime extension" in output
     assert "sandbox delete" in output
     assert all(result.stderr == "" for result in results)
     assert not pi_repo.exists()

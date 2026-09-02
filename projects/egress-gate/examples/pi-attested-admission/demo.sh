@@ -39,6 +39,8 @@ runtime_provider_profile=$script_dir/provider-profile.yaml
 runtime_gateway_fragment=$runtime_dir/gateway-middleware.toml
 gateway_fragment_template=$script_dir/gateway-middleware.toml.example
 pi_settings=$script_dir/settings.json
+runtime_extension_source=$script_dir/runtime-extension
+runtime_extension_build=$runtime_dir/integration
 z3_library_path_override=${Z3_LIBRARY_PATH_OVERRIDE:-}
 
 bold=""
@@ -341,6 +343,11 @@ prepare() {
 	run_in "$pi_repo" npm pack --workspace @earendil-works/pi-agent-core --pack-destination "$pack_dir"
 	run_in "$pi_repo" npm pack --workspace @earendil-works/pi-coding-agent --pack-destination "$pack_dir"
 	run_in "$pi_repo" npm install --prefix "$runtime_dir" --ignore-scripts "$agent_tarball" "$coding_agent_tarball"
+	describe_printed_commands "Type-check and compile the trusted runtime extension:"
+	run_in "$pi_repo" mkdir -p "$runtime_dir/integration-src" "$runtime_extension_build"
+	run_in "$pi_repo" cp -R "$runtime_extension_source/." "$runtime_dir/integration-src"
+	run_in "$runtime_dir/integration-src" "$pi_repo/node_modules/.bin/tsgo" -p tsconfig.json
+	run_in "$runtime_dir/integration-src" cp package.json "$runtime_extension_build/package.json"
 }
 
 serve() {
@@ -427,6 +434,9 @@ create_demo_sandbox() {
 		--upload "$runtime_dir/node_modules:/sandbox/pi-runtime" \
 		--upload "$models_path:/sandbox/.pi/agent/models.json" \
 		--upload "$pi_settings:/sandbox/.pi/agent/settings.json" \
+		--upload "$runtime_extension_build/openshell-context-admission.js:/sandbox/pi-runtime/integration/openshell-context-admission.js" \
+		--upload "$runtime_extension_build/openshell-pi.js:/sandbox/pi-runtime/integration/openshell-pi.js" \
+		--upload "$runtime_extension_build/package.json:/sandbox/pi-runtime/integration/package.json" \
 		--no-git-ignore \
 		--detach
 	if [[ -n $workspace_path ]]; then
@@ -451,10 +461,14 @@ reset_demo() {
 			"beforeToolResultAppend" \
 			"installed Pi agent core"
 		require_file_contains \
-			"$runtime_dir/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js" \
-			"PI_OPENSHELL_CONTEXT_ADMISSION" \
-			"installed Pi CLI"
+			"$runtime_dir/node_modules/@earendil-works/pi-coding-agent/dist/bundle/index.js" \
+			"runCli" \
+			"installed Pi SDK"
 		require_file "$pi_settings" "Pi settings"
+		require_file "$runtime_extension_build/openshell-context-admission.js" \
+			"compiled OpenShell context-admission adapter"
+		require_file "$runtime_extension_build/openshell-pi.js" "compiled OpenShell Pi launcher"
+		require_file "$runtime_extension_build/package.json" "runtime-extension package metadata"
 		require_file "$runtime_policy" "OpenShell sandbox policy"
 		require_file "$runtime_provider_profile" "OpenShell provider profile"
 	fi
@@ -486,9 +500,8 @@ launch() {
 	run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
 		sandbox exec --tty -n pi-egress-demo --workdir /sandbox/workspace -- \
 		env \
-		PI_OPENSHELL_CONTEXT_ADMISSION=1 \
 		OPENSHELL_AGENT_CONVERSATION_URL=http://127.0.0.1:8193/v1/agent/conversation \
-		/sandbox/pi-runtime/node_modules/.bin/pi
+		node /sandbox/pi-runtime/integration/openshell-pi.js
 }
 
 cleanup() {
