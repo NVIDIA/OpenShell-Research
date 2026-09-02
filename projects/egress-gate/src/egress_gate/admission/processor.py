@@ -13,14 +13,9 @@ from egress_gate.admission.adapters import (
     AdmissionMutationError,
     AdmissionShapeError,
     HarnessAdapterRegistry,
-    PiMessageV1,
     ProviderAdapterRegistry,
     ProviderShapeError,
-)
-from egress_gate.admission.canonical import (
-    CanonicalMessageV1,
-    CanonicalRole,
-    canonical_json_bytes,
+    context_entries_subject,
 )
 from egress_gate.admission.models import (
     MAX_ADMISSION_BODY_BYTES,
@@ -74,7 +69,7 @@ class HarnessAdmissionProcessor:
             "admission_schema": "openshell.pi-message.v1",
             "canonicalization": "canonical-json.v1",
             "provider_adapter": "openai.request.v1",
-            "attestation_version": "agent-attestation.v1",
+            "attestation_version": "agent-attestation.v2",
             "key_id": self._receipt_authority.key_id,
             "policy_fingerprint": self._policy_fingerprint,
         }
@@ -121,18 +116,21 @@ class HarnessAdmissionProcessor:
             final_request = apply_request_mutations(
                 projected, gate_result.request_mutations
             )
-            replacement, rendered_prompt = adapter.validate_result(
+            replacement, final = adapter.validate_result(
                 prepared, final_request.body, context, timeout
             )
             if replacement is not None and len(replacement) > MAX_ADMISSION_BODY_BYTES:
                 raise AdmissionMutationError("admission replacement body is too large")
             timeout.raise_if_expired()
-            attestation = self._receipt_authority.issue_attestation(
-                rendered_prompt,
-                context,
-                request.provenance,
-                policy_fingerprint=self._policy_fingerprint,
-            )
+            subject = adapter.attestation_subject(prepared, final)
+            attestation = None
+            if subject is not None:
+                attestation = self._receipt_authority.issue_attestation(
+                    *subject,
+                    context,
+                    request.provenance,
+                    policy_fingerprint=self._policy_fingerprint,
+                )
             timeout.raise_if_expired()
             return HarnessAdmissionResult(
                 hook=context.hook,
@@ -202,33 +200,24 @@ class AttestedEgressProcessor:
             return self._deny("attestation_missing")
         try:
             adapter = self._provider_adapters.resolve_request(request, timeout)
-            candidate = adapter.latest_attested_candidate(request, timeout)
+            entries = adapter.attested_entries(request, timeout)
+            subject_hash, entry_count = context_entries_subject(entries)
             timeout.raise_if_expired()
-            if isinstance(candidate, PiMessageV1):
-                hook = AdmissionHook.USER_MESSAGE
-                schema_version = "openshell.pi-message.v1"
-            elif (
-                isinstance(candidate, CanonicalMessageV1)
-                and candidate.role is CanonicalRole.TOOL
-            ):
-                hook = AdmissionHook.TOOL_RESULT
-                schema_version = "openshell.pi-tool-result.v1"
-            else:
-                raise ProviderShapeError("provider context addition is unsupported")
             context = HarnessAdmissionContext(
                 request_id=request.context.request_id,
                 sandbox_id=request.context.sandbox_id,
                 middleware_name=self._middleware_name,
                 harness="pi",
                 harness_version=self._harness_version,
-                hook=hook,
-                schema_version=schema_version,
+                hook=AdmissionHook.PROVIDER_CONTEXT,
+                schema_version="openshell.pi-provider-context.v1",
                 provider_target=request.target,
                 provider_adapter_schema="openai.request.v1",
             )
             self._receipt_authority.verify_attestation(
                 agent_attestation,
-                candidate,
+                subject_hash,
+                entry_count,
                 context,
                 policy_fingerprint=self._policy_fingerprint,
             )
@@ -240,8 +229,8 @@ class AttestedEgressProcessor:
             final_request = apply_request_mutations(
                 request, gate_result.request_mutations
             )
-            final_candidate = adapter.latest_attested_candidate(final_request, timeout)
-            if canonical_json_bytes(final_candidate) != canonical_json_bytes(candidate):
+            final_entries = adapter.attested_entries(final_request, timeout)
+            if final_entries != entries:
                 return self._deny("semantic_mutation_denied")
             timeout.raise_if_expired()
             return gate_result

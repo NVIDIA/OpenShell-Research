@@ -225,18 +225,19 @@ message or tool result reaches that history. `launch` preserves the history;
    result before it queues, appends, or persists the value.
 3. The external adapter sends the exact context addition to OpenShell's
    sandbox-local bridge. Egress Gate applies `policy.yaml` and returns allow,
-   deny, or a complete replacement.
-4. OpenShell keeps the signed attestation and gives Pi only an opaque handle.
-   The adapter keeps handles in its private closure, outside Pi messages.
-5. Immediately before every provider request, Pi passes the exact outbound
+   deny, or a complete replacement. This append-time checkpoint returns no
+   attestation or handle.
+4. Immediately before every provider request, Pi passes the exact outbound
    context through admission. This includes normal turns, retries, compaction,
    branch summaries, and contexts restored from a prior session. The adapter
-   applies any replacement and obtains a fresh handle for the newest user
-   message or tool result in that exact context.
-6. OpenShell strips the handle, resolves the supervisor-held attestation, and
-   supplies it only to the configured Egress Gate middleware stage. Egress Gate
-   verifies the latest context addition and scans the complete provider request
-   before OpenShell injects the proxy-delivered model credential.
+   applies per-entry replacements and obtains one fresh handle for the complete
+   ordered user/tool context.
+5. OpenShell keeps the signed whole-context attestation and gives Pi only the
+   opaque handle, which the adapter keeps outside Pi messages. At egress,
+   OpenShell strips the handle and supplies the attestation only to the
+   configured Egress Gate stage. Egress Gate verifies the same ordered entries
+   before and after request policy runs, before OpenShell injects the
+   proxy-delivered model credential.
 
 This division is intentional. The Pi fork contributes only reusable harness
 primitives: mandatory admission of user messages and finalized tool results,
@@ -251,10 +252,11 @@ built into Pi.
 
 The current OpenShell bridge is supervisor-owned but reachable by every process
 inside the sandbox over loopback; it does not yet authenticate the calling
-process. Receipt binding still prevents an unadmitted provider request from
-passing the egress middleware. However, OpenShell cannot prove that the
-designated harness invoked admission before changing its own local memory or
-session files. A stronger runtime needs one additional OpenShell primitive: a
+process. Whole-context attestation binding still prevents an unadmitted
+provider request from passing the egress middleware. However, OpenShell cannot
+prove that the designated harness invoked admission before changing its own
+local memory or session files. A stronger runtime needs one additional
+OpenShell primitive: a
 process-scoped admission capability, or a supervisor-owned adapter channel that
 only the designated harness can invoke.
 

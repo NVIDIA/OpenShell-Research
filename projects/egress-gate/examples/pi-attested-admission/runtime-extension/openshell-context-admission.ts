@@ -44,8 +44,16 @@ type BashEnvelope = {
 	output: string;
 	exit_code: number | null;
 };
+type ContextEntry =
+	| { role: "user"; text: string }
+	| { role: "tool"; tool_call_id: string; text: string };
+type ProviderContextEnvelope = {
+	schema_version: "openshell.pi-provider-context.v1";
+	entries: ContextEntry[];
+};
 type AdmissionEnvelope = MessageEnvelope | ToolResultEnvelope | AssistantEnvelope | BashEnvelope;
-type AdmissionHook =
+type BridgeEnvelope = AdmissionEnvelope | ProviderContextEnvelope;
+type AppendAdmissionHook =
 	| "user_message"
 	| "tool_result"
 	| "assistant_message"
@@ -53,9 +61,10 @@ type AdmissionHook =
 	| "branch_summary"
 	| "extension_message"
 	| "bash_execution";
+type AdmissionHook = AppendAdmissionHook | "provider_context";
 type BridgeResult =
 	| { decision: "deny"; reason_code?: string }
-	| { decision: "allow"; handle: string; replacement_body?: number[] };
+	| { decision: "allow"; handle?: string; replacement_body?: number[] };
 
 type SummaryMessage = AgentMessage & { summary: string };
 type CustomMessage = AgentMessage & { content: string | ContentBlock[] };
@@ -68,7 +77,7 @@ export function createOpenShellContextAdmission(
 ): ContextAdmission {
 	const handles = new Map<string, string>();
 
-	async function requestAdmission(hook: AdmissionHook, envelope: AdmissionEnvelope): Promise<BridgeResult> {
+	async function requestAdmission(hook: AdmissionHook, envelope: BridgeEnvelope): Promise<BridgeResult> {
 		const requestBody = new TextEncoder().encode(canonicalJson(envelope));
 		if (requestBody.byteLength > MAX_ADMISSION_BYTES) {
 			throw new Error("OpenShell admission request is too large");
@@ -107,38 +116,34 @@ export function createOpenShellContextAdmission(
 			? parseReplacement(prepared.hook, new Uint8Array(result.replacement_body))
 			: prepared.envelope;
 		const admittedMessage = applyReplacement(message, meta.origin, admittedEnvelope);
-		if (meta.origin === "user" || meta.origin === "tool_result") {
-			rememberHandle(handles, messageKey(admittedMessage), result.handle);
-		}
 		return result.replacement_body ? { action: "allow", message: admittedMessage } : { action: "allow" };
 	}
 
 	return {
 		admitMessage,
 		async admitProviderContext(context) {
-			for (let index = context.messages.length - 1; index >= 0; index -= 1) {
-				const message = context.messages[index];
-				if (message.role !== "user" && message.role !== "toolResult") continue;
-				const origin = message.role === "user" ? "user" : "tool_result";
-				const result = await admitMessage(message, { origin });
-				if (result.action === "deny") return result;
-				if (!result.message) return { action: "allow" };
-				const messages = [...context.messages];
-				messages[index] = result.message;
-				return { action: "allow", context: { ...context, messages } };
+			const envelope = providerContextEnvelope(context);
+			if (!envelope) {
+				return { action: "deny", reason: "Image inputs are not supported by OpenShell admission" };
 			}
-			return { action: "deny", reason: "Provider context has no user message or tool result to admit" };
+			const result = await requestAdmission("provider_context", envelope);
+			if (result.decision === "deny") return denied(result.reason_code);
+			if (!result.handle) throw new Error("OpenShell admission returned no provider-context handle");
+			const admittedEnvelope = result.replacement_body
+				? parseProviderContextReplacement(new Uint8Array(result.replacement_body), envelope)
+				: envelope;
+			const admittedContext = applyProviderContextReplacement(context, admittedEnvelope.entries);
+			rememberHandle(handles, contextKey(admittedEnvelope), result.handle);
+			return result.replacement_body ? { action: "allow", context: admittedContext } : { action: "allow" };
 		},
 		async transformProviderHeaders(headers: ProviderHeaders, context: Context) {
 			if (Object.keys(headers).some((name) => name.toLowerCase() === HANDLE_HEADER)) {
 				throw new Error("OpenShell admission handle header is reserved");
 			}
-			for (let index = context.messages.length - 1; index >= 0; index -= 1) {
-				const message = context.messages[index];
-				if (message.role !== "user" && message.role !== "toolResult") continue;
-				const handle = handles.get(messageKey(message));
-				if (handle) return { ...headers, [HANDLE_HEADER]: handle };
-			}
+			const envelope = providerContextEnvelope(context);
+			if (!envelope) throw new Error("Image inputs are not supported by OpenShell admission");
+			const handle = handles.get(contextKey(envelope));
+			if (handle) return { ...headers, [HANDLE_HEADER]: handle };
 			throw new Error("OpenShell admission handle is missing for the outbound context");
 		},
 	};
@@ -147,7 +152,7 @@ export function createOpenShellContextAdmission(
 function envelopeForMessage(
 	message: AgentMessage,
 	origin: MessageOrigin,
-): { hook: AdmissionHook; envelope: AdmissionEnvelope } | undefined {
+): { hook: AppendAdmissionHook; envelope: AdmissionEnvelope } | undefined {
 	switch (origin) {
 		case "user": {
 			if (message.role !== "user") throw new Error("Pi admission origin does not match the message");
@@ -268,11 +273,57 @@ function replaceTextContent(content: string | ContentBlock[], text: string): str
 	return typeof content === "string" ? text : [{ type: "text", text }];
 }
 
-function messageKey(message: AgentMessage): string {
-	const origin = message.role === "user" ? "user" : "tool_result";
-	const prepared = envelopeForMessage(message, origin);
-	if (!prepared) throw new Error("Image inputs are not supported by OpenShell admission");
-	return createHash("sha256").update(canonicalJson(prepared.envelope)).digest("hex");
+function providerContextEnvelope(context: Context): ProviderContextEnvelope | undefined {
+	const entries: ContextEntry[] = [];
+	for (const message of context.messages) {
+		if (message.role === "user") {
+			const text = textContent(message.content);
+			if (text === undefined) return undefined;
+			entries.push({ role: "user", text });
+		} else if (message.role === "toolResult") {
+			const text = textBlocks(message.content);
+			if (text === undefined) return undefined;
+			entries.push({
+				role: "tool",
+				tool_call_id: message.toolCallId.split("|", 1)[0],
+				text: text || "(no tool output)",
+			});
+		}
+	}
+	if (entries.length === 0) throw new Error("Provider context has no user message or tool result to admit");
+	return { schema_version: "openshell.pi-provider-context.v1", entries };
+}
+
+function textContent(content: string | ContentBlock[]): string | undefined {
+	if (typeof content === "string") return content;
+	return textBlocks(content);
+}
+
+function textBlocks(content: ContentBlock[]): string | undefined {
+	if (content.some((block) => block.type === "image")) return undefined;
+	return content.map((block) => (block as TextContent).text).join("\n");
+}
+
+function applyProviderContextReplacement(context: Context, entries: ContextEntry[]): Context {
+	let entryIndex = 0;
+	const messages = context.messages.map((message) => {
+		if (message.role !== "user" && message.role !== "toolResult") return message;
+		const entry = entries[entryIndex++];
+		if (message.role === "user") {
+			if (entry.role !== "user") throw new Error("OpenShell admission changed provider-context structure");
+			return { ...message, content: replaceTextContent(message.content, entry.text) };
+		}
+		if (entry.role !== "tool" || entry.tool_call_id !== message.toolCallId.split("|", 1)[0]) {
+			throw new Error("OpenShell admission changed provider-context structure");
+		}
+		return { ...message, content: [{ type: "text" as const, text: entry.text }] };
+	});
+	if (entryIndex !== entries.length) throw new Error("OpenShell admission changed provider-context structure");
+	return { ...context, messages };
+}
+
+function contextKey(envelope: ProviderContextEnvelope): string {
+	return createHash("sha256").update(canonicalJson(envelope.entries)).digest("hex");
 }
 
 function canonicalJson(value: unknown): string {
@@ -310,7 +361,10 @@ function parseBridgeResult(value: unknown): BridgeResult {
 	if (value.decision === "deny") {
 		return { decision: "deny", reason_code: typeof value.reason_code === "string" ? value.reason_code : undefined };
 	}
-	if (typeof value.handle !== "string" || !value.handle || value.handle.length > 1024) {
+	if (
+		value.handle !== undefined &&
+		(typeof value.handle !== "string" || !value.handle || value.handle.length > 1024)
+	) {
 		throw new Error("OpenShell admission returned an invalid handle");
 	}
 	if (
@@ -322,7 +376,39 @@ function parseBridgeResult(value: unknown): BridgeResult {
 	return { decision: "allow", handle: value.handle, replacement_body: value.replacement_body };
 }
 
-function parseReplacement(hook: AdmissionHook, body: Uint8Array): AdmissionEnvelope {
+function parseProviderContextReplacement(
+	body: Uint8Array,
+	original: ProviderContextEnvelope,
+): ProviderContextEnvelope {
+	const value: unknown = JSON.parse(new TextDecoder().decode(body));
+	if (
+		!isRecord(value) ||
+		value.schema_version !== "openshell.pi-provider-context.v1" ||
+		!Array.isArray(value.entries) ||
+		value.entries.length !== original.entries.length
+	) {
+		throw new Error("OpenShell admission returned an invalid provider-context replacement");
+	}
+	const entries = value.entries.map((entry, index): ContextEntry => {
+		const expected = original.entries[index];
+		if (!isRecord(entry) || entry.role !== expected.role || typeof entry.text !== "string") {
+			throw new Error("OpenShell admission changed provider-context structure");
+		}
+		if (entry.role === "user" && entry.tool_call_id === undefined) return { role: "user", text: entry.text };
+		if (
+			entry.role === "tool" &&
+			typeof entry.tool_call_id === "string" &&
+			expected.role === "tool" &&
+			entry.tool_call_id === expected.tool_call_id
+		) {
+			return { role: "tool", tool_call_id: entry.tool_call_id, text: entry.text };
+		}
+		throw new Error("OpenShell admission changed provider-context structure");
+	});
+	return { schema_version: "openshell.pi-provider-context.v1", entries };
+}
+
+function parseReplacement(hook: AppendAdmissionHook, body: Uint8Array): AdmissionEnvelope {
 	const value: unknown = JSON.parse(new TextDecoder().decode(body));
 	if (!isRecord(value)) throw new Error("OpenShell admission returned an invalid replacement");
 	switch (hook) {

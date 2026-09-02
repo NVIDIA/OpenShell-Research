@@ -18,9 +18,9 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 )
 from pydantic import Field, ValidationError
 
-from egress_gate.admission.adapters import AttestedCandidate
 from egress_gate.admission.canonical import canonical_json_bytes
 from egress_gate.admission.models import (
+    AdmissionHook,
     AdmissionProvenance,
     HarnessAdmissionContext,
 )
@@ -28,23 +28,15 @@ from egress_gate.base import StrictDomainModel
 from egress_gate.string_validators import BoundedMetadataString, ScalarString
 
 
-class AgentAttestationClaimsV1(StrictDomainModel):
-    """Supervisor-only proof that the latest context addition was admitted."""
+class AgentAttestationClaimsV2(StrictDomainModel):
+    """Supervisor-only proof that one complete provider context was admitted."""
 
-    attestation_version: Literal["agent-attestation.v1"] = "agent-attestation.v1"
+    attestation_version: Literal["agent-attestation.v2"] = "agent-attestation.v2"
     canonicalization_version: Literal["canonical-json.v1"] = "canonical-json.v1"
     harness: ScalarString
     harness_version: Literal["sdk-v1"]
     harness_schema: ScalarString
-    hook: Literal[
-        "user_message",
-        "tool_result",
-        "assistant_message",
-        "compaction_summary",
-        "branch_summary",
-        "extension_message",
-        "bash_execution",
-    ]
+    hook: Literal["provider_context"]
     middleware_binding: BoundedMetadataString
     policy_fingerprint: ScalarString
     sandbox_id: BoundedMetadataString
@@ -54,7 +46,9 @@ class AgentAttestationClaimsV1(StrictDomainModel):
     provider_adapter_schema: Literal["openai.request.v1"]
     host: ScalarString
     port: int = Field(ge=0, le=2**32 - 1)
-    candidate_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    subject_kind: Literal["context"] = "context"
+    subject_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    entry_count: int = Field(ge=1)
     issued_at: int = Field(ge=0)
     expires_at: int = Field(ge=0)
     key_id: str = Field(pattern=r"^[0-9a-f]{16}$")
@@ -96,7 +90,8 @@ class ReceiptAuthority:
 
     def issue_attestation(
         self,
-        candidate: AttestedCandidate,
+        subject_hash: str,
+        entry_count: int,
         context: HarnessAdmissionContext,
         provenance: AdmissionProvenance,
         *,
@@ -104,11 +99,14 @@ class ReceiptAuthority:
         now: int | None = None,
     ) -> bytes:
         """Issue a retry-safe proof retained by the OpenShell supervisor."""
-        if context.harness_version != "sdk-v1":
+        if (
+            context.harness_version != "sdk-v1"
+            or context.hook is not AdmissionHook.PROVIDER_CONTEXT
+        ):
             raise ValueError("agent attestation context is unsupported")
         issued_at = _now_seconds() if now is None else now
         target = context.provider_target
-        claims = AgentAttestationClaimsV1(
+        claims = AgentAttestationClaimsV2(
             harness=context.harness,
             harness_version=context.harness_version,
             harness_schema=context.schema_version,
@@ -122,34 +120,36 @@ class ReceiptAuthority:
             provider_adapter_schema=context.provider_adapter_schema,
             host=target.host,
             port=target.port,
-            candidate_hash=_candidate_hash(candidate),
+            subject_hash=subject_hash,
+            entry_count=entry_count,
             issued_at=issued_at,
             expires_at=issued_at + self._attestation_lifetime_seconds,
             key_id=self._key_id,
         )
         payload = canonical_json_bytes(claims)
         signature = self._private_key.sign(payload)
-        return b"ag1." + _encode(payload) + b"." + _encode(signature)
+        return b"ag2." + _encode(payload) + b"." + _encode(signature)
 
     def verify_attestation(
         self,
         attestation: bytes,
-        candidate: AttestedCandidate,
+        subject_hash: str,
+        entry_count: int,
         context: HarnessAdmissionContext,
         *,
         policy_fingerprint: str,
         now: int | None = None,
-    ) -> AgentAttestationClaimsV1:
-        """Verify a supervisor-supplied context-addition attestation."""
+    ) -> AgentAttestationClaimsV2:
+        """Verify a supervisor-supplied provider-context attestation."""
         payload, signature = _decode_token(
-            attestation, prefix=b"ag1", malformed_reason="attestation_malformed"
+            attestation, prefix=b"ag2", malformed_reason="attestation_malformed"
         )
         try:
             self._public_key.verify(signature, payload)
         except InvalidSignature:
             raise ReceiptVerificationError("attestation_signature_invalid") from None
         try:
-            claims = AgentAttestationClaimsV1.model_validate_json(payload, strict=True)
+            claims = AgentAttestationClaimsV2.model_validate_json(payload, strict=True)
         except ValidationError:
             raise ReceiptVerificationError("attestation_malformed") from None
         if canonical_json_bytes(claims) != payload:
@@ -173,7 +173,6 @@ class ReceiptAuthority:
             context.provider_adapter_schema,
             target.host,
             target.port,
-            _candidate_hash(candidate),
         )
         actual = (
             claims.harness,
@@ -186,15 +185,14 @@ class ReceiptAuthority:
             claims.provider_adapter_schema,
             claims.host,
             claims.port,
-            claims.candidate_hash,
         )
         if actual != expected:
             raise ReceiptVerificationError("attestation_context_mismatch")
+        if claims.entry_count != entry_count:
+            raise ReceiptVerificationError("entry_count_mismatch")
+        if claims.subject_hash != subject_hash:
+            raise ReceiptVerificationError("context_hash_mismatch")
         return claims
-
-
-def _candidate_hash(candidate: AttestedCandidate) -> str:
-    return hashlib.sha256(canonical_json_bytes(candidate)).hexdigest()
 
 
 def _encode(value: bytes) -> bytes:
@@ -228,7 +226,7 @@ def _now_seconds() -> int:
 
 
 __all__ = [
-    "AgentAttestationClaimsV1",
+    "AgentAttestationClaimsV2",
     "ReceiptAuthority",
     "ReceiptVerificationError",
 ]

@@ -156,6 +156,7 @@ def test_managed_manifest_advertises_every_pi_admission_binding() -> None:
         ("pi", "tool_result", "openshell.pi-tool-result.v1"),
         ("pi", "assistant_message", "openshell.pi-assistant-message.v1"),
         ("pi", "bash_execution", "openshell.pi-bash-execution.v1"),
+        ("pi", "provider_context", "openshell.pi-provider-context.v1"),
     ]
 
 

@@ -25,6 +25,7 @@ from egress_gate.admission import (
     PiAssistantToolCallV1,
     PiBashExecutionV1,
     PiMessageV1,
+    PiProviderContextV1,
     PiTextContentV1,
     PiToolResultV1,
     ReceiptAuthority,
@@ -43,6 +44,9 @@ _PI_RESPONSES_FIXTURES = json.loads(
 )
 _PI_CHAT_FIXTURES = json.loads(
     (Path(__file__).parent / "fixtures/pi-openai-completions.json").read_text()
+)
+_CONTEXT_ENTRY_VECTORS = json.loads(
+    (Path(__file__).parent / "fixtures/context-entries.json").read_text()
 )
 # These payloads were captured at Pi's fake-fetch boundary from its native
 # openai-responses and openai-completions stream functions. They intentionally
@@ -147,6 +151,7 @@ def _context(
         AdmissionHook.TOOL_RESULT: "openshell.pi-tool-result.v1",
         AdmissionHook.ASSISTANT_MESSAGE: "openshell.pi-assistant-message.v1",
         AdmissionHook.BASH_EXECUTION: "openshell.pi-bash-execution.v1",
+        AdmissionHook.PROVIDER_CONTEXT: "openshell.pi-provider-context.v1",
     }[hook]
     return HarnessAdmissionContext(
         request_id="admission-1",
@@ -163,7 +168,13 @@ def _context(
 
 def _admit(
     processor: HarnessAdmissionProcessor,
-    value: PiMessageV1 | PiToolResultV1 | PiAssistantMessageV1 | PiBashExecutionV1,
+    value: (
+        PiMessageV1
+        | PiToolResultV1
+        | PiAssistantMessageV1
+        | PiBashExecutionV1
+        | PiProviderContextV1
+    ),
     *,
     target: HttpTarget | None = None,
     timeout: Timeout | None = None,
@@ -179,6 +190,8 @@ def _admit(
         hook = AdmissionHook.TOOL_RESULT
     elif isinstance(value, PiAssistantMessageV1):
         hook = AdmissionHook.ASSISTANT_MESSAGE
+    elif isinstance(value, PiProviderContextV1):
+        hook = AdmissionHook.PROVIDER_CONTEXT
     else:
         hook = AdmissionHook.BASH_EXECUTION
     return processor.process(
@@ -332,35 +345,25 @@ def _egress(
     )
 
 
-def test_user_attestation_authorizes_retries_without_entering_request_headers() -> None:
+def _admit_provider_request(
+    admission: HarnessAdmissionProcessor,
+    request: HttpRequest,
+):
+    registry = create_provider_adapter_registry()
+    adapter = registry.resolve_request(request, Timeout.from_seconds(1))
+    return _admit(
+        admission,
+        PiProviderContextV1(
+            schema_version="openshell.pi-provider-context.v1",
+            entries=adapter.attested_entries(request, Timeout.from_seconds(1)),
+        ),
+        target=request.target,
+    )
+
+
+@pytest.mark.parametrize("fixture_name", ["opus", "qwen", "compaction_summary"])
+def test_complete_pi_chat_context_is_attested(fixture_name: str) -> None:
     admission, egress, _ = _processors()
-    admitted = _admit(admission, _user("safe rendered prompt"))
-
-    assert admitted.decision is AdmissionDecision.ALLOW
-    assert admitted.attestation is not None
-    request = _provider_request("safe rendered prompt")
-    first = _egress(egress, request, admitted.attestation)
-    retry = _egress(egress, request, admitted.attestation)
-
-    assert first.decision.value == "allow"
-    assert retry.decision.value == "allow"
-    assert first.request_mutations.header_mutations == ()
-
-
-@pytest.mark.parametrize(
-    ("fixture_name", "candidate"),
-    [
-        ("opus", _tool_result("safe tool output")),
-        ("qwen", _tool_result("safe tool output")),
-        ("compaction_summary", _user("Summary:\ncompacted context")),
-    ],
-)
-def test_configured_pi_chat_serializations_are_attested(
-    fixture_name: str, candidate: PiMessageV1 | PiToolResultV1
-) -> None:
-    admission, egress, _ = _processors()
-    admitted = _admit(admission, candidate)
-    assert admitted.attestation is not None
     request = _provider_request("safe").model_copy(
         update={
             "body": json.dumps(
@@ -371,54 +374,104 @@ def test_configured_pi_chat_serializations_are_attested(
             ).encode()
         }
     )
+    admitted = _admit_provider_request(admission, request)
 
     result = _egress(egress, request, admitted.attestation)
 
+    assert admitted.attestation is not None
+    assert admitted.attestation.startswith(b"ag2.")
     assert result.decision.value == "allow"
 
 
-def test_user_attestation_authorizes_responses_requests_and_retries() -> None:
+def test_provider_adapters_match_shared_context_entry_vectors() -> None:
+    expected = PiProviderContextV1.model_validate(
+        {
+            "schema_version": "openshell.pi-provider-context.v1",
+            "entries": _CONTEXT_ENTRY_VECTORS["cases"][0]["entries"],
+        },
+        strict=True,
+    ).entries
+    messages = [{"role": "system", "content": "system"}]
+    responses_input = [{"role": "developer", "content": "system"}]
+    for entry in expected:
+        if entry.role == "user":
+            messages.append({"role": "user", "content": entry.text})
+            responses_input.append({"role": "user", "content": entry.text})
+        else:
+            messages.append(
+                {
+                    "role": "tool",
+                    "content": entry.text,
+                    "tool_call_id": entry.tool_call_id,
+                }
+            )
+            responses_input.append(
+                {
+                    "type": "function_call_output",
+                    "call_id": entry.tool_call_id,
+                    "output": entry.text,
+                }
+            )
+    chat_body = json.loads(json.dumps(_PI_CHAT_FIXTURES["user_request"]))
+    chat_body["messages"] = messages
+    chat = _provider_request("unused").model_copy(
+        update={"body": json.dumps(chat_body, separators=(",", ":")).encode()}
+    )
+    responses_body = json.loads(json.dumps(_PI_RESPONSES_FIXTURES["user_request"]))
+    responses_body["input"] = responses_input
+    responses = _responses_request("unused").model_copy(
+        update={"body": json.dumps(responses_body, separators=(",", ":")).encode()}
+    )
+    registry = create_provider_adapter_registry()
+
+    assert (
+        registry.resolve_request(chat, Timeout.from_seconds(1)).attested_entries(
+            chat, Timeout.from_seconds(1)
+        )
+        == expected
+    )
+    assert (
+        registry.resolve_request(responses, Timeout.from_seconds(1)).attested_entries(
+            responses, Timeout.from_seconds(1)
+        )
+        == expected
+    )
+
+
+def test_complete_responses_context_authorizes_retries() -> None:
     admission, egress, _ = _processors()
-    admitted = _admit(admission, _user("safe"))
-    assert admitted.attestation is not None
-    request = _responses_request("safe")
+    request = _responses_request("use the tool", tool_result="safe tool output")
+    admitted = _admit_provider_request(admission, request)
 
     first = _egress(egress, request, admitted.attestation)
     retry = _egress(egress, request, admitted.attestation)
 
+    assert admitted.attestation is not None
     assert first.decision.value == "allow"
     assert retry.decision.value == "allow"
 
 
-def test_changed_responses_context_fails_closed() -> None:
-    admission, egress, _ = _processors()
-    admitted = _admit(admission, _user("safe"))
-    assert admitted.attestation is not None
-
-    result = _egress(egress, _responses_request("changed prompt"), admitted.attestation)
-
-    assert result.reason_code == "attestation_context_mismatch"
-
-
 @pytest.mark.parametrize(
-    "mutation",
+    ("mutation", "reason_code"),
     [
-        lambda body: body.update({"messages": []}),
-        lambda body: body.update({"unknown_replay_field": "value"}),
-        lambda body: body["input"].append(
-            {"role": "user", "content": [{"type": "input_image"}]}
+        (
+            lambda body: body["messages"][1].update({"content": "changed prompt"}),
+            "context_hash_mismatch",
         ),
-        lambda body: body.pop("max_output_tokens"),
+        (
+            lambda body: body["messages"].append({"role": "user", "content": "extra"}),
+            "entry_count_mismatch",
+        ),
+        (lambda body: body["messages"].pop(), "entry_count_mismatch"),
     ],
 )
-def test_mixed_or_malformed_responses_shapes_fail_closed(mutation) -> None:
+def test_chat_context_tampering_is_denied(mutation, reason_code: str) -> None:
     admission, egress, _ = _processors()
-    admitted = _admit(admission, _user("safe"))
-    assert admitted.attestation is not None
-    request = _responses_request("safe")
+    request = _provider_request("use the tool", tool_result="safe tool output")
+    admitted = _admit_provider_request(admission, request)
     body = json.loads(request.body)
     mutation(body)
-    malformed = request.model_copy(
+    changed = request.model_copy(
         update={
             "body": json.dumps(
                 body,
@@ -429,55 +482,56 @@ def test_mixed_or_malformed_responses_shapes_fail_closed(mutation) -> None:
         }
     )
 
-    result = _egress(egress, malformed, admitted.attestation)
+    result = _egress(egress, changed, admitted.attestation)
 
-    assert result.reason_code == "provider_shape_unsupported"
+    assert result.reason_code == reason_code
 
 
-def test_tool_result_attestation_authorizes_responses_call_id_projection() -> None:
+def test_responses_earlier_entry_tampering_is_denied() -> None:
     admission, egress, _ = _processors()
-    admitted = _admit(
-        admission,
-        _tool_result("safe tool output", tool_call_id="call-1|fc-1"),
-    )
-    assert admitted.attestation is not None
+    request = _responses_request("use the tool", tool_result="safe tool output")
+    admitted = _admit_provider_request(admission, request)
 
     result = _egress(
         egress,
-        _responses_request("use the tool", tool_result="safe tool output"),
+        _responses_request("changed prompt", tool_result="safe tool output"),
         admitted.attestation,
     )
 
-    assert result.decision.value == "allow"
+    assert result.reason_code == "context_hash_mismatch"
 
 
-def test_changed_or_unattested_user_context_fails_closed() -> None:
+def test_provider_context_redaction_binds_only_the_replacement() -> None:
     admission, egress, _ = _processors()
-    admitted = _admit(admission, _user("safe rendered prompt"))
+    original = _provider_request(f"hide {REDACT_TEXT} please")
+    admitted = _admit_provider_request(admission, original)
+
+    assert admitted.decision is AdmissionDecision.REPLACE
     assert admitted.attestation is not None
+    assert admitted.replacement_body is not None
+    replacement = PiProviderContextV1.model_validate_json(
+        admitted.replacement_body, strict=True
+    )
+    replaced = _provider_request(replacement.entries[0].text)
 
-    changed = _egress(egress, _provider_request("changed prompt"), admitted.attestation)
-    missing = _egress(egress, _provider_request("safe rendered prompt"), None)
+    assert _egress(egress, replaced, admitted.attestation).decision.value == "allow"
+    assert (
+        _egress(egress, original, admitted.attestation).reason_code
+        == "context_hash_mismatch"
+    )
 
-    assert changed.reason_code == "attestation_context_mismatch"
-    assert missing.reason_code == "attestation_missing"
+
+def test_restored_context_with_denied_text_is_blocked_at_send_time() -> None:
+    admission, _, _ = _processors()
+
+    denied = _admit_provider_request(admission, _provider_request(DENY_TEXT))
+
+    assert denied.decision is AdmissionDecision.DENY
+    assert denied.reason_code == "egress_gate_regex_denied"
 
 
 def test_attestation_uses_stable_destination_across_tls_proxy_normalization() -> None:
     admission, egress, _ = _processors()
-    admitted = _admit(
-        admission,
-        _user("safe"),
-        target=HttpTarget(
-            scheme="https",
-            host="provider.test",
-            port=443,
-            method="POST",
-            path="",
-            query="",
-        ),
-    )
-    assert admitted.attestation is not None
     normalized = HttpTarget(
         scheme="http",
         host="provider.test",
@@ -486,12 +540,10 @@ def test_attestation_uses_stable_destination_across_tls_proxy_normalization() ->
         path="/v1/chat/completions",
         query="",
     )
+    request = _provider_request("safe", target=normalized)
+    admitted = _admit_provider_request(admission, request)
 
-    allowed = _egress(
-        egress,
-        _provider_request("safe", target=normalized),
-        admitted.attestation,
-    )
+    allowed = _egress(egress, request, admitted.attestation)
     wrong_host = _egress(
         egress,
         _provider_request(
@@ -504,53 +556,13 @@ def test_attestation_uses_stable_destination_across_tls_proxy_normalization() ->
     assert wrong_host.reason_code == "attestation_context_mismatch"
 
 
-def test_user_redaction_attests_only_the_replacement() -> None:
-    admission, egress, _ = _processors()
-    admitted = _admit(admission, _user(f"hide {REDACT_TEXT} please"))
+def test_append_time_allow_returns_no_attestation() -> None:
+    admission, _, _ = _processors()
 
-    assert admitted.decision is AdmissionDecision.REPLACE
-    assert admitted.attestation is not None
-    assert admitted.replacement_body is not None
-    replacement = PiMessageV1.model_validate_json(
-        admitted.replacement_body, strict=True
-    ).text
-
-    assert replacement == "hide [REDACTED] please"
-    assert (
-        _egress(
-            egress, _provider_request(replacement), admitted.attestation
-        ).decision.value
-        == "allow"
-    )
-    assert (
-        _egress(
-            egress,
-            _provider_request(f"hide {REDACT_TEXT} please"),
-            admitted.attestation,
-        ).reason_code
-        == "attestation_context_mismatch"
-    )
-
-
-def test_tool_result_is_admitted_before_persistence_and_attested_at_egress() -> None:
-    admission, egress, _ = _processors()
-    admitted = _admit(admission, _tool_result("safe tool output"))
+    admitted = _admit(admission, _user("safe"))
 
     assert admitted.decision is AdmissionDecision.ALLOW
-    assert admitted.attestation is not None
-    matching = _egress(
-        egress,
-        _provider_request("inspect", tool_result="safe tool output"),
-        admitted.attestation,
-    )
-    changed = _egress(
-        egress,
-        _provider_request("inspect", tool_result="changed tool output"),
-        admitted.attestation,
-    )
-
-    assert matching.decision.value == "allow"
-    assert changed.reason_code == "attestation_context_mismatch"
+    assert admitted.attestation is None
 
 
 def test_tool_result_denial_redaction_and_images_fail_closed() -> None:
@@ -765,9 +777,8 @@ def test_malformed_duplicate_and_expired_admission_fail_closed() -> None:
 
 def test_provider_shape_validation_and_optional_reasoning_field_are_preserved() -> None:
     admission, egress, _ = _processors()
-    admitted = _admit(admission, _user("safe"))
-    assert admitted.attestation is not None
     request = _provider_request("safe")
+    admitted = _admit_provider_request(admission, request)
     malformed = request.model_copy(update={"body": b"{"})
     provider_body = json.loads(request.body)
     provider_body["reasoning_effort"] = "medium"
@@ -799,9 +810,8 @@ def test_provider_shape_validation_and_optional_reasoning_field_are_preserved() 
 )
 def test_mixed_or_null_chat_compatibility_fields_fail_closed(mutation) -> None:
     admission, egress, _ = _processors()
-    admitted = _admit(admission, _user("safe"))
-    assert admitted.attestation is not None
     request = _provider_request("safe")
+    admitted = _admit_provider_request(admission, request)
     body = json.loads(request.body)
     mutation(body)
     malformed = request.model_copy(
@@ -829,9 +839,11 @@ def test_mixed_or_null_chat_compatibility_fields_fail_closed(mutation) -> None:
 )
 def test_qwen_replay_fields_fail_closed_unless_explicitly_supported(mutation) -> None:
     admission, egress, _ = _processors()
-    admitted = _admit(admission, _tool_result("safe tool output"))
-    assert admitted.attestation is not None
     body = json.loads(json.dumps(_PI_CHAT_FIXTURES["qwen"]))
+    original = _provider_request("unused").model_copy(
+        update={"body": json.dumps(body, separators=(",", ":")).encode()}
+    )
+    admitted = _admit_provider_request(admission, original)
     mutation(body)
     request = _provider_request("unused").model_copy(
         update={"body": json.dumps(body, separators=(",", ":")).encode()}
@@ -844,12 +856,11 @@ def test_qwen_replay_fields_fail_closed_unless_explicitly_supported(mutation) ->
 
 def test_workload_receipt_header_is_reserved_in_managed_flow() -> None:
     admission, egress, _ = _processors()
-    admitted = _admit(admission, _user("safe"))
-    assert admitted.attestation is not None
     request = _provider_request(
         "safe",
         headers=(HttpHeader(name=RECEIPT_HEADER, value="eg1.untrusted"),),
     )
+    admitted = _admit_provider_request(admission, request)
 
     result = _egress(egress, request, admitted.attestation)
 
