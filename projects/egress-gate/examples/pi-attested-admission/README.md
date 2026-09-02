@@ -268,6 +268,11 @@ compaction, branch summaries, and restored sessions using the OpenAI Chat
 Completions and Responses wire formats. Image inputs are outside this example's
 current scope and fail closed.
 
+Provider-context admission runs before Pi's transport-specific history
+rewrites. Switching transports with existing tool history or sending orphaned
+tool calls may therefore fail closed. Start a fresh session when switching
+transports, and complete each tool-call/result sequence before sending.
+
 ## Cleanup
 
 Exit Pi, but leave the OpenShell gateway running while cleanup deletes the
