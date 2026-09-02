@@ -91,7 +91,9 @@ To use another catalog for the same endpoint, copy `models.json`, edit it using
 Pi's documented JSON format, and set `PI_MODELS_PATH` to that file. OpenShell
 pins network and credential access independently of Pi. To change endpoints,
 update the matching host and port explicitly in `models.json`, `policy.yaml`,
-and `provider-profile.yaml`.
+and `provider-profile.yaml`. The automated `verify` cases target the checked-in
+NVIDIA endpoint and model catalog; the script does not parse arbitrary catalogs
+to adapt those checks.
 
 `EGRESS_GATE_HOST_IP` is the address OpenShell uses to reach Egress Gate on this
 machine. It must be a reachable, non-loopback IPv4 address; do not use
@@ -248,8 +250,10 @@ messages, and bash executions. `launch` preserves the history; `reset` and
    them to JavaScript for the sandbox. Pi otherwise starts normally, including
    standard project and user extension discovery.
 2. Pi calls that boundary before each supported message reaches live or
-   persisted history. Assistant output is admitted when the complete assistant
-   message is finalized, after streamed output has already been displayed.
+   persisted history. Assistant text and tool calls are admitted when the
+   assistant message is finalized, after streamed output has already been
+   displayed. Assistant thinking is outside this append-time envelope; request
+   policy scans it at egress, but the context attestation does not hash it.
 3. OpenShell gives the launched runtime an inherited descriptor containing its
    per-exec bridge token. The launcher reads and closes the descriptor and
    deletes its environment name before Pi or its extensions start. The external
