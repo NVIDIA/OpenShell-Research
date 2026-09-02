@@ -31,8 +31,8 @@
     <table>
       <thead><tr><th>Repository</th><th>Integration head</th><th>Upstream base</th></tr></thead>
       <tbody>
-        <tr><td>Pi</td><td><code>abb462d677fa1039a68518deb5b8d998ca0b0a28</code></td><td><code>e266507b606b9552fa277252644054afd4384b11</code></td></tr>
-        <tr><td>OpenShell</td><td><code>25fb8a635c6df749cab50b73270dc30ebbef5c8e</code></td><td><code>a6b757d35f983fe4415427484ad06533d32e9e4b</code></td></tr>
+        <tr><td>Pi</td><td><code>177b42723d072b7954a5b1690ccf62c97f075b37</code></td><td><code>e266507b606b9552fa277252644054afd4384b11</code></td></tr>
+        <tr><td>OpenShell</td><td><code>abf1a6253009c78196d8fe4fb560590453216f04</code></td><td><code>a6b757d35f983fe4415427484ad06533d32e9e4b</code></td></tr>
         <tr><td>OpenShell Research</td><td><code>4d99082b199b07136a9c93558d95c73d07b929d8</code> (pre-report)</td><td><code>743839dae47621c13a3bc339bad2a2c8d0167591</code></td></tr>
       </tbody>
     </table>
@@ -41,10 +41,10 @@
     <table>
       <thead><tr><th>Repository</th><th>Result</th></tr></thead>
       <tbody>
-        <tr><td>Pi</td><td><span class="pass">Focused suites passed:</span> agent 24/24 and coding-agent 51/51. <code>npm run check</code> passed its preliminary gates and reported only unchanged upstream <code>packages/ai</code> catalog TypeScript drift.</td></tr>
-        <tr><td>OpenShell</td><td><span class="pass">Passed:</span> pre-commit, test, and the Phase 4 Docker end-to-end lane. <code>mise run ci</code> reported only the known existing Go converter coverage gap for <code>ProviderProfileCredential.delivery</code>.</td></tr>
+        <tr><td>Pi</td><td><span class="pass">Focused suite passed:</span> 38/38 after the assistant atomic-deny fix. <code>npm run check</code> passed its preliminary gates and reported only unchanged upstream <code>packages/ai</code> catalog TypeScript drift.</td></tr>
+        <tr><td>OpenShell</td><td><span class="pass">Passed:</span> pre-commit and the full <code>mise run go:ci</code> suite after the provider-profile delivery round-trip fix. The Phase 4 Docker end-to-end lane passed on the parent integration head.</td></tr>
         <tr><td>OpenShell Research</td><td><span class="pass">Passed:</span> <code>make check</code> and <code>make check-py311</code>, 377/377 tests in each environment after the upstream merge, plus formatting, lint, typing, dependency audit, 11/11 documentation-renderer tests, the clean strict documentation build, and an HTTP 200 artifact preview.</td></tr>
-        <tr><td>Independent review</td><td><span class="pass">Pi and OpenShell clean:</span> no blocker, high, or medium findings at either integration head. Final Research merge-head review was still pending when this report was prepared; earlier Research phase reviews were clean after their findings were resolved.</td></tr>
+        <tr><td>Independent review</td><td><span class="pass">Parent Pi and OpenShell heads clean:</span> no blocker, high, or medium findings. Review of the final narrow fixes and the final Research head was still pending when this report was prepared.</td></tr>
       </tbody>
     </table>
 
