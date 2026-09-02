@@ -898,8 +898,6 @@ def _parse_pi_assistant_message(body: bytes, timeout: Timeout) -> PiAssistantMes
         parsed = _PI_ASSISTANT_MESSAGE_ADAPTER.validate_python(value, strict=True)
     except ValidationError:
         raise AdmissionShapeError("Pi assistant-message body is unsupported") from None
-    if canonical_json_bytes(parsed) != body:
-        raise AdmissionShapeError("Pi assistant-message body is not canonical JSON")
     return parsed
 
 
