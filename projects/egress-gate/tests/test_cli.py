@@ -104,6 +104,7 @@ def test_cli_serve_uses_one_concise_processing_timeout(
     assert "Minimum 10ms" in serve_help
     assert "RPC timeout" in serve_help
     assert "--require-agent-attestation" in serve_help
+    assert "--json-log" in serve_help
     assert "--require-" + "pi-attestation" not in serve_help
 
     evaluate_help = CliRunner().invoke(app, ["evaluate", "--help"])

@@ -573,12 +573,16 @@ async def test_result_serialization_is_bracketed_by_the_shared_timeout(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("action_kind", "expected_source"),
-    (("detect", "pipeline_default"), ("deny", "gate")),
+    ("action_kind", "expected_source", "expected_reason"),
+    (
+        ("detect", "pipeline_default", None),
+        ("deny", "gate", "egress_gate_regex_denied"),
+    ),
 )
 async def test_evaluation_log_records_decision_source(
     action_kind: str,
     expected_source: str,
+    expected_reason: str | None,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     middleware = EgressGateMiddleware(create_builtin_registry())
@@ -596,6 +600,7 @@ async def test_evaluation_log_records_decision_source(
         if item.message.startswith("egress_gate_evaluation")
     )
     assert getattr(record, "decision_source_kind", None) == expected_source
+    assert getattr(record, "reason_code", None) == expected_reason
 
 
 @pytest.mark.asyncio

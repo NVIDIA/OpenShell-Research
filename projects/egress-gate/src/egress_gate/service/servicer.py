@@ -273,12 +273,6 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
             response.findings.extend(
                 _finding_to_proto(item) for item in result.findings
             )
-            response.metadata.update(
-                {
-                    **processor.readiness,
-                    "policy_fingerprint": result.policy_fingerprint,
-                }
-            )
             return response
         except Exception:
             return pb2.AgentConversationResult(
@@ -310,6 +304,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         request_id = _request_id_for_logging(request.context.request_id)
         failure: EgressGateError | None = None
         action = "error"
+        reason_code: str | None = None
         finding_count = 0
         source_kind = "none"
         try:
@@ -319,11 +314,13 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                 timeout,
             )
             action = "allow" if response.decision == pb2.DECISION_ALLOW else "deny"
+            reason_code = response.reason_code or None
             finding_count = sum(finding.count for finding in response.findings)
             return response
         except TimeoutExpiredError:
             response = _limit_deny()
             action = "deny"
+            reason_code = response.reason_code or None
             source_kind = DecisionSourceKind.RUNTIME_LIMIT.value
             return response
         except EgressGateError as error:
@@ -335,6 +332,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                 request_id=request_id,
                 started=started,
                 action=action,
+                reason_code=reason_code,
                 finding_count=finding_count,
                 source_kind=source_kind,
                 failure=failure,
@@ -508,9 +506,11 @@ class _AbortContext(Protocol):
 
 
 class _EvaluationLogExtra(TypedDict):
+    event: str
     request_id: str
     duration_ms: float
     action: str
+    reason_code: str | None
     finding_count: int
     decision_source_kind: str
     error_code: str | None
@@ -521,14 +521,17 @@ def _evaluation_log_extra(
     request_id: str,
     started: float,
     action: str,
+    reason_code: str | None,
     finding_count: int,
     source_kind: str,
     failure: EgressGateError | None,
 ) -> _EvaluationLogExtra:
     return {
+        "event": "egress_gate_evaluation",
         "request_id": request_id,
         "duration_ms": round((time.monotonic() - started) * 1000, 3),
         "action": action,
+        "reason_code": reason_code,
         "finding_count": finding_count,
         "decision_source_kind": source_kind,
         "error_code": failure.code.value if failure is not None else None,

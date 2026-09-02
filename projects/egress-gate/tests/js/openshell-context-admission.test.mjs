@@ -49,7 +49,7 @@ describe("OpenShell context admission adapter", () => {
 			() => "session-123",
 			async (_url, init) => {
 				const request = JSON.parse(String(init?.body));
-				const requestBody = new TextDecoder().decode(new Uint8Array(request.request_body));
+				const requestBody = Buffer.from(request.request_body_b64, "base64").toString();
 				const envelope = JSON.parse(requestBody);
 				if (request.hook !== "provider_context") {
 					return new Response(JSON.stringify({ decision: "allow" }));
@@ -94,7 +94,11 @@ describe("OpenShell context admission adapter", () => {
 			() => "session-123",
 			async () =>
 				new Response(
-					JSON.stringify({ decision: "allow", handle: "replacement-handle", replacement_body: [...replacement] }),
+					JSON.stringify({
+						decision: "allow",
+						handle: "replacement-handle",
+						replacement_body_b64: Buffer.from(replacement).toString("base64"),
+					}),
 				),
 		);
 		const context = await admittedContext(admission, {
@@ -194,7 +198,7 @@ describe("OpenShell context admission adapter", () => {
 			() => "session-123",
 			async (_url, init) => {
 				const request = JSON.parse(String(init?.body));
-				const envelope = JSON.parse(new TextDecoder().decode(new Uint8Array(request.request_body)));
+				const envelope = JSON.parse(Buffer.from(request.request_body_b64, "base64").toString());
 				observed.push({ request, envelope });
 				return new Response(JSON.stringify({ decision: "allow" }));
 			},
@@ -223,13 +227,13 @@ describe("OpenShell context admission adapter", () => {
 			() => "session-123",
 			async (_url, init) => {
 				const request = JSON.parse(String(init?.body));
-				const envelope = JSON.parse(new TextDecoder().decode(new Uint8Array(request.request_body)));
+				const envelope = JSON.parse(Buffer.from(request.request_body_b64, "base64").toString());
 				if ("text" in envelope) envelope.text = "[REDACTED]";
 				if ("output" in envelope) envelope.output = "[REDACTED]";
 				return new Response(
 					JSON.stringify({
 						decision: "allow",
-						replacement_body: [...new TextEncoder().encode(JSON.stringify(envelope))],
+						replacement_body_b64: Buffer.from(JSON.stringify(envelope)).toString("base64"),
 					}),
 				);
 			},
@@ -265,7 +269,7 @@ describe("OpenShell context admission adapter", () => {
 				() => "session-123",
 				async (_url, init) => {
 					const request = JSON.parse(String(init?.body));
-					observed = JSON.parse(new TextDecoder().decode(new Uint8Array(request.request_body)));
+					observed = JSON.parse(Buffer.from(request.request_body_b64, "base64").toString());
 					return new Response(JSON.stringify({ decision: "allow", handle: "context-handle" }));
 				},
 			);

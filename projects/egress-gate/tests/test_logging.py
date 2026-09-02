@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import logging
 import re
 from collections.abc import Iterator
@@ -18,6 +19,7 @@ from egress_gate.logging import (
     DEFAULT_LOGGING_CONFIG,
     ColorMode,
     LoggingConfig,
+    configure_json_log,
     configure_logging,
     get_logger,
     reset_logging,
@@ -122,6 +124,39 @@ def test_configure_logging_accepts_native_log_levels() -> None:
         "DEBUG    | egress_gate.request_processor | processing_diagnostic"
         in stream.getvalue()
     )
+
+
+def test_configure_json_log_writes_only_content_safe_fields(tmp_path: Path) -> None:
+    path = tmp_path / "evaluations.jsonl"
+    configure_logging()
+    configure_json_log(path)
+
+    logging.getLogger("egress_gate.service").info(
+        "egress_gate_evaluation",
+        extra={
+            "event": "egress_gate_evaluation",
+            "request_id": "request-1",
+            "duration_ms": 1.25,
+            "action": "deny",
+            "reason_code": "attestation_missing",
+            "finding_count": 0,
+            "decision_source_kind": "gate",
+            "error_code": None,
+            "request_body": "must not be logged",
+        },
+    )
+
+    record = json.loads(path.read_text())
+    assert record == {
+        "event": "egress_gate_evaluation",
+        "request_id": "request-1",
+        "duration_ms": 1.25,
+        "action": "deny",
+        "reason_code": "attestation_missing",
+        "finding_count": 0,
+        "decision_source_kind": "gate",
+        "error_code": None,
+    }
 
 
 def test_configure_logging_replaces_its_previous_handler() -> None:

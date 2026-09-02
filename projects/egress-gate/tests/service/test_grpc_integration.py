@@ -195,7 +195,7 @@ async def test_generated_stub_returns_no_attestation_for_append_time_allow() -> 
     assert response.decision == pb2.DECISION_ALLOW
     assert response.attestation == b""
     assert response.has_replacement_body is False
-    assert response.metadata["admission_schema"] == "openshell.pi-message.v1"
+    assert not response.metadata
 
 
 @pytest.mark.asyncio

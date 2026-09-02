@@ -53,7 +53,15 @@ def test_pi_example_can_print_each_action_without_running_it(
             env=environment,
             text=True,
         )
-        for action in ("prepare", "serve", "gateway", "reset", "launch", "cleanup")
+        for action in (
+            "prepare",
+            "serve",
+            "gateway",
+            "reset",
+            "launch",
+            "verify",
+            "cleanup",
+        )
     ]
     output = "\n".join(result.stdout for result in results)
     normalized_output = " ".join(output.replace("\\\n", " ").split())
@@ -78,6 +86,7 @@ def test_pi_example_can_print_each_action_without_running_it(
     assert "render-runtime-config.mjs" not in output
     assert str(models_path) in output
     assert "egress-gate --debug serve" in output
+    assert "--json-log" in output
     assert "CARGO_BUILD_JOBS=4" in output
     assert "OPENSHELL_GATEWAY_NAME=pi-egress-demo-gateway" in output
     assert "--gateway pi-egress-demo-gateway" in output
@@ -103,6 +112,9 @@ def test_pi_example_can_print_each_action_without_running_it(
     assert "/sandbox/workspace" in output
     assert "sandbox exec" in output
     assert "sandbox exec --tty" in output
+    assert "sandbox exec --no-tty" in output
+    assert "DENY_THIS" in output
+    assert "/usr/local/bin/pi" in output
     assert "PI_OFFLINE=1" not in output
     assert "PI_CODING_AGENT_DIR=" not in output
     assert "--no-extensions" not in output

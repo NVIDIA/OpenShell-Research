@@ -41,6 +41,7 @@ gateway_fragment_template=$script_dir/gateway-middleware.toml.example
 pi_settings=$script_dir/settings.json
 runtime_extension_source=$script_dir/runtime-extension
 runtime_extension_build=$runtime_dir/integration
+egress_gate_log=${EGRESS_GATE_LOG:-$runtime_dir/egress-gate.jsonl}
 z3_library_path_override=${Z3_LIBRARY_PATH_OVERRIDE:-}
 
 bold=""
@@ -353,7 +354,8 @@ prepare() {
 serve() {
 	describe_printed_commands "Run Egress Gate and keep it open:"
 	run_in "$egress_gate_dir" uv run egress-gate --debug serve \
-		--listen 0.0.0.0:50051 --timeout 4s --require-agent-attestation
+		--listen 0.0.0.0:50051 --timeout 4s --require-agent-attestation \
+		--json-log "$egress_gate_log"
 }
 
 gateway() {
@@ -504,6 +506,172 @@ launch() {
 		node /sandbox/pi-runtime/integration/openshell-pi.js
 }
 
+run_sandbox_command() {
+	run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \
+		sandbox exec --no-tty -n pi-egress-demo --workdir /sandbox/workspace -- "$@"
+}
+
+capture_sandbox_command() {
+	local output=$1
+	local error=$2
+	shift 2
+	if $print_only; then
+		run_sandbox_command "$@"
+		return
+	fi
+	(cd -- "$openshell_repo" && "$openshell_cli" --gateway "$gateway_name" \
+		sandbox exec --no-tty -n pi-egress-demo --workdir /sandbox/workspace -- "$@") \
+		>"$output" 2>"$error"
+}
+
+copy_session() {
+	local session_file=$1
+	local output=$2
+	local error=$3
+	capture_sandbox_command "$output" "$error" /bin/cat "$session_file"
+}
+
+log_line_count() {
+	if [[ -f $egress_gate_log ]]; then
+		wc -l <"$egress_gate_log"
+	else
+		printf '0\n'
+	fi
+}
+
+assert_logged_reason() {
+	local first_line=$1
+	local reason=$2
+	local label=$3
+	if ! awk -v first="$first_line" -v reason="\"reason_code\":\"$reason\"" \
+		'NR >= first && index($0, reason) { found = 1 } END { exit !found }' \
+		"$egress_gate_log"; then
+		printf '%s did not produce reason code %s in %s.\n' "$label" "$reason" "$egress_gate_log" >&2
+		exit 1
+	fi
+	printf 'PASS %-18s reason_code=%s\n' "$label" "$reason"
+}
+
+verify() {
+	local verify_id="$(date +%s)-$$"
+	local verify_dir="/sandbox/pi-admission-verify/$verify_id"
+	local bridge_url="http://127.0.0.1:8193/v1/agent/conversation"
+	local temporary_dir
+	local output
+	local error
+	local status
+	local session
+	local first_log_line
+	local raw_request_script='fetch("https://inference-api.nvidia.com/v1/chat/completions", {method:"POST", headers:{"content-type":"application/json", authorization:"Bearer openshell-proxy"}, body:JSON.stringify({model:"nvidia/qwen/qwen3.8-flash-next", messages:[{role:"user",content:"hello"}]})}).then(async response => { console.error(`provider status=${response.status}`); process.exit(response.ok ? 0 : 1); }).catch(error => { console.error(String(error)); process.exit(1); });'
+
+	if $print_only; then
+		describe_printed_commands "Create fresh real Pi sessions and run every verification case:"
+		temporary_dir=/tmp/pi-admission-verify
+	else
+		require_file "$openshell_cli" "OpenShell CLI wrapper"
+		require_demo_sandbox
+		if [[ ! -f $egress_gate_log ]]; then
+			printf 'Missing Egress Gate JSON log: %s\n' "$egress_gate_log" >&2
+			printf 'Start Egress Gate with ./demo.sh serve before running verify.\n' >&2
+			exit 1
+		fi
+		temporary_dir=$(mktemp -d)
+		trap 'rm -rf -- "$temporary_dir"' RETURN
+	fi
+
+	output=$temporary_dir/deny.out
+	error=$temporary_dir/deny.err
+	session=$verify_dir/deny.jsonl
+	status=0
+	capture_sandbox_command "$output" "$error" env \
+		OPENSHELL_AGENT_CONVERSATION_URL="$bridge_url" \
+		node /sandbox/pi-runtime/integration/openshell-pi.js \
+		--session "$session" -p "Reply with exactly: DENY_THIS" || status=$?
+	if ! $print_only; then
+		if ((status == 0)) || ! grep -Fq "OpenShell denied this context addition" "$error"; then
+			printf 'Denied-prompt verification failed. See %s and %s.\n' "$output" "$error" >&2
+			exit 1
+		fi
+		if capture_sandbox_command "$output.session" "$error.session" test -e "$session"; then
+			printf 'Denied prompt unexpectedly created a session: %s\n' "$session" >&2
+			exit 1
+		fi
+		printf 'PASS %-18s denied; session not written\n' "denied prompt"
+	fi
+
+	output=$temporary_dir/redact.out
+	error=$temporary_dir/redact.err
+	session=$verify_dir/redact.jsonl
+	capture_sandbox_command "$output" "$error" env \
+		OPENSHELL_AGENT_CONVERSATION_URL="$bridge_url" \
+		node /sandbox/pi-runtime/integration/openshell-pi.js \
+		--session "$session" -p "Reply with exactly: REDACT_THIS"
+	copy_session "$session" "$temporary_dir/redact.jsonl" "$temporary_dir/redact-session.err"
+	if ! $print_only; then
+		if ! grep -Fq "[REDACTED]" "$temporary_dir/redact.jsonl" || \
+			grep -Fq "REDACT_THIS" "$temporary_dir/redact.jsonl"; then
+			printf 'Redacted-prompt verification failed for %s.\n' "$session" >&2
+			exit 1
+		fi
+		printf 'PASS %-18s session contains only [REDACTED]\n' "redacted prompt"
+	fi
+
+	first_log_line=$(( $(log_line_count) + 1 ))
+	status=0
+	capture_sandbox_command "$temporary_dir/raw.out" "$temporary_dir/raw.err" \
+		/usr/local/bin/node -e "$raw_request_script" || status=$?
+	if ! $print_only; then
+		if ((status == 0)); then
+			printf 'Raw provider request unexpectedly succeeded.\n' >&2
+			exit 1
+		fi
+		assert_logged_reason "$first_log_line" attestation_missing "raw provider"
+	fi
+
+	first_log_line=$(( $(log_line_count) + 1 ))
+	status=0
+	capture_sandbox_command "$temporary_dir/stock.out" "$temporary_dir/stock.err" \
+		/usr/local/bin/pi --session "$verify_dir/stock.jsonl" -p hello || status=$?
+	if ! $print_only; then
+		if ((status == 0)); then
+			printf 'Stock Pi unexpectedly reached the provider.\n' >&2
+			exit 1
+		fi
+		assert_logged_reason "$first_log_line" attestation_missing "stock Pi"
+	fi
+
+	for marker in DENY REDACT; do
+		local marker_lower=${marker,,}
+		local expected="[REDACTED]"
+		if [[ $marker == DENY ]]; then
+			expected="[Tool result blocked by context admission]"
+		fi
+		session=$verify_dir/tool-$marker_lower.jsonl
+		capture_sandbox_command "$temporary_dir/tool-$marker_lower.out" "$temporary_dir/tool-$marker_lower.err" env \
+			OPENSHELL_AGENT_CONVERSATION_URL="$bridge_url" \
+			node /sandbox/pi-runtime/integration/openshell-pi.js --session "$session" -p \
+			"Use bash to print the concatenation of ${marker}_ and THIS, then tell me the output."
+		copy_session "$session" "$temporary_dir/tool-$marker_lower.jsonl" \
+			"$temporary_dir/tool-$marker_lower-session.err"
+		if ! $print_only; then
+			if grep -Fq '"role":"toolResult"' "$temporary_dir/tool-$marker_lower.jsonl"; then
+				if ! grep -Fq "$expected" "$temporary_dir/tool-$marker_lower.jsonl"; then
+					printf 'Tool %s result was present without the expected admitted text.\n' "$marker_lower" >&2
+					exit 1
+				fi
+				printf 'PASS %-18s tool result contains %s\n' "tool $marker_lower" "$expected"
+			else
+				printf 'SKIP %-18s model did not call bash\n' "tool $marker_lower"
+			fi
+		fi
+	done
+
+	if $print_only; then
+		printf '  Assertions inspect each fresh session and %s; request content is never logged.\n' \
+			"$egress_gate_log"
+	fi
+}
+
 cleanup() {
 	if ! $print_only; then
 		require_file "$openshell_cli" "OpenShell CLI wrapper"
@@ -528,6 +696,7 @@ usage() {
   gateway  Start the forked OpenShell gateway
   reset    Recreate the demo sandbox and configure its model credential
   launch   Start Pi in the existing sandbox without deleting its sessions
+  verify   Run real deny, redact, negative-control, and best-effort tool cases
   cleanup  Delete the example sandbox and credential provider
   all      Show the concise workflow walkthrough (requires --print)
 EOF
@@ -536,6 +705,7 @@ EOF
 	cat <<'EOF'
   ./demo.sh --print prepare
   ./demo.sh --print all
+  ./demo.sh --print verify
 EOF
 }
 
@@ -588,8 +758,8 @@ ${bold}${blue}Workflow${reset}
   ${green}2. serve${reset}    Start Egress Gate in Terminal 1 and leave it running.
   ${green}3. gateway${reset}  Start the OpenShell gateway in Terminal 2 and leave it running.
   ${green}4. reset${reset}    Recreate the sandbox; upload a workspace only when one is selected.
-  ${green}5. launch${reset}   Start Pi in Terminal 3. Later launches preserve its sessions.
-  ${green}6. test${reset}     At the Pi prompt, submit:
+  ${green}5. verify${reset}   Run the real non-interactive cases.
+  ${green}6. launch${reset}   Optionally explore interactively with:
                 Reply with exactly: DENY_THIS
                 Reply with exactly: REDACT_THIS
   ${green}7. cleanup${reset}  Delete the sandbox and credential provider.
@@ -600,6 +770,7 @@ ${bold}${blue}Inspect exact commands${reset}
   ./demo.sh --print gateway
   ./demo.sh --print reset
   ./demo.sh --print launch
+  ./demo.sh --print verify
   ./demo.sh --print cleanup
 
 Run an action without --print when you are ready.
@@ -612,6 +783,7 @@ case "$action" in
 	gateway) gateway ;;
 	reset) reset_demo ;;
 	launch) launch ;;
+	verify) verify ;;
 	cleanup) cleanup ;;
 	all)
 		if ! $print_only; then
