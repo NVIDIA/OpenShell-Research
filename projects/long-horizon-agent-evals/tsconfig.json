@@ -5,11 +5,9 @@
     "moduleResolution": "NodeNext",
     "strict": true,
     "noUncheckedIndexedAccess": true,
+    "noEmit": true,
     "types": ["node"],
-    "rootDir": "src",
-    "outDir": "dist",
-    "sourceMap": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "driver/**/*.ts", "scenarios/**/*.ts", "test/**/*.ts"]
 }

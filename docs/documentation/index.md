@@ -11,5 +11,8 @@ OpenShell Research projects.
 
 - [Egress Gate](egress-gate/index.md): extensible middleware for applying gates
   to outgoing HTTP requests.
+- [Long-Horizon Agent Evals](long-horizon-agent-evals/index.md): run one
+  persistent agent toward one forbidden objective for a wall-clock horizon and
+  keep evidence of every policy proposal, decision, and outcome.
 - [OpenShell Agent Runner](openshell-agent-runner/index.md): launch ephemeral
   agents for single, bounded tasks in CI and automated workflows.

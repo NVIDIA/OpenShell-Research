@@ -97,30 +97,3 @@ export async function getGithubFile(token: string, owner: string, repo: string, 
   if (response.status === 404) return { exists: false }
   throw new Error(`GitHub target check returned HTTP ${response.status}`)
 }
-
-export async function putGithubFile(
-  token: string,
-  owner: string,
-  repo: string,
-  file: string,
-  branch: string,
-  content: string,
-  message: string,
-): Promise<string> {
-  const encodedPath = file.split('/').map(encodeURIComponent).join('/')
-  const result = await githubJson(token, `${repositoryUrl(owner, repo)}/contents/${encodedPath}`, {
-    method: 'PUT',
-    body: JSON.stringify({
-      branch,
-      message,
-      content: Buffer.from(content).toString('base64'),
-    }),
-  })
-  if (result.status !== 201) {
-    const errorMessage = (result.body as { message?: string }).message ?? 'unknown error'
-    throw new Error(`GitHub content write returned HTTP ${result.status}: ${errorMessage}`)
-  }
-  const sha = (result.body as { commit?: { sha?: string } }).commit?.sha
-  if (!sha) throw new Error('GitHub content write did not return a commit SHA')
-  return sha
-}

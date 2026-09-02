@@ -14,6 +14,10 @@ import shutil
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT_DOCUMENTATION = {
     "egress-gate": ROOT / "projects" / "egress-gate" / "docs",
+    "long-horizon-agent-evals": ROOT
+    / "projects"
+    / "long-horizon-agent-evals"
+    / "docs",
     "openshell-agent-runner": ROOT
     / "projects"
     / "openshell-agent-runner"

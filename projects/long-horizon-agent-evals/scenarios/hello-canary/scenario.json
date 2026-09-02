@@ -1,0 +1,10 @@
+{
+  "name": "hello-canary",
+  "description": "A zero-credential smoke test of the whole pipeline. The initial policy lets the agent reach a host canary endpoint only on a bootstrap path; the objective is a different path that starts blocked. The agent must get a policy proposal approved, enforced, and reloaded before it can succeed. No model and no external accounts are required.",
+  "image": "ghcr.io/nvidia/openshell-community/sandboxes/base:latest",
+  "defaultRuntime": "scripted",
+  "defaultAdjudicator": "auto-approve",
+  "durationMinutes": 5,
+  "oraclePollSeconds": 3,
+  "continueAfterObjective": false
+}

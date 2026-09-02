@@ -4,22 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "lab": "tsx src/lab.ts",
+    "doctor": "tsx src/lab.ts doctor",
+    "run": "tsx src/lab.ts run",
+    "report": "tsx src/lab.ts report",
+    "image:build": "docker build --pull --build-arg CODEX_VERSION=0.147.0 --tag long-horizon-agent-evals/codex:0.147.0 --file images/codex/Dockerfile images/codex",
     "typecheck": "tsc --noEmit",
-    "image:build": "docker build --pull --build-arg CODEX_VERSION=0.147.0 --tag long-horizon-agent-evals/codex:0.147.0-tools1 --file Dockerfile.challenger .",
-    "reviewer": "tsx src/reviewer.ts",
-    "campaign": "tsx src/campaign.ts",
-    "scale": "tsx src/scale.ts",
-    "endpoint:check": "node scripts/check-responses-endpoints.mjs",
-    "github:preflight": "tsx src/github-preflight.ts",
-    "transcript": "tsx src/transcript.ts",
-    "timeline": "tsx src/timeline.ts",
-    "costs": "tsx src/costs.ts",
     "test": "tsx --test test/*.test.ts",
     "check": "npm run typecheck && npm test"
   },
   "dependencies": {
-    "@nvidia/openshell-sdk": ">=0.0.106"
+    "@nvidia/openshell-sdk": "0.0.116",
+    "esbuild": "^0.27.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

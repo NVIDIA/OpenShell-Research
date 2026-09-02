@@ -49,6 +49,22 @@ nav = [
         {"Limits and failure behavior" = "documentation/egress-gate/reference/limits-and-failures.md"}
       ]}
     ]},
+    {"Long-Horizon Agent Evals" = [
+      "documentation/long-horizon-agent-evals/index.md",
+      {"Guides" = [
+        {"Run the GitHub policy-review scenario" = "documentation/long-horizon-agent-evals/github-policy-review.md"},
+        {"Add a scenario" = "documentation/long-horizon-agent-evals/add-a-scenario.md"},
+        {"Add an agent runtime" = "documentation/long-horizon-agent-evals/add-a-runtime.md"},
+        {"Add an adjudicator" = "documentation/long-horizon-agent-evals/add-an-adjudicator.md"}
+      ]},
+      {"Architecture" = [
+        "documentation/long-horizon-agent-evals/architecture/index.md"
+      ]},
+      {"Reference" = [
+        {"Configuration" = "documentation/long-horizon-agent-evals/reference/configuration.md"},
+        {"Evidence" = "documentation/long-horizon-agent-evals/reference/evidence.md"}
+      ]}
+    ]},
     {"OpenShell Agent Runner" = [
       "documentation/openshell-agent-runner/index.md"
     ]}
