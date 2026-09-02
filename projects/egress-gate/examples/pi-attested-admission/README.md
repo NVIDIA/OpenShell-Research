@@ -254,6 +254,8 @@ messages, and bash executions. `launch` preserves the history; `reset` and
    assistant message is finalized, after streamed output has already been
    displayed. Assistant thinking is outside this append-time envelope; request
    policy scans it at egress, but the context attestation does not hash it.
+   Assistant tool calls are inspectable and denyable but immutable; a redaction
+   targeting one fails closed.
 3. OpenShell gives the launched runtime an inherited descriptor containing its
    per-exec bridge token. The launcher reads and closes the descriptor and
    deletes its environment name before Pi or its extensions start. The external

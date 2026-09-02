@@ -7,16 +7,22 @@ agent_markdown: true
 # Managed harness admission
 
 Managed Pi sessions use the same Egress Gate policy at three checkpoints. The
-append and provider-context checkpoints keep Pi's live and persisted history
-consistent with policy. Egress verification supplies the security boundary: a
-provider request without a valid attestation is denied before credentials are
-attached.
+append and provider-context checkpoints apply policy to supported message
+content before it enters history or is sent. Egress verification supplies the
+security boundary: a provider request without a valid attestation is denied
+before credentials are attached.
 
 | Checkpoint | Pi hook | Result |
 | --- | --- | --- |
-| History append | `user_message`, `tool_result`, `assistant_message`, `compaction_summary`, `branch_summary`, `extension_message`, or `bash_execution` | Allow, deny, or replace one complete Pi entry before append |
+| History append | `user_message`, `tool_result`, `assistant_message`, `compaction_summary`, `branch_summary`, `extension_message`, or `bash_execution` | Allow, deny, or replace supported content before append |
 | Provider context | `provider_context` | Allow, deny, or replace the complete ordered user/tool context and issue an attestation |
 | Network egress | OpenShell pre-credentials middleware | Verify the attestation against the provider request, then run request policy |
+
+Assistant append admission covers finalized text and tool calls. Assistant
+thinking is not append-admitted or included in the attested user/tool context
+hash; request policy scans it at egress. Tool calls are inspectable and
+denyable but immutable: a redaction targeting their ID, name, or arguments
+fails closed rather than changing them.
 
 Append-time allows do not carry attestations. Immediately before a provider
 request, Pi submits the complete context so retries, continuations, compaction,
