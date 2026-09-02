@@ -15,7 +15,7 @@ from google.protobuf import empty_pb2, json_format, message_factory
 from google.protobuf.message import Message
 
 from egress_gate.admission import (
-    PiInputV1,
+    PiMessageV1,
     canonical_json_bytes,
 )
 from egress_gate.bindings import supervisor_middleware_pb2 as pb2
@@ -159,9 +159,11 @@ async def test_generated_stub_round_trip_covers_manifest_and_gate_actions() -> N
 
 
 @pytest.mark.asyncio
-async def test_generated_stub_issues_a_rendered_prompt_attestation() -> None:
+async def test_generated_stub_issues_a_user_message_attestation() -> None:
     body = canonical_json_bytes(
-        PiInputV1(schema_version="openshell.pi-input.v1", text="safe")
+        PiMessageV1(
+            schema_version="openshell.pi-message.v1", origin="user", text="safe"
+        )
     )
     request = pb2.AgentConversationEvaluation(
         phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_AGENT_CONTEXT,
@@ -170,8 +172,8 @@ async def test_generated_stub_issues_a_rendered_prompt_attestation() -> None:
         target=pb2.AgentConversationTarget(
             harness="pi",
             harness_version="sdk-v1",
-            hook="rendered_prompt_admission",
-            schema_version="openshell.pi-input.v1",
+            hook="user_message",
+            schema_version="openshell.pi-message.v1",
             scheme="https",
             host="provider.invalid",
             port=443,
@@ -183,7 +185,7 @@ async def test_generated_stub_issues_a_rendered_prompt_attestation() -> None:
         request_body=body,
     )
     middleware = EgressGateMiddleware(
-        create_builtin_registry(), require_pi_attestation=True
+        create_builtin_registry(), require_agent_attestation=True
     )
     async with _running_stub(middleware) as (stub, _):
         response = await stub.EvaluateAgentConversation(request)
@@ -191,7 +193,7 @@ async def test_generated_stub_issues_a_rendered_prompt_attestation() -> None:
     assert response.decision == pb2.DECISION_ALLOW
     assert response.attestation.startswith(b"ag1.")
     assert response.has_replacement_body is False
-    assert response.metadata["admission_schema"] == "openshell.pi-input.v1"
+    assert response.metadata["admission_schema"] == "openshell.pi-message.v1"
 
 
 @pytest.mark.asyncio
@@ -210,7 +212,9 @@ async def test_agent_admission_is_unavailable_when_managed_mode_is_off() -> None
 @pytest.mark.asyncio
 async def test_trusted_agent_attestation_is_verified_for_http_egress() -> None:
     pi_body = canonical_json_bytes(
-        PiInputV1(schema_version="openshell.pi-input.v1", text="safe")
+        PiMessageV1(
+            schema_version="openshell.pi-message.v1", origin="user", text="safe"
+        )
     )
     admission = pb2.AgentConversationEvaluation(
         phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_AGENT_CONTEXT,
@@ -219,8 +223,8 @@ async def test_trusted_agent_attestation_is_verified_for_http_egress() -> None:
         target=pb2.AgentConversationTarget(
             harness="pi",
             harness_version="sdk-v1",
-            hook="rendered_prompt_admission",
-            schema_version="openshell.pi-input.v1",
+            hook="user_message",
+            schema_version="openshell.pi-message.v1",
             scheme="https",
             host="provider.invalid",
             port=443,
@@ -249,7 +253,7 @@ async def test_trusted_agent_attestation_is_verified_for_http_egress() -> None:
         separators=(",", ":"),
     ).encode()
     middleware = EgressGateMiddleware(
-        create_builtin_registry(), require_pi_attestation=True
+        create_builtin_registry(), require_agent_attestation=True
     )
     async with _running_stub(middleware) as (stub, _):
         admitted = await stub.EvaluateAgentConversation(admission)
@@ -279,7 +283,7 @@ async def test_trusted_agent_attestation_is_verified_for_http_egress() -> None:
 
 
 @pytest.mark.asyncio
-async def test_unmanaged_http_rejects_the_reserved_receipt_header() -> None:
+async def test_unmanaged_http_rejects_the_reserved_header() -> None:
     middleware = EgressGateMiddleware(create_builtin_registry())
     request = _evaluation(b"safe", action_kind="detect")
     request.headers.append(
@@ -293,7 +297,7 @@ async def test_unmanaged_http_rejects_the_reserved_receipt_header() -> None:
         response = await stub.EvaluateHttpRequest(request)
 
     assert response.decision == pb2.DECISION_DENY
-    assert response.reason_code == "reserved_receipt_header"
+    assert response.reason_code == "reserved_header_present"
 
 
 @pytest.mark.asyncio

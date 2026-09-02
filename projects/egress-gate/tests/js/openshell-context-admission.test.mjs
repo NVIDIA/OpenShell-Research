@@ -34,6 +34,9 @@ describe("OpenShell context admission adapter", () => {
 			async (_url, init) => {
 				const request = JSON.parse(String(init?.body));
 				const envelope = JSON.parse(new TextDecoder().decode(new Uint8Array(request.request_body)));
+				assert.equal(request.hook, "user_message");
+				assert.equal(envelope.schema_version, "openshell.pi-message.v1");
+				assert.equal(envelope.origin, "user");
 				return new Response(JSON.stringify({ decision: "allow", handle: `handle:${envelope.text}` }));
 			},
 		);
@@ -58,7 +61,7 @@ describe("OpenShell context admission adapter", () => {
 
 	it("uses an admitted replacement for the outbound handle", async () => {
 		const replacement = new TextEncoder().encode(
-			JSON.stringify({ schema_version: "openshell.pi-input.v1", text: "[REDACTED]" }),
+			JSON.stringify({ schema_version: "openshell.pi-message.v1", origin: "user", text: "[REDACTED]" }),
 		);
 		const admission = createOpenShellContextAdmission(
 			"http://bridge.test/admit",
@@ -100,8 +103,8 @@ describe("OpenShell context admission adapter", () => {
 			await admittedContext(admission, { messages: [prompt, failed], tools: [] }),
 		);
 
-		assert.equal(headers[HANDLE_HEADER], "handle:tool_result_admission");
-		assert.deepEqual(hooks, ["rendered_prompt_admission", "tool_result_admission", "tool_result_admission"]);
+		assert.equal(headers[HANDLE_HEADER], "handle:tool_result");
+		assert.deepEqual(hooks, ["user_message", "tool_result", "tool_result"]);
 	});
 
 	it("fails closed when provider-only context is denied", async () => {

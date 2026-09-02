@@ -353,7 +353,7 @@ prepare() {
 serve() {
 	describe_printed_commands "Run Egress Gate and keep it open:"
 	run_in "$egress_gate_dir" uv run egress-gate --debug serve \
-		--listen 0.0.0.0:50051 --timeout 4s --require-pi-attestation
+		--listen 0.0.0.0:50051 --timeout 4s --require-agent-attestation
 }
 
 gateway() {

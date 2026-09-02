@@ -19,7 +19,7 @@ const MAX_BRIDGE_RESPONSE_BYTES = MAX_ADMISSION_BYTES * 4 + 64 * 1024;
 const MAX_HANDLE_ENTRIES = 1024;
 
 type ContentBlock = TextContent | ImageContent;
-type UserEnvelope = { schema_version: "openshell.pi-input.v1"; text: string };
+type UserEnvelope = { schema_version: "openshell.pi-message.v1"; origin: "user"; text: string };
 type ToolResultEnvelope = {
 	schema_version: "openshell.pi-tool-result.v1";
 	tool_call_id: string;
@@ -40,7 +40,7 @@ export function createOpenShellContextAdmission(
 	const handles = new Map<string, string>();
 
 	async function requestAdmission(
-		hook: "rendered_prompt_admission" | "tool_result_admission",
+		hook: "user_message" | "tool_result",
 		envelope: AdmissionEnvelope,
 	): Promise<BridgeResult> {
 		const requestBody = new TextEncoder().encode(JSON.stringify(envelope));
@@ -75,7 +75,7 @@ export function createOpenShellContextAdmission(
 		if (!envelope) {
 			return { action: "deny", reason: "Image inputs are not supported by OpenShell admission" };
 		}
-		const result = await requestAdmission("rendered_prompt_admission", envelope);
+		const result = await requestAdmission("user_message", envelope);
 		if (result.decision === "deny") return denied(result.reason_code);
 		const admittedEnvelope = result.replacement_body
 			? parseUserEnvelope(new Uint8Array(result.replacement_body))
@@ -94,7 +94,7 @@ export function createOpenShellContextAdmission(
 		message: ToolResultMessage,
 	): Promise<ContextAdmissionResult<ToolResultMessage>> {
 		const envelope = toolResultEnvelope(message);
-		const result = await requestAdmission("tool_result_admission", envelope);
+		const result = await requestAdmission("tool_result", envelope);
 		if (result.decision === "deny") return denied(result.reason_code);
 		const admittedEnvelope = result.replacement_body
 			? parseToolResultEnvelope(new Uint8Array(result.replacement_body))
@@ -137,11 +137,12 @@ export function createOpenShellContextAdmission(
 
 function userEnvelope(message: UserMessage): UserEnvelope | undefined {
 	if (typeof message.content === "string") {
-		return { schema_version: "openshell.pi-input.v1", text: message.content };
+		return { schema_version: "openshell.pi-message.v1", origin: "user", text: message.content };
 	}
 	if (message.content.some((block) => block.type === "image")) return undefined;
 	return {
-		schema_version: "openshell.pi-input.v1",
+		schema_version: "openshell.pi-message.v1",
+		origin: "user",
 		text: message.content.map((block) => (block as TextContent).text).join("\n"),
 	};
 }
@@ -205,10 +206,15 @@ function parseBridgeResult(value: unknown): BridgeResult {
 
 function parseUserEnvelope(body: Uint8Array): UserEnvelope {
 	const value: unknown = JSON.parse(new TextDecoder().decode(body));
-	if (!isRecord(value) || value.schema_version !== "openshell.pi-input.v1" || typeof value.text !== "string") {
+	if (
+		!isRecord(value) ||
+		value.schema_version !== "openshell.pi-message.v1" ||
+		value.origin !== "user" ||
+		typeof value.text !== "string"
+	) {
 		throw new Error("OpenShell admission returned an invalid user replacement");
 	}
-	return { schema_version: "openshell.pi-input.v1", text: value.text };
+	return { schema_version: "openshell.pi-message.v1", origin: "user", text: value.text };
 }
 
 function parseToolResultEnvelope(body: Uint8Array): ToolResultEnvelope {

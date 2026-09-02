@@ -13,7 +13,7 @@ from egress_gate.admission.adapters import (
     AdmissionMutationError,
     AdmissionShapeError,
     HarnessAdapterRegistry,
-    PiInputV1,
+    PiMessageV1,
     ProviderAdapterRegistry,
     ProviderShapeError,
 )
@@ -71,7 +71,7 @@ class HarnessAdmissionProcessor:
     def readiness(self) -> dict[str, str]:
         """Return content-safe compatibility metadata for a managed launcher."""
         return {
-            "admission_schema": "openshell.pi-input.v1",
+            "admission_schema": "openshell.pi-message.v1",
             "canonicalization": "canonical-json.v1",
             "provider_adapter": "openai.request.v1",
             "attestation_version": "agent-attestation.v1",
@@ -197,16 +197,16 @@ class AttestedEgressProcessor:
         if request.context.enforcement_point is not EnforcementPoint.NETWORK_EGRESS:
             return self._deny("network_context_invalid")
         if any(header.name.lower() == RECEIPT_HEADER for header in request.headers):
-            return self._deny("reserved_receipt_header")
+            return self._deny("reserved_header_present")
         if not agent_attestation:
             return self._deny("attestation_missing")
         try:
             adapter = self._provider_adapters.resolve_request(request, timeout)
             candidate = adapter.latest_attested_candidate(request, timeout)
             timeout.raise_if_expired()
-            if isinstance(candidate, PiInputV1):
-                hook = AdmissionHook.RENDERED_PROMPT
-                schema_version = "openshell.pi-input.v1"
+            if isinstance(candidate, PiMessageV1):
+                hook = AdmissionHook.USER_MESSAGE
+                schema_version = "openshell.pi-message.v1"
             elif (
                 isinstance(candidate, CanonicalMessageV1)
                 and candidate.role is CanonicalRole.TOOL

@@ -74,9 +74,9 @@ def test_cli_serve_uses_one_concise_processing_timeout(
             registry: GateRegistry,
             *,
             timeout_middleware_processing: float,
-            require_pi_attestation: bool = False,
+            require_agent_attestation: bool = False,
         ) -> None:
-            del registry, require_pi_attestation
+            del registry, require_agent_attestation
             self.timeout_middleware_processing = timeout_middleware_processing
 
         def serve_sync(self, listen: str) -> None:
@@ -103,6 +103,8 @@ def test_cli_serve_uses_one_concise_processing_timeout(
     assert "s for seconds or ms for milliseconds" in serve_help
     assert "Minimum 10ms" in serve_help
     assert "RPC timeout" in serve_help
+    assert "--require-agent-attestation" in serve_help
+    assert "--require-" + "pi-attestation" not in serve_help
 
     evaluate_help = CliRunner().invoke(app, ["evaluate", "--help"])
     assert evaluate_help.exit_code == 0, evaluate_help.output
@@ -547,9 +549,9 @@ def test_cli_removal_forgets_registration_before_later_serve(
             registry: GateRegistry,
             *,
             timeout_middleware_processing: float,
-            require_pi_attestation: bool = False,
+            require_agent_attestation: bool = False,
         ) -> None:
-            del registry, timeout_middleware_processing, require_pi_attestation
+            del registry, timeout_middleware_processing, require_agent_attestation
 
         def serve_sync(self, listen: str) -> None:
             calls.append(listen)

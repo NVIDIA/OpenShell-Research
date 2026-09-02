@@ -23,8 +23,8 @@ PI_HARNESS_VERSION = "sdk-v1"
 class AdmissionHook(StrEnum):
     """Supported Pi admission boundaries."""
 
-    RENDERED_PROMPT = "rendered_prompt_admission"
-    TOOL_RESULT = "tool_result_admission"
+    USER_MESSAGE = "user_message"
+    TOOL_RESULT = "tool_result"
 
 
 class AdmissionDecision(StrEnum):
@@ -55,10 +55,10 @@ class HarnessAdmissionContext(StrictDomainModel):
     request_id: BoundedMetadataString
     sandbox_id: BoundedMetadataString
     middleware_name: BoundedMetadataString
-    harness: Literal["pi"]
-    harness_version: Literal["extension-v1", "sdk-v1"]
+    harness: ScalarString
+    harness_version: Literal["sdk-v1"]
     hook: AdmissionHook
-    schema_version: Literal["openshell.pi-input.v1", "openshell.pi-tool-result.v1"]
+    schema_version: ScalarString
     provider_target: HttpTarget
     provider_adapter_schema: Literal["openai.request.v1"]
 
