@@ -33,15 +33,20 @@ describe("OpenShell context admission adapter", () => {
 			() => "session-123",
 			async (_url, init) => {
 				const request = JSON.parse(String(init?.body));
-				const envelope = JSON.parse(new TextDecoder().decode(new Uint8Array(request.request_body)));
+				const requestBody = new TextDecoder().decode(new Uint8Array(request.request_body));
+				const envelope = JSON.parse(requestBody);
 				assert.equal(request.hook, "user_message");
 				assert.equal(envelope.schema_version, "openshell.pi-message.v1");
 				assert.equal(envelope.origin, "user");
+				assert.equal(
+					requestBody,
+					`{"origin":"user","schema_version":"openshell.pi-message.v1","text":${JSON.stringify(envelope.text)}}`,
+				);
 				return new Response(JSON.stringify({ decision: "allow", handle: `handle:${envelope.text}` }));
 			},
 		);
 		const current = user("current", 1);
-		const queued = user("queued", 2);
+		const queued = { role: "user", content: "queued", timestamp: 2 };
 
 		assert.equal((await admission.admitUserMessage(current, { source: "interactive" })).action, "allow");
 		assert.equal((await admission.admitUserMessage(queued, { source: "interactive" })).action, "allow");

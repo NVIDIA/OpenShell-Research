@@ -137,12 +137,12 @@ export function createOpenShellContextAdmission(
 
 function userEnvelope(message: UserMessage): UserEnvelope | undefined {
 	if (typeof message.content === "string") {
-		return { schema_version: "openshell.pi-message.v1", origin: "user", text: message.content };
+		return { origin: "user", schema_version: "openshell.pi-message.v1", text: message.content };
 	}
 	if (message.content.some((block) => block.type === "image")) return undefined;
 	return {
-		schema_version: "openshell.pi-message.v1",
 		origin: "user",
+		schema_version: "openshell.pi-message.v1",
 		text: message.content.map((block) => (block as TextContent).text).join("\n"),
 	};
 }
