@@ -44,23 +44,19 @@ all remaining commands there:
 cd projects/egress-gate/examples/pi-attested-admission
 ```
 
-Create the local configuration file, replace every example value, and load it
-into the current shell:
+Create the local configuration file and replace every example value:
 
 ```shell
 cp .env.example .env
 # Edit .env before continuing.
-set -a
-source .env
-set +a
 ```
 
-`set -a` makes assignments loaded by `source .env` available to commands run
-from this shell; `set +a` restores the shell's default behavior afterward.
+Every `demo.sh` invocation loads this file automatically. The values remain
+local to the script and its child commands; they are not added to your current
+shell. Set `PI_EGRESS_ENV_FILE` to use a configuration file elsewhere.
 
 If the model endpoint does not require authentication, set
-`PI_MODEL_API_KEY=unused`. Source `.env` in the terminals that run `gateway` and
-`reset`; the other actions do not consume the credential.
+`PI_MODEL_API_KEY=unused`.
 
 `PI_WORKSPACE_PATH` is optional. Set it to the absolute path of a project you
 want Pi to work on. The reset step uploads its contents to `/sandbox/workspace`

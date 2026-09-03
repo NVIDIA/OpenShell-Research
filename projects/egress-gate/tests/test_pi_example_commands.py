@@ -42,6 +42,7 @@ def test_pi_example_can_print_each_action_without_running_it(
         "PI_MODELS_PATH": str(models_path),
         "PI_EGRESS_PACK_DIR": str(pack_dir),
         "PI_EGRESS_RUNTIME_DIR": str(runtime_dir),
+        "PI_EGRESS_ENV_FILE": "",
         "PI_WORKSPACE_PATH": str(tmp_path / "workspace"),
     }
 
@@ -176,13 +177,14 @@ def test_pi_example_print_all_is_a_concise_walkthrough() -> None:
                 project_dir / "examples/pi-attested-admission/models.json"
             ),
             "PI_MODEL_API_KEY": "secret-not-printed",
+            "PI_EGRESS_ENV_FILE": "",
             "PI_WORKSPACE_PATH": "/tmp/example-workspace",
         },
         text=True,
     )
 
     assert "Pi attested-admission walkthrough" in result.stdout
-    assert "Configuration visible to this shell" in result.stdout
+    assert "Configuration loaded by demo.sh" in result.stdout
     assert "Model credential:  set (value hidden)" in result.stdout
     assert "1. prepare" in result.stdout
     assert "7. cleanup" in result.stdout
@@ -201,6 +203,7 @@ def test_pi_example_uses_an_empty_workspace_when_no_path_is_configured() -> None
             project_dir / "examples/pi-attested-admission/models.json"
         ),
         "PI_MODEL_API_KEY": "secret-not-printed",
+        "PI_EGRESS_ENV_FILE": "",
     }
 
     reset = subprocess.run(
@@ -232,7 +235,7 @@ def test_pi_example_launch_preserves_the_prepared_sandbox() -> None:
         ["bash", str(script), "--print", "launch"],
         check=True,
         capture_output=True,
-        env=os.environ,
+        env=os.environ | {"PI_EGRESS_ENV_FILE": ""},
         text=True,
     )
 
@@ -250,7 +253,7 @@ def test_pi_example_uses_terminal_colors_without_leaking_them_to_redirects() -> 
     script = project_dir / "examples/pi-attested-admission/demo.sh"
     environment = {
         name: value for name, value in os.environ.items() if name != "NO_COLOR"
-    } | {"FORCE_COLOR": "1"}
+    } | {"FORCE_COLOR": "1", "PI_EGRESS_ENV_FILE": ""}
 
     colored = subprocess.run(
         ["bash", str(script), "--print", "all"],
@@ -282,7 +285,8 @@ def test_pi_example_defaults_to_an_ignored_external_workspace() -> None:
             name: value
             for name, value in os.environ.items()
             if name not in {"PI_REPO", "OPENSHELL_REPO", "PI_EGRESS_FORKS_DIR"}
-        },
+        }
+        | {"PI_EGRESS_ENV_FILE": ""},
         text=True,
     )
 
@@ -370,6 +374,43 @@ def test_pi_example_uses_standard_checked_in_configuration() -> None:
     assert registration["max_payload_bytes"] == 4 * 1024 * 1024
 
 
+def test_pi_example_loads_its_env_file_automatically(tmp_path: Path) -> None:
+    project_dir = Path(__file__).parents[1]
+    script = project_dir / "examples/pi-attested-admission/demo.sh"
+    models_path = project_dir / "examples/pi-attested-admission/models.json"
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "EGRESS_GATE_HOST_IP=192.0.2.10\n"
+        f"PI_MODELS_PATH={models_path}\n"
+        "PI_MODEL_API_KEY=loaded-from-env-file\n"
+    )
+    environment = {
+        name: value
+        for name, value in os.environ.items()
+        if name
+        not in {
+            "EGRESS_GATE_HOST_IP",
+            "PI_MODELS_PATH",
+            "PI_MODEL_API_KEY",
+            "PI_WORKSPACE_PATH",
+        }
+    } | {"PI_EGRESS_ENV_FILE": str(env_file)}
+
+    result = subprocess.run(
+        ["bash", str(script), "--print", "all"],
+        check=True,
+        capture_output=True,
+        env=environment,
+        text=True,
+    )
+
+    assert "Status:             ready" in result.stdout
+    assert "Egress Gate host:   192.0.2.10" in result.stdout
+    assert f"Pi models file:     {models_path}" in result.stdout
+    assert "Model credential:  set (value hidden)" in result.stdout
+    assert "loaded-from-env-file" not in result.stdout
+
+
 def test_pi_example_reports_all_missing_configuration_before_work(
     tmp_path: Path,
 ) -> None:
@@ -386,6 +427,7 @@ def test_pi_example_reports_all_missing_configuration_before_work(
             "PI_WORKSPACE_PATH",
         }
     }
+    environment["PI_EGRESS_ENV_FILE"] = str(tmp_path / "missing.env")
 
     result = subprocess.run(
         ["bash", str(script), "reset"],
@@ -402,7 +444,7 @@ def test_pi_example_reports_all_missing_configuration_before_work(
     assert "PI_MODELS_PATH" in result.stderr
     assert "PI_MODEL_API_KEY" in result.stderr
     assert "PI_WORKSPACE_PATH" not in result.stderr
-    assert "source .env" in result.stderr
+    assert "cp .env.example .env" in result.stderr
     assert "git pull" not in result.stderr
 
 
@@ -423,6 +465,7 @@ def test_pi_example_reports_a_missing_compute_backend_before_mise(
         | {
             "PATH": f"{tmp_path}:{os.environ['PATH']}",
             "OPENSHELL_DRIVERS": "",
+            "PI_EGRESS_ENV_FILE": "",
             "EGRESS_GATE_HOST_IP": "192.0.2.10",
             "PI_MODELS_PATH": str(
                 project_dir / "examples/pi-attested-admission/models.json"

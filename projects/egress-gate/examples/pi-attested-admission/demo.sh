@@ -14,6 +14,13 @@ fi
 action=${1:-help}
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 egress_gate_dir=$(cd -- "$script_dir/../.." && pwd)
+env_file=${PI_EGRESS_ENV_FILE-$script_dir/.env}
+if [[ -n $env_file && -f $env_file ]]; then
+	set -a
+	# shellcheck disable=SC1090
+	source "$env_file"
+	set +a
+fi
 
 forks_dir=${PI_EGRESS_FORKS_DIR:-$egress_gate_dir/.workspaces/pi-attested-admission}
 pi_repo=${PI_REPO:-$forks_dir/pi}
@@ -218,8 +225,7 @@ require_host_configuration() {
 	if [[ -n ${EGRESS_GATE_HOST_IP:-} && ${EGRESS_GATE_HOST_IP:-} != YOUR_HOST_IPV4 ]]; then
 		return
 	fi
-	printf 'Set EGRESS_GATE_HOST_IP in %s and source it before starting the gateway.\n' \
-		"$script_dir/.env" >&2
+	printf 'Set EGRESS_GATE_HOST_IP in %s before starting the gateway.\n' "$env_file" >&2
 	exit 1
 }
 
@@ -246,15 +252,12 @@ require_setup_configuration() {
 	printf 'Set these environment variables:\n' >&2
 	printf '  %s\n' "${missing[@]}" >&2
 	printf '\n' >&2
-	printf 'Configure and load %s:\n' "$script_dir/.env" >&2
+	printf 'Configure %s:\n' "$env_file" >&2
 	printf '  cd %s\n' "$script_dir" >&2
-	if [[ ! -f $script_dir/.env ]]; then
+	if [[ ! -f $env_file ]]; then
 		printf '  cp .env.example .env\n' >&2
 	fi
 	printf '  # Edit .env and replace every example value.\n' >&2
-	printf '  set -a\n' >&2
-	printf '  source .env\n' >&2
-	printf '  set +a\n' >&2
 	exit 1
 }
 
@@ -751,16 +754,16 @@ print_plan() {
 	local displayed_workspace="empty /sandbox/workspace"
 	if [[ $displayed_host == YOUR_HOST_IPV4 ]]; then
 		displayed_host="not set"
-		configuration_status="incomplete — edit and source .env"
+		configuration_status="incomplete — edit .env"
 	fi
 	if [[ $displayed_models_path == YOUR_MODELS_PATH ]]; then
 		displayed_models_path="not set"
-		configuration_status="incomplete — edit and source .env"
+		configuration_status="incomplete — edit .env"
 	fi
 	if [[ -n ${PI_MODEL_API_KEY:-} && ${PI_MODEL_API_KEY:-} != your-provider-key ]]; then
 		credential_status="set (value hidden)"
 	else
-		configuration_status="incomplete — edit and source .env"
+		configuration_status="incomplete — edit .env"
 	fi
 	if [[ -n $workspace_path ]]; then
 		displayed_workspace="$workspace_path"
@@ -775,7 +778,7 @@ This is a preview; no commands are running. The numbered items show the order
 of operations and which terminal to use. Print one action separately to inspect
 its exact commands.
 
-${bold}${blue}Configuration visible to this shell${reset}
+${bold}${blue}Configuration loaded by demo.sh${reset}
   Status:             ${status_color}${configuration_status}${reset}
   Egress Gate host:   $displayed_host
   Pi models file:     $displayed_models_path
