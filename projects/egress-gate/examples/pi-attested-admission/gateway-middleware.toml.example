@@ -1,0 +1,6 @@
+[[openshell.supervisor.middleware]]
+name = "pi-egress"
+grpc_endpoint = "http://YOUR_HOST_IPV4:50051"
+allow_insecure_transport = true
+max_payload_bytes = 4194304
+timeout = "30s"

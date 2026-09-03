@@ -10,6 +10,7 @@ authors = [
   { name = "NVIDIA CORPORATION & AFFILIATES" },
 ]
 dependencies = [
+  "cryptography>=50,<51",
   "grpcio>=1.81.1,<2",
   "protobuf>=7.36,<8", # 7.36.0 fixes protobuf security advisories.
   "pydantic>=2.11,<3",

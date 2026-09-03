@@ -1,0 +1,130 @@
+{
+  "user_request": {
+    "model": "azure/anthropic/claude-opus-5",
+    "messages": [
+      {"role": "system", "content": "fixture system prompt"},
+      {"role": "user", "content": "safe"}
+    ],
+    "stream": true,
+    "stream_options": {"include_usage": true},
+    "store": false,
+    "max_tokens": 128000,
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "read",
+          "description": "Read a file",
+          "parameters": {"type": "object", "properties": {}},
+          "strict": false
+        }
+      }
+    ]
+  },
+  "opus": {
+    "model": "azure/anthropic/claude-opus-5",
+    "messages": [
+      {"role": "system", "content": "fixture system prompt"},
+      {"role": "user", "content": "use the tool"},
+      {
+        "role": "assistant",
+        "content": "I will read it.",
+        "tool_calls": [
+          {
+            "id": "call-1",
+            "type": "function",
+            "function": {"name": "read", "arguments": "{}"}
+          }
+        ]
+      },
+      {"role": "tool", "content": "safe tool output", "tool_call_id": "call-1"}
+    ],
+    "stream": true,
+    "stream_options": {"include_usage": true},
+    "store": false,
+    "max_tokens": 128000,
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "read",
+          "description": "Read a file",
+          "parameters": {"type": "object", "properties": {}},
+          "strict": false
+        }
+      }
+    ]
+  },
+  "qwen": {
+    "model": "nvidia/qwen/qwen3.8-flash-next",
+    "messages": [
+      {"role": "system", "content": "fixture system prompt"},
+      {"role": "user", "content": "use the tool"},
+      {
+        "role": "assistant",
+        "content": null,
+        "reasoning_content": "prior reasoning",
+        "tool_calls": [
+          {
+            "id": "call-1",
+            "type": "function",
+            "function": {"name": "read", "arguments": "{}"}
+          }
+        ]
+      },
+      {"role": "tool", "content": "safe tool output", "tool_call_id": "call-1"}
+    ],
+    "stream": true,
+    "stream_options": {"include_usage": true},
+    "store": false,
+    "max_tokens": 32768,
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "read",
+          "description": "Read a file",
+          "parameters": {"type": "object", "properties": {}},
+          "strict": false
+        }
+      }
+    ],
+    "enable_thinking": true,
+    "reasoning_effort": "high"
+  },
+  "compaction_summary": {
+    "model": "azure/anthropic/claude-opus-5",
+    "messages": [
+      {"role": "system", "content": "fixture system prompt"},
+      {"role": "user", "content": "use the tool"},
+      {
+        "role": "assistant",
+        "content": "I will read it.",
+        "tool_calls": [
+          {
+            "id": "call-1",
+            "type": "function",
+            "function": {"name": "read", "arguments": "{}"}
+          }
+        ]
+      },
+      {"role": "tool", "content": "safe tool output", "tool_call_id": "call-1"},
+      {"role": "user", "content": "Summary:\ncompacted context"}
+    ],
+    "stream": true,
+    "stream_options": {"include_usage": true},
+    "store": false,
+    "max_tokens": 128000,
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "read",
+          "description": "Read a file",
+          "parameters": {"type": "object", "properties": {}},
+          "strict": false
+        }
+      }
+    ]
+  }
+}

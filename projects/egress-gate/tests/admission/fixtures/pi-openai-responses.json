@@ -1,0 +1,73 @@
+{
+  "user_request": {
+    "model": "azure/openai/gpt-5.6-sol",
+    "input": [
+      {"role": "developer", "content": "fixture system prompt"},
+      {"role": "user", "content": [{"type": "input_text", "text": "safe"}]}
+    ],
+    "stream": true,
+    "store": false,
+    "max_output_tokens": 128000,
+    "tools": [
+      {
+        "type": "function",
+        "name": "read",
+        "description": "Read a file",
+        "parameters": {"type": "object", "properties": {}}
+      }
+    ],
+    "reasoning": {"effort": "high", "summary": "auto"},
+    "include": ["reasoning.encrypted_content"]
+  },
+  "tool_result_request": {
+    "model": "azure/openai/gpt-5.6-sol",
+    "input": [
+      {"role": "developer", "content": "fixture system prompt"},
+      {
+        "role": "user",
+        "content": [{"type": "input_text", "text": "use the tool"}]
+      },
+      {
+        "type": "reasoning",
+        "id": "rs-1",
+        "summary": [{"type": "summary_text", "text": "summary"}],
+        "content": [{"type": "reasoning_text", "text": "reasoning"}],
+        "encrypted_content": "encrypted",
+        "status": "completed"
+      },
+      {
+        "type": "message",
+        "role": "assistant",
+        "content": [
+          {"type": "output_text", "text": "I will read it.", "annotations": []}
+        ],
+        "status": "completed",
+        "id": "msg_pi_1"
+      },
+      {
+        "type": "function_call",
+        "call_id": "call-1",
+        "name": "read",
+        "arguments": "{}"
+      },
+      {
+        "type": "function_call_output",
+        "call_id": "call-1",
+        "output": "safe tool output"
+      }
+    ],
+    "stream": true,
+    "store": false,
+    "max_output_tokens": 128000,
+    "tools": [
+      {
+        "type": "function",
+        "name": "read",
+        "description": "Read a file",
+        "parameters": {"type": "object", "properties": {}}
+      }
+    ],
+    "reasoning": {"effort": "high", "summary": "auto"},
+    "include": ["reasoning.encrypted_content"]
+  }
+}

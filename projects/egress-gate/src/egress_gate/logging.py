@@ -6,10 +6,12 @@
 from __future__ import annotations
 
 import copy
+import json
 import logging
 import os
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import TextIO
 
 
@@ -65,13 +67,26 @@ def configure_logging(
     package_logger.propagate = False
 
 
+def configure_json_log(path: Path) -> None:
+    """Write content-safe Egress Gate records as newline-delimited JSON."""
+    package_logger = get_logger("egress_gate")
+    for handler in package_logger.handlers[:]:
+        if isinstance(handler, _EgressGateJsonHandler):
+            package_logger.removeHandler(handler)
+            handler.close()
+
+    handler = _EgressGateJsonHandler(path, encoding="utf-8")
+    handler.setFormatter(_EgressGateJsonFormatter())
+    package_logger.addHandler(handler)
+
+
 def reset_logging() -> None:
     """Remove logging configuration installed by :func:`configure_logging`."""
     package_logger = get_logger("egress_gate")
     managed_handlers = [
         handler
         for handler in package_logger.handlers
-        if isinstance(handler, _EgressGateStreamHandler)
+        if isinstance(handler, _EgressGateStreamHandler | _EgressGateJsonHandler)
     ]
     if not managed_handlers:
         return
@@ -85,6 +100,29 @@ def reset_logging() -> None:
 
 class _EgressGateStreamHandler(logging.StreamHandler[TextIO]):
     """Stream handler owned by Egress Gate's logging configuration."""
+
+
+class _EgressGateJsonHandler(logging.FileHandler):
+    """Optional content-safe JSON sink owned by Egress Gate."""
+
+
+class _EgressGateJsonFormatter(logging.Formatter):
+    """Serialize only the bounded evaluation fields used by verification."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        return json.dumps(
+            {
+                "event": getattr(record, "event", record.getMessage()),
+                "request_id": getattr(record, "request_id", None),
+                "duration_ms": getattr(record, "duration_ms", None),
+                "action": getattr(record, "action", None),
+                "reason_code": getattr(record, "reason_code", None),
+                "finding_count": getattr(record, "finding_count", None),
+                "decision_source_kind": getattr(record, "decision_source_kind", None),
+                "error_code": getattr(record, "error_code", None),
+            },
+            separators=(",", ":"),
+        )
 
 
 class _EgressGateFormatter(logging.Formatter):
@@ -129,6 +167,7 @@ __all__ = [
     "ColorMode",
     "DEFAULT_LOGGING_CONFIG",
     "LoggingConfig",
+    "configure_json_log",
     "configure_logging",
     "get_logger",
     "reset_logging",

@@ -1,5 +1,9 @@
 # Egress Gate message fingerprinting and denied-history ledger plan
 
+> **Status:** Superseded for managed harnesses by send-time whole-context
+> admission. This design remains relevant to unmanaged harnesses that cannot
+> provide an attested provider context.
+
 ## Scope
 
 The first release is intentionally process-local and in-memory. It does not

@@ -1,0 +1,55 @@
+{
+  "cases": [
+    {
+      "name": "converted-history-origins",
+      "context": {
+        "messages": [
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "The conversation history before this point was compacted into the following summary:\n\n<summary>\ncompact text\n</summary>"
+              }
+            ]
+          },
+          {
+            "role": "assistant",
+            "content": [{"type": "text", "text": "assistant text"}]
+          },
+          {
+            "role": "user",
+            "content": "Ran `printf safe`\n```\nbash text\n```"
+          },
+          {
+            "role": "user",
+            "content": [
+              {"type": "text", "text": "extension text"},
+              {"type": "text", "text": "continued"}
+            ]
+          },
+          {
+            "role": "toolResult",
+            "toolCallId": "call-1|provider-id",
+            "toolName": "read",
+            "content": [{"type": "text", "text": "tool text"}],
+            "isError": false
+          }
+        ],
+        "tools": []
+      },
+      "entries": [
+        {
+          "role": "user",
+          "text": "The conversation history before this point was compacted into the following summary:\n\n<summary>\ncompact text\n</summary>"
+        },
+        {
+          "role": "user",
+          "text": "Ran `printf safe`\n```\nbash text\n```"
+        },
+        {"role": "user", "text": "extension text\ncontinued"},
+        {"role": "tool", "tool_call_id": "call-1", "text": "tool text"}
+      ]
+    }
+  ]
+}
