@@ -20,6 +20,7 @@
   <main>
     <h1>Pi attested-admission integration QA</h1>
     <p><strong>Date:</strong> 2026-09-02 UTC</p>
+    <p><strong>Live-session update:</strong> 2026-09-03 UTC, through 02:40:14</p>
     <p>
       This report records the final proof-of-concept integration state across
       Pi, OpenShell, and OpenShell Research. It contains only sanitized command
@@ -32,8 +33,8 @@
       <thead><tr><th>Repository</th><th>Integration head</th><th>Upstream base</th></tr></thead>
       <tbody>
         <tr><td>Pi</td><td><code>177b42723d072b7954a5b1690ccf62c97f075b37</code></td><td><code>e266507b606b9552fa277252644054afd4384b11</code></td></tr>
-        <tr><td>OpenShell</td><td><code>57cbc0dc9305e657bb6177d2d6dd63baa2f5ccfc</code></td><td><code>a6b757d35f983fe4415427484ad06533d32e9e4b</code></td></tr>
-        <tr><td>OpenShell Research</td><td><code>4d99082b199b07136a9c93558d95c73d07b929d8</code> (pre-report)</td><td><code>743839dae47621c13a3bc339bad2a2c8d0167591</code></td></tr>
+        <tr><td>OpenShell</td><td><code>4d7194dc8166bfafc7236e0212d2e88aee4f7231</code></td><td><code>a6b757d35f983fe4415427484ad06533d32e9e4b</code></td></tr>
+        <tr><td>OpenShell Research</td><td><code>ff8319a69255ce0f858691095c6ea9f24d9b603f</code></td><td><code>743839dae47621c13a3bc339bad2a2c8d0167591</code></td></tr>
       </tbody>
     </table>
 
@@ -48,15 +49,95 @@
       </tbody>
     </table>
 
-    <h2>External end-to-end blocker</h2>
+    <h2>Live end-to-end result</h2>
     <p>
-      The real <code>./demo.sh verify</code> run was not substituted with a mock.
-      This checkout does not contain the ignored prepared fork/runtime, local
-      <code>.env</code>, JSON log, or provider credential required to run the
-      live sandbox and model request. The verifier reports those prerequisites;
-      a configured environment must run the clean reset and verification before
-      the proof of concept is promoted beyond draft status.
+      The configured machine completed the real <code>./demo.sh verify</code>
+      workflow and an extended interactive Pi session. The required verifier
+      cases passed: denied input was not written, redacted input was persisted
+      only as <code>[REDACTED]</code>, unauthorized bridge and unattested
+      provider calls were rejected, stock Pi could not bypass attestation, and
+      an admitted tool-result replacement persisted correctly. The
+      model-dependent tool-denial case skipped because the model did not choose
+      to call Bash; this is the verifier's documented non-failing outcome.
     </p>
+
+    <h2>Exploratory session review</h2>
+    <p>
+      The reviewed session is the persistent Pi JSONL session created at
+      <code>2026-09-03T01:45:53Z</code>, ID
+      <code>01a064f1-a65a-7fe8-ab58-e20a67f868d7</code>. The review used the
+      session structure and sanitized Egress Gate decision log; it did not copy
+      credentials or provider request bodies into this report.
+    </p>
+    <table>
+      <thead><tr><th>Area</th><th>Observed behavior</th><th>Finding</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Standard Pi workflow</td>
+          <td>One 158-entry JSONL session preserved 14 user messages, 76 assistant messages, 63 tool results, model and thinking-level changes, and one compaction event. Pi created and edited six chapter files and resumed work across repeated turns.</td>
+          <td><span class="pass">Working.</span> Persistent sessions, the normal tools, workspace writes, long-running interaction, and the standard TUI path were active.</td>
+        </tr>
+        <tr>
+          <td>Credential isolation</td>
+          <td>When Pi inspected every <code>PI_*</code> environment variable, it saw model, provider, reasoning, and session metadata but no model API key or OpenShell resolver value.</td>
+          <td><span class="pass">Working.</span> Proxy-delivered provider authentication kept the credential out of the agent environment.</td>
+        </tr>
+        <tr>
+          <td>Reasoning controls</td>
+          <td>The session began at <code>high</code>, changed to <code>xhigh</code>, and persisted 72 assistant thinking blocks. Provider usage separately reported reasoning tokens.</td>
+          <td><span class="pass">Working as a model feature.</span> The model produced reasoning and Pi retained it as ordinary session state.</td>
+        </tr>
+        <tr>
+          <td>Compaction</td>
+          <td>Pi compacted after a 69,090-token turn. The next provider request used 26,727 input tokens, then read the on-disk progress ledger and returned an accurate current story summary.</td>
+          <td><span class="pass">Working.</span> The compacted summary describes only the discarded prefix and looks stale in isolation, but <code>firstKeptEntryId</code> retains the Chapter 4 completion and the retained tail contains Chapters 5 and 6.</td>
+        </tr>
+        <tr>
+          <td>Provider failure</td>
+          <td>Immediately after switching to <code>xhigh</code>, one <code>continue</code> submission produced four retries containing <code>Connection error.</code>, empty content, and zero token usage.</td>
+          <td><strong>Failure, not denial.</strong> The session does not contain an HTTP status or lower-level cause, so it cannot distinguish the provider, proxy, or network source. The later request succeeded without a configuration change; correlation does not prove that <code>xhigh</code> caused it.</td>
+        </tr>
+        <tr>
+          <td>Reasoning-only completion</td>
+          <td>The next <code>continue</code> request returned 810 output tokens, of which 807 were reported as reasoning. It stopped successfully with one thinking block, no visible text, and no tool call. The user had to submit <code>write it</code> before work continued.</td>
+          <td><strong>Usability failure.</strong> This was a provider completion accepted by Pi, not an admission denial. It should first be reproduced against the same endpoint with stock Pi before changing the integration.</td>
+        </tr>
+        <tr>
+          <td>Denied-message audit</td>
+          <td>All 14 user entries visible in the reviewed JSONL were persisted, but an input denied before append is intentionally absent. The content-safe Egress Gate log has request IDs but no session ID, submission ID, or timestamp that can correlate a denial to this session.</td>
+          <td><strong>Observability gap.</strong> Pi can prove what was appended; it cannot prove from its own history whether another submitted message was denied. The model's claim that no denial occurred was therefore stronger than its evidence.</td>
+        </tr>
+        <tr>
+          <td>Thinking admission</td>
+          <td>Assistant thinking is persisted, can be sent on later provider turns, and consumes context. The current append envelope and attested context omit it; only request-time policy scanning covers it when it appears on the wire.</td>
+          <td><strong>Security-model gap.</strong> The current proof of concept does not guarantee that all persisted or provider-visible reasoning was admitted and bound into the context attestation.</td>
+        </tr>
+        <tr>
+          <td>Sandbox utilities</td>
+          <td>The model attempted to use <code>bc</code> and <code>file</code>, which are absent from the image. Both Bash tool results were recorded as successful because a later command in each shell invocation exited successfully.</td>
+          <td><strong>Minor environment/diagnostic issue.</strong> It did not stop the workflow, but demonstrates that a successful tool result does not imply every command in a compound shell command succeeded.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Decision-log evidence and limits</h2>
+    <p>
+      Since the latest Egress Gate server-start record, the content-safe log
+      contains 80 allows and two denials with
+      <code>reason_code=attestation_missing</code>. It contains no middleware
+      errors and no regex-denial reason. This supports the conclusion that the
+      visible interactive failures were not middleware denials. It cannot prove
+      which session or submission produced a record because the current log
+      deliberately omits the correlation fields needed for that join.
+    </p>
+
+    <h2>Recommended follow-up</h2>
+    <ol>
+      <li>Add content-free denial audit metadata that can be correlated by sandbox, session, and submission without retaining the denied text or adding it to model context.</li>
+      <li>Bring assistant thinking inside the same append-admission and whole-context attestation contract as other persisted provider-visible content.</li>
+      <li>Reproduce the reasoning-only completion and the four connection retries with stock Pi against the same endpoint. Preserve standard Pi behavior unless the integration is shown to be responsible.</li>
+      <li>Expose enough transport error detail to distinguish an upstream/provider failure from a middleware denial without logging request content or credentials.</li>
+    </ol>
 
     <h2>Verified design boundary</h2>
     <p>
