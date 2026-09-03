@@ -248,6 +248,42 @@ def test_pi_example_launch_preserves_the_prepared_sandbox() -> None:
     assert "provider create" not in result.stdout
 
 
+def test_pi_example_cleanup_explains_when_gateway_is_unavailable(
+    tmp_path: Path,
+) -> None:
+    project_dir = Path(__file__).parents[1]
+    script = project_dir / "examples/pi-attested-admission/demo.sh"
+    openshell_repo = tmp_path / "OpenShell"
+    openshell_cli = openshell_repo / "scripts/bin/openshell"
+    openshell_cli.parent.mkdir(parents=True)
+    openshell_cli.write_text(
+        "#!/bin/sh\necho 'transport error: Connection refused' >&2\nexit 1\n"
+    )
+    openshell_cli.chmod(0o755)
+
+    result = subprocess.run(
+        ["bash", str(script), "cleanup"],
+        capture_output=True,
+        env=os.environ
+        | {
+            "OPENSHELL_REPO": str(openshell_repo),
+            "PI_EGRESS_ENV_FILE": "",
+        },
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert "OpenShell gateway 'pi-egress-demo-gateway' is not reachable" in (
+        result.stderr
+    )
+    assert "Terminal 1: ./demo.sh serve" in result.stderr
+    assert "Terminal 2: ./demo.sh gateway" in result.stderr
+    assert "Then run: ./demo.sh cleanup" in result.stderr
+    assert "Do not run ./demo.sh reset" in result.stderr
+    assert "transport error" not in result.stderr
+
+
 def test_pi_example_uses_terminal_colors_without_leaking_them_to_redirects() -> None:
     project_dir = Path(__file__).parents[1]
     script = project_dir / "examples/pi-attested-admission/demo.sh"

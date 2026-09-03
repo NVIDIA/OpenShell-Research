@@ -711,6 +711,21 @@ verify() {
 cleanup() {
 	if ! $print_only; then
 		require_file "$openshell_cli" "OpenShell CLI wrapper"
+		if ! (cd -- "$openshell_repo" && "$openshell_cli" --gateway "$gateway_name" \
+			status >/dev/null 2>&1); then
+			cat >&2 <<EOF
+The OpenShell gateway '$gateway_name' is not reachable. Cleanup is performed
+through that gateway so OpenShell can remove both the sandbox and provider state.
+
+From this example directory, restart:
+  Terminal 1: ./demo.sh serve
+  Terminal 2: ./demo.sh gateway
+
+Then run: ./demo.sh cleanup
+Do not run ./demo.sh reset; reset deletes and recreates the sandbox.
+EOF
+			exit 1
+		fi
 	fi
 	describe_printed_commands "Delete the example sandbox:"
 	run_in "$openshell_repo" "$openshell_cli" --gateway "$gateway_name" \

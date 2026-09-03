@@ -333,5 +333,9 @@ sandbox and provider:
 ./demo.sh cleanup
 ```
 
+If the gateway is unavailable, `cleanup` stops before changing anything and
+prints the exact commands needed to restart the local services. Cleanup goes
+through OpenShell so sandbox and provider state are removed consistently.
+
 Then stop the OpenShell gateway and Egress Gate with `Ctrl-C`. For another
 session in the same prepared sandbox, use `./demo.sh launch` instead of cleanup.
