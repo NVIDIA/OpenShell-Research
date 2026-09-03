@@ -86,7 +86,11 @@ def test_watch_page_is_served_without_embedding_the_service_token(tmp_path: Path
     assert "OpenShell Collaboration Watcher" in response.text
     assert '<option value="conversation">Conversation</option>' in response.text
     assert '<option value="network" selected>Network flow</option>' in response.text
+    assert "Critical worker" in response.text
+    assert "Raw events" in response.text
     assert "Technical details" in response.text
+    assert "details.open = state.rawEventsOpen" in response.text
+    assert "if (data.events.length || !state.rendered)" in response.text
     assert "test-token" not in response.text
     assert "sessionStorage" in response.text
 
@@ -169,7 +173,7 @@ def test_job_detail_returns_debug_data_without_prompt_or_policy(tmp_path: Path) 
     assert "childPolicy" not in body
 
 
-def test_network_flow_reports_service_and_inference_latencies(tmp_path: Path) -> None:
+def test_network_flow_reports_service_latencies(tmp_path: Path) -> None:
     with TestClient(application(tmp_path)) as client:
         response = client.post(
             "/v1/jobs",
@@ -196,6 +200,9 @@ def test_network_flow_reports_service_and_inference_latencies(tmp_path: Path) ->
 
     assert flow.status_code == 200
     spans = flow.json()["spans"]
+    assert {"delegation", "policy", "sandbox", "execution"}.issubset(
+        {span["category"] for span in spans}
+    )
     assert any(
         span["source"] == "Parent Pi"
         and span["target"] == "Tool Service"
@@ -208,7 +215,7 @@ def test_network_flow_reports_service_and_inference_latencies(tmp_path: Path) ->
         and span["durationMs"] is not None
         for span in spans
     )
-    inference = next(span for span in spans if span["target"] == "Inference")
-    assert inference["source"] == "reviewer"
-    assert inference["durationMs"] == 250
-    assert inference["timingSource"] == "OpenShell API:INFERENCE latency"
+    assert all(span["category"] != "inference" for span in spans)
+    coordination = next(span for span in spans if span["category"] == "coordination")
+    assert coordination["label"] == "wait for execution slot"
+    assert coordination["status"] == "success"

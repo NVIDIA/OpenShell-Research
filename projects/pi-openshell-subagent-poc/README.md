@@ -224,17 +224,19 @@ http://127.0.0.1:8765/watch?parent=pi-parent
 
 Paste `OPENSHELL_TOOL_SERVICE_TOKEN` into the page and select **Connect**. The
 token is kept only in that browser tab. The page refreshes every 500 ms and
-automatically follows the newest run. Its default network-flow view shows each
-observed hop between the parent, Tool Service, Policy Reviewer, OpenShell,
-child Pi processes, and inference, including latency and the source of that
-measurement. OpenShell `API:INFERENCE` timings appear after a child finishes,
-when its captured sandbox logs become available. A message's Tool Service to
-recipient time is measured from storage to acknowledgement; sender to Tool
-Service is shown as unmeasured because the POC sees only the arrival timestamp.
-Switch to conversation, key activity, or debug when you need the underlying
-events, or select a hop to inspect its timing source and details. The browser
-API is read-only and requires the Tool Service bearer token; the HTML shell
-itself contains no credentials.
+automatically follows the newest run. Its default network-flow view is a shared
+time-axis waterfall with one lane per worker and separate tracks for control
+plane work, Pi execution, inference, and messages. It highlights the critical
+worker, slowest measured operation, failures, running spans, and message points.
+Runs above 16 workers collapse into expandable groups of 16. OpenShell
+`API:INFERENCE` timings appear after a child finishes, when its captured sandbox
+logs become available. A message's Tool Service to recipient time is measured
+from storage to acknowledgement; sender to Tool Service is shown as unmeasured
+because the POC sees only the arrival timestamp. Expand **Raw events** for the
+underlying journal, switch to conversation or activity views when useful, or
+select a bar or point to inspect its timing source and details. The browser API
+is read-only and requires the Tool Service bearer token; the HTML shell itself
+contains no credentials.
 
 ### 8. Terminal 4: create and start the parent Pi agent
 

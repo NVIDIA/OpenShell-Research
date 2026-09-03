@@ -426,11 +426,14 @@ def create_app(
         run_events = [event for event in events if event.run_id == run]
         job_ids = list(dict.fromkeys(event.job_id for event in run_events if event.job_id))
         jobs = await asyncio.to_thread(tool_service.store.get_many, job_ids)
-        spans = await asyncio.to_thread(build_network_flow, run_events, jobs)
+        generated_at = time.time()
+        spans = await asyncio.to_thread(
+            build_network_flow, run_events, jobs, now=generated_at
+        )
         return {
             "runId": run,
             "spans": [span.handle() for span in spans],
-            "generatedAt": time.time(),
+            "generatedAt": generated_at,
         }
 
     @app.post("/v1/jobs", status_code=status.HTTP_202_ACCEPTED)

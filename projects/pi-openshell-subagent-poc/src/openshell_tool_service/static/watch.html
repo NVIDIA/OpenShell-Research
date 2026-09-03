@@ -126,7 +126,7 @@
     .state { padding: 2px 6px; border-radius: 999px; font-size: 10px; background: #28313d; color: var(--muted); }
     .state.ready, .state.finished { color: var(--green); background: rgba(118,214,165,.10); }
     .state.failed { color: var(--red); background: rgba(255,133,141,.10); }
-    #eventList { padding: 10px; max-height: calc(100vh - 285px); min-height: 480px; overflow: auto; }
+    #eventList { padding: 10px; min-height: 480px; overflow-x: auto; }
     .event {
       position: relative; margin: 0 0 9px 18px; padding: 11px 12px;
       border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2);
@@ -156,36 +156,58 @@
     .event-meta { color: var(--muted); margin-top: 5px; font-size: 12px; }
     .conversation .event-meta { display: none; }
     .conversation .event:not(.message) { display: none; }
-    .network-flow { padding: 14px; max-height: calc(100vh - 285px); min-height: 480px; overflow: auto; }
-    .flow-summary {
-      display: flex; gap: 9px; align-items: center; flex-wrap: wrap;
-      margin-bottom: 14px; padding: 11px 12px; border: 1px solid var(--line);
-      border-radius: 10px; background: #0d1117; color: var(--muted);
+    .network-flow { padding: 14px; min-height: 480px; overflow-x: auto; }
+    .trace-diagnostics { display: grid; grid-template-columns: repeat(4, minmax(145px, 1fr)); gap: 8px; margin-bottom: 14px; }
+    .trace-metric { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #0d1117; min-width: 0; }
+    .trace-metric-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+    .trace-metric-value { margin-top: 4px; font-weight: 750; overflow-wrap: anywhere; }
+    .trace-metric-value.failed { color: var(--red); }
+    .trace-legend { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 11px; margin: 0 0 11px 190px; }
+    .legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+    .waterfall { min-width: 900px; }
+    .ruler, .track-row { display: grid; grid-template-columns: 180px minmax(650px, 1fr); gap: 10px; }
+    .ruler { margin-bottom: 7px; color: var(--muted); font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .ruler-track, .trace-track { position: relative; }
+    .ruler-track { height: 20px; border-bottom: 1px solid var(--line); }
+    .tick { position: absolute; bottom: 2px; transform: translateX(-50%); }
+    .tick:first-child { transform: none; }
+    .tick:last-child { transform: translateX(-100%); }
+    .worker-lane { margin-bottom: 10px; padding: 9px; border: 1px solid var(--line); border-radius: 11px; background: rgba(13,17,23,.76); }
+    .worker-lane.critical { border-color: rgba(246,200,107,.65); box-shadow: inset 3px 0 0 var(--amber); }
+    .worker-title { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 5px; font-weight: 750; }
+    .worker-title small { color: var(--muted); font-weight: 500; }
+    .critical-label { color: var(--amber); }
+    .track-row { min-height: 29px; align-items: center; }
+    .track-label { color: var(--muted); font-size: 11px; text-align: right; padding-right: 3px; }
+    .trace-track {
+      height: 25px; border-left: 1px solid var(--line); border-right: 1px solid var(--line);
+      background: repeating-linear-gradient(to right, transparent 0, transparent calc(25% - 1px), rgba(120,136,155,.12) 25%);
     }
-    .flow-summary strong { color: var(--text); }
-    .hop {
-      display: grid; grid-template-columns: minmax(110px, 1fr) minmax(210px, 2.2fr) minmax(110px, 1fr) 88px;
-      gap: 10px; align-items: center; margin-bottom: 9px; padding: 10px;
-      border: 1px solid var(--line); border-radius: 11px; background: var(--panel-2);
+    .trace-span {
+      position: absolute; top: 3px; height: 19px; min-width: 5px; padding: 2px 5px;
+      border: 0; border-radius: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+      color: #071018; font: 700 10px/15px ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: var(--blue); cursor: pointer;
     }
-    .hop.failed { border-color: rgba(255,133,141,.55); }
-    .hop-node {
-      min-width: 0; padding: 8px 9px; border: 1px solid #344152; border-radius: 8px;
-      background: #0c1117; font-weight: 700; overflow-wrap: anywhere; text-align: center;
-    }
-    .hop-route { min-width: 0; text-align: center; }
-    .hop-label { color: #dbe4ec; font-size: 12px; overflow-wrap: anywhere; }
-    .hop-line { height: 1px; margin: 8px 0 6px; background: var(--blue); position: relative; }
-    .hop-line::after {
-      content: ""; position: absolute; right: -1px; top: -4px;
-      border-left: 7px solid var(--blue); border-top: 4px solid transparent; border-bottom: 4px solid transparent;
-    }
-    .hop.failed .hop-line { background: var(--red); }
-    .hop.failed .hop-line::after { border-left-color: var(--red); }
-    .hop-via { color: var(--muted); font-size: 10px; }
-    .hop-latency { font: 700 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--green); text-align: right; }
-    .hop.failed .hop-latency { color: var(--red); }
-    .hop-time { color: var(--muted); font-weight: 400; font-size: 10px; margin-top: 3px; }
+    .trace-span.policy { background: var(--violet); }
+    .trace-span.sandbox { background: #58c7d8; }
+    .trace-span.coordination { background: var(--amber); }
+    .trace-span.execution { background: var(--green); }
+    .trace-span.message { width: 9px !important; min-width: 9px; padding: 0; border-radius: 50%; background: #f29bd4; overflow: visible; }
+    .trace-span.running { background-image: linear-gradient(110deg, transparent 25%, rgba(255,255,255,.35) 45%, transparent 65%); background-size: 200% 100%; animation: trace-pulse 1.2s linear infinite; }
+    .trace-span.failed { background: var(--red); box-shadow: 0 0 0 2px rgba(255,133,141,.20); }
+    @keyframes trace-pulse { to { background-position: -200% 0; } }
+    .group-lane { width: 100%; display: grid; grid-template-columns: 180px minmax(650px, 1fr); gap: 10px; align-items: center; margin-bottom: 8px; padding: 9px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); color: inherit; text-align: left; }
+    .group-label { font-weight: 750; }
+    .group-label small { display: block; color: var(--muted); font-weight: 500; margin-top: 2px; }
+    .group-track { position: relative; height: 20px; background: #0d1117; border-radius: 4px; overflow: hidden; }
+    .group-bar { position: absolute; top: 4px; height: 12px; min-width: 5px; border-radius: 3px; background: var(--blue); }
+    .group-bar.failed { background: var(--red); }
+    .raw-events { margin-top: 14px; border: 1px solid var(--line); border-radius: 10px; background: #0d1117; }
+    .raw-events summary { padding: 10px 12px; cursor: pointer; color: var(--muted); font-weight: 700; }
+    .raw-event-list { padding: 0 9px 9px; }
+    .raw-event { display: grid; grid-template-columns: 82px 150px 1fr; gap: 8px; width: 100%; padding: 7px 8px; border: 0; border-top: 1px solid var(--line); background: transparent; color: #dce4ec; text-align: left; font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .raw-event:hover { background: var(--panel-2); }
     .empty { color: var(--muted); padding: 36px 18px; text-align: center; }
     .detail-content { padding: 14px; height: calc(100% - 44px); overflow: auto; }
     .detail-title { display: flex; align-items: center; justify-content: space-between; }
@@ -213,11 +235,7 @@
       .stat:nth-child(2) { border-right: 0; }
       .stat:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
       .participants, .timeline { min-height: 0; }
-      #eventList { max-height: none; }
-      .network-flow { max-height: none; }
-      .hop { grid-template-columns: 1fr; }
-      .hop-route { padding: 2px 18px; }
-      .hop-latency { text-align: center; }
+      .trace-diagnostics { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
@@ -276,7 +294,8 @@
       "participant.finished", "participant.failed", "delivery.undeliverable",
       "sandbox.cleanup.failed", "run.closed", "run.expired"
     ]);
-    const state = { events: new Map(), spans: [], sequence: 0, connected: false, paused: false, timer: null, followLatest: true, flowLoadedAt: 0 };
+    const state = { events: new Map(), spans: [], sequence: 0, connected: false, paused: false, timer: null, followLatest: true, flowLoadedAt: 0, flowSignature: "", rendered: false, rawEventsOpen: false, expandedGroups: new Set() };
+    const roleCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
     const $ = (id) => document.getElementById(id);
     const node = (tag, className, text) => {
       const value = document.createElement(tag);
@@ -337,7 +356,7 @@
           }
         }
       }
-      return [...participants.values()].sort((a, b) => a.role === "parent" ? -1 : b.role === "parent" ? 1 : a.role.localeCompare(b.role));
+      return [...participants.values()].sort((a, b) => a.role === "parent" ? -1 : b.role === "parent" ? 1 : roleCollator.compare(a.role, b.role));
     }
 
     function renderRuns() {
@@ -399,48 +418,158 @@
       return `${(durationMs / 1000).toFixed(durationMs < 10000 ? 2 : 1)} s`;
     }
 
-    function renderNetworkFlow(spans) {
+    function traceBounds(spans) {
+      const startedAt = Math.min(...spans.map((span) => span.startedAt));
+      const observedEnd = Math.max(...spans.map((span) => span.endedAt));
+      return { startedAt, endedAt: Math.max(observedEnd, startedAt + 0.1), duration: Math.max(0.1, observedEnd - startedAt) };
+    }
+
+    function tracePosition(at, bounds) {
+      return Math.max(0, Math.min(100, ((at - bounds.startedAt) / bounds.duration) * 100));
+    }
+
+    function traceMetric(label, value, failed = false) {
+      const card = node("div", "trace-metric");
+      card.append(node("div", "trace-metric-label", label), node("div", `trace-metric-value ${failed ? "failed" : ""}`, value));
+      return card;
+    }
+
+    function appendTraceSpan(track, span, bounds) {
+      const left = tracePosition(span.startedAt, bounds);
+      const right = tracePosition(span.endedAt, bounds);
+      const value = node("button", `trace-span ${span.category} ${span.status}`);
+      value.type = "button";
+      value.style.left = `${Math.min(99, left)}%`;
+      value.style.width = `${Math.max(span.category === "message" ? 0 : 0.6, right - left)}%`;
+      const latency = formatLatency(span.durationMs);
+      value.title = `${span.source} → ${span.target}\n${span.label}\n${latency}${span.detail ? `\n${span.detail}` : ""}`;
+      if (span.category !== "message" && right - left > 7) {
+        value.textContent = `${span.label} · ${latency}`;
+      }
+      value.addEventListener("click", () => showSpanDetail(span));
+      track.append(value);
+    }
+
+    function workerLane(role, spans, bounds, criticalRole) {
+      const lane = node("section", `worker-lane ${role === criticalRole ? "critical" : ""}`);
+      const roleSpans = spans.filter((span) => span.roleName === role);
+      const failed = roleSpans.some((span) => span.status === "failed");
+      const running = roleSpans.some((span) => span.status === "running");
+      const elapsed = Math.max(...roleSpans.map((span) => span.endedAt)) - Math.min(...roleSpans.map((span) => span.startedAt));
+      const title = node("div", "worker-title");
+      const roleLabel = node("span", "", role);
+      if (role === criticalRole) roleLabel.append(node("span", "critical-label", "  critical path"));
+      title.append(roleLabel, node("small", "", `${failed ? "failed" : running ? "running" : "finished"} · ${formatLatency(Math.round(elapsed * 1000))}`));
+      lane.append(title);
+      const tracks = [
+        ["Control plane", new Set(["delegation", "policy", "sandbox", "coordination"])],
+        ["Pi execution", new Set(["execution"])],
+        ["Messages", new Set(["message"])],
+      ];
+      for (const [label, categories] of tracks) {
+        const row = node("div", "track-row");
+        const track = node("div", "trace-track");
+        row.append(node("div", "track-label", label), track);
+        for (const span of roleSpans.filter((item) => categories.has(item.category))) appendTraceSpan(track, span, bounds);
+        lane.append(row);
+      }
+      return lane;
+    }
+
+    function renderRawEvents(container, events) {
+      const details = node("details", "raw-events");
+      details.open = state.rawEventsOpen;
+      details.addEventListener("toggle", () => { state.rawEventsOpen = details.open; });
+      details.append(node("summary", "", `Raw events (${events.length})`));
+      const rows = node("div", "raw-event-list");
+      for (const event of events) {
+        const row = node("button", "raw-event");
+        row.type = "button";
+        const role = event.participant?.roleName || event.participant?.role || "workflow";
+        row.append(node("span", "", stamp(event.createdAt)), node("span", "", role), node("span", "", event.eventType));
+        row.addEventListener("click", () => showDetail(event));
+        rows.append(row);
+      }
+      details.append(rows);
+      container.append(details);
+    }
+
+    function renderNetworkFlow(spans, events) {
       const list = $("eventList");
       list.className = "network-flow";
       list.replaceChildren();
       if (!spans.length) {
-        list.append(node("div", "empty", "Waiting for measurable network hops in this run."));
+        list.append(node("div", "empty", "Waiting for trace spans in this run."));
+        renderRawEvents(list, events);
         return;
       }
-      const measured = spans.filter((span) => span.durationMs !== null);
-      const slowest = measured.reduce((best, span) => !best || span.durationMs > best.durationMs ? span : best, null);
+      const bounds = traceBounds(spans);
+      const roles = [...new Set(spans.map((span) => span.roleName).filter((role) => role && role !== "parent"))].sort(roleCollator.compare);
       const failures = spans.filter((span) => span.status === "failed");
-      const summary = node("div", "flow-summary");
-      summary.append(
-        node("span", "", `${spans.length} observed hops`),
-        node("span", "", "·"),
-        node("span", "", `${measured.length} timed`),
+      const leafSpans = spans.filter((span) => span.durationMs !== null && !["execution", "coordination", "delegation"].includes(span.category));
+      const slowest = leafSpans.reduce((best, span) => !best || span.durationMs > best.durationMs ? span : best, null);
+      const latestByRole = roles.map((role) => ({ role, endedAt: Math.max(...spans.filter((span) => span.roleName === role).map((span) => span.endedAt)) }));
+      const criticalRole = latestByRole.reduce((best, item) => !best || item.endedAt > best.endedAt ? item : best, null)?.role || "—";
+      const diagnostics = node("div", "trace-diagnostics");
+      diagnostics.append(
+        traceMetric("Total runtime", formatLatency(Math.round(bounds.duration * 1000))),
+        traceMetric("Critical worker", criticalRole),
+        traceMetric("Slowest operation", slowest ? `${slowest.roleName}: ${slowest.label} · ${formatLatency(slowest.durationMs)}` : "Waiting for timing"),
+        traceMetric("Failures", failures.length ? `${failures.length} · ${failures[0].roleName}: ${failures[0].label}` : "None", failures.length > 0),
       );
-      if (slowest) {
-        summary.append(node("span", "", "·"), node("strong", "", `Slowest: ${slowest.label} (${formatLatency(slowest.durationMs)})`));
+      list.append(diagnostics);
+      const waterfall = node("div", "waterfall");
+      const legend = node("div", "trace-legend");
+      for (const [label, color] of [["Policy", "var(--violet)"], ["Sandbox", "#58c7d8"], ["Pi", "var(--green)"], ["Message", "#f29bd4"], ["Failure", "var(--red)"]]) {
+        const item = node("span", "", label);
+        const dot = node("i", "legend-dot");
+        dot.style.background = color;
+        item.prepend(dot);
+        legend.append(item);
       }
-      if (failures.length) {
-        summary.append(node("span", "", "·"), node("strong", "", `${failures.length} failed hop${failures.length === 1 ? "" : "s"}`));
+      waterfall.append(legend);
+      const ruler = node("div", "ruler");
+      const rulerTrack = node("div", "ruler-track");
+      ruler.append(node("div", "", `time from ${stamp(bounds.startedAt)}`), rulerTrack);
+      for (const fraction of [0, .25, .5, .75, 1]) {
+        const tick = node("span", "tick", formatLatency(Math.round(bounds.duration * fraction * 1000)));
+        tick.style.left = `${fraction * 100}%`;
+        rulerTrack.append(tick);
       }
-      list.append(summary);
-      for (const span of spans) {
-        const row = node("button", `hop ${span.status === "failed" ? "failed" : ""}`);
-        row.type = "button";
-        row.style.width = "100%";
-        row.style.color = "inherit";
-        row.style.font = "inherit";
-        const source = node("div", "hop-node", span.source);
-        const route = node("div", "hop-route");
-        route.append(node("div", "hop-label", span.label), node("div", "hop-line"));
-        route.append(node("div", "hop-via", span.via ? `via ${span.via}` : span.timingSource));
-        const target = node("div", "hop-node", span.target);
-        const latency = node("div", "hop-latency", formatLatency(span.durationMs));
-        latency.append(node("div", "hop-time", stamp(span.endedAt)));
-        row.append(source, route, target, latency);
-        row.addEventListener("click", () => showSpanDetail(span));
-        list.append(row);
+      waterfall.append(ruler);
+      if (roles.length <= 16) {
+        for (const role of roles) waterfall.append(workerLane(role, spans, bounds, criticalRole));
+      } else {
+        for (let index = 0; index < roles.length; index += 16) {
+          const groupIndex = index / 16;
+          const groupRoles = roles.slice(index, index + 16);
+          const groupSpans = spans.filter((span) => groupRoles.includes(span.roleName));
+          const groupStart = Math.min(...groupSpans.map((span) => span.startedAt));
+          const groupEnd = Math.max(...groupSpans.map((span) => span.endedAt));
+          const groupFailures = groupSpans.filter((span) => span.status === "failed").length;
+          const group = node("button", "group-lane");
+          group.type = "button";
+          const label = node("div", "group-label", `Workers ${index + 1}–${index + groupRoles.length}`);
+          label.append(node("small", "", `${groupRoles.length} workers · ${groupFailures ? `${groupFailures} failed` : "healthy"} · click to ${state.expandedGroups.has(groupIndex) ? "collapse" : "expand"}`));
+          const track = node("div", "group-track");
+          const bar = node("span", `group-bar ${groupFailures ? "failed" : ""}`);
+          bar.style.left = `${tracePosition(groupStart, bounds)}%`;
+          bar.style.width = `${Math.max(.6, tracePosition(groupEnd, bounds) - tracePosition(groupStart, bounds))}%`;
+          track.append(bar);
+          group.append(label, track);
+          group.addEventListener("click", () => {
+            if (state.expandedGroups.has(groupIndex)) state.expandedGroups.delete(groupIndex);
+            else state.expandedGroups.add(groupIndex);
+            render();
+          });
+          waterfall.append(group);
+          if (state.expandedGroups.has(groupIndex)) {
+            for (const role of groupRoles) waterfall.append(workerLane(role, spans, bounds, criticalRole));
+          }
+        }
       }
-      list.scrollTop = list.scrollHeight;
+      list.append(waterfall);
+      renderRawEvents(list, events);
     }
 
     function renderTimeline(events) {
@@ -552,7 +681,7 @@
       const events = selectedEvents();
       const participants = participantsFor(runEvents);
       renderParticipants(participants);
-      if ($("typeFilter").value === "network") renderNetworkFlow(state.spans);
+      if ($("typeFilter").value === "network") renderNetworkFlow(state.spans, runEvents);
       else renderTimeline(events);
       const workers = participants.filter((item) => item.role !== "parent");
       const messages = runEvents.filter((event) => event.eventType === "message.stored");
@@ -596,9 +725,14 @@
       );
       if (!response.ok) throw new Error(`Network flow HTTP ${response.status}`);
       const data = await response.json();
-      state.spans = data.spans || [];
+      const spans = data.spans || [];
+      const signature = JSON.stringify(spans);
       state.flowLoadedAt = now;
+      if (signature === state.flowSignature) return;
+      state.spans = spans;
+      state.flowSignature = signature;
       render();
+      state.rendered = true;
     }
 
     async function poll() {
@@ -612,7 +746,10 @@
         state.sequence = data.lastSequence;
         setConnection("live", "Live · 500 ms refresh");
         $("updatedAt").textContent = `Updated ${new Date().toLocaleTimeString([], { hour12: false })}`;
-        render();
+        if (data.events.length || !state.rendered) {
+          render();
+          state.rendered = true;
+        }
         await loadNetworkFlow();
         if (data.hasMore) return poll();
       } catch (error) {
@@ -633,8 +770,12 @@
       history.replaceState({}, "", url);
       state.events.clear();
       state.spans = [];
+      state.expandedGroups.clear();
       state.sequence = 0;
       state.flowLoadedAt = 0;
+      state.flowSignature = "";
+      state.rendered = false;
+      state.rawEventsOpen = false;
       state.connected = true;
       state.paused = false;
       state.followLatest = true;
@@ -655,12 +796,16 @@
     $("runFilter").addEventListener("change", () => {
       state.followLatest = false;
       state.spans = [];
+      state.flowSignature = "";
+      state.expandedGroups.clear();
       state.flowLoadedAt = 0;
       render();
+      state.rendered = true;
       loadNetworkFlow(true).catch((error) => setConnection("error", String(error.message || error)));
     });
     $("typeFilter").addEventListener("change", () => {
       render();
+      state.rendered = true;
       loadNetworkFlow(true).catch((error) => setConnection("error", String(error.message || error)));
     });
     $("tokenInput").value = sessionStorage.getItem("openshell-watch-token") || "";

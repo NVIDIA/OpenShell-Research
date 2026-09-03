@@ -2,23 +2,13 @@
 
 from __future__ import annotations
 
-import re
+import time
 from collections import defaultdict
 from dataclasses import asdict, dataclass
 from typing import Any
 
 from openshell_tool_service.collaboration import CollaborationTimelineEvent
 from openshell_tool_service.store import Job
-
-INFERENCE_SUCCESS = re.compile(
-    r"^\[(?P<at>\d+(?:\.\d+)?)\].*API:INFERENCE.*"
-    r"(?P<status>Success|Failure) (?P<model>\S+) via (?P<endpoint>\S+) "
-    r"(?P<duration>\d+)ms"
-)
-INFERENCE_CONNECTION_FAILURE = re.compile(
-    r"^\[(?P<at>\d+(?:\.\d+)?)\].*DENIED inference\.local:443 "
-    r"\[reason:(?P<reason>[^]]+)\]"
-)
 
 
 @dataclass(frozen=True)
@@ -27,6 +17,7 @@ class NetworkSpan:
     run_id: str
     job_id: str | None
     role_name: str | None
+    category: str
     source: str
     target: str
     via: str | None
@@ -45,6 +36,7 @@ class NetworkSpan:
             "runId": value["run_id"],
             "jobId": value["job_id"],
             "roleName": value["role_name"],
+            "category": value["category"],
             "source": value["source"],
             "target": value["target"],
             "via": value["via"],
@@ -69,91 +61,46 @@ def _role(event: CollaborationTimelineEvent, job: Job | None) -> str:
 def _paired_span(
     *,
     started: CollaborationTimelineEvent,
-    ended: CollaborationTimelineEvent,
+    ended: CollaborationTimelineEvent | None,
     job: Job | None,
     source: str,
     target: str,
     via: str | None,
     label: str,
+    category: str,
+    now: float,
     timing_source: str = "Tool Service event timestamps",
 ) -> NetworkSpan:
-    failed = any(token in ended.event_type for token in ("failed", "denied"))
-    detail = ended.payload.get("reason") or ended.payload.get("error")
+    failed = ended is not None and any(
+        token in ended.event_type for token in ("failed", "denied")
+    )
+    ended_at = ended.created_at if ended else now
+    detail = (ended.payload.get("reason") or ended.payload.get("error")) if ended else None
     return NetworkSpan(
-        id=f"{started.sequence}:{ended.sequence}:{label}",
+        id=f"{started.sequence}:{ended.sequence if ended else 'running'}:{label}",
         run_id=started.run_id,
         job_id=started.job_id,
         role_name=_role(started, job),
+        category=category,
         source=source,
         target=target,
         via=via,
         label=label,
-        status="failed" if failed else "success",
+        status="failed" if failed else "success" if ended else "running",
         started_at=started.created_at,
-        ended_at=ended.created_at,
-        duration_ms=_duration_ms(started.created_at, ended.created_at),
+        ended_at=ended_at,
+        duration_ms=_duration_ms(started.created_at, ended_at),
         timing_source=timing_source,
         detail=str(detail) if detail else None,
     )
 
 
-def _inference_spans(job: Job) -> list[NetworkSpan]:
-    spans: list[NetworkSpan] = []
-    for index, line in enumerate((job.sandbox_logs or "").splitlines()):
-        match = INFERENCE_SUCCESS.search(line)
-        if match:
-            ended_at = float(match.group("at"))
-            duration_ms = int(match.group("duration"))
-            spans.append(
-                NetworkSpan(
-                    id=f"{job.id}:inference:{index}",
-                    run_id=job.run_id,
-                    job_id=job.id,
-                    role_name=job.participant_alias,
-                    source=job.participant_alias,
-                    target="Inference",
-                    via="OpenShell inference router",
-                    label=f"{match.group('model')} response",
-                    status=(
-                        "success" if match.group("status") == "Success" else "failed"
-                    ),
-                    started_at=ended_at - duration_ms / 1000,
-                    ended_at=ended_at,
-                    duration_ms=duration_ms,
-                    timing_source="OpenShell API:INFERENCE latency",
-                    detail=match.group("endpoint"),
-                )
-            )
-            continue
-        failure = INFERENCE_CONNECTION_FAILURE.search(line)
-        if failure:
-            at = float(failure.group("at"))
-            spans.append(
-                NetworkSpan(
-                    id=f"{job.id}:inference-failure:{index}",
-                    run_id=job.run_id,
-                    job_id=job.id,
-                    role_name=job.participant_alias,
-                    source=job.participant_alias,
-                    target="Inference",
-                    via="OpenShell inference router",
-                    label="TLS connection",
-                    status="failed",
-                    started_at=at,
-                    ended_at=at,
-                    duration_ms=None,
-                    timing_source="OpenShell sandbox log",
-                    detail=failure.group("reason"),
-                )
-            )
-    return spans
-
-
 def build_network_flow(
-    events: list[CollaborationTimelineEvent], jobs: list[Job]
+    events: list[CollaborationTimelineEvent], jobs: list[Job], *, now: float | None = None
 ) -> list[NetworkSpan]:
     """Derive operator-facing hops without introducing another tracing store."""
 
+    current_time = time.time() if now is None else now
     jobs_by_id = {job.id: job for job in jobs}
     by_job: dict[str, list[CollaborationTimelineEvent]] = defaultdict(list)
     for event in events:
@@ -169,6 +116,7 @@ def build_network_flow(
             "OpenShell",
             None,
             "get parent policy",
+            "policy",
         ),
         (
             "policy.review.started",
@@ -177,6 +125,7 @@ def build_network_flow(
             "Policy Reviewer",
             "Inference API",
             "review child policy",
+            "policy",
         ),
         (
             "sandbox.create.requested",
@@ -185,6 +134,7 @@ def build_network_flow(
             "OpenShell",
             None,
             "create sandbox and wait Ready",
+            "sandbox",
         ),
         (
             "pi.execution.started",
@@ -192,7 +142,8 @@ def build_network_flow(
             "Tool Service",
             "Child Pi",
             "OpenShell exec",
-            "run delegated task",
+            "child execution lifecycle",
+            "execution",
         ),
     )
     for job_id, job_events in by_job.items():
@@ -207,6 +158,7 @@ def build_network_flow(
                     run_id=accepted.run_id,
                     job_id=accepted.job_id,
                     role_name=_role(accepted, job),
+                    category="delegation",
                     source="Parent Pi",
                     target="Tool Service",
                     via="pi-subagents external-job adapter",
@@ -218,7 +170,7 @@ def build_network_flow(
                     timing_source="Acceptance timestamp only",
                 )
             )
-        for start_type, end_types, source, target, via, label in pair_specs:
+        for start_type, end_types, source, target, via, label, category in pair_specs:
             started = next((event for event in job_events if event.event_type == start_type), None)
             if started is None:
                 continue
@@ -230,8 +182,6 @@ def build_network_flow(
                 ),
                 None,
             )
-            if ended is None:
-                continue
             resolved_target = _role(started, job) if target == "Child Pi" else target
             spans.append(
                 _paired_span(
@@ -242,6 +192,49 @@ def build_network_flow(
                     target=resolved_target,
                     via=via,
                     label=label,
+                    category=category,
+                    now=current_time,
+                )
+            )
+
+        prepared = next(
+            (event for event in job_events if event.event_type == "sandbox.prepared"), None
+        )
+        if prepared is not None:
+            coordinated = job is not None and job.start_mode == "all-ready"
+            release_type = "workflow.released" if coordinated else "worker.released"
+            ended = next(
+                (
+                    event
+                    for event in job_events
+                    if event.sequence > prepared.sequence
+                    and event.event_type
+                    in {
+                        release_type,
+                        "pi.execution.started",
+                        "pi.execution.failed",
+                        "job.completed",
+                        "participant.finished",
+                        "participant.failed",
+                    }
+                ),
+                None,
+            )
+            spans.append(
+                _paired_span(
+                    started=prepared,
+                    ended=ended,
+                    job=job,
+                    source="Tool Service",
+                    target=_role(prepared, job),
+                    via="all-ready barrier" if coordinated else "execution queue",
+                    label=(
+                        "wait for all workers"
+                        if coordinated
+                        else "wait for execution slot"
+                    ),
+                    category="coordination",
+                    now=current_time,
                 )
             )
 
@@ -263,6 +256,7 @@ def build_network_flow(
                 run_id=stored.run_id,
                 job_id=stored.job_id,
                 role_name=message.sender_alias,
+                category="message",
                 source=message.sender_alias,
                 target="Tool Service",
                 via=None,
@@ -281,6 +275,7 @@ def build_network_flow(
                 run_id=event.run_id,
                 job_id=stored.job_id,
                 role_name=message.recipient_alias,
+                category="message",
                 source="Tool Service",
                 target=message.recipient_alias,
                 via=None,
@@ -294,6 +289,4 @@ def build_network_flow(
             )
         )
 
-    for job in jobs:
-        spans.extend(_inference_spans(job))
     return sorted(spans, key=lambda span: (span.started_at, span.ended_at, span.id))
