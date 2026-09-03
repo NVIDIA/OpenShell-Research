@@ -1,6 +1,6 @@
 # Pi OpenShell Subagent POC
 
-- Keep this project limited to one parent and bounded, one-shot child workers.
+- Keep this project limited to one parent and one-shot child workers.
 - The Python service uses the OpenShell CLI rather than the checked-in Python
   SDK because the current generated Python protobufs are stale.
 - Never accept an image, provider, workspace, or command from a sandbox request.

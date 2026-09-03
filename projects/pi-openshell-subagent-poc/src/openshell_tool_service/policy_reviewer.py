@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+from collections import OrderedDict
 from collections.abc import Callable
-from dataclasses import dataclass
+from concurrent.futures import Future
+from dataclasses import dataclass, replace
+from threading import Lock
 from typing import Literal, Protocol
 
 import httpx
@@ -88,20 +92,25 @@ class LlmPolicyReviewer:
         self.model = model
         self.timeout_seconds = timeout_seconds
         self.requester = requester or self._request
+        self._client = (
+            None
+            if requester is not None
+            else httpx.Client(http2=True, timeout=self.timeout_seconds)
+        )
 
     def _request(self, payload: dict[str, object]) -> dict[str, object]:
         try:
             # NVIDIA Inference Hub currently rejects this credential path over
             # HTTP/1.1, even though the same credential succeeds over HTTP/2.
-            with httpx.Client(http2=True, timeout=self.timeout_seconds) as client:
-                response = client.post(
-                    f"{self.base_url}/responses",
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json=payload,
-                )
+            assert self._client is not None
+            response = self._client.post(
+                f"{self.base_url}/responses",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
             response.raise_for_status()
             value = response.json()
         except httpx.TimeoutException as error:
@@ -202,3 +211,72 @@ class LlmPolicyReviewer:
             task_alignment_reason=task_alignment_reason.strip(),
             reviewer=f"mock-llm:{self.model}",
         )
+
+    def close(self) -> None:
+        if self._client is not None:
+            self._client.close()
+
+
+class CachingPolicyReviewer:
+    """Single-flight attenuation cache keyed only by effective policy inputs."""
+
+    def __init__(self, delegate: PolicyReviewer, max_entries: int = 256) -> None:
+        self.delegate = delegate
+        self.max_entries = max_entries
+        self._lock = Lock()
+        self._cache: OrderedDict[str, PolicyReviewResult] = OrderedDict()
+        self._in_flight: dict[str, Future[PolicyReviewResult]] = {}
+
+    @staticmethod
+    def _key(request: PolicyReviewRequest) -> str:
+        digest = hashlib.sha256()
+        digest.update(request.parent_policy.encode())
+        digest.update(b"\0")
+        digest.update(request.child_policy.encode())
+        return digest.hexdigest()
+
+    @staticmethod
+    def _cached_result(result: PolicyReviewResult) -> PolicyReviewResult:
+        return replace(
+            result,
+            task_alignment="unknown",
+            task_alignment_reason=(
+                "Cached attenuation decision; task alignment was not re-evaluated."
+            ),
+        )
+
+    def review(self, request: PolicyReviewRequest) -> PolicyReviewResult:
+        key = self._key(request)
+        owner = False
+        with self._lock:
+            cached = self._cache.get(key)
+            if cached is not None:
+                self._cache.move_to_end(key)
+                return self._cached_result(cached)
+            future = self._in_flight.get(key)
+            if future is None:
+                future = Future()
+                self._in_flight[key] = future
+                owner = True
+        if not owner:
+            return self._cached_result(future.result())
+        try:
+            result = self.delegate.review(request)
+        except Exception as error:
+            with self._lock:
+                self._in_flight.pop(key, None)
+                future.set_exception(error)
+            raise
+        with self._lock:
+            self._cache[key] = result
+            self._cache.move_to_end(key)
+            while len(self._cache) > self.max_entries:
+                self._cache.popitem(last=False)
+            self._in_flight.pop(key, None)
+            future.set_result(result)
+        return result
+
+    def close(self) -> None:
+        close = getattr(self.delegate, "close", None)
+        if callable(close):
+            close()

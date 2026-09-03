@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 openshell-tool-service = "openshell_tool_service.cli:main"
+openshell-collaboration-watch = "openshell_tool_service.collaboration_watch:main"
 
 [dependency-groups]
 dev = [

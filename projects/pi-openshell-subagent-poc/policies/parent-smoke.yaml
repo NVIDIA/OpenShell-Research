@@ -42,8 +42,26 @@ network_policies:
               method: POST
               path: /v1/jobs
           - allow:
+              method: POST
+              path: /v1/jobs/status
+          - allow:
               method: GET
               path: /v1/jobs/**
+          - allow:
+              method: GET
+              path: /v1/collaboration/participants
+          - allow:
+              method: POST
+              path: /v1/collaboration/messages
+          - allow:
+              method: GET
+              path: /v1/collaboration/messages
+          - allow:
+              method: GET
+              path: /v1/collaboration/mailbox
+          - allow:
+              method: POST
+              path: /v1/collaboration/mailbox/ack
     binaries:
       - path: /usr/bin/pi
       - path: /usr/local/bin/pi
@@ -51,23 +69,3 @@ network_policies:
       - path: /usr/local/bin/node
       - path: /usr/lib/node_modules/@earendil-works/pi-coding-agent/dist/cli.js
       - path: /usr/local/lib/node_modules/@earendil-works/pi-coding-agent/dist/cli.js
-
-  github_public_clone:
-    name: github-public-clone-read-only
-    endpoints:
-      - host: github.com
-        port: 443
-        protocol: rest
-        enforcement: enforce
-        rules:
-          - allow:
-              method: GET
-              path: /*/*/info/refs
-              query:
-                service: git-upload-pack
-          - allow:
-              method: POST
-              path: /*/*/git-upload-pack
-    binaries:
-      - path: /usr/bin/git
-      - path: /usr/local/bin/git

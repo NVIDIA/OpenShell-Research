@@ -54,11 +54,18 @@ class Settings:
     delete_timeout_seconds: int = 60
     host: str = "0.0.0.0"
     port: int = 8765
+    collaboration_url: str = "http://host.openshell.internal:8765"
+    child_collaboration_extension: Path | None = None
     log_level: str = "INFO"
     policy_review_base_url: str = "https://inference-api.nvidia.com/v1"
     policy_review_api_key: str = field(default="", repr=False)
     policy_review_model: str = "azure/openai/gpt-5.6-sol"
     policy_review_timeout_seconds: int = 120
+    create_concurrency: int = 8
+    max_active_workers: int = 64
+    workflow_ready_timeout_seconds: int = 300
+    collaboration_run_ttl_seconds: int = 3600
+    graceful_shutdown_seconds: int = 2
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -100,6 +107,14 @@ class Settings:
             delete_timeout_seconds=_positive_int("OPENSHELL_DELETE_TIMEOUT_SECONDS", 60),
             host=os.environ.get("OPENSHELL_TOOL_SERVICE_HOST", "0.0.0.0"),
             port=_positive_int("OPENSHELL_TOOL_SERVICE_PORT", 8765),
+            collaboration_url=os.environ.get(
+                "OPENSHELL_COLLABORATION_URL", "http://host.openshell.internal:8765"
+            ).rstrip("/"),
+            child_collaboration_extension=(
+                Path(value)
+                if (value := _optional("OPENSHELL_CHILD_COLLABORATION_EXTENSION"))
+                else Path("pi-package/collaboration.ts")
+            ),
             log_level=_log_level("OPENSHELL_TOOL_SERVICE_LOG_LEVEL", "INFO"),
             policy_review_base_url=os.environ.get(
                 "OPENSHELL_POLICY_REVIEW_BASE_URL",
@@ -112,4 +127,11 @@ class Settings:
             policy_review_timeout_seconds=_positive_int(
                 "OPENSHELL_POLICY_REVIEW_TIMEOUT_SECONDS", 120
             ),
+            create_concurrency=_positive_int("POC_CREATE_CONCURRENCY", 8),
+            max_active_workers=_positive_int("POC_MAX_ACTIVE_WORKERS", 64),
+            workflow_ready_timeout_seconds=_positive_int(
+                "POC_WORKFLOW_READY_TIMEOUT_SECONDS", 300
+            ),
+            collaboration_run_ttl_seconds=_positive_int("POC_COLLABORATION_RUN_TTL_SECONDS", 3600),
+            graceful_shutdown_seconds=_positive_int("POC_GRACEFUL_SHUTDOWN_SECONDS", 2),
         )

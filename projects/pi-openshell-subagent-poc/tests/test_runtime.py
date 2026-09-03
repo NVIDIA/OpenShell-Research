@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from openshell_tool_service.collaboration import ChildCollaboration
 from openshell_tool_service.config import Settings
 from openshell_tool_service.runtime import (
     OpenShellCliParentPolicySource,
@@ -22,8 +23,11 @@ def job() -> Job:
         id="1234567890abcdef",
         caller_id="sandbox-1",
         run_id="run-1",
+        start_mode="immediate",
+        expected_workers=None,
         step_index=0,
         agent="openshell-worker",
+        participant_alias="worker-1",
         prompt="Return OPEN_SHELL_CHILD_OK",
         prompt_digest="digest",
         profile="worker",
@@ -37,6 +41,8 @@ def job() -> Job:
         failure_code=None,
         failure_message=None,
         cleanup_error=None,
+        sandbox_logs=None,
+        sandbox_log_error=None,
         created_at=0,
         updated_at=0,
     )
@@ -45,6 +51,8 @@ def job() -> Job:
 def settings(tmp_path: Path) -> Settings:
     models = tmp_path / "models.json"
     models.write_text("{}\n")
+    extension = tmp_path / "collaboration.ts"
+    extension.write_text("export default () => {};\n")
     return Settings(
         token="token",
         database_path=tmp_path / "jobs.sqlite3",
@@ -52,6 +60,18 @@ def settings(tmp_path: Path) -> Settings:
         workspace="workspace",
         child_provider="poc-openai",
         child_models_file=models,
+        child_collaboration_extension=extension,
+        collaboration_url="http://host.openshell.internal:8765",
+    )
+
+
+def collaboration() -> ChildCollaboration:
+    return ChildCollaboration(
+        service_url="http://host.openshell.internal:8765",
+        participant_id="participant-1",
+        participant_alias="worker-1",
+        group_id="group-1",
+        token="child-token",
     )
 
 
@@ -65,25 +85,51 @@ def test_runtime_creates_executes_and_deletes(
     ) -> subprocess.CompletedProcess[str]:
         argv = list(command)
         calls.append((argv, input_text, timeout))
-        stdout = "OPEN_SHELL_CHILD_OK\n" if "exec" in argv else ""
+        stdout = (
+            "OPEN_SHELL_CHILD_OK\n"
+            if "exec" in argv
+            else "captured sandbox log\n"
+            if "logs" in argv
+            else ""
+        )
         return subprocess.CompletedProcess(argv, 0, stdout=stdout, stderr="")
 
     caplog.set_level(logging.DEBUG, logger="openshell_tool_service.runtime")
-    result = OpenShellCliRuntime(settings(tmp_path), runner).run(job())
+    result = OpenShellCliRuntime(settings(tmp_path), runner).run(job(), collaboration())
     assert result.output == "OPEN_SHELL_CHILD_OK"
-    assert [call[0][2] for call in calls] == ["create", "exec", "delete"]
+    assert result.sandbox_logs == "captured sandbox log\n"
+    assert ["logs" if call[0][1] == "logs" else call[0][2] for call in calls] == [
+        "create",
+        "exec",
+        "logs",
+        "delete",
+    ]
     assert calls[1][1] == "Return OPEN_SHELL_CHILD_OK"
     assert "--provider" in calls[0][0]
     assert "--upload" in calls[0][0]
     upload_index = calls[0][0].index("--upload")
     assert calls[0][0][upload_index + 1].endswith(":/home/sandbox/.pi/agent")
+    uploads = [
+        calls[0][0][index + 1] for index, value in enumerate(calls[0][0]) if value == "--upload"
+    ]
+    assert any(value.endswith("collaboration.ts:/home/sandbox/.pi/agent") for value in uploads)
     assert "PI_CODING_AGENT_DIR=/home/sandbox/.pi/agent" in calls[0][0]
+    assert "POC_COLLABORATION_TOKEN=child-token" in calls[0][0]
+    assert "POC_COLLABORATION_PARTICIPANT_ID=participant-1" in calls[0][0]
+    assert "POC_COLLABORATION_ROLE=worker-1" in calls[0][0]
+    assert "POC_COLLABORATION_GROUP_ID=group-1" in calls[0][0]
+    assert "poc-role=worker-1" in calls[0][0]
+    assert "NODE_OPTIONS=--disable-warning=UNDICI-EHPA" in calls[0][0]
+    assert "--extension" in calls[1][0]
+    assert "/home/sandbox/.pi/agent/collaboration.ts" in calls[1][0]
     assert "--detach" in calls[0][0]
+    assert "--no-credential-warnings" in calls[0][0]
     assert "/bin/true" not in calls[0][0]
     assert "job 12345678 creating sandbox pi-child-1234567890" in caplog.text
     assert "job 12345678 sandbox ready" in caplog.text
     assert "job 12345678 running Pi" in caplog.text
     assert "job 12345678 Pi completed" in caplog.text
+    assert "job 12345678 captured child sandbox logs" in caplog.text
     assert "job 12345678 sandbox deleted" in caplog.text
     assert "prompt_sha256=" in caplog.text
     assert "policy_sha256=" in caplog.text
@@ -149,9 +195,135 @@ def test_runtime_deletes_after_child_failure(tmp_path: Path) -> None:
         return subprocess.CompletedProcess(argv, returncode, stdout="", stderr="failed")
 
     with pytest.raises(RuntimeExecutionError, match="Pi failed") as raised:
-        OpenShellCliRuntime(settings(tmp_path), runner).run(job())
+        OpenShellCliRuntime(settings(tmp_path), runner).run(job(), collaboration())
     assert raised.value.code == "child-exit"
-    assert [call[2] for call in calls] == ["create", "exec", "delete"]
+    assert ["logs" if call[1] == "logs" else call[2] for call in calls] == [
+        "create",
+        "exec",
+        "logs",
+        "delete",
+    ]
+
+
+def test_runtime_deletes_after_create_reports_failure(tmp_path: Path) -> None:
+    calls: list[list[str]] = []
+
+    def runner(
+        command: Sequence[str], _input_text: str | None, _timeout: int
+    ) -> subprocess.CompletedProcess[str]:
+        argv = list(command)
+        calls.append(argv)
+        if "create" in argv:
+            return subprocess.CompletedProcess(
+                argv, 1, stdout="", stderr="image upload was rejected"
+            )
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="not found")
+
+    with pytest.raises(RuntimeExecutionError) as raised:
+        OpenShellCliRuntime(settings(tmp_path), runner, sleep=lambda _delay: None).run(
+            job(), collaboration()
+        )
+
+    assert raised.value.code == "sandbox-create"
+    assert [call[2] for call in calls] == ["create", "delete"]
+
+
+def test_runtime_retries_transient_create_upload_after_partial_cleanup(
+    tmp_path: Path,
+) -> None:
+    calls: list[list[str]] = []
+    create_attempts = 0
+
+    def runner(
+        command: Sequence[str], _input_text: str | None, _timeout: int
+    ) -> subprocess.CompletedProcess[str]:
+        nonlocal create_attempts
+        argv = list(command)
+        calls.append(argv)
+        if "create" in argv:
+            create_attempts += 1
+            if create_attempts == 1:
+                return subprocess.CompletedProcess(
+                    argv,
+                    1,
+                    stdout="",
+                    stderr=(
+                        "transport error: tls handshake eof; "
+                        "ssh tar extract exited with status 255"
+                    ),
+                )
+        stdout = "DONE\n" if "exec" in argv else ""
+        return subprocess.CompletedProcess(argv, 0, stdout=stdout, stderr="")
+
+    result = OpenShellCliRuntime(
+        settings(tmp_path), runner, sleep=lambda _delay: None
+    ).run(job(), collaboration())
+
+    assert result.output == "DONE"
+    assert ["logs" if call[1] == "logs" else call[2] for call in calls] == [
+        "create",
+        "delete",
+        "create",
+        "exec",
+        "logs",
+        "delete",
+    ]
+
+
+def test_runtime_retries_transient_ssh_connection_failure(tmp_path: Path) -> None:
+    calls: list[list[str]] = []
+    exec_attempts = 0
+
+    def runner(
+        command: Sequence[str], _input_text: str | None, _timeout: int
+    ) -> subprocess.CompletedProcess[str]:
+        nonlocal exec_attempts
+        argv = list(command)
+        calls.append(argv)
+        if "exec" in argv:
+            exec_attempts += 1
+            if exec_attempts == 1:
+                return subprocess.CompletedProcess(
+                    argv,
+                    1,
+                    stdout="",
+                    stderr="failed to establish ssh transport: Connection reset by peer",
+                )
+            return subprocess.CompletedProcess(argv, 0, stdout="DONE\n", stderr="")
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    result = OpenShellCliRuntime(
+        settings(tmp_path), runner, sleep=lambda _delay: None
+    ).run(job(), collaboration())
+
+    assert result.output == "DONE"
+    assert ["logs" if call[1] == "logs" else call[2] for call in calls] == [
+        "create",
+        "exec",
+        "exec",
+        "logs",
+        "delete",
+    ]
+
+
+def test_runtime_deletes_after_file_descriptor_failure(tmp_path: Path) -> None:
+    calls: list[list[str]] = []
+
+    def runner(
+        command: Sequence[str], _input_text: str | None, _timeout: int
+    ) -> subprocess.CompletedProcess[str]:
+        argv = list(command)
+        calls.append(argv)
+        if "exec" in argv:
+            raise OSError(24, "Too many open files")
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    with pytest.raises(RuntimeExecutionError) as raised:
+        OpenShellCliRuntime(settings(tmp_path), runner).run(job(), collaboration())
+
+    assert raised.value.code == "runtime-os-error"
+    assert "Too many open files" in raised.value.stderr
+    assert any("delete" in call for call in calls)
 
 
 def test_runtime_applies_parent_authored_policy_and_removes_it(tmp_path: Path) -> None:
@@ -195,7 +367,7 @@ network_policies:
         stdout = "REVIEW_OK\n" if "exec" in argv else ""
         return subprocess.CompletedProcess(argv, 0, stdout=stdout, stderr="")
 
-    result = OpenShellCliRuntime(settings(tmp_path), runner).run(repo_job)
+    result = OpenShellCliRuntime(settings(tmp_path), runner).run(repo_job, collaboration())
     assert result.output == "REVIEW_OK"
     create_argv = calls[0][0]
     policy_path = Path(create_argv[create_argv.index("--policy") + 1])

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
 from openshell_tool_service.policy_reviewer import (
+    CachingPolicyReviewer,
     LlmPolicyReviewer,
     PolicyReviewError,
     PolicyReviewRequest,
@@ -145,3 +148,36 @@ def test_llm_reviewer_rejects_malformed_or_ambiguous_results(
     )
     with pytest.raises(PolicyReviewError):
         reviewer.review(request())
+
+
+def test_policy_cache_coalesces_identical_concurrent_reviews() -> None:
+    calls = 0
+
+    class Delegate:
+        def review(self, _request: PolicyReviewRequest):
+            nonlocal calls
+            calls += 1
+            time.sleep(0.05)
+            return LlmPolicyReviewer(
+                base_url="https://example.test/v1",
+                api_key="secret",
+                model="test-model",
+                timeout_seconds=10,
+                requester=lambda _payload: response_body(
+                    {
+                        "decision": "allow",
+                        "reason": "contained",
+                        "violations": [],
+                        "taskAlignment": "aligned",
+                        "taskAlignmentReason": "aligned",
+                    }
+                ),
+            ).review(request())
+
+    cached = CachingPolicyReviewer(Delegate())
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        results = list(executor.map(lambda _index: cached.review(request()), range(8)))
+
+    assert calls == 1
+    assert all(result.decision == "allow" for result in results)
+    assert sum(result.task_alignment == "aligned" for result in results) == 1

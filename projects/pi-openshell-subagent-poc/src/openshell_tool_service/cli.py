@@ -17,11 +17,14 @@ def main() -> None:
         format="%(asctime)s %(levelname)s %(message)s",
         datefmt="%H:%M:%S",
     )
+    if settings.log_level != "DEBUG":
+        logging.getLogger("httpx").setLevel(logging.WARNING)
     uvicorn.run(
         create_app(settings),
         host=settings.host,
         port=settings.port,
         access_log=False,
+        timeout_graceful_shutdown=settings.graceful_shutdown_seconds,
     )
 
 

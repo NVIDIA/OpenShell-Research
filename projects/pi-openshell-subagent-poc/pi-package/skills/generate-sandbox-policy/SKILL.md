@@ -36,10 +36,46 @@ landlock:
 process:
   run_as_user: sandbox
   run_as_group: sandbox
-network_policies: {}
+network_policies:
+  openshell_collaboration:
+    name: openshell-collaboration
+    endpoints:
+      - host: host.openshell.internal
+        port: 8765
+        protocol: rest
+        enforcement: enforce
+        allowed_ips:
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+        rules:
+          - allow:
+              method: GET
+              path: /v1/collaboration/participants
+          - allow:
+              method: POST
+              path: /v1/collaboration/messages
+          - allow:
+              method: GET
+              path: /v1/collaboration/messages
+          - allow:
+              method: GET
+              path: /v1/collaboration/mailbox
+          - allow:
+              method: POST
+              path: /v1/collaboration/mailbox/ack
+    binaries:
+      - path: /usr/bin/pi
+      - path: /usr/local/bin/pi
+      - path: /usr/bin/node
+      - path: /usr/local/bin/node
 ```
 
-Add only the network access required by the assigned task:
+The collaboration rule is part of the worker baseline so every child can send
+messages to its parent and active siblings and receive messages through
+`collaboration_wait`. Children do not run the parent's automatic mailbox. Keep
+the rule in every child policy. Add only the other network access required by
+the assigned task:
 
 - Prefer exact hosts, ports, HTTP methods, and paths.
 - Bind each network policy to only the binaries that need it.
@@ -54,13 +90,14 @@ Add only the network access required by the assigned task:
 - Inference access is configured separately by the Tool Service and does not
   belong in this policy.
 
-For read-only clone or fetch of one public GitHub repository, replace the empty
-`network_policies` map with the block below. Substitute the exact `OWNER/REPO`;
+For read-only clone or fetch of one public GitHub repository, add the block
+below alongside `openshell_collaboration`. Substitute the exact `OWNER/REPO`;
 do not use wildcards. This is an example for a read-only task, not a restriction
 on other Git operations:
 
 ```yaml
 network_policies:
+  # Keep openshell_collaboration exactly as shown in the baseline.
   github_repository:
     name: github-repository-read-only
     endpoints:

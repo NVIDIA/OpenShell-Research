@@ -1,0 +1,670 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenShell Collaboration Watcher</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0a0c10;
+      --panel: #11151b;
+      --panel-2: #171c24;
+      --line: #28313d;
+      --text: #f2f5f8;
+      --muted: #98a5b4;
+      --green: #76d6a5;
+      --blue: #79b8ff;
+      --amber: #f6c86b;
+      --red: #ff858d;
+      --violet: #b7a2ff;
+      --shadow: 0 18px 48px rgba(0, 0, 0, .28);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 10% -10%, rgba(62, 117, 88, .20), transparent 32rem),
+        radial-gradient(circle at 92% 8%, rgba(56, 95, 148, .18), transparent 34rem),
+        var(--bg);
+      color: var(--text);
+      font: 14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .shell { max-width: 1600px; margin: 0 auto; padding: 22px; }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 18px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .mark {
+      width: 38px; height: 38px; border-radius: 11px;
+      display: grid; place-items: center;
+      background: linear-gradient(145deg, #8ae6b6, #4794db);
+      color: #07110c; font-weight: 900; box-shadow: var(--shadow);
+    }
+    h1 { margin: 0; font-size: 19px; letter-spacing: -.02em; }
+    .subtitle { color: var(--muted); font-size: 12px; }
+    .connection { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #56616e; }
+    .dot.live { background: var(--green); box-shadow: 0 0 0 5px rgba(118,214,165,.10); }
+    .dot.error { background: var(--red); }
+    .connect-panel, .toolbar, .stats, .participants, .timeline, .detail {
+      border: 1px solid var(--line);
+      background: rgba(17, 21, 27, .93);
+      box-shadow: var(--shadow);
+    }
+    .connect-panel {
+      border-radius: 14px; padding: 13px;
+      display: grid; grid-template-columns: minmax(150px, 1fr) minmax(220px, 1.4fr) auto;
+      gap: 10px; margin-bottom: 12px;
+    }
+    input, select {
+      width: 100%; border: 1px solid var(--line); border-radius: 9px;
+      background: #0d1117; color: var(--text); padding: 9px 11px; outline: none;
+    }
+    input:focus, select:focus { border-color: #4d78a7; box-shadow: 0 0 0 3px rgba(82,136,191,.12); }
+    .primary {
+      border: 0; border-radius: 9px; padding: 9px 17px;
+      background: var(--green); color: #07120c; font-weight: 750;
+    }
+    .toolbar {
+      border-radius: 14px; padding: 10px 12px; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .toolbar select { width: auto; min-width: 150px; }
+    .toolbar button {
+      border: 1px solid var(--line); border-radius: 8px; padding: 7px 11px;
+      background: var(--panel-2); color: var(--text);
+    }
+    .check { display: flex; gap: 7px; align-items: center; color: var(--muted); }
+    .check input { width: auto; }
+    .spacer { flex: 1; }
+    .timestamp { color: var(--muted); font-size: 12px; }
+    .stats, .story {
+      border-radius: 14px; display: grid; grid-template-columns: repeat(4, 1fr);
+      margin-bottom: 12px; overflow: hidden;
+    }
+    .stat { padding: 13px 16px; border-right: 1px solid var(--line); }
+    .stat:last-child { border-right: 0; }
+    .stat-value { font-size: 22px; font-weight: 750; line-height: 1.1; }
+    .stat-label { color: var(--muted); font-size: 11px; margin-top: 4px; text-transform: uppercase; letter-spacing: .08em; }
+    .story {
+      display: block; padding: 12px 15px; color: #cbd5df;
+      border: 1px solid var(--line); background: rgba(17, 21, 27, .93);
+      box-shadow: var(--shadow);
+    }
+    .story strong { color: var(--text); }
+    .workspace { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: start; }
+    .participants, .timeline, .detail { border-radius: 14px; overflow: hidden; }
+    .participants { min-height: 0; }
+    .timeline { min-height: 520px; }
+    .detail {
+      position: fixed; z-index: 20; top: 16px; right: 16px; bottom: 16px;
+      width: min(430px, calc(100vw - 32px)); min-height: 0;
+      transform: translateX(calc(100% + 32px)); transition: transform .2s ease;
+    }
+    .detail.open { transform: translateX(0px); }
+    .panel-title {
+      padding: 12px 14px; border-bottom: 1px solid var(--line);
+      color: var(--muted); font-size: 11px; font-weight: 750;
+      text-transform: uppercase; letter-spacing: .09em;
+    }
+    #participantList { padding: 9px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .participant {
+      min-width: 150px; padding: 8px 10px; border: 1px solid var(--line);
+      border-radius: 10px; background: var(--panel-2);
+    }
+    .participant-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+    .role { font-weight: 700; overflow-wrap: anywhere; }
+    .sandbox { color: var(--muted); font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; margin-top: 3px; }
+    .state { padding: 2px 6px; border-radius: 999px; font-size: 10px; background: #28313d; color: var(--muted); }
+    .state.ready, .state.finished { color: var(--green); background: rgba(118,214,165,.10); }
+    .state.failed { color: var(--red); background: rgba(255,133,141,.10); }
+    #eventList { padding: 10px; max-height: calc(100vh - 285px); min-height: 480px; overflow: auto; }
+    .event {
+      position: relative; margin: 0 0 9px 18px; padding: 11px 12px;
+      border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2);
+      transition: border-color .15s, transform .15s;
+    }
+    .event:hover { border-color: #48627f; transform: translateX(2px); }
+    .event::before {
+      content: ""; position: absolute; width: 8px; height: 8px; border-radius: 50%;
+      left: -23px; top: 17px; background: #627084; box-shadow: 0 0 0 4px var(--panel);
+    }
+    .event::after {
+      content: ""; position: absolute; width: 1px; left: -20px;
+      top: 25px; bottom: -22px; background: var(--line);
+    }
+    .event:last-child::after { display: none; }
+    .event.message::before { background: var(--blue); }
+    .event.message { padding: 14px 16px; }
+    .event.failure::before { background: var(--red); }
+    .event.success::before { background: var(--green); }
+    .event.policy::before { background: var(--violet); }
+    .event-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .event-time { color: var(--muted); font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .route { font-weight: 700; }
+    .arrow { color: var(--muted); padding: 0 3px; }
+    .badge { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; padding: 2px 6px; border-radius: 999px; background: rgba(121,184,255,.11); color: var(--blue); }
+    .event-body { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 8px; color: #dce4ec; }
+    .event-meta { color: var(--muted); margin-top: 5px; font-size: 12px; }
+    .conversation .event-meta { display: none; }
+    .conversation .event:not(.message) { display: none; }
+    .network-flow { padding: 14px; max-height: calc(100vh - 285px); min-height: 480px; overflow: auto; }
+    .flow-summary {
+      display: flex; gap: 9px; align-items: center; flex-wrap: wrap;
+      margin-bottom: 14px; padding: 11px 12px; border: 1px solid var(--line);
+      border-radius: 10px; background: #0d1117; color: var(--muted);
+    }
+    .flow-summary strong { color: var(--text); }
+    .hop {
+      display: grid; grid-template-columns: minmax(110px, 1fr) minmax(210px, 2.2fr) minmax(110px, 1fr) 88px;
+      gap: 10px; align-items: center; margin-bottom: 9px; padding: 10px;
+      border: 1px solid var(--line); border-radius: 11px; background: var(--panel-2);
+    }
+    .hop.failed { border-color: rgba(255,133,141,.55); }
+    .hop-node {
+      min-width: 0; padding: 8px 9px; border: 1px solid #344152; border-radius: 8px;
+      background: #0c1117; font-weight: 700; overflow-wrap: anywhere; text-align: center;
+    }
+    .hop-route { min-width: 0; text-align: center; }
+    .hop-label { color: #dbe4ec; font-size: 12px; overflow-wrap: anywhere; }
+    .hop-line { height: 1px; margin: 8px 0 6px; background: var(--blue); position: relative; }
+    .hop-line::after {
+      content: ""; position: absolute; right: -1px; top: -4px;
+      border-left: 7px solid var(--blue); border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+    }
+    .hop.failed .hop-line { background: var(--red); }
+    .hop.failed .hop-line::after { border-left-color: var(--red); }
+    .hop-via { color: var(--muted); font-size: 10px; }
+    .hop-latency { font: 700 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--green); text-align: right; }
+    .hop.failed .hop-latency { color: var(--red); }
+    .hop-time { color: var(--muted); font-weight: 400; font-size: 10px; margin-top: 3px; }
+    .empty { color: var(--muted); padding: 36px 18px; text-align: center; }
+    .detail-content { padding: 14px; height: calc(100% - 44px); overflow: auto; }
+    .detail-title { display: flex; align-items: center; justify-content: space-between; }
+    .close-detail {
+      border: 0; background: transparent; color: var(--muted); font-size: 20px;
+      line-height: 1; padding: 0 2px;
+    }
+    .detail-section { margin-bottom: 18px; }
+    .detail-label { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+    .detail-value { overflow-wrap: anywhere; }
+    pre {
+      margin: 7px 0 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px;
+      background: #0b0e13; color: #cbd5df; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: pre-wrap; overflow-wrap: anywhere;
+    }
+    .hint { color: var(--muted); font-size: 12px; }
+    @media (max-width: 1050px) {
+      .workspace { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 700px) {
+      .shell { padding: 12px; }
+      header { align-items: flex-start; }
+      .connect-panel { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .stat:nth-child(2) { border-right: 0; }
+      .stat:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+      .participants, .timeline { min-height: 0; }
+      #eventList { max-height: none; }
+      .network-flow { max-height: none; }
+      .hop { grid-template-columns: 1fr; }
+      .hop-route { padding: 2px 18px; }
+      .hop-latency { text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand">
+        <div class="mark">OS</div>
+        <div><h1>Collaboration Watcher</h1><div class="subtitle">Parent and child agent activity</div></div>
+      </div>
+      <div class="connection"><span id="connectionDot" class="dot"></span><span id="connectionText">Not connected</span></div>
+    </header>
+
+    <section class="connect-panel">
+      <input id="parentInput" aria-label="Parent sandbox" placeholder="Parent sandbox" value="pi-parent">
+      <input id="tokenInput" aria-label="Tool Service token" type="password" placeholder="Tool Service token (kept in this browser tab)">
+      <button id="connectButton" class="primary">Connect</button>
+    </section>
+
+    <section class="toolbar">
+      <select id="runFilter" aria-label="Run"><option value="all">All runs</option></select>
+      <select id="typeFilter" aria-label="Event type">
+        <option value="network" selected>Network flow</option>
+        <option value="conversation">Conversation</option>
+        <option value="activity">Conversation + key activity</option>
+        <option value="debug">All debug events</option>
+      </select>
+      <span class="spacer"></span>
+      <span id="updatedAt" class="timestamp">No data</span>
+      <button id="pauseButton">Pause</button>
+    </section>
+
+    <section class="stats">
+      <div class="stat"><div id="participantCount" class="stat-value">0</div><div class="stat-label">Workers</div></div>
+      <div class="stat"><div id="messageCount" class="stat-value">0</div><div class="stat-label">Messages</div></div>
+      <div class="stat"><div id="runStatus" class="stat-value">—</div><div class="stat-label">Run status</div></div>
+      <div class="stat"><div id="runDuration" class="stat-value">—</div><div class="stat-label">Duration</div></div>
+    </section>
+
+    <section id="story" class="story">Connect to see what the agents did.</section>
+
+    <main class="workspace">
+      <section class="participants"><div class="panel-title">Participants</div><div id="participantList"></div></section>
+      <section class="timeline"><div id="timelineTitle" class="panel-title">Network flow</div><div id="eventList" class="network-flow"><div class="empty">Connect to load the latest run.</div></div></section>
+      <aside id="detailPanel" class="detail">
+        <div class="panel-title detail-title"><span>Technical details</span><button id="closeDetail" class="close-detail" aria-label="Close details">×</button></div>
+        <div id="detailContent" class="detail-content"><div class="hint">Select an item to inspect IDs, payload, result, and captured logs.</div></div>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    const usefulEvents = new Set([
+      "participant.reserved", "policy.review.started", "policy.review.allowed",
+      "policy.review.denied", "sandbox.ready", "message.stored",
+      "participant.finished", "participant.failed", "delivery.undeliverable",
+      "sandbox.cleanup.failed", "run.closed", "run.expired"
+    ]);
+    const state = { events: new Map(), spans: [], sequence: 0, connected: false, paused: false, timer: null, followLatest: true, flowLoadedAt: 0 };
+    const $ = (id) => document.getElementById(id);
+    const node = (tag, className, text) => {
+      const value = document.createElement(tag);
+      if (className) value.className = className;
+      if (text !== undefined) value.textContent = text;
+      return value;
+    };
+    const short = (value, size = 12) => value ? String(value).slice(0, size) : "—";
+    const stamp = (seconds) => new Date(seconds * 1000).toLocaleTimeString([], { hour12: false });
+    const authHeaders = () => ({ Authorization: `Bearer ${$("tokenInput").value.trim()}` });
+
+    function setConnection(kind, text) {
+      $("connectionDot").className = `dot ${kind}`;
+      $("connectionText").textContent = text;
+    }
+
+    function roleFromParticipant(participant) {
+      if (!participant) return null;
+      return {
+        id: participant.participantId,
+        role: participant.roleName || participant.role || "unknown",
+        sandbox: participant.sandboxName || "unknown",
+      };
+    }
+
+    function selectedEvents() {
+      const run = $("runFilter").value;
+      const type = $("typeFilter").value;
+      return [...state.events.values()].filter((event) => {
+        if (run !== "all" && event.runId !== run) return false;
+        if (type === "conversation" && event.eventType !== "message.stored") return false;
+        if (type === "activity" && !usefulEvents.has(event.eventType)) return false;
+        return true;
+      });
+    }
+
+    function participantsFor(events) {
+      const participants = new Map();
+      const parent = $("parentInput").value.trim();
+      participants.set("parent", { id: "parent", role: "parent", sandbox: parent, state: "ready" });
+      for (const event of events) {
+        const direct = roleFromParticipant(event.participant);
+        if (direct) {
+          const key = direct.role === "parent" ? "parent" : direct.id;
+          const previous = participants.get(key) || {};
+          let lifecycle = previous.state || "reserved";
+          if (event.eventType === "sandbox.ready" || event.eventType === "participant.ready") lifecycle = "ready";
+          if (event.eventType === "participant.finished") lifecycle = "finished";
+          if (event.eventType === "participant.failed") lifecycle = "failed";
+          participants.set(key, { ...previous, ...direct, state: lifecycle });
+        }
+        if (event.message) {
+          for (const item of [event.message.sender, event.message.recipient]) {
+            const participant = roleFromParticipant(item);
+            if (participant && participant.role !== "parent") {
+              participants.set(participant.id, { state: "ready", ...participants.get(participant.id), ...participant });
+            }
+          }
+        }
+      }
+      return [...participants.values()].sort((a, b) => a.role === "parent" ? -1 : b.role === "parent" ? 1 : a.role.localeCompare(b.role));
+    }
+
+    function renderRuns() {
+      const select = $("runFilter");
+      const selected = select.value;
+      const latestByRun = new Map();
+      for (const event of state.events.values()) latestByRun.set(event.runId, event.sequence);
+      const runs = [...latestByRun].sort((a, b) => b[1] - a[1]).map(([run]) => run);
+      select.replaceChildren(new Option("All runs", "all"));
+      for (const run of runs) select.append(new Option(short(run, 18), run));
+      if (state.followLatest && runs.length) {
+        select.value = runs[0];
+      } else {
+        select.value = runs.includes(selected) ? selected : "all";
+      }
+    }
+
+    function renderParticipants(participants) {
+      const list = $("participantList");
+      list.replaceChildren();
+      for (const participant of participants) {
+        const card = node("div", "participant");
+        const head = node("div", "participant-head");
+        head.append(node("div", "role", participant.role));
+        head.append(node("span", `state ${participant.state}`, participant.state));
+        card.append(head, node("div", "sandbox", participant.sandbox));
+        list.append(card);
+      }
+    }
+
+    function eventClass(event) {
+      if (event.eventType === "message.stored") return "message";
+      if (event.eventType.includes("failed") || event.eventType.includes("denied") || event.eventType.includes("undeliverable")) return "failure";
+      if (event.eventType.includes("allowed") || event.eventType.includes("ready") || event.eventType.includes("finished")) return "success";
+      if (event.eventType.startsWith("policy.")) return "policy";
+      return "";
+    }
+
+    function friendlyEvent(event) {
+      const labels = {
+        "participant.reserved": "worker requested",
+        "policy.review.started": "policy review started",
+        "policy.review.allowed": "policy approved",
+        "policy.review.denied": "policy denied",
+        "sandbox.ready": "sandbox ready",
+        "participant.finished": "worker finished",
+        "participant.failed": "worker failed",
+        "delivery.undeliverable": "message could not be delivered",
+        "sandbox.cleanup.failed": "sandbox cleanup failed",
+        "run.closed": "run completed",
+        "run.expired": "run expired",
+      };
+      return labels[event.eventType] || event.eventType;
+    }
+
+    function formatLatency(durationMs) {
+      if (durationMs === null || durationMs === undefined) return "not measured";
+      if (durationMs < 1000) return `${durationMs} ms`;
+      return `${(durationMs / 1000).toFixed(durationMs < 10000 ? 2 : 1)} s`;
+    }
+
+    function renderNetworkFlow(spans) {
+      const list = $("eventList");
+      list.className = "network-flow";
+      list.replaceChildren();
+      if (!spans.length) {
+        list.append(node("div", "empty", "Waiting for measurable network hops in this run."));
+        return;
+      }
+      const measured = spans.filter((span) => span.durationMs !== null);
+      const slowest = measured.reduce((best, span) => !best || span.durationMs > best.durationMs ? span : best, null);
+      const failures = spans.filter((span) => span.status === "failed");
+      const summary = node("div", "flow-summary");
+      summary.append(
+        node("span", "", `${spans.length} observed hops`),
+        node("span", "", "·"),
+        node("span", "", `${measured.length} timed`),
+      );
+      if (slowest) {
+        summary.append(node("span", "", "·"), node("strong", "", `Slowest: ${slowest.label} (${formatLatency(slowest.durationMs)})`));
+      }
+      if (failures.length) {
+        summary.append(node("span", "", "·"), node("strong", "", `${failures.length} failed hop${failures.length === 1 ? "" : "s"}`));
+      }
+      list.append(summary);
+      for (const span of spans) {
+        const row = node("button", `hop ${span.status === "failed" ? "failed" : ""}`);
+        row.type = "button";
+        row.style.width = "100%";
+        row.style.color = "inherit";
+        row.style.font = "inherit";
+        const source = node("div", "hop-node", span.source);
+        const route = node("div", "hop-route");
+        route.append(node("div", "hop-label", span.label), node("div", "hop-line"));
+        route.append(node("div", "hop-via", span.via ? `via ${span.via}` : span.timingSource));
+        const target = node("div", "hop-node", span.target);
+        const latency = node("div", "hop-latency", formatLatency(span.durationMs));
+        latency.append(node("div", "hop-time", stamp(span.endedAt)));
+        row.append(source, route, target, latency);
+        row.addEventListener("click", () => showSpanDetail(span));
+        list.append(row);
+      }
+      list.scrollTop = list.scrollHeight;
+    }
+
+    function renderTimeline(events) {
+      const list = $("eventList");
+      list.replaceChildren();
+      if (!events.length) {
+        list.append(node("div", "empty", "No events match the current filters."));
+        return;
+      }
+      list.className = $("typeFilter").value;
+      for (const event of events) {
+        const card = node("button", `event ${eventClass(event)}`);
+        card.type = "button";
+        card.style.width = "calc(100% - 18px)";
+        card.style.textAlign = "left";
+        card.style.color = "inherit";
+        card.style.font = "inherit";
+        const head = node("div", "event-head");
+        head.append(node("span", "event-time", stamp(event.createdAt)));
+        if (event.message) {
+          const sender = event.message.sender.roleName || event.message.sender.sandboxName;
+          const recipient = event.message.recipient.roleName || event.message.recipient.sandboxName;
+          const route = node("span", "route");
+          route.append(document.createTextNode(sender), node("span", "arrow", "→"), document.createTextNode(recipient));
+          head.append(route, node("span", "badge", event.message.kind));
+          card.append(head, node("div", "event-body", event.message.body));
+          card.append(node("div", "event-meta", `${event.message.envelope.type} · correlation ${short(event.message.envelope.correlationId)}`));
+        } else {
+          const role = event.participant?.roleName || event.participant?.role || "workflow";
+          head.append(node("span", "route", role), node("span", "badge", friendlyEvent(event)));
+          card.append(head);
+          const reason = event.payload?.reason;
+          if (reason) card.append(node("div", "event-body", String(reason)));
+          card.append(node("div", "event-meta", `run ${short(event.runId)}${event.jobId ? ` · job ${short(event.jobId, 8)}` : ""}`));
+        }
+        card.addEventListener("click", () => showDetail(event));
+        list.append(card);
+      }
+      list.scrollTop = list.scrollHeight;
+    }
+
+    function detailField(label, value, pre = false) {
+      const section = node("div", "detail-section");
+      section.append(node("div", "detail-label", label));
+      section.append(node(pre ? "pre" : "div", pre ? "" : "detail-value", value ?? "—"));
+      return section;
+    }
+
+    async function showDetail(event) {
+      $("detailPanel").classList.add("open");
+      const detail = $("detailContent");
+      detail.replaceChildren(
+        detailField("Event", event.eventType),
+        detailField("Sequence", String(event.sequence)),
+        detailField("Run", event.runId),
+        detailField("Group", event.groupId),
+        detailField("Job", event.jobId),
+        detailField("Delivery", event.deliveryId),
+        detailField("Payload", JSON.stringify(event.payload || {}, null, 2), true),
+      );
+      if (event.message) {
+        detail.append(
+          detailField("Message body", event.message.body, true),
+          detailField("Message ID", event.message.messageId),
+          detailField("Correlation ID", event.message.envelope.correlationId),
+          detailField("Envelope", JSON.stringify(event.message.envelope, null, 2), true),
+        );
+      }
+      if (!event.jobId) return;
+      try {
+        const response = await fetch(`/v1/watch/jobs/${encodeURIComponent(event.jobId)}`, { headers: authHeaders() });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const job = await response.json();
+        detail.append(
+          detailField("Job state", job.state),
+          detailField("Sandbox", job.sandboxName),
+          detailField("Final output", job.output, true),
+          detailField("Failure", [job.failureCode, job.failureMessage].filter(Boolean).join(": "), true),
+          detailField("Child stderr", job.stderr, true),
+          detailField("Captured sandbox logs", job.sandboxLogs, true),
+          detailField("Cleanup error", job.cleanupError, true),
+        );
+      } catch (error) {
+        detail.append(detailField("Job detail unavailable", String(error)));
+      }
+    }
+
+    function showSpanDetail(span) {
+      $("detailPanel").classList.add("open");
+      $("detailContent").replaceChildren(
+        detailField("Network hop", `${span.source} → ${span.target}`),
+        detailField("Operation", span.label),
+        detailField("Latency", formatLatency(span.durationMs)),
+        detailField("Status", span.status),
+        detailField("Via", span.via),
+        detailField("Timing source", span.timingSource),
+        detailField("Worker role", span.roleName),
+        detailField("Job", span.jobId),
+        detailField("Started", new Date(span.startedAt * 1000).toISOString()),
+        detailField("Ended", new Date(span.endedAt * 1000).toISOString()),
+        detailField("Detail", span.detail, true),
+      );
+    }
+
+    function render() {
+      renderRuns();
+      const selectedRun = $("runFilter").value;
+      const runEvents = [...state.events.values()].filter((event) => selectedRun === "all" || event.runId === selectedRun);
+      const events = selectedEvents();
+      const participants = participantsFor(runEvents);
+      renderParticipants(participants);
+      if ($("typeFilter").value === "network") renderNetworkFlow(state.spans);
+      else renderTimeline(events);
+      const workers = participants.filter((item) => item.role !== "parent");
+      const messages = runEvents.filter((event) => event.eventType === "message.stored");
+      const failures = runEvents.filter((event) => eventClass(event) === "failure");
+      const completed = runEvents.some((event) => event.eventType === "run.closed");
+      const firstAt = runEvents.length ? runEvents[0].createdAt : null;
+      const lastAt = runEvents.length ? runEvents[runEvents.length - 1].createdAt : null;
+      const duration = firstAt && lastAt ? Math.max(0, Math.round(lastAt - firstAt)) : 0;
+      const status = failures.length ? "Needs attention" : completed ? "Completed" : runEvents.length ? "In progress" : "—";
+      $("participantCount").textContent = String(workers.length);
+      $("messageCount").textContent = String(messages.length);
+      $("runStatus").textContent = status;
+      $("runStatus").style.color = failures.length ? "var(--red)" : completed ? "var(--green)" : "var(--amber)";
+      $("runDuration").textContent = runEvents.length ? `${duration}s` : "—";
+      $("timelineTitle").textContent = $("typeFilter").selectedOptions[0].textContent;
+      if (!runEvents.length) {
+        $("story").textContent = "No collaboration activity exists for this selection.";
+      } else if (failures.length) {
+        $("story").textContent = `${workers.length} workers exchanged ${messages.length} messages. ${failures.length} event${failures.length === 1 ? " needs" : "s need"} attention.`;
+      } else if (completed) {
+        $("story").textContent = `${workers.length} workers exchanged ${messages.length} messages and completed the run in ${duration} seconds.`;
+      } else {
+        const active = workers.filter((item) => !["finished", "failed"].includes(item.state)).length;
+        $("story").textContent = `${active} of ${workers.length} workers are active. ${messages.length} messages have been exchanged so far.`;
+      }
+    }
+
+    async function loadNetworkFlow(force = false) {
+      if ($("typeFilter").value !== "network") return;
+      const run = $("runFilter").value;
+      if (!run || run === "all") {
+        state.spans = [];
+        return;
+      }
+      const now = Date.now();
+      if (!force && now - state.flowLoadedAt < 2000) return;
+      const parent = encodeURIComponent($("parentInput").value.trim());
+      const response = await fetch(
+        `/v1/watch/network-flow?parent=${parent}&run=${encodeURIComponent(run)}`,
+        { headers: authHeaders() },
+      );
+      if (!response.ok) throw new Error(`Network flow HTTP ${response.status}`);
+      const data = await response.json();
+      state.spans = data.spans || [];
+      state.flowLoadedAt = now;
+      render();
+    }
+
+    async function poll() {
+      if (!state.connected || state.paused) return;
+      try {
+        const parent = encodeURIComponent($("parentInput").value.trim());
+        const response = await fetch(`/v1/watch/timeline?parent=${parent}&after=${state.sequence}&limit=500`, { headers: authHeaders() });
+        if (!response.ok) throw new Error(response.status === 401 ? "Invalid Tool Service token" : `HTTP ${response.status}`);
+        const data = await response.json();
+        for (const event of data.events) state.events.set(event.sequence, event);
+        state.sequence = data.lastSequence;
+        setConnection("live", "Live · 500 ms refresh");
+        $("updatedAt").textContent = `Updated ${new Date().toLocaleTimeString([], { hour12: false })}`;
+        render();
+        await loadNetworkFlow();
+        if (data.hasMore) return poll();
+      } catch (error) {
+        setConnection("error", String(error.message || error));
+      }
+      clearTimeout(state.timer);
+      state.timer = setTimeout(poll, 500);
+    }
+
+    function connect() {
+      if (!$("parentInput").value.trim() || !$("tokenInput").value.trim()) {
+        setConnection("error", "Parent and token are required");
+        return;
+      }
+      sessionStorage.setItem("openshell-watch-token", $("tokenInput").value.trim());
+      const url = new URL(window.location.href);
+      url.searchParams.set("parent", $("parentInput").value.trim());
+      history.replaceState({}, "", url);
+      state.events.clear();
+      state.spans = [];
+      state.sequence = 0;
+      state.flowLoadedAt = 0;
+      state.connected = true;
+      state.paused = false;
+      state.followLatest = true;
+      clearTimeout(state.timer);
+      $("pauseButton").textContent = "Pause";
+      setConnection("", "Connecting…");
+      poll();
+    }
+
+    $("connectButton").addEventListener("click", connect);
+    $("closeDetail").addEventListener("click", () => $("detailPanel").classList.remove("open"));
+    $("pauseButton").addEventListener("click", () => {
+      state.paused = !state.paused;
+      $("pauseButton").textContent = state.paused ? "Resume" : "Pause";
+      setConnection(state.paused ? "" : "live", state.paused ? "Paused" : "Live · 500 ms refresh");
+      if (!state.paused) poll();
+    });
+    $("runFilter").addEventListener("change", () => {
+      state.followLatest = false;
+      state.spans = [];
+      state.flowLoadedAt = 0;
+      render();
+      loadNetworkFlow(true).catch((error) => setConnection("error", String(error.message || error)));
+    });
+    $("typeFilter").addEventListener("change", () => {
+      render();
+      loadNetworkFlow(true).catch((error) => setConnection("error", String(error.message || error)));
+    });
+    $("tokenInput").value = sessionStorage.getItem("openshell-watch-token") || "";
+    $("parentInput").value = new URLSearchParams(location.search).get("parent") || "pi-parent";
+  </script>
+</body>
+</html>

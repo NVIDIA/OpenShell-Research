@@ -16,12 +16,36 @@ Whenever you delegate work to any subagent:
    Service compare that policy with the live parent policy.
 4. For independent tasks, launch the `openshell-worker` jobs in parallel with
    one `workflowScript` and `runs.all`.
+   Give each workflow item a stable, unique role name and place it immediately
+   after that worker's policy as `<openshell-role>role-name</openshell-role>`.
+   Use those role names for collaboration instead of generated sandbox names.
+   Independent workers need no `<openshell-coordination>` block and start as
+   soon as their own sandbox is ready. If any worker needs to message a sibling,
+   add this identical block to every item in that `runs.all` call, after its
+   role block:
+   `<openshell-coordination>\nmode: all-ready\nexpected_workers: N\n</openshell-coordination>`.
+   Replace `N` with the exact number of workers. Do not use `all-ready` merely
+   because the parent is collecting independent results.
 5. Do not perform delegated repository cloning or review work in the parent
    sandbox. The dedicated OpenShell child must perform it.
 6. Preserve the user's requested scope in each child task. Do not turn a
    concise repository review into an exhaustive security audit, implementation
    task, or full test run. Do not add acceptance, gate, or agent-contract
    overrides to the workflow item.
+7. Incoming collaboration messages are stored durably and remain visible in the
+   collaboration watcher. Ordinary messages, progress, and final results do not
+   interrupt this parent; final worker answers arrive through Pi Subagents.
+   Questions automatically trigger a new Pi turn. For any other message that
+   genuinely requires immediate parent action, set envelope payload
+   `actionRequired: true`. Do not subscribe, poll, or manage sequence cursors in
+   the parent. One-shot workers do not use automatic delivery: when a worker
+   task depends on a message or reply, explicitly tell it to call
+   `collaboration_wait` with the expected sender's stable role and repeat after
+   an empty timeout until the task deadline. This makes a failed or prematurely
+   finished dependency terminate the wait instead of hanging until timeout.
+   Use `collaboration_send` to address `parent` or a stable worker role. When the
+   user asks workers to communicate, include the send and wait behavior in each
+   worker's task.
 
 If an `openshell-worker` returns `policy-review-denied` with
 `POLICY_ADVISOR_ACTION_REQUIRED`:
