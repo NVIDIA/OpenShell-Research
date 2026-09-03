@@ -47,6 +47,16 @@ Run all commands from this project directory unless a section says otherwise:
 cd projects/pi-openshell-subagent-poc
 ```
 
+The POC uses two required processes, one recommended operator view, and one
+optional collaboration observer:
+
+| Component | Where it runs | Required |
+| --- | --- | --- |
+| `openshell term` | Host terminal | Recommended operator view for sandboxes and policy approvals |
+| OpenShell Tool Service | Host terminal | Yes; keep it running for delegation, collaboration, and the browser UI |
+| Parent Pi agent | `pi-parent` sandbox | Yes |
+| Collaboration observer | Browser UI or host terminal watcher | Choose either one; running both is optional |
+
 ### 1. Check the prerequisites
 
 You need:
@@ -179,10 +189,10 @@ job, collaboration, and captured child-log state in `.state/jobs.sqlite3`, and
 uses the authenticated host OpenShell CLI to operate on the same gateway as the
 parent sandbox.
 
-Optionally verify it from another host terminal:
+Verify it from another host terminal before creating or starting `pi-parent`:
 
 ```bash
-curl http://127.0.0.1:8765/healthz
+curl --fail --silent --show-error http://127.0.0.1:8765/healthz
 ```
 
 Expected response:
@@ -191,9 +201,53 @@ Expected response:
 {"status":"ok"}
 ```
 
-### 7. Terminal 3: watch the collaboration timeline
+Do not continue until this succeeds. The parent delegates jobs and reads its
+automatic mailbox through this service. The browser UI is also served by this
+same process. If the Tool Service stops, existing Pi inference may continue,
+but new delegation, collaboration messages, and the UI will be unavailable.
 
-Open a third terminal and start the read-only timeline monitor:
+### 7. Choose the browser UI or terminal watcher
+
+The browser UI and terminal watcher show the same retained Tool Service state.
+Choose the browser UI for the visual lifecycle and latency waterfall, or use the
+terminal watcher for a compact text timeline. You do not need to run both.
+
+#### Option A: browser UI
+
+The Tool Service serves the UI directly; there is no separate UI server or
+build command. After the health check succeeds, open this URL in a browser on
+the same host:
+
+```text
+http://127.0.0.1:8765/watch?parent=pi-parent
+```
+
+Paste the value of `OPENSHELL_TOOL_SERVICE_TOKEN` from `.env` into the token
+field and select **Connect**. The token is kept only in that browser tab.
+
+Before the first worker run, the page may show no active run or only retained
+history. After submitting a worker task, verify that:
+
+1. The top-right connection state says **Live**.
+2. The newest run is selected automatically.
+3. The parent and each stable worker role appear under **Participants**.
+4. The waterfall shows policy review, sandbox creation, Pi execution,
+   inference, messages, completion, and any failures for which timing exists.
+5. The conversation or activity view shows collaboration messages in order.
+
+The page refreshes every 500 ms. Runs above 16 workers collapse into expandable
+groups of 16. OpenShell `API:INFERENCE` timings appear after a child finishes,
+when its captured sandbox logs become available. A message's Tool Service to
+recipient time is measured from storage to acknowledgement; sender to Tool
+Service is shown as unmeasured because the POC sees only the arrival timestamp.
+Expand **Raw events** for the underlying journal, switch views when useful, or
+select a bar or point to inspect its timing source and details. The browser API
+is read-only and requires the Tool Service bearer token; the HTML page itself
+contains no credentials.
+
+#### Option B: terminal watcher
+
+Open another host terminal and start the read-only timeline monitor:
 
 ```bash
 cd projects/pi-openshell-subagent-poc
@@ -216,31 +270,9 @@ Use `--history` to print retained events before following new ones,
 `--snapshot` to print retained events and exit, `--metadata-only` to hide
 message bodies, or `--verbose` for the diagnostic view.
 
-For a visual near-real-time view, open:
+### 8. Create and start the parent Pi agent
 
-```text
-http://127.0.0.1:8765/watch?parent=pi-parent
-```
-
-Paste `OPENSHELL_TOOL_SERVICE_TOKEN` into the page and select **Connect**. The
-token is kept only in that browser tab. The page refreshes every 500 ms and
-automatically follows the newest run. Its default network-flow view is a shared
-time-axis waterfall with one lane per worker and separate tracks for control
-plane work, Pi execution, inference, and messages. It highlights the critical
-worker, slowest measured operation, failures, running spans, and message points.
-Runs above 16 workers collapse into expandable groups of 16. OpenShell
-`API:INFERENCE` timings appear after a child finishes, when its captured sandbox
-logs become available. A message's Tool Service to recipient time is measured
-from storage to acknowledgement; sender to Tool Service is shown as unmeasured
-because the POC sees only the arrival timestamp. Expand **Raw events** for the
-underlying journal, switch to conversation or activity views when useful, or
-select a bar or point to inspect its timing source and details. The browser API
-is read-only and requires the Tool Service bearer token; the HTML shell itself
-contains no credentials.
-
-### 8. Terminal 4: create and start the parent Pi agent
-
-Open a fourth terminal and load the same configuration:
+Open another host terminal and load the same configuration:
 
 ```bash
 cd projects/pi-openshell-subagent-poc
@@ -305,7 +337,8 @@ sandbox. Run hostname, wait 30 seconds, and then reply with
 OPEN_SHELL_CHILD_OK followed by the hostname.
 ```
 
-Watch `openshell term` and the Tool Service terminal. Verify that:
+Watch `openshell term`, the Tool Service terminal, and your chosen collaboration
+observer. Verify that:
 
 1. The Tool Service accepts the job and runs the policy review.
 2. A `pi-child-*` sandbox appears and reaches `Ready`.
@@ -444,12 +477,35 @@ the installed skills, the parent system prompt, or the parent policy.
 Confirm that it is running and listening on the configured port:
 
 ```bash
-curl http://127.0.0.1:8765/healthz
+curl --fail --silent --show-error http://127.0.0.1:8765/healthz
 ```
 
 The URL, port, and token must match across `.env`, `policies/parent-smoke.yaml`,
 and the parent create command. The Tool Service must use an authenticated
 OpenShell CLI connected to the same gateway as the sandbox.
+
+Repeated Pi messages such as these mean the automatic parent mailbox cannot
+reach the Tool Service:
+
+```text
+OpenShell automatic mailbox retrying after error: TypeError: fetch failed
+OpenShell automatic mailbox retrying after error: TimeoutError: The operation was aborted due to timeout
+```
+
+Start or restart `uv run openshell-tool-service`, confirm `/healthz`, and leave
+that process running. Increasing the mailbox timeout does not fix a service that
+is stopped or not listening on the configured port.
+
+### The browser UI does not connect or shows no run
+
+First confirm the Tool Service health check. Then verify that the browser URL
+uses the expected `parent` value and that the token matches
+`OPENSHELL_TOOL_SERVICE_TOKEN` in the environment of the running Tool Service.
+The UI has no separate server and stops when the Tool Service stops.
+
+If the connection says **Live** but no run appears, submit a subagent task in
+the parent Pi session. A new run appears only after the Tool Service accepts the
+first worker job. Use the run selector to inspect older retained runs.
 
 ### NVIDIA Inference Hub returns `401`
 
