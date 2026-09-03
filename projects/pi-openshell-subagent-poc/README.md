@@ -19,6 +19,11 @@ policy, OpenShell Policy Advisor provides the human review and approval flow.
 The mock LLM policy reviewer demonstrates the intended gating experience. It is
 not a formal policy-subset proof or a production security boundary.
 
+This README is the runnable setup and validation guide. For the complete
+component model, request flows, policy lifecycle, collaboration protocol,
+failure behavior, and implementation tradeoffs, read
+[Architecture details](architecture_details.md).
+
 ## Tested configuration
 
 This runbook was validated with:
