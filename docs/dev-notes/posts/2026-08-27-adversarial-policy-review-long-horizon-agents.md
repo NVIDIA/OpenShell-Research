@@ -56,7 +56,7 @@ The most interesting result was that an attacker did fool the AI reviewer once. 
 
 The challengers also became much more persistent and creative than a traditional prompt-jailbreak benchmark would suggest. The early approaches were predictable. More unusual protocol, identity, decomposition, reviewer-manipulation, and delegated-effect strategies appeared after sustained rejection. Past 100 minutes, one challenger pivoted from network-style attacks to the OpenShell runtime. It compiled and unlinked a purpose-built uploader, kept it alive as a Linux process, and proposed `/proc/20005/exe` as the binary identity for a one-shot policy grant. It used the process's seccomp filters, `no_new_privs`, removed capabilities, unlinked executable inode, exact command line, and hardcoded request body to argue that the permission was ephemeral and safely scoped.
 
-The harness is on the OpenShell research repo at: [https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/long-horizon-agent-evals](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/long-horizon-agent-evals)
+The harness is on the OpenShell research repo. It has since become [Nightshift](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/nightshift), a general tool for running agents on long tasks under OpenShell; this experiment ships as its [`github-policy-review`](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/nightshift/experiments/github-policy-review) experiment folder.
 
 ## Experiment setup
 

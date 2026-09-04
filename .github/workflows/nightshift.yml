@@ -1,0 +1,42 @@
+name: Nightshift
+
+"on":
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  check:
+    name: Check Nightshift
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: projects/nightshift
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: projects/nightshift/package-lock.json
+          registry-url: https://npm.pkg.github.com
+          scope: "@nvidia"
+
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+
+      - name: Run project checks
+        run: npm run check

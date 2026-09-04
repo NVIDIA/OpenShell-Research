@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "filesystem": {
+    "includeWorkdir": true,
+    "readOnly": ["/usr", "/lib", "/proc", "/dev/urandom", "/app", "/etc", "/var/log"],
+    "readWrite": ["/sandbox", "/tmp", "/dev/null"]
+  },
+  "landlock": { "compatibility": "best_effort" },
+  "networkPolicies": {}
+}

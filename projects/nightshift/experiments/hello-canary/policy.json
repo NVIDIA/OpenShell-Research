@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "filesystem": {
+    "includeWorkdir": true,
+    "readOnly": ["/usr", "/lib", "/proc", "/dev/urandom", "/app", "/etc", "/var/log"],
+    "readWrite": ["/sandbox", "/tmp", "/dev/null"]
+  },
+  "landlock": { "compatibility": "best_effort" },
+  "networkPolicies": {
+    "canary": {
+      "name": "canary",
+      "endpoints": [{
+        "host": "{{HOST}}",
+        "port": {{PORT}},
+        "protocol": "rest",
+        "enforcement": "enforce",
+        "allowedIps": ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"],
+        "rules": [{ "allow": { "method": "GET", "path": "{{BOOTSTRAP_PATH}}" } }]
+      }],
+      "binaries": [{ "path": "/usr/bin/curl" }]
+    }
+  }
+}

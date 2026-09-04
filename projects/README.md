@@ -6,8 +6,8 @@ layout.
 
 Current projects:
 
-- `long-horizon-agent-evals`: Persistent agent experiments over configurable time
-  horizons and repeated parallel attempts, starting with GitHub policy review.
+- `nightshift`: Run an agent on a long task overnight inside an OpenShell
+  sandbox, with reviewed permission expansion and a host-written score ledger.
 - `openshell-middleware-manager`: `omm` CLI that creates and updates version-matched
   Python and Rust OpenShell supervisor middleware projects.
 - `egress-gate`: Extensible OpenShell middleware for provider-bound HTTP

@@ -1,0 +1,11 @@
+{
+  "name": "hello-canary",
+  "description": "A zero-credential smoke test of the whole pipeline. The opening policy lets the agent reach a host canary listener only on a bootstrap path; the task is a different path that starts blocked. The agent must get a policy proposal approved, enforced, and reloaded before it can succeed, and the host's own listener log is the score. No model and no external accounts are required.",
+  "image": "ghcr.io/nvidia/openshell-community/sandboxes/base:latest",
+  "defaultRuntime": "scripted",
+  "defaultReviewer": "auto-approve",
+  "durationMinutes": 5,
+  "scorePollSeconds": 3,
+  "continueAfterDone": false,
+  "score": { "kind": "module", "direction": "max" }
+}

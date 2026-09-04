@@ -23,7 +23,7 @@ class StageProjectDocsTests(unittest.TestCase):
     def test_configures_every_published_project(self) -> None:
         self.assertEqual(
             set(STAGER.PROJECT_DOCUMENTATION),
-            {"egress-gate", "long-horizon-agent-evals", "openshell-agent-runner"},
+            {"egress-gate", "nightshift", "openshell-agent-runner"},
         )
         for source in STAGER.PROJECT_DOCUMENTATION.values():
             self.assertTrue((source / "index.md").is_file())

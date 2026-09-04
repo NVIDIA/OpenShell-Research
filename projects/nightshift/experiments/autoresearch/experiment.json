@@ -1,0 +1,45 @@
+{
+  "name": "autoresearch",
+  "description": "Karpathy's autoresearch loop under OpenShell: an agent edits one training script, trains a small GPT for a fixed time budget, and keeps or discards each change by validation bits per byte. The fixed data, tokenizer, evaluator, and scorer are baked read-only into the sandbox image; the harness writes the ledger. The laptop profile runs on CPU inside Docker on a Mac; the station profile is the GPU configuration for a DGX Station.",
+  "image": "nightshift/autoresearch:laptop",
+  "defaultRuntime": "claude-code",
+  "defaultReviewer": "model-reviewer",
+  "scorePollSeconds": 20,
+  "continueAfterDone": false,
+  "score": {
+    "kind": "command",
+    "command": ["/sandbox/.venv/bin/python", "/opt/autoresearch/score.py"],
+    "direction": "min"
+  },
+  "defaultProfile": "laptop",
+  "profiles": {
+    "laptop": {
+      "image": "nightshift/autoresearch:laptop",
+      "env": {
+        "AUTORESEARCH_PROFILE": "laptop",
+        "AUTORESEARCH_TIME_BUDGET": "90",
+        "AUTORESEARCH_CACHE": "/opt/autoresearch/cache",
+        "PYTHONPATH": "/opt/autoresearch",
+        "BASH_DEFAULT_TIMEOUT_MS": "900000",
+        "BASH_MAX_TIMEOUT_MS": "900000"
+      },
+      "turnTimeoutSeconds": 7200
+    },
+    "station": {
+      "image": "nightshift/autoresearch:station",
+      "env": {
+        "AUTORESEARCH_PROFILE": "station",
+        "AUTORESEARCH_TIME_BUDGET": "300",
+        "AUTORESEARCH_CACHE": "/opt/autoresearch/cache",
+        "PYTHONPATH": "/opt/autoresearch",
+        "BASH_DEFAULT_TIMEOUT_MS": "1500000",
+        "BASH_MAX_TIMEOUT_MS": "1500000"
+      },
+      "turnTimeoutSeconds": 7200,
+      "gpu": true
+    }
+  },
+  "driver": {
+    "resumeNudge": "Continue the experiment loop. First check `git log --oneline -5` and the tail of run.log so you know where you left off. Then run exactly one more experiment: edit train.py, commit, run it, read val_bpb, keep or discard. Submit at most one policy proposal this turn, then return; the harness resumes you."
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "name": "nightshift",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Run an agent on a long task overnight inside an OpenShell sandbox, with reviewed permission expansion and a score ledger the agent cannot edit.",
+  "type": "module",
+  "bin": {
+    "nightshift": "bin/nightshift.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "driver",
+    "reviewers",
+    "experiments",
+    "tsconfig.json",
+    ".env.example",
+    "README.md"
+  ],
+  "scripts": {
+    "nightshift": "tsx src/nightshift.ts",
+    "doctor": "tsx src/nightshift.ts doctor",
+    "run": "tsx src/nightshift.ts run",
+    "report": "tsx src/nightshift.ts report",
+    "image:codex": "docker build --pull --build-arg CODEX_VERSION=0.147.0 --tag nightshift/codex:0.147.0 --file images/codex/Dockerfile images/codex",
+    "image:autoresearch": "docker build --build-arg PROFILE=laptop --tag nightshift/autoresearch:laptop --file experiments/autoresearch/image/Dockerfile experiments/autoresearch/image",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "check": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "@nvidia/openshell-sdk": "0.0.116",
+    "esbuild": "^0.27.0",
+    "tsx": "^4.20.0",
+    "typescript": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0"
+  },
+  "engines": {
+    "node": ">=20.3"
+  }
+}
