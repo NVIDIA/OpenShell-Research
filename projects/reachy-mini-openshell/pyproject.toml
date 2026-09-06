@@ -29,6 +29,7 @@ dependencies = [
  "gradio_client>=1.13.3",
  "setuptools>=84,<85", # 84.0.0 fixes setuptools security advisories pulled in by torch.
  "starlette>=1.6,<2", # 1.6.0 fixes Starlette security advisories pulled in by Gradio and reachy-mini.
+ "tornado>=6.5.8,<7", # 6.5.8 fixes Tornado advisories pulled in by reachy-mini.
 ]
 [[project.authors]]
 name = "Pollen Robotics"
