@@ -19,10 +19,10 @@ export function findMissingTools(
 }
 
 export default function (pi: ExtensionAPI) {
-  pi.on("before_agent_start", (_event, context) => {
-    const availableTools = context.getAllTools();
+  pi.on("before_agent_start", () => {
+    const availableTools = pi.getAllTools();
     const missingTools = findMissingTools(requestedTools, availableTools);
-    const activeTools = context.getActiveTools();
+    const activeTools = pi.getActiveTools();
     const activeNames = new Set(activeTools);
     const inactiveTools = requestedTools.filter((name) => !activeNames.has(name));
     const unavailableTools = [...new Set([...missingTools, ...inactiveTools])];

@@ -69,11 +69,12 @@ if operation == "create":
     if os.environ.get("FAKE_SLEEP_CREATE") == "1":
         import time; time.sleep(5)
 elif operation == "upload":
+    if os.environ.get("FAKE_FAIL_UPLOAD") == "1": sys.exit(2)
     if args[4] == "/sandbox/oar-runtime/prompt.md":
         capture = log.with_name("uploaded-prompt.md")
         capture.write_text(pathlib.Path(args[3]).read_text())
 elif operation == "exec":
-    pass
+    if os.environ.get("FAKE_FAIL_EXEC") == "1": sys.exit(2)
 elif operation == "get":
     if not state.exists(): sys.exit(1)
     document = json.loads(state.read_text())
@@ -344,6 +345,25 @@ def test_invalid_output_still_cleans(tmp_path: Path, monkeypatch) -> None:
     with pytest.raises(ArtifactError):
         run_agent(request(profile, executable, tmp_path / "result.json"))
     assert not state.exists()
+
+
+@pytest.mark.parametrize("operation", ["upload", "exec"])
+def test_runtime_failure_preserves_output_and_cleans(
+    tmp_path: Path, monkeypatch, operation: str
+) -> None:
+    profile, executable, state, log = prepare(tmp_path, monkeypatch)
+    monkeypatch.setenv(f"FAKE_FAIL_{operation.upper()}", "1")
+    output = tmp_path / "result.json"
+    output.write_text("previous result\n")
+
+    with pytest.raises(ExecutionError, match=f"sandbox {operation}"):
+        run_agent(request(profile, executable, output))
+
+    assert output.read_text() == "previous result\n"
+    assert not state.exists()
+    operations = [json.loads(line)[1] for line in log.read_text().splitlines()]
+    assert "download" not in operations
+    assert operations[-2:] == ["get", "delete"]
 
 
 def test_cleanup_failure_does_not_mask_primary_error(
