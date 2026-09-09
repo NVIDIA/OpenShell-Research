@@ -7,8 +7,9 @@ description: Automated checks for added and changed locked dependencies.
 
 The `Dependency licenses` workflow enforces the repository's dependency-license
 policy on every pull request. It compares committed lockfiles, looks up license
-metadata for added or changed packages, and fails when a result does not satisfy
-the policy. It uses no agent, inference service, secrets, or write permissions.
+metadata for direct dependencies, and identifies additions and changes that
+must satisfy the policy. It uses no agent, inference service, secrets, or write
+permissions.
 
 The policy source of truth is
 `.github/dependency-license-policy.toml`. It contains the currently approved
@@ -27,13 +28,15 @@ Supported lockfiles are:
 - JavaScript: npm v2/v3 `package-lock.json`.
 - Rust: `Cargo.lock`.
 
-The inventory includes external direct and transitive packages, including
-development, optional, and platform-specific dependencies. First-party project
-and workspace packages are excluded.
+The inventory includes external packages declared directly by each project,
+including development, optional, and platform-specific direct dependencies.
+Transitive packages and first-party project or workspace packages are excluded.
 
 For a pull request, a package is checked when its locked name, version, source,
 or lockfile location is added or changed. Removed packages do not fail the
-check. Unchanged packages are not rechecked during an ordinary pull request.
+check. The report still includes unchanged current direct dependencies so that
+every run provides a repository-wide view. Only additions and changes affect
+the status of an ordinary pull request.
 
 Changed `pyproject.toml`, `package.json`, `Cargo.toml`, and PEP 723 inline-script
 metadata must have a corresponding lockfile or belong to a declared locked
@@ -59,7 +62,9 @@ complete legal clearance.
 The policy approves a maintained set of open-source licenses. Consult
 `.github/dependency-license-policy.toml` for the current policy. License metadata
 that is missing, ambiguous, malformed, or not approved fails the check. Registry
-outages fail as unresolved rather than being treated as successful checks.
+outages are unresolved rather than being treated as successful lookups. An
+unresolved addition or change fails the pull request; an unresolved unchanged
+dependency contributes no license to the report.
 
 Public metadata comes from PyPI, npm, or crates.io. Private registries, Git
 dependencies, and other unsupported source forms require reviewed, exact-source
@@ -79,8 +84,21 @@ itself from changes made in the same pull request.
 ## Results and remediation
 
 The workflow publishes the `Check dependency licenses` status and uploads a
-`dependency-licenses.json` artifact. Each result records the package identity,
-source, affected lockfiles, reported license, and reason for passing or failing.
+compact `dependency-licenses.json` artifact with three fields:
+
+- `folders` maps every scanned project folder to the lockfiles inspected there
+  and its direct-dependency licenses.
+- `licenses` maps every unique reported license value to the project folders
+  that depend on it.
+- `failures` maps affected project folders to the licenses that fail the check.
+  Missing or unusable license metadata is reported as `unknown`.
+
+The report contains no package-level records and does not list transitive
+dependency licenses.
+
+The lockfiles identify each direct dependency and its exact resolved version.
+The reported license value comes from that version's package-registry metadata
+or a reviewed policy clarification, not from the lockfile itself.
 
 For a failure:
 
@@ -94,10 +112,10 @@ For a failure:
 
 ## Rollout and full audits
 
-An ordinary pull request checks only dependency additions and changes. Editing
-an existing policy triggers a full inventory audit, as does manually dispatching
-the workflow without a base revision. A full audit evaluates every external
-package in every supported tracked lockfile.
+An ordinary pull request enforces policy only for direct dependency additions
+and changes, while still reporting all current direct-dependency licenses.
+Editing an existing policy triggers full enforcement, as does manually
+dispatching the workflow without a base revision.
 
 ## Local checks
 

@@ -14,6 +14,7 @@ import argparse
 import json
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
@@ -99,6 +100,64 @@ def inventory(path: str, content: str) -> set[Dependency]:
     return result
 
 
+def direct_inventory(path: str, content: str) -> set[Dependency]:
+    """Return locked packages declared directly by the project or script."""
+    lock = (
+        json.loads(content)
+        if Path(path).name == "package-lock.json"
+        else tomllib.loads(content)
+    )
+    direct_names = set()
+    if Path(path).name == "package-lock.json":
+        for location, package in lock["packages"].items():
+            if location and "node_modules/" in location:
+                continue
+            for key in (
+                "dependencies",
+                "devDependencies",
+                "optionalDependencies",
+                "peerDependencies",
+            ):
+                direct_names.update(package.get(key, {}))
+    elif Path(path).name == "Cargo.lock":
+        for package in lock.get("package", []):
+            if package.get("source") is None:
+                direct_names.update(
+                    dependency.split(" ", 1)[0]
+                    for dependency in package.get("dependencies", [])
+                )
+    else:
+        direct_names.update(
+            requirement["name"]
+            for requirement in lock.get("manifest", {}).get("requirements", [])
+        )
+        workspace_members = set(lock.get("manifest", {}).get("members", []))
+        for package in lock.get("package", []):
+            if package["name"] not in workspace_members and package.get(
+                "source"
+            ) not in (
+                {"editable": "."},
+                {"virtual": "."},
+            ):
+                continue
+            direct_names.update(
+                dependency["name"] for dependency in package.get("dependencies", [])
+            )
+            for groups in (
+                package.get("optional-dependencies", {}),
+                package.get("dev-dependencies", {}),
+            ):
+                for dependencies in groups.values():
+                    direct_names.update(
+                        dependency["name"] for dependency in dependencies
+                    )
+    return {
+        dependency
+        for dependency in inventory(path, content)
+        if dependency.name in direct_names
+    }
+
+
 def allowed_expression(expression: str, approved: list[str]) -> bool:
     """Parse SPDX using its library; evaluate AND/OR over approved license atoms."""
     from license_expression import ExpressionError, get_spdx_licensing
@@ -118,6 +177,32 @@ def allowed_expression(expression: str, approved: list[str]) -> bool:
         for symbol in parsed.get_symbols()
     }
     return parsed.subs(values).simplify() == licensing.TRUE
+
+
+def license_identifiers(expression: str) -> list[str]:
+    """Return the distinct license identifiers in a valid expression."""
+    from license_expression import ExpressionError, get_spdx_licensing
+
+    if not isinstance(expression, str) or not expression.strip():
+        return []
+    licensing = get_spdx_licensing()
+    try:
+        parsed = licensing.parse(expression, validate=True, strict=True)
+    except ExpressionError:
+        return []
+    return (
+        sorted(str(symbol) for symbol in parsed.get_symbols())
+        if parsed is not None
+        else []
+    )
+
+
+def reported_license(expression: str | None) -> str:
+    """Return a compact, single-line registry license value for reporting."""
+    if not isinstance(expression, str) or not expression.strip():
+        return "unknown"
+    value = " ".join(expression.split())
+    return value if len(value) <= 120 else f"{value[:119]}…"
 
 
 def load_policy(content: str, approved_override: list[str] | None = None) -> dict:
@@ -235,6 +320,18 @@ def check_dependency(dependency: Dependency, policy: dict) -> dict:
     }
 
 
+def check_dependencies(
+    dependencies: dict[Dependency, list[str]], policy: dict
+) -> dict[Dependency, dict]:
+    """Resolve package metadata concurrently while preserving deterministic output."""
+    ordered = sorted(dependencies)
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        results = executor.map(
+            lambda dependency: check_dependency(dependency, policy), ordered
+        )
+    return dict(zip(ordered, results, strict=True))
+
+
 def git_text(root: Path, *args: str) -> str:
     return subprocess.check_output(["git", "-C", str(root), *args], text=True)
 
@@ -318,7 +415,16 @@ def check_manifest_coverage(
         if base
         else set()
     )
-    candidates = paths if base is None else set(changed)
+    candidates = set() if base is None else set(changed)
+    if base is None:
+        lock_manifests = {lock: manifest for manifest, lock in MANIFEST_LOCKS.items()}
+        for path in paths:
+            if path.endswith(".py.lock"):
+                candidates.add(path.removesuffix(".lock"))
+                continue
+            manifest_name = lock_manifests.get(Path(path).name)
+            if manifest_name:
+                candidates.add((Path(path).parent / manifest_name).as_posix())
     targets: set[tuple[str, str, str]] = set()
     for path in changed:
         if path.endswith(".py.lock"):
@@ -438,11 +544,60 @@ def select_dependencies(
     selected: dict[Dependency, list[str]] = {}
     for path, content in after.items():
         previous = (
-            inventory(path, before[path]) if path in before and not full else set()
+            direct_inventory(path, before[path])
+            if path in before and not full
+            else set()
         )
-        for dependency in inventory(path, content) - previous:
+        for dependency in direct_inventory(path, content) - previous:
             selected.setdefault(dependency, []).append(path)
     return selected
+
+
+def report_summary(
+    lockfiles: dict[str, str],
+    dependencies: dict[Dependency, list[str]],
+    checked: dict[Dependency, dict],
+    enforced: dict[Dependency, list[str]],
+) -> dict:
+    """Map scanned folders and licenses without per-package success records."""
+    folders = {}
+    for path in lockfiles:
+        folder = Path(path).parent.as_posix()
+        folders.setdefault(folder, {"files": set(), "licenses": set()})["files"].add(
+            path
+        )
+    license_folders: dict[str, set[str]] = {}
+    for dependency in sorted(dependencies):
+        license_name = reported_license(checked[dependency]["license"])
+        for path in dependencies[dependency]:
+            folder = Path(path).parent.as_posix()
+            folders[folder]["licenses"].add(license_name)
+            license_folders.setdefault(license_name, set()).add(folder)
+
+    failures: dict[str, set[str]] = {}
+    for dependency in sorted(enforced):
+        if checked[dependency]["passed"]:
+            continue
+        license_name = reported_license(checked[dependency]["license"])
+        for path in enforced[dependency]:
+            failures.setdefault(Path(path).parent.as_posix(), set()).add(license_name)
+
+    return {
+        "folders": {
+            folder: {
+                "files": sorted(values["files"]),
+                "licenses": sorted(values["licenses"]),
+            }
+            for folder, values in sorted(folders.items())
+        },
+        "licenses": {
+            license_name: sorted(values)
+            for license_name, values in sorted(license_folders.items())
+        },
+        "failures": {
+            folder: sorted(values) for folder, values in sorted(failures.items())
+        },
+    }
 
 
 def main() -> int:
@@ -459,6 +614,11 @@ def main() -> int:
         help="Base-branch policy providing the approved list; head clarifications cannot expand it",
     )
     parser.add_argument("--report", type=Path)
+    parser.add_argument(
+        "--lock-checks-report",
+        type=Path,
+        help="Write native lock-validation targets separately from the license report",
+    )
     args = parser.parse_args()
     try:
         approved = (
@@ -485,31 +645,34 @@ def main() -> int:
         )
         full = not args.base or policy_existed
         lock_checks = check_manifest_coverage(args.repo, args.base, args.head, changed)
+        if args.lock_checks_report:
+            args.lock_checks_report.write_text(json.dumps(lock_checks, indent=2) + "\n")
         selected = select_dependencies(before, after, full=full)
-        results = []
+        repository_dependencies = select_dependencies({}, after, full=True)
+        checked = check_dependencies(repository_dependencies, policy)
         for dependency in sorted(selected):
-            result = check_dependency(dependency, policy)
-            result["lockfiles"] = selected[dependency]
-            results.append(result)
+            result = {**checked[dependency], "lockfiles": selected[dependency]}
             license_label = str(result["license"] or "unknown").replace("\n", " ")[:120]
             print(
                 f"{'PASS' if result['passed'] else 'FAIL'} {dependency.ecosystem}:{dependency.name}@{dependency.version}: {license_label} ({result['reason']})"
             )
-        report = {
-            "base": args.base,
-            "head": args.head,
-            "full_audit": full,
-            "checked": len(results),
-            "failed": sum(not result["passed"] for result in results),
-            "results": results,
-            "lock_checks": lock_checks,
-        }
+        report = report_summary(after, repository_dependencies, checked, selected)
         if args.report:
             args.report.write_text(json.dumps(report, indent=2) + "\n")
+        failed = sum(not checked[dependency]["passed"] for dependency in selected)
         print(
-            f"Checked {report['checked']} added/changed dependencies; {report['failed']} require resolution."
+            f"Checked {len(selected)} enforced dependencies; "
+            f"{failed} require resolution."
         )
-        return 1 if report["failed"] else 0
+        unresolved = sum(
+            not license_identifiers(checked[dependency]["license"])
+            for dependency in repository_dependencies
+        )
+        print(
+            f"Repository inventory: {len(repository_dependencies)} dependencies, "
+            f"{len(report['licenses'])} licenses, {unresolved} unresolved."
+        )
+        return 1 if failed else 0
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
         print(f"Dependency license check failed: {error}", file=sys.stderr)
         return 1

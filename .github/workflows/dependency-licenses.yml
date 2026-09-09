@@ -43,7 +43,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          args=(--head "$HEAD_SHA" --report dependency-licenses.json)
+          args=(--head "$HEAD_SHA" --report dependency-licenses.json --lock-checks-report .dependency-license-lock-checks.json)
           if [ -n "$BASE_SHA" ]; then
             args+=(--base "$BASE_SHA")
             if git cat-file -e "$BASE_SHA:.github/dependency-license-policy.toml" 2>/dev/null; then
@@ -56,9 +56,9 @@ jobs:
           uv run --locked --script scripts/check_dependency_licenses.py "${args[@]}"
 
       - name: Validate affected lockfiles with native package managers
-        if: always() && hashFiles('dependency-licenses.json') != ''
+        if: always() && hashFiles('.dependency-license-lock-checks.json') != ''
         run: |
-          jq -c '.lock_checks[]' dependency-licenses.json | while IFS= read -r target; do
+          jq -c '.[]' .dependency-license-lock-checks.json | while IFS= read -r target; do
             directory=$(jq -r '.directory' <<< "$target")
             manager=$(jq -r '.manager' <<< "$target")
             script=$(jq -r '.script // empty' <<< "$target")

@@ -33,7 +33,17 @@ DEPENDENCY = checker.Dependency(
 
 
 def uv_lock(version="1.0", source='registry = "https://pypi.org/simple"'):
-    return f'[[package]]\nname = "example"\nversion = "{version}"\nsource = {{ {source} }}\n'
+    return f'''[[package]]
+name = "root"
+version = "0.1"
+source = {{ virtual = "." }}
+dependencies = [{{ name = "example" }}]
+
+[[package]]
+name = "example"
+version = "{version}"
+source = {{ {source} }}
+'''
 
 
 def uv_script(*dependencies):
@@ -53,7 +63,7 @@ def assert_true(value):
     assert value
 
 
-def check_coverage(before, after):
+def check_coverage(before, after, base="base"):
     changed = sorted(
         path
         for path in before.keys() | after.keys()
@@ -68,7 +78,7 @@ def check_coverage(before, after):
         return (before if revision == "base" else after)[path]
 
     with mock.patch.object(checker, "git_text", side_effect=git_text):
-        return checker.check_manifest_coverage(ROOT, "base", "head", changed)
+        return checker.check_manifest_coverage(ROOT, base, "head", changed)
 
 
 def test_native_check_targets_for_direct_projects():
@@ -97,6 +107,18 @@ def test_native_check_targets_for_changed_lock_only_and_no_changes():
     assert_equal(
         check_coverage(before, {**before, "uv.lock": uv_lock("2.0")}),
         [{"directory": ".", "manager": "uv"}],
+    )
+
+
+def test_full_audit_validates_locked_projects_not_manifest_templates():
+    after = {
+        "project/pyproject.toml": '[project]\ndependencies=["example"]',
+        "project/uv.lock": uv_lock(),
+        "src/templates/pyproject.toml": '[project]\ndependencies=["template"]',
+    }
+    assert_equal(
+        check_coverage({}, after, base=None),
+        [{"directory": "project", "manager": "uv"}],
     )
     root = {
         "pyproject.toml": '[tool.uv.workspace]\nmembers=["packages/*"]',
@@ -357,6 +379,57 @@ source = "git+https://example.org/repo#abc"
     )
 
 
+def test_direct_inventory_excludes_transitive_dependencies():
+    uv_content = (
+        uv_lock()
+        + """[[package]]
+name = "transitive"
+version = "1"
+source = { registry = "https://pypi.org/simple" }
+"""
+    )
+    assert_equal(
+        {item.name for item in checker.direct_inventory("uv.lock", uv_content)},
+        {"example"},
+    )
+
+    npm_content = json.dumps(
+        {
+            "lockfileVersion": 3,
+            "packages": {
+                "": {"dependencies": {"direct": "1"}},
+                "node_modules/direct": {"version": "1"},
+                "node_modules/transitive": {"version": "1"},
+            },
+        }
+    )
+    assert_equal(
+        {
+            item.name
+            for item in checker.direct_inventory("package-lock.json", npm_content)
+        },
+        {"direct"},
+    )
+
+    cargo_content = """[[package]]
+name = "root"
+version = "0.1"
+dependencies = ["direct"]
+[[package]]
+name = "direct"
+version = "1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+[[package]]
+name = "transitive"
+version = "1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+"""
+    assert_equal(
+        {item.name for item in checker.direct_inventory("Cargo.lock", cargo_content)},
+        {"direct"},
+    )
+
+
 def test_changes_include_version_and_source_but_not_removals():
     path = "project/uv.lock"
     assert_false(checker.select_dependencies({path: uv_lock()}, {path: uv_lock()}))
@@ -421,6 +494,75 @@ def test_with_requires_approved_exact_combination():
     assert_false(
         checker.allowed_expression(expression, ["Apache-2.0", "LLVM-exception"])
     )
+
+
+def test_report_summarizes_scanned_targets_and_repository_licenses():
+    npm_dependency = checker.Dependency(
+        "npm",
+        "web-example",
+        "2.0",
+        "https://registry.npmjs.org/web-example/-/web-example-2.0.tgz",
+    )
+    dependencies = {
+        DEPENDENCY: ["python/uv.lock"],
+        npm_dependency: ["web/package-lock.json"],
+    }
+    checked = {
+        DEPENDENCY: {
+            **DEPENDENCY.__dict__,
+            "license": "MIT OR Apache-2.0",
+            "evidence": "",
+            "passed": True,
+            "reason": "approved",
+        },
+        npm_dependency: {
+            **npm_dependency.__dict__,
+            "license": "MIT",
+            "evidence": "",
+            "passed": False,
+            "reason": "not approved",
+        },
+    }
+    lockfiles = {
+        "python/uv.lock": uv_lock(),
+        "web/package-lock.json": json.dumps(
+            {
+                "lockfileVersion": 3,
+                "packages": {
+                    "": {},
+                    "node_modules/example": {
+                        "version": "1.0",
+                        "resolved": "https://registry.npmjs.org/example/-/example-1.0.tgz",
+                    },
+                },
+            }
+        ),
+    }
+    report = checker.report_summary(lockfiles, dependencies, checked, dependencies)
+    assert_equal(
+        report["folders"],
+        {
+            "python": {
+                "files": ["python/uv.lock"],
+                "licenses": ["MIT OR Apache-2.0"],
+            },
+            "web": {
+                "files": ["web/package-lock.json"],
+                "licenses": ["MIT"],
+            },
+        },
+    )
+    assert_equal(
+        report["licenses"],
+        {"MIT": ["web"], "MIT OR Apache-2.0": ["python"]},
+    )
+    assert_equal(report["failures"], {"web": ["MIT"]})
+
+
+def test_reported_license_is_compact_and_preserves_registry_wording():
+    assert_equal(checker.reported_license(None), "unknown")
+    assert_equal(checker.reported_license("MIT\nLicense"), "MIT License")
+    assert_equal(checker.reported_license("x" * 121), "x" * 119 + "…")
 
 
 def test_pypi_uses_exact_version_and_prefers_expression():
@@ -553,6 +695,7 @@ def test_cli_uses_git_revisions_not_uncommitted_files():
         git("commit", "-qm", "head")
         (root / "uv.lock").write_text("uncommitted invalid file")
         report = root / "report.json"
+        lock_checks_report = root / "lock-checks.json"
         args = [
             "check",
             "--repo",
@@ -563,22 +706,34 @@ def test_cli_uses_git_revisions_not_uncommitted_files():
             str(ROOT / checker.POLICY_PATH),
             "--report",
             str(report),
+            "--lock-checks-report",
+            str(lock_checks_report),
         ]
         with (
             mock.patch.object(sys, "argv", args),
             mock.patch.object(checker, "package_license", return_value="MIT"),
         ):
             assert_equal(checker.main(), 0)
-        assert_equal(json.loads(report.read_text())["results"][0]["version"], "2.0")
+        report_data = json.loads(report.read_text())
+        assert_equal(
+            report_data,
+            {
+                "folders": {".": {"files": ["uv.lock"], "licenses": ["MIT"]}},
+                "licenses": {"MIT": ["."]},
+                "failures": {},
+            },
+        )
+        assert_equal(
+            json.loads(lock_checks_report.read_text()),
+            [{"directory": ".", "manager": "uv"}],
+        )
         with (
             mock.patch.object(sys, "argv", args),
             mock.patch.object(checker, "package_license", return_value="GPL-3.0-only"),
         ):
             assert_equal(checker.main(), 1)
-        assert_equal(
-            json.loads(report.read_text())["lock_checks"],
-            [{"directory": ".", "manager": "uv"}],
-        )
+        failed_report = json.loads(report.read_text())
+        assert_equal(failed_report["failures"], {".": ["GPL-3.0-only"]})
 
 
 def test_first_policy_introduction_is_delta_then_policy_edits_are_full():
@@ -616,12 +771,14 @@ def test_first_policy_introduction_is_delta_then_policy_edits_are_full():
         ]
         with (
             mock.patch.object(sys, "argv", args),
-            mock.patch.object(checker, "package_license", return_value="MIT") as fetch,
+            mock.patch.object(
+                checker, "package_license", return_value="GPL-3.0-only"
+            ) as fetch,
         ):
             assert_equal(checker.main(), 0)
-            fetch.assert_not_called()
-        assert_equal(json.loads(report.read_text())["checked"], 0)
-        assert_false(json.loads(report.read_text())["full_audit"])
+            fetch.assert_called_once()
+        report_data = json.loads(report.read_text())
+        assert_equal(report_data["failures"], {})
         args[args.index("--base") + 1] = git("rev-parse", "HEAD")
         policy_path.write_text('approved = ["MIT", "Apache-2.0"]\n')
         git("add", str(policy_path))
@@ -632,4 +789,4 @@ def test_first_policy_introduction_is_delta_then_policy_edits_are_full():
         ):
             assert_equal(checker.main(), 0)
             fetch.assert_called_once()
-        assert_true(json.loads(report.read_text())["full_audit"])
+        assert_equal(json.loads(report.read_text())["failures"], {})
