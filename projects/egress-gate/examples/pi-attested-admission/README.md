@@ -1,341 +1,195 @@
-# Pi attested-admission example
+# Pi admission without forks
 
-This example runs the normal forked Pi CLI inside OpenShell and sends admitted
-conversation context to the configured NVIDIA inference endpoint. One
-endpoint-scoped provider and credential serve all configured models.
+A small, real Pi-powered coding assistant runs in unmodified OpenShell.
+Egress Gate approves content **before** it enters the assistant's live history
+or Pi's saved session. It can deny text or replace it; a second check at the
+network boundary prevents sending an unapproved user/tool context.
 
-The example demonstrates the same policy, identified by the same fingerprint,
-at three checkpoints: before Pi appends history, immediately before Pi sends
-its complete provider context, and again at provider egress before OpenShell
-attaches credentials.
+This is an application built from Pi's public APIs, not the stock Pi CLI.
+It keeps real tools, tool continuations, project instructions, explicit skills,
+and manual/automatic compaction. Neither Pi nor OpenShell needs a patch.
 
-- `DENY_THIS` is rejected before Pi adds a user message or tool result to its
-  live context.
-- `REDACT_THIS` becomes `[REDACTED]` before Pi adds or sends it.
+## Try it
 
-The redaction case makes one real request to your configured endpoint and may
-incur charges from that provider.
+Prerequisites: **Linux x86_64**, running Docker, Python 3.11+, uv 0.11+,
+curl, and a real key for a text-only OpenAI-compatible Chat Completions model.
+The checked-in model uses NVIDIA's inference endpoint and requires access to it.
+Edit [model.json](model.json) to use another compatible HTTPS endpoint/model.
 
-## Before you start
+From this directory:
 
-Use these matching fork branches:
-
-- [Pi `johnny/before-user-message-commit`](https://github.com/johnnygreco/pi/tree/johnny/before-user-message-commit)
-- [OpenShell `openshell/pi-egress-admission`](https://github.com/johnnygreco/OpenShell/tree/openshell/pi-egress-admission)
-- [OpenShell Research integration branch](https://github.com/NVIDIA/OpenShell-Research/tree/johnny/pi-attested-admission)
-
-You do not need to clone the Pi or OpenShell forks manually. The first
-`./demo.sh prepare` clones both into the ignored local workspace
-`projects/egress-gate/.workspaces/pi-attested-admission/`. Later runs update
-them with fast-forward-only pulls, so the fork contents never appear as
-OpenShell Research changes. To reuse a checkout elsewhere, set `PI_REPO` or
-`OPENSHELL_REPO` to its absolute path.
-
-The OpenShell gateway needs a running compute backend. On macOS, start Docker
-Desktop and wait until `docker info` succeeds before running the gateway;
-Podman is also supported. Building the gateway also requires Z3 (`brew install
-z3` on macOS or `libz3-dev` on Debian and Ubuntu). The fork recommends `mise`
-2026.4.25 or newer.
-
-From the `OpenShell-Research` checkout, change to the example directory. Run
-all remaining commands there:
-
-```shell
-cd projects/egress-gate/examples/pi-attested-admission
-```
-
-Create the local configuration file and replace every example value:
-
-```shell
+```sh
 cp .env.example .env
-# Edit .env before continuing.
-```
-
-Every `demo.sh` invocation loads this file automatically. The values remain
-local to the script and its child commands; they are not added to your current
-shell. Set `PI_EGRESS_ENV_FILE` to use a configuration file elsewhere.
-
-If the model endpoint does not require authentication, set
-`PI_MODEL_API_KEY=unused`.
-
-`PI_WORKSPACE_PATH` is optional. Set it to the absolute path of a project you
-want Pi to work on. The reset step uploads its contents to `/sandbox/workspace`
-using the project's normal `.gitignore` rules. If you omit it, Pi starts in an
-empty `/sandbox/workspace`; no local files are copied. In either case, Pi starts
-there, so project instructions, extensions, skills, prompts, and session
-grouping follow its ordinary current-directory behavior.
-
-`PI_MODELS_PATH` points to a standard Pi `models.json`. Relative paths are
-resolved from this example directory. The checked-in [models.json](models.json)
-defines one `attested-provider`, its endpoint and credential reference, and
-these models:
-
-| Model ID | Pi transport |
-| --- | --- |
-| `azure/anthropic/claude-opus-5` | OpenAI Chat Completions |
-| `azure/openai/gpt-5.6-sol` | OpenAI Responses |
-| `nvidia/qwen/qwen3.8-flash-next` | OpenAI Chat Completions |
-
-Pi starts with the reasoning-capable Qwen model and `high` thinking from
-[settings.json](settings.json). Use Pi's normal model picker to switch among all
-three without creating another OpenShell provider. Qwen uses Chat Completions
-reasoning controls, and GPT-5.6 Sol uses Responses reasoning.
-The endpoint's Opus 5 alias currently rejects explicit adaptive-thinking
-controls, so it runs with the endpoint's default thinking behavior.
-
-To use another catalog for the same endpoint, copy `models.json`, edit it using
-Pi's documented JSON format, and set `PI_MODELS_PATH` to that file. OpenShell
-pins network and credential access independently of Pi. To change endpoints,
-update the matching host and port explicitly in `models.json`, `policy.yaml`,
-and `provider-profile.yaml`. The automated `verify` cases target the checked-in
-NVIDIA endpoint and model catalog; the script does not parse arbitrary catalogs
-to adapt those checks.
-
-`EGRESS_GATE_HOST_IP` is the address OpenShell uses to reach Egress Gate on this
-machine. It must be a reachable, non-loopback IPv4 address; do not use
-`127.0.0.1`. The provider's `baseUrl` in `models.json` is the model endpoint Pi
-will call. A model server running on this machine must likewise use a hostname
-or address reachable from the sandbox rather than `localhost`.
-
-The example checks in ordinary Pi and OpenShell configuration files. It uploads
-`models.json` and `settings.json` unchanged to Pi's standard
-`~/.pi/agent` directory. The only generated configuration is a copy of
-`gateway-middleware.toml.example` with `EGRESS_GATE_HOST_IP` substituted for its
-documented placeholder. If an action needs configuration that is missing, the
-script prints the values required by that action and stops before doing work.
-
-Preview the complete workflow before running anything:
-
-```shell
-./demo.sh --print all
-```
-
-The walkthrough lists the terminal sequence and configuration visible to the
-current shell. To inspect the exact commands for one action, use its name—for
-example, `./demo.sh --print prepare` or `./demo.sh --print launch`.
-
-## Run the example
-
-Prepare the forks and build and package the locally modified Pi agent core and
-coding agent:
-
-```shell
+# Edit .env: set PI_MODEL_API_KEY and the host address reachable from Docker.
+# Edit model.json if using a different endpoint/model.
 ./demo.sh prepare
 ```
 
-The updates use fast-forward-only pulls and stop instead of merging divergent
-local work.
+Preparation downloads checksum-verified OpenShell **0.0.116** binaries, installs
+locked Pi **0.85.1** packages in a pinned Node image, and creates local TLS and
+configuration under the project's ignored `.workspaces/pi-no-fork/` directory.
+No fork clones, Rust build, global Pi install, or existing gateway are needed.
+The current launcher is deliberately Linux-only; other platforms are not tested.
 
-Keep Egress Gate running in one terminal:
+Keep these two terminals open:
 
-```shell title="Terminal 1: Egress Gate"
+```sh
+# Terminal 1
 ./demo.sh serve
 ```
 
-This starts a managed-harness-only Egress Gate instance and writes content-safe
-evaluation records to `/tmp/pi-egress-runtime/egress-gate.jsonl`. Set
-`EGRESS_GATE_LOG` to use another path. Request bodies, headers, and message text
-are not written to this log.
-
-Start the matching OpenShell gateway in a second terminal:
-
-```shell title="Terminal 2: OpenShell gateway"
+```sh
+# Terminal 2
 ./demo.sh gateway
 ```
 
-The example uses its own gateway name and passes it explicitly to every
-OpenShell command. It does not depend on or change your globally selected
-OpenShell gateway.
+Then create the sandbox and start a session:
 
-After the gateway reports that it is ready, create the demo sandbox from a
-third terminal. `reset` is deliberately named: it deletes any prior demo
-sandbox and its sessions before uploading the current runtime, configuration,
-and workspace.
-
-```shell title="Terminal 3: Pi"
-./demo.sh reset
-```
-
-Run the complete non-interactive verification:
-
-```shell title="Terminal 3: verify the example"
-./demo.sh verify
-```
-
-`verify` runs the real packaged Pi and OpenShell sandbox. It checks a denied
-prompt without a session write, a persisted redaction with a successful model
-response, an unauthenticated call
-to the admission bridge, a raw provider request without an admission handle,
-the stock Pi binary without the runtime adapter, and best-effort tool-result
-cases. Each case uses a fresh session and prints one `PASS` or `SKIP` line. Tool
-cases can skip because choosing to call a tool is model-dependent; the other
-cases are required. There is no mock fallback. Run `./demo.sh --print verify`
-to inspect every underlying sandbox command.
-
-To explore interactively afterward, launch Pi:
-
-```shell title="Terminal 3: Pi"
+```sh
+# Terminal 3
+./demo.sh setup
 ./demo.sh launch
 ```
 
-This runs Pi's standard CLI with a trusted runtime extension. Unlike ordinary
-user and project extensions, a runtime extension is installed by the launcher,
-supplies mandatory runtime boundaries, and is not affected by
-`--no-extensions`. Pi still owns argument parsing, the TUI, settings, ordinary
-extensions, tools, model selection, compaction, and session storage. `launch`
-only enters the existing sandbox; it does not replace the sandbox or Pi's
-state. Exit and run `launch` again to use Pi's normal `/resume` flow and
-persistent JSONL sessions. Run `reset` only when you intentionally want a fresh
-sandbox or need to apply a new runtime, policy, model configuration, credential,
-or workspace snapshot.
+The gateway is isolated on port **17672**. Egress Gate listens on **50051**
+(authenticated middleware gRPC) and **5443** (authenticated admission HTTPS).
+Allow access only from this host/sandbox network. TLS certificates last 30 days.
+If these ports are occupied, stop the conflicting demo before starting this one.
 
-The sandbox image adds the `fd` and `rg` executables used by Pi's standard
-`find` and `grep` tools. Pi itself still comes from the prepared fork package
-and starts without restrictive CLI flags. Its standard user and project
-resource discovery, extension loading, tools, model picker, thinking controls,
-compaction, and session manager remain active. OpenShell's filesystem and
-network policy still apply to every process in the sandbox; arbitrary package
-downloads are intentionally outside this endpoint-focused example.
+Every action is inspectable without executing it, loading `.env`, or printing
+secrets:
 
-The example registers an endpoint-specific provider profile using the host-side
-`PI_MODEL_API_KEY`. Its `delivery: proxy` setting keeps the credential and any
-resolver placeholder out of the sandbox. Pi sends the non-secret placeholder
-declared by `models.json`; after admission and middleware processing succeed,
-the OpenShell supervisor replaces that authorization header with the real,
-endpoint-bound credential immediately before forwarding the request.
-
-At the Pi prompt, submit both of these in the same session:
-
-```text
-Reply with exactly: DENY_THIS
+```sh
+./demo.sh --print prepare
+./demo.sh --print setup
+./demo.sh --print launch
 ```
 
-```text
-Reply with exactly: REDACT_THIS
-```
+Printed commands name credential environment variables; OpenShell reads their
+values on the host. The generated admission configuration contains a private
+bearer token and must remain outside the image and repository.
 
-The first submission is denied without starting a model request. The submitted
-text is not appended, but Pi does not restore it to the editor after denial.
-The second makes a request containing `[REDACTED]`.
+## What to try
 
-To exercise tool-result admission without putting the marker in the user
-message, ask Pi:
+Type these into the running application:
 
 ```text
-Use bash to print the concatenation of DENY_ and THIS, then tell me the output.
+Hello. Briefly describe what you can do.
+Please repeat REDACT_THIS.
+/history
+DENY_THIS
+/history
+/skill:review
+/compact
+/history
+/exit
 ```
 
-The tool runs, but its result is replaced by Pi's protocol-safe blocked result
-before it enters live context. Repeat with `REDACT_` and `THIS` to see the tool
-result admitted as `[REDACTED]`.
+`DENY_THIS` and `REDACT_THIS` are harmless, literal demonstration markers defined
+in [policy.yaml](policy.yaml), not magic Pi/OpenShell features or real secrets.
+The first is denied; the second becomes `[REDACTED]` before insertion.
+Policy detection is only as good as its configured rules.
 
-Pi uses its standard session manager and JSONL session location, and exposes
-the active path to tools as `PI_SESSION_FILE`. Every supported history origin
-passes the same generic append boundary before it reaches that history: user
-messages, tool results, finalized assistant output, summaries, extension
-messages, and bash executions. `launch` preserves the history; `reset` and
-`cleanup` delete it with the sandbox.
+The selected project is `/sandbox/project`, copied from [project/](project/).
+The same directory scopes Pi's resource loader, tools, and session store.
+Its `AGENTS.md` and skill metadata are admitted as system context.
+`/skill:review` loads and renders the actual skill before user-message admission.
+The skill asks the model to read the real `notes.txt`; that result is admitted
+before the next model call. `cwd` is convenient scoping, not an access-control
+boundary: OpenShell's filesystem policy supplies that boundary.
 
-## How it works
+Responses and tool progress are buffered, not streamed into the transcript.
+`/history` shows only admitted active context. The startup message names the
+Pi JSONL file under `/sandbox/sessions`. Compaction retains the latest whole turn;
+older **approved** entries remain in the append-only file. Automatic compaction
+uses the same summary path at a completed-turn context threshold. Ctrl-C cancels
+the current operation. An unfinished tool batch that cannot be safely closed
+requires a new session.
 
-1. Pi exposes a provider-neutral `runCli()` entrypoint and a `RuntimeExtension`
-   interface for mandatory `ContextAdmission` hooks. The TypeScript
-   [openshell-pi.ts](runtime-extension/openshell-pi.ts) launcher calls that
-   entrypoint with the OpenShell adapter from
-   [openshell-context-admission.ts](runtime-extension/openshell-context-admission.ts).
-   `prepare` type-checks both files against the packaged Pi API and compiles
-   them to JavaScript for the sandbox. Pi otherwise starts normally, including
-   standard project and user extension discovery.
-2. Pi calls that boundary before each supported message reaches live or
-   persisted history. Assistant text and tool calls are admitted when the
-   assistant message is finalized, after streamed output has already been
-   displayed. Assistant thinking is outside this append-time envelope; request
-   policy scans it at egress, but the context attestation does not hash it.
-   Assistant tool calls are inspectable and denyable but immutable; a redaction
-   targeting one fails closed.
-3. OpenShell gives the launched runtime an inherited descriptor containing its
-   per-exec bridge token. The launcher reads and closes the descriptor and
-   deletes its environment name before Pi or its extensions start. The external
-   adapter sends the token with the exact context addition to OpenShell's
-   sandbox-local bridge. Egress Gate applies `policy.yaml` and returns allow,
-   deny, or a complete replacement. This append-time checkpoint returns no
-   attestation or handle.
-4. Immediately before every provider request, Pi passes the exact outbound
-   context through admission. This includes normal turns, retries, compaction,
-   branch summaries, and contexts restored from a prior session. The adapter
-   applies per-entry replacements and obtains one fresh handle bound to one hash
-   of the complete ordered user/tool context. System/developer and assistant
-   content is scanned by request policy at egress but is not included in that
-   attested context hash.
-5. OpenShell keeps the signed whole-context attestation and gives Pi only the
-   opaque handle, which the adapter keeps outside Pi messages. At egress,
-   OpenShell strips the handle and supplies the attestation only to the
-   configured Egress Gate stage. Egress Gate verifies the same ordered entries
-   before and after request policy runs, before OpenShell injects the
-   proxy-delivered model credential.
+## Verify and clean up
 
-The two Pi checkpoints serve different purposes. Append-time admission keeps
-the UI, live context, and session file consistent with policy. Provider-context
-admission covers every entry actually selected for the request, including
-history introduced by retries, compaction, continuations, or session restore.
-The egress checkpoint is the enforcement boundary: without a matching fresh
-attestation, OpenShell does not attach the credential or forward the request.
-
-This division is intentional. The Pi fork contributes only reusable harness
-primitives: generic append admission for every supported history origin,
-including finalized assistant output, summaries, extension messages, and bash
-executions; admission of the exact provider context; an outbound-header
-transformation; and a standard-CLI entrypoint that accepts those hooks.
-OpenShell contributes the sandbox-local bridge, signed attestations,
-attestation-to-request binding, middleware enforcement, and post-policy
-credential delivery. The TypeScript files under
-`runtime-extension/` are the reusable integration layer that translates between
-those generic Pi hooks and the OpenShell protocol; no OpenShell-specific code is
-built into Pi.
-
-The supervisor mints a separate admission token for each `sandbox exec`, accepts
-it only while that process is running, and rejects bridge calls without a valid
-token. Because the launcher consumes the descriptor before starting Pi, tool
-subprocesses receive neither the descriptor nor its environment name. Setting
-`OPENSHELL_AGENT_ADMISSION_REQUIRE_CALLER_TOKEN=false` when starting the
-OpenShell supervisor disables this check for debugging; this example keeps the
-secure default.
-
-## Current scope
-
-The attestation adapter supports normal text turns, text tool results, queued
-steering and follow-up messages, retries, automatic model continuations,
-compaction, branch summaries, and restored sessions using the OpenAI Chat
-Completions and Responses wire formats. Image inputs are outside this example's
-current scope and fail closed.
-
-Provider-context admission runs before Pi's transport-specific history
-rewrites. Switching transports with existing tool history or sending orphaned
-tool calls may therefore fail closed. Start a fresh session when switching
-transports, and complete each tool-call/result sequence before sending.
-
-Admission handles and their attestations expire after 300 seconds. Pi refreshes
-them immediately before ordinary requests, but a provider retry that begins
-more than five minutes later is denied. An Egress Gate started with
-`--require-agent-attestation` serves managed harnesses only; an ordinary client
-using the same middleware registration is denied because it has no attestation.
-
-The per-exec token remains in the Pi process's memory. A same-user process that
-can read that memory could copy it; the sandbox's process isolation and ptrace
-restrictions reduce this residual risk but do not make the token hardware-bound.
-
-## Cleanup
-
-Exit Pi, but leave the OpenShell gateway running while cleanup deletes the
-sandbox and provider:
-
-```shell
+```sh
+./demo.sh verify
 ./demo.sh cleanup
 ```
 
-If the gateway is unavailable, `cleanup` stops before changing anything and
-prints the exact commands needed to restart the local services. Cleanup goes
-through OpenShell so sandbox and provider state are removed consistently.
+Verification uses the **real configured model** and can incur several model
+calls and normal provider charges. It checks a raw request without a receipt,
+deny/redact history, a real skill/tool continuation, and manual and automatic
+compaction. It exits unsuccessfully on any missing capability or failed check;
+it does not skip checks or substitute a mock model. Deterministic failure and
+pending-admission tests live in [app/test/](app/test/).
 
-Then stop the OpenShell gateway and Egress Gate with `Ctrl-C`. For another
-session in the same prepared sandbox, use `./demo.sh launch` instead of cleanup.
+Cleanup deletes only this demo sandbox and its provider instances/profiles.
+**Sandbox files and sessions are deleted and are not recoverable by this script.**
+Copy out anything wanted first. Stop the two foreground services with Ctrl-C.
+Downloaded artifacts and private host configuration remain in the ignored state
+directory for inspection/reuse. Run setup again to create a fresh sandbox.
+Changes to model/policy/project files require prepare, a service restart, and a
+fresh sandbox (cleanup then setup).
+
+## How the pieces fit
+
+```text
+Pi application                  Egress Gate (outside sandbox)
+  candidate ------------------> policy: allow / replace / deny
+  approved entry <-------------+
+       |
+       +--> live context + Pi JSONL
+       |
+  next user/tool context ------> policy + signed receipt
+  model request + receipt
+       |
+       v
+OpenShell supervisor ----------> verify actual request + policy
+       |                        strip receipt header
+       v
+attach real provider key --> model
+```
+
+[session.ts](app/src/session.ts) is the only owner of writable history. It uses
+Pi's model calls, tool implementations, resource loader, summarizer, and
+`SessionManager`; it does not instantiate an autonomous `AgentSession` with
+unchecked insertion paths. Finalized assistant text and tool calls are admitted
+before execution. Tool output, missing-tool/argument/execution errors, rendered
+skills, and completed summaries all pass the same boundary.
+
+[admission.ts](app/src/admission.ts) translates these candidates into the existing
+Egress Gate schemas. A provider-context replacement is rejected: silently
+redacting only the outbound request would leave saved history inconsistent.
+
+[prepare.py](prepare.py) is **trusted host-side operator code**, not the
+in-sandbox harness. It provisions policy, TLS, and endpoint-bound provider
+profiles. Setup reads the actual sandbox ID from OpenShell and binds the
+admission credential to it. The application cannot supply an authoritative
+sandbox ID or choose a policy. Upstream credential delivery gives it placeholders,
+not the real model/admission secrets. Placeholders are usable capabilities, not
+proof of which code used them; the application removes them from child-process
+environments as hygiene, not a security boundary.
+
+The service uses standard OpenShell RPCs and verifies the gateway's signed
+extension JWT, including the supervisor's sandbox identity. Its additional
+HTTPS listener accepts candidates. There is no loopback bridge, custom RPC,
+custom OpenShell protobuf field, or second model proxy.
+
+## Honest boundaries
+
+- The local history property holds for this controlled application's write
+  paths. It is not protection against a compromised application or arbitrary
+  same-authority code rewriting local files.
+- Receipts bind the **ordered user/tool text projection**, destination, sandbox,
+  policy and expiry—not the full HTTP body, system prompt, assistant history,
+  model parameters, or proof that an extension ran. Request policy still checks
+  the intercepted body. Receipts are reusable for identical content for up to
+  five minutes; service restarts invalidate them.
+- One text-only Chat Completions model, sequential tools, and new sessions.
+  No TUI/RPC parity, third-party extensions, resume/branching, images, reasoning
+  payloads, WebSockets, or model switching. Unsupported content fails closed.
+- Redaction can change ordinary text, not executable tool arguments or call
+  identifiers. Admitting a tool result cannot reverse tool side effects.
+  Bash output is bounded before Pi's unchecked spill-to-file behavior.
+- There is one final Egress Gate middleware binding. Do not append another
+  middleware that rewrites receipt-covered content afterward.
+
+See the [architecture and evidence guide](../../docs/architecture/admission.md)
+for the exact contract and the Dev Note narrative.

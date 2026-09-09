@@ -20,6 +20,9 @@ fi
 "${uv_run[@]}" ruff check .
 "${uv_run[@]}" ty check
 "${uv_run[@]}" python -c "import egress_gate"
+npm --prefix examples/pi-attested-admission/app ci --ignore-scripts --no-audit --no-fund
+npm --prefix examples/pi-attested-admission/app run build
+npm --prefix examples/pi-attested-admission/app test
 "${uv_run[@]}" pip-audit \
   --progress-spinner off \
   --local

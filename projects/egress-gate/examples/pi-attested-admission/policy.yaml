@@ -18,10 +18,29 @@ network_policies:
         port: 443
         protocol: rest
         enforcement: enforce
-        access: full
+        rules:
+          - allow:
+              method: POST
+              path: /v1/chat/completions
     binaries:
       - { path: /usr/bin/node }
       - { path: /usr/local/bin/node }
+      - { path: /usr/bin/curl }
+
+  admission:
+    name: Authenticated admission API (not a model endpoint)
+    endpoints:
+      - host: host.openshell.internal
+        port: 5443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow:
+              method: POST
+              path: /v1/admission
+    binaries:
+      - { path: /usr/local/bin/node }
+      - { path: /usr/bin/curl }
 
 network_middlewares:
   pi_egress_gate:

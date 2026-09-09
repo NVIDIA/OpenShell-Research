@@ -1,0 +1,17 @@
+{
+  "id": "azure/anthropic/claude-opus-5",
+  "name": "Claude Opus 5",
+  "provider": "pi-egress",
+  "api": "openai-completions",
+  "baseUrl": "https://inference-api.nvidia.com/v1",
+  "reasoning": false,
+  "input": ["text"],
+  "contextWindow": 1000000,
+  "maxTokens": 4096,
+  "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+  "compat": {
+    "maxTokensField": "max_tokens",
+    "supportsDeveloperRole": false,
+    "supportsReasoningEffort": false
+  }
+}

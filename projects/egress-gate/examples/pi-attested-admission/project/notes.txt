@@ -1,0 +1,2 @@
+This is a real file in the sandbox project.
+REDACT_THIS is an intentionally harmless marker for the example replacement rule.
