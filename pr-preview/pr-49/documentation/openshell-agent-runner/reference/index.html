@@ -6,36 +6,38 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Automated checks for added and changed locked dependencies.">
+        <meta name="description" content="OAR commands, uploads, result handling, CI behavior, and troubleshooting.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
       
       
       
+        <link rel="prev" href="../profiles/">
+      
       
       
         
       
       
-      <link rel="icon" href="../../assets/brand/favicon.svg">
+      <link rel="icon" href="../../../assets/brand/favicon.svg">
       <meta name="generator" content="zensical-0.0.44">
     
     
       
-        <title>Dependency License Checks - OpenShell Research</title>
+        <title>Command reference - OpenShell Research</title>
       
     
     
       
         
       
-      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.fba56155.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/modern/main.fba56155.min.css">
       
         
           
         
-        <link rel="stylesheet" href="../../assets/stylesheets/modern/palette.dfe2e883.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/modern/palette.dfe2e883.min.css">
       
       
 
@@ -54,11 +56,11 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/dev-notes.css">
+      <link rel="stylesheet" href="../../../stylesheets/dev-notes.css">
     
-      <link rel="stylesheet" href="../../stylesheets/documentation.css">
+      <link rel="stylesheet" href="../../../stylesheets/documentation.css">
     
-    <script>__md_scope=new URL("../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    <script>__md_scope=new URL("../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
     
       
 
@@ -75,6 +77,8 @@
       document.documentElement.dataset.navigationDrawer = "closed";
     }
   </script>
+  
+    <link rel="alternate" type="text/markdown" href="../reference.md" title="Markdown source">
   
 
   </head>
@@ -96,7 +100,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#dependency-license-checks" class="md-skip">
+        <a href="#command-reference" class="md-skip">
           Skip to content
         </a>
       
@@ -112,9 +116,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../../.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     <label class="md-header__button md-icon openshell-drawer-button" for="__drawer" role="button" tabindex="0" aria-label="Open navigation" aria-controls="primary-navigation" aria-expanded="false">
@@ -135,7 +139,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Dependency License Checks
+              Command reference
             
           </span>
         </div>
@@ -224,9 +228,9 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../../.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     OpenShell Research
@@ -278,7 +282,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../dev-notes/" class="md-nav__link ">
+            <a href="../../../dev-notes/" class="md-nav__link ">
               
   
   
@@ -375,7 +379,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev-notes/posts/2026-08-27-adversarial-policy-review-long-horizon-agents/" class="md-nav__link">
+      <a href="../../../dev-notes/posts/2026-08-27-adversarial-policy-review-long-horizon-agents/" class="md-nav__link">
         
   
   
@@ -402,7 +406,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev-notes/posts/2026-08-07-formal-methods-ai-generated-robot-actions/" class="md-nav__link">
+      <a href="../../../dev-notes/posts/2026-08-07-formal-methods-ai-generated-robot-actions/" class="md-nav__link">
         
   
   
@@ -429,7 +433,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
+      <a href="../../../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
         
   
   
@@ -468,6 +472,8 @@
       
   
   
+    
+  
   
   
     
@@ -490,15 +496,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../documentation/" class="md-nav__link ">
+            <a href="../../" class="md-nav__link ">
               
   
   
@@ -521,7 +527,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -568,7 +574,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../documentation/egress-gate/" class="md-nav__link ">
+            <a href="../../egress-gate/" class="md-nav__link ">
               
   
   
@@ -667,7 +673,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/configuration/" class="md-nav__link">
+      <a href="../../egress-gate/configuration/" class="md-nav__link">
         
   
   
@@ -694,7 +700,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/request-content/" class="md-nav__link">
+      <a href="../../egress-gate/request-content/" class="md-nav__link">
         
   
   
@@ -721,7 +727,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/evaluation/" class="md-nav__link">
+      <a href="../../egress-gate/evaluation/" class="md-nav__link">
         
   
   
@@ -748,7 +754,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/operations/" class="md-nav__link">
+      <a href="../../egress-gate/operations/" class="md-nav__link">
         
   
   
@@ -807,7 +813,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../documentation/egress-gate/gates/" class="md-nav__link ">
+            <a href="../../egress-gate/gates/" class="md-nav__link ">
               
   
   
@@ -849,7 +855,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/gates/regex/" class="md-nav__link">
+      <a href="../../egress-gate/gates/regex/" class="md-nav__link">
         
   
   
@@ -876,7 +882,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/gates/custom/" class="md-nav__link">
+      <a href="../../egress-gate/gates/custom/" class="md-nav__link">
         
   
   
@@ -935,7 +941,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../documentation/egress-gate/architecture/" class="md-nav__link ">
+            <a href="../../egress-gate/architecture/" class="md-nav__link ">
               
   
   
@@ -977,7 +983,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/architecture/request-lifecycle/" class="md-nav__link">
+      <a href="../../egress-gate/architecture/request-lifecycle/" class="md-nav__link">
         
   
   
@@ -1004,7 +1010,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/architecture/service-boundary/" class="md-nav__link">
+      <a href="../../egress-gate/architecture/service-boundary/" class="md-nav__link">
         
   
   
@@ -1090,7 +1096,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/reference/limits-and-failures/" class="md-nav__link">
+      <a href="../../egress-gate/reference/limits-and-failures/" class="md-nav__link">
         
   
   
@@ -1130,6 +1136,8 @@
                 
   
   
+    
+  
   
   
     
@@ -1151,15 +1159,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../documentation/openshell-agent-runner/" class="md-nav__link ">
+            <a href="../" class="md-nav__link ">
               
   
   
@@ -1182,7 +1190,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1201,7 +1209,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/openshell-agent-runner/reviews/" class="md-nav__link">
+      <a href="../reviews/" class="md-nav__link">
         
   
   
@@ -1228,7 +1236,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/openshell-agent-runner/profiles/" class="md-nav__link">
+      <a href="../profiles/" class="md-nav__link">
         
   
   
@@ -1252,10 +1260,36 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../documentation/openshell-agent-runner/reference/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Command reference
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1270,6 +1304,110 @@
   
 
       </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Commands
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Run options
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choose-a-gateway-and-workspace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Choose a gateway and workspace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upload-supporting-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Upload supporting files
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-happens-during-a-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        What happens during a run
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-oar-in-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Use OAR in CI
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Troubleshooting
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1331,10 +1469,49 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#repository-coverage" class="md-nav__link">
+  <a href="#commands" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Repository coverage
+        Commands
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Run options
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choose-a-gateway-and-workspace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Choose a gateway and workspace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upload-supporting-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Upload supporting files
       </span>
     </span>
   </a>
@@ -1342,10 +1519,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#policy-and-unresolved-results" class="md-nav__link">
+  <a href="#what-happens-during-a-run" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Policy and unresolved results
+        What happens during a run
       </span>
     </span>
   </a>
@@ -1353,10 +1530,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#results-and-remediation" class="md-nav__link">
+  <a href="#use-oar-in-ci" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Results and remediation
+        Use OAR in CI
       </span>
     </span>
   </a>
@@ -1364,21 +1541,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rollout-and-full-audits" class="md-nav__link">
+  <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Rollout and full audits
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#local-checks" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Local checks
+        Troubleshooting
       </span>
     </span>
   </a>
@@ -1403,6 +1569,95 @@
   
 
 
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../../.." class="md-path__link">
+        
+  
+  <span class="md-ellipsis">
+    OpenShell Research
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Documentation
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    OpenShell Agent Runner
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
               
               <article class="md-content__inner md-typeset">
                 
@@ -1412,114 +1667,242 @@
   
 
 
+  
+  <a href="../reference.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.56 18H3.44C2.65 18 2 17.37 2 16.59V7.41C2 6.63 2.65 6 3.44 6h17.12c.79 0 1.44.63 1.44 1.41v9.18c0 .78-.65 1.41-1.44 1.41M3.44 6.94c-.26 0-.48.21-.48.47v9.19c0 .25.22.46.48.46h17.12c.26 0 .48-.21.48-.46V7.41c0-.26-.22-.47-.48-.47zm1.45 8.25V8.81h1.92l1.92 2.35 1.92-2.35h1.93v6.38h-1.93v-3.66l-1.92 2.35-1.92-2.35v3.66zm12.01 0-2.9-3.1h1.94V8.81h1.92v3.28h1.93z"/></svg>
+  </a>
 
-<h1 id="dependency-license-checks">Dependency license checks</h1>
-<p>The <code>Dependency licenses</code> workflow enforces the repository's dependency-license
-policy on every pull request. It compares committed lockfiles, looks up license
-metadata for direct dependencies, and identifies additions and changes that
-must satisfy the policy. It uses no agent, inference service, secrets, or write
-permissions.</p>
-<p>The policy source of truth is
-<code>.github/dependency-license-policy.toml</code>. It contains the currently approved
-open-source licenses and any reviewed metadata clarifications. Keep policy
-details there rather than duplicating them in documentation.</p>
-<h2 id="repository-coverage">Repository coverage</h2>
-<p>The checker searches the complete tracked Git tree, regardless of folder. It
-reads files from the committed base and head revisions, so untracked, ignored,
-and uncommitted files are outside the check.</p>
-<p>Supported lockfiles are:</p>
-<ul>
-<li>Python: <code>uv.lock</code> and uv script lockfiles (<code>*.py.lock</code>).</li>
-<li>JavaScript: npm v2/v3 <code>package-lock.json</code>.</li>
-<li>Rust: <code>Cargo.lock</code>.</li>
-</ul>
-<p>The inventory includes external packages declared directly by each project,
-including development, optional, and platform-specific direct dependencies.
-Transitive packages and first-party project or workspace packages are excluded.</p>
-<p>For a pull request, a package is checked when its locked name, version, source,
-or lockfile location is added or changed. Removed packages do not fail the
-check. The report still includes unchanged current direct dependencies so that
-every run provides a repository-wide view. Only additions and changes affect
-the status of an ordinary pull request.</p>
-<p>Changed <code>pyproject.toml</code>, <code>package.json</code>, <code>Cargo.toml</code>, and PEP 723 inline-script
-metadata must have a corresponding lockfile or belong to a declared locked
-workspace. The workflow asks the native package manager to confirm that each
-affected lock is current:</p>
-<ul>
-<li>uv projects: <code>uv lock --check</code></li>
-<li>uv inline scripts: <code>uv lock --script SCRIPT --check</code></li>
-<li>npm projects: <code>npm ci --ignore-scripts --no-audit --no-fund</code></li>
-<li>Cargo projects: <code>cargo metadata --locked</code></li>
-</ul>
-<p>The npm command installs locked packages without lifecycle scripts. Cargo
-metadata does not build project code. A compatible constraint edit does not
-need to rewrite a lockfile when the native check accepts it.</p>
-<p>The checker does not inventory vendored code, datasets, model weights,
-container or system packages, unsupported package managers, or dependencies
-that are absent from a supported lockfile. A passing check is therefore not a
-complete legal clearance.</p>
-<h2 id="policy-and-unresolved-results">Policy and unresolved results</h2>
-<p>The policy approves a maintained set of open-source licenses. Consult
-<code>.github/dependency-license-policy.toml</code> for the current policy. License metadata
-that is missing, ambiguous, malformed, or not approved fails the check. Registry
-outages are unresolved rather than being treated as successful lookups. An
-unresolved addition or change fails the pull request; an unresolved unchanged
-dependency contributes no license to the report.</p>
-<p>Public metadata comes from PyPI, npm, or crates.io. Private registries, Git
-dependencies, and other unsupported source forms require reviewed, exact-source
-clarification.</p>
-<p>If metadata is incomplete, a maintainer can add a <code>[[clarification]]</code> entry with
-<code>ecosystem</code>, <code>name</code>, <code>version</code>, <code>source</code>, <code>license</code>, and an HTTPS <code>evidence</code> URL.
-Use the exact identity reported by the checker and verify the authoritative
-license evidence. A clarification must still satisfy the approved policy; it
-cannot grant an exception for an unapproved license.</p>
-<p>PR checks use the base branch's approved list when one exists. A proposed
-allowlist expansion cannot approve its own dependencies. Workflow and checker
-changes still require maintainer review because the workflow cannot protect
-itself from changes made in the same pull request.</p>
-<h2 id="results-and-remediation">Results and remediation</h2>
-<p>The workflow publishes the <code>Check dependency licenses</code> status and uploads a
-compact <code>dependency-licenses.json</code> artifact with three fields:</p>
-<ul>
-<li><code>folders</code> maps every scanned project folder to the lockfiles inspected there
-  and its direct-dependency licenses.</li>
-<li><code>licenses</code> maps every unique reported license value to the project folders
-  that depend on it.</li>
-<li><code>failures</code> maps affected project folders to the licenses that fail the check.
-  Missing or unusable license metadata is reported as <code>unknown</code>.</li>
-</ul>
-<p>The report contains no package-level records and does not list transitive
-dependency licenses.</p>
-<p>The lockfiles identify each direct dependency and its exact resolved version.
-The reported license value comes from that version's package-registry metadata
-or a reviewed policy clarification, not from the lockfile itself.</p>
-<p>For a failure:</p>
-<ol>
-<li>Confirm that the manifest and lockfile contain the intended dependency and
-   source.</li>
-<li>Check the package registry's exact-version metadata.</li>
-<li>If that metadata is incomplete, add a narrowly scoped clarification backed
-   by an authoritative HTTPS source.</li>
-<li>Treat any policy change as a separate maintainer decision. Do not broaden the
-   policy merely to make a check pass.</li>
-</ol>
-<h2 id="rollout-and-full-audits">Rollout and full audits</h2>
-<p>An ordinary pull request enforces policy only for direct dependency additions
-and changes, while still reporting all current direct-dependency licenses.
-Editing an existing policy triggers full enforcement, as does manually
-dispatching the workflow without a base revision.</p>
-<h2 id="local-checks">Local checks</h2>
-<p>From the repository root, run the pinned command in the workflow's <code>Test checker</code>
-step. Keeping the executable test command in the workflow provides one source of
-truth for its dependencies and versions.</p>
-<p>Compare committed revisions:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>run<span class="w"> </span>--locked<span class="w"> </span>--script<span class="w"> </span>scripts/check_dependency_licenses.py<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--base<span class="w"> </span>BASE_SHA<span class="w"> </span>--head<span class="w"> </span>HEAD_SHA<span class="w"> </span>--report<span class="w"> </span>/tmp/dependency-licenses.json
+
+<h1 id="command-reference">Command reference</h1>
+<h2 id="commands">Commands</h2>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>oar init PROFILE_ROOT --model MODEL_ID</code></td>
+<td>Create editable copies of the packaged profiles.</td>
+</tr>
+<tr>
+<td><code>oar validate PROFILE_DIRECTORY</code></td>
+<td>Check the profile and its local resources.</td>
+</tr>
+<tr>
+<td><code>oar doctor</code></td>
+<td>Display the OpenShell version, gateway status, and inference configuration.</td>
+</tr>
+<tr>
+<td><code>oar run PROFILE_DIRECTORY --task TASK --output PATH</code></td>
+<td>Run a task and save its result.</td>
+</tr>
+</tbody>
+</table>
+<p><code>init</code> creates both profiles by default. Repeat <code>--profile NAME</code> to select
+which ones to create. It refuses to overwrite existing profile directories.
+<code>--thinking</code> accepts <code>off</code>, <code>minimal</code>, <code>low</code>, <code>medium</code>, <code>high</code> (default),
+<code>xhigh</code>, or <code>max</code>; choose a level your model supports.</p>
+<p>Use <code>oar COMMAND --help</code> for all options. For a task's inputs, variables, and
+output format, put the profile and task before <code>--help</code>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>oar<span class="w"> </span>run<span class="w"> </span>./profiles/code-reviewer<span class="w"> </span>--task<span class="w"> </span>review-repository<span class="w"> </span>--help
 </span></code></pre></div>
-<p>Omit <code>--base</code> for a full audit. To reproduce the base-branch policy constraint,
-also pass <code>--approved-policy</code> with a copy of that branch's policy file.
-The checker reads committed lockfiles, not uncommitted changes. Its own pinned
-dependencies are recorded in <code>scripts/check_dependency_licenses.py.lock</code>.</p>
+<h3 id="run-options">Run options</h3>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Meaning / default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--task NAME</code></td>
+<td>Required. Select a task in the profile.</td>
+</tr>
+<tr>
+<td><code>--output PATH</code></td>
+<td>Required. Save the result to this path on your machine.</td>
+</tr>
+<tr>
+<td><code>--input PATH</code></td>
+<td>Required when the task declares a document or repository input.</td>
+</tr>
+<tr>
+<td><code>--prompt-var NAME=VALUE</code></td>
+<td>Set a declared prompt variable. Repeat for several.</td>
+</tr>
+<tr>
+<td><code>--upload SOURCE:DESTINATION</code></td>
+<td>Upload a supporting file or directory. Repeat for several.</td>
+</tr>
+<tr>
+<td><code>--env KEY=VALUE</code></td>
+<td>Add a non-secret sandbox environment value. Repeat for several.</td>
+</tr>
+<tr>
+<td><code>--gateway NAME</code></td>
+<td>Use this gateway; otherwise use OpenShell's selected gateway.</td>
+</tr>
+<tr>
+<td><code>--workspace NAME</code></td>
+<td>Use this OpenShell workspace. Default: <code>default</code>.</td>
+</tr>
+<tr>
+<td><code>--timeout-seconds N</code></td>
+<td>Timeout for sandbox creation and agent execution, applied separately. Default: <code>1200</code>.</td>
+</tr>
+<tr>
+<td><code>--dry-run</code></td>
+<td>Validate the request and print planned operations without executing them.</td>
+</tr>
+<tr>
+<td><code>--keep-sandbox</code></td>
+<td>Retain the sandbox and print its name for debugging.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="choose-a-gateway-and-workspace">Choose a gateway and workspace</h3>
+<p>A gateway runs your sandboxes and connects them to inference. A workspace is a
+named group of resources on that gateway. It is different from the
+<code>/workspace</code> directory inside a sandbox.</p>
+<p>Use the same <code>--gateway</code> and <code>--workspace</code> options with <code>doctor</code> and <code>run</code>.
+OAR uses existing gateways, workspaces, and inference configuration; manage
+them through OpenShell.</p>
+<h2 id="upload-supporting-files">Upload supporting files</h2>
+<p>Use <code>--input</code> for the task's main file or directory. Use <code>--upload</code> for
+additional material, with a local source on the left and a sandbox destination
+on the right:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Path the agent sees</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--input ./notes.txt</code> on a document task</td>
+<td><code>/workspace/input/document.txt</code></td>
+</tr>
+<tr>
+<td><code>--input ./my-project</code> on a repository task</td>
+<td><code>/workspace/input/my-project/</code></td>
+</tr>
+<tr>
+<td><code>--upload ./requirements.md:/workspace/requirements.md</code></td>
+<td><code>/workspace/requirements.md</code></td>
+</tr>
+<tr>
+<td><code>--upload ./references:/workspace</code></td>
+<td><code>/workspace/references/</code></td>
+</tr>
+</tbody>
+</table>
+<p>Document inputs preserve ordinary file extensions. Directory uploads place the
+source directory <strong>inside</strong> the destination, like <code>cp</code>. Point the prompt or
+<code>context</code> variable at supporting files so the agent knows why they are there.</p>
+<p>For uploads shared by every run, use <code>sandbox.upload</code> in <code>profile.yaml</code>.
+Uploads happen in order: profile uploads, required input, additional CLI
+uploads, then OAR's runtime files. Earlier files can be overwritten by later
+uploads. Relative upload sources are resolved from the caller's working
+directory. Use <code>/workspace</code> for your files; <code>/sandbox/oar-runtime</code> and
+<code>/sandbox/artifacts</code> are reserved for OAR.</p>
+<p>Upload only what the agent needs. The destination may be a remote machine.
+Keep secrets in OpenShell's provider configuration; prompt variables and
+<code>--env</code> are for non-secret values. Environment names use letters, numbers, and
+underscores, cannot start with a number, and cannot start with <code>OPENSHELL_</code>.</p>
+<h2 id="what-happens-during-a-run">What happens during a run</h2>
+<p><img alt="OAR checks the request, creates a sandbox and uploads files, runs Pi, validates and saves the result, then removes the sandbox." src="../assets/diagrams/run-lifecycle.svg" /></p>
+<p>OAR downloads only the result, which must be non-empty and no larger than
+1 MiB. For a JSON task, it must also match the output schema. OAR replaces the
+host output only after validation succeeds; a failed download or invalid
+result leaves an existing output untouched.</p>
+<p>Cleanup also runs after failures. OAR checks the sandbox name and its
+<code>oar-run-id</code> ownership label before deleting it. <code>--keep-sandbox</code> skips deletion.
+A cleanup failure can occur after the result has already been saved.</p>
+<h2 id="use-oar-in-ci">Use OAR in CI</h2>
+<p>A CI job uses the same <code>oar run</code> command as a terminal. Install OAR and OpenShell,
+make the gateway and inference route available, then run the profile and retain
+the output file. Version the profile alongside the project and pin the OAR
+release in the job.</p>
+<p>One gateway can serve several sequential runs; each run gets its own sandbox.
+Use the CI job's timeout to cap total wall time: <code>--timeout-seconds</code> applies to
+creation and execution separately, and uploads and cleanup take additional time.</p>
+<table>
+<thead>
+<tr>
+<th>Exit code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0</code></td>
+<td>The result was validated and saved, and requested cleanup succeeded.</td>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td>OpenShell execution, timeout, download, ownership checking, or cleanup failed.</td>
+</tr>
+<tr>
+<td><code>2</code></td>
+<td>A command argument, profile, input, or prompt variable was invalid.</td>
+</tr>
+<tr>
+<td><code>3</code></td>
+<td>The downloaded result was empty or failed validation.</td>
+</tr>
+</tbody>
+</table>
+<p>These are <strong>run</strong> outcomes. A reviewer can return <code>needs_changes</code> while OAR exits
+with <code>0</code>. Read the JSON verdict if your CI policy depends on the review.</p>
+<p>For this repository's workflow and PR reports, see the
+<a href="https://github.com/NVIDIA/OpenShell-Research/blob/main/docs/development/ci.md">repository CI guide</a>.</p>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Next step</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>oar: command not found</code> after installation</td>
+<td>Run <code>uv tool update-shell</code>, then open a new terminal.</td>
+</tr>
+<tr>
+<td><code>doctor</code> cannot connect</td>
+<td>Check OpenShell gateway status and that you selected the intended gateway.</td>
+</tr>
+<tr>
+<td>No inference route or model request fails</td>
+<td>Check the route in OpenShell, then the model ID and thinking level in your profile.</td>
+</tr>
+<tr>
+<td><code>init</code> says a profile already exists</td>
+<td>Use the existing profile or choose a new destination.</td>
+</tr>
+<tr>
+<td>Unknown task or prompt variable</td>
+<td>Run task-specific <code>--help</code> and check <code>profile.yaml</code>.</td>
+</tr>
+<tr>
+<td>Missing or invalid result</td>
+<td>Read the run's errors; use <code>--keep-sandbox</code> on the next run to inspect it.</td>
+</tr>
+<tr>
+<td>No output with <code>--dry-run</code></td>
+<td>Expected: the plan is printed, but no result file is created.</td>
+</tr>
+</tbody>
+</table>
+<p>To run the current source without installing a tool, use <code>uv run --frozen oar</code>
+from <code>projects/openshell-agent-runner</code>. See <a href="../#1-install-and-check-the-connection">installation</a>
+for making this version available as <code>oar</code> from any directory.</p>
 
 
 
@@ -1557,6 +1940,24 @@ dependencies are recorded in <code>scripts/check_dependency_licenses.py.lock</co
 <footer class="md-footer">
   
     
+      
+      <nav class="md-footer__inner md-grid" aria-label="Continue reading" >
+        
+          
+          <a href="../profiles/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Customize profiles">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">Previous</span>
+              <div class="md-ellipsis">Customize profiles</div>
+            </div>
+          </a>
+        
+        
+      </nav>
+    
   
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
@@ -1583,12 +1984,12 @@ dependencies are recorded in <code>scripts/check_dependency_licenses.py.lock</co
     
       
       
-      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"search":"../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"search":"../../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.6e5f0216.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.6e5f0216.min.js"></script>
       
-        <script src="../../javascripts/navigation-drawer.js"></script>
+        <script src="../../../javascripts/navigation-drawer.js"></script>
       
     
   </body>
