@@ -38,6 +38,113 @@ AUDIENCE = "urn:openshell:extension:middleware:pi-egress"
 AUTHORIZATION = {"Authorization": "Bearer test-admission-credential"}
 
 
+@pytest.mark.asyncio
+async def test_http_admission_allow_deny_replace_and_authentication(
+    tmp_path: Path,
+) -> None:
+    async with _clients(tmp_path) as (client, _, config, _):
+        denied_auth = await client.post("/v1/admission", json=_call("safe"))
+        assert denied_auth.status == 401
+        for text, expected in (
+            ("safe", "allow"),
+            ("DENY_THIS", "deny"),
+            ("REDACT_THIS", "replace"),
+        ):
+            response = await client.post(
+                "/v1/admission", json=_call(text), headers=AUTHORIZATION
+            )
+            assert response.status == 200
+            result = await response.json()
+            assert result["decision"] == expected, result["reason_code"]
+            assert result["receipt"] is None
+            if expected == "replace":
+                assert result["replacement"]["text"] == "[REDACTED]"
+        forged = {**_call("safe"), "sandbox_id": "somebody-else"}
+        response = await client.post(
+            "/v1/admission", json=forged, headers=AUTHORIZATION
+        )
+        assert response.status == 400
+        config.sandbox_id_file.unlink()
+        response = await client.post(
+            "/v1/admission", json=_call("safe"), headers=AUTHORIZATION
+        )
+        assert response.status == 503
+
+
+@pytest.mark.asyncio
+async def test_http_receipt_is_verified_and_stripped_by_standard_authenticated_rpc(
+    tmp_path: Path,
+) -> None:
+    async with _clients(tmp_path) as (client, stub, config, token):
+        response = await client.post(
+            "/v1/admission",
+            json=_call("safe", kind="provider_context"),
+            headers=AUTHORIZATION,
+        )
+        result = await response.json()
+        assert result["decision"] == "allow", result["reason_code"]
+        assert result["receipt"]
+        request = _network(config, result["receipt"])
+        metadata = (("authorization", f"Bearer {token}"),)
+        allowed = await stub.EvaluateHttpRequest(request, metadata=metadata)
+        assert allowed.decision == pb.DECISION_ALLOW
+        assert allowed.header_mutations[-1].remove.name == RECEIPT_HEADER
+        with pytest.raises(grpc.aio.AioRpcError) as failure:
+            await stub.EvaluateHttpRequest(request)
+        assert failure.value.code() == grpc.StatusCode.UNAUTHENTICATED
+        request.context.sandbox_id = "forged"
+        with pytest.raises(grpc.aio.AioRpcError) as failure:
+            await stub.EvaluateHttpRequest(request, metadata=metadata)
+        assert failure.value.code() == grpc.StatusCode.UNAUTHENTICATED
+        request.context.sandbox_id = "sandbox"
+        request.headers.pop()
+        denied = await stub.EvaluateHttpRequest(request, metadata=metadata)
+        assert denied.reason_code == "attestation_missing"
+        request.headers.add(name=RECEIPT_HEADER, value=result["receipt"])
+        request.headers.add(name=RECEIPT_HEADER, value=result["receipt"])
+        denied = await stub.EvaluateHttpRequest(request, metadata=metadata)
+        assert denied.reason_code == "attestation_malformed"
+        empty = message_factory.GetMessageClass(
+            empty_pb2.DESCRIPTOR.message_types_by_name["Empty"]
+        )()
+        manifest = await stub.Describe(empty, metadata=metadata)
+        assert manifest.expected_audience == AUDIENCE
+        assert len(manifest.bindings) == 1
+
+
+@pytest.mark.parametrize("change", ["issuer", "audience", "expired", "type", "key"])
+def test_gateway_authentication_rejects_invalid_trust_claims(change: str) -> None:
+    key = Ed25519PrivateKey.generate()
+    public = key.public_key().public_bytes(
+        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    claims = {
+        "iss": "trusted-gateway",
+        "aud": AUDIENCE,
+        "iat": int(time.time()) - 10,
+        "exp": int(time.time()) + 60,
+        "caller_kind": "supervisor",
+        "sandbox_id": "sandbox",
+    }
+    if change == "issuer":
+        claims["iss"] = "some-other-gateway"
+    elif change == "audience":
+        claims["aud"] = "another-service"
+    elif change == "expired":
+        claims["exp"] = int(time.time()) - 1
+    token = jwt.encode(
+        claims,
+        Ed25519PrivateKey.generate() if change == "key" else key,
+        algorithm="EdDSA",
+        headers={"typ": "JWT" if change == "type" else "openshell-ext+jwt"},
+    )
+    request = pb.HttpRequestEvaluation(context=pb.RequestContext(sandbox_id="sandbox"))
+    with pytest.raises((ValueError, jwt.PyJWTError)):
+        GatewayAuthentication(public, "trusted-gateway", AUDIENCE).verify(
+            (("authorization", f"Bearer {token}"),), request
+        )
+
+
 @asynccontextmanager
 async def _clients(
     directory: Path,
@@ -153,110 +260,3 @@ def _network(config: AdmissionServerConfig, receipt: str) -> pb.HttpRequestEvalu
     )
     json_format.ParseDict(config.policy, request.config)
     return request
-
-
-@pytest.mark.asyncio
-async def test_http_admission_allow_deny_replace_and_authentication(
-    tmp_path: Path,
-) -> None:
-    async with _clients(tmp_path) as (client, _, config, _):
-        denied_auth = await client.post("/v1/admission", json=_call("safe"))
-        assert denied_auth.status == 401
-        for text, expected in (
-            ("safe", "allow"),
-            ("DENY_THIS", "deny"),
-            ("REDACT_THIS", "replace"),
-        ):
-            response = await client.post(
-                "/v1/admission", json=_call(text), headers=AUTHORIZATION
-            )
-            assert response.status == 200
-            result = await response.json()
-            assert result["decision"] == expected, result["reason_code"]
-            assert result["receipt"] is None
-            if expected == "replace":
-                assert result["replacement"]["text"] == "[REDACTED]"
-        forged = {**_call("safe"), "sandbox_id": "somebody-else"}
-        response = await client.post(
-            "/v1/admission", json=forged, headers=AUTHORIZATION
-        )
-        assert response.status == 400
-        config.sandbox_id_file.unlink()
-        response = await client.post(
-            "/v1/admission", json=_call("safe"), headers=AUTHORIZATION
-        )
-        assert response.status == 503
-
-
-@pytest.mark.asyncio
-async def test_http_receipt_is_verified_and_stripped_by_standard_authenticated_rpc(
-    tmp_path: Path,
-) -> None:
-    async with _clients(tmp_path) as (client, stub, config, token):
-        response = await client.post(
-            "/v1/admission",
-            json=_call("safe", kind="provider_context"),
-            headers=AUTHORIZATION,
-        )
-        result = await response.json()
-        assert result["decision"] == "allow", result["reason_code"]
-        assert result["receipt"]
-        request = _network(config, result["receipt"])
-        metadata = (("authorization", f"Bearer {token}"),)
-        allowed = await stub.EvaluateHttpRequest(request, metadata=metadata)
-        assert allowed.decision == pb.DECISION_ALLOW
-        assert allowed.header_mutations[-1].remove.name == RECEIPT_HEADER
-        with pytest.raises(grpc.aio.AioRpcError) as failure:
-            await stub.EvaluateHttpRequest(request)
-        assert failure.value.code() == grpc.StatusCode.UNAUTHENTICATED
-        request.context.sandbox_id = "forged"
-        with pytest.raises(grpc.aio.AioRpcError) as failure:
-            await stub.EvaluateHttpRequest(request, metadata=metadata)
-        assert failure.value.code() == grpc.StatusCode.UNAUTHENTICATED
-        request.context.sandbox_id = "sandbox"
-        request.headers.pop()
-        denied = await stub.EvaluateHttpRequest(request, metadata=metadata)
-        assert denied.reason_code == "attestation_missing"
-        request.headers.add(name=RECEIPT_HEADER, value=result["receipt"])
-        request.headers.add(name=RECEIPT_HEADER, value=result["receipt"])
-        denied = await stub.EvaluateHttpRequest(request, metadata=metadata)
-        assert denied.reason_code == "attestation_malformed"
-        empty = message_factory.GetMessageClass(
-            empty_pb2.DESCRIPTOR.message_types_by_name["Empty"]
-        )()
-        manifest = await stub.Describe(empty, metadata=metadata)
-        assert manifest.expected_audience == AUDIENCE
-        assert len(manifest.bindings) == 1
-
-
-@pytest.mark.parametrize("change", ["issuer", "audience", "expired", "type", "key"])
-def test_gateway_authentication_rejects_invalid_trust_claims(change: str) -> None:
-    key = Ed25519PrivateKey.generate()
-    public = key.public_key().public_bytes(
-        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
-    )
-    claims = {
-        "iss": "trusted-gateway",
-        "aud": AUDIENCE,
-        "iat": int(time.time()) - 10,
-        "exp": int(time.time()) + 60,
-        "caller_kind": "supervisor",
-        "sandbox_id": "sandbox",
-    }
-    if change == "issuer":
-        claims["iss"] = "some-other-gateway"
-    elif change == "audience":
-        claims["aud"] = "another-service"
-    elif change == "expired":
-        claims["exp"] = int(time.time()) - 1
-    token = jwt.encode(
-        claims,
-        Ed25519PrivateKey.generate() if change == "key" else key,
-        algorithm="EdDSA",
-        headers={"typ": "JWT" if change == "type" else "openshell-ext+jwt"},
-    )
-    request = pb.HttpRequestEvaluation(context=pb.RequestContext(sandbox_id="sandbox"))
-    with pytest.raises((ValueError, jwt.PyJWTError)):
-        GatewayAuthentication(public, "trusted-gateway", AUDIENCE).verify(
-            (("authorization", f"Bearer {token}"),), request
-        )
