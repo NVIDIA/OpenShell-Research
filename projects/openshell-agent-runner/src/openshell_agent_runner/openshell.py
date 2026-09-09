@@ -131,6 +131,8 @@ def run(
             command,
             check=True,
             text=True,
+            # Native commands are noninteractive; do not drain a caller's task list.
+            stdin=subprocess.DEVNULL,
             capture_output=capture,
             timeout=timeout,
             preexec_fn=(
