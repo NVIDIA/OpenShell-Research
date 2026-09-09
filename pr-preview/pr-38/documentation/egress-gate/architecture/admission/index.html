@@ -12,7 +12,13 @@
         <meta name="author" content="OpenShell Research Engineering">
       
       
+        <link rel="canonical" href="https://nvidia.github.io/OpenShell-Research/documentation/egress-gate/architecture/admission/">
       
+      
+        <link rel="prev" href="../request-lifecycle/">
+      
+      
+        <link rel="next" href="../service-boundary/">
       
       
         
@@ -22,10 +28,14 @@
       <meta name="generator" content="zensical-0.0.44">
     
     
+  
+    
       
         <title>Admission without harness forks - OpenShell Research</title>
       
     
+  
+
     
       
         
@@ -65,6 +75,38 @@
     
     
   
+  
+
+
+  
+    
+    
+  
+    
+    
+  
+    
+    
+  
+
+
+
+
+  
+  
+  
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="OpenShell Research">
+  <meta property="og:title" content="Admission without harness forks">
+  <meta property="og:description" content="Application-owned history admission and standard OpenShell egress verification.">
+  <meta property="og:url" content="https://nvidia.github.io/OpenShell-Research/documentation/egress-gate/architecture/admission/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Admission without harness forks">
+  <meta name="twitter:description" content="Application-owned history admission and standard OpenShell egress verification.">
+  
+  
+  
+
   <script>
     try {
       document.documentElement.dataset.navigationDrawer =
@@ -470,6 +512,8 @@
       
   
   
+    
+  
   
   
     
@@ -492,11 +536,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <div class="md-nav__link md-nav__container">
@@ -523,7 +567,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -538,6 +582,8 @@
               
                 
   
+  
+    
   
   
   
@@ -562,11 +608,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" checked>
         
           
           <div class="md-nav__link md-nav__container">
@@ -593,7 +639,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -910,6 +956,8 @@
                 
   
   
+    
+  
   
   
     
@@ -923,17 +971,19 @@
       
         
       
+        
+      
     
     
     
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2_4" checked>
         
           
           <div class="md-nav__link md-nav__container">
@@ -960,7 +1010,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_2_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_2_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_2_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -994,6 +1044,135 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Admission without harness forks
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Admission without harness forks
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-two-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        The two boundaries
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-history-owner" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        One history owner
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#service-identity-and-receipts" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Service, identity, and receipts
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deliberate-poc-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Deliberate POC limits
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#evidence-and-dev-note-narrative" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Evidence and Dev Note narrative
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1313,6 +1492,131 @@
   
 
 
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../../../.." class="md-path__link">
+        
+  
+  <span class="md-ellipsis">
+    OpenShell Research
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../../../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Documentation
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Egress Gate
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Architecture
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
               
               <article class="md-content__inner md-typeset">
                 
@@ -1418,9 +1722,13 @@ supports Chat Completions only and extracts ordered user/tool entries directly;
 there is no second normalized model-request representation. Branching, extension
 messages and standalone bash-execution envelopes are not admission APIs in this
 POC. Bash tool output uses the same tool-result boundary as other tools.</p>
-<p>The operator supplies the existing gateway's public Ed25519 signing key and
-issuer. Host setup generates only service TLS, one admission bearer credential,
-provider destination and policy; setup reads the actual sandbox ID. It prints
+<p>Preparation discovers the existing gateway's public Ed25519 signing key and
+issuer using its HTTPS discovery endpoints and the CLI's saved mTLS credentials.
+Only the gateway name, reachable service host and model key are supplied by the
+operator. Discovery requires one published signing key and refuses plaintext,
+cross-origin key URLs and untrusted TLS; browser/edge-login gateways are outside
+this POC helper's scope. Host setup generates service TLS, one admission bearer
+credential, provider destination and policy; setup reads the actual sandbox ID. It prints
 a middleware registration for the operator to install and does not generate
 gateway credentials, download OpenShell binaries, or restart the gateway.
 The sandbox cannot select its authoritative
@@ -1512,8 +1820,9 @@ Pi's actual tool-capable serialized request with a receipt passed the gate and
 received HTTP 401 from the real endpoint when deliberately given an invalid test
 credential. This establishes the transport seam, <strong>not</strong> successful model output.</p>
 <p><strong>Existing-gateway deployment and real-model acceptance remain unverified.</strong>
-Preparation is tested with both DNS and IPv4 service addresses, and local
-cross-language tests exercise service TLS and gateway public-key verification.
+Preparation is tested with both DNS and IPv4 service addresses against a local
+mTLS discovery server. Local cross-language tests exercise service TLS and
+gateway public-key verification.
 The host launcher contains no Linux-specific binary bootstrap; Linux tests do
 not establish macOS deployment support. The checked-in
 verification command passed its bypass/denial checks and then failed at the model
@@ -1569,6 +1878,36 @@ easier to reproduce; it does not make the guarantees stronger by itself.</p>
         
 <footer class="md-footer">
   
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Continue reading" >
+        
+          
+          <a href="../request-lifecycle/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Request lifecycle">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">Previous</span>
+              <div class="md-ellipsis">Request lifecycle</div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../service-boundary/" class="md-footer__link md-footer__link--next" aria-label="Next: Service boundary">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">Next</span>
+              <div class="md-ellipsis">Service boundary</div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
+        
+      </nav>
     
   
   <div class="md-footer-meta md-typeset">
