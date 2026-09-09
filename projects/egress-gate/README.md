@@ -24,7 +24,7 @@ commands work from any directory and do not depend on repository-only files:
 egress-gate gates list
 egress-gate gates schema
 egress-gate validate --policy /absolute/path/to/your-policy.yaml
-egress-gate serve --listen 127.0.0.1:50051 --no-require-agent-attestation
+egress-gate serve --listen 127.0.0.1:50051
 ```
 
 ## Source-checkout quickstart
@@ -39,7 +39,7 @@ uv run egress-gate gates list
 uv run egress-gate gates schema
 uv run egress-gate validate \
   --policy examples/regex-redaction/egress-gate-config.yaml
-uv run egress-gate serve --listen 127.0.0.1:50051 --no-require-agent-attestation
+uv run egress-gate serve --listen 127.0.0.1:50051
 uv run egress-gate evaluate \
   --policy examples/regex-redaction/egress-gate-config.yaml \
   --cases examples/regex-redaction/cases.yaml
@@ -49,13 +49,12 @@ Use `0.0.0.0` only when the OpenShell supervisor must reach the service across
 network namespaces. The development server uses plaintext gRPC. Restrict its
 listen port to trusted networks.
 
-The CLI requires managed Pi context attestations by default, coupling admission
-to provider egress verification. The general Gate quickstarts opt out
-explicitly. Keep the default, or pass `--require-agent-attestation`, for a
-managed harness; use `--no-require-agent-attestation` only for an intentionally
-unmanaged deployment.
-See the [managed Pi example](examples/pi-attested-admission/README.md) for the
-matching Pi and OpenShell fork branches, startup contract, and current limits.
+Ordinary HTTP middleware is the default. To require admission receipts, pass
+`--admission-config /absolute/path/to/admission.json`. That operator-owned
+configuration enables the additional authenticated HTTPS admission API and
+TLS/JWT authentication for the middleware listener. See the
+[no-fork Pi example](examples/pi-attested-admission/README.md) for a runnable
+upstream deployment, trust boundaries, and supported scope.
 
 ## Policy shape
 
@@ -95,7 +94,7 @@ need initialization, helper bases, or typed resources use the full class-based
 
 ```bash
 uv run egress-gate --registry my_gates:registry gates list
-uv run egress-gate --registry my_gates:registry serve --no-require-agent-attestation
+uv run egress-gate --registry my_gates:registry serve
 ```
 
 OpenShell owns interception, routing, and credential attachment. Egress Gate
@@ -111,13 +110,12 @@ from egress_gate.service import EgressGateServer
 server = EgressGateServer(
     create_builtin_registry(),
     timeout_middleware_processing=10,
-    require_agent_attestation=False,
 )
 server.serve_sync("127.0.0.1:50051")
 ```
 
-Make the `require_agent_attestation` choice explicit in programmatic deployments;
-set it to `True` for a managed harness. In this unmanaged example,
+Pass an `AdmissionServerConfig` as `admission=` to enable the optional
+receipt-required deployment. In this ordinary middleware example,
 `timeout_middleware_processing` gives each evaluation 10
 seconds. Omitting it uses the one-second service default. The value is expressed
 in seconds, must be at least 10 milliseconds, and must resolve to whole
@@ -152,6 +150,9 @@ timeout failures must deny.
 - [Class-based custom gate](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/class-based-gate)
 
 ## Development
+
+Full checks also require Node 22.19+ and npm for the locked upstream Pi example.
+The first run installs its JavaScript dependencies.
 
 ```bash
 make help
