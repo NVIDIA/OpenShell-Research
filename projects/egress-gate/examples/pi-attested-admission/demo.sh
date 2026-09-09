@@ -7,7 +7,7 @@ set +x # Never trace populated credential variables.
 umask 077
 example=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 project=$(cd -- "$example/../.." && pwd)
-state=$project/.workspaces/pi-no-fork
+state=$project/.workspaces/pi-admission
 print_only=false
 if [[ ${1:-} == --print ]]; then print_only=true; shift; fi
 action=${1:-help}
@@ -17,55 +17,39 @@ if ! $print_only && [[ -f $example/.env ]]; then
   source "$example/.env"
   set +a
 fi
-host_ip=${EGRESS_GATE_HOST_IP:-172.17.0.1}
-cli=$state/bin/openshell
-openshell=(env XDG_CONFIG_HOME="$state/config" "$cli" --gateway pi-admission --gateway-endpoint https://127.0.0.1:17672)
-runtime_env=(env OPENSHELL_LOCAL_TLS_DIR="$state/tls" XDG_CONFIG_HOME="$state/config" XDG_STATE_HOME="$state/state" XDG_DATA_HOME="$state/data")
+service_host=${EGRESS_GATE_HOST:-YOUR_SERVICE_HOST}
+gateway=${OPENSHELL_GATEWAY:-YOUR_GATEWAY}
+openshell=(openshell --gateway "$gateway")
 run() {
   if $print_only; then printf '%q ' "$@"; printf '\n'; else "$@"; fi
 }
 cd "$project"
 case "$action" in
   prepare)
-    if ! $print_only && [[ $(uname -s) != Linux || $(uname -m) != x86_64 ]]; then
-      echo "This pinned POC launcher supports Linux x86_64 with Docker." >&2; exit 1
+    if ! $print_only; then
+      : "${EGRESS_GATE_HOST:?Set the service hostname or IPv4 address in .env}"
+      : "${OPENSHELL_GATEWAY_PUBLIC_KEY:?Set the gateway public PEM path in .env}"
+      : "${OPENSHELL_GATEWAY_ISSUER:?Set the gateway JWT issuer in .env}"
     fi
     run uv sync --frozen
-    run mkdir -p "$state/bin"
-    for component in openshell openshell-gateway openshell-sandbox; do
-      target=x86_64-unknown-linux-musl
-      [[ $component != openshell-gateway ]] || target=x86_64-unknown-linux-gnu
-      archive=$component-$target.tar.gz
-      case "$component" in
-        openshell) checksum=4fb4476d80a1875a0b83547ec3aba999cf0a2e2d75f95f2f709b622e2103520e ;;
-        openshell-gateway) checksum=59c6da724eae7a00c28826f9191efbdf4fbaa5c768afdc8dea6a80a949ebcc89 ;;
-        openshell-sandbox) checksum=0bb160f73e5007338b94e3c868f66f50c71cd65c27c932ed9a4fa67c49e6d423 ;;
-      esac
-      run curl --fail --location --silent --show-error "https://github.com/NVIDIA/OpenShell/releases/download/v0.0.116/$archive" -o "$state/bin/$archive"
-      if $print_only; then
-        printf 'printf "%%s  %%s\\n" %q %q | sha256sum --check\n' "$checksum" "$state/bin/$archive"
-      else
-        printf '%s  %s\n' "$checksum" "$state/bin/$archive" | sha256sum --check
-      fi
-      run tar -xzf "$state/bin/$archive" -C "$state/bin" "$component"
-      run chmod 755 "$state/bin/$component"
-    done
-    run uv run --frozen python "$example/prepare.py" --state "$state" --host-ip "$host_ip"
+    run uv run --frozen python "$example/prepare.py" --state "$state" --host "$service_host" --gateway-public-key "${OPENSHELL_GATEWAY_PUBLIC_KEY:-/path/to/gateway-public.pem}" --gateway-issuer "${OPENSHELL_GATEWAY_ISSUER:-YOUR_GATEWAY_ISSUER}"
     run docker build --tag pi-admission:local "$state/image"
     ;;
   serve)
     run uv run --frozen egress-gate serve --listen 0.0.0.0:50051 --admission-config "$state/admission.json"
     ;;
-  gateway)
-    run "${runtime_env[@]}" "$state/bin/openshell-gateway" --config "$state/gateway.toml" --port 17672 --bind-address 0.0.0.0 --db-url "sqlite:$state/gateway.db"
+  registration)
+    run cat "$state/middleware.toml"
     ;;
   setup)
     if ! $print_only; then
+      : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}"
       : "${PI_MODEL_API_KEY:?Set PI_MODEL_API_KEY in the example .env}"
       export PI_MODEL_API_KEY
       EGRESS_ADMISSION_TOKEN=$(uv run --frozen python -c 'import json,sys; print(json.load(open(sys.argv[1]))["bearer_token"])' "$state/admission.json")
       export EGRESS_ADMISSION_TOKEN
     fi
+    run "${openshell[@]}" gateway info
     for provider in model admission; do
       run "${openshell[@]}" provider profile import --file "$state/$provider-provider.yaml"
       variable=PI_MODEL_API_KEY
@@ -81,26 +65,29 @@ case "$action" in
     fi
     ;;
   launch)
-    run "${openshell[@]}" sandbox exec --tty --name pi-admission -- /usr/local/bin/node /app/dist/src/cli.js --admission https://host.openshell.internal:5443/v1/admission
+    if ! $print_only; then : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}" "${EGRESS_GATE_HOST:?Set the service host in .env}"; fi
+    run "${openshell[@]}" sandbox exec --tty --name pi-admission -- /usr/local/bin/node /app/dist/src/cli.js --admission "https://$service_host:5443/v1/admission"
     ;;
   verify)
-    run "${openshell[@]}" sandbox exec --no-tty --name pi-admission -- /usr/local/bin/node /app/dist/src/verify.js --admission https://host.openshell.internal:5443/v1/admission
+    if ! $print_only; then : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}" "${EGRESS_GATE_HOST:?Set the service host in .env}"; fi
+    run "${openshell[@]}" sandbox exec --no-tty --name pi-admission -- /usr/local/bin/node /app/dist/src/verify.js --admission "https://$service_host:5443/v1/admission"
     ;;
   cleanup)
+    if ! $print_only; then : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}"; fi
     run "${openshell[@]}" sandbox delete pi-admission
     for provider in model admission; do
       run "${openshell[@]}" provider delete "pi-admission-$provider"
       run "${openshell[@]}" provider profile delete "pi-admission-$provider"
     done
     run uv run --frozen python -c 'import pathlib,sys; pathlib.Path(sys.argv[1]).unlink(missing_ok=True)' "$state/sandbox-id"
-    printf 'Sandbox and its sessions removed. Stop serve and gateway with Ctrl-C.\n'
-    printf 'Host configuration and downloaded artifacts remain in %s.\n' "$state"
+    printf 'Sandbox and its sessions removed. Stop serve with Ctrl-C; the gateway is unchanged.\n'
+    printf 'Host configuration remains in %s; the local Docker image is retained.\n' "$state"
     ;;
   help)
     printf 'Usage: ./demo.sh [--print] ACTION\n\n'
-    printf '  prepare  Download pinned upstream binaries; generate local TLS/config; build image\n'
+    printf '  prepare  Generate service TLS/config; build the Pi image\n'
     printf '  serve    Run Egress Gate (keep this terminal open)\n'
-    printf '  gateway  Run isolated OpenShell gateway (keep this terminal open)\n'
+    printf '  registration  Print middleware config for your gateway operator\n'
     printf '  setup    Create providers and sandbox; bind admission identity\n'
     printf '  launch   Start a new interactive Pi-powered session\n'
     printf '  verify   Run real allow/deny/redact, tools, skill, compaction and bypass checks\n'

@@ -11,53 +11,71 @@ and manual/automatic compaction. Neither Pi nor OpenShell needs a patch.
 
 ## Try it
 
-Prerequisites: **Linux x86_64**, running Docker, Python 3.11+, uv 0.11+,
-curl, and a real key for a text-only OpenAI-compatible Chat Completions model.
-The checked-in model uses NVIDIA's inference endpoint and requires access to it.
-Edit [model.json](model.json) to use another compatible HTTPS endpoint/model.
+You need an **existing, authenticated OpenShell gateway** and the `openshell`
+CLI configured with its name. Use OpenShell **0.0.116** (the tested protocol
+baseline) or a compatible newer release with middleware authentication and
+proxy credential delivery. This example does not install or start OpenShell.
+
+Also needed: Bash, Python 3.11+, uv 0.11+, Docker, and a real key for a text-only
+Chat Completions model. The simple image workflow assumes your gateway's Docker
+driver uses the same Docker daemon as `docker build`. Remote drivers/image
+distribution are outside this example. The host no longer has to be Linux;
+Linux has been tested, while macOS execution remains unverified.
 
 From this directory:
 
 ```sh
 cp .env.example .env
-# Edit .env: set PI_MODEL_API_KEY and the host address reachable from Docker.
+# Fill in the existing gateway name, public signing key path, issuer,
+# reachable Egress Gate host, and model API key.
 # Edit model.json if using a different endpoint/model.
 ./demo.sh prepare
+./demo.sh registration
 ```
 
-Preparation downloads checksum-verified OpenShell **0.0.116** binaries, installs
-locked Pi **0.85.1** packages in a pinned Node image, and creates local TLS and
-configuration under the project's ignored `.workspaces/pi-no-fork/` directory.
-No fork clones, Rust build, global Pi install, or existing gateway are needed.
-The current launcher is deliberately Linux-only; other platforms are not tested.
+The checked-in model uses NVIDIA's inference endpoint and requires access to it.
+Ask your gateway operator for the **public Ed25519 signing key (PEM)** and exact
+JWT issuer. These are not the gateway TLS certificate or its private signing
+key. Keep the public-key file at the absolute path set in `.env`; the service
+reads it on startup.
 
-Keep these two terminals open:
+`EGRESS_GATE_HOST` must resolve to this service from **both gateway and sandbox**:
+use a reachable DNS name or IPv4 address, without a scheme or port.
+Docker Desktop commonly provides `host.docker.internal`; Linux Docker may need
+its bridge address. Do not use `localhost` when callers are in containers.
+
+Preparation builds the pinned Pi **0.85.1** image and writes service TLS,
+policy and provider profiles under `../../.workspaces/pi-admission/`.
+No fork clones, gateway binaries, gateway keys or gateway configuration are
+created. `registration` prints only the middleware entry to add.
+
+Keep Egress Gate running in one terminal:
 
 ```sh
-# Terminal 1
 ./demo.sh serve
 ```
 
-```sh
-# Terminal 2
-./demo.sh gateway
-```
+Have the operator merge the printed entry into the existing gateway's
+configuration. Make `tls/ca.crt` readable to the gateway (copy or mount the
+public certificate if needed) and adjust `tls_ca_cert_path` in the entry to
+that gateway-visible path. Restart the gateway through its usual service
+manager to load the registration; coordinate this on a shared gateway.
+The demo never edits or restarts it.
 
-Then create the sandbox and start a session:
+In a second terminal, from this directory:
 
 ```sh
-# Terminal 3
 ./demo.sh setup
 ./demo.sh launch
 ```
 
-The gateway is isolated on port **17672**. Egress Gate listens on **50051**
-(authenticated middleware gRPC) and **5443** (authenticated admission HTTPS).
-Allow access only from this host/sandbox network. TLS certificates last 30 days.
-If these ports are occupied, stop the conflicting demo before starting this one.
+`setup` displays the selected gateway and creates the `pi-admission` sandbox
+and its two provider profiles/instances. Reserve those names for this demo.
+Egress Gate listens on **50051** (authenticated middleware gRPC) and **5443**
+(authenticated admission HTTPS). Restrict access to the gateway/sandbox network.
 
-Every action is inspectable without executing it, loading `.env`, or printing
-secrets:
+Every action can print its commands without executing them, loading `.env`,
+or printing secrets:
 
 ```sh
 ./demo.sh --print prepare
@@ -65,9 +83,14 @@ secrets:
 ./demo.sh --print launch
 ```
 
-Printed commands name credential environment variables; OpenShell reads their
-values on the host. The generated admission configuration contains a private
-bearer token and must remain outside the image and repository.
+Print mode uses exported configuration or placeholders because it does not load
+`.env`. Real commands use `.env`; credentials are passed by environment-variable
+name. The generated `admission.json` contains a private admission token and must
+remain outside the image and repository.
+
+**Validation status:** local cross-language integration passes, but the complete
+existing-gateway workflow with a valid model key remains to be verified.
+`./demo.sh verify` below is that separate real-model acceptance check.
 
 ## What to try
 
@@ -122,11 +145,20 @@ pending-admission tests live in [app/test/](app/test/).
 
 Cleanup deletes only this demo sandbox and its provider instances/profiles.
 **Sandbox files and sessions are deleted and are not recoverable by this script.**
-Copy out anything wanted first. Stop the two foreground services with Ctrl-C.
-Downloaded artifacts and private host configuration remain in the ignored state
-directory for inspection/reuse. Run setup again to create a fresh sandbox.
-Changes to model/policy/project files require prepare, a service restart, and a
-fresh sandbox (cleanup then setup).
+Copy out anything wanted first, then stop `serve` with Ctrl-C. The gateway and
+its middleware registration are left untouched; the operator can remove the
+registration when the demo is no longer needed. Host configuration and the local
+Docker image remain for reuse.
+
+For source/model/policy changes, clean up the old demo sandbox, run `prepare`,
+restart `serve`, then run `setup`. Valid service certificates are reused for
+the same host. After 30 days or a host change, `prepare` generates new service
+TLS: install the new CA in the gateway and restart it before setup. Refresh the
+public signing-key file if the gateway rotates its key.
+
+The earlier isolated launcher's `.workspaces/pi-no-fork/` directory is no longer
+used. Any old isolated gateway must be stopped separately; this launcher does
+not manage it.
 
 ## How the pieces fit
 
@@ -159,7 +191,7 @@ Egress Gate schemas. A provider-context replacement is rejected: silently
 redacting only the outbound request would leave saved history inconsistent.
 
 [prepare.py](prepare.py) is **trusted host-side operator code**, not the
-in-sandbox harness. It provisions policy, TLS, and endpoint-bound provider
+in-sandbox harness. It provisions policy, service TLS, and endpoint-bound provider
 profiles. Setup reads the actual sandbox ID from OpenShell and binds the
 admission credential to it. The application cannot supply an authoritative
 sandbox ID or choose a policy. Upstream credential delivery gives it placeholders,

@@ -30,7 +30,7 @@ network_policies:
   admission:
     name: Authenticated admission API (not a model endpoint)
     endpoints:
-      - host: host.openshell.internal
+      - host: host.docker.internal # prepare replaces this with EGRESS_GATE_HOST.
         port: 5443
         protocol: rest
         enforcement: enforce
