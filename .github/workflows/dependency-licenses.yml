@@ -1,0 +1,82 @@
+name: Dependency licenses
+
+"on":
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-licenses-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check dependency licenses
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # No secrets, project builds, or package lifecycle hooks.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.12"
+
+      - name: Test checker
+        run: uv run --python 3.12 --with license-expression==30.4.4 --with boolean.py==5.0 python -m unittest discover -s tests -p test_dependency_licenses.py
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Check licenses
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          args=(--head "$HEAD_SHA" --report dependency-licenses.json)
+          if [ -n "$BASE_SHA" ]; then
+            args+=(--base "$BASE_SHA")
+            if git cat-file -e "$BASE_SHA:.github/dependency-license-policy.toml" 2>/dev/null; then
+              git show "$BASE_SHA:.github/dependency-license-policy.toml" > "$RUNNER_TEMP/base-license-policy.toml"
+              args+=(--approved-policy "$RUNNER_TEMP/base-license-policy.toml")
+            else
+              echo 'Introducing license policy: proposed allowlist requires maintainer review.'
+            fi
+          fi
+          uv run --locked --script scripts/check_dependency_licenses.py "${args[@]}"
+
+      - name: Validate affected lockfiles with native package managers
+        if: always() && hashFiles('dependency-licenses.json') != ''
+        run: |
+          jq -c '.lock_checks[]' dependency-licenses.json | while IFS= read -r target; do
+            directory=$(jq -r '.directory' <<< "$target")
+            manager=$(jq -r '.manager' <<< "$target")
+            echo "Checking $manager lockfile in $directory"
+            (
+              cd -- "$directory"
+              case "$manager" in
+                uv) uv lock --check ;;
+                npm) npm ci --ignore-scripts --no-audit --no-fund ;;
+                cargo) cargo metadata --locked --format-version 1 > /dev/null ;;
+                *) echo "Unknown package manager: $manager" >&2; exit 1 ;;
+              esac
+            )
+          done
+
+      - name: Upload license report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-licenses
+          path: dependency-licenses.json
+          if-no-files-found: warn

@@ -5,6 +5,9 @@ description: Agent instructions for maintaining the OpenShell Research documenta
 
 # Documentation site development
 
+For automated dependency policy checks, see
+[Dependency License Checks](dependency-licenses.md).
+
 Follow these instructions for changes under `docs/`, a project's `docs/` tree,
 `zensical.toml`, the Dev Notes renderer, or the documentation workflow. Run
 commands from the repository root. Use Python 3.10 or newer.

@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+approved = ["Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "MIT", "MIT-CMU"]
+
+# Bare "BSD" is ambiguous and is not an approved SPDX identifier.
+# Clarifications resolve metadata, not policy exceptions. Each must identify
+# the exact ecosystem/name/version/source, an approved license expression,
+# and an HTTPS evidence URL reviewed by a maintainer.
