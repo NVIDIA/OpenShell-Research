@@ -28,11 +28,16 @@ case "$action" in
   prepare)
     if ! $print_only; then
       : "${EGRESS_GATE_HOST:?Set the service hostname or IPv4 address in .env}"
-      : "${OPENSHELL_GATEWAY_PUBLIC_KEY:?Set the gateway public PEM path in .env}"
-      : "${OPENSHELL_GATEWAY_ISSUER:?Set the gateway JWT issuer in .env}"
+      : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}"
     fi
     run uv sync --frozen
-    run uv run --frozen python "$example/prepare.py" --state "$state" --host "$service_host" --gateway-public-key "${OPENSHELL_GATEWAY_PUBLIC_KEY:-/path/to/gateway-public.pem}" --gateway-issuer "${OPENSHELL_GATEWAY_ISSUER:-YOUR_GATEWAY_ISSUER}"
+    if $print_only; then
+      printf '%q ' "${openshell[@]}" gateway list --output json
+      printf '| '
+      run uv run --frozen python "$example/prepare.py" --state "$state" --host "$service_host" --gateway "$gateway"
+    else
+      "${openshell[@]}" gateway list --output json | uv run --frozen python "$example/prepare.py" --state "$state" --host "$service_host" --gateway "$gateway"
+    fi
     run docker build --tag pi-admission:local "$state/image"
     ;;
   serve)

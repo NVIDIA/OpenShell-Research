@@ -87,9 +87,13 @@ there is no second normalized model-request representation. Branching, extension
 messages and standalone bash-execution envelopes are not admission APIs in this
 POC. Bash tool output uses the same tool-result boundary as other tools.
 
-The operator supplies the existing gateway's public Ed25519 signing key and
-issuer. Host setup generates only service TLS, one admission bearer credential,
-provider destination and policy; setup reads the actual sandbox ID. It prints
+Preparation discovers the existing gateway's public Ed25519 signing key and
+issuer using its HTTPS discovery endpoints and the CLI's saved mTLS credentials.
+Only the gateway name, reachable service host and model key are supplied by the
+operator. Discovery requires one published signing key and refuses plaintext,
+cross-origin key URLs and untrusted TLS; browser/edge-login gateways are outside
+this POC helper's scope. Host setup generates service TLS, one admission bearer
+credential, provider destination and policy; setup reads the actual sandbox ID. It prints
 a middleware registration for the operator to install and does not generate
 gateway credentials, download OpenShell binaries, or restart the gateway.
 The sandbox cannot select its authoritative
@@ -175,8 +179,9 @@ received HTTP 401 from the real endpoint when deliberately given an invalid test
 credential. This establishes the transport seam, **not** successful model output.
 
 **Existing-gateway deployment and real-model acceptance remain unverified.**
-Preparation is tested with both DNS and IPv4 service addresses, and local
-cross-language tests exercise service TLS and gateway public-key verification.
+Preparation is tested with both DNS and IPv4 service addresses against a local
+mTLS discovery server. Local cross-language tests exercise service TLS and
+gateway public-key verification.
 The host launcher contains no Linux-specific binary bootstrap; Linux tests do
 not establish macOS deployment support. The checked-in
 verification command passed its bypass/denial checks and then failed at the model

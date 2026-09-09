@@ -8,8 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import subprocess
-import sys
+import runpy
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -157,21 +156,12 @@ async def test_pi_session_through_admission_and_authenticated_egress(
 ) -> None:
     example = PROJECT / "examples/pi-attested-admission"
     async with _clients(tmp_path) as (_, stub, config, token, middleware):
-        subprocess.run(
-            [
-                sys.executable,
-                str(example / "prepare.py"),
-                "--state",
-                str(tmp_path),
-                "--host",
-                "127.0.0.1",
-                "--gateway-public-key",
-                str(config.gateway_public_key),
-                "--gateway-issuer",
-                config.gateway_issuer,
-            ],
-            check=True,
-            capture_output=True,
+        runpy.run_path(str(example / "prepare.py"))["prepare"](
+            example,
+            tmp_path,
+            "127.0.0.1",
+            config.gateway_public_key,
+            config.gateway_issuer,
         )
         config = config.model_copy(
             update={

@@ -11,10 +11,14 @@ import json
 import os
 import secrets
 import shutil
+import ssl
+import sys
 from datetime import UTC, datetime, timedelta
+from http.client import HTTPSConnection
 from pathlib import Path
 from urllib.parse import urlparse
 
+import jwt
 import yaml
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -143,6 +147,55 @@ timeout = "10s"
     shutil.copyfile(tls / "ca.crt", image / "admission-ca.crt")
 
 
+def _discover_gateway(gateway: dict[str, str]) -> tuple[bytes, str]:
+    """Use the CLI's registered endpoint and existing client TLS, never new keys."""
+    endpoint = urlparse(gateway["endpoint"])
+    name = gateway["name"]
+    if endpoint.scheme != "https" or not endpoint.hostname or gateway["auth"] != "mtls":
+        raise ValueError("This demo requires a registered HTTPS/mTLS gateway")
+    if not name or Path(name).name != name or name in (".", ".."):
+        raise ValueError("Invalid gateway name")
+    config = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    tls = config / "openshell/gateways" / name / "mtls"
+    context = ssl.create_default_context(cafile=str(tls / "ca.crt"))
+    context.load_cert_chain(tls / "tls.crt", tls / "tls.key")
+    connection = HTTPSConnection(
+        endpoint.hostname, endpoint.port, context=context, timeout=10
+    )
+    try:
+        print(f"Discovering gateway identity from {gateway['endpoint']}")
+        connection.request("GET", "/.well-known/openid-configuration")
+        response = connection.getresponse()
+        if response.status != 200:
+            raise ValueError(f"Gateway discovery returned HTTP {response.status}")
+        discovery = json.load(response)
+        issuer = discovery["issuer"]
+        if not isinstance(issuer, str) or not issuer:
+            raise ValueError("Gateway discovery must provide a nonempty issuer")
+        jwks = urlparse(discovery["jwks_uri"])
+        if (jwks.scheme, jwks.netloc) != (endpoint.scheme, endpoint.netloc):
+            raise ValueError(
+                "Gateway signing keys must come from the same HTTPS origin"
+            )
+        connection.request("GET", jwks.path + (f"?{jwks.query}" if jwks.query else ""))
+        response = connection.getresponse()
+        if response.status != 200:
+            raise ValueError(
+                f"Gateway signing-key discovery returned HTTP {response.status}"
+            )
+        keys = json.load(response)["keys"]
+        if len(keys) != 1:
+            raise ValueError("This demo expects one gateway signing key")
+        key = jwt.PyJWK.from_dict(keys[0]).key
+        if not isinstance(key, ed25519.Ed25519PublicKey):
+            raise ValueError("Gateway must publish an Ed25519 public signing key")
+        return key.public_bytes(
+            serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+        ), issuer
+    finally:
+        connection.close()
+
+
 def _create_certificates(tls: Path, host: str) -> None:
     now = datetime.now(UTC)
     ca_key = ec.generate_private_key(ec.SECP256R1())
@@ -212,13 +265,21 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--state", type=Path, required=True)
     parser.add_argument("--host", required=True)
-    parser.add_argument("--gateway-public-key", type=Path, required=True)
-    parser.add_argument("--gateway-issuer", required=True)
+    parser.add_argument("--gateway", required=True)
     args = parser.parse_args()
+    gateways = json.load(sys.stdin)
+    gateway = next((item for item in gateways if item["name"] == args.gateway), None)
+    if gateway is None:
+        parser.error("Gateway is not registered; use openshell gateway add first")
+    public_key, issuer = _discover_gateway(gateway)
+    os.umask(0o077)
+    args.state.mkdir(parents=True, exist_ok=True)
+    public_path = args.state.resolve() / "gateway-public.pem"
+    public_path.write_bytes(public_key)
     prepare(
         Path(__file__).resolve().parent,
         args.state.resolve(),
         args.host,
-        args.gateway_public_key.resolve(),
-        args.gateway_issuer,
+        public_path,
+        issuer,
     )

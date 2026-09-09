@@ -3,24 +3,151 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import shutil
+import ssl
 import subprocess
 import sys
+import threading
 import tomllib
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
 import yaml
 from cryptography import x509
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from jwt.algorithms import OKPAlgorithm
 
 from egress_gate.service.admission import AdmissionServerConfig
 
 PROJECT = Path(__file__).parents[1]
 EXAMPLE = PROJECT / "examples/pi-attested-admission"
+
+
+@pytest.fixture
+def gateway_discovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[tuple[dict[str, str], bytes]]:
+    """A real mTLS discovery server using the CLI's on-disk client layout."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    tls = tmp_path / "config/openshell/gateways/test-gateway/mtls"
+    tls.mkdir(parents=True)
+    ca_key = ec.generate_private_key(ec.SECP256R1())
+    ca_name = x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, "Test CA")])
+    now = datetime.now(UTC)
+    for name in ("ca", "tls"):
+        key = ca_key if name == "ca" else ec.generate_private_key(ec.SECP256R1())
+        certificate = (
+            x509.CertificateBuilder()
+            .subject_name(
+                ca_name
+                if name == "ca"
+                else x509.Name(
+                    [x509.NameAttribute(x509.NameOID.COMMON_NAME, "localhost")]
+                )
+            )
+            .issuer_name(ca_name)
+            .public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(minutes=1))
+            .not_valid_after(now + timedelta(days=1))
+            .add_extension(
+                x509.BasicConstraints(ca=name == "ca", path_length=None), critical=True
+            )
+            .add_extension(
+                x509.KeyUsage(
+                    digital_signature=True,
+                    content_commitment=False,
+                    key_encipherment=False,
+                    data_encipherment=False,
+                    key_agreement=False,
+                    key_cert_sign=name == "ca",
+                    crl_sign=name == "ca",
+                    encipher_only=False,
+                    decipher_only=False,
+                ),
+                critical=True,
+            )
+            .add_extension(
+                x509.SubjectAlternativeName(
+                    [
+                        x509.DNSName("localhost"),
+                        x509.IPAddress(ipaddress.ip_address("127.0.0.1")),
+                    ]
+                ),
+                critical=False,
+            )
+            .add_extension(
+                x509.SubjectKeyIdentifier.from_public_key(key.public_key()),
+                critical=False,
+            )
+            .add_extension(
+                x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()),
+                critical=False,
+            )
+            .sign(ca_key, hashes.SHA256())
+        )
+        (tls / f"{name}.crt").write_bytes(
+            certificate.public_bytes(serialization.Encoding.PEM)
+        )
+        if name == "tls":
+            (tls / "tls.key").write_bytes(
+                key.private_bytes(
+                    serialization.Encoding.PEM,
+                    serialization.PrivateFormat.PKCS8,
+                    serialization.NoEncryption(),
+                )
+            )
+    signing_key = Ed25519PrivateKey.generate().public_key()
+    gateway = {"name": "test-gateway", "auth": "mtls"}
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            if self.path == "/.well-known/openid-configuration":
+                body = {
+                    "issuer": "existing-gateway-issuer",
+                    "jwks_uri": gateway.get(
+                        "jwks_uri", gateway["endpoint"] + "/.well-known/jwks.json"
+                    ),
+                }
+            else:
+                assert self.path == "/.well-known/jwks.json"
+                body = {"keys": [json.loads(OKPAlgorithm.to_jwk(signing_key))]}
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(json.dumps(body).encode())
+
+        def log_message(self, format: str, *args: object) -> None:
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(tls / "tls.crt", tls / "tls.key")
+    context.load_verify_locations(tls / "ca.crt")
+    context.verify_mode = ssl.CERT_REQUIRED
+    server.socket = context.wrap_socket(server.socket, server_side=True)
+    gateway["endpoint"] = f"https://127.0.0.1:{server.server_port}"
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield (
+            gateway,
+            signing_key.public_bytes(
+                serialization.Encoding.PEM,
+                serialization.PublicFormat.SubjectPublicKeyInfo,
+            ),
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
 
 
 def test_every_action_prints_without_secrets_or_side_effects(tmp_path: Path) -> None:
@@ -65,6 +192,8 @@ def test_every_action_prints_without_secrets_or_side_effects(tmp_path: Path) -> 
     assert "--gateway test-gateway" in output
     assert "https://service.example:5443/v1/admission" in output
     assert "middleware.toml" in output
+    assert "gateway list --output json" in output
+    assert "--gateway-public-key" not in output and "--gateway-issuer" not in output
     assert "17672" not in output and "XDG_CONFIG_HOME" not in output
     assert "docker build" in output
     assert "--admission-config" in output
@@ -80,17 +209,11 @@ def test_every_action_prints_without_secrets_or_side_effects(tmp_path: Path) -> 
 def test_preparation_uses_existing_gateway_and_excludes_private_material(
     tmp_path: Path,
     host: str,
+    gateway_discovery: tuple[dict[str, str], bytes],
 ) -> None:
     state = tmp_path / "state"
-    public = (
-        Ed25519PrivateKey.generate()
-        .public_key()
-        .public_bytes(
-            serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
-        )
-    )
-    public_path = tmp_path / "gateway-public.pem"
-    public_path.write_bytes(public)
+    gateway, public = gateway_discovery
+    public_path = state / "gateway-public.pem"
     command = [
         sys.executable,
         str(EXAMPLE / "prepare.py"),
@@ -98,12 +221,10 @@ def test_preparation_uses_existing_gateway_and_excludes_private_material(
         str(state),
         "--host",
         host,
-        "--gateway-public-key",
-        str(public_path),
-        "--gateway-issuer",
-        "existing-gateway-issuer",
+        "--gateway",
+        gateway["name"],
     ]
-    subprocess.run(command, check=True)
+    subprocess.run(command, input=json.dumps([gateway]), text=True, check=True)
     config = AdmissionServerConfig.model_validate_json(
         (state / "admission.json").read_bytes()
     )
@@ -125,7 +246,7 @@ def test_preparation_uses_existing_gateway_and_excludes_private_material(
     token = config.bearer_token.get_secret_value()
     assert len(token) >= 32
     (state / "image/stale-config.json").write_text("{}")
-    subprocess.run(command, check=True)
+    subprocess.run(command, input=json.dumps([gateway]), text=True, check=True)
     again = AdmissionServerConfig.model_validate_json(
         (state / "admission.json").read_bytes()
     )
@@ -144,12 +265,12 @@ def test_preparation_uses_existing_gateway_and_excludes_private_material(
     assert not (image / "admission.json").exists()
     assert not (image / "app/node_modules").exists()
     assert (image / "project/.pi/skills/review/SKILL.md").is_file()
-    gateway = tomllib.loads((state / "middleware.toml").read_text())
-    registration = gateway["openshell"]["supervisor"]["middleware"][0]
+    middleware = tomllib.loads((state / "middleware.toml").read_text())
+    registration = middleware["openshell"]["supervisor"]["middleware"][0]
     assert registration["grpc_endpoint"] == f"https://{host}:50051"
     assert registration["tls_ca_cert_path"] == str(state / "tls/ca.crt")
-    assert "gateway" not in gateway["openshell"]
-    assert "drivers" not in gateway["openshell"]
+    assert "gateway" not in middleware["openshell"]
+    assert "drivers" not in middleware["openshell"]
     policy = yaml.safe_load((state / "policy.yaml").read_text())
     assert policy["network_middlewares"]["pi_egress_gate"]["on_error"] == "fail_closed"
     model_endpoint = policy["network_policies"]["model_provider"]["endpoints"][0]
@@ -162,9 +283,62 @@ def test_preparation_uses_existing_gateway_and_excludes_private_material(
     admission_profile = yaml.safe_load((state / "admission-provider.yaml").read_text())
     assert admission_profile["endpoints"][0]["host"] == host
     command[command.index("--host") + 1] = "new-service.example"
-    subprocess.run(command, check=True)
+    subprocess.run(command, input=json.dumps([gateway]), text=True, check=True)
     assert (state / "tls/server/tls.crt").read_bytes() != certificate_bytes
     assert public_path.read_bytes() == public
+
+
+@pytest.mark.parametrize("failure", ["plaintext", "foreign-key-url", "untrusted-ca"])
+def test_discovery_rejects_untrusted_gateway_before_preparation(
+    tmp_path: Path, gateway_discovery: tuple[dict[str, str], bytes], failure: str
+) -> None:
+    gateway, _ = gateway_discovery
+    if failure == "plaintext":
+        gateway["endpoint"] = gateway["endpoint"].replace("https:", "http:")
+    elif failure == "foreign-key-url":
+        gateway["jwks_uri"] = "https://untrusted.example/keys"
+    else:
+        # Keep the client identity, but remove its trust in the server's CA.
+        key = Ed25519PrivateKey.generate()
+        name = x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, "Wrong CA")])
+        certificate = (
+            x509.CertificateBuilder()
+            .subject_name(name)
+            .issuer_name(name)
+            .public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(datetime.now(UTC) - timedelta(minutes=1))
+            .not_valid_after(datetime.now(UTC) + timedelta(days=1))
+            .add_extension(
+                x509.BasicConstraints(ca=True, path_length=None), critical=True
+            )
+            .sign(key, None)
+        )
+        (tmp_path / "config/openshell/gateways/test-gateway/mtls/ca.crt").write_bytes(
+            certificate.public_bytes(serialization.Encoding.PEM)
+        )
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(EXAMPLE / "prepare.py"),
+            "--state",
+            str(tmp_path / "state"),
+            "--host",
+            "127.0.0.1",
+            "--gateway",
+            gateway["name"],
+        ],
+        input=json.dumps([gateway]),
+        text=True,
+        capture_output=True,
+    )
+    assert result.returncode != 0
+    assert {
+        "plaintext": "registered HTTPS/mTLS gateway",
+        "foreign-key-url": "same HTTPS origin",
+        "untrusted-ca": "CERTIFICATE_VERIFY_FAILED",
+    }[failure] in result.stderr
+    assert not (tmp_path / "state").exists()
 
 
 def test_sandbox_binding_accepts_only_operator_cli_output(tmp_path: Path) -> None:

@@ -11,7 +11,7 @@ and manual/automatic compaction. Neither Pi nor OpenShell needs a patch.
 
 ## Try it
 
-You need an **existing, authenticated OpenShell gateway** and the `openshell`
+You need an **existing HTTPS/mTLS OpenShell gateway** and the `openshell`
 CLI configured with its name. Use OpenShell **0.0.116** (the tested protocol
 baseline) or a compatible newer release with middleware authentication and
 proxy credential delivery. This example does not install or start OpenShell.
@@ -26,18 +26,20 @@ From this directory:
 
 ```sh
 cp .env.example .env
-# Fill in the existing gateway name, public signing key path, issuer,
-# reachable Egress Gate host, and model API key.
+# Fill in the gateway name, reachable Egress Gate host, and model API key.
 # Edit model.json if using a different endpoint/model.
 ./demo.sh prepare
 ./demo.sh registration
 ```
 
 The checked-in model uses NVIDIA's inference endpoint and requires access to it.
-Ask your gateway operator for the **public Ed25519 signing key (PEM)** and exact
-JWT issuer. These are not the gateway TLS certificate or its private signing
-key. Keep the public-key file at the absolute path set in `.env`; the service
-reads it on startup.
+`prepare` reads the selected endpoint from `openshell gateway list --output json`
+and discovers its issuer and public signing key over verified HTTPS. It reuses
+the CLI's existing client certificates under
+`${XDG_CONFIG_HOME:-$HOME/.config}/openshell/gateways/<name>/mtls/`.
+You do not supply signing keys, an issuer, or certificate paths. This POC supports
+registered mTLS gateways; plaintext and browser/edge-login gateways are not
+supported by this discovery helper. It never disables TLS verification.
 
 `EGRESS_GATE_HOST` must resolve to this service from **both gateway and sandbox**:
 use a reachable DNS name or IPv4 address, without a scheme or port.
@@ -46,8 +48,9 @@ its bridge address. Do not use `localhost` when callers are in containers.
 
 Preparation builds the pinned Pi **0.85.1** image and writes service TLS,
 policy and provider profiles under `../../.workspaces/pi-admission/`.
-No fork clones, gateway binaries, gateway keys or gateway configuration are
-created. `registration` prints only the middleware entry to add.
+The discovered public key is saved there as `gateway-public.pem`. No fork clones,
+gateway binaries, gateway private keys or full gateway configuration are created.
+`registration` prints only the middleware entry to add.
 
 Keep Egress Gate running in one terminal:
 
@@ -154,7 +157,8 @@ For source/model/policy changes, clean up the old demo sandbox, run `prepare`,
 restart `serve`, then run `setup`. Valid service certificates are reused for
 the same host. After 30 days or a host change, `prepare` generates new service
 TLS: install the new CA in the gateway and restart it before setup. Refresh the
-public signing-key file if the gateway rotates its key.
+gateway identity by rerunning `prepare` and restarting `serve` if the gateway
+rotates its signing key. Discovery currently expects one published signing key.
 
 The earlier isolated launcher's `.workspaces/pi-no-fork/` directory is no longer
 used. Any old isolated gateway must be stopped separately; this launcher does
