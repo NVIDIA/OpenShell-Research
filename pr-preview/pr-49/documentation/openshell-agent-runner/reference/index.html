@@ -1853,24 +1853,42 @@ Keep secrets in OpenShell's provider configuration; prompt variables and
 <code>--env</code> are for non-secret values. Environment names use letters, numbers, and
 underscores, cannot start with a number, and cannot start with <code>OPENSHELL_</code>.</p>
 <h2 id="what-happens-during-a-run">What happens during a run</h2>
-<p>Your profile and command options start the run. OAR prepares the selected task's
-instructions and uses OpenShell to create its sandbox; the agent executes there
-using the gateway's configured inference connection.</p>
-<figure class="documentation-figure documentation-figure--wide">
-  <a href="../assets/diagrams/run-lifecycle.svg" aria-label="Open the OAR run lifecycle diagram at full size">
-    <img src="../assets/diagrams/run-lifecycle.svg" alt="On the caller's machine, OAR loads the profile and inputs, resolves prompt variables, and creates a sandbox with the profile policy. It uploads the input, prompt, skills, and optional schema. Pi runs inside that sandbox using gateway inference. OAR downloads and validates the result, saves the output, then verifies ownership and removes only the sandbox.">
-  </a>
-  <figcaption>The profile and final output stay on your machine. OAR runs the agent in an OpenShell sandbox and cleans it up when done. Select the diagram to view it at full size.</figcaption>
-</figure>
-
+<p>Each <code>oar run</code> moves work from your machine into a new sandbox and brings back
+one result. OAR checks the request before attempting to create the sandbox.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>1. PREPARE · your machine / CI
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>   Load profile + task + input
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>   Fill in prompt variables
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>              |
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>              v
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>2. RUN · new OpenShell sandbox
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>   Create using the profile's policy
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>   Upload input, prompt, skills + schema*
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>   Run the agent using gateway inference
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>              |
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>              v
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>3. COLLECT · your machine / CI
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>   Download and validate the result
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>   Pass --&gt; save to --output
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>   Fail --&gt; keep existing output
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>              |
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>              v
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>4. CLEAN UP · on success or failure
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>   Verify ownership, then delete sandbox
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>   --keep-sandbox skips deletion
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>   Gateway stays running
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>* If the selected task declares a schema.
+</span></code></pre></div>
 <p>OAR downloads only the result, which must be non-empty and no larger than
 1 MiB. For a JSON task, it must also match the
 <a href="../profiles/#choose-the-result-format">schema named by the profile task</a>. OAR
 replaces the host output only after validation succeeds; a failed download or
 invalid result leaves an existing output untouched.</p>
-<p>Cleanup also runs after failures. OAR checks the sandbox name and its
-<code>oar-run-id</code> ownership label before deleting it. <code>--keep-sandbox</code> skips deletion.
-A cleanup failure can occur after the result has already been saved.</p>
+<p>Once sandbox creation is attempted, any failure skips the remaining steps and
+goes to cleanup. OAR checks the sandbox name and its <code>oar-run-id</code> ownership label
+before deleting it; if that check fails, it leaves the sandbox alone.
+<code>--keep-sandbox</code> skips deletion. Cleanup can fail after the result has already
+been saved; it does not undo that output.</p>
 <h2 id="use-oar-in-ci">Use OAR in CI</h2>
 <p>A CI job uses the same <code>oar run</code> command as a terminal. Install OAR and OpenShell,
 make the gateway and inference route available, then run the profile and retain
