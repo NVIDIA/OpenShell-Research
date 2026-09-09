@@ -23,6 +23,17 @@ openshell=(openshell --gateway "$gateway")
 run() {
   if $print_only; then printf '%q ' "$@"; printf '\n'; else "$@"; fi
 }
+registration() {
+  run uv run --frozen python "$example/gateway-registration.py" "$1" --state "$state" --gateway "$gateway"
+  if $print_only; then
+    printf '# Helper edits only pi-egress, waits for health, and internally runs: '
+    case "$OSTYPE" in
+      darwin*) run brew services restart openshell ;;
+      linux*) run systemctl --user restart openshell-gateway ;;
+      *) printf 'no supported service manager\n' ;;
+    esac
+  fi
+}
 cd "$project"
 case "$action" in
   prepare)
@@ -49,6 +60,10 @@ case "$action" in
     ;;
   registration)
     run cat "$state/middleware.toml"
+    ;;
+  register|unregister)
+    if ! $print_only; then : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}"; fi
+    registration "$action"
     ;;
   setup)
     if ! $print_only; then
@@ -89,18 +104,21 @@ case "$action" in
       run "${openshell[@]}" provider profile delete "pi-admission-$provider"
     done
     run uv run --frozen python -c 'import pathlib,sys; pathlib.Path(sys.argv[1]).unlink(missing_ok=True)' "$state/sandbox-id"
-    printf 'Sandbox and its sessions removed. Stop serve with Ctrl-C; the gateway is unchanged.\n'
+    registration unregister
+    printf 'Sandbox and its sessions removed. Stop serve with Ctrl-C.\n'
     printf 'Host configuration remains in %s; the local Docker image is retained.\n' "$state"
     ;;
   help)
     printf 'Usage: ./demo.sh [--print] ACTION\n\n'
     printf '  prepare  Generate service TLS/config; build the Pi image\n'
     printf '  serve    Run Egress Gate (keep this terminal open)\n'
-    printf '  registration  Print middleware config for your gateway operator\n'
+    printf '  register  Add middleware to the local gateway and restart it\n'
+    printf '  unregister  Remove that registration and restart the gateway\n'
+    printf '  registration  Show the TOML entry (manual deployments only; does not register)\n'
     printf '  setup    Create providers and sandbox; bind admission identity\n'
     printf '  launch   Start a new interactive Pi-powered session\n'
     printf '  verify   Run real allow/deny/redact, tools, skill, compaction and bypass checks\n'
-    printf '  cleanup  Delete this sandbox/providers, including saved sessions\n'
+    printf '  cleanup  Delete sandbox/providers/sessions; unregister middleware\n'
     printf '\n--print shows commands without executing .env, requiring secrets, or changing state.\n'
     ;;
   *) echo "Unknown action. Run ./demo.sh help." >&2; exit 2 ;;

@@ -19,8 +19,10 @@ proxy credential delivery. This example does not install or start OpenShell.
 Also needed: Bash, Python 3.11+, uv 0.11+, Docker, and a real key for a text-only
 Chat Completions model. The simple image workflow assumes your gateway's Docker
 driver uses the same Docker daemon as `docker build`. Remote drivers/image
-distribution are outside this example. The host no longer has to be Linux;
-Linux has been tested, while macOS execution remains unverified.
+distribution are outside this example. The same commands below work with a local,
+installer-managed gateway on macOS or Linux; the helper selects its config and
+service manager automatically. Remote and custom gateway deployments require
+operator-managed registration (see below).
 
 From this directory:
 
@@ -30,7 +32,6 @@ cp model.json.example model.json
 # Fill in the gateway name, reachable Egress Gate host, and model API key.
 # Edit model.json for your endpoint, model ID, and token limits (see below).
 ./demo.sh prepare
-./demo.sh registration
 ```
 
 Create your own `model.json` from [model.json.example](model.json.example).
@@ -69,8 +70,7 @@ its bridge address. Do not use `localhost` when callers are in containers.
 Preparation builds the pinned Pi **0.85.1** image and writes service TLS,
 policy and provider profiles under `../../.workspaces/pi-admission/`.
 The discovered public key is saved there as `gateway-public.pem`. No fork clones,
-gateway binaries, gateway private keys or full gateway configuration are created.
-`registration` prints only the middleware entry to add.
+gateway binaries or gateway private keys are created.
 
 Keep Egress Gate running in one terminal:
 
@@ -78,19 +78,32 @@ Keep Egress Gate running in one terminal:
 ./demo.sh serve
 ```
 
-Have the operator merge the printed entry into the existing gateway's
-configuration. Make `tls/ca.crt` readable to the gateway (copy or mount the
-public certificate if needed) and adjust `tls_ca_cert_path` in the entry to
-that gateway-visible path. Restart the gateway through its usual service
-manager to load the registration; coordinate this on a shared gateway.
-The demo never edits or restarts it.
-
 In a second terminal, from this directory:
 
 ```sh
+./demo.sh register
 ./demo.sh setup
 ./demo.sh launch
 ```
+
+`register` finds the local gateway's config, adds only `pi-egress`, restarts the
+gateway through its service manager, and waits for gateway health. It preserves
+unrelated settings and refuses to overwrite a registration it did not create.
+If the installation uses built-in defaults without a config file, it creates a
+minimal one for this registration. You do not need to choose a config path or
+run service-manager commands yourself.
+**Registration and cleanup briefly interrupt this gateway.** Coordinate this
+if anyone else uses it. No OpenShell changes or additional `.env` settings are
+needed for the standard installation.
+
+Automatic service handling supports Homebrew and the DEB/RPM user service.
+Other service layouts (including Snap and custom config overrides) are
+operator-managed; the helper does not guess their config or request root access.
+
+For other deployments, `./demo.sh registration` only **prints** the TOML entry;
+it does not install it. The gateway operator must merge it into the active config,
+make the public `tls/ca.crt` accessible at `tls_ca_cert_path`, and restart the
+gateway. Those operator-managed registrations must also be removed manually.
 
 `setup` displays the selected gateway and creates the `pi-admission` sandbox
 and its two provider profiles/instances. Reserve those names for this demo.
@@ -102,8 +115,10 @@ or printing secrets:
 
 ```sh
 ./demo.sh --print prepare
+./demo.sh --print register
 ./demo.sh --print setup
 ./demo.sh --print launch
+./demo.sh --print cleanup
 ```
 
 Print mode uses exported configuration or placeholders because it does not load
@@ -113,6 +128,8 @@ remain outside the image and repository.
 
 **Validation status:** local cross-language integration passes, but the complete
 existing-gateway workflow with a valid model key remains to be verified.
+Registration lifecycle tests cover both supported service managers; live
+service-manager execution remains unverified.
 `./demo.sh verify` below is that separate real-model acceptance check.
 
 ## What to try
@@ -166,17 +183,19 @@ compaction. It exits unsuccessfully on any missing capability or failed check;
 it does not skip checks or substitute a mock model. Deterministic failure and
 pending-admission tests live in [app/test/](app/test/).
 
-Cleanup deletes only this demo sandbox and its provider instances/profiles.
+Cleanup deletes only this demo sandbox and its provider instances/profiles,
+then removes the registration created by `register` and restarts the gateway.
 **Sandbox files and sessions are deleted and are not recoverable by this script.**
-Copy out anything wanted first, then stop `serve` with Ctrl-C. The gateway and
-its middleware registration are left untouched; the operator can remove the
-registration when the demo is no longer needed. Host configuration and the local
-Docker image remain for reuse.
+Copy out anything wanted first, then stop `serve` with Ctrl-C. Host configuration
+and the local Docker image remain for reuse. To remove only the registration
+(without deleting the sandbox), use `./demo.sh unregister`. This also works
+after a failed registration restart; fix the service problem and retry.
 
 For source/model/policy changes, clean up the old demo sandbox, run `prepare`,
-restart `serve`, then run `setup`. Valid service certificates are reused for
-the same host. After 30 days or a host change, `prepare` generates new service
-TLS: install the new CA in the gateway and restart it before setup. Refresh the
+restart `serve`, then run `register` and `setup`. Valid service certificates are
+reused for the same host. After 30 days or a host change, `prepare` generates new service
+TLS: rerun `register` to reload the new CA before setup (other deployments must
+update their gateway-visible CA and restart manually). Refresh the
 gateway identity by rerunning `prepare` and restarting `serve` if the gateway
 rotates its signing key. Discovery currently expects one published signing key.
 

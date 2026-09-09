@@ -6,6 +6,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import os
+import runpy
 import shutil
 import ssl
 import subprocess
@@ -145,6 +146,8 @@ def test_every_action_prints_without_secrets_or_side_effects(tmp_path: Path) -> 
         "prepare",
         "serve",
         "registration",
+        "register",
+        "unregister",
         "setup",
         "launch",
         "verify",
@@ -168,7 +171,6 @@ def test_every_action_prints_without_secrets_or_side_effects(tmp_path: Path) -> 
     assert not marker.exists()
     assert not (tmp_path / ".workspaces").exists()
     assert "git clone" not in output
-    assert "openshell-gateway" not in output
     assert "sha256sum" not in output and "curl" not in output
     assert "--gateway test-gateway" in output
     assert "https://service.example:5443/v1/admission" in output
@@ -184,6 +186,140 @@ def test_every_action_prints_without_secrets_or_side_effects(tmp_path: Path) -> 
     assert "sandbox create" in output and "--from pi-admission:local" in output
     assert "/app/dist/src/cli.js" in output and "/app/dist/src/verify.js" in output
     assert "sandbox delete pi-admission" in output
+    assert "gateway-registration.py" in output
+    assert (
+        "brew services restart openshell"
+        if sys.platform == "darwin"
+        else "systemctl --user restart openshell-gateway"
+    ) in output
+
+
+@pytest.mark.parametrize(
+    "installation", ["homebrew-prefix", "homebrew-user", "systemd", "systemd-defaults"]
+)
+def test_installer_registration_round_trip(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, installation: str
+) -> None:
+    configure = runpy.run_path(str(EXAMPLE / "gateway-registration.py"))["configure"]
+    homebrew = installation.startswith("homebrew")
+    monkeypatch.setattr(sys, "platform", "darwin" if homebrew else "linux")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.delenv("OPENSHELL_GATEWAY_CONFIG", raising=False)
+    prefix_config = tmp_path / "brew/var/openshell/gateway.toml"
+    prefix_config.parent.mkdir(parents=True)
+    original = (
+        "# Keep my comments\n[openshell]\nversion = 1\n"
+        '[openshell.gateway]\nbind_address = "127.0.0.1:17670"\n'
+        '[[openshell.supervisor.middleware]]\nname = "other"\n'
+        'grpc_endpoint = "http://localhost:1234"\n'
+    )
+    prefix_config.write_text(original)
+    config = prefix_config
+    if installation != "homebrew-prefix":
+        config = tmp_path / "config/openshell/gateway.toml"
+        config.parent.mkdir(parents=True)
+        config.write_text(original)
+    if installation == "systemd-defaults":
+        config.unlink()
+        original = "[openshell]\nversion = 1\n"
+    state = tmp_path / "state"
+    state.mkdir()
+    fragment = (
+        '[[openshell.supervisor.middleware]]\nname = "pi-egress"\n'
+        'grpc_endpoint = "https://service.example:50051"\n'
+        'tls_ca_cert_path = "/demo/tls/ca.crt"\n'
+        'audience = "urn:openshell:extension:middleware:pi-egress"\n'
+        'max_payload_bytes = 4194304\ntimeout = "10s"\n'
+    )
+    (state / "middleware.toml").write_text(fragment)
+    commands: list[tuple[str, ...]] = []
+    endpoint = "https://localhost:17670"
+    fail_restart = False
+    restart = (
+        ["brew", "services", "restart", "openshell"]
+        if homebrew
+        else ["systemctl", "--user", "restart", "openshell-gateway"]
+    )
+
+    def output(command: tuple[str, ...], **_kwargs: object) -> str:
+        commands.append(command)
+        if command == ("brew", "--prefix"):
+            assert homebrew
+            return str(tmp_path / "brew")
+        if command == (
+            "systemctl",
+            "--user",
+            "show",
+            "openshell-gateway",
+            "--property=LoadState",
+            "--value",
+        ):
+            assert not homebrew
+            return "loaded\n"
+        assert command == ("openshell", "gateway", "list", "--output", "json")
+        return json.dumps([{"name": "openshell", "endpoint": endpoint}])
+
+    def run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        commands.append(tuple(command))
+        if command == restart:
+            if fail_restart:
+                raise subprocess.CalledProcessError(1, command)
+            return subprocess.CompletedProcess(command, 0)
+        assert command == [
+            "openshell",
+            "--gateway",
+            "openshell",
+            "gateway",
+            "info",
+            "--output",
+            "json",
+        ]
+        return subprocess.CompletedProcess(command, 0, '{"status":"healthy"}')
+
+    monkeypatch.setattr(subprocess, "check_output", output)
+    monkeypatch.setattr(subprocess, "run", run)
+    # Never modify a local service when the selected gateway is remote.
+    endpoint = "https://remote.example:17670"
+    with pytest.raises(ValueError, match="local installer-managed gateway"):
+        configure("register", state, "openshell")
+    if installation == "systemd-defaults":
+        assert not config.exists()
+    else:
+        assert config.read_text() == original
+    endpoint = "https://localhost:17670"
+    # Refuse to take over an operator's pre-existing registration, even if identical.
+    config.write_text(original + fragment)
+    with pytest.raises(ValueError, match="refusing to overwrite"):
+        configure("register", state, "openshell")
+    config.write_text(original)
+    if installation == "systemd-defaults":
+        config.unlink()
+    fail_restart = True
+    with pytest.raises(subprocess.CalledProcessError):
+        configure("register", state, "openshell")
+    assert (state / "gateway-registration.json").exists()
+    fail_restart = False
+    configure("register", state, "openshell")
+    registered = config.read_text()
+    assert registered.startswith(original)
+    assert registered.count('name = "pi-egress"') == 1
+    assert (
+        tomllib.loads(registered)["openshell"]["supervisor"]["middleware"][-1]
+        == (tomllib.loads(fragment)["openshell"]["supervisor"]["middleware"][0])
+    )
+    fail_restart = True
+    with pytest.raises(subprocess.CalledProcessError):
+        configure("unregister", state, "openshell")
+    assert (state / "gateway-registration.json").exists()
+    fail_restart = False
+    configure("unregister", state, "openshell")
+    assert config.read_text().strip() == original.strip()
+    assert not (state / "gateway-registration.json").exists()
+    before = len(commands)
+    configure("unregister", state, "openshell")
+    assert len(commands) == before
+    if installation == "homebrew-user":
+        assert prefix_config.read_text() == original
 
 
 def test_prepare_requires_operator_model_configuration(tmp_path: Path) -> None:
