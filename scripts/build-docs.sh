@@ -38,3 +38,4 @@ REQUIRE_RENDERED_AGENT_MARKDOWN=1 python tests/test_agent_markdown.py
 REQUIRE_RENDERED_404=1 python tests/test_docs_404.py
 REQUIRE_RENDERED_NAVIGATION=1 python tests/test_navigation_drawer.py
 REQUIRE_RENDERED_PAGE_NAVIGATION=1 python tests/test_page_navigation.py
+REQUIRE_RENDERED_SEO=1 python -m pytest -q tests/test_docs_seo.py
