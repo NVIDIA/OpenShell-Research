@@ -5,6 +5,9 @@ description: Agent instructions for maintaining the OpenShell Research documenta
 
 # Documentation site development
 
+For automated dependency policy checks, see
+[Dependency License Checks](dependency-licenses.md).
+
 Follow these instructions for changes under `docs/`, a project's `docs/` tree,
 `zensical.toml`, the Dev Notes renderer, or the documentation workflow. Run
 commands from the repository root. Use Python 3.10 or newer.
@@ -87,7 +90,9 @@ project site prefix.
 Run the renderer tests and the same clean build used by CI:
 
 ```sh
-python3 tests/test_render_dev_notes.py
+uv run --python 3.12 --with pytest==8.4.2 pytest -q \
+  tests/test_agent_markdown.py tests/test_docs_404.py \
+  tests/test_render_dev_notes.py tests/test_stage_project_docs.py
 scripts/build-docs.sh
 ```
 

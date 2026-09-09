@@ -27,6 +27,8 @@ read `docs/development/index.md`.
   command execution unless a project explicitly documents an exception. Treat
   `pyproject.toml` and the committed `uv.lock` as the dependency sources of truth.
 - Use absolute imports in Python code. Do not use relative imports.
+- Always use pytest for Python tests. Prefer flat test functions over test
+  methods nested in test classes.
 - At Python module scope, place public constants, classes, and functions before
   private underscore-prefixed definitions. Keep entry-point guards last.
 - Do not add `requirements.txt` or another generated dependency export by
