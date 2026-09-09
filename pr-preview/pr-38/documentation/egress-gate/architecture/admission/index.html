@@ -1728,9 +1728,13 @@ Only the gateway name, reachable service host and model key are supplied by the
 operator. Discovery requires one published signing key and refuses plaintext,
 cross-origin key URLs and untrusted TLS; browser/edge-login gateways are outside
 this POC helper's scope. Host setup generates service TLS, one admission bearer
-credential, provider destination and policy; setup reads the actual sandbox ID. It prints
-a middleware registration for the operator to install and does not generate
-gateway credentials, download OpenShell binaries, or restart the gateway.
+credential, provider destination and policy; setup reads the actual sandbox ID.
+For local installer-managed gateways, the same <code>register</code> command selects the
+config and service manager (Homebrew or the DEB/RPM user service), adds the demo's
+middleware entry, and restarts the gateway; <code>cleanup</code> removes that entry and
+restarts it again. Other deployments use the printed
+registration with their own gateway operator. The demo does not generate
+gateway credentials or download OpenShell binaries.
 The sandbox cannot select its authoritative
 identity or submit a policy. The single host-owned identity file is populated
 after sandbox creation; until then admission is unavailable. There is no
