@@ -98,7 +98,7 @@ class ReceiptAuthority:
         policy_fingerprint: str,
         now: int | None = None,
     ) -> bytes:
-        """Issue a retry-safe proof retained by the OpenShell supervisor."""
+        """Issue a retry-safe approval receipt for a provider-context projection."""
         if (
             context.harness_version != "sdk-v1"
             or context.hook is not AdmissionHook.PROVIDER_CONTEXT
@@ -140,7 +140,7 @@ class ReceiptAuthority:
         policy_fingerprint: str,
         now: int | None = None,
     ) -> AgentAttestationClaimsV2:
-        """Verify a supervisor-supplied provider-context attestation."""
+        """Verify a receipt against authoritative context and intercepted content."""
         payload, signature = _decode_token(
             attestation, prefix=b"ag2", malformed_reason="attestation_malformed"
         )

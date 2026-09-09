@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 from typing import Literal
 
 from pydantic import ValidationError
@@ -26,12 +28,15 @@ from egress_gate.admission.models import (
     HarnessAdmissionResult,
 )
 from egress_gate.admission.receipts import ReceiptAuthority, ReceiptVerificationError
+from egress_gate.constants import MAX_AGENT_ATTESTATION_BYTES
 from egress_gate.errors import EgressGateError, GateError, TimeoutExpiredError
 from egress_gate.request import (
     EnforcementPoint,
     HarnessAdmissionMetadata,
     HttpRequest,
+    RemoveHeaderMutation,
     RequestContext,
+    RequestMutations,
 )
 from egress_gate.request_processor import RequestProcessor, apply_request_mutations
 from egress_gate.result import (
@@ -42,7 +47,7 @@ from egress_gate.result import (
 )
 from egress_gate.timeout import Timeout
 
-RECEIPT_HEADER = "x-openshell-middleware-egress-receipt"
+RECEIPT_HEADER = "x-egress-admission"
 
 
 class HarnessAdmissionProcessor:
@@ -176,16 +181,39 @@ class AttestedEgressProcessor:
         self,
         request: HttpRequest,
         *,
-        agent_attestation: bytes,
         timeout: Timeout,
     ) -> EgressResult:
         """Deny any unattested or semantically changed provider request."""
         if request.context.enforcement_point is not EnforcementPoint.NETWORK_EGRESS:
             return self._deny("network_context_invalid")
-        if any(header.name.lower() == RECEIPT_HEADER for header in request.headers):
-            return self._deny("reserved_header_present")
-        if not agent_attestation:
+        receipts = [
+            h.value for h in request.headers if h.name.lower() == RECEIPT_HEADER
+        ]
+        if not receipts:
             return self._deny("attestation_missing")
+        if (
+            len(receipts) != 1
+            or len(receipts[0]) > MAX_AGENT_ATTESTATION_BYTES * 4 // 3 + 4
+        ):
+            return self._deny("attestation_malformed")
+        try:
+            agent_attestation = base64.b64decode(
+                receipts[0], altchars=b"-_", validate=True
+            )
+        except (ValueError, binascii.Error):
+            return self._deny("attestation_malformed")
+        if (
+            not agent_attestation
+            or len(agent_attestation) > MAX_AGENT_ATTESTATION_BYTES
+        ):
+            return self._deny("attestation_malformed")
+        request = request.model_copy(
+            update={
+                "headers": tuple(
+                    h for h in request.headers if h.name.lower() != RECEIPT_HEADER
+                )
+            }
+        )
         try:
             adapter = self._provider_adapters.resolve_request(request, timeout)
             entries = adapter.attested_entries(request, timeout)
@@ -221,7 +249,17 @@ class AttestedEgressProcessor:
             if final_entries != entries:
                 return self._deny("semantic_mutation_denied")
             timeout.raise_if_expired()
-            return gate_result
+            return gate_result.model_copy(
+                update={
+                    "request_mutations": RequestMutations(
+                        replacement_body=gate_result.request_mutations.replacement_body,
+                        header_mutations=(
+                            *gate_result.request_mutations.header_mutations,
+                            RemoveHeaderMutation(kind="remove", name=RECEIPT_HEADER),
+                        ),
+                    )
+                }
+            )
         except ReceiptVerificationError as error:
             return self._deny(error.reason_code)
         except TimeoutExpiredError:

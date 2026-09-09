@@ -3,8 +3,8 @@
 import grpc
 import warnings
 
+from egress_gate.bindings import supervisor_middleware_pb2 as egress__gate_dot_bindings_dot_supervisor__middleware__pb2
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
-from . import supervisor_middleware_pb2 as supervisor__middleware__pb2
 
 GRPC_GENERATED_VERSION = '1.81.1'
 GRPC_VERSION = grpc.__version__
@@ -19,7 +19,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in supervisor_middleware_pb2_grpc.py depends on'
+        + ' but the generated code in egress_gate/bindings/supervisor_middleware_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -27,10 +27,9 @@ if _version_not_supported:
 
 
 class SupervisorMiddlewareStub:
-    """SupervisorMiddleware discovers and configures one operator-run middleware.
-    It evaluates HTTP requests, HTTP responses, WebSocket messages, and supported
-    agent-harness requests at their declared phases.
-    Phase-specific services share the same registration.
+    """SupervisorMiddleware lets an operator-run service inspect and transform
+    sandbox HTTP requests and client WebSocket text messages before OpenShell
+    injects credentials.
     """
 
     def __init__(self, channel):
@@ -42,35 +41,29 @@ class SupervisorMiddlewareStub:
         self.Describe = channel.unary_unary(
                 '/openshell.middleware.v1.SupervisorMiddleware/Describe',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=supervisor__middleware__pb2.MiddlewareManifest.FromString,
+                response_deserializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.MiddlewareManifest.FromString,
                 _registered_method=True)
         self.ValidateConfig = channel.unary_unary(
                 '/openshell.middleware.v1.SupervisorMiddleware/ValidateConfig',
-                request_serializer=supervisor__middleware__pb2.ValidateConfigRequest.SerializeToString,
-                response_deserializer=supervisor__middleware__pb2.ValidateConfigResponse.FromString,
+                request_serializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.ValidateConfigRequest.SerializeToString,
+                response_deserializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.ValidateConfigResponse.FromString,
                 _registered_method=True)
         self.EvaluateHttpRequest = channel.unary_unary(
                 '/openshell.middleware.v1.SupervisorMiddleware/EvaluateHttpRequest',
-                request_serializer=supervisor__middleware__pb2.HttpRequestEvaluation.SerializeToString,
-                response_deserializer=supervisor__middleware__pb2.HttpRequestResult.FromString,
-                _registered_method=True)
-        self.EvaluateAgentConversation = channel.unary_unary(
-                '/openshell.middleware.v1.SupervisorMiddleware/EvaluateAgentConversation',
-                request_serializer=supervisor__middleware__pb2.AgentConversationEvaluation.SerializeToString,
-                response_deserializer=supervisor__middleware__pb2.AgentConversationResult.FromString,
+                request_serializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.HttpRequestEvaluation.SerializeToString,
+                response_deserializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.HttpRequestResult.FromString,
                 _registered_method=True)
         self.EvaluateWebSocketSession = channel.stream_stream(
                 '/openshell.middleware.v1.SupervisorMiddleware/EvaluateWebSocketSession',
-                request_serializer=supervisor__middleware__pb2.WebSocketSessionEvent.SerializeToString,
-                response_deserializer=supervisor__middleware__pb2.WebSocketSessionEventResult.FromString,
+                request_serializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.WebSocketSessionEvent.SerializeToString,
+                response_deserializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.WebSocketSessionEventResult.FromString,
                 _registered_method=True)
 
 
 class SupervisorMiddlewareServicer:
-    """SupervisorMiddleware discovers and configures one operator-run middleware.
-    It evaluates HTTP requests, HTTP responses, WebSocket messages, and supported
-    agent-harness requests at their declared phases.
-    Phase-specific services share the same registration.
+    """SupervisorMiddleware lets an operator-run service inspect and transform
+    sandbox HTTP requests and client WebSocket text messages before OpenShell
+    injects credentials.
     """
 
     def Describe(self, request, context):
@@ -95,14 +88,6 @@ class SupervisorMiddlewareServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def EvaluateAgentConversation(self, request, context):
-        """EvaluateAgentConversation returns an allow, deny, or replacement decision for
-        one versioned, harness-native request before the harness commits or sends it.
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def EvaluateWebSocketSession(self, request_iterator, context):
         """EvaluateWebSocketSession opens one ordered, phase-specific stream for a
         single middleware stage and WebSocket upgrade attempt. The current
@@ -122,27 +107,22 @@ def add_SupervisorMiddlewareServicer_to_server(servicer, server):
             'Describe': grpc.unary_unary_rpc_method_handler(
                     servicer.Describe,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=supervisor__middleware__pb2.MiddlewareManifest.SerializeToString,
+                    response_serializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.MiddlewareManifest.SerializeToString,
             ),
             'ValidateConfig': grpc.unary_unary_rpc_method_handler(
                     servicer.ValidateConfig,
-                    request_deserializer=supervisor__middleware__pb2.ValidateConfigRequest.FromString,
-                    response_serializer=supervisor__middleware__pb2.ValidateConfigResponse.SerializeToString,
+                    request_deserializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.ValidateConfigRequest.FromString,
+                    response_serializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.ValidateConfigResponse.SerializeToString,
             ),
             'EvaluateHttpRequest': grpc.unary_unary_rpc_method_handler(
                     servicer.EvaluateHttpRequest,
-                    request_deserializer=supervisor__middleware__pb2.HttpRequestEvaluation.FromString,
-                    response_serializer=supervisor__middleware__pb2.HttpRequestResult.SerializeToString,
-            ),
-            'EvaluateAgentConversation': grpc.unary_unary_rpc_method_handler(
-                    servicer.EvaluateAgentConversation,
-                    request_deserializer=supervisor__middleware__pb2.AgentConversationEvaluation.FromString,
-                    response_serializer=supervisor__middleware__pb2.AgentConversationResult.SerializeToString,
+                    request_deserializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.HttpRequestEvaluation.FromString,
+                    response_serializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.HttpRequestResult.SerializeToString,
             ),
             'EvaluateWebSocketSession': grpc.stream_stream_rpc_method_handler(
                     servicer.EvaluateWebSocketSession,
-                    request_deserializer=supervisor__middleware__pb2.WebSocketSessionEvent.FromString,
-                    response_serializer=supervisor__middleware__pb2.WebSocketSessionEventResult.SerializeToString,
+                    request_deserializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.WebSocketSessionEvent.FromString,
+                    response_serializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.WebSocketSessionEventResult.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -153,10 +133,9 @@ def add_SupervisorMiddlewareServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class SupervisorMiddleware:
-    """SupervisorMiddleware discovers and configures one operator-run middleware.
-    It evaluates HTTP requests, HTTP responses, WebSocket messages, and supported
-    agent-harness requests at their declared phases.
-    Phase-specific services share the same registration.
+    """SupervisorMiddleware lets an operator-run service inspect and transform
+    sandbox HTTP requests and client WebSocket text messages before OpenShell
+    injects credentials.
     """
 
     @staticmethod
@@ -175,88 +154,7 @@ class SupervisorMiddleware:
             target,
             '/openshell.middleware.v1.SupervisorMiddleware/Describe',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            supervisor__middleware__pb2.MiddlewareManifest.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-
-class HttpResponsePreReturnStub:
-    """HttpResponsePreReturn evaluates one response for one middleware stage before
-    OpenShell returns it to the sandbox.
-    """
-
-    def __init__(self, channel):
-        """Constructor.
-
-        Args:
-            channel: A grpc.Channel.
-        """
-        self.Evaluate = channel.stream_stream(
-                '/openshell.middleware.v1.HttpResponsePreReturn/Evaluate',
-                request_serializer=supervisor__middleware__pb2.HttpResponseEvent.SerializeToString,
-                response_deserializer=supervisor__middleware__pb2.HttpResponseEventResult.FromString,
-                _registered_method=True)
-
-
-class HttpResponsePreReturnServicer:
-    """HttpResponsePreReturn evaluates one response for one middleware stage before
-    OpenShell returns it to the sandbox.
-    """
-
-    def Evaluate(self, request_iterator, context):
-        """Evaluate starts with preflight and may continue with selected body units
-        and trailers. A body unit marked end_of_stream ends body inspection, not
-        the event stream. Trailers and one best-effort session_end may follow.
-        """
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-
-def add_HttpResponsePreReturnServicer_to_server(servicer, server):
-    rpc_method_handlers = {
-            'Evaluate': grpc.stream_stream_rpc_method_handler(
-                    servicer.Evaluate,
-                    request_deserializer=supervisor__middleware__pb2.HttpResponseEvent.FromString,
-                    response_serializer=supervisor__middleware__pb2.HttpResponseEventResult.SerializeToString,
-            ),
-    }
-    generic_handler = grpc.method_handlers_generic_handler(
-            'openshell.middleware.v1.HttpResponsePreReturn', rpc_method_handlers)
-    server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('openshell.middleware.v1.HttpResponsePreReturn', rpc_method_handlers)
-
-
- # This class is part of an EXPERIMENTAL API.
-class HttpResponsePreReturn:
-    """HttpResponsePreReturn evaluates one response for one middleware stage before
-    OpenShell returns it to the sandbox.
-    """
-
-    @staticmethod
-    def Evaluate(request_iterator,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.stream_stream(
-            request_iterator,
-            target,
-            '/openshell.middleware.v1.HttpResponsePreReturn/Evaluate',
-            supervisor__middleware__pb2.HttpResponseEvent.SerializeToString,
-            supervisor__middleware__pb2.HttpResponseEventResult.FromString,
+            egress__gate_dot_bindings_dot_supervisor__middleware__pb2.MiddlewareManifest.FromString,
             options,
             channel_credentials,
             insecure,
@@ -282,8 +180,8 @@ class HttpResponsePreReturn:
             request,
             target,
             '/openshell.middleware.v1.SupervisorMiddleware/ValidateConfig',
-            supervisor__middleware__pb2.ValidateConfigRequest.SerializeToString,
-            supervisor__middleware__pb2.ValidateConfigResponse.FromString,
+            egress__gate_dot_bindings_dot_supervisor__middleware__pb2.ValidateConfigRequest.SerializeToString,
+            egress__gate_dot_bindings_dot_supervisor__middleware__pb2.ValidateConfigResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -309,35 +207,8 @@ class HttpResponsePreReturn:
             request,
             target,
             '/openshell.middleware.v1.SupervisorMiddleware/EvaluateHttpRequest',
-            supervisor__middleware__pb2.HttpRequestEvaluation.SerializeToString,
-            supervisor__middleware__pb2.HttpRequestResult.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def EvaluateAgentConversation(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/openshell.middleware.v1.SupervisorMiddleware/EvaluateAgentConversation',
-            supervisor__middleware__pb2.AgentConversationEvaluation.SerializeToString,
-            supervisor__middleware__pb2.AgentConversationResult.FromString,
+            egress__gate_dot_bindings_dot_supervisor__middleware__pb2.HttpRequestEvaluation.SerializeToString,
+            egress__gate_dot_bindings_dot_supervisor__middleware__pb2.HttpRequestResult.FromString,
             options,
             channel_credentials,
             insecure,
@@ -363,8 +234,8 @@ class HttpResponsePreReturn:
             request_iterator,
             target,
             '/openshell.middleware.v1.SupervisorMiddleware/EvaluateWebSocketSession',
-            supervisor__middleware__pb2.WebSocketSessionEvent.SerializeToString,
-            supervisor__middleware__pb2.WebSocketSessionEventResult.FromString,
+            egress__gate_dot_bindings_dot_supervisor__middleware__pb2.WebSocketSessionEvent.SerializeToString,
+            egress__gate_dot_bindings_dot_supervisor__middleware__pb2.WebSocketSessionEventResult.FromString,
             options,
             channel_credentials,
             insecure,

@@ -53,7 +53,7 @@ class ProviderShapeError(ValueError):
 
 
 PiMessageOrigin: TypeAlias = Literal[
-    "user", "compaction_summary", "branch_summary", "extension_message"
+    "user", "system", "compaction_summary", "branch_summary", "extension_message"
 ]
 
 
@@ -953,6 +953,7 @@ def create_pi_adapter_registry() -> HarnessAdapterRegistry:
     registry = HarnessAdapterRegistry()
     for hook, origin in (
         (AdmissionHook.USER_MESSAGE, "user"),
+        (AdmissionHook.SYSTEM_CONTEXT, "system"),
         (AdmissionHook.COMPACTION_SUMMARY, "compaction_summary"),
         (AdmissionHook.BRANCH_SUMMARY, "branch_summary"),
         (AdmissionHook.EXTENSION_MESSAGE, "extension_message"),

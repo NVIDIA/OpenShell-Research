@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 from typing import Literal
@@ -338,11 +339,19 @@ def _egress(
     request: HttpRequest,
     attestation: bytes | None,
 ):
-    return processor.process(
-        request,
-        agent_attestation=attestation or b"",
-        timeout=Timeout.from_seconds(1),
-    )
+    if attestation:
+        request = request.model_copy(
+            update={
+                "headers": (
+                    *request.headers,
+                    HttpHeader(
+                        name=RECEIPT_HEADER,
+                        value=base64.urlsafe_b64encode(attestation).decode(),
+                    ),
+                )
+            }
+        )
+    return processor.process(request, timeout=Timeout.from_seconds(1))
 
 
 def _admit_provider_request(
@@ -872,7 +881,7 @@ def test_qwen_replay_fields_fail_closed_unless_explicitly_supported(mutation) ->
     assert result.reason_code == "provider_shape_unsupported"
 
 
-def test_workload_receipt_header_is_reserved_in_managed_flow() -> None:
+def test_duplicate_receipt_header_is_denied_in_managed_flow() -> None:
     admission, egress, _ = _processors()
     request = _provider_request(
         "safe",
@@ -882,4 +891,4 @@ def test_workload_receipt_header_is_reserved_in_managed_flow() -> None:
 
     result = _egress(egress, request, admitted.attestation)
 
-    assert result.reason_code == "reserved_header_present"
+    assert result.reason_code == "attestation_malformed"

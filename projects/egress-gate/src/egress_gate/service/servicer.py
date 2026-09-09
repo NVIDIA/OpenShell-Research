@@ -12,23 +12,20 @@ import time
 from collections.abc import Callable, Iterable
 from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Lock
-from typing import Literal, Never, Protocol, TypedDict, TypeVar
+from typing import Never, Protocol, TypedDict, TypeVar
 
 import grpc
 from google.protobuf import json_format
 from google.protobuf.message import Message
 
 from egress_gate.admission import (
-    MAX_ADMISSION_BODY_BYTES,
     PI_HARNESS_VERSION,
     RECEIPT_HEADER,
-    AdmissionDecision,
-    AdmissionHook,
-    AdmissionProvenance,
     AttestedEgressProcessor,
     HarnessAdmissionContext,
     HarnessAdmissionProcessor,
     HarnessAdmissionRequest,
+    HarnessAdmissionResult,
     ReceiptAuthority,
     create_pi_adapter_registry,
     create_provider_adapter_registry,
@@ -41,7 +38,6 @@ from egress_gate.constants import (
     DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING,
     LIMIT_REASON,
     LIMIT_REASON_CODE,
-    MAX_AGENT_ATTESTATION_BYTES,
     MAX_BODY_BYTES,
     MAX_CONCURRENT_PROCESSING,
     MAX_PROTO_CONFIG_BYTES,
@@ -92,12 +88,6 @@ from egress_gate.timeout import (
 )
 
 
-def _require_harness_version(value: str) -> Literal["sdk-v1"]:
-    if value == PI_HARNESS_VERSION:
-        return value
-    raise ValueError("invalid admission harness version")
-
-
 class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
     """Validate, prepare, resolve, and run Egress Gate policies."""
 
@@ -107,6 +97,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         *,
         timeout_middleware_processing: float = DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING,
         require_agent_attestation: bool = False,
+        expected_audience: str = "",
     ) -> None:
         registry.configuration_json_schema()
         self._registry = registry
@@ -117,6 +108,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         self._receipt_authority = ReceiptAuthority()
         self._admission_adapters = create_pi_adapter_registry()
         self._require_agent_attestation = require_agent_attestation
+        self._expected_audience = expected_audience
         self._processing_slots = asyncio.Semaphore(MAX_CONCURRENT_PROCESSING)
         self._processing_executor = ThreadPoolExecutor(
             max_workers=MAX_CONCURRENT_PROCESSING,
@@ -147,25 +139,12 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         return pb2.MiddlewareManifest(
             name=SERVICE_NAME,
             service_version=SERVICE_VERSION,
+            expected_audience=self._expected_audience,
             bindings=[
                 pb2.MiddlewareBinding(
                     operation=pb2.SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_REQUEST,
                     phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS,
                     max_payload_bytes=MAX_BODY_BYTES,
-                ),
-                *(
-                    pb2.MiddlewareBinding(
-                        operation=pb2.SUPERVISOR_MIDDLEWARE_OPERATION_AGENT_CONVERSATION,
-                        phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_AGENT_CONTEXT,
-                        max_payload_bytes=MAX_ADMISSION_BODY_BYTES,
-                        harness=harness,
-                        hook=hook,
-                        schema_version=schema_version,
-                    )
-                    for harness, hook, schema_version in (
-                        self._admission_adapters.bindings
-                    )
-                    if self._require_agent_attestation
                 ),
             ],
         )
@@ -192,93 +171,24 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         """Resolve the prepared pipeline and evaluate one current request."""
         return await self._evaluate_rpc(request, context)
 
-    async def EvaluateAgentConversation(
+    async def admit(
         self,
-        request: pb2.AgentConversationEvaluation,
-        context: grpc.aio.ServicerContext[
-            pb2.AgentConversationEvaluation,
-            pb2.AgentConversationResult,
-        ],
-    ) -> pb2.AgentConversationResult:
-        """Evaluate one supervisor-stamped agent admission request."""
+        request: HarnessAdmissionRequest,
+        context: HarnessAdmissionContext,
+        policy: dict[str, object],
+    ) -> HarnessAdmissionResult:
+        """Evaluate a candidate with HTTP-service-owned identity and policy."""
+        if not self._require_agent_attestation:
+            raise ValueError("admission is disabled")
         timeout = Timeout.from_seconds(self._timeout_middleware_processing_seconds)
         return await self._run_in_worker(
-            lambda: self._evaluate_agent_admission(request, timeout),
-            timeout=timeout,
-        )
-
-    def _evaluate_agent_admission(
-        self,
-        request: pb2.AgentConversationEvaluation,
-        timeout: Timeout,
-    ) -> pb2.AgentConversationResult:
-        try:
-            if not self._require_agent_attestation:
-                raise ValueError("agent admission is disabled")
-            if request.phase != pb2.SUPERVISOR_MIDDLEWARE_PHASE_AGENT_CONTEXT:
-                raise ValueError("invalid admission phase")
-            if len(request.request_body) > MAX_ADMISSION_BODY_BYTES:
-                raise ValueError("admission request body is too large")
-            hook = AdmissionHook(request.target.hook)
-            target = HttpTarget(
-                scheme=request.target.scheme,
-                host=request.target.host,
-                port=request.target.port,
-                method="POST",
-                path=request.target.path,
-                query="",
-            )
-            provenance = AdmissionProvenance(
-                session_id=request.session_id,
-                submission_id=request.turn_id,
-            )
-            processor = HarnessAdmissionProcessor(
-                self._policy.processor_for(
-                    _mapping_from_proto(request.config), timeout=timeout
-                ),
+            lambda: HarnessAdmissionProcessor(
+                self._policy.processor_for(policy, timeout=timeout),
                 self._admission_adapters,
                 self._receipt_authority,
-            )
-            result = processor.process(
-                HarnessAdmissionRequest(
-                    request_body=request.request_body,
-                    provenance=provenance,
-                ),
-                HarnessAdmissionContext(
-                    request_id=request.context.request_id,
-                    sandbox_id=request.context.sandbox_id,
-                    middleware_name=request.middleware_name,
-                    harness=request.target.harness,
-                    harness_version=_require_harness_version(
-                        request.target.harness_version
-                    ),
-                    hook=hook,
-                    schema_version=request.target.schema_version,
-                    provider_target=target,
-                    provider_adapter_schema="openai.request.v1",
-                ),
-                timeout=timeout,
-            )
-            response = pb2.AgentConversationResult(
-                decision=(
-                    pb2.DECISION_DENY
-                    if result.decision is AdmissionDecision.DENY
-                    else pb2.DECISION_ALLOW
-                ),
-                reason_code=result.reason_code or "",
-                attestation=result.attestation or b"",
-                replacement_body=result.replacement_body or b"",
-                has_replacement_body=result.replacement_body is not None,
-            )
-            response.findings.extend(
-                _finding_to_proto(item) for item in result.findings
-            )
-            return response
-        except Exception:
-            return pb2.AgentConversationResult(
-                decision=pb2.DECISION_DENY,
-                reason_code="admission_unavailable",
-            )
+            ).process(request, context, timeout=timeout),
+            timeout=timeout,
+        )
 
     def _validate_config(
         self,
@@ -397,7 +307,6 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                 harness_version=PI_HARNESS_VERSION,
             ).process(
                 domain_request,
-                agent_attestation=request.agent_attestation,
                 timeout=timeout,
             )
         if any(
@@ -620,7 +529,6 @@ def _validate_evaluation_envelope(request: pb2.HttpRequestEvaluation) -> None:
         or request.target.ByteSize() > MAX_PROTO_TARGET_BYTES
         or len(request.headers) > MAX_PROTO_HEADERS
         or _encoded_headers_size(request.headers) > MAX_PROTO_HEADERS_BYTES
-        or len(request.agent_attestation) > MAX_AGENT_ATTESTATION_BYTES
     ):
         raise EgressGateError(ErrorCode.REQUEST_ENVELOPE_INVALID)
 

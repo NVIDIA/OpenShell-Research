@@ -24,7 +24,6 @@ from egress_gate.constants import (
     DEFAULT_DENY_REASON_CODE,
     LIMIT_REASON,
     LIMIT_REASON_CODE,
-    MAX_AGENT_ATTESTATION_BYTES,
     MAX_BODY_BYTES,
     MAX_PROTO_CONFIG_BYTES,
     MAX_PROTO_CONTEXT_BYTES,
@@ -131,33 +130,23 @@ def test_manifest_leaves_the_gateway_rpc_timeout_to_the_operator() -> None:
     assert manifest.bindings[0].timeout == ""
 
 
-def test_managed_manifest_advertises_every_pi_admission_binding() -> None:
+def test_managed_manifest_uses_only_upstream_http_binding() -> None:
     middleware = EgressGateMiddleware(
-        create_builtin_registry(), require_agent_attestation=True
+        create_builtin_registry(),
+        require_agent_attestation=True,
+        expected_audience="urn:test",
     )
     try:
         manifest = asyncio.run(middleware.Describe(object(), Mock()))
     finally:
         asyncio.run(middleware.close())
-
-    agent_bindings = [
-        binding
-        for binding in manifest.bindings
-        if binding.operation == pb2.SUPERVISOR_MIDDLEWARE_OPERATION_AGENT_CONVERSATION
-    ]
-    assert [
-        (binding.harness, binding.hook, binding.schema_version)
-        for binding in agent_bindings
-    ] == [
-        ("pi", "user_message", "openshell.pi-message.v1"),
-        ("pi", "compaction_summary", "openshell.pi-message.v1"),
-        ("pi", "branch_summary", "openshell.pi-message.v1"),
-        ("pi", "extension_message", "openshell.pi-message.v1"),
-        ("pi", "tool_result", "openshell.pi-tool-result.v1"),
-        ("pi", "assistant_message", "openshell.pi-assistant-message.v1"),
-        ("pi", "bash_execution", "openshell.pi-bash-execution.v1"),
-        ("pi", "provider_context", "openshell.pi-provider-context.v1"),
-    ]
+    assert manifest.expected_audience == "urn:test"
+    assert len(manifest.bindings) == 1
+    assert (
+        manifest.bindings[0].operation
+        == pb2.SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_REQUEST
+    )
+    assert not hasattr(pb2.HttpRequestEvaluation(), "agent_attestation")
 
 
 def test_copied_proto_remains_the_current_five_field_finding_contract() -> None:
@@ -247,13 +236,6 @@ def test_evaluation_enforces_exact_encoded_transport_boundaries() -> None:
         request.headers.add()
     servicer_module._validate_evaluation_envelope(request)
     request.headers.add()
-    with pytest.raises(EgressGateError):
-        servicer_module._validate_evaluation_envelope(request)
-
-    request = _request(body=b"")
-    request.agent_attestation = b"x" * MAX_AGENT_ATTESTATION_BYTES
-    servicer_module._validate_evaluation_envelope(request)
-    request.agent_attestation += b"x"
     with pytest.raises(EgressGateError):
         servicer_module._validate_evaluation_envelope(request)
 

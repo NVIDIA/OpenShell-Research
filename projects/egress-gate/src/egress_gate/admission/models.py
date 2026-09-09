@@ -24,6 +24,7 @@ class AdmissionHook(StrEnum):
     """Supported harness admission boundaries."""
 
     USER_MESSAGE = "user_message"
+    SYSTEM_CONTEXT = "system_context"
     TOOL_RESULT = "tool_result"
     ASSISTANT_MESSAGE = "assistant_message"
     COMPACTION_SUMMARY = "compaction_summary"

@@ -161,7 +161,7 @@ async def test_serve_async_starts_waits_and_closes_resources(
         closed.append(middleware)
 
     server = EgressGateServer(create_builtin_registry())
-    monkeypatch.setattr(server_module, "_create_grpc_server", lambda _: fake_server)
+    monkeypatch.setattr(server_module, "_create_grpc_server", lambda *args: fake_server)
     monkeypatch.setattr(EgressGateMiddleware, "close", record_close)
 
     await server.serve_async("127.0.0.1:50053")
@@ -184,7 +184,7 @@ async def test_serve_async_sanitizes_bind_failures_and_closes_resources(
         closed.append(middleware)
 
     server = EgressGateServer(create_builtin_registry())
-    monkeypatch.setattr(server_module, "_create_grpc_server", lambda _: fake_server)
+    monkeypatch.setattr(server_module, "_create_grpc_server", lambda *args: fake_server)
     monkeypatch.setattr(EgressGateMiddleware, "close", record_close)
 
     with pytest.raises(EgressGateError) as error:

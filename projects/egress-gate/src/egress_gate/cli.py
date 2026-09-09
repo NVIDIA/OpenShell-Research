@@ -179,20 +179,20 @@ def serve(
             help="Write content-safe evaluation records as newline-delimited JSON.",
         ),
     ] = None,
-    require_agent_attestation: Annotated[
-        bool,
+    admission_config: Annotated[
+        Path | None,
         typer.Option(
-            "--require-agent-attestation/--no-require-agent-attestation",
+            "--admission-config",
             help=(
-                "Require a supervisor-held agent context attestation on HTTP "
-                "egress. Enabled by default; disable only for an "
-                "explicitly unmanaged deployment."
+                "Operator-owned JSON configuration for authenticated admission "
+                "and receipt-required egress."
             ),
         ),
-    ] = True,
+    ] = None,
 ) -> None:
     """Start the Egress Gate gRPC service and run until shutdown."""
     options = _command_options(context)
+    from egress_gate.service.admission import AdmissionServerConfig
     from egress_gate.service.server import EgressGateServer
 
     try:
@@ -231,14 +231,21 @@ def serve(
     if json_log is not None:
         configure_json_log(json_log)
     try:
+        admission = (
+            AdmissionServerConfig.model_validate_json(admission_config.read_bytes())
+            if admission_config is not None
+            else None
+        )
         EgressGateServer(
             options.registry,
             timeout_middleware_processing=timeout_middleware_processing,
-            require_agent_attestation=require_agent_attestation,
+            admission=admission,
         ).serve_sync(listen)
     except EgressGateError as error:
         _render_egress_error("Egress Gate could not start", error)
         raise typer.Exit(code=1) from None
+    except (ValueError, OSError):
+        raise typer.BadParameter("Invalid admission service configuration") from None
 
 
 @app.command(
