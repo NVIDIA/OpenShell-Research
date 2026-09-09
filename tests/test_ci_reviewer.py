@@ -138,6 +138,9 @@ class CIReviewerTests(unittest.TestCase):
         guidelines = ROOT / "projects/PROJECT_GUIDELINES.md"
         remote = "/workspace/review-context/PROJECT_GUIDELINES.md"
         with tempfile.TemporaryDirectory() as directory:
+            context = Path(directory) / "review-context"
+            context.mkdir()
+            (context / guidelines.name).write_bytes(guidelines.read_bytes())
             for case in json.loads((fixtures / "cases.json").read_text()):
                 output = Path(directory) / f"{case['id']}.json"
                 result = CliRunner().invoke(
@@ -150,7 +153,7 @@ class CIReviewerTests(unittest.TestCase):
                         "--input",
                         str(fixtures / case["input"]),
                         "--upload",
-                        f"{guidelines}:{remote}",
+                        f"{context}:/workspace",
                         "--prompt-var",
                         f"guidelines_path={remote}",
                         "--output",
@@ -160,7 +163,7 @@ class CIReviewerTests(unittest.TestCase):
                 )
                 with self.subTest(task=case["task"]):
                     self.assertEqual(result.exit_code, 0, result.output)
-                    self.assertIn(remote, result.output)
+                    self.assertIn(str(context), result.output)
                     self.assertFalse(output.exists())
 
     def test_workflows_keep_trusted_guidelines_separate_and_smoke_read_only(self):
@@ -197,9 +200,29 @@ class CIReviewerTests(unittest.TestCase):
         self.assertEqual(job["permissions"], {"contents": "read"})
         run = next(step["run"] for step in job["steps"] if step.get("id") == "reviews")
         arguments = shlex.split(run)
-        upload = "$GITHUB_WORKSPACE/projects/PROJECT_GUIDELINES.md:/workspace/review-context/PROJECT_GUIDELINES.md"
+        upload = "$RUNNER_TEMP/review-context:/workspace"
         self.assertIn(upload, arguments)
-        self.assertIn(f"guidelines_path={upload.split(':', 1)[1]}", arguments)
+        self.assertIn(
+            "guidelines_path=/workspace/review-context/PROJECT_GUIDELINES.md", arguments
+        )
+        preparation = next(
+            step["run"]
+            for step in job["steps"]
+            if step["name"] == "Configure isolated paths"
+        )
+        copy = next(
+            shlex.split(line)
+            for line in preparation.splitlines()
+            if line.strip().startswith("cp ")
+        )
+        self.assertEqual(
+            copy,
+            [
+                "cp",
+                "projects/PROJECT_GUIDELINES.md",
+                "$RUNNER_TEMP/review-context/PROJECT_GUIDELINES.md",
+            ],
+        )
 
     def test_guideline_assessment_is_part_of_every_result(self):
         for task in CRITERIA:

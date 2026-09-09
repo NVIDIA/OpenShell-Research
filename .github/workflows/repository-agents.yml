@@ -75,12 +75,14 @@ jobs:
 
       - name: Preview agent execution
         run: |
+          mkdir -p "$RUNNER_TEMP/review-context"
+          cp projects/PROJECT_GUIDELINES.md "$RUNNER_TEMP/review-context/PROJECT_GUIDELINES.md"
           uv run --project projects/openshell-agent-runner oar run \
             .github/openshell-agents/profiles/ci-reviewer \
             --task review-tool \
             --gateway openshell \
             --input projects/openshell-agent-runner/tests/fixtures/reviewer-e2e/repository \
-            --upload projects/PROJECT_GUIDELINES.md:/workspace/review-context/PROJECT_GUIDELINES.md \
+            --upload "$RUNNER_TEMP/review-context:/workspace" \
             --prompt-var guidelines_path=/workspace/review-context/PROJECT_GUIDELINES.md \
             --output "$RUNNER_TEMP/project-review.json" \
             --dry-run

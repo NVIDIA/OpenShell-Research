@@ -60,11 +60,14 @@ jobs:
 
       - name: Configure isolated paths
         run: |
-          echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/reviewer-e2e-venv" >> "$GITHUB_ENV"
-          echo "RESULTS_DIR=$RUNNER_TEMP/reviewer-results" >> "$GITHUB_ENV"
-          echo "PROFILES_DIR=$RUNNER_TEMP/reviewer-profiles" >> "$GITHUB_ENV"
-          echo "FIXTURES_DIR=$GITHUB_WORKSPACE/projects/openshell-agent-runner/tests/fixtures/reviewer-e2e" >> "$GITHUB_ENV"
-          mkdir -p "$RUNNER_TEMP/reviewer-results"
+          {
+            echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/reviewer-e2e-venv"
+            echo "RESULTS_DIR=$RUNNER_TEMP/reviewer-results"
+            echo "PROFILES_DIR=$RUNNER_TEMP/reviewer-profiles"
+            echo "FIXTURES_DIR=$GITHUB_WORKSPACE/projects/openshell-agent-runner/tests/fixtures/reviewer-e2e"
+          } >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/reviewer-results" "$RUNNER_TEMP/review-context"
+          cp projects/PROJECT_GUIDELINES.md "$RUNNER_TEMP/review-context/PROJECT_GUIDELINES.md"
 
       - name: Build and install the wheel
         id: build
@@ -125,7 +128,7 @@ jobs:
             if "$UV_PROJECT_ENVIRONMENT/bin/oar" run "$PROFILES_DIR/ci-reviewer" \
               --task "$task" --input "$FIXTURES_DIR/$input" \
               --upload "$FIXTURES_DIR:/workspace" \
-              --upload "$GITHUB_WORKSPACE/projects/PROJECT_GUIDELINES.md:/workspace/review-context/PROJECT_GUIDELINES.md" \
+              --upload "$RUNNER_TEMP/review-context:/workspace" \
               --prompt-var guidelines_path=/workspace/review-context/PROJECT_GUIDELINES.md \
               --prompt-var 'focus=Review the complete fixture against its explicit purpose and claims.' \
               --prompt-var 'context=This is a small CI fixture, not a production product. Related evidence is in /workspace/reviewer-e2e. Evaluate only its stated scope; do not request production packaging or generalized infrastructure. This is a pipeline check, not a review of the PR.' \
