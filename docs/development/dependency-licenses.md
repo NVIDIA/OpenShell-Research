@@ -29,11 +29,12 @@ source is checked again. Removing a dependency does not fail the check.
 New dependency manifests need a corresponding lockfile or membership in a
 declared locked workspace. Unchanged inventories are not a full-repository audit.
 
-The workflow also validates affected project locks with their package managers:
-`uv lock --check`, `npm ci --ignore-scripts --no-audit --no-fund`, or
-`cargo metadata --locked`. The npm check installs locked packages without
-lifecycle scripts; Cargo metadata does not build project code. A compatible
-constraint edit need not rewrite a lockfile if the native check accepts it.
+The workflow also validates affected project and inline-script locks with their
+package managers: `uv lock --check`, `uv lock --script SCRIPT --check`,
+`npm ci --ignore-scripts --no-audit --no-fund`, or `cargo metadata --locked`.
+The npm check installs locked packages without lifecycle scripts; Cargo metadata
+does not build project code. A compatible constraint edit need not rewrite a
+lockfile if the native check accepts it.
 
 This is not a complete inventory of vendored code, datasets, model weights,
 container/system packages, or unsupported package managers. Passing the check
@@ -79,7 +80,7 @@ From the repository root, run the isolated unit tests:
 
 ```sh
 uv run --python 3.12 --with license-expression==30.4.4 --with boolean.py==5.0 \
-  python -m unittest discover -s tests -p test_dependency_licenses.py
+  --with pytest==8.4.2 pytest -q tests/test_dependency_licenses.py
 ```
 
 Compare committed revisions:

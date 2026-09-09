@@ -31,7 +31,7 @@ jobs:
           python-version: "3.12"
 
       - name: Test checker
-        run: uv run --python 3.12 --with license-expression==30.4.4 --with boolean.py==5.0 python -m unittest discover -s tests -p test_dependency_licenses.py
+        run: uv run --python 3.12 --with license-expression==30.4.4 --with boolean.py==5.0 --with pytest==8.4.2 pytest -q tests/test_dependency_licenses.py
 
       - name: Set up Node
         uses: actions/setup-node@v6
@@ -61,11 +61,13 @@ jobs:
           jq -c '.lock_checks[]' dependency-licenses.json | while IFS= read -r target; do
             directory=$(jq -r '.directory' <<< "$target")
             manager=$(jq -r '.manager' <<< "$target")
+            script=$(jq -r '.script // empty' <<< "$target")
             echo "Checking $manager lockfile in $directory"
             (
               cd -- "$directory"
               case "$manager" in
                 uv) uv lock --check ;;
+                uv-script) uv lock --script "$script" --check ;;
                 npm) npm ci --ignore-scripts --no-audit --no-fund ;;
                 cargo) cargo metadata --locked --format-version 1 > /dev/null ;;
                 *) echo "Unknown package manager: $manager" >&2; exit 1 ;;

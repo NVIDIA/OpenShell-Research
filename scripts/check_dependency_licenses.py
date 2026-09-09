@@ -53,9 +53,22 @@ def inventory(path: str, content: str) -> set[Dependency]:
             raise ValueError(
                 f"{path}: expected npm lockfileVersion 2 or 3 with packages"
             )
+        workspace_patterns = lock["packages"].get("", {}).get("workspaces", [])
+        workspace_targets = set()
+        for package in lock["packages"].values():
+            resolved = package.get("resolved")
+            if not package.get("link") or not isinstance(resolved, str):
+                continue
+            target = resolved.removeprefix("./").rstrip("/")
+            if any(Path(target).match(pattern) for pattern in workspace_patterns):
+                workspace_targets.add(target)
         for location, package in lock["packages"].items():
-            if not location or package.get("link"):
-                continue  # Root package or link; workspace target has its own entry.
+            if (
+                not location
+                or package.get("link")
+                or location.removeprefix("./").rstrip("/") in workspace_targets
+            ):
+                continue  # Root package, workspace link, or its first-party target.
             name = package.get("name") or location.rsplit("node_modules/", 1)[-1]
             source = package.get("resolved") or f"local:{location}"
             result.add(Dependency("npm", name, package.get("version", ""), source))
@@ -63,11 +76,15 @@ def inventory(path: str, content: str) -> set[Dependency]:
         lock = tomllib.loads(content)
         if "package" not in lock:
             raise ValueError(f"{path}: missing package inventory")
+        workspace_members = set(lock.get("manifest", {}).get("members", []))
         for package in lock["package"]:
             source = package.get("source")
             if Path(path).name == "uv.lock" or path.endswith(".py.lock"):
-                if source in ({"editable": "."}, {"virtual": "."}):
-                    continue  # This project's own source, not a third-party package.
+                if package["name"] in workspace_members or source in (
+                    {"editable": "."},
+                    {"virtual": "."},
+                ):
+                    continue  # First-party project/workspace source.
                 source = json.dumps(source, sort_keys=True, separators=(",", ":"))
                 ecosystem = "pypi"
             else:
@@ -263,6 +280,28 @@ def manifest_dependencies(name: str, data: dict) -> list:
     ]
 
 
+def script_metadata(content: str) -> dict | None:
+    """Parse a PEP 723 script metadata block, if present."""
+    lines = content.splitlines()
+    for start, line in enumerate(lines):
+        if line != "# /// script":
+            continue
+        metadata_lines = []
+        for line in lines[start + 1 :]:
+            if line == "# ///":
+                return tomllib.loads(
+                    "\n".join(
+                        line[2:] if line.startswith("# ") else ""
+                        for line in metadata_lines
+                    )
+                )
+            if line != "#" and not line.startswith("# "):
+                raise ValueError("invalid PEP 723 script metadata block")
+            metadata_lines.append(line)
+        raise ValueError("unterminated PEP 723 script metadata block")
+    return None
+
+
 def check_manifest_coverage(
     root: Path, base: str | None, head: str, changed: list[str]
 ) -> list[dict[str, str]]:
@@ -280,13 +319,44 @@ def check_manifest_coverage(
         else set()
     )
     candidates = paths if base is None else set(changed)
-    targets: set[tuple[str, str]] = set()
+    targets: set[tuple[str, str, str]] = set()
     for path in changed:
+        if path.endswith(".py.lock"):
+            script_path = path.removesuffix(".lock")
+            if script_path not in paths:
+                raise ValueError(f"{path}: uv script lockfile has no matching script")
+            candidates.add(script_path)
         for manifest_name, lock_name in MANIFEST_LOCKS.items():
             if Path(path).name == lock_name:
                 candidates.add((Path(path).parent / manifest_name).as_posix())
     for path in sorted(candidates & paths):
         manifest = Path(path)
+        if manifest.suffix == ".py":
+            metadata = script_metadata(git_text(root, "show", f"{head}:{path}"))
+            previous_metadata = (
+                script_metadata(git_text(root, "show", f"{base}:{path}"))
+                if path in base_paths
+                else None
+            )
+            lock_path = f"{path}.lock"
+            has_dependencies = bool(
+                (metadata or {}).get("dependencies")
+                or (previous_metadata or {}).get("dependencies")
+            )
+            if not has_dependencies:
+                continue
+            if (
+                path in base_paths
+                and lock_path not in changed
+                and previous_metadata == metadata
+            ):
+                continue
+            if lock_path not in paths:
+                raise ValueError(
+                    f"{path}: dependencies have no {manifest.name}.lock inventory; commit the uv script lockfile"
+                )
+            targets.add((manifest.parent.as_posix(), "uv-script", manifest.name))
+            continue
         if manifest.name not in MANIFEST_LOCKS:
             continue
         content = git_text(root, "show", f"{head}:{path}")
@@ -314,7 +384,9 @@ def check_manifest_coverage(
         ):
             continue
         if direct_lock in paths:
-            targets.add((manifest.parent.as_posix(), MANIFEST_MANAGERS[manifest.name]))
+            targets.add(
+                (manifest.parent.as_posix(), MANIFEST_MANAGERS[manifest.name], "")
+            )
             continue
         covered = False
         for parent in manifest.parent.parents:
@@ -343,7 +415,7 @@ def check_manifest_coverage(
                 members = workspace.get("workspace", {}).get("members", [])
             relative = manifest.parent.relative_to(parent).as_posix()
             if any(fnmatch(relative, member) for member in members):
-                targets.add((parent.as_posix(), MANIFEST_MANAGERS[manifest.name]))
+                targets.add((parent.as_posix(), MANIFEST_MANAGERS[manifest.name], ""))
                 covered = True
                 break
         if not covered:
@@ -351,8 +423,12 @@ def check_manifest_coverage(
                 f"{path}: dependencies have no {lock_name} inventory; commit a lockfile or declare membership in a locked workspace"
             )
     return [
-        {"directory": directory, "manager": manager}
-        for directory, manager in sorted(targets)
+        {
+            "directory": directory,
+            "manager": manager,
+            **({"script": script} if script else {}),
+        }
+        for directory, manager, script in sorted(targets)
     ]
 
 
