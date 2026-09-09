@@ -27,9 +27,10 @@ if _version_not_supported:
 
 
 class SupervisorMiddlewareStub:
-    """SupervisorMiddleware lets an operator-run service inspect and transform
-    sandbox HTTP requests and client WebSocket text messages before OpenShell
-    injects credentials, or evaluate a supported agent-harness request.
+    """SupervisorMiddleware discovers and configures one operator-run middleware.
+    It evaluates HTTP requests, HTTP responses, WebSocket messages, and supported
+    agent-harness requests at their declared phases.
+    Phase-specific services share the same registration.
     """
 
     def __init__(self, channel):
@@ -66,9 +67,10 @@ class SupervisorMiddlewareStub:
 
 
 class SupervisorMiddlewareServicer:
-    """SupervisorMiddleware lets an operator-run service inspect and transform
-    sandbox HTTP requests and client WebSocket text messages before OpenShell
-    injects credentials, or evaluate a supported agent-harness request.
+    """SupervisorMiddleware discovers and configures one operator-run middleware.
+    It evaluates HTTP requests, HTTP responses, WebSocket messages, and supported
+    agent-harness requests at their declared phases.
+    Phase-specific services share the same registration.
     """
 
     def Describe(self, request, context):
@@ -151,9 +153,10 @@ def add_SupervisorMiddlewareServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class SupervisorMiddleware:
-    """SupervisorMiddleware lets an operator-run service inspect and transform
-    sandbox HTTP requests and client WebSocket text messages before OpenShell
-    injects credentials, or evaluate a supported agent-harness request.
+    """SupervisorMiddleware discovers and configures one operator-run middleware.
+    It evaluates HTTP requests, HTTP responses, WebSocket messages, and supported
+    agent-harness requests at their declared phases.
+    Phase-specific services share the same registration.
     """
 
     @staticmethod
@@ -173,6 +176,87 @@ class SupervisorMiddleware:
             '/openshell.middleware.v1.SupervisorMiddleware/Describe',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             supervisor__middleware__pb2.MiddlewareManifest.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
+class HttpResponsePreReturnStub:
+    """HttpResponsePreReturn evaluates one response for one middleware stage before
+    OpenShell returns it to the sandbox.
+    """
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.Evaluate = channel.stream_stream(
+                '/openshell.middleware.v1.HttpResponsePreReturn/Evaluate',
+                request_serializer=supervisor__middleware__pb2.HttpResponseEvent.SerializeToString,
+                response_deserializer=supervisor__middleware__pb2.HttpResponseEventResult.FromString,
+                _registered_method=True)
+
+
+class HttpResponsePreReturnServicer:
+    """HttpResponsePreReturn evaluates one response for one middleware stage before
+    OpenShell returns it to the sandbox.
+    """
+
+    def Evaluate(self, request_iterator, context):
+        """Evaluate starts with preflight and may continue with selected body units
+        and trailers. A body unit marked end_of_stream ends body inspection, not
+        the event stream. Trailers and one best-effort session_end may follow.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_HttpResponsePreReturnServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'Evaluate': grpc.stream_stream_rpc_method_handler(
+                    servicer.Evaluate,
+                    request_deserializer=supervisor__middleware__pb2.HttpResponseEvent.FromString,
+                    response_serializer=supervisor__middleware__pb2.HttpResponseEventResult.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'openshell.middleware.v1.HttpResponsePreReturn', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('openshell.middleware.v1.HttpResponsePreReturn', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class HttpResponsePreReturn:
+    """HttpResponsePreReturn evaluates one response for one middleware stage before
+    OpenShell returns it to the sandbox.
+    """
+
+    @staticmethod
+    def Evaluate(request_iterator,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.stream_stream(
+            request_iterator,
+            target,
+            '/openshell.middleware.v1.HttpResponsePreReturn/Evaluate',
+            supervisor__middleware__pb2.HttpResponseEvent.SerializeToString,
+            supervisor__middleware__pb2.HttpResponseEventResult.FromString,
             options,
             channel_credentials,
             insecure,
