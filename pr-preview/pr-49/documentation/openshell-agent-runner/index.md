@@ -10,7 +10,12 @@ OpenShell Agent Runner (OAR) runs an agent task in an isolated OpenShell sandbox
 and saves the result to a file. Use it to review a project, improve a technical
 document, or run your own tasks from a terminal or CI job.
 
-![A profile and input go into OAR. OAR runs the agent in a temporary OpenShell sandbox, saves a result file, and removes the sandbox.](assets/diagrams/system-overview.svg)
+<figure class="documentation-figure documentation-figure--wide">
+  <a href="assets/diagrams/system-overview.svg" aria-label="Open the OAR architecture diagram at full size">
+    <img src="assets/diagrams/system-overview.svg" alt="Three independent OAR runs share one OpenShell gateway. Two use code-reviewer and one uses technical-writing-reviewer. Each has a separate sandbox, input, and returned result file.">
+  </a>
+  <figcaption>One gateway, many independent runs. Reusing a profile still creates a separate sandbox for each task. Select the diagram to view it at full size.</figcaption>
+</figure>
 
 A **profile** is a folder containing instructions, model settings, and sandbox
 permissions. A **task** is one job defined in that profile. You choose a profile,

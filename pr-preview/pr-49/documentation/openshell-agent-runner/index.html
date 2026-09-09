@@ -12,6 +12,8 @@
         <meta name="author" content="OpenShell Research Engineering">
       
       
+        <link rel="canonical" href="https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/">
+      
       
         <link rel="prev" href="../egress-gate/reference/limits-and-failures/">
       
@@ -26,10 +28,14 @@
       <meta name="generator" content="zensical-0.0.44">
     
     
+  
+    
       
         <title>OpenShell Agent Runner - OpenShell Research</title>
       
     
+  
+
     
       
         
@@ -69,6 +75,38 @@
     
     
   
+  
+
+
+  
+    
+    
+  
+    
+    
+  
+    
+    
+  
+
+
+
+
+  
+  
+  
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="OpenShell Research">
+  <meta property="og:title" content="OpenShell Agent Runner">
+  <meta property="og:description" content="Install OAR, connect to OpenShell, and run your first agent review.">
+  <meta property="og:url" content="https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="OpenShell Agent Runner">
+  <meta name="twitter:description" content="Install OAR, connect to OpenShell, and run your first agent review.">
+  
+  
+  
+
   <script>
     try {
       document.documentElement.dataset.navigationDrawer =
@@ -1532,7 +1570,13 @@
 <p>OpenShell Agent Runner (OAR) runs an agent task in an isolated OpenShell sandbox
 and saves the result to a file. Use it to review a project, improve a technical
 document, or run your own tasks from a terminal or CI job.</p>
-<p><img alt="A profile and input go into OAR. OAR runs the agent in a temporary OpenShell sandbox, saves a result file, and removes the sandbox." src="assets/diagrams/system-overview.svg" /></p>
+<figure class="documentation-figure documentation-figure--wide">
+  <a href="assets/diagrams/system-overview.svg" aria-label="Open the OAR architecture diagram at full size">
+    <img src="assets/diagrams/system-overview.svg" alt="Three independent OAR runs share one OpenShell gateway. Two use code-reviewer and one uses technical-writing-reviewer. Each has a separate sandbox, input, and returned result file.">
+  </a>
+  <figcaption>One gateway, many independent runs. Reusing a profile still creates a separate sandbox for each task. Select the diagram to view it at full size.</figcaption>
+</figure>
+
 <p>A <strong>profile</strong> is a folder containing instructions, model settings, and sandbox
 permissions. A <strong>task</strong> is one job defined in that profile. You choose a profile,
 select a task, and provide the input and output paths.</p>

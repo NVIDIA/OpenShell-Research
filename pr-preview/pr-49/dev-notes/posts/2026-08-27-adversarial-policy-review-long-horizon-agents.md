@@ -2,8 +2,10 @@
 title: "Adversarial prototype: AI policy auto-approval for long-horizon agents in OpenShell"
 date: 2026-08-27
 description: "Can an attacker agent convince an equally capable reviewer agent to grant a capability that is explicitly prohibited?"
+author: "Alex Watson"
 agent_markdown: true
 hero_image: "../../assets/long-horizon-agent-evals/back-and-forth-by-session.png"
+social_image: "assets/long-horizon-agent-evals/back-and-forth-by-session.png"
 categories:
   - OpenShell
 tags:
