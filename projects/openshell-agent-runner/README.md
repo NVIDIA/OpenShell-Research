@@ -9,8 +9,9 @@ Profile + input → OAR → Agent in a temporary sandbox → Result file
                             sandbox removed when the run ends
 ```
 
-A **profile** is a folder of instructions and settings. A **task** is one job
-defined in that profile. OAR includes two ready-to-use reviewers:
+A **profile** packages prompts, reusable skills, and settings. A **task** is one
+job in that profile; it selects the prompt and skills to use. OAR includes two
+ready-to-use reviewers:
 
 | Profile | Task | Input |
 | --- | --- | --- |
