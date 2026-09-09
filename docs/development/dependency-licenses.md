@@ -5,17 +5,21 @@ description: Automated checks for added and changed locked dependencies.
 
 # Dependency license checks
 
-The `Dependency licenses` workflow runs on every pull request. It compares the
-base and head lockfiles, looks up the exact versions of added or changed packages,
-and checks their reported licenses against
-`.github/dependency-license-policy.toml`. It uses no agent, inference service,
-secrets, or write permissions.
+The `Dependency licenses` workflow enforces the repository's dependency-license
+policy on every pull request. It compares committed lockfiles, looks up license
+metadata for added or changed packages, and fails when a result does not satisfy
+the policy. It uses no agent, inference service, secrets, or write permissions.
 
-The workflow returns a pass/fail check and uploads `dependency-licenses.json`.
-Maintainers can make `Check dependency licenses` a required check in repository
-rules. Adding this workflow does not change those rules automatically.
+The policy source of truth is
+`.github/dependency-license-policy.toml`. It contains the currently approved
+open-source licenses and any reviewed metadata clarifications. Keep policy
+details there rather than duplicating them in documentation.
 
-## Coverage
+## Repository coverage
+
+The checker searches the complete tracked Git tree, regardless of folder. It
+reads files from the committed base and head revisions, so untracked, ignored,
+and uncommitted files are outside the check.
 
 Supported lockfiles are:
 
@@ -23,65 +27,83 @@ Supported lockfiles are:
 - JavaScript: npm v2/v3 `package-lock.json`.
 - Rust: `Cargo.lock`.
 
-Checks cover the external packages recorded in those files, including transitive,
-development, optional, and platform-specific dependencies. A changed version or
-source is checked again. Removing a dependency does not fail the check.
-New dependency manifests need a corresponding lockfile or membership in a
-declared locked workspace. Unchanged inventories are not a full-repository audit.
+The inventory includes external direct and transitive packages, including
+development, optional, and platform-specific dependencies. First-party project
+and workspace packages are excluded.
 
-The workflow also validates affected project and inline-script locks with their
-package managers: `uv lock --check`, `uv lock --script SCRIPT --check`,
-`npm ci --ignore-scripts --no-audit --no-fund`, or `cargo metadata --locked`.
-The npm check installs locked packages without lifecycle scripts; Cargo metadata
-does not build project code. A compatible constraint edit need not rewrite a
-lockfile if the native check accepts it.
+For a pull request, a package is checked when its locked name, version, source,
+or lockfile location is added or changed. Removed packages do not fail the
+check. Unchanged packages are not rechecked during an ordinary pull request.
 
-This is not a complete inventory of vendored code, datasets, model weights,
-container/system packages, or unsupported package managers. Passing the check
-does not constitute complete legal clearance.
+Changed `pyproject.toml`, `package.json`, `Cargo.toml`, and PEP 723 inline-script
+metadata must have a corresponding lockfile or belong to a declared locked
+workspace. The workflow asks the native package manager to confirm that each
+affected lock is current:
+
+- uv projects: `uv lock --check`
+- uv inline scripts: `uv lock --script SCRIPT --check`
+- npm projects: `npm ci --ignore-scripts --no-audit --no-fund`
+- Cargo projects: `cargo metadata --locked`
+
+The npm command installs locked packages without lifecycle scripts. Cargo
+metadata does not build project code. A compatible constraint edit does not
+need to rewrite a lockfile when the native check accepts it.
+
+The checker does not inventory vendored code, datasets, model weights,
+container or system packages, unsupported package managers, or dependencies
+that are absent from a supported lockfile. A passing check is therefore not a
+complete legal clearance.
 
 ## Policy and unresolved results
 
-The approved identifiers are `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `ISC`,
-`MIT`, and `MIT-CMU`. Bare `BSD` is ambiguous and is not an approved identifier.
-
-SPDX `OR` expressions pass when at least one alternative is approved; `AND`
-requires every term. A `WITH` combination must be approved explicitly as a whole.
-Unknown, malformed, missing, or unapproved license metadata fails visibly.
-Registry outages also fail as unresolved, not as successful checks.
+The policy approves a maintained set of open-source licenses. Consult
+`.github/dependency-license-policy.toml` for the current policy. License metadata
+that is missing, ambiguous, malformed, or not approved fails the check. Registry
+outages fail as unresolved rather than being treated as successful checks.
 
 Public metadata comes from PyPI, npm, or crates.io. Private registries, Git
 dependencies, and other unsupported source forms require reviewed, exact-source
-clarification. First-party Cargo workspace/path packages are not registry
-dependencies.
+clarification.
 
 If metadata is incomplete, a maintainer can add a `[[clarification]]` entry with
 `ecosystem`, `name`, `version`, `source`, `license`, and an HTTPS `evidence` URL.
 Use the exact identity reported by the checker and verify the authoritative
-license evidence. A clarification must still satisfy the approved list; it is
-not an exception permitting an unapproved license.
+license evidence. A clarification must still satisfy the approved policy; it
+cannot grant an exception for an unapproved license.
 
 PR checks use the base branch's approved list when one exists. A proposed
 allowlist expansion cannot approve its own dependencies. Workflow and checker
-edits still require maintainer review; this is not tamper-proof against authors
-who can rewrite the check itself.
+changes still require maintainer review because the workflow cannot protect
+itself from changes made in the same pull request.
+
+## Results and remediation
+
+The workflow publishes the `Check dependency licenses` status and uploads a
+`dependency-licenses.json` artifact. Each result records the package identity,
+source, affected lockfiles, reported license, and reason for passing or failing.
+
+For a failure:
+
+1. Confirm that the manifest and lockfile contain the intended dependency and
+   source.
+2. Check the package registry's exact-version metadata.
+3. If that metadata is incomplete, add a narrowly scoped clarification backed
+   by an authoritative HTTPS source.
+4. Treat any policy change as a separate maintainer decision. Do not broaden the
+   policy merely to make a check pass.
 
 ## Rollout and full audits
 
-When introducing this policy, the PR check covers additions and changes, not
-unchanged dependencies across the repository. Later edits to the existing policy
-trigger a full inventory audit. Manual workflow dispatch also audits the full
-inventory. Existing dependencies may need separate remediation or explicit
-policy decisions; do not add blanket approvals to hide those results.
+An ordinary pull request checks only dependency additions and changes. Editing
+an existing policy triggers a full inventory audit, as does manually dispatching
+the workflow without a base revision. A full audit evaluates every external
+package in every supported tracked lockfile.
 
 ## Local checks
 
-From the repository root, run the isolated unit tests:
-
-```sh
-uv run --python 3.12 --with license-expression==30.4.4 --with boolean.py==5.0 \
-  --with pytest==8.4.2 pytest -q tests/test_dependency_licenses.py
-```
+From the repository root, run the pinned command in the workflow's `Test checker`
+step. Keeping the executable test command in the workflow provides one source of
+truth for its dependencies and versions.
 
 Compare committed revisions:
 

@@ -90,7 +90,9 @@ project site prefix.
 Run the renderer tests and the same clean build used by CI:
 
 ```sh
-python3 tests/test_render_dev_notes.py
+uv run --python 3.12 --with pytest==8.4.2 pytest -q \
+  tests/test_agent_markdown.py tests/test_docs_404.py \
+  tests/test_render_dev_notes.py tests/test_stage_project_docs.py
 scripts/build-docs.sh
 ```
 
