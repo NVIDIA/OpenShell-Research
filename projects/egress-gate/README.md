@@ -152,7 +152,11 @@ timeout failures must deny.
 ## Development
 
 Full checks also require Node 22.19+ and npm for the locked upstream Pi example.
-The first run installs its JavaScript dependencies.
+The first run installs its JavaScript dependencies. `make check` builds the Pi
+application before running Python tests, including the local cross-language
+integration test. To run that test directly, first run
+`npm --prefix examples/pi-attested-admission/app ci --ignore-scripts` and
+`npm --prefix examples/pi-attested-admission/app run build`.
 
 ```bash
 make help

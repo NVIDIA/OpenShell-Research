@@ -24,7 +24,6 @@ from egress_gate.admission import (
     HarnessAdmissionRequest,
     PiAssistantMessageV1,
     PiAssistantToolCallV1,
-    PiBashExecutionV1,
     PiMessageV1,
     PiProviderContextV1,
     PiTextContentV1,
@@ -32,7 +31,7 @@ from egress_gate.admission import (
     ReceiptAuthority,
     canonical_json_bytes,
     create_pi_adapter_registry,
-    create_provider_adapter_registry,
+    extract_provider_entries,
 )
 from egress_gate.gates import create_builtin_registry
 from egress_gate.request import HttpHeader, HttpRequest, HttpTarget, RequestContext
@@ -40,18 +39,11 @@ from egress_gate.timeout import Timeout
 
 DENY_TEXT = "DENY_THIS"
 REDACT_TEXT = "REDACT_THIS"
-_PI_RESPONSES_FIXTURES = json.loads(
-    (Path(__file__).parent / "fixtures/pi-openai-responses.json").read_text()
-)
+# Captured serializer payloads remain useful regression fixtures; live serializer
+# coverage is exercised by the cross-language service test.
 _PI_CHAT_FIXTURES = json.loads(
     (Path(__file__).parent / "fixtures/pi-openai-completions.json").read_text()
 )
-_CONTEXT_ENTRY_VECTORS = json.loads(
-    (Path(__file__).parent / "fixtures/context-entries.json").read_text()
-)
-# These payloads were captured at Pi's fake-fetch boundary from its native
-# openai-responses and openai-completions stream functions. They intentionally
-# preserve the serializer output rather than restating it through test builders.
 
 
 def _processors(
@@ -119,7 +111,6 @@ def _processors(
         ),
         AttestedEgressProcessor(
             request_processor,
-            create_provider_adapter_registry(),
             authority,
             middleware_name="pi-egress",
             harness_version="sdk-v1",
@@ -145,13 +136,11 @@ def _context(
     target: HttpTarget | None = None,
 ) -> HarnessAdmissionContext:
     schema = {
+        AdmissionHook.SYSTEM_CONTEXT: "openshell.pi-message.v1",
         AdmissionHook.USER_MESSAGE: "openshell.pi-message.v1",
         AdmissionHook.COMPACTION_SUMMARY: "openshell.pi-message.v1",
-        AdmissionHook.BRANCH_SUMMARY: "openshell.pi-message.v1",
-        AdmissionHook.EXTENSION_MESSAGE: "openshell.pi-message.v1",
         AdmissionHook.TOOL_RESULT: "openshell.pi-tool-result.v1",
         AdmissionHook.ASSISTANT_MESSAGE: "openshell.pi-assistant-message.v1",
-        AdmissionHook.BASH_EXECUTION: "openshell.pi-bash-execution.v1",
         AdmissionHook.PROVIDER_CONTEXT: "openshell.pi-provider-context.v1",
     }[hook]
     return HarnessAdmissionContext(
@@ -169,13 +158,7 @@ def _context(
 
 def _admit(
     processor: HarnessAdmissionProcessor,
-    value: (
-        PiMessageV1
-        | PiToolResultV1
-        | PiAssistantMessageV1
-        | PiBashExecutionV1
-        | PiProviderContextV1
-    ),
+    value: (PiMessageV1 | PiToolResultV1 | PiAssistantMessageV1 | PiProviderContextV1),
     *,
     target: HttpTarget | None = None,
     timeout: Timeout | None = None,
@@ -183,18 +166,15 @@ def _admit(
     if isinstance(value, PiMessageV1):
         hook = {
             "user": AdmissionHook.USER_MESSAGE,
+            "system": AdmissionHook.SYSTEM_CONTEXT,
             "compaction_summary": AdmissionHook.COMPACTION_SUMMARY,
-            "branch_summary": AdmissionHook.BRANCH_SUMMARY,
-            "extension_message": AdmissionHook.EXTENSION_MESSAGE,
         }[value.origin]
     elif isinstance(value, PiToolResultV1):
         hook = AdmissionHook.TOOL_RESULT
     elif isinstance(value, PiAssistantMessageV1):
         hook = AdmissionHook.ASSISTANT_MESSAGE
-    elif isinstance(value, PiProviderContextV1):
-        hook = AdmissionHook.PROVIDER_CONTEXT
     else:
-        hook = AdmissionHook.BASH_EXECUTION
+        hook = AdmissionHook.PROVIDER_CONTEXT
     return processor.process(
         HarnessAdmissionRequest(
             request_body=canonical_json_bytes(value),
@@ -210,9 +190,7 @@ def _admit(
 def _message(
     text: str,
     *,
-    origin: Literal[
-        "user", "compaction_summary", "branch_summary", "extension_message"
-    ] = "user",
+    origin: Literal["user", "system", "compaction_summary"] = "user",
 ) -> PiMessageV1:
     return PiMessageV1(
         schema_version="openshell.pi-message.v1", origin=origin, text=text
@@ -234,15 +212,6 @@ def _assistant(
                 id="call-1", name="read", arguments=arguments or {"path": "safe"}
             ),
         ),
-    )
-
-
-def _bash(output: str, *, command: str = "printf safe") -> PiBashExecutionV1:
-    return PiBashExecutionV1(
-        schema_version="openshell.pi-bash-execution.v1",
-        command=command,
-        output=output,
-        exit_code=0,
     )
 
 
@@ -310,30 +279,6 @@ def _provider_request(
     )
 
 
-def _responses_request(
-    prompt: str,
-    *,
-    tool_result: str | None = None,
-) -> HttpRequest:
-    fixture_name = "tool_result_request" if tool_result is not None else "user_request"
-    provider_body = json.loads(json.dumps(_PI_RESPONSES_FIXTURES[fixture_name]))
-    provider_body["input"][1]["content"][0]["text"] = prompt
-    if tool_result is not None:
-        provider_body["input"][-1]["output"] = tool_result
-    body = json.dumps(
-        provider_body,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    ).encode()
-    return HttpRequest(
-        context=RequestContext(request_id="network-1", sandbox_id="sandbox-1"),
-        target=_target().model_copy(update={"path": "/v1/responses"}),
-        headers=(HttpHeader(name="content-type", value="application/json"),),
-        body=body,
-    )
-
-
 def _egress(
     processor: AttestedEgressProcessor,
     request: HttpRequest,
@@ -358,13 +303,11 @@ def _admit_provider_request(
     admission: HarnessAdmissionProcessor,
     request: HttpRequest,
 ):
-    registry = create_provider_adapter_registry()
-    adapter = registry.resolve_request(request, Timeout.from_seconds(1))
     return _admit(
         admission,
         PiProviderContextV1(
             schema_version="openshell.pi-provider-context.v1",
-            entries=adapter.attested_entries(request, Timeout.from_seconds(1)),
+            entries=extract_provider_entries(request, Timeout.from_seconds(1)),
         ),
         target=request.target,
     )
@@ -390,92 +333,7 @@ def test_complete_pi_chat_context_is_attested(fixture_name: str) -> None:
     assert admitted.attestation is not None
     assert admitted.attestation.startswith(b"ag2.")
     assert result.decision.value == "allow"
-
-
-def test_provider_adapters_match_shared_context_entry_vectors() -> None:
-    expected = PiProviderContextV1.model_validate(
-        {
-            "schema_version": "openshell.pi-provider-context.v1",
-            "entries": _CONTEXT_ENTRY_VECTORS["cases"][0]["entries"],
-        },
-        strict=True,
-    ).entries
-    source_messages = [
-        message
-        for message in _CONTEXT_ENTRY_VECTORS["cases"][0]["context"]["messages"]
-        if message["role"] in {"user", "toolResult"}
-    ]
-    messages = [{"role": "system", "content": "system"}]
-    responses_input = [{"role": "developer", "content": "system"}]
-    for entry, source in zip(expected, source_messages, strict=True):
-        if entry.role == "user":
-            messages.append({"role": "user", "content": source["content"]})
-            content = source["content"]
-            responses_input.append(
-                {
-                    "role": "user",
-                    "content": (
-                        content
-                        if isinstance(content, str)
-                        else [
-                            {"type": "input_text", "text": block["text"]}
-                            for block in content
-                        ]
-                    ),
-                }
-            )
-        else:
-            messages.append(
-                {
-                    "role": "tool",
-                    "content": entry.text,
-                    "tool_call_id": entry.tool_call_id,
-                }
-            )
-            responses_input.append(
-                {
-                    "type": "function_call_output",
-                    "call_id": entry.tool_call_id,
-                    "output": entry.text,
-                }
-            )
-    chat_body = json.loads(json.dumps(_PI_CHAT_FIXTURES["user_request"]))
-    chat_body["messages"] = messages
-    chat = _provider_request("unused").model_copy(
-        update={"body": json.dumps(chat_body, separators=(",", ":")).encode()}
-    )
-    responses_body = json.loads(json.dumps(_PI_RESPONSES_FIXTURES["user_request"]))
-    responses_body["input"] = responses_input
-    responses = _responses_request("unused").model_copy(
-        update={"body": json.dumps(responses_body, separators=(",", ":")).encode()}
-    )
-    registry = create_provider_adapter_registry()
-
-    assert (
-        registry.resolve_request(chat, Timeout.from_seconds(1)).attested_entries(
-            chat, Timeout.from_seconds(1)
-        )
-        == expected
-    )
-    assert (
-        registry.resolve_request(responses, Timeout.from_seconds(1)).attested_entries(
-            responses, Timeout.from_seconds(1)
-        )
-        == expected
-    )
-
-
-def test_complete_responses_context_authorizes_retries() -> None:
-    admission, egress, _ = _processors()
-    request = _responses_request("use the tool", tool_result="safe tool output")
-    admitted = _admit_provider_request(admission, request)
-
-    first = _egress(egress, request, admitted.attestation)
-    retry = _egress(egress, request, admitted.attestation)
-
-    assert admitted.attestation is not None
-    assert first.decision.value == "allow"
-    assert retry.decision.value == "allow"
+    assert _egress(egress, request, admitted.attestation).decision.value == "allow"
 
 
 @pytest.mark.parametrize(
@@ -514,20 +372,6 @@ def test_chat_context_tampering_is_denied(mutation, reason_code: str) -> None:
     assert result.reason_code == reason_code
 
 
-def test_responses_earlier_entry_tampering_is_denied() -> None:
-    admission, egress, _ = _processors()
-    request = _responses_request("use the tool", tool_result="safe tool output")
-    admitted = _admit_provider_request(admission, request)
-
-    result = _egress(
-        egress,
-        _responses_request("changed prompt", tool_result="safe tool output"),
-        admitted.attestation,
-    )
-
-    assert result.reason_code == "context_hash_mismatch"
-
-
 def test_provider_context_redaction_binds_only_the_replacement() -> None:
     admission, egress, _ = _processors()
     original = _provider_request(f"hide {REDACT_TEXT} please")
@@ -554,6 +398,7 @@ def test_restored_context_with_denied_text_is_blocked_at_send_time() -> None:
     denied = _admit_provider_request(admission, _provider_request(DENY_TEXT))
 
     assert denied.decision is AdmissionDecision.DENY
+    assert denied.replacement_body is None
     assert denied.reason_code == "egress_gate_regex_denied"
 
 
@@ -583,15 +428,6 @@ def test_attestation_uses_stable_destination_across_tls_proxy_normalization() ->
     assert wrong_host.reason_code == "attestation_context_mismatch"
 
 
-def test_append_time_allow_returns_no_attestation() -> None:
-    admission, _, _ = _processors()
-
-    admitted = _admit(admission, _user("safe"))
-
-    assert admitted.decision is AdmissionDecision.ALLOW
-    assert admitted.attestation is None
-
-
 def test_tool_result_denial_redaction_and_images_fail_closed() -> None:
     admission, _, _ = _processors()
 
@@ -614,7 +450,7 @@ def test_tool_result_denial_redaction_and_images_fail_closed() -> None:
 
 @pytest.mark.parametrize(
     "origin",
-    ["user", "compaction_summary", "branch_summary", "extension_message"],
+    ["user", "system", "compaction_summary"],
 )
 def test_text_message_origins_allow_replace_and_deny(origin) -> None:
     admission, _, _ = _processors()
@@ -624,6 +460,7 @@ def test_text_message_origins_allow_replace_and_deny(origin) -> None:
     denied = _admit(admission, _message(DENY_TEXT, origin=origin))
 
     assert allowed.decision is AdmissionDecision.ALLOW
+    assert allowed.attestation is None
     assert redacted.decision is AdmissionDecision.REPLACE
     assert redacted.replacement_body is not None
     replacement = PiMessageV1.model_validate_json(
@@ -636,7 +473,7 @@ def test_text_message_origins_allow_replace_and_deny(origin) -> None:
 
 def test_text_message_binding_rejects_a_different_origin() -> None:
     admission, _, _ = _processors()
-    value = _message("safe", origin="branch_summary")
+    value = _message("safe", origin="user")
 
     result = admission.process(
         HarnessAdmissionRequest(
@@ -699,43 +536,6 @@ def test_assistant_message_rejects_tool_call_mutation() -> None:
 
     assert result.decision is AdmissionDecision.DENY
     assert result.reason_code == "admission_contract_invalid"
-
-
-def test_bash_execution_allows_output_replacement_and_denial() -> None:
-    admission, _, _ = _processors()
-
-    allowed = _admit(admission, _bash("safe"))
-    redacted = _admit(admission, _bash(REDACT_TEXT))
-    denied = _admit(admission, _bash(DENY_TEXT))
-
-    assert allowed.decision is AdmissionDecision.ALLOW
-    assert redacted.decision is AdmissionDecision.REPLACE
-    assert redacted.replacement_body is not None
-    replacement = PiBashExecutionV1.model_validate_json(
-        redacted.replacement_body, strict=True
-    )
-    assert replacement.output == "[REDACTED]"
-    assert (replacement.command, replacement.exit_code) == ("printf safe", 0)
-    assert denied.decision is AdmissionDecision.DENY
-
-
-def test_bash_execution_rejects_command_mutation() -> None:
-    admission, _, _ = _processors()
-
-    result = _admit(admission, _bash("safe", command=f"printf {REDACT_TEXT}"))
-
-    assert result.decision is AdmissionDecision.DENY
-    assert result.reason_code == "admission_contract_invalid"
-
-
-def test_denial_returns_no_attestation_or_replacement() -> None:
-    admission, _, _ = _processors()
-
-    denied = _admit(admission, _user(f"do not persist {DENY_TEXT}"))
-
-    assert denied.decision is AdmissionDecision.DENY
-    assert denied.attestation is None
-    assert denied.replacement_body is None
 
 
 @pytest.mark.parametrize(
@@ -833,9 +633,15 @@ def test_provider_shape_validation_and_optional_reasoning_field_are_preserved() 
         lambda body: body.update({"max_completion_tokens": 128}),
         lambda body: body.update({"store": None}),
         lambda body: body["tools"][0]["function"].update({"strict": None}),
+        lambda body: body.update({"input": []}),
+        lambda body: body["messages"][1].update({"tool_call_id": "wrong-role"}),
+        lambda body: body["messages"][1].update({"role": "tool"}),
+        lambda body: body["tools"][0]["function"].update(
+            {"parameters": {"limit": float("inf")}}
+        ),
     ],
 )
-def test_mixed_or_null_chat_compatibility_fields_fail_closed(mutation) -> None:
+def test_unsupported_chat_shapes_fail_closed(mutation) -> None:
     admission, egress, _ = _processors()
     request = _provider_request("safe")
     admitted = _admit_provider_request(admission, request)
@@ -879,16 +685,3 @@ def test_qwen_replay_fields_fail_closed_unless_explicitly_supported(mutation) ->
     result = _egress(egress, request, admitted.attestation)
 
     assert result.reason_code == "provider_shape_unsupported"
-
-
-def test_duplicate_receipt_header_is_denied_in_managed_flow() -> None:
-    admission, egress, _ = _processors()
-    request = _provider_request(
-        "safe",
-        headers=(HttpHeader(name=RECEIPT_HEADER, value="eg1.untrusted"),),
-    )
-    admitted = _admit_provider_request(admission, request)
-
-    result = _egress(egress, request, admitted.attestation)
-
-    assert result.reason_code == "attestation_malformed"

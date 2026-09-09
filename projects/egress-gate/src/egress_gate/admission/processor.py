@@ -15,9 +15,9 @@ from egress_gate.admission.adapters import (
     AdmissionMutationError,
     AdmissionShapeError,
     HarnessAdapterRegistry,
-    ProviderAdapterRegistry,
     ProviderShapeError,
     context_entries_subject,
+    extract_provider_entries,
 )
 from egress_gate.admission.models import (
     MAX_ADMISSION_BODY_BYTES,
@@ -161,7 +161,6 @@ class AttestedEgressProcessor:
     def __init__(
         self,
         request_processor: RequestProcessor,
-        provider_adapters: ProviderAdapterRegistry,
         receipt_authority: ReceiptAuthority,
         *,
         middleware_name: str,
@@ -171,7 +170,6 @@ class AttestedEgressProcessor:
         if not fingerprint:
             raise ValueError("attested egress requires a policy fingerprint")
         self._request_processor = request_processor
-        self._provider_adapters = provider_adapters
         self._receipt_authority = receipt_authority
         self._middleware_name = middleware_name
         self._harness_version = harness_version
@@ -215,8 +213,7 @@ class AttestedEgressProcessor:
             }
         )
         try:
-            adapter = self._provider_adapters.resolve_request(request, timeout)
-            entries = adapter.attested_entries(request, timeout)
+            entries = extract_provider_entries(request, timeout)
             subject_hash, entry_count = context_entries_subject(entries)
             timeout.raise_if_expired()
             context = HarnessAdmissionContext(
@@ -245,7 +242,7 @@ class AttestedEgressProcessor:
             final_request = apply_request_mutations(
                 request, gate_result.request_mutations
             )
-            final_entries = adapter.attested_entries(final_request, timeout)
+            final_entries = extract_provider_entries(final_request, timeout)
             if final_entries != entries:
                 return self._deny("semantic_mutation_denied")
             timeout.raise_if_expired()

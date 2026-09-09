@@ -28,7 +28,6 @@ from egress_gate.admission import (
     HarnessAdmissionResult,
     ReceiptAuthority,
     create_pi_adapter_registry,
-    create_provider_adapter_registry,
 )
 from egress_gate.bindings import supervisor_middleware_pb2 as pb2
 from egress_gate.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
@@ -301,7 +300,6 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         if self._require_agent_attestation:
             return AttestedEgressProcessor(
                 processor,
-                create_provider_adapter_registry(),
                 self._receipt_authority,
                 middleware_name=request.middleware_name,
                 harness_version=PI_HARNESS_VERSION,

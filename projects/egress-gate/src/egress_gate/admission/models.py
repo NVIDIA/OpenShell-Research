@@ -28,9 +28,6 @@ class AdmissionHook(StrEnum):
     TOOL_RESULT = "tool_result"
     ASSISTANT_MESSAGE = "assistant_message"
     COMPACTION_SUMMARY = "compaction_summary"
-    BRANCH_SUMMARY = "branch_summary"
-    EXTENSION_MESSAGE = "extension_message"
-    BASH_EXECUTION = "bash_execution"
     PROVIDER_CONTEXT = "provider_context"
 
 

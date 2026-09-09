@@ -5,7 +5,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import os
+import subprocess
+import sys
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -27,6 +31,7 @@ from egress_gate.bindings import supervisor_middleware_pb2_grpc as rpc
 from egress_gate.gates import create_builtin_registry
 from egress_gate.service.admission import (
     AdmissionServerConfig,
+    admission_tls_context,
     create_admission_application,
 )
 from egress_gate.service.authentication import GatewayAuthentication
@@ -42,7 +47,7 @@ AUTHORIZATION = {"Authorization": "Bearer test-admission-credential"}
 async def test_http_admission_allow_deny_replace_and_authentication(
     tmp_path: Path,
 ) -> None:
-    async with _clients(tmp_path) as (client, _, config, _):
+    async with _clients(tmp_path) as (client, _, config, _, _):
         denied_auth = await client.post("/v1/admission", json=_call("safe"))
         assert denied_auth.status == 401
         for text, expected in (
@@ -75,7 +80,7 @@ async def test_http_admission_allow_deny_replace_and_authentication(
 async def test_http_receipt_is_verified_and_stripped_by_standard_authenticated_rpc(
     tmp_path: Path,
 ) -> None:
-    async with _clients(tmp_path) as (client, stub, config, token):
+    async with _clients(tmp_path) as (client, stub, config, token, _):
         response = await client.post(
             "/v1/admission",
             json=_call("safe", kind="provider_context"),
@@ -145,6 +150,125 @@ def test_gateway_authentication_rejects_invalid_trust_claims(change: str) -> Non
         )
 
 
+@pytest.mark.asyncio
+async def test_pi_session_through_admission_and_authenticated_egress(
+    tmp_path: Path,
+    unused_tcp_port: int,
+) -> None:
+    example = PROJECT / "examples/pi-attested-admission"
+    subprocess.run(
+        [
+            sys.executable,
+            str(example / "prepare.py"),
+            "--state",
+            str(tmp_path),
+            "--host-ip",
+            "127.0.0.1",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    async with _clients(tmp_path) as (_, stub, config, token, middleware):
+        config = config.model_copy(
+            update={
+                "tls_certificate": tmp_path / "tls/server/tls.crt",
+                "tls_private_key": tmp_path / "tls/server/tls.key",
+                "provider_target": config.provider_target.model_copy(
+                    update={"host": "127.0.0.1", "port": unused_tcp_port}
+                ),
+            }
+        )
+        calls: list[bytes] = []
+
+        async def provider(request: web.Request) -> web.Response:
+            body = await request.read()
+            evaluation = pb.HttpRequestEvaluation(
+                phase=pb.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS,
+                context=pb.RequestContext(sandbox_id="sandbox", request_id="pi"),
+                target=pb.HttpRequestTarget(**config.provider_target.model_dump()),
+                middleware_name=config.middleware_name,
+                body=body,
+                headers=[
+                    pb.HttpHeader(name=k, value=v) for k, v in request.headers.items()
+                ],
+            )
+            json_format.ParseDict(config.policy, evaluation.config)
+            metadata = (("authorization", f"Bearer {token}"),)
+            result = await stub.EvaluateHttpRequest(evaluation, metadata=metadata)
+            assert result.decision == pb.DECISION_ALLOW, result.reason_code
+            assert result.header_mutations[-1].remove.name == RECEIPT_HEADER
+            assert (
+                "REDACT_THIS" not in body.decode() and "DENY_THIS" not in body.decode()
+            )
+            calls.append(body)
+            if len(calls) == 1:
+                changed = json.loads(body)
+                next(m for m in changed["messages"] if m["role"] == "user")[
+                    "content"
+                ] = "tampered"
+                evaluation.body = json.dumps(changed).encode()
+                denied = await stub.EvaluateHttpRequest(evaluation, metadata=metadata)
+                assert denied.reason_code == "context_hash_mismatch"
+            assert len(calls) <= 7, "unexpected model call"
+            delta: dict[str, object] = {"role": "assistant", "content": "REDACT_THIS"}
+            finish = "stop"
+            if len(calls) == 2:
+                delta = {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "index": 0,
+                            "id": "call-1",
+                            "type": "function",
+                            "function": {
+                                "name": "read",
+                                "arguments": '{"path":"notes.txt"}',
+                            },
+                        }
+                    ],
+                }
+                finish = "tool_calls"
+            elif len(calls) in (4, 7):
+                delta["content"] = "Approved summary"
+            chunk = {
+                "id": "local",
+                "object": "chat.completion.chunk",
+                "created": 0,
+                "model": "test",
+                "choices": [{"index": 0, "delta": delta, "finish_reason": finish}],
+            }
+            return web.Response(
+                text=f"data: {json.dumps(chunk)}\n\ndata: [DONE]\n\n",
+                content_type="text/event-stream",
+            )
+
+        application = create_admission_application(middleware, config)
+        application.router.add_post("/v1/chat/completions", provider)
+        server = TestServer(application, scheme="https", port=unused_tcp_port)
+        await server.start_server(ssl=admission_tls_context(config))
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "node",
+                str(example / "app/dist/test/service-integration.js"),
+                str(server.make_url("/")).rstrip("/"),
+                str(tmp_path),
+                env=os.environ | {"NODE_EXTRA_CA_CERTS": str(tmp_path / "tls/ca.crt")},
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            try:
+                stdout, stderr = await asyncio.wait_for(process.communicate(), 30)
+            finally:
+                if process.returncode is None:
+                    process.kill()
+                    await process.wait()
+            assert process.returncode == 0, (stdout + stderr).decode()
+            assert len(calls) == 7
+            assert any(m["role"] == "tool" for m in json.loads(calls[2])["messages"])
+        finally:
+            await server.close()
+
+
 @asynccontextmanager
 async def _clients(
     directory: Path,
@@ -154,6 +278,7 @@ async def _clients(
         rpc.SupervisorMiddlewareStub,
         AdmissionServerConfig,
         str,
+        EgressGateMiddleware,
     ]
 ]:
     key = Ed25519PrivateKey.generate()
@@ -215,7 +340,13 @@ async def _clients(
         TestServer(create_admission_application(middleware, config))
     ) as client:
         try:
-            yield client, rpc.SupervisorMiddlewareStub(channel), config, token
+            yield (
+                client,
+                rpc.SupervisorMiddlewareStub(channel),
+                config,
+                token,
+                middleware,
+            )
         finally:
             await channel.close()
             await server.stop(0)
