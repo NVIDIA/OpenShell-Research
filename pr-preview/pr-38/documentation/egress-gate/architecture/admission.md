@@ -1,84 +1,181 @@
 ---
-title: Managed harness admission
-description: Pi context admission, whole-context attestations, and egress verification.
+title: Admission without harness forks
+description: Application-owned history admission and standard OpenShell egress verification.
 agent_markdown: true
 ---
 
-# Managed harness admission
+# Admission without harness forks
 
-Managed Pi sessions use the same Egress Gate policy at three checkpoints. The
-append and provider-context checkpoints apply policy to supported message
-content before it enters history or is sent. Egress verification supplies the
-security boundary: a provider request without a valid attestation is denied
-before credentials are attached.
+The [runnable Pi example](https://github.com/NVIDIA/OpenShell-Research/tree/johnny/pi-attested-admission/projects/egress-gate/examples/pi-attested-admission)
+uses published Pi 0.85.1 packages and OpenShell 0.0.116. No upstream library,
+runtime, protobuf, or CLI patches are required. Its smaller surface is a
+Pi-powered application, not stock Pi CLI parity.
 
-| Checkpoint | Pi hook | Result |
-| --- | --- | --- |
-| History append | `user_message`, `tool_result`, `assistant_message`, `compaction_summary`, `branch_summary`, `extension_message`, or `bash_execution` | Allow, deny, or replace supported content before append |
-| Provider context | `provider_context` | Allow, deny, or replace the complete ordered user/tool context and issue an attestation |
-| Network egress | OpenShell pre-credentials middleware | Verify the attestation against the provider request, then run request policy |
+## The two boundaries
 
-Assistant append admission covers finalized text and tool calls. Assistant
-thinking is not append-admitted or included in the attested user/tool context
-hash; request policy scans it at egress. Tool calls are inspectable and
-denyable but immutable: a redaction targeting their ID, name, or arguments
-fails closed rather than changing them.
+Network enforcement cannot undo an earlier local-history write. For example,
+a tool may return sensitive text; blocking the next model request leaves that
+text in the transcript if it was already appended. Conversely, a cooperative
+application check alone does not prevent another client making a raw request.
 
-Append-time allows do not carry attestations. Immediately before a provider
-request, Pi submits the complete context so retries, continuations, compaction,
-queued input, and restored sessions do not depend on the newest entry alone.
-OpenShell retains the signed attestation and returns only an opaque handle to
-the runtime adapter.
+```text
+Candidate --> admission policy --> approved history --> next model context
+                  |                                       |
+                deny                                  signed receipt
+                  |                                       |
+            no history write                    OpenShell inspects request
+                                                          |
+                                              verify + request policy
+                                                          |
+                                                 credential --> model
+```
 
-## Attestation and verification
+There are two distinct properties:
 
-An `agent-attestation.v2` claim set binds the canonical context hash and entry
-count to the harness and schema versions, middleware binding, policy
-fingerprint, sandbox, session and submission identifiers, provider adapter,
-provider host and port, signing-key identifier, and issue and expiry times. The
-attestation is signed with the Egress Gate instance's ephemeral Ed25519 key and
-expires after 300 seconds.
+1. **Local insertion:** the controlled application asks before writing to live
+   conversation state or Pi's SessionManager. Only approved/replacement content
+   enters history. Transient candidate buffers necessarily exist.
+2. **Egress:** an external verifier checks a service-signed receipt against the
+   actual intercepted request before OpenShell attaches provider credentials.
 
-At egress, Egress Gate:
+A receipt proves service approval of covered content, **not** that a particular
+extension ran or that every historical append was checked. A compromised
+application or same-authority code can violate local storage integrity.
 
-1. requires the network enforcement point, rejects the reserved handle header,
-   and requires an attestation;
-2. parses the provider request with the selected OpenAI request adapter and
-   derives its complete ordered user/tool context;
-3. verifies the signature, key, lifetime, trusted context fields, entry count,
-   and context hash;
-4. runs the configured request gate pipeline; and
-5. parses the resulting request again and denies if policy mutation changed the
-   attested semantic context.
+## One history owner
 
-OpenShell attaches proxy-delivered credentials only after this middleware
-allows the request.
+The application uses Pi's public model stream, resource loader, built-in tools,
+summary generator, and session storage. It does not run a second autonomous
+AgentSession or depend on late message notifications.
 
-## Failures and limits
+| Candidate | What is admitted before writing |
+| --- | --- |
+| User / explicit skill | Final text after supported skill rendering |
+| Project context | Loaded project instructions and model-visible skill metadata |
+| Assistant | Finalized text and tool-call IDs, names, arguments |
+| Tool | Final output, including invalid-argument, missing-tool and execution errors |
+| Compaction | Complete summary, for both manual and automatic triggers |
 
-Admission payloads and replacements are limited to 4 MiB. The middleware
-manifest advertises the registered harness, hook, schema, and limit. Image
-inputs are not supported by the Pi adapter and fail closed. Provider-context
-admission currently runs before Pi's transport-specific history rewrites, so
-switching transports with tool history or sending an orphaned tool call can
-also fail closed.
+Tool-call fields are inspectable but immutable: attempted executable-argument
+redaction fails closed. Unsupported images/reasoning/provider state is rejected,
+not stored as unchecked sidecars. Tool details and progress are not transcripts.
+Bash uses a bounded public operations wrapper to avoid Pi's output-log spill.
 
-Stable admission failures include `admission_contract_invalid` and
-`admission_unavailable`. Egress verification failures include
-`network_context_invalid`, `reserved_header_present`, `attestation_missing`,
-`attestation_malformed`,
-`attestation_signature_invalid`, `attestation_key_mismatch`,
-`attestation_not_yet_valid`, `attestation_expired`,
-`attestation_context_mismatch`, `entry_count_mismatch`,
-`context_hash_mismatch`, `provider_shape_unsupported`,
-`semantic_mutation_denied`, and `egress_verification_failed`. A configured gate
-may instead return its own deny reason.
+On a denied tool result, the application stops model calls. It submits fixed,
+content-free failures for outstanding calls through the same boundary. If those
+cannot be admitted, the session stops without claiming crash recovery.
+Tool side effects themselves are not reversible by result admission.
 
-An Egress Gate started with `--require-agent-attestation` is dedicated to
-managed harness traffic: unattested matching provider requests fail closed.
-The supervisor-owned loopback bridge requires a per-exec capability delivered
-to the launched harness on an inherited file descriptor. The launcher reads and
-closes that descriptor and deletes its environment name before Pi starts, so
-tool subprocesses do not receive the capability. The token remains in Pi's
-memory; a same-user process able to read that memory could copy it, though the
-sandbox's process isolation and ptrace restrictions reduce this residual risk.
+Compaction keeps the latest whole user turn. Its summary-generation request
+needs a fresh receipt; its finished summary needs fresh insertion approval.
+Denial leaves the preceding context and file unchanged. Auto compaction runs
+between completed turns; overflow gets at most one compact/retry. Old approved
+entries remain in the append-only JSONL file.
+
+One cwd scopes resources, tools and storage. It is not confinement; OpenShell
+filesystem policy is. The application is installed outside the writable project
+and does not load third-party extensions or implicitly resume saved transcripts.
+
+## Service, identity, and receipts
+
+The service adds one bounded `POST /v1/admission` HTTPS endpoint alongside
+ordinary OpenShell middleware gRPC. It reuses the transport-neutral admission
+models, shape adapters, policy pipeline and receipt authority.
+
+The host setup provisions one admission bearer credential, provider destination,
+policy and actual sandbox ID. The sandbox cannot select its authoritative
+identity or submit a policy. The single host-owned identity file is populated
+after sandbox creation; until then admission is unavailable. There is no
+registration API or new credential broker.
+
+Upstream OpenShell delivers endpoint-bound credential placeholders. Real secrets
+stay outside the sandbox. A placeholder is still an application-accessible
+capability, not process attestation. Removing it from tool child environments
+is hygiene, not isolation from malicious same-authority code.
+
+The gRPC boundary verifies the existing EdDSA extension JWT against the operator's
+pinned gateway public key, issuer, audience and token type. HTTP evaluations also
+require a supervisor caller whose sandbox ID matches request context.
+Both listeners use verified TLS. The gateway advertises only the standard HTTP
+middleware contract, not fork-specific harness RPCs.
+
+Before every model call, including tool continuation and summarization, the
+application asks approval for the ordered user/tool text projection and sends
+the resulting base64url receipt in one `x-egress-admission` header.
+
+At egress the verifier:
+
+1. requires exactly one well-formed receipt;
+2. parses the supported provider body and derives the ordered user/tool text;
+3. checks signature, key, expiry, sandbox, destination, policy and content hash;
+4. runs the configured request gates;
+5. rechecks that mutations did not change receipt-covered content; and
+6. removes the receipt header before forwarding.
+
+The existing `agent-attestation.v2` wire claim format is retained internally.
+Its ephemeral service signing key and five-minute lifetime permit identical
+retries, not one-time delivery. Restarting the service invalidates old receipts.
+
+The receipt does **not** sign every byte, system/assistant messages, model
+parameters or tool schemas. Those remain subject to the normal request policy.
+Final-context replacement is rejected by the application so outbound text cannot
+silently diverge from its approved history. There is one final middleware
+attachment; adding a later content-mutating middleware breaks that assumption.
+
+## Deliberate POC limits
+
+One text-only OpenAI-compatible Chat Completions model, sequential tools, fresh
+sessions and explicit skills. No TUI/RPC parity, arbitrary extensions, reasoning,
+images, WebSockets, transport switching, branching, or crash resume.
+Network policy allows only the chosen POST model path and separately scopes the
+admission endpoint. Unknown shapes fail closed; admission requests do not
+recursively require model receipts.
+
+Ordinary HTTP-only Egress Gate remains available with `egress-gate serve`.
+Only `--admission-config` selects the receipt-required deployment.
+
+## Evidence and Dev Note narrative
+
+The implementation's deterministic tests cover pending/denied candidates before
+both live and durable writes, accepted replacements, real tool continuations,
+and the shared manual/auto compaction path. Service tests cover authenticated
+caller binding, upstream RPCs, receipts, policy decisions and header removal.
+The example's `demo.sh verify` is a separate real-model end-to-end acceptance
+command, not a simulated demonstration. Its success must be observed, not inferred
+from unit tests. See the PR validation record for the latest executed checks.
+
+Implementation validation on **2026-09-09** used:
+
+| Component | Tested pin |
+| --- | --- |
+| Pi public npm packages | `0.85.1`, exact dependencies and integrity hashes in the example lockfile |
+| OpenShell CLI, gateway and supervisor | `0.0.116`, release commit `d1155aa70042d3e2ee49dbfa15346b108b7c1d92`; archive checksums in `demo.sh` |
+| Node image | `22.22.2-bookworm-slim@sha256:9f6d5975c7dca860947d3915877f85607946403fc55349f39b4bc3688448bb6e` |
+| HTTP client | Undici `8.9.0`; explicit public proxy configuration after loading Pi |
+
+The isolated upstream sandbox successfully exercised TLS/JWT bootstrap,
+endpoint-bound admission credentials, allow/deny/replacement, a real Pi session
+denial before history, and rejection of a raw provider request without a receipt.
+Pi's actual tool-capable serialized request with a receipt passed the gate and
+received HTTP 401 from the real endpoint when deliberately given an invalid test
+credential. This establishes the transport seam, **not** successful model output.
+
+**Real-model acceptance remains pending a valid provider key.** The checked-in
+verification command passed its bypass/denial checks and then failed at the model
+call with that invalid credential; it did not skip ahead. Tool continuations,
+skills and compaction have deterministic application coverage but must also pass
+that real-model command before describing the whole example as e2e-verified.
+
+A useful Dev Note, **“Gating at the network layer is not enough,”** can follow:
+
+1. A network-denied tool result can still contaminate local history.
+2. Move the local decision before the write; show deny and replacement in JSONL.
+3. Keep a real agent: tools, skills and compaction all use that one boundary.
+4. Demonstrate a raw provider request bypassing the application but being denied
+   by OpenShell because it has no approval receipt.
+5. Explain the complementary guarantees and honestly show their limits.
+
+The takeaway is not “the network boundary is insufficient security.” It is that
+local-history integrity and outbound-request authorization happen at different
+times and require different enforcement points. No fork makes the composition
+easier to reproduce; it does not make the guarantees stronger by itself.

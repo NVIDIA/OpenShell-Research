@@ -6,40 +6,36 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Protobuf conversion, validation, worker scheduling, and lifecycle.">
+        <meta name="description" content="Automated checks for added and changed locked dependencies.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
       
       
       
-        <link rel="prev" href="../request-lifecycle/">
-      
-      
-        <link rel="next" href="../../reference/limits-and-failures/">
       
       
         
       
       
-      <link rel="icon" href="../../../../assets/brand/favicon.svg">
+      <link rel="icon" href="../../assets/brand/favicon.svg">
       <meta name="generator" content="zensical-0.0.44">
     
     
       
-        <title>Service boundary - OpenShell Research</title>
+        <title>Dependency License Checks - OpenShell Research</title>
       
     
     
       
         
       
-      <link rel="stylesheet" href="../../../../assets/stylesheets/modern/main.fba56155.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.fba56155.min.css">
       
         
           
         
-        <link rel="stylesheet" href="../../../../assets/stylesheets/modern/palette.dfe2e883.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/modern/palette.dfe2e883.min.css">
       
       
 
@@ -58,11 +54,11 @@
       
     
     
-      <link rel="stylesheet" href="../../../../stylesheets/dev-notes.css">
+      <link rel="stylesheet" href="../../stylesheets/dev-notes.css">
     
-      <link rel="stylesheet" href="../../../../stylesheets/documentation.css">
+      <link rel="stylesheet" href="../../stylesheets/documentation.css">
     
-    <script>__md_scope=new URL("../../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    <script>__md_scope=new URL("../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
     
       
 
@@ -79,8 +75,6 @@
       document.documentElement.dataset.navigationDrawer = "closed";
     }
   </script>
-  
-    <link rel="alternate" type="text/markdown" href="../service-boundary.md" title="Markdown source">
   
 
   </head>
@@ -102,7 +96,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#service-boundary" class="md-skip">
+        <a href="#dependency-license-checks" class="md-skip">
           Skip to content
         </a>
       
@@ -118,9 +112,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../../.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     <label class="md-header__button md-icon openshell-drawer-button" for="__drawer" role="button" tabindex="0" aria-label="Open navigation" aria-controls="primary-navigation" aria-expanded="false">
@@ -141,7 +135,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Service boundary
+              Dependency License Checks
             
           </span>
         </div>
@@ -230,9 +224,9 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../../.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     OpenShell Research
@@ -284,7 +278,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../../dev-notes/" class="md-nav__link ">
+            <a href="../../dev-notes/" class="md-nav__link ">
               
   
   
@@ -381,7 +375,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../dev-notes/posts/2026-08-27-adversarial-policy-review-long-horizon-agents/" class="md-nav__link">
+      <a href="../../dev-notes/posts/2026-08-27-adversarial-policy-review-long-horizon-agents/" class="md-nav__link">
         
   
   
@@ -408,7 +402,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../dev-notes/posts/2026-08-07-formal-methods-ai-generated-robot-actions/" class="md-nav__link">
+      <a href="../../dev-notes/posts/2026-08-07-formal-methods-ai-generated-robot-actions/" class="md-nav__link">
         
   
   
@@ -435,7 +429,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
+      <a href="../../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
         
   
   
@@ -474,8 +468,6 @@
       
   
   
-    
-  
   
   
     
@@ -498,15 +490,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../" class="md-nav__link ">
+            <a href="../../documentation/" class="md-nav__link ">
               
   
   
@@ -529,7 +521,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -545,8 +537,6 @@
                 
   
   
-    
-  
   
   
     
@@ -570,15 +560,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../" class="md-nav__link ">
+            <a href="../../documentation/egress-gate/" class="md-nav__link ">
               
   
   
@@ -601,7 +591,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -677,7 +667,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../configuration/" class="md-nav__link">
+      <a href="../../documentation/egress-gate/configuration/" class="md-nav__link">
         
   
   
@@ -704,7 +694,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../request-content/" class="md-nav__link">
+      <a href="../../documentation/egress-gate/request-content/" class="md-nav__link">
         
   
   
@@ -731,7 +721,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../evaluation/" class="md-nav__link">
+      <a href="../../documentation/egress-gate/evaluation/" class="md-nav__link">
         
   
   
@@ -758,7 +748,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../operations/" class="md-nav__link">
+      <a href="../../documentation/egress-gate/operations/" class="md-nav__link">
         
   
   
@@ -817,7 +807,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../gates/" class="md-nav__link ">
+            <a href="../../documentation/egress-gate/gates/" class="md-nav__link ">
               
   
   
@@ -859,7 +849,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../gates/regex/" class="md-nav__link">
+      <a href="../../documentation/egress-gate/gates/regex/" class="md-nav__link">
         
   
   
@@ -886,7 +876,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../gates/custom/" class="md-nav__link">
+      <a href="../../documentation/egress-gate/gates/custom/" class="md-nav__link">
         
   
   
@@ -918,8 +908,6 @@
                 
   
   
-    
-  
   
   
     
@@ -939,15 +927,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2_4" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2_4" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../" class="md-nav__link ">
+            <a href="../../documentation/egress-gate/architecture/" class="md-nav__link ">
               
   
   
@@ -970,7 +958,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_2_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_2_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2_2_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -989,7 +977,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../request-lifecycle/" class="md-nav__link">
+      <a href="../../documentation/egress-gate/architecture/request-lifecycle/" class="md-nav__link">
         
   
   
@@ -1013,36 +1001,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-  Service boundary
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="././" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../documentation/egress-gate/architecture/service-boundary/" class="md-nav__link">
         
   
   
@@ -1057,71 +1019,6 @@
   
 
       </a>
-      
-        
-
-
-<nav class="md-nav md-nav--secondary" aria-label="On this page">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      On this page
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#rpcs" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        RPCs
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#shared-deadline-and-workers" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Shared deadline and workers
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#wire-findings-and-mutations" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Wire findings and mutations
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#lifecycle-and-errors" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Lifecycle and errors
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1193,7 +1090,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/limits-and-failures/" class="md-nav__link">
+      <a href="../../documentation/egress-gate/reference/limits-and-failures/" class="md-nav__link">
         
   
   
@@ -1256,7 +1153,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../../openshell-agent-runner/" class="md-nav__link ">
+            <a href="../../documentation/openshell-agent-runner/" class="md-nav__link ">
               
   
   
@@ -1342,10 +1239,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#rpcs" class="md-nav__link">
+  <a href="#repository-coverage" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        RPCs
+        Repository coverage
       </span>
     </span>
   </a>
@@ -1353,10 +1250,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#shared-deadline-and-workers" class="md-nav__link">
+  <a href="#policy-and-unresolved-results" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Shared deadline and workers
+        Policy and unresolved results
       </span>
     </span>
   </a>
@@ -1364,10 +1261,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#wire-findings-and-mutations" class="md-nav__link">
+  <a href="#results-and-remediation" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Wire findings and mutations
+        Results and remediation
       </span>
     </span>
   </a>
@@ -1375,10 +1272,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#lifecycle-and-errors" class="md-nav__link">
+  <a href="#rollout-and-full-audits" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Lifecycle and errors
+        Rollout and full audits
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Local checks
       </span>
     </span>
   </a>
@@ -1403,129 +1311,6 @@
   
 
 
-  <nav class="md-path" aria-label="Navigation" >
-    <ol class="md-path__list">
-      
-        
-  
-  
-    <li class="md-path__item">
-      <a href="../../../.." class="md-path__link">
-        
-  
-  <span class="md-ellipsis">
-    OpenShell Research
-  </span>
-
-      </a>
-    </li>
-  
-
-      
-      
-        
-  
-  
-    
-    
-      
-        
-          
-        
-      
-        
-      
-        
-      
-    
-    
-    
-    
-      <li class="md-path__item">
-        <a href="../../../" class="md-path__link">
-          
-  
-  <span class="md-ellipsis">
-    Documentation
-  </span>
-
-        </a>
-      </li>
-    
-  
-
-      
-        
-  
-  
-    
-    
-      
-        
-          
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-    
-      <li class="md-path__item">
-        <a href="../../" class="md-path__link">
-          
-  
-  <span class="md-ellipsis">
-    Egress Gate
-  </span>
-
-        </a>
-      </li>
-    
-  
-
-      
-        
-  
-  
-    
-    
-      
-        
-          
-        
-      
-        
-      
-        
-      
-    
-    
-    
-    
-      <li class="md-path__item">
-        <a href="../" class="md-path__link">
-          
-  
-  <span class="md-ellipsis">
-    Architecture
-  </span>
-
-        </a>
-      </li>
-    
-  
-
-      
-    </ol>
-  </nav>
-
               
               <article class="md-content__inner md-typeset">
                 
@@ -1535,91 +1320,114 @@
   
 
 
-  
-  <a href="../service-boundary.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.56 18H3.44C2.65 18 2 17.37 2 16.59V7.41C2 6.63 2.65 6 3.44 6h17.12c.79 0 1.44.63 1.44 1.41v9.18c0 .78-.65 1.41-1.44 1.41M3.44 6.94c-.26 0-.48.21-.48.47v9.19c0 .25.22.46.48.46h17.12c.26 0 .48-.21.48-.46V7.41c0-.26-.22-.47-.48-.47zm1.45 8.25V8.81h1.92l1.92 2.35 1.92-2.35h1.93v6.38h-1.93v-3.66l-1.92 2.35-1.92-2.35v3.66zm12.01 0-2.9-3.1h1.94V8.81h1.92v3.28h1.93z"/></svg>
-  </a>
 
-
-<h1 id="service-boundary">Service boundary</h1>
-<p>The <code>service/</code> package is the only handwritten package that imports OpenShell
-protobuf/gRPC bindings. It owns exact encoded wire limits and transport status
-mapping. Domain models own protobuf-free invariants.</p>
-<p>The optional admission deployment adds a bounded HTTPS candidate endpoint and
-authenticates standard gRPC calls using OpenShell's existing extension JWTs.
-It does not add a protobuf RPC. See <a href="../admission/">Admission without forks</a>.</p>
-<p>The OpenShell supervisor owns the intercepted request. Egress Gate receives its
-request data over gRPC and works with local immutable <code>HttpRequest</code> snapshots.
-The Egress Gate service adapter returns a decision and final mutations; the
-supervisor applies allowed mutations to the intercepted request.</p>
-<h2 id="rpcs">RPCs</h2>
-<table>
-<thead>
-<tr>
-<th>RPC</th>
-<th>Behavior</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>Describe</code></td>
-<td>Return Egress Gate's pre-credentials HTTP binding</td>
-</tr>
-<tr>
-<td><code>ValidateConfig</code></td>
-<td>Validate a complete registry-backed pipeline without publishing it</td>
-</tr>
-<tr>
-<td><code>EvaluateHttpRequest</code></td>
-<td>Adapt one request, prepare/reuse policy, execute, and serialize</td>
-</tr>
-</tbody>
-</table>
-<p>The configuration arrives as <code>google.protobuf.Struct</code>. The adapter normalizes
-safe integral doubles before strict domain validation and rejects oversized
-encoded configuration before registry parsing.</p>
-<h2 id="shared-deadline-and-workers">Shared deadline and workers</h2>
-<p><code>EvaluateHttpRequest</code> converts <code>timeout_middleware_processing</code> into one monotonic
-<code>Timeout</code> used for semaphore acquisition, policy preparation, replacement-lock
-waits, gate execution, and final result checks. <code>Describe</code> leaves the binding's
-optional RPC timeout empty. OpenShell therefore applies the separately
-configured gateway registration timeout to the complete RPC.</p>
-<p>The middleware protocol does not report the resolved gateway timeout back to
-Egress Gate, and OpenShell does not propagate it as a gRPC deadline. For the
-normal CLI-managed path, <code>add-gateway-registration</code> remembers the gateway TOML
-path and registration name. <code>serve</code> reads the current timeout from that entry
-at startup and requires it to be greater than
-<code>timeout_middleware_processing</code>. Direct Python API use and manually managed
-registrations do not have this startup check. If the gateway timeout expires
-first, OpenShell applies the policy's <code>on_error</code> behavior.</p>
-<p><code>RequestProcessor.process</code> accepts the caller-owned timeout and never creates or
-stores one.</p>
-<p>Synchronous work runs in a bounded four-slot executor. The gRPC server permits
-sixteen concurrent RPCs. Cancellation does not stop Python code that already
-runs in a worker. The worker owns its slot until it exits.</p>
-<h2 id="wire-findings-and-mutations">Wire findings and mutations</h2>
-<p>The current OpenShell <code>Finding</code> contains exactly <code>type</code>, <code>label</code>, <code>count</code>,
-<code>confidence</code>, and <code>severity</code>. <code>SourcedFinding.source_gate</code>, decision sources,
-and traces belong to the pipeline processor and are not serialized. Decision
-sources use a strict <code>kind</code>-discriminated union. The adapter rechecks protobuf
-finding and header sizes before returning a response.</p>
-<p><code>RequestMutations</code> is Egress Gate's internal aggregate. A gate returns it with
-<code>proceed</code> instead of modifying its input. The pipeline processor validates and
-applies it to a new local <code>HttpRequest</code> snapshot for the next gate.</p>
-<p>At the service boundary, the adapter maps the accumulated
-<code>RequestMutations.replacement_body</code> to <code>HttpRequestResult.body</code> and <code>has_body</code>.
-It maps each ordered header operation to
-<code>HttpRequestResult.header_mutations</code>. <code>None</code> means no body replacement, while
-empty bytes are emitted with <code>has_body=true</code>. The OpenShell supervisor applies
-these wire mutations after an allow.</p>
-<h2 id="lifecycle-and-errors">Lifecycle and errors</h2>
-<p>The active policy contains one validated configuration and one prepared
-pipeline processor. An equal configuration reuses the active pipeline
-processor. The service prepares a changed candidate before it publishes that
-candidate. An invalid candidate does not replace the active policy.</p>
-<p>Invalid input maps to <code>INVALID_ARGUMENT</code>. Internal gate or service failures map
-to <code>INTERNAL</code>. A pipeline processor limit denial is not a gRPC failure. It uses
-<code>egress_gate_limit_exceeded</code>.</p>
+<h1 id="dependency-license-checks">Dependency license checks</h1>
+<p>The <code>Dependency licenses</code> workflow enforces the repository's dependency-license
+policy on every pull request. It compares committed lockfiles, looks up license
+metadata for direct dependencies, and identifies additions and changes that
+must satisfy the policy. It uses no agent, inference service, secrets, or write
+permissions.</p>
+<p>The policy source of truth is
+<code>.github/dependency-license-policy.toml</code>. It contains the currently approved
+open-source licenses and any reviewed metadata clarifications. Keep policy
+details there rather than duplicating them in documentation.</p>
+<h2 id="repository-coverage">Repository coverage</h2>
+<p>The checker searches the complete tracked Git tree, regardless of folder. It
+reads files from the committed base and head revisions, so untracked, ignored,
+and uncommitted files are outside the check.</p>
+<p>Supported lockfiles are:</p>
+<ul>
+<li>Python: <code>uv.lock</code> and uv script lockfiles (<code>*.py.lock</code>).</li>
+<li>JavaScript: npm v2/v3 <code>package-lock.json</code>.</li>
+<li>Rust: <code>Cargo.lock</code>.</li>
+</ul>
+<p>The inventory includes external packages declared directly by each project,
+including development, optional, and platform-specific direct dependencies.
+Transitive packages and first-party project or workspace packages are excluded.</p>
+<p>For a pull request, a package is checked when its locked name, version, source,
+or lockfile location is added or changed. Removed packages do not fail the
+check. The report still includes unchanged current direct dependencies so that
+every run provides a repository-wide view. Only additions and changes affect
+the status of an ordinary pull request.</p>
+<p>Changed <code>pyproject.toml</code>, <code>package.json</code>, <code>Cargo.toml</code>, and PEP 723 inline-script
+metadata must have a corresponding lockfile or belong to a declared locked
+workspace. The workflow asks the native package manager to confirm that each
+affected lock is current:</p>
+<ul>
+<li>uv projects: <code>uv lock --check</code></li>
+<li>uv inline scripts: <code>uv lock --script SCRIPT --check</code></li>
+<li>npm projects: <code>npm ci --ignore-scripts --no-audit --no-fund</code></li>
+<li>Cargo projects: <code>cargo metadata --locked</code></li>
+</ul>
+<p>The npm command installs locked packages without lifecycle scripts. Cargo
+metadata does not build project code. A compatible constraint edit does not
+need to rewrite a lockfile when the native check accepts it.</p>
+<p>The checker does not inventory vendored code, datasets, model weights,
+container or system packages, unsupported package managers, or dependencies
+that are absent from a supported lockfile. A passing check is therefore not a
+complete legal clearance.</p>
+<h2 id="policy-and-unresolved-results">Policy and unresolved results</h2>
+<p>The policy approves a maintained set of open-source licenses. Consult
+<code>.github/dependency-license-policy.toml</code> for the current policy. License metadata
+that is missing, ambiguous, malformed, or not approved fails the check. Registry
+outages are unresolved rather than being treated as successful lookups. An
+unresolved addition or change fails the pull request; an unresolved unchanged
+dependency contributes no license to the report.</p>
+<p>Public metadata comes from PyPI, npm, or crates.io. Private registries, Git
+dependencies, and other unsupported source forms require reviewed, exact-source
+clarification.</p>
+<p>If metadata is incomplete, a maintainer can add a <code>[[clarification]]</code> entry with
+<code>ecosystem</code>, <code>name</code>, <code>version</code>, <code>source</code>, <code>license</code>, and an HTTPS <code>evidence</code> URL.
+Use the exact identity reported by the checker and verify the authoritative
+license evidence. A clarification must still satisfy the approved policy; it
+cannot grant an exception for an unapproved license.</p>
+<p>PR checks use the base branch's approved list when one exists. A proposed
+allowlist expansion cannot approve its own dependencies. Workflow and checker
+changes still require maintainer review because the workflow cannot protect
+itself from changes made in the same pull request.</p>
+<h2 id="results-and-remediation">Results and remediation</h2>
+<p>The workflow publishes the <code>Check dependency licenses</code> status and uploads a
+compact <code>dependency-licenses.json</code> artifact with three fields:</p>
+<ul>
+<li><code>folders</code> maps every scanned project folder to the lockfiles inspected there
+  and its direct-dependency licenses.</li>
+<li><code>licenses</code> maps every unique reported license value to the project folders
+  that depend on it.</li>
+<li><code>failures</code> maps affected project folders to the licenses that fail the check.
+  Missing or unusable license metadata is reported as <code>unknown</code>.</li>
+</ul>
+<p>The report contains no package-level records and does not list transitive
+dependency licenses.</p>
+<p>The lockfiles identify each direct dependency and its exact resolved version.
+The reported license value comes from that version's package-registry metadata
+or a reviewed policy clarification, not from the lockfile itself.</p>
+<p>For a failure:</p>
+<ol>
+<li>Confirm that the manifest and lockfile contain the intended dependency and
+   source.</li>
+<li>Check the package registry's exact-version metadata.</li>
+<li>If that metadata is incomplete, add a narrowly scoped clarification backed
+   by an authoritative HTTPS source.</li>
+<li>Treat any policy change as a separate maintainer decision. Do not broaden the
+   policy merely to make a check pass.</li>
+</ol>
+<h2 id="rollout-and-full-audits">Rollout and full audits</h2>
+<p>An ordinary pull request enforces policy only for direct dependency additions
+and changes, while still reporting all current direct-dependency licenses.
+Editing an existing policy triggers full enforcement, as does manually
+dispatching the workflow without a base revision.</p>
+<h2 id="local-checks">Local checks</h2>
+<p>From the repository root, run the pinned command in the workflow's <code>Test checker</code>
+step. Keeping the executable test command in the workflow provides one source of
+truth for its dependencies and versions.</p>
+<p>Compare committed revisions:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>run<span class="w"> </span>--locked<span class="w"> </span>--script<span class="w"> </span>scripts/check_dependency_licenses.py<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--base<span class="w"> </span>BASE_SHA<span class="w"> </span>--head<span class="w"> </span>HEAD_SHA<span class="w"> </span>--report<span class="w"> </span>/tmp/dependency-licenses.json
+</span></code></pre></div>
+<p>Omit <code>--base</code> for a full audit. To reproduce the base-branch policy constraint,
+also pass <code>--approved-policy</code> with a copy of that branch's policy file.
+The checker reads committed lockfiles, not uncommitted changes. Its own pinned
+dependencies are recorded in <code>scripts/check_dependency_licenses.py.lock</code>.</p>
 
 
 
@@ -1657,36 +1465,6 @@ to <code>INTERNAL</code>. A pipeline processor limit denial is not a gRPC failur
 <footer class="md-footer">
   
     
-      
-      <nav class="md-footer__inner md-grid" aria-label="Continue reading" >
-        
-          
-          <a href="../request-lifecycle/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Request lifecycle">
-            <div class="md-footer__button md-icon">
-              
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
-            </div>
-            <div class="md-footer__title">
-              <span class="md-footer__direction">Previous</span>
-              <div class="md-ellipsis">Request lifecycle</div>
-            </div>
-          </a>
-        
-        
-          
-          <a href="../../reference/limits-and-failures/" class="md-footer__link md-footer__link--next" aria-label="Next: Limits and failure behavior">
-            <div class="md-footer__title">
-              <span class="md-footer__direction">Next</span>
-              <div class="md-ellipsis">Limits and failure behavior</div>
-            </div>
-            <div class="md-footer__button md-icon">
-              
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </div>
-          </a>
-        
-      </nav>
-    
   
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
@@ -1713,12 +1491,12 @@ to <code>INTERNAL</code>. A pipeline processor limit denial is not a gRPC failur
     
       
       
-      <script id="__config" type="application/json">{"annotate":null,"base":"../../../..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"search":"../../../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"search":"../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
-      <script src="../../../../assets/javascripts/bundle.6e5f0216.min.js"></script>
+      <script src="../../assets/javascripts/bundle.6e5f0216.min.js"></script>
       
-        <script src="../../../../javascripts/navigation-drawer.js"></script>
+        <script src="../../javascripts/navigation-drawer.js"></script>
       
     
   </body>
