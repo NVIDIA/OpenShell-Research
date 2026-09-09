@@ -3,8 +3,10 @@ title: "Bringing Privacy and Security to the Edge with OpenShell"
 date: 2026-07-20
 updated: 2026-07-20
 description: "Edge agents handle sensitive data and make decisions with physical consequences. Reachy Mini shows why privacy and safety controls must be deterministic and local."
+author: "Kirit Thadaka"
 agent_markdown: true
 hero_image: "../../assets/reachy-mini-openshell/hero.svg"
+social_image: "assets/reachy-mini-openshell/hero.svg"
 categories:
   - Edge AI
 tags:

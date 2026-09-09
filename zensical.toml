@@ -1,6 +1,7 @@
 [project]
 site_name = "OpenShell Research"
-site_description = "Research engineering Dev Notes and software documentation from the OpenShell team."
+site_url = "https://nvidia.github.io/OpenShell-Research/"
+site_description = "Research engineering Dev Notes and documentation for secure AI agents, policy enforcement, automation, and robotics with OpenShell."
 site_author = "OpenShell Research Engineering"
 repo_url = "https://github.com/NVIDIA/OpenShell-Research"
 repo_name = "OpenShell Research on GitHub"
@@ -58,6 +59,10 @@ nav = [
 [project.extra]
 homepage = "."
 generator = false
+
+[project.extra.seo]
+# Keep internal instructions and legacy entry points available without indexing them.
+noindex_prefixes = ["development/", "projects/", "research/"]
 
 [project.markdown_extensions.admonition]
 

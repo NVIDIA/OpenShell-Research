@@ -3,6 +3,7 @@
 
 {% block extrahead %}
   {{ super() }}
+  {% include "partials/seo.html" %}
   <script>
     try {
       document.documentElement.dataset.navigationDrawer =
@@ -15,5 +16,13 @@
   </script>
   {% if page.meta and page.meta.agent_markdown %}
     <link rel="alternate" type="text/markdown" href="{{ agent_markdown.href(page) }}" title="Markdown source">
+  {% endif %}
+{% endblock %}
+
+{% block htmltitle %}
+  {% if page.canonical_url == config.site_url %}
+    <title>{{ config.site_name }}</title>
+  {% else %}
+    {{ super() }}
   {% endif %}
 {% endblock %}

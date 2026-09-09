@@ -1,6 +1,6 @@
 ---
 title: OpenShell Research
-description: Dev Notes and software documentation from the OpenShell team.
+description: OpenShell research, experiments, and documentation for secure AI agents, policy enforcement, automation, and robotics.
 hide:
   - toc
 ---

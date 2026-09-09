@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+      {# The homepage is intentionally outside the explicit navigation. #}
+      <url>
+        <loc>{{ config.site_url }}</loc>
+      </url>
+  {%- for page in pages -%}
+    {%- set seo = namespace() -%}
+    {%- set seo.noindex = false -%}
+    {%- if page.canonical_url -%}
+      {%- for prefix in config.extra.seo.noindex_prefixes -%}
+        {%- set prefix_url = config.site_url ~ prefix -%}
+        {%- if prefix_url in page.canonical_url -%}
+          {%- set seo.noindex = true -%}
+        {%- endif -%}
+      {%- endfor -%}
+    {%- endif -%}
+    {%- if page.canonical_url and not seo.noindex %}
+      <url>
+        <loc>{{ page.canonical_url }}</loc>
+      </url>
+    {%- endif -%}
+  {%- endfor %}
+</urlset>

@@ -1,1 +1,2 @@
+pytest==8.4.2
 zensical==0.0.44
