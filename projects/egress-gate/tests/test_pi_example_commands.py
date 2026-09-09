@@ -195,6 +195,75 @@ def test_every_action_prints_without_secrets_or_side_effects(tmp_path: Path) -> 
 
 
 @pytest.mark.parametrize(
+    ("failure", "expected_status"),
+    [
+        ("", 0),
+        (
+            "code: 'Some requested entity was not found', "
+            'message: "sandbox not found"',
+            0,
+        ),
+        ("code: 'Permission denied', message: \"sandbox not found\"", 7),
+        (
+            "code: 'Some requested entity was not found', "
+            'message: "workspace not found"',
+            7,
+        ),
+        ("Connection refused", 7),
+    ],
+)
+def test_cleanup_after_partial_setup(
+    tmp_path: Path, failure: str, expected_status: int
+) -> None:
+    example = tmp_path / "examples/demo"
+    example.mkdir(parents=True)
+    script = example / "demo.sh"
+    shutil.copyfile(EXAMPLE / "demo.sh", script)
+    commands = tmp_path / "commands"
+    binaries = tmp_path / "bin"
+    binaries.mkdir()
+    # Exercise the real shell flow without deleting a live sandbox or registration.
+    stub = f"""#!{sys.executable}
+import os, pathlib, sys
+with open(os.environ["COMMAND_LOG"], "a") as log:
+    log.write(pathlib.Path(sys.argv[0]).name + " " + " ".join(sys.argv[1:]) + "\\n")
+if "sandbox" in sys.argv and os.environ["SANDBOX_FAILURE"]:
+    print(os.environ["SANDBOX_FAILURE"], file=sys.stderr)
+    sys.exit(7)
+"""
+    for name in ("openshell", "uv"):
+        executable = binaries / name
+        executable.write_text(stub)
+        executable.chmod(0o755)
+    result = subprocess.run(
+        ["bash", str(script), "cleanup"],
+        capture_output=True,
+        text=True,
+        env=os.environ
+        | {
+            "PATH": f"{binaries}{os.pathsep}{os.environ['PATH']}",
+            "OPENSHELL_GATEWAY": "test-gateway",
+            "COMMAND_LOG": str(commands),
+            "SANDBOX_FAILURE": failure,
+        },
+    )
+    assert result.returncode == expected_status
+    recorded = commands.read_text().splitlines()
+    assert recorded[0] == "openshell --gateway test-gateway sandbox delete pi-admission"
+    if expected_status:
+        assert len(recorded) == 1
+        assert failure in result.stderr
+        assert "sessions removed" not in result.stdout
+    else:
+        assert len(recorded) == 7
+        assert "provider delete pi-admission-model" in recorded[1]
+        assert "provider profile delete pi-admission-admission" in recorded[4]
+        assert "gateway-registration.py unregister" in recorded[-1]
+        if failure:
+            assert "already absent; continuing cleanup" in result.stdout
+
+
+@pytest.mark.parametrize(
     "installation", ["homebrew-prefix", "homebrew-user", "systemd", "systemd-defaults"]
 )
 def test_installer_registration_round_trip(

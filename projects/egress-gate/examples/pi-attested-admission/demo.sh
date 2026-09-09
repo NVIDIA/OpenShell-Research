@@ -23,6 +23,24 @@ openshell=(openshell --gateway "$gateway")
 run() {
   if $print_only; then printf '%q ' "$@"; printf '\n'; else "$@"; fi
 }
+delete_if_present() {
+  local resource=$1 output status
+  shift
+  if $print_only; then run "$@"; return; fi
+  if output=$("$@" 2>&1); then
+    printf '%s\n' "$output"
+  else
+    status=$?
+    # Older OpenShell releases return gRPC NotFound for an absent resource.
+    if [[ $output == *"code: 'Some requested entity was not found'"* &&
+          $output == *"message: \"$resource not found\""* ]]; then
+      printf '%s already absent; continuing cleanup.\n' "$resource"
+    else
+      printf '%s\n' "$output" >&2
+      return "$status"
+    fi
+  fi
+}
 registration() {
   run uv run --frozen python "$example/gateway-registration.py" "$1" --state "$state" --gateway "$gateway"
   if $print_only; then
@@ -98,10 +116,10 @@ case "$action" in
     ;;
   cleanup)
     if ! $print_only; then : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}"; fi
-    run "${openshell[@]}" sandbox delete pi-admission
+    delete_if_present sandbox "${openshell[@]}" sandbox delete pi-admission
     for provider in model admission; do
-      run "${openshell[@]}" provider delete "pi-admission-$provider"
-      run "${openshell[@]}" provider profile delete "pi-admission-$provider"
+      delete_if_present provider "${openshell[@]}" provider delete "pi-admission-$provider"
+      delete_if_present 'provider profile' "${openshell[@]}" provider profile delete "pi-admission-$provider"
     done
     run uv run --frozen python -c 'import pathlib,sys; pathlib.Path(sys.argv[1]).unlink(missing_ok=True)' "$state/sandbox-id"
     registration unregister
