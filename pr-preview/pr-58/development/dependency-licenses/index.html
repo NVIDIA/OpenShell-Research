@@ -1324,8 +1324,9 @@
 <h1 id="dependency-license-checks">Dependency license checks</h1>
 <p>The <code>Dependency licenses</code> workflow enforces the repository's dependency-license
 policy on every pull request. It compares committed lockfiles, looks up license
-metadata for added or changed packages, and fails when a result does not satisfy
-the policy. It uses no agent, inference service, secrets, or write permissions.</p>
+metadata for direct dependencies, and identifies additions and changes that
+must satisfy the policy. It uses no agent, inference service, secrets, or write
+permissions.</p>
 <p>The policy source of truth is
 <code>.github/dependency-license-policy.toml</code>. It contains the currently approved
 open-source licenses and any reviewed metadata clarifications. Keep policy
@@ -1340,12 +1341,14 @@ and uncommitted files are outside the check.</p>
 <li>JavaScript: npm v2/v3 <code>package-lock.json</code>.</li>
 <li>Rust: <code>Cargo.lock</code>.</li>
 </ul>
-<p>The inventory includes external direct and transitive packages, including
-development, optional, and platform-specific dependencies. First-party project
-and workspace packages are excluded.</p>
+<p>The inventory includes external packages declared directly by each project,
+including development, optional, and platform-specific direct dependencies.
+Transitive packages and first-party project or workspace packages are excluded.</p>
 <p>For a pull request, a package is checked when its locked name, version, source,
 or lockfile location is added or changed. Removed packages do not fail the
-check. Unchanged packages are not rechecked during an ordinary pull request.</p>
+check. The report still includes unchanged current direct dependencies so that
+every run provides a repository-wide view. Only additions and changes affect
+the status of an ordinary pull request.</p>
 <p>Changed <code>pyproject.toml</code>, <code>package.json</code>, <code>Cargo.toml</code>, and PEP 723 inline-script
 metadata must have a corresponding lockfile or belong to a declared locked
 workspace. The workflow asks the native package manager to confirm that each
@@ -1367,7 +1370,9 @@ complete legal clearance.</p>
 <p>The policy approves a maintained set of open-source licenses. Consult
 <code>.github/dependency-license-policy.toml</code> for the current policy. License metadata
 that is missing, ambiguous, malformed, or not approved fails the check. Registry
-outages fail as unresolved rather than being treated as successful checks.</p>
+outages are unresolved rather than being treated as successful lookups. An
+unresolved addition or change fails the pull request; an unresolved unchanged
+dependency contributes no license to the report.</p>
 <p>Public metadata comes from PyPI, npm, or crates.io. Private registries, Git
 dependencies, and other unsupported source forms require reviewed, exact-source
 clarification.</p>
@@ -1382,8 +1387,20 @@ changes still require maintainer review because the workflow cannot protect
 itself from changes made in the same pull request.</p>
 <h2 id="results-and-remediation">Results and remediation</h2>
 <p>The workflow publishes the <code>Check dependency licenses</code> status and uploads a
-<code>dependency-licenses.json</code> artifact. Each result records the package identity,
-source, affected lockfiles, reported license, and reason for passing or failing.</p>
+compact <code>dependency-licenses.json</code> artifact with three fields:</p>
+<ul>
+<li><code>folders</code> maps every scanned project folder to the lockfiles inspected there
+  and its direct-dependency licenses.</li>
+<li><code>licenses</code> maps every unique reported license value to the project folders
+  that depend on it.</li>
+<li><code>failures</code> maps affected project folders to the licenses that fail the check.
+  Missing or unusable license metadata is reported as <code>unknown</code>.</li>
+</ul>
+<p>The report contains no package-level records and does not list transitive
+dependency licenses.</p>
+<p>The lockfiles identify each direct dependency and its exact resolved version.
+The reported license value comes from that version's package-registry metadata
+or a reviewed policy clarification, not from the lockfile itself.</p>
 <p>For a failure:</p>
 <ol>
 <li>Confirm that the manifest and lockfile contain the intended dependency and
@@ -1395,10 +1412,10 @@ source, affected lockfiles, reported license, and reason for passing or failing.
    policy merely to make a check pass.</li>
 </ol>
 <h2 id="rollout-and-full-audits">Rollout and full audits</h2>
-<p>An ordinary pull request checks only dependency additions and changes. Editing
-an existing policy triggers a full inventory audit, as does manually dispatching
-the workflow without a base revision. A full audit evaluates every external
-package in every supported tracked lockfile.</p>
+<p>An ordinary pull request enforces policy only for direct dependency additions
+and changes, while still reporting all current direct-dependency licenses.
+Editing an existing policy triggers full enforcement, as does manually
+dispatching the workflow without a base revision.</p>
 <h2 id="local-checks">Local checks</h2>
 <p>From the repository root, run the pinned command in the workflow's <code>Test checker</code>
 step. Keeping the executable test command in the workflow provides one source of
