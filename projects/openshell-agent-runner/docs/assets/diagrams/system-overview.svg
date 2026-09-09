@@ -1,36 +1,116 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 330" role="img" aria-labelledby="title description">
-  <title id="title">From input to result</title>
-  <desc id="description">Pass a profile and input to OAR. OAR runs the agent in an OpenShell sandbox, saves the result on your machine, and removes the sandbox.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 640" role="img" aria-labelledby="title description">
+  <title id="title">Independent OAR runs on one OpenShell gateway</title>
+  <desc id="description">Three separate oar run invocations share one OpenShell gateway. Runs 1 and 3 use the code-reviewer profile on different projects. Run 2 uses technical-writing-reviewer on a document. Each run uploads its own input to a separate sandbox, runs an agent, and returns its own result file. OAR removes each sandbox when its task finishes; the gateway remains available.</desc>
   <defs>
     <style>
       text{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;fill:#24352c}
-      .box{fill:#f6f8f7;stroke:#b9c8bf;stroke-width:1.5}
-      .accent{fill:#edf6dc;stroke:#76a938;stroke-width:1.5}
-      .title{font-size:22px;font-weight:650}
+      .host{fill:#f4f5f2;stroke:#c8cec8;stroke-width:1.5}
+      .gateway{fill:#f5f9ee;stroke:#7da54b;stroke-width:2}
+      .sandbox{fill:#fff;stroke:#9dad9e;stroke-width:1.5;stroke-dasharray:5 4}
+      .writing{stroke:#7598ae}
+      .heading{font-size:25px;font-weight:650}
+      .label{font-size:17px;font-weight:600}
       .note{font-size:16px;fill:#53665a}
-      .arrow{fill:none;stroke:#73877b;stroke-width:2;marker-end:url(#arrow)}
-      @media(prefers-color-scheme:dark){text{fill:#edf3ee}.box{fill:#202c25;stroke:#64786c}.accent{fill:#2b3c1e;stroke:#8fba53}.note{fill:#c2cec5}}
+      .small{font-size:14px;fill:#53665a}
+      .mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+      .profile{font-size:20px;font-weight:600}
+      .input{font-size:18px}
+      .result{font-size:15px;fill:#53665a}
+      .rule{stroke:#c8cec8;stroke-width:1}
+      .launch{fill:none;stroke:#568029;stroke-width:2;marker-end:url(#launch-arrow)}
+      .return{fill:none;stroke:#73877b;stroke-width:1.7;stroke-dasharray:4 4;marker-end:url(#return-arrow)}
+      .code-badge{fill:#e6efda;stroke:#a2b887;stroke-width:1}
+      .writing-badge{fill:#e8f0f5;stroke:#94adbd;stroke-width:1}
+      .number{font-size:14px;font-weight:650;text-anchor:middle}
+      @media(prefers-color-scheme:dark){
+        text{fill:#edf3ee}
+        .host{fill:#202722;stroke:#59685e}
+        .gateway{fill:#23301b;stroke:#8eaf62}
+        .sandbox{fill:#1c2720;stroke:#859788}
+        .writing{stroke:#85a6bb}
+        .note,.small,.result{fill:#bdcbbf}
+        .rule{stroke:#59685e}
+        .code-badge{fill:#354b26;stroke:#7b9c57}
+        .writing-badge{fill:#293f4c;stroke:#799cac}
+        .launch{stroke:#8eb55d}
+      }
     </style>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+    <marker id="launch-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#719447"/>
+    </marker>
+    <marker id="return-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
       <path d="M0 0 10 5 0 10Z" fill="#73877b"/>
     </marker>
   </defs>
-  <rect x="25" y="25" width="250" height="95" rx="12" class="box"/>
-  <text x="150" y="65" text-anchor="middle" class="title">Profile + input</text>
-  <text x="150" y="93" text-anchor="middle" class="note">Your instructions and files</text>
-  <path d="M275 72H363" class="arrow"/>
-  <rect x="365" y="25" width="250" height="95" rx="12" class="accent"/>
-  <text x="490" y="65" text-anchor="middle" class="title">OAR</text>
-  <text x="490" y="93" text-anchor="middle" class="note">One command, one task</text>
-  <path d="M490 120V192" class="arrow"/>
-  <text x="478" y="163" text-anchor="end" class="note">Create and run</text>
-  <rect x="365" y="195" width="250" height="110" rx="12" class="box"/>
-  <text x="490" y="231" text-anchor="middle" class="title">OpenShell sandbox</text>
-  <text x="490" y="259" text-anchor="middle" class="note">Agent runs one task</text>
-  <text x="490" y="283" text-anchor="middle" class="note">Removed after the run</text>
-  <path d="M365 250H277" class="arrow"/>
-  <text x="320" y="235" text-anchor="middle" class="note">Save</text>
-  <rect x="25" y="195" width="250" height="110" rx="12" class="accent"/>
-  <text x="150" y="236" text-anchor="middle" class="title">Result file</text>
-  <text x="150" y="265" text-anchor="middle" class="note">Saved to your output path</text>
+
+  <!-- The caller owns the invocations, original inputs, and returned results. -->
+  <rect x="20" y="22" width="232" height="594" rx="16" class="host"/>
+  <text x="40" y="57" class="label">Your terminal or CI</text>
+  <path d="m42 78 8 7-8 7m15 0h10" fill="none" stroke="#73877b" stroke-width="2"/>
+  <text x="78" y="97" class="heading">OAR</text>
+  <text x="40" y="125" class="note">One invocation per task</text>
+
+  <!-- A single gateway contains all three isolated sandboxes. -->
+  <rect x="330" y="22" width="490" height="594" rx="16" class="gateway"/>
+  <text x="354" y="61" class="heading">OpenShell gateway</text>
+  <text x="354" y="93" class="note">Reused across runs</text>
+  <text x="354" y="120" class="note">Shared inference connection</text>
+
+  <!-- Run 1: the first use of the code review profile. -->
+  <path d="M40 149H232" class="rule"/>
+  <circle cx="49" cy="179" r="12" class="code-badge"/>
+  <text x="49" y="184" class="number">1</text>
+  <text x="74" y="185" class="mono label">oar run</text>
+  <text x="40" y="218" class="mono input">./service/</text>
+  <text x="40" y="254" class="mono result">service-review.json</text>
+
+  <rect x="356" y="155" width="438" height="115" rx="10" class="sandbox"/>
+  <text x="376" y="180" class="label">Sandbox 1</text>
+  <text x="774" y="180" text-anchor="end" class="small">Agent + uploaded files</text>
+  <text x="376" y="214" class="mono profile">code-reviewer</text>
+  <text x="376" y="246" class="mono note">review-repository</text>
+  <path d="M252 213H354" class="launch"/>
+  <text x="292" y="203" text-anchor="middle" class="small">input</text>
+  <path d="M356 249H254" class="return"/>
+  <text x="292" y="239" text-anchor="middle" class="small">result</text>
+
+  <!-- Run 2: a different profile on the same gateway. -->
+  <path d="M40 291H232" class="rule"/>
+  <circle cx="49" cy="321" r="12" class="writing-badge"/>
+  <text x="49" y="326" class="number">2</text>
+  <text x="74" y="327" class="mono label">oar run</text>
+  <text x="40" y="360" class="mono input">./design.md</text>
+  <text x="40" y="396" class="mono result">writing-review.json</text>
+
+  <rect x="356" y="297" width="438" height="115" rx="10" class="sandbox writing"/>
+  <text x="376" y="322" class="label">Sandbox 2</text>
+  <text x="774" y="322" text-anchor="end" class="small">Agent + uploaded files</text>
+  <text x="376" y="356" class="mono profile">technical-writing-reviewer</text>
+  <text x="376" y="388" class="mono note">review-document</text>
+  <path d="M252 355H354" class="launch"/>
+  <text x="292" y="345" text-anchor="middle" class="small">input</text>
+  <path d="M356 391H254" class="return"/>
+  <text x="292" y="381" text-anchor="middle" class="small">result</text>
+
+  <!-- Run 3: reusing a profile still creates an independent sandbox. -->
+  <path d="M40 433H232" class="rule"/>
+  <circle cx="49" cy="463" r="12" class="code-badge"/>
+  <text x="49" y="468" class="number">3</text>
+  <text x="74" y="469" class="mono label">oar run</text>
+  <text x="40" y="502" class="mono input">./cli/</text>
+  <text x="40" y="538" class="mono result">cli-review.json</text>
+
+  <rect x="356" y="439" width="438" height="115" rx="10" class="sandbox"/>
+  <text x="376" y="464" class="label">Sandbox 3</text>
+  <text x="774" y="464" text-anchor="end" class="small">Agent + uploaded files</text>
+  <text x="376" y="498" class="mono profile">code-reviewer</text>
+  <text x="376" y="530" class="mono note">review-repository</text>
+  <path d="M252 497H354" class="launch"/>
+  <text x="292" y="487" text-anchor="middle" class="small">input</text>
+  <path d="M356 533H254" class="return"/>
+  <text x="292" y="523" text-anchor="middle" class="small">result</text>
+
+  <text x="40" y="589" class="small">One output file per run.</text>
+  <text x="354" y="581" class="note">Each sandbox is removed when its task finishes.</text>
+  <text x="354" y="604" class="small">The gateway stays available for the next run.</text>
 </svg>
