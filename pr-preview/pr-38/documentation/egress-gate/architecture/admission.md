@@ -80,7 +80,11 @@ and does not load third-party extensions or implicitly resume saved transcripts.
 
 The service adds one bounded `POST /v1/admission` HTTPS endpoint alongside
 ordinary OpenShell middleware gRPC. It reuses the transport-neutral admission
-models, shape adapters, policy pipeline and receipt authority.
+models, shape adapters, policy pipeline and receipt authority. Provider validation
+supports Chat Completions only and extracts ordered user/tool entries directly;
+there is no second normalized model-request representation. Branching, extension
+messages and standalone bash-execution envelopes are not admission APIs in this
+POC. Bash tool output uses the same tool-result boundary as other tools.
 
 The host setup provisions one admission bearer credential, provider destination,
 policy and actual sandbox ID. The sandbox cannot select its authoritative
@@ -140,6 +144,11 @@ The implementation's deterministic tests cover pending/denied candidates before
 both live and durable writes, accepted replacements, real tool continuations,
 and the shared manual/auto compaction path. Service tests cover authenticated
 caller binding, upstream RPCs, receipts, policy decisions and header removal.
+A cross-language integration test also runs the actual Pi serializer and HTTP
+admission client against local HTTPS admission and provider endpoints. It checks
+redaction, skills, a real read-tool continuation, both compaction paths and
+receipt verification over authenticated gRPC. Only provider responses are
+controlled test data; it does not substitute for live OpenShell acceptance.
 The example's `demo.sh verify` is a separate real-model end-to-end acceptance
 command, not a simulated demonstration. Its success must be observed, not inferred
 from unit tests. See the PR validation record for the latest executed checks.
