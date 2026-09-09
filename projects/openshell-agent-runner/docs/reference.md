@@ -84,12 +84,22 @@ underscores, cannot start with a number, and cannot start with `OPENSHELL_`.
 
 ## What happens during a run
 
-![OAR checks the request, creates a sandbox and uploads files, runs Pi, validates and saves the result, then removes the sandbox.](assets/diagrams/run-lifecycle.svg)
+Your profile and command options start the run. OAR prepares the selected task's
+instructions and uses OpenShell to create its sandbox; the agent executes there
+using the gateway's configured inference connection.
+
+<figure class="documentation-figure documentation-figure--wide">
+  <a href="assets/diagrams/run-lifecycle.svg" aria-label="Open the OAR run lifecycle diagram at full size">
+    <img src="assets/diagrams/run-lifecycle.svg" alt="On the caller's machine, OAR loads the profile and inputs, resolves prompt variables, and creates a sandbox with the profile policy. It uploads the input, prompt, skills, and optional schema. Pi runs inside that sandbox using gateway inference. OAR downloads and validates the result, saves the output, then verifies ownership and removes only the sandbox.">
+  </a>
+  <figcaption>The profile and final output stay on your machine. OAR runs the agent in an OpenShell sandbox and cleans it up when done. Select the diagram to view it at full size.</figcaption>
+</figure>
 
 OAR downloads only the result, which must be non-empty and no larger than
-1 MiB. For a JSON task, it must also match the output schema. OAR replaces the
-host output only after validation succeeds; a failed download or invalid
-result leaves an existing output untouched.
+1 MiB. For a JSON task, it must also match the
+[schema named by the profile task](profiles.md#choose-the-result-format). OAR
+replaces the host output only after validation succeeds; a failed download or
+invalid result leaves an existing output untouched.
 
 Cleanup also runs after failures. OAR checks the sandbox name and its
 `oar-run-id` ownership label before deleting it. `--keep-sandbox` skips deletion.

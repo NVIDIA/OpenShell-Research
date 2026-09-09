@@ -128,15 +128,29 @@ access, including commands run through `bash`.
 
 ## Choose the result format
 
-Omit `output_schema` to save the agent's final text response. Add it to require
-JSON with specific fields. The included reviewers use JSON.
+The result schema is a JSON file **in your profile**. Each task names the file
+through `output_schema` in `profile.yaml`. For the included reviewers, `oar init`
+copies `schemas/review.json` into the profile; you can edit it to change the
+required fields, types, and bounds. OAR supplies the validation machinery.
 
-![Without a schema, OAR saves the agent's final text. With a schema, the agent submits JSON and can correct validation errors. OAR checks the downloaded result before saving it.](assets/diagrams/result-handling.svg)
+<figure class="documentation-figure documentation-figure--wide">
+  <a href="assets/diagrams/result-handling.svg" aria-label="Open the result validation diagram at full size">
+    <img src="assets/diagrams/result-handling.svg" alt="The selected task points to a schema file in the profile. OAR uploads a copy for submit_result to check the agent's JSON in the sandbox, then checks the downloaded JSON against the profile's schema before saving the host output. Invalid submissions return errors to the agent for correction.">
+  </a>
+  <figcaption>The profile defines the format. OAR checks it in the sandbox and again on your machine. Select the diagram to view it at full size.</figcaption>
+</figure>
 
-For a JSON task, OAR provides the `submit_result` tool automatically. Tell the
-agent to finish by calling it. Invalid submissions return errors so the agent
-can correct and resubmit. OAR checks the downloaded JSON against the same
-schema before replacing the output file.
+For a JSON task, OAR uploads a copy of that schema along with its built-in
+`submit_result` tool. Tell the agent to finish by calling the tool. Invalid
+submissions return errors so the agent can correct and resubmit. OAR downloads
+the result and validates it against the profile's schema before replacing the
+file at `--output`.
+
+Omit `output_schema` to save the agent's final text response instead. The
+`--output` option chooses only the destination. OAR still checks that the result
+is non-empty and within the size limit. The
+[run lifecycle](reference.md#what-happens-during-a-run) shows how both formats fit
+into sandbox creation, execution, and cleanup.
 
 Use JSON Schema Draft 2020-12 with inline definitions. References (`$ref`,
 `$dynamicRef`, `$recursiveRef`) and regex keywords (`pattern`,
