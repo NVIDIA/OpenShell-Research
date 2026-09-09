@@ -1239,10 +1239,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#coverage" class="md-nav__link">
+  <a href="#repository-coverage" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Coverage
+        Repository coverage
       </span>
     </span>
   </a>
@@ -1254,6 +1254,17 @@
     <span class="md-ellipsis">
       <span class="md-typeset">
         Policy and unresolved results
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results-and-remediation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Results and remediation
       </span>
     </span>
   </a>
@@ -1311,69 +1322,90 @@
 
 
 <h1 id="dependency-license-checks">Dependency license checks</h1>
-<p>The <code>Dependency licenses</code> workflow runs on every pull request. It compares the
-base and head lockfiles, looks up the exact versions of added or changed packages,
-and checks their reported licenses against
-<code>.github/dependency-license-policy.toml</code>. It uses no agent, inference service,
-secrets, or write permissions.</p>
-<p>The workflow returns a pass/fail check and uploads <code>dependency-licenses.json</code>.
-Maintainers can make <code>Check dependency licenses</code> a required check in repository
-rules. Adding this workflow does not change those rules automatically.</p>
-<h2 id="coverage">Coverage</h2>
+<p>The <code>Dependency licenses</code> workflow enforces the repository's dependency-license
+policy on every pull request. It compares committed lockfiles, looks up license
+metadata for added or changed packages, and fails when a result does not satisfy
+the policy. It uses no agent, inference service, secrets, or write permissions.</p>
+<p>The policy source of truth is
+<code>.github/dependency-license-policy.toml</code>. It contains the currently approved
+open-source licenses and any reviewed metadata clarifications. Keep policy
+details there rather than duplicating them in documentation.</p>
+<h2 id="repository-coverage">Repository coverage</h2>
+<p>The checker searches the complete tracked Git tree, regardless of folder. It
+reads files from the committed base and head revisions, so untracked, ignored,
+and uncommitted files are outside the check.</p>
 <p>Supported lockfiles are:</p>
 <ul>
 <li>Python: <code>uv.lock</code> and uv script lockfiles (<code>*.py.lock</code>).</li>
 <li>JavaScript: npm v2/v3 <code>package-lock.json</code>.</li>
 <li>Rust: <code>Cargo.lock</code>.</li>
 </ul>
-<p>Checks cover the external packages recorded in those files, including transitive,
-development, optional, and platform-specific dependencies. A changed version or
-source is checked again. Removing a dependency does not fail the check.
-New dependency manifests need a corresponding lockfile or membership in a
-declared locked workspace. Unchanged inventories are not a full-repository audit.</p>
-<p>The workflow also validates affected project and inline-script locks with their
-package managers: <code>uv lock --check</code>, <code>uv lock --script SCRIPT --check</code>,
-<code>npm ci --ignore-scripts --no-audit --no-fund</code>, or <code>cargo metadata --locked</code>.
-The npm check installs locked packages without lifecycle scripts; Cargo metadata
-does not build project code. A compatible constraint edit need not rewrite a
-lockfile if the native check accepts it.</p>
-<p>This is not a complete inventory of vendored code, datasets, model weights,
-container/system packages, or unsupported package managers. Passing the check
-does not constitute complete legal clearance.</p>
+<p>The inventory includes external direct and transitive packages, including
+development, optional, and platform-specific dependencies. First-party project
+and workspace packages are excluded.</p>
+<p>For a pull request, a package is checked when its locked name, version, source,
+or lockfile location is added or changed. Removed packages do not fail the
+check. Unchanged packages are not rechecked during an ordinary pull request.</p>
+<p>Changed <code>pyproject.toml</code>, <code>package.json</code>, <code>Cargo.toml</code>, and PEP 723 inline-script
+metadata must have a corresponding lockfile or belong to a declared locked
+workspace. The workflow asks the native package manager to confirm that each
+affected lock is current:</p>
+<ul>
+<li>uv projects: <code>uv lock --check</code></li>
+<li>uv inline scripts: <code>uv lock --script SCRIPT --check</code></li>
+<li>npm projects: <code>npm ci --ignore-scripts --no-audit --no-fund</code></li>
+<li>Cargo projects: <code>cargo metadata --locked</code></li>
+</ul>
+<p>The npm command installs locked packages without lifecycle scripts. Cargo
+metadata does not build project code. A compatible constraint edit does not
+need to rewrite a lockfile when the native check accepts it.</p>
+<p>The checker does not inventory vendored code, datasets, model weights,
+container or system packages, unsupported package managers, or dependencies
+that are absent from a supported lockfile. A passing check is therefore not a
+complete legal clearance.</p>
 <h2 id="policy-and-unresolved-results">Policy and unresolved results</h2>
-<p>The approved identifiers are <code>Apache-2.0</code>, <code>BSD-2-Clause</code>, <code>BSD-3-Clause</code>, <code>ISC</code>,
-<code>MIT</code>, and <code>MIT-CMU</code>. Bare <code>BSD</code> is ambiguous and is not an approved identifier.</p>
-<p>SPDX <code>OR</code> expressions pass when at least one alternative is approved; <code>AND</code>
-requires every term. A <code>WITH</code> combination must be approved explicitly as a whole.
-Unknown, malformed, missing, or unapproved license metadata fails visibly.
-Registry outages also fail as unresolved, not as successful checks.</p>
+<p>The policy approves a maintained set of open-source licenses. Consult
+<code>.github/dependency-license-policy.toml</code> for the current policy. License metadata
+that is missing, ambiguous, malformed, or not approved fails the check. Registry
+outages fail as unresolved rather than being treated as successful checks.</p>
 <p>Public metadata comes from PyPI, npm, or crates.io. Private registries, Git
 dependencies, and other unsupported source forms require reviewed, exact-source
-clarification. First-party Cargo workspace/path packages are not registry
-dependencies.</p>
+clarification.</p>
 <p>If metadata is incomplete, a maintainer can add a <code>[[clarification]]</code> entry with
 <code>ecosystem</code>, <code>name</code>, <code>version</code>, <code>source</code>, <code>license</code>, and an HTTPS <code>evidence</code> URL.
 Use the exact identity reported by the checker and verify the authoritative
-license evidence. A clarification must still satisfy the approved list; it is
-not an exception permitting an unapproved license.</p>
+license evidence. A clarification must still satisfy the approved policy; it
+cannot grant an exception for an unapproved license.</p>
 <p>PR checks use the base branch's approved list when one exists. A proposed
 allowlist expansion cannot approve its own dependencies. Workflow and checker
-edits still require maintainer review; this is not tamper-proof against authors
-who can rewrite the check itself.</p>
+changes still require maintainer review because the workflow cannot protect
+itself from changes made in the same pull request.</p>
+<h2 id="results-and-remediation">Results and remediation</h2>
+<p>The workflow publishes the <code>Check dependency licenses</code> status and uploads a
+<code>dependency-licenses.json</code> artifact. Each result records the package identity,
+source, affected lockfiles, reported license, and reason for passing or failing.</p>
+<p>For a failure:</p>
+<ol>
+<li>Confirm that the manifest and lockfile contain the intended dependency and
+   source.</li>
+<li>Check the package registry's exact-version metadata.</li>
+<li>If that metadata is incomplete, add a narrowly scoped clarification backed
+   by an authoritative HTTPS source.</li>
+<li>Treat any policy change as a separate maintainer decision. Do not broaden the
+   policy merely to make a check pass.</li>
+</ol>
 <h2 id="rollout-and-full-audits">Rollout and full audits</h2>
-<p>When introducing this policy, the PR check covers additions and changes, not
-unchanged dependencies across the repository. Later edits to the existing policy
-trigger a full inventory audit. Manual workflow dispatch also audits the full
-inventory. Existing dependencies may need separate remediation or explicit
-policy decisions; do not add blanket approvals to hide those results.</p>
+<p>An ordinary pull request checks only dependency additions and changes. Editing
+an existing policy triggers a full inventory audit, as does manually dispatching
+the workflow without a base revision. A full audit evaluates every external
+package in every supported tracked lockfile.</p>
 <h2 id="local-checks">Local checks</h2>
-<p>From the repository root, run the isolated unit tests:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>run<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.12<span class="w"> </span>--with<span class="w"> </span>license-expression<span class="o">==</span><span class="m">30</span>.4.4<span class="w"> </span>--with<span class="w"> </span>boolean.py<span class="o">==</span><span class="m">5</span>.0<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--with<span class="w"> </span><span class="nv">pytest</span><span class="o">==</span><span class="m">8</span>.4.2<span class="w"> </span>pytest<span class="w"> </span>-q<span class="w"> </span>tests/test_dependency_licenses.py
-</span></code></pre></div>
+<p>From the repository root, run the pinned command in the workflow's <code>Test checker</code>
+step. Keeping the executable test command in the workflow provides one source of
+truth for its dependencies and versions.</p>
 <p>Compare committed revisions:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>run<span class="w"> </span>--locked<span class="w"> </span>--script<span class="w"> </span>scripts/check_dependency_licenses.py<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--base<span class="w"> </span>BASE_SHA<span class="w"> </span>--head<span class="w"> </span>HEAD_SHA<span class="w"> </span>--report<span class="w"> </span>/tmp/dependency-licenses.json
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>run<span class="w"> </span>--locked<span class="w"> </span>--script<span class="w"> </span>scripts/check_dependency_licenses.py<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--base<span class="w"> </span>BASE_SHA<span class="w"> </span>--head<span class="w"> </span>HEAD_SHA<span class="w"> </span>--report<span class="w"> </span>/tmp/dependency-licenses.json
 </span></code></pre></div>
 <p>Omit <code>--base</code> for a full audit. To reproduce the base-branch policy constraint,
 also pass <code>--approved-policy</code> with a copy of that branch's policy file.
