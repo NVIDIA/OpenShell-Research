@@ -26,13 +26,33 @@ From this directory:
 
 ```sh
 cp .env.example .env
+cp model.json.example model.json
 # Fill in the gateway name, reachable Egress Gate host, and model API key.
-# Edit model.json if using a different endpoint/model.
+# Edit model.json for your endpoint, model ID, and token limits (see below).
 ./demo.sh prepare
 ./demo.sh registration
 ```
 
-The checked-in model uses NVIDIA's inference endpoint and requires access to it.
+Create your own `model.json` from [model.json.example](model.json.example).
+No working provider configuration is shipped. Use a text-only, tool-capable
+OpenAI-compatible Chat Completions endpoint; NVIDIA inference is one option if
+you have access, not a requirement. Set:
+
+- `id` and `name`: your provider's model ID and a display name.
+- `baseUrl`: the HTTPS API base, such as `https://your-provider.example/v1`;
+  the application appends `/chat/completions`.
+- `contextWindow` and `maxTokens`: the model's context limit and your desired
+  response limit, in tokens. The template's numbers are examples.
+- `compat.maxTokensField`: the field your provider accepts (`max_tokens` or
+  `max_completion_tokens`). The other compatibility settings are conservative
+  defaults; adjust them if your endpoint requires it.
+
+Keep `api`, `provider`, `reasoning`, and `input` as shown for this demo.
+The zero `cost` values disable cost estimates; provider usage is not free.
+Put the API key only in `.env`, never in `model.json`.
+Both files are ignored by Git. Preparation copies your model configuration into
+the local sandbox image, but not `.env` or the API key.
+
 `prepare` reads the selected endpoint from `openshell gateway list --output json`
 and discovers its issuer and public signing key over verified HTTPS. It reuses
 the CLI's existing client certificates under

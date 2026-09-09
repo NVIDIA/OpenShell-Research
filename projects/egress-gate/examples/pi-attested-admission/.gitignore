@@ -1,0 +1,2 @@
+# Operator-owned model configuration, like the already ignored .env.
+/model.json

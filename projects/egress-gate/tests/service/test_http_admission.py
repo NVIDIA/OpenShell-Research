@@ -9,6 +9,7 @@ import asyncio
 import json
 import os
 import runpy
+import shutil
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -154,7 +155,14 @@ async def test_pi_session_through_admission_and_authenticated_egress(
     tmp_path: Path,
     unused_tcp_port: int,
 ) -> None:
-    example = PROJECT / "examples/pi-attested-admission"
+    source = PROJECT / "examples/pi-attested-admission"
+    example = tmp_path / "example"
+    shutil.copytree(
+        source,
+        example,
+        ignore=shutil.ignore_patterns(".env", "model.json", "node_modules", "dist"),
+    )
+    shutil.copyfile(example / "model.json.example", example / "model.json")
     async with _clients(tmp_path) as (_, stub, config, token, middleware):
         runpy.run_path(str(example / "prepare.py"))["prepare"](
             example,
@@ -243,7 +251,7 @@ async def test_pi_session_through_admission_and_authenticated_egress(
         try:
             process = await asyncio.create_subprocess_exec(
                 "node",
-                str(example / "app/dist/test/service-integration.js"),
+                str(source / "app/dist/test/service-integration.js"),
                 str(server.make_url("/")).rstrip("/"),
                 str(tmp_path),
                 env=os.environ | {"NODE_EXTRA_CA_CERTS": str(tmp_path / "tls/ca.crt")},

@@ -35,7 +35,7 @@ EXAMPLE = PROJECT / "examples/pi-attested-admission"
 def gateway_discovery(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[tuple[dict[str, str], bytes]]:
-    """A real mTLS discovery server using the CLI's on-disk client layout."""
+    """Real mTLS with OpenShell-style certs (no AKI or CA Key Usage extension)."""
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
     tls = tmp_path / "config/openshell/gateways/test-gateway/mtls"
     tls.mkdir(parents=True)
@@ -50,7 +50,7 @@ def gateway_discovery(
                 ca_name
                 if name == "ca"
                 else x509.Name(
-                    [x509.NameAttribute(x509.NameOID.COMMON_NAME, "localhost")]
+                    [x509.NameAttribute(x509.NameOID.COMMON_NAME, "test-gateway")]
                 )
             )
             .issuer_name(ca_name)
@@ -62,23 +62,8 @@ def gateway_discovery(
                 x509.BasicConstraints(ca=name == "ca", path_length=None), critical=True
             )
             .add_extension(
-                x509.KeyUsage(
-                    digital_signature=True,
-                    content_commitment=False,
-                    key_encipherment=False,
-                    data_encipherment=False,
-                    key_agreement=False,
-                    key_cert_sign=name == "ca",
-                    crl_sign=name == "ca",
-                    encipher_only=False,
-                    decipher_only=False,
-                ),
-                critical=True,
-            )
-            .add_extension(
                 x509.SubjectAlternativeName(
                     [
-                        x509.DNSName("localhost"),
                         x509.IPAddress(ipaddress.ip_address("127.0.0.1")),
                     ]
                 ),
@@ -86,10 +71,6 @@ def gateway_discovery(
             )
             .add_extension(
                 x509.SubjectKeyIdentifier.from_public_key(key.public_key()),
-                critical=False,
-            )
-            .add_extension(
-                x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()),
                 critical=False,
             )
             .sign(ca_key, hashes.SHA256())
@@ -205,6 +186,20 @@ def test_every_action_prints_without_secrets_or_side_effects(tmp_path: Path) -> 
     assert "sandbox delete pi-admission" in output
 
 
+def test_prepare_requires_operator_model_configuration(tmp_path: Path) -> None:
+    script = tmp_path / "demo.sh"
+    shutil.copyfile(EXAMPLE / "demo.sh", script)
+    result = subprocess.run(
+        ["bash", str(script), "prepare"],
+        env=os.environ | {"OPENSHELL_GATEWAY": "test", "EGRESS_GATE_HOST": "localhost"},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "Create model.json from model.json.example" in result.stderr
+    assert not (tmp_path / "model.json").exists()
+
+
 @pytest.mark.parametrize("host", ["192.0.2.10", "host.docker.internal"])
 def test_preparation_uses_existing_gateway_and_excludes_private_material(
     tmp_path: Path,
@@ -212,11 +207,18 @@ def test_preparation_uses_existing_gateway_and_excludes_private_material(
     gateway_discovery: tuple[dict[str, str], bytes],
 ) -> None:
     state = tmp_path / "state"
+    example = tmp_path / "example"
+    shutil.copytree(
+        EXAMPLE,
+        example,
+        ignore=shutil.ignore_patterns(".env", "model.json", "node_modules", "dist"),
+    )
+    shutil.copyfile(example / "model.json.example", example / "model.json")
     gateway, public = gateway_discovery
     public_path = state / "gateway-public.pem"
     command = [
         sys.executable,
-        str(EXAMPLE / "prepare.py"),
+        str(example / "prepare.py"),
         "--state",
         str(state),
         "--host",
@@ -229,6 +231,7 @@ def test_preparation_uses_existing_gateway_and_excludes_private_material(
         (state / "admission.json").read_bytes()
     )
     assert config.provider_target.scheme == "https"
+    assert config.provider_target.host == "api.example.com"
     assert config.gateway_public_key == public_path
     assert config.gateway_issuer == "existing-gateway-issuer"
     assert public_path.read_bytes() == public
@@ -265,6 +268,7 @@ def test_preparation_uses_existing_gateway_and_excludes_private_material(
     assert not (image / "admission.json").exists()
     assert not (image / "app/node_modules").exists()
     assert (image / "project/.pi/skills/review/SKILL.md").is_file()
+    assert json.loads((image / "model.json").read_text())["id"] == "YOUR_MODEL_ID"
     middleware = tomllib.loads((state / "middleware.toml").read_text())
     registration = middleware["openshell"]["supervisor"]["middleware"][0]
     assert registration["grpc_endpoint"] == f"https://{host}:50051"
@@ -288,7 +292,9 @@ def test_preparation_uses_existing_gateway_and_excludes_private_material(
     assert public_path.read_bytes() == public
 
 
-@pytest.mark.parametrize("failure", ["plaintext", "foreign-key-url", "untrusted-ca"])
+@pytest.mark.parametrize(
+    "failure", ["plaintext", "foreign-key-url", "untrusted-ca", "wrong-hostname"]
+)
 def test_discovery_rejects_untrusted_gateway_before_preparation(
     tmp_path: Path, gateway_discovery: tuple[dict[str, str], bytes], failure: str
 ) -> None:
@@ -297,6 +303,8 @@ def test_discovery_rejects_untrusted_gateway_before_preparation(
         gateway["endpoint"] = gateway["endpoint"].replace("https:", "http:")
     elif failure == "foreign-key-url":
         gateway["jwks_uri"] = "https://untrusted.example/keys"
+    elif failure == "wrong-hostname":
+        gateway["endpoint"] = gateway["endpoint"].replace("127.0.0.1", "localhost")
     else:
         # Keep the client identity, but remove its trust in the server's CA.
         key = Ed25519PrivateKey.generate()
@@ -337,6 +345,7 @@ def test_discovery_rejects_untrusted_gateway_before_preparation(
         "plaintext": "registered HTTPS/mTLS gateway",
         "foreign-key-url": "same HTTPS origin",
         "untrusted-ca": "CERTIFICATE_VERIFY_FAILED",
+        "wrong-hostname": "Hostname mismatch",
     }[failure] in result.stderr
     assert not (tmp_path / "state").exists()
 

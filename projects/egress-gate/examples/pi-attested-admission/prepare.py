@@ -158,6 +158,9 @@ def _discover_gateway(gateway: dict[str, str]) -> tuple[bytes, str]:
     config = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
     tls = config / "openshell/gateways" / name / "mtls"
     context = ssl.create_default_context(cafile=str(tls / "ca.crt"))
+    # OpenShell's generated certificates omit extensions required by Python 3.13's
+    # strict X.509 mode. Retain CA/signature, expiry and hostname verification.
+    context.verify_flags &= ~ssl.VERIFY_X509_STRICT
     context.load_cert_chain(tls / "tls.crt", tls / "tls.key")
     connection = HTTPSConnection(
         endpoint.hostname, endpoint.port, context=context, timeout=10

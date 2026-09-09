@@ -29,6 +29,10 @@ case "$action" in
     if ! $print_only; then
       : "${EGRESS_GATE_HOST:?Set the service hostname or IPv4 address in .env}"
       : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}"
+      if [[ ! -f $example/model.json ]]; then
+        echo 'Create model.json from model.json.example and configure your model first.' >&2
+        exit 1
+      fi
     fi
     run uv sync --frozen
     if $print_only; then
