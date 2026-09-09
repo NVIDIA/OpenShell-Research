@@ -3,8 +3,10 @@ title: "Can Formal Methods Govern AI-Generated Robot Actions?"
 date: 2026-08-07
 updated: 2026-08-10
 description: "A robotics experiment asks whether an independent, SMT-backed policy boundary can efficiently govern AI-generated plans before they reach a simulated or physical robot."
+author: "Alex Watson"
 agent_markdown: true
 hero_image: "../../assets/robotics-policy-prover/robotics-policy-prover-hero.png"
+social_image: "assets/robotics-policy-prover/robotics-policy-prover-hero.png"
 categories:
   - Physical AI
 tags:
