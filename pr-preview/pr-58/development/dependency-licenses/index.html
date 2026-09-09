@@ -1331,11 +1331,12 @@ development, optional, and platform-specific dependencies. A changed version or
 source is checked again. Removing a dependency does not fail the check.
 New dependency manifests need a corresponding lockfile or membership in a
 declared locked workspace. Unchanged inventories are not a full-repository audit.</p>
-<p>The workflow also validates affected project locks with their package managers:
-<code>uv lock --check</code>, <code>npm ci --ignore-scripts --no-audit --no-fund</code>, or
-<code>cargo metadata --locked</code>. The npm check installs locked packages without
-lifecycle scripts; Cargo metadata does not build project code. A compatible
-constraint edit need not rewrite a lockfile if the native check accepts it.</p>
+<p>The workflow also validates affected project and inline-script locks with their
+package managers: <code>uv lock --check</code>, <code>uv lock --script SCRIPT --check</code>,
+<code>npm ci --ignore-scripts --no-audit --no-fund</code>, or <code>cargo metadata --locked</code>.
+The npm check installs locked packages without lifecycle scripts; Cargo metadata
+does not build project code. A compatible constraint edit need not rewrite a
+lockfile if the native check accepts it.</p>
 <p>This is not a complete inventory of vendored code, datasets, model weights,
 container/system packages, or unsupported package managers. Passing the check
 does not constitute complete legal clearance.</p>
@@ -1368,7 +1369,7 @@ policy decisions; do not add blanket approvals to hide those results.</p>
 <h2 id="local-checks">Local checks</h2>
 <p>From the repository root, run the isolated unit tests:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>run<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.12<span class="w"> </span>--with<span class="w"> </span>license-expression<span class="o">==</span><span class="m">30</span>.4.4<span class="w"> </span>--with<span class="w"> </span>boolean.py<span class="o">==</span><span class="m">5</span>.0<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>python<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>discover<span class="w"> </span>-s<span class="w"> </span>tests<span class="w"> </span>-p<span class="w"> </span>test_dependency_licenses.py
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--with<span class="w"> </span><span class="nv">pytest</span><span class="o">==</span><span class="m">8</span>.4.2<span class="w"> </span>pytest<span class="w"> </span>-q<span class="w"> </span>tests/test_dependency_licenses.py
 </span></code></pre></div>
 <p>Compare committed revisions:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>run<span class="w"> </span>--locked<span class="w"> </span>--script<span class="w"> </span>scripts/check_dependency_licenses.py<span class="w"> </span><span class="se">\</span>
