@@ -12,14 +12,15 @@ document, or run your own tasks from a terminal or CI job.
 
 <figure class="documentation-figure documentation-figure--wide">
   <a href="assets/diagrams/system-overview.svg" aria-label="Open the OAR architecture diagram at full size">
-    <img src="assets/diagrams/system-overview.svg" alt="Three independent OAR runs share one OpenShell gateway. Two use code-reviewer and one uses technical-writing-reviewer. Each has a separate sandbox, input, and returned result file.">
+    <img src="assets/diagrams/system-overview.svg" alt="Three independent OAR runs share one OpenShell gateway. Each sandbox uses a profile containing prompts and skills: code-reviewer for two runs and technical-writing-reviewer for one. Inputs and results remain separate for each run.">
   </a>
-  <figcaption>One gateway, many independent runs. Reusing a profile still creates a separate sandbox for each task. Select the diagram to view it at full size.</figcaption>
+  <figcaption>Each profile supplies prompts and skills to its agent. Runs stay isolated, even when they share a profile. Select the diagram to view it at full size.</figcaption>
 </figure>
 
-A **profile** is a folder containing instructions, model settings, and sandbox
-permissions. A **task** is one job defined in that profile. You choose a profile,
-select a task, and provide the input and output paths.
+A **profile** packages task prompts, reusable skills, model settings, and sandbox
+permissions. A **task** is one job defined in that profile; it selects the prompt
+and skills to use. You choose a profile, select a task, and provide the input and
+output paths.
 
 ## Before you start
 
