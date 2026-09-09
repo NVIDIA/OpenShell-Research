@@ -12,7 +12,6 @@ from openshell_agent_runner.errors import ConfigurationError
 from openshell_agent_runner.runner import RunRequest, resolve_run
 
 REPOSITORY = Path(__file__).resolve().parents[3]
-PROFILE = REPOSITORY / ".github/openshell-agents/profiles/dev-note-reviewer"
 CODE_REVIEWER = (
     REPOSITORY
     / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/code-reviewer"
@@ -25,18 +24,32 @@ TECHNICAL_WRITING_REVIEWER = (
 
 def request(
     *,
+    profile_directory: Path,
     uploads: Sequence[str] = (),
     environments: Sequence[str] = (),
     gateway: str | None = None,
 ) -> RunRequest:
     return RunRequest(
-        profile_directory=PROFILE,
-        task_id="editorial",
+        profile_directory=profile_directory,
+        task_id="review-repository",
         output=Path("/tmp/review.json"),
         uploads=uploads,
         environments=environments,
         gateway=gateway,
     )
+
+
+@pytest.fixture
+def plain_profile(tmp_path: Path) -> Path:
+    profile = tmp_path / "plain-profile"
+    shutil.copytree(CODE_REVIEWER, profile)
+    configuration = yaml.safe_load((profile / "profile.yaml").read_text())
+    task = configuration["tasks"]["review-repository"]
+    del task["required_input"]
+    del task["prompt_variables"]
+    (profile / task["prompt"]).write_text("Inspect the supplied uploads.\n")
+    (profile / "profile.yaml").write_text(yaml.safe_dump(configuration))
+    return profile
 
 
 def review_request(
@@ -60,9 +73,12 @@ def review_request(
     )
 
 
-def test_native_upload_and_environment_are_forwarded_exactly() -> None:
+def test_native_upload_and_environment_are_forwarded_exactly(
+    plain_profile: Path,
+) -> None:
     resolved = resolve_run(
         request(
+            profile_directory=plain_profile,
             uploads=(".:/workspace/source",),
             environments=("REVIEW_TARGET_PATH=note.md",),
             gateway="openshell",
@@ -81,7 +97,7 @@ def test_native_upload_and_environment_are_forwarded_exactly() -> None:
     )
 
 
-def test_conflicting_and_reserved_uploads_are_rejected() -> None:
+def test_conflicting_and_reserved_uploads_are_rejected(plain_profile: Path) -> None:
     for uploads, message in (
         (("evil:/sandbox/artifacts/result",), "reserved for runner resources"),
         (("evil:/sandbox/oar-runtime/schemas",), "reserved for runner resources"),
@@ -94,17 +110,24 @@ def test_conflicting_and_reserved_uploads_are_rejected() -> None:
         ),
     ):
         with pytest.raises(ConfigurationError, match=message):
-            resolve_run(request(uploads=uploads))
+            resolve_run(request(profile_directory=plain_profile, uploads=uploads))
 
 
-def test_uploads_can_merge_into_the_same_destination() -> None:
+def test_uploads_can_merge_into_the_same_destination(plain_profile: Path) -> None:
     uploads = (".:/workspace/source", ".git:/workspace/source")
 
-    assert resolve_run(request(uploads=uploads)).uploads == uploads
+    assert (
+        resolve_run(request(profile_directory=plain_profile, uploads=uploads)).uploads
+        == uploads
+    )
 
 
-def test_environment_names_are_forwarded_to_native_openshell() -> None:
-    resolved = resolve_run(request(environments=("KEYBOARD_LAYOUT=us",)))
+def test_environment_names_are_forwarded_to_native_openshell(
+    plain_profile: Path,
+) -> None:
+    resolved = resolve_run(
+        request(profile_directory=plain_profile, environments=("KEYBOARD_LAYOUT=us",))
+    )
 
     assert "KEYBOARD_LAYOUT=us" in resolved.environments
 
@@ -114,6 +137,8 @@ def test_environment_names_are_forwarded_to_native_openshell() -> None:
     [
         ("proposal.md", "document.md"),
         ("notes.txt", "document.txt"),
+        ("release notes.md", "document.md"),
+        ("review notes.txt", "document.txt"),
         ("config.json", "document.json"),
         ("README", "document"),
     ],
@@ -140,24 +165,24 @@ def test_document_input_preserves_ordinary_file_extension(
     assert dict(resolved.prompt_variables)["oar.input_name"] == filename
 
 
+@pytest.mark.parametrize("name", ["example-project", "example project"])
 def test_repository_input_is_uploaded_and_used_as_working_directory(
     tmp_path: Path,
+    name: str,
 ) -> None:
-    repository = tmp_path / "example-project"
+    repository = tmp_path / name
     repository.mkdir()
 
     resolved = resolve_run(review_request("review-repository", repository))
 
     assert resolved.uploads == (f"{repository.resolve()}:/workspace/input",)
-    assert resolved.environments == (
-        "REPOSITORY_ROOT=/workspace/input/example-project",
-    )
+    assert resolved.environments == (f"REPOSITORY_ROOT=/workspace/input/{name}",)
     assert resolved.input is not None
     assert resolved.input.source == repository.resolve()
-    assert resolved.input.sandbox_path == "/workspace/input/example-project"
-    assert resolved.input.name == "example-project"
+    assert resolved.input.sandbox_path == f"/workspace/input/{name}"
+    assert resolved.input.name == name
     assert dict(resolved.prompt_variables)["oar.input_path"] == (
-        "/workspace/input/example-project"
+        f"/workspace/input/{name}"
     )
 
 
@@ -274,15 +299,17 @@ def test_required_input_must_be_provided(task_id: str, input_label: str) -> None
         resolve_run(review_request(task_id, None))
 
 
-def test_task_without_required_input_rejects_input(tmp_path: Path) -> None:
+def test_task_without_required_input_rejects_input(
+    tmp_path: Path, plain_profile: Path
+) -> None:
     document = tmp_path / "document.md"
     document.write_text("content\n")
 
     with pytest.raises(ConfigurationError, match="does not accept --input"):
         resolve_run(
             RunRequest(
-                profile_directory=PROFILE,
-                task_id="editorial",
+                profile_directory=plain_profile,
+                task_id="review-repository",
                 output=Path("/tmp/review.json"),
                 input_path=document,
             )
@@ -311,7 +338,9 @@ def test_required_input_repository_root_cannot_be_overridden(tmp_path: Path) -> 
     ],
 )
 def test_environment_names_match_openshell_contract(
-    environment: str, message: str
+    environment: str, message: str, plain_profile: Path
 ) -> None:
     with pytest.raises(ConfigurationError, match=message):
-        resolve_run(request(environments=(environment,)))
+        resolve_run(
+            request(profile_directory=plain_profile, environments=(environment,))
+        )

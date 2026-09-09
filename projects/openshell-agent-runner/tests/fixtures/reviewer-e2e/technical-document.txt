@@ -1,13 +1,20 @@
-Installing Totals
+Running the Totals example
 
 Totals requires Python 3.12 or newer.
 
-Create an environment and install the project:
+Totals is a source-only example with no third-party dependencies. Obtain the
+repository fixture directory containing README.md, checks.py, and src/totals.py.
+Open a terminal in that directory and check your interpreter:
 
-    uv sync --locked
+    python3 --version
 
 Run the tests:
 
-    uv run pytest
+    python3 checks.py
 
-The installation is ready when the test command exits successfully.
+Expect two passing tests and an OK line. A nonzero exit status means the checks
+failed. No environment creation or package installation is necessary.
+
+The arithmetic_mean function accepts non-empty lists of ordinary finite numbers.
+Callers must not provide an empty list; extreme floating-point values and input
+type validation are outside this example's scope.

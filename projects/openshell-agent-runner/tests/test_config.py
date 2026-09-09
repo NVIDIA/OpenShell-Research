@@ -10,7 +10,7 @@ from openshell_agent_runner.config import load_profile
 from openshell_agent_runner.errors import ConfigurationError
 
 REPOSITORY = Path(__file__).resolve().parents[3]
-PROFILE = REPOSITORY / ".github/openshell-agents/profiles/dev-note-reviewer"
+PROFILE = REPOSITORY / ".github/openshell-agents/profiles/ci-reviewer"
 PACKAGED_PROFILES = REPOSITORY / (
     "projects/openshell-agent-runner/src/openshell_agent_runner/profiles"
 )
@@ -18,8 +18,12 @@ PACKAGED_PROFILES = REPOSITORY / (
 
 def test_repository_profile_validates() -> None:
     resolved = load_profile(PROFILE)
-    assert resolved.profile.id == "dev-note-reviewer"
-    assert list(resolved.profile.tasks) == ["editorial", "technical"]
+    assert resolved.profile.id == "ci-reviewer"
+    assert list(resolved.profile.tasks) == [
+        "review-tool",
+        "review-research-spike",
+        "review-use-case-example",
+    ]
 
 
 @pytest.mark.parametrize(

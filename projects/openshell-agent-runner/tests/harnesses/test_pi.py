@@ -53,12 +53,22 @@ def test_pi_entrypoint_disables_automatic_resources() -> None:
 
 def test_schema_task_receives_generic_submission_protocol() -> None:
     resolved = load_profile(
-        REPOSITORY / ".github/openshell-agents/profiles/dev-note-reviewer"
+        REPOSITORY / ".github/openshell-agents/profiles/ci-reviewer"
     )
-    prepared = prepare_resources(resolved, "editorial")
+    prepared = prepare_resources(
+        resolved,
+        "review-tool",
+        {
+            "review_skill": "review-tool",
+            "guidelines_path": "/workspace/trusted-guidelines.md",
+            "focus": "Review the note.",
+            "context": "A new Dev Note.",
+            "oar.input_path": "/workspace/input/document.md",
+            "oar.input_name": "note.md",
+        },
+    )
     try:
         assert isinstance(prepared, PreparedResources)
-        assert "REPOSITORY_ROOT=/workspace/source" in resolved.profile.sandbox.env
         index = prepared.arguments.index("--tools")
         assert prepared.arguments[index + 1] == "read,grep,find,ls,bash,submit_result"
         assert "/sandbox/oar-runtime/extensions/oar-submit-result.ts" in (
@@ -84,7 +94,7 @@ def test_schema_task_receives_generic_submission_protocol() -> None:
             item for item in prepared.uploads if "output.schema.json" in item
         )
         schema = json.loads(Path(schema_upload.rpartition(":")[0]).read_text())
-        assert schema["title"] == "DevNoteReview"
+        assert schema["title"] == "NewProjectReview"
         assert schema == json.loads(
             (resolved.profile_dir / "schemas/review.json").read_text()
         )
@@ -241,15 +251,15 @@ def test_tool_validator_checks_the_loaded_pi_registry_before_inference() -> None
     ).read_text()
 
     assert 'pi.on("before_agent_start"' in extension
-    assert "context.getAllTools()" in extension
-    assert "context.getActiveTools()" in extension
+    assert "pi.getAllTools()" in extension
+    assert "pi.getActiveTools()" in extension
     assert "findMissingTools(requestedTools, availableTools)" in extension
     assert "process.exit(2)" in extension
 
 
 def test_supplied_policies_allow_no_ordinary_network_egress() -> None:
     policies = [
-        REPOSITORY / ".github/openshell-agents/profiles/dev-note-reviewer/policy.yaml",
+        REPOSITORY / ".github/openshell-agents/profiles/ci-reviewer/policy.yaml",
         *(
             REPOSITORY
             / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles"

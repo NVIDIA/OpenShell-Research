@@ -4,18 +4,28 @@ name: Repository agents
   pull_request:
     paths:
       - .pre-commit-config.yaml
-      - .github/workflows/repository-agents.yml
-      - .github/workflows/reviewer-profiles-e2e.yml
+      - .github/workflows/**
       - .github/openshell-agents/**
+      - .github/scripts/**
+      - projects/PROJECT_GUIDELINES.md
+      - .github/actions/setup-review-gateway/**
+      - tests/*review*
+      - tests/test_ci_scope.py
+      - tests/test_github_api.py
       - projects/openshell-agent-runner/**
   push:
     branches:
       - main
     paths:
       - .pre-commit-config.yaml
-      - .github/workflows/repository-agents.yml
-      - .github/workflows/reviewer-profiles-e2e.yml
+      - .github/workflows/**
       - .github/openshell-agents/**
+      - .github/scripts/**
+      - projects/PROJECT_GUIDELINES.md
+      - .github/actions/setup-review-gateway/**
+      - tests/*review*
+      - tests/test_ci_scope.py
+      - tests/test_github_api.py
       - projects/openshell-agent-runner/**
   workflow_dispatch:
 
@@ -57,7 +67,7 @@ jobs:
       - name: Validate agent profiles
         run: |
           uv run --project projects/openshell-agent-runner oar validate \
-            .github/openshell-agents/profiles/dev-note-reviewer
+            .github/openshell-agents/profiles/ci-reviewer
           for profile in code-reviewer technical-writing-reviewer; do
             uv run --project projects/openshell-agent-runner oar validate \
               "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/$profile"
@@ -66,14 +76,30 @@ jobs:
       - name: Preview agent execution
         run: |
           uv run --project projects/openshell-agent-runner oar run \
-            .github/openshell-agents/profiles/dev-note-reviewer \
-            --task editorial \
+            .github/openshell-agents/profiles/ci-reviewer \
+            --task review-tool \
             --gateway openshell \
-            --upload .:/workspace/source \
-            --upload .git:/workspace/source \
-            --env REVIEW_TARGET_PATH=docs/dev-notes/posts/2026-08-07-formal-methods-ai-generated-robot-actions.md \
-            --output "$RUNNER_TEMP/editorial-review.json" \
+            --input projects/openshell-agent-runner/tests/fixtures/reviewer-e2e/repository \
+            --upload projects/PROJECT_GUIDELINES.md:/workspace/review-context/PROJECT_GUIDELINES.md \
+            --prompt-var guidelines_path=/workspace/review-context/PROJECT_GUIDELINES.md \
+            --output "$RUNNER_TEMP/project-review.json" \
             --dry-run
+
+      - name: Test CI profile, routing, and reports
+        run: |
+          uv run --project projects/openshell-agent-runner python -m unittest discover -s tests -p test_ci_scope.py
+          uv run --project projects/openshell-agent-runner python -m unittest discover -s tests -p test_github_api.py
+          uv run --project projects/openshell-agent-runner python -m unittest discover -s tests -p 'test_*review*.py'
+
+      - name: Validate agent workflow syntax
+        if: matrix.python-version == '3.12'
+        run: |
+          curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            | tar -xz -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" \
+            .github/workflows/repository-agents.yml \
+            .github/workflows/reviewer-profiles-e2e.yml \
+            .github/workflows/pr-review.yml
 
       - name: Run project checks
         working-directory: projects/openshell-agent-runner
@@ -130,11 +156,9 @@ jobs:
       - name: Validate the Pi extensions
         if: matrix.python-version == '3.12'
         run: |
-          docker run --rm \
+          docker run --rm --network none \
             --entrypoint bash \
-            --env OAR_RUNTIME_ROOT=/sandbox \
             --volume "$PWD/projects/openshell-agent-runner/tests/fixtures/format-output.schema.json:/sandbox/output.schema.json:ro" \
-            --volume "$PWD/projects/openshell-agent-runner/tests/fixtures/tools.json:/sandbox/tools.json:ro" \
             --volume "$PWD/projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/extensions/submit-result.ts:/sandbox/oar-submit-result.ts:ro" \
             --volume "$PWD/projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/extensions/validate-tools.ts:/sandbox/oar-validate-tools.ts:ro" \
             --volume "$PWD/projects/openshell-agent-runner/tests/fixtures/validate-pi-extensions.mjs:/sandbox/validate-pi-extensions.mjs:ro" \

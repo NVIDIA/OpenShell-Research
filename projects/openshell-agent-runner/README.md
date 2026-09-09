@@ -181,6 +181,9 @@ Run a focused test with `make test PYTEST_ARGS="tests/test_config.py"`. Use
 [RELEASING.md](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-agent-runner/RELEASING.md)
 for the local PyPI release process.
 
-The `Reviewer profiles end to end` workflow starts an ephemeral OpenShell
-gateway and runs each packaged reviewer directly through the OAR CLI against a
-representative repository or document input.
+The `Reviewer profiles end to end` workflow installs the built wheel, validates
+and previews both packaged reviewers, then runs all three repository-local
+new-project `ci-reviewer` tasks directly through the OAR CLI on one ephemeral gateway.
+Its fixture scores test the review pipeline; they do not assess the PR itself.
+Smoke results appear in the Actions summary. Actual new-project reviews use the
+[project guidelines](../PROJECT_GUIDELINES.md) and update one PR comment.

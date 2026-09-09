@@ -6,6 +6,11 @@
 OpenShell Research is where we build, document, and share research engineering
 work that uses [OpenShell](https://github.com/NVIDIA/OpenShell) as its runtime.
 
+## Adding a project
+
+Read the [project guidelines](projects/PROJECT_GUIDELINES.md) for the expectations
+for tools and libraries, research spikes, and use case examples.
+
 ## Start with an agent
 
 This repository is designed to be explored and developed with a coding agent.

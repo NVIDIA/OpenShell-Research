@@ -1,0 +1,303 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NewProjectReview",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task",
+    "verdict",
+    "summary",
+    "guidelines_assessment",
+    "criterion_scores",
+    "overall_score",
+    "findings",
+    "strengths",
+    "limitations"
+  ],
+  "properties": {
+    "task": {
+      "enum": [
+        "review-tool",
+        "review-research-spike",
+        "review-use-case-example"
+      ]
+    },
+    "verdict": {
+      "description": "pass: no material change needed; needs_changes: a demonstrated material issue needs correction; inconclusive: missing evidence prevents an overall decision.",
+      "enum": [
+        "pass",
+        "needs_changes",
+        "inconclusive"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "criterion_scores": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "criterion",
+          "score",
+          "explanation"
+        ],
+        "properties": {
+          "criterion": {
+            "type": "string",
+            "minLength": 1
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "explanation": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "overall_score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Arithmetic mean of criterion scores, rounded to the nearest integer with halves rounded up."
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "severity",
+          "title",
+          "path",
+          "evidence",
+          "impact",
+          "recommendation"
+        ],
+        "properties": {
+          "severity": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 1
+          },
+          "impact": {
+            "type": "string",
+            "minLength": 1
+          },
+          "recommendation": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "strengths": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "guidelines_assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verdict",
+        "explanation"
+      ],
+      "properties": {
+        "verdict": {
+          "enum": ["pass", "needs_changes", "inconclusive"]
+        },
+        "explanation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"verdict": {"const": "pass"}}},
+      "then": {
+        "properties": {
+          "guidelines_assessment": {"properties": {"verdict": {"const": "pass"}}}
+        }
+      }
+    }
+  ],
+  "oneOf": [
+    {
+      "properties": {
+        "task": {
+          "const": "review-tool"
+        },
+        "criterion_scores": {
+          "prefixItems": [
+            {
+              "properties": {
+                "criterion": {
+                  "const": "correctness"
+                }
+              }
+            },
+            {
+              "properties": {
+                "criterion": {
+                  "const": "robustness_security"
+                }
+              }
+            },
+            {
+              "properties": {
+                "criterion": {
+                  "const": "maintainability_complexity"
+                }
+              }
+            },
+            {
+              "properties": {
+                "criterion": {
+                  "const": "tests_verification"
+                }
+              }
+            },
+            {
+              "properties": {
+                "criterion": {
+                  "const": "usability_integration"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "properties": {
+        "task": {
+          "const": "review-research-spike"
+        },
+        "criterion_scores": {
+          "prefixItems": [
+            {
+              "properties": {
+                "criterion": {
+                  "const": "method_validity"
+                }
+              }
+            },
+            {
+              "properties": {
+                "criterion": {
+                  "const": "evidence_claims"
+                }
+              }
+            },
+            {
+              "properties": {
+                "criterion": {
+                  "const": "reproducibility"
+                }
+              }
+            },
+            {
+              "properties": {
+                "criterion": {
+                  "const": "clarity_limitations"
+                }
+              }
+            },
+            {
+              "properties": {
+                "criterion": {
+                  "const": "implementation_proportionality"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "properties": {
+        "task": {
+          "const": "review-use-case-example"
+        },
+        "criterion_scores": {
+          "prefixItems": [
+            {
+              "properties": {
+                "criterion": {
+                  "const": "workflow_correctness"
+                }
+              }
+            },
+            {
+              "properties": {
+                "criterion": {
+                  "const": "reproducibility"
+                }
+              }
+            },
+            {
+              "properties": {
+                "criterion": {
+                  "const": "instructional_clarity"
+                }
+              }
+            },
+            {
+              "properties": {
+                "criterion": {
+                  "const": "safe_configuration"
+                }
+              }
+            },
+            {
+              "properties": {
+                "criterion": {
+                  "const": "scope_relevance"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

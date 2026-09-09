@@ -2,20 +2,26 @@ name: Reviewer profiles end to end
 
 "on":
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
     paths:
       - .github/workflows/reviewer-profiles-e2e.yml
+      - .github/actions/setup-review-gateway/**
+      - .github/openshell-agents/profiles/ci-reviewer/**
+      - .github/scripts/**
       - projects/openshell-agent-runner/**
+      - projects/PROJECT_GUIDELINES.md
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - .github/workflows/reviewer-profiles-e2e.yml
+      - .github/actions/setup-review-gateway/**
+      - .github/openshell-agents/profiles/ci-reviewer/**
+      - .github/scripts/**
       - projects/openshell-agent-runner/**
+      - projects/PROJECT_GUIDELINES.md
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pull-requests: write
+permissions: {}
 
 concurrency:
   group: reviewer-profiles-e2e-${{ github.ref }}
@@ -23,21 +29,25 @@ concurrency:
 
 jobs:
   reviewer-e2e:
-    name: Run reviewer profiles through OAR
+    name: Exercise the installed OAR wheel and three new-project review tasks
+    # This smoke executes candidate OAR code, so only same-repository PRs are
+    # trusted. Fork PRs do not run live inference in this iteration.
     if: >-
-      github.event_name != 'pull_request' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+      (github.event_name == 'pull_request' &&
+       !github.event.pull_request.draft &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.actor != 'dependabot[bot]') ||
+      (github.event_name != 'pull_request' &&
+       github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     runs-on: ubuntu-latest
-    timeout-minutes: 75
-    env:
-      OPENAI_API_KEY: ${{ secrets.INFERENCE_API_KEY }}
-      OPENAI_BASE_URL: ${{ secrets.INFERENCE_BASE_URL }}
-      REVIEW_MODEL: ${{ secrets.MODEL_ID_TOP }}
-
+    timeout-minutes: 45
+    permissions:
+      contents: read
     steps:
-      - name: Checkout
+      - name: Checkout the exact tested head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Set up uv and Python
@@ -53,222 +63,95 @@ jobs:
           echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/reviewer-e2e-venv" >> "$GITHUB_ENV"
           echo "RESULTS_DIR=$RUNNER_TEMP/reviewer-results" >> "$GITHUB_ENV"
           echo "PROFILES_DIR=$RUNNER_TEMP/reviewer-profiles" >> "$GITHUB_ENV"
+          echo "FIXTURES_DIR=$GITHUB_WORKSPACE/projects/openshell-agent-runner/tests/fixtures/reviewer-e2e" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/reviewer-results"
 
-      - name: Check inference configuration
+      - name: Build and install the wheel
+        id: build
+        working-directory: projects/openshell-agent-runner
         run: |
-          test -n "$OPENAI_API_KEY"
-          test -n "$OPENAI_BASE_URL"
+          uv sync --locked --no-install-project
+          uv build --no-sources --out-dir "$RUNNER_TEMP/reviewer-wheels"
+          wheel=("$RUNNER_TEMP"/reviewer-wheels/*.whl)
+          test "${#wheel[@]}" -eq 1
+          uv pip install --python "$UV_PROJECT_ENVIRONMENT/bin/python" --no-deps "${wheel[0]}"
+          "$UV_PROJECT_ENVIRONMENT/bin/oar" --help
+
+      - name: Validate profiles and preview packaged reviewers
+        id: profiles
+        env:
+          REVIEW_MODEL: ${{ secrets.MODEL_ID_TOP }}
+        run: |
           test -n "$REVIEW_MODEL"
-
-      - name: Install OAR dependencies
-        run: uv sync --project projects/openshell-agent-runner --locked
-
-      - name: Install OpenShell
-        run: |
-          curl -LsSf \
-            https://raw.githubusercontent.com/NVIDIA/OpenShell/v0.0.116/install.sh \
-            | OPENSHELL_VERSION=v0.0.116 sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Wait for the gateway
-        run: |
-          for attempt in {1..30}; do
-            if openshell status; then
-              exit 0
-            fi
-            sleep 2
-          done
-          openshell status
-
-      - name: Configure inference
-        run: |
-          openshell provider create \
-            --name reviewer-ci \
-            --type openai \
-            --credential OPENAI_API_KEY \
-            --config "OPENAI_BASE_URL=$OPENAI_BASE_URL"
-          openshell inference set \
-            --provider reviewer-ci \
-            --model "$REVIEW_MODEL"
-
-      - name: Initialize and validate reviewer profiles
-        run: |
-          uv run --project projects/openshell-agent-runner oar init \
-            "$PROFILES_DIR" \
-            --model "$REVIEW_MODEL"
+          oar="$UV_PROJECT_ENVIRONMENT/bin/oar"
+          "$oar" init "$PROFILES_DIR" --model "$REVIEW_MODEL"
           for profile in code-reviewer technical-writing-reviewer; do
-            uv run --project projects/openshell-agent-runner oar validate \
-              "$PROFILES_DIR/$profile"
+            "$oar" validate "$PROFILES_DIR/$profile"
           done
+          "$oar" run "$PROFILES_DIR/code-reviewer" --task review-repository \
+            --input "$FIXTURES_DIR/repository" --output "$RUNNER_TEMP/code-preview.json" --dry-run
+          "$oar" run "$PROFILES_DIR/technical-writing-reviewer" --task review-document \
+            --input "$FIXTURES_DIR/technical-document.txt" --output "$RUNNER_TEMP/document-preview.json" --dry-run
+          test ! -e "$RUNNER_TEMP/code-preview.json"
+          test ! -e "$RUNNER_TEMP/document-preview.json"
+          cp -R .github/openshell-agents/profiles/ci-reviewer "$PROFILES_DIR/ci-reviewer"
+          jq --arg model "$REVIEW_MODEL" '.providers.openshell.models[0].id = $model' \
+            "$PROFILES_DIR/ci-reviewer/models.json" > "$RUNNER_TEMP/models.json"
+          mv "$RUNNER_TEMP/models.json" "$PROFILES_DIR/ci-reviewer/models.json"
+          jq --arg model "$REVIEW_MODEL" '.defaultModel = $model' \
+            "$PROFILES_DIR/ci-reviewer/settings.json" > "$RUNNER_TEMP/settings.json"
+          mv "$RUNNER_TEMP/settings.json" "$PROFILES_DIR/ci-reviewer/settings.json"
+          "$oar" validate "$PROFILES_DIR/ci-reviewer"
+          python3 "$FIXTURES_DIR/repository/checks.py"
+          python3 "$FIXTURES_DIR/research-spike/experiment.py"
+          python3 "$FIXTURES_DIR/use-case-example/summarize.py"
 
-      - name: Run reviewer profiles
+      - name: Start one ephemeral gateway
+        id: gateway
+        uses: ./.github/actions/setup-review-gateway
+        with:
+          api-key: ${{ secrets.INFERENCE_API_KEY }}
+          base-url: ${{ secrets.INFERENCE_BASE_URL }}
+          model: ${{ secrets.MODEL_ID_TOP }}
+
+      - name: Run all three new-project reviewer tasks
+        id: reviews
         run: |
-          mkdir -p "$RESULTS_DIR"
-          uv run --project projects/openshell-agent-runner oar run \
-            "$PROFILES_DIR/code-reviewer" \
-            --task review-repository \
-            --gateway openshell \
-            --input projects/openshell-agent-runner/tests/fixtures/reviewer-e2e/repository \
-            --prompt-var focus="Review the implementation and its documented contract." \
-            --prompt-var context="This is a deliberately small example library." \
-            --output "$RESULTS_DIR/code-review.json"
-          uv run --project projects/openshell-agent-runner oar run \
-            "$PROFILES_DIR/technical-writing-reviewer" \
-            --task review-document \
-            --gateway openshell \
-            --input projects/openshell-agent-runner/tests/fixtures/reviewer-e2e/technical-document.txt \
-            --prompt-var focus="Check whether the installation steps are clear and actionable." \
-            --prompt-var context="The audience is developers installing the library for the first time." \
-            --output "$RESULTS_DIR/technical-writing-review.json"
-      - name: Summarize results
+          failed=0
+          while IFS= read -r item; do
+            id=$(jq -r '.id' <<< "$item")
+            task=$(jq -r '.task' <<< "$item")
+            input=$(jq -r '.input' <<< "$item")
+            if "$UV_PROJECT_ENVIRONMENT/bin/oar" run "$PROFILES_DIR/ci-reviewer" \
+              --task "$task" --input "$FIXTURES_DIR/$input" \
+              --upload "$FIXTURES_DIR:/workspace" \
+              --upload "$GITHUB_WORKSPACE/projects/PROJECT_GUIDELINES.md:/workspace/review-context/PROJECT_GUIDELINES.md" \
+              --prompt-var guidelines_path=/workspace/review-context/PROJECT_GUIDELINES.md \
+              --prompt-var 'focus=Review the complete fixture against its explicit purpose and claims.' \
+              --prompt-var 'context=This is a small CI fixture, not a production product. Related evidence is in /workspace/reviewer-e2e. Evaluate only its stated scope; do not request production packaging or generalized infrastructure. This is a pipeline check, not a review of the PR.' \
+              --gateway openshell --timeout-seconds 600 \
+              --output "$RESULTS_DIR/$id.json" > "$RESULTS_DIR/$id.log" 2>&1; then
+              echo "$id completed"
+            else
+              echo "::error::$id did not complete; see its artifact log."
+              failed=1
+            fi
+          done < <(jq -c '.[]' "$FIXTURES_DIR/cases.json")
+          exit "$failed"
+
+      - name: Verify every result and rubric total
+        id: results
         if: always()
         run: |
-          {
-            echo "## Reviewer profile results"
-            echo
-            echo "| Profile | Verdict | Score |"
-            echo "| --- | --- | ---: |"
-            for result in "$RESULTS_DIR"/*.json; do
-              if test -f "$result"; then
-                profile="$(basename "$result" .json)"
-                verdict="$(jq -r '.verdict' "$result")"
-                score="$(jq -r '.overall_score' "$result")"
-                echo "| $profile | $verdict | $score |"
-              fi
-            done
-          } >> "$GITHUB_STEP_SUMMARY"
+          python3 .github/scripts/review_report.py verify \
+            --request "$FIXTURES_DIR/cases.json" --results "$RESULTS_DIR"
 
-      - name: Add or update PR report
-        if: github.event_name == 'pull_request' && always()
-        uses: actions/github-script@v8
-        env:
-          RESULTS_DIR: ${{ runner.temp }}/reviewer-results
-        with:
-          script: |
-            const fs = require('node:fs');
-            const path = require('node:path');
+      - name: Stop the gateway
+        id: cleanup
+        if: always() && steps.gateway.outcome != 'skipped'
+        run: systemctl --user stop openshell-gateway.service
 
-            const marker = '<!-- reviewer-profiles-e2e -->';
-            const profiles = [
-              { label: 'Code reviewer', file: 'code-review.json' },
-              { label: 'Technical writing reviewer', file: 'technical-writing-review.json' },
-            ].map((profile) => {
-              const resultPath = path.join(process.env.RESULTS_DIR, profile.file);
-              return {
-                ...profile,
-                result: fs.existsSync(resultPath)
-                  ? JSON.parse(fs.readFileSync(resultPath, 'utf8'))
-                  : null,
-              };
-            });
-            const complete = profiles.every(({ result }) => result !== null);
-            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
-              `/actions/runs/${context.runId}`;
-            const words = (value) => value.replaceAll('_', ' ')
-              .replace(/\b\w/g, (letter) => letter.toUpperCase());
-            const tableText = (value) => String(value).replaceAll('|', '\\|').replaceAll('\n', ' ');
-            const verdictIcon = {
-              pass: '✅',
-              needs_changes: '⚠️',
-              inconclusive: '❔',
-            };
-
-            const lines = [
-              marker,
-              '## Reviewer profile smoke test',
-              '',
-              complete
-                ? `✅ The full OAR pipeline completed successfully. [View workflow run](${runUrl}).`
-                : `❌ The workflow did not produce every expected result. [View workflow run](${runUrl}).`,
-              '',
-              '| Profile | Verdict | Score | Findings |',
-              '| --- | --- | ---: | ---: |',
-            ];
-            for (const { label, result } of profiles) {
-              if (result) {
-                const icon = verdictIcon[result.verdict] || '•';
-                lines.push(
-                  `| ${label} | ${icon} ${words(result.verdict)} | **${result.overall_score}/100** | ${result.findings.length} |`,
-                );
-              } else {
-                lines.push(`| ${label} | ❌ No result | — | — |`);
-              }
-            }
-
-            for (const { label, result } of profiles) {
-              if (!result) continue;
-              const icon = verdictIcon[result.verdict] || '•';
-              lines.push(
-                '',
-                '<details>',
-                `<summary><strong>${label}</strong> — ${result.overall_score}/100 · ${icon} ${words(result.verdict)}</summary>`,
-                '',
-                '### Summary',
-                '',
-                result.summary,
-                '',
-                '### Rubric',
-                '',
-                '| Criterion | Score | Rationale |',
-                '| --- | ---: | --- |',
-              );
-              for (const criterion of result.criterion_scores) {
-                lines.push(
-                  `| ${words(criterion.criterion)} | **${criterion.score}** | ${tableText(criterion.explanation)} |`,
-                );
-              }
-              lines.push('', '### Findings', '');
-              if (result.findings.length === 0) {
-                lines.push('No findings.');
-              } else {
-                for (const finding of result.findings) {
-                  const location = finding.path
-                    ? ` · \`${finding.path}${finding.line ? `:${finding.line}` : ''}\``
-                    : finding.line ? ` · line ${finding.line}` : '';
-                  lines.push(
-                    `- **${finding.severity.toUpperCase()} — ${finding.title}**${location}`,
-                    `  - ${finding.recommendation}`,
-                  );
-                }
-              }
-              if (result.strengths.length > 0) {
-                lines.push('', '### Strengths', '');
-                for (const strength of result.strengths) lines.push(`- ${strength}`);
-              }
-              lines.push('', '</details>');
-            }
-            lines.push(
-              '',
-              `Tested PR head \`${context.payload.pull_request.head.sha.slice(0, 7)}\`. ` +
-                `Full JSON results are available from the workflow run's artifacts.`,
-            );
-            const body = lines.join('\n');
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.payload.pull_request.number,
-              per_page: 100,
-            });
-            const existing = comments.find(
-              (comment) => comment.user?.type === 'Bot' && comment.body?.includes(marker),
-            );
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.payload.pull_request.number,
-                body,
-              });
-            }
-
-      - name: Upload reviewer results
+      - name: Upload results and logs
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -277,6 +160,12 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Stop the gateway
+      - name: Summarize the pipeline smoke test
         if: always()
-        run: systemctl --user stop openshell-gateway.service || true
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXECUTION_OUTCOME: ${{ job.status }}
+        run: |
+          python3 .github/scripts/review_report.py summary --smoke \
+            --request "$FIXTURES_DIR/cases.json" --results "$RESULTS_DIR" \
+            --outcome "$EXECUTION_OUTCOME" --output "$RESULTS_DIR/report.md"

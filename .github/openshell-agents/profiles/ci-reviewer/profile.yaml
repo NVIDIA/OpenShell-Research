@@ -1,0 +1,66 @@
+id: ci-reviewer
+description: Assess new projects against their claims and repository guidelines.
+
+sandbox:
+  policy: policy.yaml
+
+tasks:
+  review-tool:
+    description: Assess a new reusable tool or library.
+    required_input: repository
+    prompt: prompt.md
+    prompt_variables:
+      review_skill:
+        description: Selected task and domain skill.
+        default: review-tool
+      guidelines_path:
+        description: Sandbox path to the trusted project guidelines (upload this file).
+      focus:
+        description: Project purpose or areas deserving particular attention.
+        default: Assess the complete new project.
+      context:
+        description: Original project path, intent, constraints, and evidence locations.
+        default: No PR context was provided; assess the project as supplied.
+    output_schema: schemas/review.json
+    tools: [read, grep, find, ls, bash]
+    skills: [skills/review-common, skills/review-tool]
+
+  review-research-spike:
+    description: Assess a new research investigation.
+    required_input: repository
+    prompt: prompt.md
+    prompt_variables:
+      review_skill:
+        description: Selected task and domain skill.
+        default: review-research-spike
+      guidelines_path:
+        description: Sandbox path to the trusted project guidelines (upload this file).
+      focus:
+        description: Project purpose or areas deserving particular attention.
+        default: Assess the complete new project.
+      context:
+        description: Original project path, intent, constraints, and evidence locations.
+        default: No PR context was provided; assess the project as supplied.
+    output_schema: schemas/review.json
+    tools: [read, grep, find, ls, bash]
+    skills: [skills/review-common, skills/review-research-spike]
+
+  review-use-case-example:
+    description: Assess a new end-to-end use case demonstration.
+    required_input: repository
+    prompt: prompt.md
+    prompt_variables:
+      review_skill:
+        description: Selected task and domain skill.
+        default: review-use-case-example
+      guidelines_path:
+        description: Sandbox path to the trusted project guidelines (upload this file).
+      focus:
+        description: Project purpose or areas deserving particular attention.
+        default: Assess the complete new project.
+      context:
+        description: Original project path, intent, constraints, and evidence locations.
+        default: No PR context was provided; assess the project as supplied.
+    output_schema: schemas/review.json
+    tools: [read, grep, find, ls, bash]
+    skills: [skills/review-common, skills/review-use-case-example]
