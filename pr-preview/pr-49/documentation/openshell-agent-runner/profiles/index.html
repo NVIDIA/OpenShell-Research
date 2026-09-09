@@ -1821,13 +1821,27 @@ declarations locally and the registered tools before the first model request.
 Tool selection controls the agent interface; <code>policy.yaml</code> controls sandbox
 access, including commands run through <code>bash</code>.</p>
 <h2 id="choose-the-result-format">Choose the result format</h2>
-<p>Omit <code>output_schema</code> to save the agent's final text response. Add it to require
-JSON with specific fields. The included reviewers use JSON.</p>
-<p><img alt="Without a schema, OAR saves the agent's final text. With a schema, the agent submits JSON and can correct validation errors. OAR checks the downloaded result before saving it." src="../assets/diagrams/result-handling.svg" /></p>
-<p>For a JSON task, OAR provides the <code>submit_result</code> tool automatically. Tell the
-agent to finish by calling it. Invalid submissions return errors so the agent
-can correct and resubmit. OAR checks the downloaded JSON against the same
-schema before replacing the output file.</p>
+<p>The result schema is a JSON file <strong>in your profile</strong>. Each task names the file
+through <code>output_schema</code> in <code>profile.yaml</code>. For the included reviewers, <code>oar init</code>
+copies <code>schemas/review.json</code> into the profile; you can edit it to change the
+required fields, types, and bounds. OAR supplies the validation machinery.</p>
+<figure class="documentation-figure documentation-figure--wide">
+  <a href="../assets/diagrams/result-handling.svg" aria-label="Open the result validation diagram at full size">
+    <img src="../assets/diagrams/result-handling.svg" alt="The selected task points to a schema file in the profile. OAR uploads a copy for submit_result to check the agent's JSON in the sandbox, then checks the downloaded JSON against the profile's schema before saving the host output. Invalid submissions return errors to the agent for correction.">
+  </a>
+  <figcaption>The profile defines the format. OAR checks it in the sandbox and again on your machine. Select the diagram to view it at full size.</figcaption>
+</figure>
+
+<p>For a JSON task, OAR uploads a copy of that schema along with its built-in
+<code>submit_result</code> tool. Tell the agent to finish by calling the tool. Invalid
+submissions return errors so the agent can correct and resubmit. OAR downloads
+the result and validates it against the profile's schema before replacing the
+file at <code>--output</code>.</p>
+<p>Omit <code>output_schema</code> to save the agent's final text response instead. The
+<code>--output</code> option chooses only the destination. OAR still checks that the result
+is non-empty and within the size limit. The
+<a href="../reference/#what-happens-during-a-run">run lifecycle</a> shows how both formats fit
+into sandbox creation, execution, and cleanup.</p>
 <p>Use JSON Schema Draft 2020-12 with inline definitions. References (<code>$ref</code>,
 <code>$dynamicRef</code>, <code>$recursiveRef</code>) and regex keywords (<code>pattern</code>,
 <code>patternProperties</code>) are rejected. Use types, enums, required fields, lengths,
