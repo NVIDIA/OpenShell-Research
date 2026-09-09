@@ -7,7 +7,8 @@ agent_markdown: true
 # Admission without harness forks
 
 The [runnable Pi example](https://github.com/NVIDIA/OpenShell-Research/tree/johnny/pi-attested-admission/projects/egress-gate/examples/pi-attested-admission)
-uses published Pi 0.85.1 packages and OpenShell 0.0.116. No upstream library,
+uses published Pi 0.85.1 packages with an existing OpenShell gateway (0.0.116
+is the tested protocol baseline). No upstream library,
 runtime, protobuf, or CLI patches are required. Its smaller surface is a
 Pi-powered application, not stock Pi CLI parity.
 
@@ -86,8 +87,12 @@ there is no second normalized model-request representation. Branching, extension
 messages and standalone bash-execution envelopes are not admission APIs in this
 POC. Bash tool output uses the same tool-result boundary as other tools.
 
-The host setup provisions one admission bearer credential, provider destination,
-policy and actual sandbox ID. The sandbox cannot select its authoritative
+The operator supplies the existing gateway's public Ed25519 signing key and
+issuer. Host setup generates only service TLS, one admission bearer credential,
+provider destination and policy; setup reads the actual sandbox ID. It prints
+a middleware registration for the operator to install and does not generate
+gateway credentials, download OpenShell binaries, or restart the gateway.
+The sandbox cannot select its authoritative
 identity or submit a policy. The single host-owned identity file is populated
 after sandbox creation; until then admission is unavailable. There is no
 registration API or new credential broker.
@@ -153,23 +158,27 @@ The example's `demo.sh verify` is a separate real-model end-to-end acceptance
 command, not a simulated demonstration. Its success must be observed, not inferred
 from unit tests. See the PR validation record for the latest executed checks.
 
-Implementation validation on **2026-09-09** used:
+Protocol and application validation on **2026-09-09** used:
 
 | Component | Tested pin |
 | --- | --- |
 | Pi public npm packages | `0.85.1`, exact dependencies and integrity hashes in the example lockfile |
-| OpenShell CLI, gateway and supervisor | `0.0.116`, release commit `d1155aa70042d3e2ee49dbfa15346b108b7c1d92`; archive checksums in `demo.sh` |
+| OpenShell CLI, gateway and supervisor | `0.0.116`, release commit `d1155aa70042d3e2ee49dbfa15346b108b7c1d92`; the launcher now uses the operator's installed runtime |
 | Node image | `22.22.2-bookworm-slim@sha256:9f6d5975c7dca860947d3915877f85607946403fc55349f39b4bc3688448bb6e` |
 | HTTP client | Undici `8.9.0`; explicit public proxy configuration after loading Pi |
 
-The isolated upstream sandbox successfully exercised TLS/JWT bootstrap,
+Earlier validation using the now-removed isolated launcher exercised TLS/JWT bootstrap,
 endpoint-bound admission credentials, allow/deny/replacement, a real Pi session
 denial before history, and rejection of a raw provider request without a receipt.
 Pi's actual tool-capable serialized request with a receipt passed the gate and
 received HTTP 401 from the real endpoint when deliberately given an invalid test
 credential. This establishes the transport seam, **not** successful model output.
 
-**Real-model acceptance remains pending a valid provider key.** The checked-in
+**Existing-gateway deployment and real-model acceptance remain unverified.**
+Preparation is tested with both DNS and IPv4 service addresses, and local
+cross-language tests exercise service TLS and gateway public-key verification.
+The host launcher contains no Linux-specific binary bootstrap; Linux tests do
+not establish macOS deployment support. The checked-in
 verification command passed its bypass/denial checks and then failed at the model
 call with that invalid credential; it did not skip ahead. Tool continuations,
 skills and compaction have deterministic application coverage but must also pass
