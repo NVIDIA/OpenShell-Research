@@ -1166,6 +1166,15 @@ body[data-md-color-scheme="slate"] .openshell-home-brand__dark {
 
 /* Article bylines --------------------------------------------------------- */
 
+.md-typeset .dev-note-deck {
+  max-width: 46rem;
+  margin: -0.35rem 0 1.8rem;
+  color: var(--openshell-muted);
+  font-family: var(--openshell-serif);
+  font-size: clamp(1.08rem, 2vw, 1.28rem);
+  line-height: 1.5;
+}
+
 .dev-note-byline {
   margin: -0.5rem 0 2rem;
   padding: 1rem 0;
