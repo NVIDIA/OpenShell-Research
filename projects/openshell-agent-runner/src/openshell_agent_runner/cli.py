@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 import shlex
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as distribution_version
 from pathlib import Path
 from typing import Annotated, NoReturn
 
@@ -20,12 +22,35 @@ from openshell_agent_runner.openshell import doctor as run_doctor
 from openshell_agent_runner.profile_init import ThinkingLevel, initialize_profiles
 from openshell_agent_runner.runner import RunRequest, render_dry_run, run_agent
 
+
+def version_callback(value: bool) -> None:
+    """Print the installed OAR version when requested."""
+    if value:
+        typer.echo(f"oar {_installed_version()}")
+        raise typer.Exit()
+
+
 app = typer.Typer(
     help="Launch ephemeral agents for single tasks in OpenShell sandboxes.",
     no_args_is_help=True,
     add_completion=False,
     pretty_exceptions_enable=False,
 )
+
+
+@app.callback()
+def main(
+    version: Annotated[
+        bool | None,
+        typer.Option(
+            "--version",
+            callback=version_callback,
+            is_eager=True,
+            help="Show the installed OAR version and exit.",
+        ),
+    ] = None,
+) -> None:
+    """Launch ephemeral agents for single tasks in OpenShell sandboxes."""
 
 
 class ProfileTaskHelpCommand(TyperCommand):
@@ -213,6 +238,13 @@ def _fail(error: OarError) -> NoReturn:
     if isinstance(error, ConfigurationError):
         raise typer.Exit(2)
     raise typer.Exit(1)
+
+
+def _installed_version() -> str:
+    try:
+        return distribution_version("openshell-agent-runner")
+    except PackageNotFoundError:
+        return "unknown"
 
 
 def _profile_task_selection(args: list[str]) -> tuple[Path, str] | None:

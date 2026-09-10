@@ -10,6 +10,7 @@ agent_markdown: true
 
 | Command | Purpose |
 | --- | --- |
+| `oar --version` | Display the installed OAR version. |
 | `oar init PROFILE_ROOT --model MODEL_ID` | Create editable copies of the packaged profiles. |
 | `oar validate PROFILE_DIRECTORY` | Check the profile and its local resources. |
 | `oar doctor` | Display the OpenShell version, gateway status, and inference configuration. |

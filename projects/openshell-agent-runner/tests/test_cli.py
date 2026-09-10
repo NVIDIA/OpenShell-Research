@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import shutil
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as distribution_version
 from pathlib import Path
 
 import pytest
@@ -28,6 +30,30 @@ def test_root_help_lists_commands() -> None:
     assert result.exit_code == 0
     for command in ("init", "validate", "run", "doctor"):
         assert command in result.stdout
+    assert "--version" in result.stdout
+
+
+def test_version_reports_installed_distribution_version() -> None:
+    result = CliRunner().invoke(app, ["--version"])
+
+    assert result.exit_code == 0
+    assert result.stdout == f"oar {distribution_version('openshell-agent-runner')}\n"
+
+
+def test_version_handles_unavailable_distribution_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def missing_distribution(_distribution_name: str) -> str:
+        raise PackageNotFoundError
+
+    monkeypatch.setattr(
+        "openshell_agent_runner.cli.distribution_version", missing_distribution
+    )
+
+    result = CliRunner().invoke(app, ["--version"])
+
+    assert result.exit_code == 0
+    assert result.stdout == "oar unknown\n"
 
 
 @pytest.mark.parametrize(
