@@ -238,7 +238,7 @@ calls and normal provider charges. It checks a raw request without a receipt,
 deny/redact history, a real skill/tool continuation, and manual and automatic
 compaction. It exits unsuccessfully on any missing capability or failed check;
 it does not skip checks or substitute a mock model. Deterministic failure and
-pending-admission tests live in [app/test/](app/test/).
+pending-admission tests live in [pi-harness/test/](pi-harness/test/).
 
 Cleanup deletes only this demo sandbox and its provider instances/profiles,
 then removes the registration created by `register` and restarts the gateway.
@@ -281,17 +281,17 @@ OpenShell supervisor ----------> verify actual request + policy
 attach real provider key --> model
 ```
 
-[agent.ts](app/src/agent.ts) supplies Pi's public `AgentSessionConfig.agent`
+[agent.ts](pi-harness/src/agent.ts) supplies Pi's public `AgentSessionConfig.agent`
 with an admission-controlled execution loop. It approves each candidate before
 updating live state or emitting message events. Pi's native `AgentSession`
 is the **only persistence owner**; it saves those approved events.
-[session.ts](app/src/session.ts) wires the runtime and the
+[session.ts](pi-harness/src/session.ts) wires the runtime and the
 `session_before_compact` extension, and blocks alternate unchecked write paths.
 Finalized assistant text and tool calls are admitted
 before execution. Tool output, missing-tool/argument/execution errors, rendered
 skills, and completed summaries all pass the same boundary.
 
-[admission.ts](app/src/admission.ts) translates these candidates into the existing
+[admission.ts](pi-harness/src/admission.ts) translates these candidates into the existing
 Egress Gate schemas. A provider-context replacement is rejected: silently
 redacting only the outbound request would leave saved history inconsistent.
 

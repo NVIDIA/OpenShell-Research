@@ -11,9 +11,9 @@ RUN apt-get update \
 COPY admission-ca.crt /usr/local/share/ca-certificates/admission-ca.crt
 RUN update-ca-certificates
 WORKDIR /app
-COPY app/package.json app/package-lock.json ./
+COPY pi-harness/package.json pi-harness/package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
-COPY app/ ./
+COPY pi-harness/ ./
 RUN npm run build && mkdir /app/agent
 COPY models.json /app/models.json
 COPY model-selection.json /app/model-selection.json

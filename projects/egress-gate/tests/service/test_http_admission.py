@@ -320,7 +320,7 @@ async def test_pi_session_through_admission_and_authenticated_egress(
                 os.set_blocking(terminal[0], False)
             process = await asyncio.create_subprocess_exec(
                 "node",
-                str(source / "app/dist/test/service-integration.js"),
+                str(source / "pi-harness/dist/test/service-integration.js"),
                 str(server.make_url("/")).rstrip("/"),
                 str(tmp_path),
                 *(["--tui"] if tui else []),

@@ -564,7 +564,7 @@ def test_preparation_uses_existing_gateway_and_excludes_private_material(
     assert not list(image.rglob("*.pem"))
     assert not list(image.rglob(".env"))
     assert not (image / "admission.json").exists()
-    assert not (image / "app/node_modules").exists()
+    assert not (image / "pi-harness/node_modules").exists()
     assert (image / "project/.pi/skills/review/SKILL.md").is_file()
     catalog = json.loads((image / "models.json").read_text())
     assert catalog["providers"]["example"]["models"][0]["id"] == "YOUR_MODEL_ID"
@@ -668,8 +668,8 @@ def test_sandbox_binding_accepts_only_operator_cli_output(tmp_path: Path) -> Non
 
 
 def test_pi_dependencies_are_exact_upstream_packages() -> None:
-    package = json.loads((EXAMPLE / "app/package.json").read_text())
-    lock = json.loads((EXAMPLE / "app/package-lock.json").read_text())
+    package = json.loads((EXAMPLE / "pi-harness/package.json").read_text())
+    lock = json.loads((EXAMPLE / "pi-harness/package-lock.json").read_text())
     for name, version in package["dependencies"].items():
         if name.startswith("@earendil-works/"):
             assert version == "0.85.1"

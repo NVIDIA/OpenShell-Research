@@ -148,10 +148,10 @@ timeout = "10s"
     if image.exists():
         shutil.rmtree(image)
     image.mkdir()
-    for directory in ("app/src", "app/test"):
+    for directory in ("pi-harness/src", "pi-harness/test"):
         shutil.copytree(example / directory, image / directory, dirs_exist_ok=True)
     for name in ("package.json", "package-lock.json", "tsconfig.json"):
-        shutil.copyfile(example / "app" / name, image / "app" / name)
+        shutil.copyfile(example / "pi-harness" / name, image / "pi-harness" / name)
     # This is one explicit project, not a recursive upload of the operator's cwd.
     for name in ("AGENTS.md", "notes.txt", ".pi/skills/review/SKILL.md"):
         destination = image / "project" / name
