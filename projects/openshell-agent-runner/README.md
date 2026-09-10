@@ -28,14 +28,13 @@ OAR uses that setup to create sandboxes and reach your model.
 
 **1. Install OAR and check your connection.**
 
-The two reviewers below require the source version; PyPI 0.0.2 does not include
-them yet. From the root of an OpenShell-Research checkout containing these
-profiles, run:
-
 ```bash
-uv tool install --python 3.12 ./projects/openshell-agent-runner
+uv tool install openshell-agent-runner
 oar doctor
 ```
+
+Prefer to run without installing the command? Replace `oar` in the commands
+below with `uvx --from openshell-agent-runner oar`.
 
 These commands use your selected OpenShell gateway and its `default` workspace.
 For another target, add `--gateway NAME --workspace NAME` to `doctor` and `run`.
@@ -105,7 +104,8 @@ make build
 
 `make check` includes CLI workflows against a simulated OpenShell. With Docker,
 run `make test-runtime` to exercise the real Pi harness without external inference.
-Live CI also reviews clean and deliberately flawed inputs with both packaged profiles.
+For runtime changes, one live CI task checks input transfer, prompt variables,
+structured output, and sandbox cleanup. It does not grade reviewer opinions.
 
 Use `uv run --frozen oar` in this directory to run the checked-out code instead
 of the installed release. Run a focused test with

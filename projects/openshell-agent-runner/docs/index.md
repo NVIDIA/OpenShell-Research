@@ -35,14 +35,13 @@ belong there.
 
 ## 1. Install and check the connection
 
-These profiles are not included in PyPI 0.0.2. Use an
-[OpenShell-Research checkout](https://github.com/NVIDIA/OpenShell-Research)
-containing these profiles and run the following from its root:
-
 ```bash
-uv tool install --python 3.12 ./projects/openshell-agent-runner
+uv tool install openshell-agent-runner
 oar doctor
 ```
+
+Prefer to run without installing the command? Replace `oar` in the commands
+below with `uvx --from openshell-agent-runner oar`.
 
 `doctor` displays the OpenShell version, gateway status, and inference
 configuration. Check that a model is configured and note its model ID for the
