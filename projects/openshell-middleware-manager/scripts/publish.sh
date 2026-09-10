@@ -4,6 +4,9 @@
 
 set -euo pipefail
 
+PUBLISH_TOKEN="${UV_PUBLISH_TOKEN:-}"
+unset UV_PUBLISH_TOKEN
+
 PROJECT_DIRECTORY=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 PYPI_PROJECT_URL="https://pypi.org/project/openshell-middleware-manager"
 
@@ -12,12 +15,6 @@ usage() {
     echo
     echo "Build and publish openshell-middleware-manager to PyPI with uv."
     echo "Publishing requires UV_PUBLISH_TOKEN in the current environment."
-}
-
-print_tag_deletion_instructions() {
-    echo "To delete the tag locally and from origin, run:" >&2
-    echo "  git tag -d '$TAG'" >&2
-    echo "  git push origin --delete '$TAG'" >&2
 }
 
 if [[ $# -lt 1 ]]; then
@@ -100,7 +97,6 @@ TAG_PUBLIC=false
 if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
     if [[ "$(git rev-list -n 1 "$TAG")" != "$(git rev-parse HEAD)" ]]; then
         echo "publish: tag '$TAG' exists on another commit" >&2
-        print_tag_deletion_instructions
         exit 1
     fi
 else
@@ -130,7 +126,6 @@ if [[ -n "$RETRY_ARTIFACT" && "$TAG_PUBLIC" != true ]]; then
 fi
 if [[ -z "$RETRY_ARTIFACT" && "$DRY_RUN" != true && "$TAG_PUBLIC" == true ]]; then
     echo "publish: remote tag '$TAG' already exists; retry the missing artifact or artifacts with --retry-artifact" >&2
-    print_tag_deletion_instructions
     exit 1
 fi
 
@@ -155,7 +150,7 @@ if [[ "$DRY_RUN" == true ]]; then
     exit 0
 fi
 
-if [[ -z "${UV_PUBLISH_TOKEN:-}" ]]; then
+if [[ -z "$PUBLISH_TOKEN" ]]; then
     echo "publish: UV_PUBLISH_TOKEN is not set; export it before publishing" >&2
     exit 1
 fi
@@ -173,7 +168,7 @@ elif [[ "$RETRY_ARTIFACT" == "sdist" ]]; then
 fi
 
 echo "Uploading openshell-middleware-manager $VERSION to PyPI with uv..."
-if ! uv publish --trusted-publishing never "${UPLOAD_ARTIFACTS[@]}"; then
+if ! UV_PUBLISH_TOKEN="$PUBLISH_TOKEN" uv publish --trusted-publishing never "${UPLOAD_ARTIFACTS[@]}"; then
     echo "publish: upload failed; identify the missing artifact or artifacts before retrying" >&2
     exit 1
 fi

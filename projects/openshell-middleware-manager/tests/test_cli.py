@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as distribution_version
 from pathlib import Path
 
@@ -34,20 +33,6 @@ def test_version_reports_installed_distribution_version() -> None:
 
     assert result.exit_code == 0
     assert result.stdout == f"omm {distribution_version('openshell-middleware-manager')}\n"
-
-
-def test_version_handles_unavailable_distribution_metadata(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    def missing_distribution(_distribution_name: str) -> str:
-        raise PackageNotFoundError
-
-    monkeypatch.setattr(cli, "distribution_version", missing_distribution)
-
-    result = runner.invoke(cli.app, ["--version"])
-
-    assert result.exit_code == 0
-    assert result.stdout == "omm unknown\n"
 
 
 def test_cli_reports_success(monkeypatch, tmp_path: Path) -> None:

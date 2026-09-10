@@ -5,6 +5,7 @@ description = "Create and update version-matched OpenShell middleware projects."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [
     { name = "NVIDIA CORPORATION & AFFILIATES" },
 ]
@@ -46,6 +47,7 @@ packages = ["src/openshell_middleware_manager"]
 [tool.hatch.build.targets.sdist]
 include = [
     "/src/openshell_middleware_manager",
+    "/LICENSE",
     "/README.md",
     "/pyproject.toml",
 ]

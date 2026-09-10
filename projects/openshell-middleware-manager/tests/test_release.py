@@ -14,7 +14,7 @@ PUBLISH_SCRIPT = REPOSITORY / "projects/openshell-middleware-manager/scripts/pub
 PROJECT_MAKEFILE = REPOSITORY / "projects/openshell-middleware-manager/Makefile"
 
 
-def test_publish_prints_tag_deletion_commands_for_existing_remote_tag(
+def test_publish_existing_remote_tag_requests_artifact_retry(
     tmp_path: Path,
 ) -> None:
     project = tmp_path / "project"
@@ -55,8 +55,8 @@ def test_publish_prints_tag_deletion_commands_for_existing_remote_tag(
 
     assert result.returncode == 1
     assert "remote tag 'omm-v0.1.0' already exists" in result.stderr
-    assert "git tag -d 'omm-v0.1.0'" in result.stderr
-    assert "git push origin --delete 'omm-v0.1.0'" in result.stderr
+    assert "--retry-artifact" in result.stderr
+    assert "git tag -d" not in result.stderr
 
 
 @pytest.mark.parametrize(
@@ -112,7 +112,7 @@ def test_publish_retry_uploads_only_missing_artifacts(
         fake_bin / "uv",
         """
         #!/usr/bin/env bash
-        printf '%s\\n' "$*" >> "$FAKE_UV_LOG"
+        printf '%s|token=%s\\n' "$*" "${UV_PUBLISH_TOKEN:-}" >> "$FAKE_UV_LOG"
         if [[ "$1" == "build" ]]; then
             mkdir -p dist
             : > dist/openshell_middleware_manager-0.1.0-py3-none-any.whl
@@ -175,11 +175,16 @@ def test_publish_retry_uploads_only_missing_artifacts(
 
     assert retry.returncode == 0, retry.stderr
     assert (repository_state / "sdist").exists()
-    publish_commands = [
-        line for line in uv_log.read_text().splitlines() if line.startswith("publish ")
-    ]
+    command_records = uv_log.read_text().splitlines()
+    publish_commands = [line for line in command_records if line.startswith("publish ")]
     assert all("--trusted-publishing never" in line for line in publish_commands)
     uploads = [line for line in publish_commands if "--dry-run" not in line]
+    assert all(
+        line.endswith("|token=test-token")
+        if line.startswith("publish ") and "--dry-run" not in line
+        else line.endswith("|token=")
+        for line in command_records
+    )
     assert ".whl" in uploads[0] and ".tar.gz" in uploads[0]
     assert (".whl" in uploads[1]) is (retry_artifact == "both")
     assert ".tar.gz" in uploads[1]

@@ -7,13 +7,12 @@ from __future__ import annotations
 
 import shlex
 from enum import Enum
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as distribution_version
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
+from openshell_middleware_manager import __version__
 from openshell_middleware_manager.generator import (
     ProjectError,
     create_project,
@@ -24,7 +23,7 @@ from openshell_middleware_manager.generator import (
 def version_callback(value: bool) -> None:
     """Print the installed OMM version when requested."""
     if value:
-        typer.echo(f"omm {_installed_version()}")
+        typer.echo(f"omm {__version__}")
         raise typer.Exit()
 
 
@@ -155,13 +154,6 @@ def update(
 def _report_error(error: ProjectError) -> None:
     typer.echo(f"omm: error: {error}", err=True)
     raise typer.Exit(code=1) from error
-
-
-def _installed_version() -> str:
-    try:
-        return distribution_version("openshell-middleware-manager")
-    except PackageNotFoundError:
-        return "unknown"
 
 
 def main() -> None:
