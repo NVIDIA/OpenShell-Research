@@ -1463,14 +1463,14 @@
 </thead>
 <tbody>
 <tr>
-<td>OAR and PR review checks</td>
-<td>Lint, types, tests, wheel installation, offline Pi sessions, and PR selection-to-report integration. No inference credentials.</td>
+<td>OAR functional checks</td>
+<td>Independent Python 3.12 jobs check deterministic behavior, installable distributions, and offline Pi sessions. No inference credentials.</td>
 <td>OAR or review infrastructure changes.</td>
 </tr>
 <tr>
-<td>OAR pipeline smoke</td>
-<td>One installed CLI run through a real gateway; checks input transfer, prompt variables, structured output, and sandbox cleanup.</td>
-<td>OAR source, dependencies, smoke fixture, or gateway setup changes on trusted branches.</td>
+<td>OAR live integration</td>
+<td>One installed CLI run through a real gateway checks input transfer, prompt variables, structured output, and sandbox cleanup.</td>
+<td>OAR source, dependencies, integration fixture, or gateway setup changes on trusted branches.</td>
 </tr>
 <tr>
 <td>New project review</td>
@@ -1484,8 +1484,9 @@
 </tr>
 </tbody>
 </table>
-<p>Model verdicts are not CI pass/fail expectations. The live smoke checks execution
-contracts; it does not evaluate reviewer quality or assess the PR's content.</p>
+<p>Model verdicts are not CI pass/fail expectations. The live integration checks
+execution contracts; it does not evaluate reviewer quality or assess the PR's
+content.</p>
 <p>The first iteration answers: <strong>Does this new project deliver what it claims,
 follow our project guidelines, and use an appropriate level of engineering?</strong></p>
 <h2 id="contributor-workflow">Contributor workflow</h2>
@@ -1541,11 +1542,13 @@ start live reviews. There is no central registry or metadata backfill.</p>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>                 └─ oar run once per project
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>                      └─ Validated JSON → one current-revision PR comment
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>Native checks + offline integration ─── execution and policy checks
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>One live OAR pipeline check ─────────── Actions summary, not a PR assessment
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>Deterministic, package, and offline runtime checks ─── functional contracts
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>One live OAR integration ───────────────────────────── Actions summary, not a PR assessment
 </span></code></pre></div>
-<p>The result includes an overall verdict, five fixed criterion scores (0–100,
-100 best), their rounded mean, findings, strengths, and limitations.
+<p>The result artifact includes an overall verdict, five fixed criterion scores
+(0–100, 100 best), their rounded mean, findings, strengths, and limitations.
+The PR comment emphasizes verdicts and actionable findings rather than
+displaying the numerical scores.
 <code>guidelines_assessment</code> separately records a verdict and evidence-based
 explanation covering applicable requirements and material verification gaps.
 Findings cite specific guideline violations; they do not invent requirements.</p>
@@ -1554,7 +1557,9 @@ issue needs correction), and <code>inconclusive</code> (insufficient evidence). 
 does not hide guideline violations or force a passing verdict. Scores and
 findings are advisory; native checks remain separate merge gates.</p>
 <h2 id="execution-and-trust">Execution and trust</h2>
-<p><code>New project review</code> runs on PR opening, reopening, new commits, and readiness.
+<p><code>New project review</code> runs on PR opening, reopening, new commits, readiness, and
+conversion back to draft. When a new project is removed from the PR or the PR
+returns to draft, the workflow removes its now-stale bot report.
 Draft, fork, and Dependabot PRs skip live review. There is no manual fork
 authorization or waiting for other workflows.</p>
 <ul>
@@ -1578,8 +1583,8 @@ authorization or waiting for other workflows.</p>
 project additions. Before that, offline integration tests exercise selection,
 snapshot preparation, the real OAR CLI, and report creation/update together,
 with simulated GitHub and OpenShell boundaries. This does not claim a live
-GitHub comment has been tested. The separate smoke verifies real OpenShell
-execution using the candidate wheel.</p>
+GitHub comment has been tested. The separate live integration verifies real
+OpenShell execution using the candidate wheel.</p>
 <h2 id="setup">Setup</h2>
 <p>Set these repository Actions secrets:</p>
 <ul>
@@ -1599,18 +1604,24 @@ GitHub calls use the runner's <code>gh api</code>. Run from the repository root:
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>tests/test_ci_scope.py<span class="w"> </span>tests/test_github_api.py<span class="w"> </span>tests/test_*review*.py
 </span></code></pre></div>
 <p>Run <code>make check</code> and <code>make build</code> from the OAR project directory. <code>make check</code>
-includes CLI workflows against a simulated OpenShell; <code>make test-runtime</code> uses
-Docker to exercise real Pi sessions against local scripted inference, with no
-external network or credentials. CI runs both, plus the Pi extension SDK checks.</p>
-<p>The live smoke workflow (<code>.github/workflows/oar-smoke.yml</code>) installs the built
-wheel, configures a small task from <code>tests/fixtures/pipeline-smoke/</code>, and calls
-<code>oar run</code> directly. The agent reads an uploaded file and returns its contents
-plus a runtime prompt variable in a schema-validated result. CI checks those
-values and confirms that no sandbox remains on its dedicated gateway.</p>
-<p>The task has a five-minute timeout and the job has a 15-minute limit.
+includes CLI workflows against a simulated OpenShell. CI runs deterministic
+checks, distribution checks, and offline runtime checks as independent Python
+3.12 jobs. The distribution job builds both artifacts, proves that the sdist can
+build a wheel, installs the release wheel, and exercises its CLI and packaged
+resources. The runtime job uses Docker to exercise real Pi sessions against
+local scripted inference, with no external network or credentials, and checks
+the Pi extensions directly.</p>
+<p>The live integration workflow (<code>.github/workflows/oar-integration.yml</code>) installs
+the built wheel, configures a small task from
+<code>tests/fixtures/pipeline-integration/</code>, and calls <code>oar run</code> directly. The agent
+reads an uploaded file and returns its contents plus a runtime prompt variable
+in a schema-validated result. CI checks those values and confirms that no
+sandbox remains on its dedicated gateway.</p>
+<p>The task has a five-minute timeout and the job has a 10-minute limit.
 Input, result, log, and sandbox inventory are uploaded as
-the <code>oar-pipeline-smoke</code> artifact. The workflow writes an Actions summary,
-never a PR comment. No clean/flawed reviewer experiments run in CI.</p>
+the <code>oar-live-integration</code> artifact, together with safe OpenShell version and
+gateway-status diagnostics. The workflow writes an Actions summary, never a PR
+comment. No reviewer-opinion expectations run in CI.</p>
 <p>Keep team expectations in the project guidelines. Change review judgment in the
 common or kind-specific skill, and change selection/reporting only when the
 workflow needs it. Existing-project and document-only review, generic project
