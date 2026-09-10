@@ -19,3 +19,5 @@ The CI workflow uploads this fixture to an OpenShell review sandbox; it is not
 itself an OpenShell integration or a published project. This standard-library-only
 fixture deliberately omits packaging and a lockfile; the OAR CI job owns its
 Python environment. No credentials, services, or paid operations are needed.
+The fixture inherits the Apache-2.0 license from the parent OpenShell-Research
+repository; it is not distributed as a separate project.
