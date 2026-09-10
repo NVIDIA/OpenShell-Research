@@ -2,13 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
-import type { Model } from "@earendil-works/pi-ai";
 import { InteractiveMode, convertToLlm } from "@earendil-works/pi-coding-agent";
 import { Admission, AdmissionError, createHttpEvaluator } from "./admission.js";
 import { createAdmissionRuntime } from "./session.js";
 import { configureProxy } from "./network.js";
+import { loadSelectedModel } from "./model.js";
 
 async function main(): Promise<void> {
   configureProxy();
@@ -16,7 +15,6 @@ async function main(): Promise<void> {
     options: {
       cwd: { type: "string", default: "/sandbox/project" },
       "session-dir": { type: "string", default: "/sandbox/sessions" },
-      model: { type: "string", default: "/app/model.json" },
       admission: { type: "string" },
       prompt: { type: "string" },
     },
@@ -29,9 +27,7 @@ async function main(): Promise<void> {
   delete process.env.EGRESS_ADMISSION_TOKEN;
   if (!apiKey || !admissionKey || !values.admission)
     throw new Error("Missing provider or admission configuration.");
-  const model = JSON.parse(
-    await readFile(values.model, "utf8"),
-  ) as Model<"openai-completions">;
+  const model = await loadSelectedModel();
   const runtime = await createAdmissionRuntime({
     cwd: values.cwd,
     sessionDir: values["session-dir"],

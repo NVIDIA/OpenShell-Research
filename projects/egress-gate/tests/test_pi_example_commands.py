@@ -32,6 +32,46 @@ PROJECT = Path(__file__).parents[1]
 EXAMPLE = PROJECT / "examples/pi-attested-admission"
 
 
+def test_native_model_selection_keeps_only_selected_configuration(
+    tmp_path: Path,
+) -> None:
+    catalog = json.loads((EXAMPLE / "models.json.example").read_text())
+    provider = catalog["providers"]["example"]
+    provider["apiKey"] = "!do-not-execute-or-copy"
+    provider["models"].append(
+        {
+            "id": "vendor/second",
+            "baseUrl": "https://selected.example/custom/v1",
+            "api": "openai-completions",
+        }
+    )
+    provider["modelOverrides"] = {"vendor/second": {"maxTokens": 2048}}
+    catalog["providers"]["unselected"] = {
+        "apiKey": "private",
+        "models": [{"id": "third"}],
+    }
+    path = tmp_path / "models.json"
+    path.write_text(json.dumps(catalog))
+    select = runpy.run_path(str(EXAMPLE / "prepare.py"))["select_model"]
+    for selection in ("", "example/missing"):
+        with pytest.raises(ValueError, match="PI_MODEL"):
+            select(path, selection)
+    staged, selection, endpoint = select(path, "example/vendor/second")
+    assert selection == {"provider": "example", "id": "vendor/second"}
+    assert endpoint == "https://selected.example/custom/v1"
+    assert staged == {
+        "providers": {
+            "example": {
+                "api": provider["api"],
+                "baseUrl": provider["baseUrl"],
+                "compat": provider["compat"],
+                "models": [provider["models"][1]],
+                "modelOverrides": provider["modelOverrides"],
+            }
+        }
+    }
+
+
 @pytest.fixture
 def gateway_discovery(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -401,8 +441,33 @@ def test_prepare_requires_operator_model_configuration(tmp_path: Path) -> None:
         text=True,
     )
     assert result.returncode == 1
-    assert "Create model.json from model.json.example" in result.stderr
-    assert not (tmp_path / "model.json").exists()
+    assert "Create models.json from models.json.example" in result.stderr
+    assert not (tmp_path / "models.json").exists()
+
+
+def test_image_suppresses_only_the_proxy_agent_warning() -> None:
+    dockerfile = (EXAMPLE / "sandbox/Dockerfile").read_text()
+    options = next(
+        line.removeprefix("ENV NODE_OPTIONS=").strip('"')
+        for line in dockerfile.splitlines()
+        if line.startswith("ENV NODE_OPTIONS=")
+    )
+    result = subprocess.run(
+        [
+            "node",
+            "-e",
+            "process.emitWarning('proxy notice', {code: 'UNDICI-EHPA'});"
+            "process.emitWarning('unrelated notice', {code: 'OTHER_WARNING'});",
+        ],
+        env=os.environ | {"NODE_OPTIONS": options},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "UNDICI-EHPA" not in result.stderr
+    assert "proxy notice" not in result.stderr
+    assert "OTHER_WARNING" in result.stderr
+    assert "unrelated notice" in result.stderr
 
 
 @pytest.mark.parametrize("host", ["192.0.2.10", "host.docker.internal"])
@@ -416,9 +481,17 @@ def test_preparation_uses_existing_gateway_and_excludes_private_material(
     shutil.copytree(
         EXAMPLE,
         example,
-        ignore=shutil.ignore_patterns(".env", "model.json", "node_modules", "dist"),
+        ignore=shutil.ignore_patterns(
+            ".env", "model.json", "models.json", "node_modules", "dist"
+        ),
     )
-    shutil.copyfile(example / "model.json.example", example / "model.json")
+    catalog = json.loads((example / "models.json.example").read_text())
+    provider = catalog["providers"]["example"]
+    provider["apiKey"] = "must-not-enter-image"
+    provider["models"][0]["baseUrl"] = provider["baseUrl"]
+    provider["baseUrl"] = "https://unselected.example/v1"
+    provider["models"].append({"id": "unselected"})
+    (example / "models.json").write_text(json.dumps(catalog))
     gateway, public = gateway_discovery
     public_path = state / "gateway-public.pem"
     command = [
@@ -430,6 +503,8 @@ def test_preparation_uses_existing_gateway_and_excludes_private_material(
         host,
         "--gateway",
         gateway["name"],
+        "--model",
+        "example/YOUR_MODEL_ID",
     ]
     subprocess.run(command, input=json.dumps([gateway]), text=True, check=True)
     config = AdmissionServerConfig.model_validate_json(
@@ -473,7 +548,14 @@ def test_preparation_uses_existing_gateway_and_excludes_private_material(
     assert not (image / "admission.json").exists()
     assert not (image / "app/node_modules").exists()
     assert (image / "project/.pi/skills/review/SKILL.md").is_file()
-    assert json.loads((image / "model.json").read_text())["id"] == "YOUR_MODEL_ID"
+    catalog = json.loads((image / "models.json").read_text())
+    assert catalog["providers"]["example"]["models"][0]["id"] == "YOUR_MODEL_ID"
+    assert len(catalog["providers"]["example"]["models"]) == 1
+    assert "must-not-enter-image" not in (image / "models.json").read_text()
+    assert json.loads((image / "model-selection.json").read_text()) == {
+        "provider": "example",
+        "id": "YOUR_MODEL_ID",
+    }
     middleware = tomllib.loads((state / "middleware.toml").read_text())
     registration = middleware["openshell"]["supervisor"]["middleware"][0]
     assert registration["grpc_endpoint"] == f"https://{host}:50051"

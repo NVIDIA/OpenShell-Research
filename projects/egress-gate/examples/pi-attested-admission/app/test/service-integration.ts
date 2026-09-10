@@ -7,7 +7,6 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Model } from "@earendil-works/pi-ai";
 import { InteractiveMode } from "@earendil-works/pi-coding-agent";
 import {
   Admission,
@@ -15,21 +14,14 @@ import {
   createHttpEvaluator,
 } from "../src/admission.js";
 import { AdmissionSession, createAdmissionRuntime } from "../src/session.js";
+import { loadSelectedModel } from "../src/model.js";
 
 const [endpoint, directory] = process.argv.slice(2);
-const model: Model<"openai-completions"> = {
-  id: "test",
-  name: "Local integration provider",
-  provider: "test",
-  api: "openai-completions",
-  baseUrl: `${endpoint}/v1`,
-  reasoning: false,
-  input: ["text"],
-  contextWindow: 100000,
-  maxTokens: 4096,
-  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-  compat: { maxTokensField: "max_tokens", supportsDeveloperRole: false },
-};
+const model = await loadSelectedModel(join(directory, "image"));
+assert.equal(model.id, "YOUR_MODEL_ID");
+assert.equal(model.compat?.supportsDeveloperRole, false);
+// Only the endpoint changes: exercise the prepared catalog through Pi's parser.
+model.baseUrl = `${endpoint}/v1`;
 const options = (compactAtTokens?: number) => ({
   cwd: join(directory, "image/project"),
   sessionDir: join(directory, "sessions"),
@@ -48,6 +40,7 @@ const options = (compactAtTokens?: number) => ({
 
 if (process.argv.includes("--tui")) {
   const runtime = await createAdmissionRuntime(options());
+  assert.equal(runtime.services.modelRuntime.getError(), undefined);
   await new InteractiveMode(runtime, {
     initialMessage: "Please repeat REDACT_THIS and café.",
     initialMessages: ["/skill:review"],
@@ -59,6 +52,7 @@ const create = (compactAtTokens?: number) =>
   AdmissionSession.create(options(compactAtTokens));
 
 const session = await create();
+assert.equal(session.modelRuntime.getError(), undefined);
 await assert.rejects(session.prompt("DENY_THIS"), AdmissionError);
 assert.equal(session.history.length, 0);
 assert.equal(session.entries.length, 0);

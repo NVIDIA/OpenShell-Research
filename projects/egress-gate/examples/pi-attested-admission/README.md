@@ -30,19 +30,23 @@ From this directory:
 
 ```sh
 cp .env.example .env
-cp model.json.example model.json
+cp models.json.example models.json
 # Fill in the gateway name, reachable Egress Gate host, and model API key.
-# Edit model.json for your endpoint, model ID, and token limits (see below).
+# Edit models.json for your endpoint, model ID, and token limits (see below).
 ./demo.sh prepare
 ```
 
-Create your own `model.json` from [model.json.example](model.json.example).
+Create your own `models.json` from [models.json.example](models.json.example).
+It uses **Pi's native `{"providers": {...}}` catalog format**. Add as many providers
+and models as you like. One declared model is selected automatically; with more
+than one, set `PI_MODEL=provider/model` in `.env` (for example,
+`PI_MODEL=example/YOUR_MODEL_ID`). Model IDs can contain slashes.
 No working provider configuration is shipped. Use a text-only, tool-capable
 OpenAI-compatible Chat Completions endpoint; NVIDIA inference is one option if
 you have access, not a requirement. Set:
 
-- `id` and `name`: your provider's model ID and a display name.
-- `baseUrl`: the HTTPS API base, such as `https://your-provider.example/v1`;
+- `providers.<provider>.models`: your models, each with an `id` and optional `name`.
+- `providers.<provider>.baseUrl`: the HTTPS API base, such as `https://your-provider.example/v1`;
   the application appends `/chat/completions`.
 - `contextWindow` and `maxTokens`: the model's context limit and your desired
   response limit, in tokens. The POC caps each response at the smaller of
@@ -51,11 +55,24 @@ you have access, not a requirement. Set:
   `max_completion_tokens`). The other compatibility settings are conservative
   defaults; adjust them if your endpoint requires it.
 
-Keep `api`, `provider`, `reasoning`, and `input` as shown for this demo.
+Keep `api`, `reasoning`, and `input` as shown for this demo.
 The zero `cost` values disable cost estimates; provider usage is not free.
-Put the API key only in `.env`, never in `model.json`.
-Both files are ignored by Git. Preparation copies your model configuration into
-the local sandbox image, but not `.env` or the API key.
+Put the API key only in `.env`, never in `models.json`.
+Both files are ignored by Git. Preparation copies **only the selected model** and
+its provider settings into the image, removing provider `apiKey` configuration.
+Pi resolves its defaults and compatibility settings; a model-level `baseUrl` or
+`api` takes precedence over the provider setting. Declare both values explicitly
+at one of those levels. This POC does not support OAuth or custom headers.
+Credentials and model caches stay in memory; no writable `/app/agent/auth.json`
+is needed.
+
+If you used the earlier single-object `model.json`, start from the new template
+and transfer your endpoint and model settings; renaming the file alone is not enough.
+The catalog can contain many models, but each prepared demo uses **one**. To change
+the selection, run `./demo.sh cleanup`, stop `serve`, update `PI_MODEL` and its key,
+then repeat `prepare`, `serve`, `register`, and `setup`. Live model switching is
+disabled because OpenShell's policy and admission receipts are bound to the
+prepared endpoint.
 
 `prepare` reads the selected endpoint from `openshell gateway list --output json`
 and discovers its issuer and public signing key over verified HTTPS. It reuses
@@ -168,6 +185,8 @@ boundary: OpenShell's filesystem policy supplies that boundary.
 
 Responses and tool output are buffered until approved, rather than streamed
 unchecked into the transcript. Pi still shows activity while waiting.
+The image suppresses only Node warning `UNDICI-EHPA` (the experimental
+`EnvHttpProxyAgent` notice); other warnings and errors remain visible.
 Use Ctrl+O to expand tool output and `/session` to inspect session information;
 Pi saves JSONL under `/sandbox/sessions`. The former custom `/history` and
 `/exit` commands are gone; use Pi's chat view and `/quit`.

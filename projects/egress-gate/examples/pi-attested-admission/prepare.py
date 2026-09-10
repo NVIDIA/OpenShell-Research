@@ -27,12 +27,33 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 
 def prepare(
-    example: Path, state: Path, host: str, gateway_public_key: Path, gateway_issuer: str
+    example: Path,
+    state: Path,
+    host: str,
+    gateway_public_key: Path,
+    gateway_issuer: str,
+    model_selection: str = "",
 ) -> None:
     """Keep keys outside the image; copy only the public CA and explicit demo files."""
     endpoint = urlparse(f"https://{host}:5443")
     if endpoint.hostname != host or endpoint.port != 5443 or endpoint.path:
         raise ValueError("Use a DNS hostname or IPv4 address, without a URL or port")
+    catalog, selection, base_url = select_model(
+        example / "models.json", model_selection
+    )
+    target = urlparse(base_url)
+    if (
+        target.scheme != "https"
+        or not target.hostname
+        or target.username
+        or target.query
+        or target.fragment
+    ):
+        raise ValueError(
+            "The model must use an HTTPS endpoint without credentials or query"
+        )
+    if target.hostname == host:
+        raise ValueError("Model and admission endpoints must be separate")
     public_key = serialization.load_pem_public_key(gateway_public_key.read_bytes())
     if not isinstance(public_key, ed25519.Ed25519PublicKey):
         raise ValueError("Provide the gateway's Ed25519 public signing key")
@@ -49,12 +70,6 @@ def prepare(
         _create_certificates(tls, host)
         print("Service TLS created: install tls/ca.crt in the gateway's trust config.")
     (state / "service-host").write_text(host)
-    model = json.loads((example / "model.json").read_text())
-    target = urlparse(model["baseUrl"])
-    if target.scheme != "https" or not target.hostname or target.username:
-        raise ValueError("The model must use an HTTPS endpoint without credentials")
-    if target.hostname == host:
-        raise ValueError("Model and admission endpoints must be separate")
     model_path = target.path.rstrip("/") + "/chat/completions"
     policy = yaml.safe_load((example / "policy.yaml").read_text())
     model_endpoint = policy["network_policies"]["model_provider"]["endpoints"][0]
@@ -142,9 +157,56 @@ timeout = "10s"
         destination = image / "project" / name
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(example / "project" / name, destination)
-    shutil.copyfile(example / "model.json", image / "model.json")
+    (image / "models.json").write_text(json.dumps(catalog, indent=2) + "\n")
+    (image / "model-selection.json").write_text(json.dumps(selection) + "\n")
     shutil.copyfile(example / "sandbox/Dockerfile", image / "Dockerfile")
     shutil.copyfile(tls / "ca.crt", image / "admission-ca.crt")
+    print(f"Selected model: {selection['provider']}/{selection['id']}")
+
+
+def select_model(
+    path: Path, requested: str
+) -> tuple[dict[str, object], dict[str, str], str]:
+    """Stage one native Pi model; provider credentials remain owned by OpenShell."""
+    providers = json.loads(path.read_text()).get("providers")
+    if not isinstance(providers, dict):
+        raise ValueError(
+            "Use Pi's native models.json providers catalog; see models.json.example"
+        )
+    choices = [
+        (provider_id, provider, model)
+        for provider_id, provider in providers.items()
+        for model in provider.get("models", [])
+        if not requested or f"{provider_id}/{model['id']}" == requested
+    ]
+    if len(choices) != 1:
+        raise ValueError(
+            "Set PI_MODEL=provider/model to select exactly one declared model"
+        )
+    provider_id, provider, model = choices[0]
+    overrides = provider.get("modelOverrides", {}).get(model["id"], {})
+    if any(config.get("headers") for config in (provider, model, overrides)):
+        raise ValueError("Custom model headers are unsupported; use PI_MODEL_API_KEY")
+    if provider.get("oauth") or provider.get("authHeader"):
+        raise ValueError(
+            "Custom provider authentication is unsupported; use PI_MODEL_API_KEY"
+        )
+    if model.get("api", provider.get("api")) != "openai-completions":
+        raise ValueError("Select an openai-completions model for this example")
+    base_url = model.get("baseUrl", provider.get("baseUrl"))
+    if not isinstance(base_url, str):
+        raise ValueError("Declare the selected model's baseUrl in models.json")
+    selected_provider = {
+        key: provider[key] for key in ("api", "baseUrl", "compat") if key in provider
+    }
+    selected_provider["models"] = [model]
+    if overrides:
+        selected_provider["modelOverrides"] = {model["id"]: overrides}
+    return (
+        {"providers": {provider_id: selected_provider}},
+        {"provider": provider_id, "id": model["id"]},
+        base_url,
+    )
 
 
 def _discover_gateway(gateway: dict[str, str]) -> tuple[bytes, str]:
@@ -269,6 +331,7 @@ if __name__ == "__main__":
     parser.add_argument("--state", type=Path, required=True)
     parser.add_argument("--host", required=True)
     parser.add_argument("--gateway", required=True)
+    parser.add_argument("--model", default="")
     args = parser.parse_args()
     gateways = json.load(sys.stdin)
     gateway = next((item for item in gateways if item["name"] == args.gateway), None)
@@ -285,4 +348,5 @@ if __name__ == "__main__":
         args.host,
         public_path,
         issuer,
+        args.model,
     )

@@ -164,9 +164,14 @@ async def test_pi_session_through_admission_and_authenticated_egress(
     shutil.copytree(
         source,
         example,
-        ignore=shutil.ignore_patterns(".env", "model.json", "node_modules", "dist"),
+        ignore=shutil.ignore_patterns(
+            ".env", "model.json", "models.json", "node_modules", "dist"
+        ),
     )
-    shutil.copyfile(example / "model.json.example", example / "model.json")
+    shutil.copyfile(example / "models.json.example", example / "models.json")
+    # Match the image: the sandbox user cannot create Pi auth/cache files in /app.
+    agent_dir = tmp_path / "agent"
+    agent_dir.mkdir(mode=0o555)
     async with _clients(tmp_path) as (_, stub, config, token, middleware):
         runpy.run_path(str(example / "prepare.py"))["prepare"](
             example,
@@ -304,6 +309,9 @@ async def test_pi_session_through_admission_and_authenticated_egress(
                     process.kill()
                     await process.wait()
             assert process.returncode == 0, (stdout + stderr).decode()
+            assert not list(agent_dir.iterdir()), (
+                "Pi must not write auth or model caches"
+            )
             assert len(calls) == (4 if tui else 7)
             assert any(m["role"] == "tool" for m in json.loads(calls[2])["messages"])
         finally:

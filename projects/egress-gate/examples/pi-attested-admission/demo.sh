@@ -58,8 +58,8 @@ case "$action" in
     if ! $print_only; then
       : "${EGRESS_GATE_HOST:?Set the service hostname or IPv4 address in .env}"
       : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}"
-      if [[ ! -f $example/model.json ]]; then
-        echo 'Create model.json from model.json.example and configure your model first.' >&2
+      if [[ ! -f $example/models.json ]]; then
+        echo 'Create models.json from models.json.example and configure your model first.' >&2
         exit 1
       fi
     fi
@@ -67,9 +67,9 @@ case "$action" in
     if $print_only; then
       printf '%q ' "${openshell[@]}" gateway list --output json
       printf '| '
-      run uv run --frozen python "$example/prepare.py" --state "$state" --host "$service_host" --gateway "$gateway"
+      run uv run --frozen python "$example/prepare.py" --state "$state" --host "$service_host" --gateway "$gateway" --model "${PI_MODEL:-}"
     else
-      "${openshell[@]}" gateway list --output json | uv run --frozen python "$example/prepare.py" --state "$state" --host "$service_host" --gateway "$gateway"
+      "${openshell[@]}" gateway list --output json | uv run --frozen python "$example/prepare.py" --state "$state" --host "$service_host" --gateway "$gateway" --model "${PI_MODEL:-}"
     fi
     run docker build --tag pi-admission:local "$state/image"
     ;;

@@ -3,13 +3,14 @@
 
 import { resolve } from "node:path";
 import type { AgentTool, StreamFn } from "@earendil-works/pi-agent-core";
-import type { Model } from "@earendil-works/pi-ai";
+import { InMemoryCredentialStore, type Model } from "@earendil-works/pi-ai";
 import { streamSimple } from "@earendil-works/pi-ai/compat";
 import {
   AgentSession,
   AgentSessionRuntime,
   SessionManager,
   SettingsManager,
+  ModelRuntime,
   createAgentSessionServices,
   convertToLlm,
   generateSummaryWithUsage,
@@ -165,6 +166,11 @@ function sessionFactory(options: SessionOptions) {
     const services = await createAgentSessionServices({
       cwd,
       agentDir,
+      // OpenShell supplies runtime credentials; /app remains read-only.
+      modelRuntime: await ModelRuntime.create({
+        credentials: new InMemoryCredentialStore(),
+        modelsPath: null,
+      }),
       settingsManager: SettingsManager.inMemory({
         packages: [],
         enableInstallTelemetry: false,

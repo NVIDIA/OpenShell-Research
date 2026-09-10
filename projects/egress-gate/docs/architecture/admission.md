@@ -102,6 +102,13 @@ operator. Discovery requires one published signing key and refuses plaintext,
 cross-origin key URLs and untrusted TLS; browser/edge-login gateways are outside
 this POC helper's scope. Host setup generates service TLS, one admission bearer
 credential, provider destination and policy; setup reads the actual sandbox ID.
+The operator supplies Pi's native `models.json` catalog. Preparation selects one
+declared model (using `PI_MODEL=provider/model` when there are several), stages
+only that model and its provider settings without provider API-key configuration,
+and derives the endpoint policy from it. Pi's own parser resolves model defaults
+and compatibility settings. Credential and model-cache stores are in memory;
+the image does not need a writable `auth.json`. Changing the selection requires
+repreparing and recreating the demo, not live switching.
 For local installer-managed gateways, the same `register` command selects the
 config and service manager (Homebrew or the DEB/RPM user service), adds the demo's
 middleware entry, and restarts the gateway; `cleanup` removes that entry and

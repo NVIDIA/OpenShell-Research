@@ -5,10 +5,10 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
-import type { Model } from "@earendil-works/pi-ai";
 import { Admission, AdmissionError, createHttpEvaluator } from "./admission.js";
 import { AdmissionSession } from "./session.js";
 import { configureProxy } from "./network.js";
+import { loadSelectedModel } from "./model.js";
 
 /** Real service, upstream runtime, real project tools, and the configured model. */
 async function verify(): Promise<void> {
@@ -22,9 +22,7 @@ async function verify(): Promise<void> {
     apiKey && admissionKey && values.admission,
     "Missing example configuration",
   );
-  const model = JSON.parse(
-    await readFile("/app/model.json", "utf8"),
-  ) as Model<"openai-completions">;
+  const model = await loadSelectedModel();
   const makeSession = (compactAtTokens?: number) =>
     AdmissionSession.create({
       cwd: "/sandbox/project",

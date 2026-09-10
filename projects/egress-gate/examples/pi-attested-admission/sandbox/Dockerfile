@@ -15,10 +15,13 @@ COPY app/package.json app/package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
 COPY app/ ./
 RUN npm run build && mkdir /app/agent
-COPY model.json /app/model.json
+COPY models.json /app/models.json
+COPY model-selection.json /app/model-selection.json
 COPY --chown=sandbox:sandbox project/ /sandbox/project/
 RUN mkdir /sandbox/sessions && chown sandbox:sandbox /sandbox/sessions \
     && chmod -R a+rX /app /sandbox/project
 ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
+# Hide only EnvHttpProxyAgent's experimental warning, not other Node warnings.
+ENV NODE_OPTIONS="--disable-warning=UNDICI-EHPA"
 WORKDIR /sandbox/project
 USER sandbox

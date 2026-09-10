@@ -14,7 +14,7 @@ network_policies:
   model_provider:
     name: Configured model endpoint
     endpoints:
-      - host: api.example.com # prepare replaces this with the model.json endpoint.
+      - host: api.example.com # prepare replaces this with the models.json endpoint.
         port: 443
         protocol: rest
         enforcement: enforce
@@ -80,4 +80,4 @@ network_middlewares:
     on_error: fail_closed
     endpoints:
       include:
-        - api.example.com # prepare replaces this with the model.json endpoint.
+        - api.example.com # prepare replaces this with the models.json endpoint.
