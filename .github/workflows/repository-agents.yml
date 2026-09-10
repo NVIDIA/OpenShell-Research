@@ -140,6 +140,7 @@ jobs:
             --output "$RUNNER_TEMP/review-output.json" \
             --dry-run
           test ! -e "$RUNNER_TEMP/review-output.json"
+          uvx --from "$wheel" --with pytest pytest tests/test_lifecycle.py -k cli
 
       - name: Build the Pi image
         if: matrix.python-version == '3.12'
@@ -169,3 +170,10 @@ jobs:
               node \
               --experimental-strip-types --no-warnings \
               /sandbox/validate-pi-extensions.mjs"
+
+      - name: Exercise the real Pi harness without network access
+        if: matrix.python-version == '3.12'
+        working-directory: projects/openshell-agent-runner
+        env:
+          OAR_PI_IMAGE: openshell-agent-runner-pi:ci
+        run: uv run --frozen pytest tests/harnesses/runtime_checks.py

@@ -7,7 +7,6 @@ from pathlib import Path
 
 import yaml
 
-from openshell_agent_runner.artifacts import ARTIFACT_PATH
 from openshell_agent_runner.config import load_profile
 from openshell_agent_runner.harnesses.pi.resources import (
     image_directory,
@@ -28,27 +27,6 @@ def test_pi_image_contract_is_pinned_and_least_privilege() -> None:
     assert "git" in dockerfile
     assert "WORKDIR /sandbox" in dockerfile
     assert "USER node" in dockerfile
-
-
-def test_pi_entrypoint_disables_automatic_resources() -> None:
-    script = (image_directory() / "exec.sh").read_text()
-    for flag in (
-        "--no-session",
-        "--no-extensions",
-        "--no-skills",
-        "--no-prompt-templates",
-        "--no-context-files",
-        "--offline",
-    ):
-        assert flag in script
-    assert Path(image_directory() / "exec.sh").is_file()
-    assert "agent_workdir=${REPOSITORY_ROOT:-/sandbox}" in script
-    assert 'cd "$agent_workdir"' in script
-    assert 'export OAR_MODEL_ID="$model_id"' in script
-    assert 'ln -s /usr/local/lib/node_modules "$payload/node_modules"' in script
-    assert "REPOSITORY_ROOT is not a directory" in script
-    assert '[[ ! "$model_id" =~ ^[A-Za-z0-9._:/-]{1,256}$ ]]' in script
-    assert '"${arguments[$index]}" == "--model"' in script
 
 
 def test_schema_task_receives_generic_submission_protocol() -> None:
@@ -225,36 +203,6 @@ def test_custom_extension_and_declared_tool_are_staged(tmp_path: Path) -> None:
         )
     finally:
         prepared.close()
-
-
-def test_generic_submission_extension_validates_and_saves_result() -> None:
-    extension = (
-        REPOSITORY
-        / "projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/extensions/submit-result.ts"
-    ).read_text()
-
-    assert 'import Ajv2020 from "ajv/dist/2020.js"' in extension
-    assert 'import { Type } from "typebox"' in extension
-    assert "strict: false" in extension
-    assert "validateFormats: false" in extension
-    assert "Type.Object({ result: Type.Unsafe(schema) })" in extension
-    assert "async execute(_toolCallId, { result })" in extension
-    assert 'name: "submit_result"' in extension
-    assert "const outputPath = `${outputDirectory}/result`" in extension
-    assert ARTIFACT_PATH == "/sandbox/artifacts/result"
-
-
-def test_tool_validator_checks_the_loaded_pi_registry_before_inference() -> None:
-    extension = (
-        REPOSITORY
-        / "projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/extensions/validate-tools.ts"
-    ).read_text()
-
-    assert 'pi.on("before_agent_start"' in extension
-    assert "pi.getAllTools()" in extension
-    assert "pi.getActiveTools()" in extension
-    assert "findMissingTools(requestedTools, availableTools)" in extension
-    assert "process.exit(2)" in extension
 
 
 def test_supplied_policies_allow_no_ordinary_network_egress() -> None:

@@ -151,7 +151,7 @@ def test_profile_resource_types_are_checked(tmp_path: Path) -> None:
 
 
 def test_skill_directory_requires_skill_markdown(tmp_path: Path) -> None:
-    _write_profile(tmp_path, task="skills: [skill]")
+    _write_profile(tmp_path, task="skills: [skill]\n    tools: [read]")
     (tmp_path / "skill").mkdir()
 
     with pytest.raises(ConfigurationError, match="missing SKILL.md"):
@@ -159,7 +159,7 @@ def test_skill_directory_requires_skill_markdown(tmp_path: Path) -> None:
 
 
 def test_skill_tree_rejects_symlinks(tmp_path: Path) -> None:
-    _write_profile(tmp_path, task="skills: [skill]")
+    _write_profile(tmp_path, task="skills: [skill]\n    tools: [read]")
     skill = tmp_path / "skill"
     skill.mkdir()
     (skill / "SKILL.md").write_text("# Skill\n")

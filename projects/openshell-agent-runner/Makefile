@@ -18,7 +18,7 @@ ifdef RETRY_ARTIFACT
 PUBLISH_FLAGS += --retry-artifact $(RETRY_ARTIFACT)
 endif
 
-.PHONY: help sync test format-check lint typecheck check build clean publish
+.PHONY: help sync test test-runtime format-check lint typecheck check build clean publish
 
 help: ## Show available targets and configurable variables.
 	@printf "\033[1;36mOpenShell Agent Runner\033[0m\n"
@@ -39,6 +39,10 @@ sync: ## Install locked runtime and development dependencies.
 
 test: ## Run tests; pass paths or flags with PYTEST_ARGS.
 	$(UV_RUN) pytest $(PYTEST_ARGS)
+
+test-runtime: ## Build Pi and test the real harness in offline Docker containers.
+	docker build -t openshell-agent-runner-pi:test src/openshell_agent_runner/harnesses/pi/runtime/image
+	$(UV_RUN) pytest tests/harnesses/runtime_checks.py
 
 format-check: ## Check Python formatting.
 	$(UV_RUN) ruff format --check .

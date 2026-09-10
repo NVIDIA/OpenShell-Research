@@ -110,6 +110,8 @@ OAR runs **Pi**, the agent inside the sandbox. A task's `tools` list selects
 which tools Pi may use: `read`, `grep`, `find`, `ls`, `bash`, `edit`, and `write`
 are built in. A skill is a directory containing a `SKILL.md` with reusable
 instructions; list the skills the task needs under `skills`.
+Tasks with skills must include `read` in `tools`: Pi uses it to expose the skill
+catalog and let the agent load the selected instructions.
 
 For a custom tool, declare its extension file and tool name, then add the name
 to the task's `tools` list. This fragment belongs under a task:

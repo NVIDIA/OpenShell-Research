@@ -53,6 +53,11 @@ Use the same `--gateway` and `--workspace` options with `doctor` and `run`.
 OAR uses existing gateways, workspaces, and inference configuration; manage
 them through OpenShell.
 
+`doctor` displays configuration; it does not send a model request. Exit 0 means
+the inspection commands succeeded, not that inference is ready. If inference
+shows `Not configured`, configure a provider and route in OpenShell before
+running a task.
+
 ## Upload supporting files
 
 Use `--input` for the task's main file or directory. Use `--upload` for

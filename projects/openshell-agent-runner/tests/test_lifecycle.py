@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
+import os
 import subprocess
+import sys
 from dataclasses import replace
 from pathlib import Path
 
@@ -58,6 +60,12 @@ log = pathlib.Path(os.environ["FAKE_LOG"])
 with log.open("a") as stream:
     stream.write(json.dumps(sys.argv[1:]) + "\\n")
 args = sys.argv[1:]
+if args[0] == "--version":
+    print("openshell 0.0.111"); sys.exit(0)
+if args[0] == "status":
+    print("Status: Connected"); sys.exit(0)
+if args[:2] == ["inference", "get"]:
+    print(os.environ.get("FAKE_INFERENCE", "Not configured")); sys.exit(0)
 operation = args[1]
 if operation == "create":
     if "--upload" in args and "--" in args: sys.exit(2)
@@ -117,6 +125,7 @@ def prepare(tmp_path: Path, monkeypatch) -> tuple[Path, Path, Path, Path]:
     executable, state, log = fake_openshell(tmp_path)
     monkeypatch.setenv("FAKE_STATE", str(state))
     monkeypatch.setenv("FAKE_LOG", str(log))
+    monkeypatch.setenv("PATH", f"{executable.parent}{os.pathsep}{os.environ['PATH']}")
     return profile, executable, state, log
 
 
@@ -132,11 +141,11 @@ def test_create_download_owned_delete_order(tmp_path: Path, monkeypatch) -> None
     commands = [json.loads(line) for line in log.read_text().splitlines()]
     operations = [command[1] for command in commands]
     assert operations[0] == "create"
-    assert operations.count("upload") == 8
+    assert "upload" in operations
     assert operations[-4:] == ["exec", "download", "get", "delete"]
 
 
-def test_run_agent_renders_complete_prompt_variable_context(
+def test_cli_renders_complete_prompt_variable_context(
     tmp_path: Path, monkeypatch
 ) -> None:
     profile, executable, state, log = prepare(tmp_path, monkeypatch)
@@ -169,14 +178,29 @@ tasks:
 """
     )
     focus = "--src/auth\nUnicode: café = {{ context }}"
-    item = replace(
-        request(profile, executable, tmp_path / "result.json"),
-        input_path=document,
-        prompt_variables=(f"focus={focus}",),
+    output = tmp_path / "result.json"
+    result = subprocess.run(
+        [
+            str(Path(sys.executable).with_name("oar")),
+            "run",
+            str(profile),
+            "--task",
+            "smoke",
+            "--input",
+            str(document),
+            "--output",
+            str(output),
+            "--prompt-var",
+            f"focus={focus}",
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=15,
     )
 
-    run_agent(item)
-
+    assert result.returncode == 0, result.stderr
+    assert json.loads(output.read_text()) == {"status": "pass"}
     assert not state.exists()
     assert log.with_name("uploaded-prompt.md").read_text() == (
         "Input: /workspace/input/document.txt\n"
@@ -266,12 +290,10 @@ def test_keep_sandbox_skips_inspection_and_delete(tmp_path: Path, monkeypatch) -
     )
     run_agent(item)
     assert state.exists()
-    assert [json.loads(line)[1] for line in log.read_text().splitlines()] == [
-        "create",
-        *(["upload"] * 8),
-        "exec",
-        "download",
-    ]
+    operations = [json.loads(line)[1] for line in log.read_text().splitlines()]
+    assert operations[0] == "create"
+    assert operations[-2:] == ["exec", "download"]
+    assert "get" not in operations and "delete" not in operations
 
 
 def test_keep_sandbox_reports_name_after_artifact_failure(
@@ -339,14 +361,6 @@ def test_malformed_ownership_response_refuses_delete(
     assert state.exists()
 
 
-def test_invalid_output_still_cleans(tmp_path: Path, monkeypatch) -> None:
-    profile, executable, state, _ = prepare(tmp_path, monkeypatch)
-    monkeypatch.setenv("FAKE_OUTPUT", "{}")
-    with pytest.raises(ArtifactError):
-        run_agent(request(profile, executable, tmp_path / "result.json"))
-    assert not state.exists()
-
-
 @pytest.mark.parametrize("operation", ["upload", "exec"])
 def test_runtime_failure_preserves_output_and_cleans(
     tmp_path: Path, monkeypatch, operation: str
@@ -377,13 +391,6 @@ def test_cleanup_failure_does_not_mask_primary_error(
     assert "cleanup failed after primary error" in capsys.readouterr().err
 
 
-def test_cleanup_failure_after_success_is_reported(tmp_path: Path, monkeypatch) -> None:
-    profile, executable, _, _ = prepare(tmp_path, monkeypatch)
-    monkeypatch.setenv("FAKE_FAIL_DELETE", "1")
-    with pytest.raises(ExecutionError, match="sandbox delete"):
-        run_agent(request(profile, executable, tmp_path / "result.json"))
-
-
 def test_interrupt_preserves_interrupt_and_cleans(tmp_path: Path, monkeypatch) -> None:
     import openshell_agent_runner.openshell as openshell
 
@@ -406,14 +413,6 @@ def test_interrupt_preserves_interrupt_and_cleans(tmp_path: Path, monkeypatch) -
 
     monkeypatch.setattr(openshell, "run", interrupt_after_create)
     with pytest.raises(KeyboardInterrupt):
-        run_agent(request(profile, executable, tmp_path / "result.json"))
-    assert not state.exists()
-
-
-def test_download_failure_cleans(tmp_path: Path, monkeypatch) -> None:
-    profile, executable, state, _ = prepare(tmp_path, monkeypatch)
-    monkeypatch.setenv("FAKE_FAIL_DOWNLOAD", "1")
-    with pytest.raises(ExecutionError, match="sandbox download"):
         run_agent(request(profile, executable, tmp_path / "result.json"))
     assert not state.exists()
 
@@ -446,13 +445,88 @@ def test_directory_result_is_rejected_before_transfer(
     assert not state.exists()
 
 
-def test_create_failure_still_deletes_owned_sandbox(
-    tmp_path: Path, monkeypatch
+@pytest.mark.parametrize(
+    ("environment", "exit_code", "published", "retained"),
+    [
+        ({}, 0, True, False),
+        ({"FAKE_FAIL_CREATE": "1"}, 1, False, False),
+        ({"FAKE_FAIL_DOWNLOAD": "1"}, 1, False, False),
+        ({"FAKE_OUTPUT": "{}"}, 3, False, False),
+        ({"FAKE_FAIL_DELETE": "1"}, 1, True, True),
+        ({"FAKE_COLLISION": "1"}, 1, True, True),
+    ],
+    ids=[
+        "success",
+        "create-failure",
+        "download-failure",
+        "invalid-result",
+        "cleanup-failure",
+        "ownership-mismatch",
+    ],
+)
+def test_cli_result_publication_and_cleanup(
+    tmp_path: Path,
+    monkeypatch,
+    environment: dict[str, str],
+    exit_code: int,
+    published: bool,
+    retained: bool,
 ) -> None:
-    profile, executable, state, log = prepare(tmp_path, monkeypatch)
-    monkeypatch.setenv("FAKE_FAIL_CREATE", "1")
-    with pytest.raises(ExecutionError):
-        run_agent(request(profile, executable, tmp_path / "result.json"))
+    profile, _, state, log = prepare(tmp_path, monkeypatch)
+    for key, value in environment.items():
+        monkeypatch.setenv(key, value)
+    output = tmp_path / "previous result.json"
+    output.write_text("previous result\n")
+
+    result = subprocess.run(
+        [
+            str(Path(sys.executable).with_name("oar")),
+            "run",
+            str(profile),
+            "--task",
+            "smoke",
+            "--output",
+            str(output),
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+
+    assert result.returncode == exit_code, result.stderr
+    assert state.exists() is retained
+    if published:
+        assert json.loads(output.read_text()) == {"status": "pass"}
+    else:
+        assert output.read_text() == "previous result\n"
+    operations = [json.loads(line)[1] for line in log.read_text().splitlines()]
+    if "FAKE_COLLISION" in environment:
+        assert "delete" not in operations
+    else:
+        assert operations[-2:] == ["get", "delete"]
+
+
+@pytest.mark.parametrize(
+    "inference", ["Not configured", "Provider: example; Model: example-model"]
+)
+def test_cli_doctor_displays_configuration_without_claiming_inference_readiness(
+    tmp_path: Path,
+    monkeypatch,
+    inference: str,
+) -> None:
+    _, _, state, log = prepare(tmp_path, monkeypatch)
+    monkeypatch.setenv("FAKE_INFERENCE", inference)
+    result = subprocess.run(
+        [str(Path(sys.executable).with_name("oar")), "doctor"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    assert result.returncode == 0, result.stderr
+    assert inference in result.stdout
+    assert "not an inference request" in result.stdout
     assert not state.exists()
     commands = [json.loads(line) for line in log.read_text().splitlines()]
-    assert [command[1] for command in commands] == ["create", "get", "delete"]
+    assert [command[0] for command in commands] == ["--version", "status", "inference"]

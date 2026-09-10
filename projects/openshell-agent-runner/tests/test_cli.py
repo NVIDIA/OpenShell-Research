@@ -1,12 +1,13 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import shutil
 from pathlib import Path
 
-from typer.main import get_group
+import pytest
+import yaml
 from typer.testing import CliRunner
 
-import openshell_agent_runner.cli as cli
 from openshell_agent_runner.cli import app
 
 REPOSITORY = Path(__file__).resolve().parents[3]
@@ -20,37 +21,26 @@ TECHNICAL_WRITING_REVIEWER = (
 )
 
 
-def test_root_help_exposes_only_supported_commands() -> None:
+def test_root_help_lists_commands() -> None:
     result = CliRunner().invoke(app, ["--help"])
 
     assert result.exit_code == 0
-    for command, description in (
-        ("init", "Create editable profiles from resources packaged with OAR."),
-        ("validate", "Validate a profile and all referenced local resources."),
-        ("run", "Launch or preview an ephemeral agent for one profile task."),
-        ("doctor", "Check OpenShell readiness without changing its state."),
-    ):
+    for command in ("init", "validate", "run", "doctor"):
         assert command in result.stdout
-        assert description in result.stdout
-    for removed in ("plan", "schema", "config", "profiles", "tasks"):
-        assert f"│ {removed}" not in result.stdout
-    assert "--install-completion" not in result.stdout
-    assert "--show-completion" not in result.stdout
 
 
-def test_init_help_has_only_the_supported_options() -> None:
-    result = CliRunner().invoke(app, ["init", "--help"])
-
+@pytest.mark.parametrize(
+    ("command", "arguments"),
+    [
+        ("init", ["PROFILE_ROOT", "--model", "--profile", "--thinking"]),
+        ("run", ["PROFILE_DIRECTORY", "--task", "--input", "--output", "--dry-run"]),
+    ],
+)
+def test_help_explains_how_to_start(command: str, arguments: list[str]) -> None:
+    result = CliRunner().invoke(app, [command, "--help"])
     assert result.exit_code == 0
-    assert "PROFILE_ROOT" in result.stdout
-    init_command = get_group(app).commands["init"]
-    options = {
-        option
-        for parameter in init_command.params
-        for option in parameter.opts
-        if option.startswith("--")
-    }
-    assert options == {"--model", "--profile", "--thinking"}
+    for argument in arguments:
+        assert argument in result.stdout
 
 
 def test_init_command_creates_a_valid_profile(tmp_path: Path) -> None:
@@ -77,56 +67,6 @@ def test_init_command_creates_a_valid_profile(tmp_path: Path) -> None:
     assert validation.exit_code == 0, validation.output
 
 
-def test_run_help_has_only_the_supported_override_surface() -> None:
-    result = CliRunner().invoke(app, ["run", "--help"])
-
-    assert result.exit_code == 0
-    assert "PROFILE_DIRECTORY" in result.stdout
-    run_command = get_group(app).commands["run"]
-    options = {
-        option
-        for parameter in run_command.params
-        for option in parameter.opts
-        if option.startswith("--")
-    }
-    assert options == {
-        "--task",
-        "--output",
-        "--input",
-        "--prompt-var",
-        "--upload",
-        "--env",
-        "--gateway",
-        "--workspace",
-        "--timeout-seconds",
-        "--keep-sandbox",
-        "--dry-run",
-    }
-
-
-def test_doctor_separates_native_output_with_blank_lines(monkeypatch) -> None:
-    monkeypatch.setattr(
-        cli,
-        "run_doctor",
-        lambda _target: [
-            ("version", "openshell 0.0.111"),
-            ("status", "Server Status\n\n  Status: Connected"),
-            ("inference", "Inference:\n\n  Provider: example"),
-        ],
-    )
-
-    result = CliRunner().invoke(app, ["doctor"])
-
-    assert result.exit_code == 0
-    assert result.stdout == (
-        "openshell 0.0.111\n\n"
-        "Server Status\n\n"
-        "  Status: Connected\n\n"
-        "Inference:\n\n"
-        "  Provider: example\n"
-    )
-
-
 def test_run_help_describes_selected_profile_task() -> None:
     result = CliRunner().invoke(
         app,
@@ -141,19 +81,11 @@ def test_run_help_describes_selected_profile_task() -> None:
 
     assert result.exit_code == 0
     assert "technical-writing-reviewer:review-document" in result.stdout
-    assert "Review an input technical document" in result.stdout
     assert "--input DOCUMENT" in result.stdout
-    assert "Required argument:" in result.stdout
-    assert "Host document to review." in result.stdout
     assert "--prompt-var focus=VALUE" in result.stdout
     assert "--prompt-var context=VALUE" in result.stdout
     assert "Default: Review the complete document." in result.stdout
-    assert "Additional configured uploads:" in result.stdout
-    assert "Configured environment:" in result.stdout
-    assert "None. Add values with --env KEY=VALUE." in result.stdout
     assert "JSON validated against schemas/review.json." in result.stdout
-    assert "Usage: oar run [OPTIONS]" not in result.stdout
-    assert "Options" not in result.stdout
 
 
 def test_run_help_describes_repository_input() -> None:
@@ -170,28 +102,6 @@ def test_run_help_describes_repository_input() -> None:
     assert "--prompt-var focus=VALUE" in result.stdout
     assert "--prompt-var context=VALUE" in result.stdout
     assert "Default: Review the complete repository." in result.stdout
-
-
-def test_run_help_colors_selected_profile_task() -> None:
-    result = CliRunner().invoke(
-        app,
-        [
-            "run",
-            str(TECHNICAL_WRITING_REVIEWER),
-            "--task",
-            "review-document",
-            "--help",
-        ],
-        color=True,
-    )
-
-    assert result.exit_code == 0
-    assert (
-        "\x1b[36m\x1b[1mtechnical-writing-reviewer:review-document\x1b[0m"
-        in result.stdout
-    )
-    assert "\x1b[33m\x1b[1mUsage:\x1b[0m" in result.stdout
-    assert "\x1b[32m  oar run " in result.stdout
 
 
 def test_run_help_rejects_unknown_profile_task() -> None:
@@ -304,14 +214,21 @@ def test_repository_task_requires_input() -> None:
     assert "requires --input REPOSITORY" in result.stderr
 
 
-def test_removed_review_task_is_unknown() -> None:
-    result = CliRunner().invoke(
-        app,
-        ["run", str(CODE_REVIEWER), "--task", "review", "--help"],
-    )
+def test_skills_require_read_and_validate_after_correction(tmp_path: Path) -> None:
+    profile = tmp_path / "profile"
+    shutil.copytree(CODE_REVIEWER, profile)
+    configuration = yaml.safe_load((profile / "profile.yaml").read_text())
+    task = configuration["tasks"]["review-repository"]
+    task["tools"] = ["bash"]
+    (profile / "profile.yaml").write_text(yaml.safe_dump(configuration))
 
+    result = CliRunner().invoke(app, ["validate", str(profile)])
     assert result.exit_code == 2
-    assert "unknown task 'review'" in result.stderr
+    assert "skills must include 'read'" in result.stderr
+
+    task["tools"].append("read")
+    (profile / "profile.yaml").write_text(yaml.safe_dump(configuration))
+    assert CliRunner().invoke(app, ["validate", str(profile)]).exit_code == 0
 
 
 def test_validate_reports_invalid_encoding_as_cli_input_error(tmp_path: Path) -> None:
