@@ -49,6 +49,9 @@ temp/
 *.bak
 .scratch/
 
+# Local planning artifacts
+/plans/
+
 # Python
 __pycache__/
 *.py[cod]
