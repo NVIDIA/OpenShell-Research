@@ -70,6 +70,11 @@ cargo run --locked -- 127.0.0.1:50051
 The output path must not exist. Pin an OpenShell tag when you need repeatable
 builds. Use `--openshell-version latest` when you want the newest release.
 
+The starter templates still use the older `max_body_bytes` binding field, so
+`omm create` does not yet support v0.0.116. Validation stops without publishing
+that starter. `omm update` can refresh an existing service already compatible
+with the newer contract, such as Egress Gate.
+
 Run `omm --help` for all options. By default, `omm` derives the Python package
 name from the project name. Use `--package-name` to set it yourself.
 
@@ -93,6 +98,20 @@ and Python package. It downloads the selected `supervisor_middleware.proto`,
 regenerates Python protobuf and gRPC bindings when needed, updates `uv.lock` or
 `Cargo.lock`, and writes the version and protocol checksum to the manifest.
 The manifest must name `openshell-middleware-manager` as its generator.
+
+Python updates run `uv sync` and then `uv run pytest` by default. If a project
+needs additional build steps, supply its normal validation command:
+
+```sh
+omm update /path/to/egress-gate \
+  --openshell-version v0.0.116 --check-command 'make check'
+```
+
+The command runs in the staged project with its isolated Python environment,
+after binding generation and dependency sync. Arguments are split with shell
+quoting rules, but no shell is invoked; use a project script for pipelines or
+multiple commands. A failure prevents publication. The protobuf compiler runs
+in a separate environment from the project's runtime dependencies.
 
 ## What you get
 

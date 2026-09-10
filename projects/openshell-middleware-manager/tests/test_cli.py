@@ -3,6 +3,7 @@
 
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from openshell_middleware_manager import cli
@@ -85,13 +86,15 @@ def test_cli_reports_project_error(monkeypatch, tmp_path: Path) -> None:
     assert "omm: error: output exists" in result.stderr
 
 
-def test_cli_reports_update_success(monkeypatch, tmp_path: Path) -> None:
+@pytest.mark.parametrize("check_command", [None, 'python "scripts/check project.py"'])
+def test_cli_reports_update_success(monkeypatch, tmp_path: Path, check_command: str | None) -> None:
     destination = tmp_path / "audit"
 
     def fake_update_project(**options):
         assert options == {
             "project_dir": destination,
             "requested_version": "v1.2.3",
+            "check_command": ["python", "scripts/check project.py"] if check_command else None,
         }
         return ProjectResult(
             destination=destination,
@@ -109,12 +112,19 @@ def test_cli_reports_update_success(monkeypatch, tmp_path: Path) -> None:
             str(destination),
             "--openshell-version",
             "v1.2.3",
+            *(["--check-command", check_command] if check_command else []),
         ],
     )
 
     assert result.exit_code == 0
     assert "Updated rust middleware project" in result.stdout
     assert "OpenShell contract: v1.2.3" in result.stdout
+
+
+def test_cli_rejects_malformed_check_command() -> None:
+    result = runner.invoke(cli.app, ["update", "--check-command", 'python "unfinished'])
+    assert result.exit_code == 1
+    assert "invalid check command" in result.stderr
 
 
 def test_cli_reports_update_error(monkeypatch, tmp_path: Path) -> None:
