@@ -5,9 +5,11 @@ Egress Gate approves content **before** it enters the assistant's live history
 or Pi's saved session. It can deny text or replace it; a second check at the
 network boundary prevents sending an unapproved user/tool context.
 
-This is an application built from Pi's public APIs, not the stock Pi CLI.
-It keeps real tools, tool continuations, project instructions, explicit skills,
-and manual/automatic compaction. Neither Pi nor OpenShell needs a patch.
+This launches **Pi's native TUI** through its public SDK: the normal editor,
+chat, tool cards, shortcuts, and compaction UI. An application-owned agent
+checks content before publishing it to Pi's session. It keeps real tools,
+tool continuations, project instructions, explicit skills, and manual/automatic
+compaction. Neither Pi nor OpenShell needs a patch.
 
 ## Try it
 
@@ -43,7 +45,8 @@ you have access, not a requirement. Set:
 - `baseUrl`: the HTTPS API base, such as `https://your-provider.example/v1`;
   the application appends `/chat/completions`.
 - `contextWindow` and `maxTokens`: the model's context limit and your desired
-  response limit, in tokens. The template's numbers are examples.
+  response limit, in tokens. The POC caps each response at the smaller of
+  `maxTokens` and 4,096 tokens. The template's numbers are examples.
 - `compat.maxTokensField`: the field your provider accepts (`max_tokens` or
   `max_completion_tokens`). The other compatibility settings are conservative
   defaults; adjust them if your endpoint requires it.
@@ -64,8 +67,11 @@ supported by this discovery helper. It never disables TLS verification.
 
 `EGRESS_GATE_HOST` must resolve to this service from **both gateway and sandbox**:
 use a reachable DNS name or IPv4 address, without a scheme or port.
-Docker Desktop commonly provides `host.docker.internal`; Linux Docker may need
-its bridge address. Do not use `localhost` when callers are in containers.
+`host.docker.internal` may work inside Docker Desktop containers but fail to
+resolve for a gateway running directly on the host. Use the service machine's
+reachable LAN IPv4 address or a DNS name that works from both places. Do not
+use `localhost` when callers are in containers. The gateway connects to the
+middleware during startup, so an unreachable address can prevent it starting.
 
 Preparation builds the pinned Pi **0.85.1** image and writes service TLS,
 policy and provider profiles under `../../.workspaces/pi-admission/`.
@@ -126,10 +132,11 @@ Print mode uses exported configuration or placeholders because it does not load
 name. The generated `admission.json` contains a private admission token and must
 remain outside the image and repository.
 
-**Validation status:** local cross-language integration passes, but the complete
-existing-gateway workflow with a valid model key remains to be verified.
-Registration lifecycle tests cover both supported service managers; live
-service-manager execution remains unverified.
+**Validation status:** local SDK and native-TUI integration tests pass, including
+real admission HTTP/RPC traffic, tool output, compaction, denial and saved JSONL.
+Provider responses in those tests are controlled fixtures. The updated native-TUI
+workflow still needs acceptance testing with a running OpenShell gateway and a
+real model. Registration lifecycle tests cover both supported service managers.
 `./demo.sh verify` below is that separate real-model acceptance check.
 
 ## What to try
@@ -139,13 +146,11 @@ Type these into the running application:
 ```text
 Hello. Briefly describe what you can do.
 Please repeat REDACT_THIS.
-/history
 DENY_THIS
-/history
 /skill:review
 /compact
-/history
-/exit
+/new
+/quit
 ```
 
 `DENY_THIS` and `REDACT_THIS` are harmless, literal demonstration markers defined
@@ -161,13 +166,24 @@ The skill asks the model to read the real `notes.txt`; that result is admitted
 before the next model call. `cwd` is convenient scoping, not an access-control
 boundary: OpenShell's filesystem policy supplies that boundary.
 
-Responses and tool progress are buffered, not streamed into the transcript.
-`/history` shows only admitted active context. The startup message names the
-Pi JSONL file under `/sandbox/sessions`. Compaction retains the latest whole turn;
-older **approved** entries remain in the append-only file. Automatic compaction
-uses the same summary path at a completed-turn context threshold. Ctrl-C cancels
-the current operation. An unfinished tool batch that cannot be safely closed
-requires a new session.
+Responses and tool output are buffered until approved, rather than streamed
+unchecked into the transcript. Pi still shows activity while waiting.
+Use Ctrl+O to expand tool output and `/session` to inspect session information;
+Pi saves JSONL under `/sandbox/sessions`. The former custom `/history` and
+`/exit` commands are gone; use Pi's chat view and `/quit`.
+Compaction retains the latest whole turn; older **approved** entries remain in
+the append-only file. Automatic compaction
+uses the same summary path at Pi's context thresholds, including between tool
+turns. Esc cancels the current operation. Steering and follow-up inputs are
+admitted after skill expansion, before joining the transcript. Drafts and pending
+input queues are not approved history. An unfinished tool batch that cannot be
+safely closed requires `/new`.
+
+This POC deliberately blocks `!`/`!!`, resume/import, branching, renaming,
+model switching, and resource reload: these need additional handling before
+they can be safely enabled. Ask the model to use the **bash tool** for shell
+work. Arbitrary extensions are not loaded. Tool cards display admitted results,
+not unchecked progress or extra tool metadata such as edit diffs.
 
 ## Verify and clean up
 
@@ -192,7 +208,9 @@ and the local Docker image remain for reuse. To remove only the registration
 after a failed registration restart; fix the service problem and retry.
 
 For source/model/policy changes, clean up the old demo sandbox, run `prepare`,
-restart `serve`, then run `register` and `setup`. Valid service certificates are
+restart `serve`, then run `register`, `setup`, and `launch`. This rebuild is
+also required when upgrading from the earlier line-based interface to the TUI;
+launching an existing sandbox continues using its old image. Valid service certificates are
 reused for the same host. After 30 days or a host change, `prepare` generates new service
 TLS: rerun `register` to reload the new CA before setup (other deployments must
 update their gateway-visible CA and restart manually). Refresh the
@@ -222,10 +240,13 @@ OpenShell supervisor ----------> verify actual request + policy
 attach real provider key --> model
 ```
 
-[session.ts](app/src/session.ts) is the only owner of writable history. It uses
-Pi's model calls, tool implementations, resource loader, summarizer, and
-`SessionManager`; it does not instantiate an autonomous `AgentSession` with
-unchecked insertion paths. Finalized assistant text and tool calls are admitted
+[agent.ts](app/src/agent.ts) supplies Pi's public `AgentSessionConfig.agent`
+with an admission-controlled execution loop. It approves each candidate before
+updating live state or emitting message events. Pi's native `AgentSession`
+is the **only persistence owner**; it saves those approved events.
+[session.ts](app/src/session.ts) wires the runtime and the
+`session_before_compact` extension, and blocks alternate unchecked write paths.
+Finalized assistant text and tool calls are admitted
 before execution. Tool output, missing-tool/argument/execution errors, rendered
 skills, and completed summaries all pass the same boundary.
 
@@ -258,7 +279,8 @@ custom OpenShell protobuf field, or second model proxy.
   the intercepted body. Receipts are reusable for identical content for up to
   five minutes; service restarts invalidate them.
 - One text-only Chat Completions model, sequential tools, and new sessions.
-  No TUI/RPC parity, third-party extensions, resume/branching, images, reasoning
+  The real TUI is used, but not every stock CLI feature is supported.
+  No RPC mode, third-party extensions, resume/branching, images, reasoning
   payloads, WebSockets, or model switching. Unsupported content fails closed.
 - Redaction can change ordinary text, not executable tool arguments or call
   identifiers. Admitting a tool result cannot reverse tool side effects.

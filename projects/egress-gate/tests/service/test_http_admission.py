@@ -8,8 +8,10 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import pty
 import runpy
 import shutil
+import termios
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -151,9 +153,11 @@ def test_gateway_authentication_rejects_invalid_trust_claims(change: str) -> Non
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("tui", [False, True], ids=["sdk", "native-tui"])
 async def test_pi_session_through_admission_and_authenticated_egress(
     tmp_path: Path,
     unused_tcp_port: int,
+    tui: bool,
 ) -> None:
     source = PROJECT / "examples/pi-attested-admission"
     example = tmp_path / "example"
@@ -248,27 +252,81 @@ async def test_pi_session_through_admission_and_authenticated_egress(
         application.router.add_post("/v1/chat/completions", provider)
         server = TestServer(application, scheme="https", port=unused_tcp_port)
         await server.start_server(ssl=admission_tls_context(config))
+        terminal: tuple[int, int] | None = None
         try:
+            if tui:
+                terminal = pty.openpty()
+                termios.tcsetwinsize(terminal[1], (35, 110))
+                os.set_blocking(terminal[0], False)
             process = await asyncio.create_subprocess_exec(
                 "node",
                 str(source / "app/dist/test/service-integration.js"),
                 str(server.make_url("/")).rstrip("/"),
                 str(tmp_path),
-                env=os.environ | {"NODE_EXTRA_CA_CERTS": str(tmp_path / "tls/ca.crt")},
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+                *(["--tui"] if tui else []),
+                env=os.environ
+                | {
+                    "NODE_EXTRA_CA_CERTS": str(tmp_path / "tls/ca.crt"),
+                    "PI_OFFLINE": "1",
+                    "PI_CODING_AGENT_DIR": str(tmp_path / "agent"),
+                    "TERM": "xterm-256color",
+                },
+                stdin=terminal[1] if terminal else None,
+                stdout=terminal[1] if terminal else asyncio.subprocess.PIPE,
+                stderr=terminal[1] if terminal else asyncio.subprocess.PIPE,
             )
             try:
-                stdout, stderr = await asyncio.wait_for(process.communicate(), 30)
+                if terminal:
+                    await _terminal_until(terminal[0], b"notes.txt")
+                    os.write(terminal[0], b"\x0f")  # Pi's expand-tool-output shortcut.
+                    await _terminal_until(terminal[0], b"This is a real file")
+                    os.write(terminal[0], b"/compact\r")
+                    await _terminal_until(terminal[0], b"Approved summary")
+                    os.write(terminal[0], b"DENY_THIS\r")
+                    await _terminal_until(terminal[0], b"Admission denied")
+                    os.write(terminal[0], b"/new\r")
+                    await _terminal_until(terminal[0], b"New session started")
+                    os.write(terminal[0], b"DENY_THIS\r")
+                    await _terminal_until(terminal[0], b"Admission denied")
+                    os.write(terminal[0], b"/quit\r")
+                    await asyncio.wait_for(process.wait(), 10)
+                    saved = "\n".join(
+                        path.read_text()
+                        for path in (tmp_path / "sessions").glob("*.jsonl")
+                    )
+                    assert "[REDACTED]" in saved and "Approved summary" in saved
+                    assert "DENY_THIS" not in saved and "REDACT_THIS" not in saved
+                    stdout = stderr = b""
+                else:
+                    stdout, stderr = await asyncio.wait_for(process.communicate(), 30)
             finally:
                 if process.returncode is None:
                     process.kill()
                     await process.wait()
             assert process.returncode == 0, (stdout + stderr).decode()
-            assert len(calls) == 7
+            assert len(calls) == (4 if tui else 7)
             assert any(m["role"] == "tool" for m in json.loads(calls[2])["messages"])
         finally:
+            if terminal:
+                os.close(terminal[0])
+                os.close(terminal[1])
             await server.close()
+
+
+async def _terminal_until(fd: int, expected: bytes) -> None:
+    output = b""
+    try:
+        async with asyncio.timeout(20):
+            while expected not in output:
+                try:
+                    output += os.read(fd, 65536)
+                except BlockingIOError:
+                    pass
+                await asyncio.sleep(0.02)
+    except TimeoutError:
+        pytest.fail(
+            f"Terminal did not show {expected!r}: {output.decode(errors='replace')}"
+        )
 
 
 @asynccontextmanager

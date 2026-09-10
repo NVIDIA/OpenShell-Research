@@ -19,7 +19,11 @@ import {
   type AdmissionResponse,
   type Evaluate,
 } from "../src/admission.js";
-import { AdmissionSession, projectTools } from "../src/session.js";
+import {
+  AdmissionSession,
+  createAdmissionRuntime,
+  projectTools,
+} from "../src/session.js";
 
 const model: Model<"openai-completions"> = {
   id: "test",
@@ -172,14 +176,21 @@ for (const [kind, marker, prompt, responses] of [
       },
       [...responses],
     );
+    const events: unknown[] = [];
+    session.subscribe((event) => {
+      events.push(structuredClone(event));
+    });
     await writeFile(join(cwd, "candidate.txt"), "CANDIDATE");
     const run = session.prompt(prompt);
     await seen;
     assert.ok(!JSON.stringify(session.entries).includes(marker));
     assert.ok(!JSON.stringify(session.history).includes(marker));
+    assert.ok(!JSON.stringify(session.messages).includes(marker));
+    assert.ok(!JSON.stringify(events).includes(marker));
     assert.ok(!(await disk(session)).includes(marker));
     release(deny);
     await assert.rejects(run);
+    assert.ok(!JSON.stringify(events).includes(marker));
     assert.ok(!JSON.stringify(session.history).includes(marker));
     assert.ok(!(await disk(session)).includes(marker));
   });
@@ -253,7 +264,7 @@ test("manual compaction waits for approval and preserves the latest whole turn",
     replacement: { ...summaryBody, text: "Approved summary" },
     receipt: null,
   });
-  assert.equal(await compact, true);
+  assert.equal((await compact).summary, "Approved summary");
   assert.equal(requests.length, 3);
   assert.ok(!JSON.stringify(session.history).includes("SUMMARY_CANDIDATE"));
   assert.ok(JSON.stringify(session.history).includes("Approved summary"));
@@ -398,12 +409,11 @@ test("project context is checked before any model request or message write", asy
 });
 
 test("cancelled admission cannot append even when the service subsequently allows", async () => {
-  const controller = new AbortController();
   const { session, requests } = await fixture(async (kind) => {
-    if (kind === "user_message") controller.abort();
+    if (kind === "user_message") session.agent.abort();
     return allow;
   });
-  await assert.rejects(session.prompt("CANCELLED", controller.signal));
+  await assert.rejects(session.prompt("CANCELLED"));
   assert.deepEqual(session.entries, []);
   assert.equal(requests.length, 0);
 });
@@ -426,4 +436,206 @@ test("context overflow makes one admitted summary and one retry", async () => {
   assert.equal(kinds.filter((kind) => kind === "compaction_summary").length, 1);
   assert.ok(JSON.stringify(session.history).includes("retry result"));
   assert.ok(!(await disk(session)).includes("exceeds the context window"));
+});
+
+test("native session persists each approved message once and never renders tool details", async () => {
+  const { session, cwd } = await fixture(undefined, [
+    answer("", [
+      { id: "read", name: "read", arguments: { path: "notes.txt" } },
+    ]),
+    answer("Done"),
+  ]);
+  await writeFile(join(cwd, "notes.txt"), "Approved file");
+  const tool = session.agent.state.tools.find((tool) => tool.name === "read")!;
+  const execute = tool.execute;
+  tool.execute = async (id, args, signal, onUpdate) => {
+    onUpdate?.({
+      content: [{ type: "text", text: "UNCHECKED_PROGRESS" }],
+      details: undefined,
+    });
+    const result = await execute(id, args, signal);
+    return { ...result, details: { diff: "UNCHECKED_DETAILS" } };
+  };
+  const events: unknown[] = [];
+  session.subscribe((event) => {
+    events.push(structuredClone(event));
+  });
+  await session.prompt("Read notes.txt");
+  assert.equal(session.messages.length, 4);
+  assert.equal(
+    session.entries.filter((entry) => entry.type === "message").length,
+    4,
+  );
+  const saved = (await disk(session))
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  assert.equal(saved.filter((entry) => entry.type === "message").length, 4);
+  assert.ok(JSON.stringify(events).includes("Approved file"));
+  for (const snapshot of [
+    JSON.stringify(events),
+    JSON.stringify(session.messages),
+    await disk(session),
+  ])
+    assert.ok(!snapshot.includes("UNCHECKED"));
+});
+
+for (const mode of ["steer", "followUp"] as const) {
+  test(`native ${mode} queue admits expanded input before transcript insertion`, async () => {
+    let release!: () => void;
+    let reached!: () => void;
+    const seen = new Promise<void>((resolve) => {
+      reached = resolve;
+    });
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const { session, requests } = await fixture(
+      async (kind, body) => {
+        if (kind === "assistant_message" && body.text === "First") {
+          reached();
+          await hold;
+        }
+        if (
+          kind === "user_message" &&
+          String(body.text).includes("SKILL_CANDIDATE")
+        )
+          return {
+            ...allow,
+            decision: "replace",
+            replacement: {
+              ...body,
+              text: String(body.text).replace(
+                "SKILL_CANDIDATE",
+                "APPROVED_SKILL",
+              ),
+            },
+          };
+        return kind === "provider_context"
+          ? { ...allow, receipt: "receipt" }
+          : allow;
+      },
+      [answer("First"), answer("Second")],
+    );
+    const running = session.prompt("hello");
+    await seen;
+    await session[mode]("/skill:example");
+    assert.ok(!JSON.stringify(session.messages).includes("SKILL_CANDIDATE"));
+    assert.ok(!(await disk(session)).includes("SKILL_CANDIDATE"));
+    release();
+    await running;
+    assert.equal(requests.length, 2);
+    assert.ok(JSON.stringify(requests[1]).includes("APPROVED_SKILL"));
+    assert.ok(!JSON.stringify(session.entries).includes("SKILL_CANDIDATE"));
+    assert.equal(session.agent.hasQueuedMessages(), false);
+    assert.equal(
+      session.getSteeringMessages().length +
+        session.getFollowUpMessages().length,
+      0,
+    );
+  });
+}
+
+test("abort settles the native lifecycle without saving late content and permits the next prompt", async () => {
+  let release!: () => void;
+  let reached!: () => void;
+  const seen = new Promise<void>((resolve) => {
+    reached = resolve;
+  });
+  const hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const { session } = await fixture(
+    async (kind, body) => {
+      if (kind === "assistant_message" && body.text === "LATE_RESPONSE") {
+        reached();
+        await hold;
+      }
+      return kind === "provider_context"
+        ? { ...allow, receipt: "receipt" }
+        : allow;
+    },
+    [answer("LATE_RESPONSE"), answer("Next reply")],
+  );
+  const running = session.prompt("first");
+  await seen;
+  const rejected = assert.rejects(running);
+  const abort = session.abort();
+  assert.equal(session.agent.state.isStreaming, true);
+  release();
+  await Promise.all([rejected, abort]);
+  await session.agent.waitForIdle();
+  assert.equal(session.isStreaming, false);
+  assert.ok(!JSON.stringify(session.messages).includes("LATE_RESPONSE"));
+  assert.ok(!(await disk(session)).includes("LATE_RESPONSE"));
+  await session.prompt("next");
+  assert.ok(JSON.stringify(session.history).includes("Next reply"));
+});
+
+test("native alternate writes fail closed; /new reuses the admission factory", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-runtime-test-"));
+  const runtime = await createAdmissionRuntime({
+    cwd,
+    agentDir: join(cwd, "agent"),
+    sessionDir: join(cwd, "sessions"),
+    model,
+    apiKey: "placeholder",
+    admission: new Admission(async (kind) =>
+      kind === "user_message" ? deny : allow,
+    ),
+  });
+  await runtime.session.bindExtensions({});
+  const before = JSON.stringify(runtime.session.messages);
+  const entries = runtime.session.sessionManager.getEntries();
+  await assert.rejects(
+    runtime.session.executeBash("touch must-not-exist"),
+    /not supported/,
+  );
+  assert.throws(
+    () =>
+      runtime.session.recordBashResult("bad", {
+        output: "UNCHECKED",
+        exitCode: 0,
+        cancelled: false,
+        truncated: false,
+      }),
+    /not supported/,
+  );
+  await assert.rejects(
+    runtime.session.sendCustomMessage({
+      customType: "test",
+      content: "UNCHECKED",
+      display: true,
+    }),
+    /not supported/,
+  );
+  await assert.rejects(
+    runtime.session.navigateTree("missing"),
+    /not supported/,
+  );
+  await assert.rejects(runtime.session.setModel(model), /not supported/);
+  assert.throws(
+    () => runtime.session.setSessionName("UNCHECKED"),
+    /not supported/,
+  );
+  await assert.rejects(
+    runtime.switchSession("/does/not/exist"),
+    /not supported/,
+  );
+  await assert.rejects(
+    runtime.importFromJsonl("/does/not/exist"),
+    /not supported/,
+  );
+  await assert.rejects(runtime.fork("missing"), /not supported/);
+  assert.equal(JSON.stringify(runtime.session.messages), before);
+  assert.deepEqual(runtime.session.sessionManager.getEntries(), entries);
+  await assert.rejects(readFile(join(cwd, "must-not-exist")));
+  const previous = runtime.session;
+  await runtime.newSession();
+  assert.notEqual(runtime.session, previous);
+  await runtime.session.bindExtensions({});
+  await assert.rejects(runtime.session.prompt("DENIED"));
+  assert.equal(runtime.session.messages.length, 0);
+  assert.equal(runtime.session.sessionManager.getEntries().length, 0);
+  await runtime.dispose();
 });

@@ -1,44 +1,31 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import {
-  formatSkillInvocation,
-  type AgentTool,
-  type StreamFn,
-} from "@earendil-works/pi-agent-core";
-import {
-  isContextOverflow,
-  validateToolArguments,
-  type AssistantMessage,
-  type Context,
-  type Message,
-  type Model,
-  type Usage,
-} from "@earendil-works/pi-ai";
+import type { AgentTool, StreamFn } from "@earendil-works/pi-agent-core";
+import type { Model } from "@earendil-works/pi-ai";
 import { streamSimple } from "@earendil-works/pi-ai/compat";
 import {
+  AgentSession,
+  AgentSessionRuntime,
   SessionManager,
-  DefaultResourceLoader,
   SettingsManager,
+  createAgentSessionServices,
   convertToLlm,
-  createReadTool,
-  createBashTool,
-  createEditTool,
-  createWriteTool,
-  createGrepTool,
-  createFindTool,
-  createLsTool,
-  createLocalBashOperations,
-  formatSkillsForPrompt,
-  estimateTokens,
-  shouldCompact,
   generateSummaryWithUsage,
   sessionEntryToContextMessages,
-  type Skill,
+  type CreateAgentSessionRuntimeFactory,
+  type PromptOptions,
 } from "@earendil-works/pi-coding-agent";
 import { Admission, AdmissionError, RECEIPT_HEADER } from "./admission.js";
+import {
+  AdmissionAgent,
+  ContextOverflowError,
+  retainedUsage,
+} from "./agent.js";
+import { projectTools } from "./tools.js";
+
+export { projectTools } from "./tools.js";
 
 export interface SessionOptions {
   cwd: string;
@@ -47,368 +34,263 @@ export interface SessionOptions {
   model: Model<"openai-completions">;
   apiKey: string;
   admission: Admission;
-  /** Public Pi stream/tool seams also permit deterministic boundary tests. */
+  /** Deterministic integration tests use Pi's public stream/tool seams. */
   stream?: StreamFn;
   tools?: AgentTool[];
   compactAtTokens?: number;
 }
 
-/** The only owner of writable Pi history. Candidates stay local until approved. */
-export class AdmissionSession {
-  private readonly store: SessionManager;
-  private readonly tools: AgentTool[];
-  private readonly stream: StreamFn;
-  private systemPrompt = "";
-  private skills: Skill[] = [];
-  private busy = false;
-  private stopped = false;
-  private readonly reserveTokens: number;
-
-  private constructor(private readonly options: SessionOptions) {
-    this.store = SessionManager.create(
-      resolve(options.cwd),
-      resolve(options.sessionDir),
-    );
-    this.tools = options.tools ?? projectTools(resolve(options.cwd));
-    this.reserveTokens = Math.min(4096, options.model.maxTokens);
-    this.stream = async (model, context, streamOptions) => {
-      const receipt = await options.admission.receipt(
-        context,
-        streamOptions?.signal,
-      );
-      return (options.stream ?? streamSimple)(model, context, {
-        ...streamOptions,
-        apiKey: options.apiKey,
-        maxRetries: 0,
-        headers: { ...streamOptions?.headers, [RECEIPT_HEADER]: receipt },
-      });
-    };
-  }
-
+/** Native Pi session/persistence, with explicit guards for unsupported writes. */
+export class AdmissionSession extends AgentSession {
   static async create(options: SessionOptions): Promise<AdmissionSession> {
-    if (
-      options.model.api !== "openai-completions" ||
-      options.model.reasoning ||
-      options.model.input.some((type) => type !== "text") ||
-      new URL(options.model.baseUrl).protocol !== "https:"
-    ) {
-      throw new AdmissionError("unsupported");
-    }
-    const session = new AdmissionSession(options);
-    const resources = new DefaultResourceLoader({
+    const result = await sessionFactory(options)({
       cwd: resolve(options.cwd),
       agentDir: resolve(options.agentDir),
-      settingsManager: SettingsManager.inMemory({ packages: [] }),
-      noExtensions: true,
-      noPromptTemplates: true,
-      noThemes: true,
+      sessionManager: SessionManager.create(
+        resolve(options.cwd),
+        resolve(options.sessionDir),
+      ),
     });
-    await resources.reload();
-    const skills = resources.getSkills().skills;
-    const candidate = [
-      "You are a coding assistant. Use the available tools to work in the project directory.",
-      resources.getSystemPrompt() ?? "",
-      ...resources.getAppendSystemPrompt(),
-      ...resources
-        .getAgentsFiles()
-        .agentsFiles.map((file) => `${file.path}\n${file.content}`),
-      formatSkillsForPrompt(skills),
-    ].join("\n\n");
-    session.systemPrompt = await options.admission.text("system", candidate);
-    session.skills = skills;
-    return session;
+    await result.session.bindExtensions({});
+    return result.session;
   }
 
-  get history(): Message[] {
-    return structuredClone(
-      convertToLlm(this.store.buildSessionContext().messages),
-    );
+  get history() {
+    return structuredClone(convertToLlm(this.messages));
   }
   get entries() {
-    return structuredClone(this.store.getEntries());
+    return structuredClone(this.sessionManager.getEntries());
   }
-  get sessionFile(): string {
-    return this.store.getSessionFile()!;
+  override get sessionFile(): string {
+    return this.sessionManager.getSessionFile()!;
   }
-  get isStopped(): boolean {
-    return this.stopped;
+  get isStopped() {
+    return (this.agent as AdmissionAgent).stopped;
   }
 
-  async prompt(input: string, signal?: AbortSignal): Promise<void> {
-    this.begin();
+  override async prompt(text: string, options?: PromptOptions): Promise<void> {
+    if (this.isStopped)
+      throw new Error("An unfinished tool batch requires /new.");
     try {
-      let text = input;
-      const invocation = /^\/skill:([^\s]+)(?:\s+([\s\S]*))?$/.exec(input);
-      if (invocation) {
-        const skill = this.skills.find((skill) => skill.name === invocation[1]);
-        if (!skill) throw new Error("Unknown project skill.");
-        text = formatSkillInvocation(
-          { ...skill, content: await readFile(skill.filePath, "utf8") },
-          invocation[2],
-        );
-      }
-      await this.admitAndAppend(
-        { role: "user", content: text, timestamp: Date.now() },
-        signal,
-      );
-      let retriedOverflow = false;
-      for (;;) {
-        const response = await (
-          await this.stream(this.options.model, this.context(), {
-            signal,
-            maxTokens: this.reserveTokens,
-          })
-        ).result();
-        if (isContextOverflow(response, this.options.model.contextWindow)) {
-          if (retriedOverflow || !(await this.compactSession(signal)))
-            throw new Error("Context is too large; start a new session.");
-          retriedOverflow = true;
-          continue;
-        }
-        if (
-          response.stopReason === "error" ||
-          response.stopReason === "aborted"
-        )
-          throw new Error(
-            "Model request failed or was cancelled; no response was saved.",
-          );
-        const candidate: AssistantMessage = {
-          role: "assistant",
-          content: response.content,
-          api: this.options.model.api,
-          model: this.options.model.id,
-          provider: this.options.model.provider,
-          usage: retainedUsage(response.usage),
-          stopReason: response.stopReason,
-          timestamp: Date.now(),
-        };
-        const assistant = (await this.admitAndAppend(
-          candidate,
-          signal,
-        )) as AssistantMessage;
-        const calls = assistant.content.filter(
-          (block) => block.type === "toolCall",
-        );
-        if (!calls.length) break;
-        for (let index = 0; index < calls.length; index++) {
-          const call = calls[index];
-          try {
-            if (assistant.stopReason === "length")
-              throw new Error("Incomplete tool call.");
-            const tool = this.tools.find((tool) => tool.name === call.name);
-            let content:
-              | { type: "text"; text: string }[]
-              | Awaited<ReturnType<AgentTool["execute"]>>["content"];
-            let isError = false;
-            try {
-              if (!tool) throw new Error("Requested tool is not available.");
-              const args = validateToolArguments(tool, call);
-              content = (await tool.execute(call.id, args, signal)).content;
-            } catch (error) {
-              isError = true;
-              content = [
-                {
-                  type: "text",
-                  text:
-                    error instanceof Error
-                      ? error.message
-                      : "Tool execution failed.",
-                },
-              ];
-            }
-            await this.admitAndAppend(
-              {
-                role: "toolResult",
-                toolCallId: call.id,
-                toolName: call.name,
-                content,
-                isError,
-                timestamp: Date.now(),
-              },
-              signal,
-            );
-          } catch (error) {
-            // No more model calls after a rejected result. Close outstanding
-            // pairs only with separately admitted, content-free failures.
-            try {
-              for (const pending of calls.slice(index))
-                await this.admitAndAppend(
-                  {
-                    role: "toolResult",
-                    toolCallId: pending.id,
-                    toolName: pending.name,
-                    content: [
-                      {
-                        type: "text",
-                        text: "Tool result unavailable; this turn was stopped.",
-                      },
-                    ],
-                    isError: true,
-                    timestamp: Date.now(),
-                  },
-                  signal,
-                );
-            } catch {
-              this.stopped = true;
-            }
-            throw error;
-          }
-        }
-      }
-      const tokens = this.contextTokens();
-      if (
-        tokens >= (this.options.compactAtTokens ?? Infinity) ||
-        shouldCompact(tokens, this.options.model.contextWindow, {
-          enabled: true,
-          reserveTokens: this.reserveTokens,
-          keepRecentTokens: 0,
-        })
-      )
-        await this.compactSession(signal);
+      await super.prompt(text, options);
+    } catch (error) {
+      if (!(error instanceof ContextOverflowError)) throw error;
+      // The failed provider response was never published. Compact only approved
+      // history, then retry that unfinished turn once.
+      await this.compact();
+      await this.agent.continue();
     } finally {
-      this.busy = false;
+      if (!this.isStreaming) this.clearQueue();
     }
   }
 
-  async compact(signal?: AbortSignal): Promise<boolean> {
-    this.begin();
-    try {
-      return await this.compactSession(signal);
-    } finally {
-      this.busy = false;
-    }
+  // These native entry points write outside the agent's message event path.
+  // Keep them unavailable until each has its own pre-write admission boundary.
+  override async executeBash(): Promise<never> {
+    return unsupported("Direct ! commands; ask the model to use the bash tool");
   }
-
-  private begin(): void {
-    if (this.busy || this.stopped)
-      throw new Error(
-        "Session is busy or stopped; start a new session if stopped.",
-      );
-    this.busy = true;
+  override recordBashResult(): never {
+    return unsupported("Direct shell results");
   }
-
-  private context(): Context {
-    return {
-      systemPrompt: this.systemPrompt,
-      messages: this.history,
-      tools: this.tools,
-    };
+  override async sendCustomMessage(): Promise<never> {
+    return unsupported("Custom extension messages");
   }
-  private contextTokens(): number {
-    return this.history.reduce(
-      (sum, message) => sum + estimateTokens(message),
-      Math.ceil(this.systemPrompt.length / 4),
-    );
+  override async navigateTree(): Promise<never> {
+    return unsupported("Session branching");
   }
-
-  private async admitAndAppend(
-    candidate: Message,
-    signal?: AbortSignal,
-  ): Promise<Message> {
-    const admitted = await this.options.admission.message(candidate, signal);
-    this.store.appendMessage(admitted);
-    return structuredClone(admitted);
+  override async reload(): Promise<never> {
+    return unsupported("Resource reload; use /new");
   }
-
-  private async compactSession(signal?: AbortSignal): Promise<boolean> {
-    const entries = this.store.buildContextEntries();
-    const keepIndex = entries.findLastIndex(
-      (entry) => entry.type === "message" && entry.message.role === "user",
-    );
-    if (keepIndex <= 0) return false;
-    const previous = entries.slice(0, keepIndex);
-    const messages = previous.flatMap((entry) =>
-      entry.type === "compaction" ? [] : sessionEntryToContextMessages(entry),
-    );
-    if (!messages.length) return false;
-    const priorSummary = previous.find((entry) => entry.type === "compaction");
-    const tokensBefore = this.contextTokens();
-    const summary = await generateSummaryWithUsage(
-      messages,
-      this.options.model,
-      this.reserveTokens,
-      this.options.apiKey,
-      undefined,
-      signal,
-      undefined,
-      priorSummary?.summary,
-      "off",
-      this.stream,
-      undefined,
-      { enabled: false, maxRetries: 0, baseDelayMs: 0 },
-    );
-    const approved = await this.options.admission.text(
-      "compaction_summary",
-      summary.text,
-      signal,
-    );
-    this.store.appendCompaction(
-      approved,
-      entries[keepIndex].id,
-      tokensBefore,
-      undefined,
-      undefined,
-      retainedUsage(summary.usage),
-    );
-    return true;
+  override async setModel(): Promise<never> {
+    return unsupported("Model switching");
+  }
+  override async cycleModel(): Promise<never> {
+    return unsupported("Model switching");
+  }
+  override setSessionName(): never {
+    return unsupported("Session renaming");
   }
 }
 
-/** Keep bash output below Pi's automatic spill-to-file threshold. */
-export function projectTools(cwd: string): AgentTool[] {
-  const local = createLocalBashOperations();
-  const bash = createBashTool(cwd, {
-    exposeSessionEnvironment: false,
-    operations: {
-      async exec(command, directory, options) {
-        const limit = new AbortController();
-        let bytes = 0;
-        let lines = 0;
-        const result = await local.exec(command, directory, {
-          ...options,
-          signal: AbortSignal.any([
-            limit.signal,
-            ...(options.signal ? [options.signal] : []),
-          ]),
-          onData(data) {
-            bytes += data.length;
-            lines += data.toString("utf8").split("\n").length - 1;
-            if (bytes > 16_000 || lines > 1000) limit.abort();
-            else if (!limit.signal.aborted) options.onData(data);
-          },
-        });
-        if (limit.signal.aborted)
-          throw new Error(
-            "Bash output exceeded the example's in-memory limit.",
-          );
-        return result;
-      },
-    },
+/** Use Pi's real TUI runtime; /new is safe, importing unchecked history is not. */
+export async function createAdmissionRuntime(
+  options: SessionOptions,
+): Promise<AgentSessionRuntime> {
+  const factory = sessionFactory(options);
+  const result = await factory({
+    cwd: resolve(options.cwd),
+    agentDir: resolve(options.agentDir),
+    sessionManager: SessionManager.create(
+      resolve(options.cwd),
+      resolve(options.sessionDir),
+    ),
   });
-  return [
-    createReadTool(cwd),
-    bash,
-    createEditTool(cwd),
-    createWriteTool(cwd),
-    createGrepTool(cwd),
-    createFindTool(cwd),
-    createLsTool(cwd),
-  ];
+  return new AdmissionRuntime(
+    result.session,
+    result.services,
+    factory,
+    result.diagnostics,
+  );
 }
 
-function retainedUsage(usage: Usage): Usage {
-  return {
-    input: usage.input,
-    output: usage.output,
-    cacheRead: usage.cacheRead,
-    cacheWrite: usage.cacheWrite,
-    totalTokens: usage.totalTokens,
-    cost: {
-      input: usage.cost.input,
-      output: usage.cost.output,
-      cacheRead: usage.cost.cacheRead,
-      cacheWrite: usage.cost.cacheWrite,
-      total: usage.cost.total,
-    },
+function sessionFactory(options: SessionOptions) {
+  if (
+    options.model.api !== "openai-completions" ||
+    options.model.reasoning ||
+    options.model.input.some((type) => type !== "text") ||
+    new URL(options.model.baseUrl).protocol !== "https:"
+  )
+    throw new AdmissionError("unsupported");
+  const stream: StreamFn = async (model, context, streamOptions) => {
+    const receipt = await options.admission.receipt(
+      context,
+      streamOptions?.signal,
+    );
+    return (options.stream ?? streamSimple)(model, context, {
+      ...streamOptions,
+      apiKey: options.apiKey,
+      maxRetries: 0,
+      headers: { ...streamOptions?.headers, [RECEIPT_HEADER]: receipt },
+    });
   };
+  return async ({
+    cwd,
+    agentDir,
+    sessionManager,
+    sessionStartEvent,
+  }: Parameters<CreateAgentSessionRuntimeFactory>[0]) => {
+    if (sessionManager.getEntries().length)
+      return unsupported("Restoring existing history");
+    const reserveTokens = Math.min(4096, options.model.maxTokens);
+    const services = await createAgentSessionServices({
+      cwd,
+      agentDir,
+      settingsManager: SettingsManager.inMemory({
+        packages: [],
+        enableInstallTelemetry: false,
+        compaction: {
+          enabled: true,
+          keepRecentTokens: 0,
+          reserveTokens:
+            options.compactAtTokens === undefined
+              ? reserveTokens
+              : options.model.contextWindow - options.compactAtTokens,
+        },
+        retry: { enabled: false },
+      }),
+      resourceLoaderOptions: {
+        noExtensions: true,
+        noPromptTemplates: true,
+        noThemes: true,
+        extensionFactories: [
+          {
+            name: "admission",
+            factory: (pi) => {
+              pi.on("session_before_compact", async (event) => {
+                // Supplying a summary or explicitly cancelling is mandatory:
+                // throwing from an extension handler could fall back to Pi's
+                // unchecked default summarizer.
+                try {
+                  const entries = sessionManager.buildContextEntries();
+                  const keepIndex = entries.findLastIndex(
+                    (entry) =>
+                      entry.type === "message" && entry.message.role === "user",
+                  );
+                  if (keepIndex <= 0) return { cancel: true };
+                  const previous = entries.slice(0, keepIndex);
+                  const messages = previous.flatMap((entry) =>
+                    entry.type === "compaction"
+                      ? []
+                      : sessionEntryToContextMessages(entry),
+                  );
+                  if (!messages.length) return { cancel: true };
+                  const summary = await generateSummaryWithUsage(
+                    messages,
+                    options.model,
+                    reserveTokens,
+                    options.apiKey,
+                    undefined,
+                    event.signal,
+                    event.customInstructions,
+                    previous.find((entry) => entry.type === "compaction")
+                      ?.summary,
+                    "off",
+                    stream,
+                    undefined,
+                    { enabled: false, maxRetries: 0, baseDelayMs: 0 },
+                  );
+                  const approved = await options.admission.text(
+                    "compaction_summary",
+                    summary.text,
+                    event.signal,
+                  );
+                  return {
+                    compaction: {
+                      summary: approved,
+                      firstKeptEntryId: entries[keepIndex].id,
+                      tokensBefore: event.preparation.tokensBefore,
+                      usage: retainedUsage(summary.usage),
+                    },
+                  };
+                } catch {
+                  return { cancel: true };
+                }
+              });
+            },
+          },
+        ],
+      },
+    });
+    services.modelRuntime.registerProvider(options.model.provider, {
+      api: options.model.api,
+      baseUrl: options.model.baseUrl,
+      models: [options.model],
+    });
+    await services.modelRuntime.setRuntimeApiKey(
+      options.model.provider,
+      options.apiKey,
+    );
+    const tools = options.tools ?? projectTools(cwd);
+    const session = new AdmissionSession({
+      agent: new AdmissionAgent(options.model, stream, options.admission),
+      cwd,
+      sessionManager,
+      sessionStartEvent,
+      settingsManager: services.settingsManager,
+      resourceLoader: services.resourceLoader,
+      modelRuntime: services.modelRuntime,
+      baseToolsOverride: Object.fromEntries(
+        tools.map((tool) => [tool.name, tool]),
+      ),
+      initialActiveToolNames: tools.map((tool) => tool.name),
+      allowedToolNames: tools.map((tool) => tool.name),
+    });
+    // Check project instructions and skill metadata before exposing the session.
+    session.agent.state.systemPrompt = await options.admission.text(
+      "system",
+      session.systemPrompt,
+    );
+    return {
+      session,
+      services,
+      diagnostics: services.diagnostics,
+      extensionsResult: services.resourceLoader.getExtensions(),
+    };
+  };
+}
+
+class AdmissionRuntime extends AgentSessionRuntime {
+  override async switchSession(): Promise<never> {
+    return unsupported("Resume");
+  }
+  override async importFromJsonl(): Promise<never> {
+    return unsupported("Import");
+  }
+  override async fork(): Promise<never> {
+    return unsupported("Fork");
+  }
+}
+
+function unsupported(feature: string): never {
+  throw new Error(`${feature} is not supported by this admission example.`);
 }

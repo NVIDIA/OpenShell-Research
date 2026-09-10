@@ -8,12 +8,13 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Model } from "@earendil-works/pi-ai";
+import { InteractiveMode } from "@earendil-works/pi-coding-agent";
 import {
   Admission,
   AdmissionError,
   createHttpEvaluator,
 } from "../src/admission.js";
-import { AdmissionSession } from "../src/session.js";
+import { AdmissionSession, createAdmissionRuntime } from "../src/session.js";
 
 const [endpoint, directory] = process.argv.slice(2);
 const model: Model<"openai-completions"> = {
@@ -29,22 +30,33 @@ const model: Model<"openai-completions"> = {
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
   compat: { maxTokensField: "max_tokens", supportsDeveloperRole: false },
 };
-const create = (compactAtTokens?: number) =>
-  AdmissionSession.create({
-    cwd: join(directory, "image/project"),
-    sessionDir: join(directory, "sessions"),
-    agentDir: join(directory, "agent"),
-    model,
-    apiKey: "local-test-credential",
-    admission: new Admission(
-      createHttpEvaluator(
-        `${endpoint}/v1/admission`,
-        "test-admission-credential",
-        randomUUID(),
-      ),
+const options = (compactAtTokens?: number) => ({
+  cwd: join(directory, "image/project"),
+  sessionDir: join(directory, "sessions"),
+  agentDir: join(directory, "agent"),
+  model,
+  apiKey: "local-test-credential",
+  admission: new Admission(
+    createHttpEvaluator(
+      `${endpoint}/v1/admission`,
+      "test-admission-credential",
+      randomUUID(),
     ),
-    compactAtTokens,
-  });
+  ),
+  compactAtTokens,
+});
+
+if (process.argv.includes("--tui")) {
+  const runtime = await createAdmissionRuntime(options());
+  await new InteractiveMode(runtime, {
+    initialMessage: "Please repeat REDACT_THIS and café.",
+    initialMessages: ["/skill:review"],
+  }).run();
+  process.exit(0);
+}
+
+const create = (compactAtTokens?: number) =>
+  AdmissionSession.create(options(compactAtTokens));
 
 const session = await create();
 await assert.rejects(session.prompt("DENY_THIS"), AdmissionError);
@@ -67,7 +79,9 @@ for (const snapshot of [
   await readFile(session.sessionFile, "utf8"),
 ]) {
   assert.ok(snapshot.includes("[REDACTED]"));
-  assert.ok(!snapshot.includes("REDACT_THIS") && !snapshot.includes("DENY_THIS"));
+  assert.ok(
+    !snapshot.includes("REDACT_THIS") && !snapshot.includes("DENY_THIS"),
+  );
 }
 assert.ok(await session.compact());
 assert.ok(session.entries.some((entry) => entry.type === "compaction"));
@@ -83,6 +97,8 @@ for (const current of [session, automatic]) {
     JSON.stringify(current.entries),
     await readFile(current.sessionFile, "utf8"),
   ]) {
-    assert.ok(!snapshot.includes("REDACT_THIS") && !snapshot.includes("DENY_THIS"));
+    assert.ok(
+      !snapshot.includes("REDACT_THIS") && !snapshot.includes("DENY_THIS"),
+    );
   }
 }
