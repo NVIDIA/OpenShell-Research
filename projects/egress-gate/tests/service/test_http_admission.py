@@ -154,12 +154,18 @@ def test_gateway_authentication_rejects_invalid_trust_claims(change: str) -> Non
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("tui", [False, True], ids=["sdk", "native-tui"])
-@pytest.mark.parametrize("max_tokens", [2048, 16384])
+@pytest.mark.parametrize(
+    ("max_tokens", "cache_control", "cache_retention"),
+    [(2048, False, ""), (16384, True, ""), (16384, True, "long")],
+    ids=["default-cache", "compat-cache", "long-cache"],
+)
 async def test_pi_session_through_admission_and_authenticated_egress(
     tmp_path: Path,
     unused_tcp_port: int,
     tui: bool,
     max_tokens: int,
+    cache_control: bool,
+    cache_retention: str,
 ) -> None:
     source = PROJECT / "examples/pi-attested-admission"
     example = tmp_path / "example"
@@ -174,6 +180,14 @@ async def test_pi_session_through_admission_and_authenticated_egress(
     model = catalog["providers"]["example"]["models"][0]
     model["maxTokens"] = max_tokens
     model["samplingParams"] = {"temperature": 0.25, "top_p": 0.9}
+    model["compat"] = {
+        "supportsUsageInStreaming": not tui,
+        "sendSessionAffinityHeaders": True,
+        "sessionAffinityFormat": "openai",
+        "supportsLongCacheRetention": True,
+    }
+    if cache_control:
+        model["compat"]["cacheControlFormat"] = "anthropic"
     (example / "models.json").write_text(json.dumps(catalog))
     # Match the image: the sandbox user cannot create Pi auth/cache files in /app.
     agent_dir = tmp_path / "agent"
@@ -196,6 +210,7 @@ async def test_pi_session_through_admission_and_authenticated_egress(
             }
         )
         calls: list[bytes] = []
+        session_ids: list[str | None] = []
 
         async def provider(request: web.Request) -> web.Response:
             body = await request.read()
@@ -213,12 +228,37 @@ async def test_pi_session_through_admission_and_authenticated_egress(
             metadata = (("authorization", f"Bearer {token}"),)
             result = await stub.EvaluateHttpRequest(evaluation, metadata=metadata)
             assert result.decision == pb.DECISION_ALLOW, result.reason_code
+            assert not result.has_body or result.body == body
             assert result.header_mutations[-1].remove.name == RECEIPT_HEADER
             assert (
                 "REDACT_THIS" not in body.decode() and "DENY_THIS" not in body.decode()
             )
             calls.append(body)
+            session_ids.append(request.headers.get("x-session-affinity"))
+            # Pi deliberately disables cache/affinity headers for summaries.
+            assert (session_ids[-1] is None) == (len(calls) in (4, 7))
             payload = json.loads(body)
+            summary = len(calls) in (4, 7)
+            if cache_retention == "long" and not summary:
+                assert payload["prompt_cache_key"] == session_ids[-1]
+                assert payload["prompt_cache_retention"] == "24h"
+            else:
+                assert "prompt_cache_key" not in payload
+                assert "prompt_cache_retention" not in payload
+            if cache_control and not summary:
+                expected_cache = {"type": "ephemeral"}
+                if cache_retention == "long":
+                    expected_cache["ttl"] = "1h"
+                assert payload["messages"][0]["content"][-1]["cache_control"] == (
+                    expected_cache
+                )
+                assert payload["messages"][-1]["content"][-1]["cache_control"] == (
+                    expected_cache
+                )
+                assert payload["tools"][-1]["cache_control"] == expected_cache
+            else:
+                assert '"cache_control"' not in body.decode()
+            assert ("stream_options" in payload) is not tui
             assert payload["temperature"] == 0.25
             assert payload["top_p"] == 0.9
             if len(calls) not in (4, 7):
@@ -290,6 +330,7 @@ async def test_pi_session_through_admission_and_authenticated_egress(
                     "PI_OFFLINE": "1",
                     "PI_CODING_AGENT_DIR": str(tmp_path / "agent"),
                     "TERM": "xterm-256color",
+                    "PI_CACHE_RETENTION": cache_retention,
                 },
                 stdin=terminal[1] if terminal else None,
                 stdout=terminal[1] if terminal else asyncio.subprocess.PIPE,
@@ -328,6 +369,10 @@ async def test_pi_session_through_admission_and_authenticated_egress(
                 "Pi must not write auth or model caches"
             )
             assert len(calls) == (4 if tui else 7)
+            assert len(set(session_ids[:3])) == 1
+            if not tui:
+                assert len(set(session_ids[4:6])) == 1
+                assert session_ids[0] != session_ids[4]
             assert any(m["role"] == "tool" for m in json.loads(calls[2])["messages"])
         finally:
             if terminal:

@@ -28,6 +28,8 @@ export class ContextOverflowError extends Error {}
  */
 export class AdmissionAgent extends Agent {
   private readonly live;
+  private systemPromptCandidate = "";
+  private approvedSystemPrompt = "";
   private readonly subscribers = new Set<
     (event: AgentEvent, signal: AbortSignal) => Promise<void> | void
   >();
@@ -45,7 +47,30 @@ export class AdmissionAgent extends Agent {
     super({ initialState: { model, thinkingLevel: "off" }, streamFn });
     // Pi's base lifecycle fields are readonly. This engine owns its own public
     // state and lifecycle; it never invokes the base execution/state reducer.
-    this.live = { ...super.state, pendingToolCalls: new Set<string>() };
+    const owner = this;
+    this.live = {
+      ...super.state,
+      // Pi rebuilds this field synchronously. Stage those writes as candidates;
+      // public state continues to expose only the last approved system prompt.
+      get systemPrompt(): string {
+        return owner.approvedSystemPrompt;
+      },
+      set systemPrompt(value: string) {
+        owner.systemPromptCandidate = value;
+      },
+      pendingToolCalls: new Set<string>(),
+    };
+  }
+
+  async approveSystemPrompt(signal?: AbortSignal): Promise<string> {
+    const approved = await this.admission.text(
+      "system",
+      this.systemPromptCandidate,
+      signal,
+    );
+    signal?.throwIfAborted();
+    this.approvedSystemPrompt = approved;
+    return approved;
   }
 
   override get state() {
@@ -148,11 +173,7 @@ export class AdmissionAgent extends Agent {
         await this.emit({ type: "turn_start" });
         // AgentSession rebuilds system context when tools/settings change.
         // Approve that snapshot before every provider call.
-        const systemPrompt = await this.admission.text(
-          "system",
-          this.live.systemPrompt,
-          this.signal,
-        );
+        const systemPrompt = await this.approveSystemPrompt(this.signal);
         const response = await (
           await this.streamFunction(
             this.live.model,
@@ -161,7 +182,7 @@ export class AdmissionAgent extends Agent {
               messages: convertToLlm(this.live.messages),
               tools: this.live.tools,
             },
-            { signal: this.signal },
+            { signal: this.signal, sessionId: this.sessionId },
           )
         ).result();
         this.signal!.throwIfAborted();

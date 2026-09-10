@@ -632,6 +632,12 @@ def test_provider_shape_validation_and_optional_reasoning_field_are_preserved() 
     [
         lambda body: body.update({"max_completion_tokens": 128}),
         lambda body: body.update({"store": None}),
+        lambda body: body.update({"stream_options": None}),
+        lambda body: body.update({"stream_options": {"include_usage": "true"}}),
+        lambda body: body["tools"][0].update({"cache_control": {"type": "persistent"}}),
+        lambda body: body["tools"][0].update(
+            {"cache_control": {"type": "ephemeral", "ttl": "forever"}}
+        ),
         lambda body: body["tools"][0]["function"].update({"strict": None}),
         lambda body: body.update({"input": []}),
         lambda body: body["messages"][1].update({"tool_call_id": "wrong-role"}),

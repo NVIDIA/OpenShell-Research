@@ -5,10 +5,27 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
+import type { Message } from "@earendil-works/pi-ai";
 import { Admission, AdmissionError, createHttpEvaluator } from "./admission.js";
 import { AdmissionSession } from "./session.js";
 import { configureProxy } from "./network.js";
 import { loadSelectedModel } from "./model.js";
+
+export function assertProjectRead(history: readonly Message[]): void {
+  assert.ok(
+    history.some((message) =>
+      message.role === "toolResult" &&
+      message.toolName === "read" &&
+      !message.isError &&
+      message.content.some((block) =>
+        block.type === "text" &&
+        block.text.includes("This is a real file in the sandbox project.") &&
+        block.text.includes("[REDACTED]"),
+      ),
+    ),
+    "The read tool must successfully return the approved notes.txt content",
+  );
+}
 
 /** Real service, upstream runtime, real project tools, and the configured model. */
 async function verify(): Promise<void> {
@@ -66,10 +83,7 @@ async function verify(): Promise<void> {
   await session.prompt(
     "/skill:review Use the read tool to read notes.txt; do not guess its contents.",
   );
-  assert.ok(
-    session.history.some((message) => message.role === "toolResult"),
-    "The real model must actually use the project tool",
-  );
+  assertProjectRead(session.history);
   assert.ok(
     await session.compact(),
     "Manual compaction must summarize an older turn",
@@ -98,9 +112,11 @@ async function verify(): Promise<void> {
   );
 }
 
-verify().catch(() => {
-  console.error(
-    "FAIL end-to-end verification. Check service availability, credentials, model compatibility, and the last PASS line; no checks were skipped.",
-  );
-  process.exitCode = 1;
-});
+if (import.meta.main) {
+  verify().catch(() => {
+    console.error(
+      "FAIL end-to-end verification. Check service availability, credentials, model compatibility, and the last PASS line; no checks were skipped.",
+    );
+    process.exitCode = 1;
+  });
+}

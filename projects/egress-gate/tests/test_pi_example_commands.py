@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import ipaddress
 import json
 import os
@@ -39,6 +40,7 @@ def test_native_model_selection_keeps_only_selected_configuration(
     catalog = json.loads((EXAMPLE / "models.json.example").read_text())
     provider = catalog["providers"]["example"]
     provider["apiKey"] = "!do-not-execute-or-copy"
+    provider["authHeader"] = True
     provider["models"].append(
         {
             "id": "vendor/second",
@@ -447,25 +449,32 @@ def test_prepare_requires_operator_model_configuration(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("action", ["launch", "verify"])
-def test_commands_suppress_only_the_proxy_agent_warning(action: str) -> None:
+@pytest.mark.parametrize("cache_retention", ["", "long"])
+def test_commands_forward_cache_preference_and_suppress_only_proxy_warning(
+    action: str, cache_retention: str
+) -> None:
     printed = subprocess.run(
         ["bash", str(EXAMPLE / "demo.sh"), "--print", action],
         capture_output=True,
         text=True,
         check=True,
+        env=os.environ | {"PI_CACHE_RETENTION": cache_retention},
     )
     command = shlex.split(printed.stdout)
     node_index = command.index("/usr/local/bin/node")
     assert command[node_index + 1] == "--disable-warning=UNDICI-EHPA"
     environment = os.environ.copy()
     environment.pop("NODE_OPTIONS", None)
+    environment.pop("PI_CACHE_RETENTION", None)
     result = subprocess.run(
         [
+            *command[command.index("--") + 1 : node_index],
             "node",
             command[node_index + 1],
             "-e",
             "process.emitWarning('proxy notice', {code: 'UNDICI-EHPA'});"
-            "process.emitWarning('unrelated notice', {code: 'OTHER_WARNING'});",
+            "process.emitWarning('unrelated notice', {code: 'OTHER_WARNING'});"
+            "console.log(process.env.PI_CACHE_RETENTION ?? '');",
         ],
         env=environment,
         capture_output=True,
@@ -476,6 +485,7 @@ def test_commands_suppress_only_the_proxy_agent_warning(action: str) -> None:
     assert "proxy notice" not in result.stderr
     assert "OTHER_WARNING" in result.stderr
     assert "unrelated notice" in result.stderr
+    assert result.stdout.strip() == cache_retention
 
 
 @pytest.mark.parametrize("host", ["192.0.2.10", "host.docker.internal"])
@@ -667,3 +677,22 @@ def test_pi_dependencies_are_exact_upstream_packages() -> None:
         assert resolved["version"] == version
         assert resolved["resolved"].startswith("https://registry.npmjs.org/")
         assert resolved["integrity"].startswith("sha512-")
+
+
+def test_middleware_manifest_matches_upstream_protocol() -> None:
+    manifest = json.loads((PROJECT / ".openshell-middleware-manifest.json").read_text())
+    revision = "d1155aa70042d3e2ee49dbfa15346b108b7c1d92"
+    assert manifest["openshell_version"] == "0.0.116"
+    assert manifest["proto_source"] == (
+        f"https://raw.githubusercontent.com/NVIDIA/OpenShell/{revision}"
+        "/proto/supervisor_middleware.proto"
+    )
+    assert (
+        manifest["proto_sha256"]
+        == hashlib.sha256(
+            (PROJECT / "proto/supervisor_middleware.proto").read_bytes()
+        ).hexdigest()
+    )
+    assert (
+        f"revision={revision}" in (PROJECT / "scripts/generate-bindings.sh").read_text()
+    )

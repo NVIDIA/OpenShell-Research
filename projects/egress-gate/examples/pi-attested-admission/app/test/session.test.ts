@@ -418,24 +418,69 @@ test("cancelled admission cannot append even when the service subsequently allow
   assert.equal(requests.length, 0);
 });
 
-test("context overflow makes one admitted summary and one retry", async () => {
-  const overflow = {
-    ...answer(""),
-    stopReason: "error" as const,
-    errorMessage: "exceeds the context window",
-  };
-  const { session, requests, kinds } = await fixture(undefined, [
-    answer("first"),
-    overflow,
-    answer("summary"),
-    answer("retry result"),
-  ]);
-  await session.prompt("first turn");
-  await session.prompt("next turn");
-  assert.equal(requests.length, 4);
-  assert.equal(kinds.filter((kind) => kind === "compaction_summary").length, 1);
-  assert.ok(JSON.stringify(session.history).includes("retry result"));
-  assert.ok(!(await disk(session)).includes("exceeds the context window"));
+for (const enabled of [true, false]) {
+  test(`overflow respects auto-compaction ${enabled}`, async () => {
+    const overflow = {
+      ...answer(""),
+      stopReason: "error" as const,
+      errorMessage: "exceeds the context window",
+    };
+    const { session, requests, kinds } = await fixture(undefined, [
+      answer("first"),
+      overflow,
+      answer("summary"),
+      answer("retry result"),
+    ]);
+    await session.prompt("first turn");
+    session.setAutoCompactionEnabled(enabled);
+    if (enabled) await session.prompt("next turn");
+    else await assert.rejects(session.prompt("next turn"), /Context is too large/);
+    assert.equal(requests.length, enabled ? 4 : 2);
+    assert.equal(
+      kinds.filter((kind) => kind === "compaction_summary").length,
+      enabled ? 1 : 0,
+    );
+    assert.equal(JSON.stringify(session.history).includes("retry result"), enabled);
+    assert.ok(!(await disk(session)).includes("exceeds the context window"));
+  });
+}
+
+test("system rebuilds remain private while user admission is pending or denied", async () => {
+  let release!: () => void;
+  let reached!: () => void;
+  const hold = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const seen = new Promise<void>((resolve) => {
+    reached = resolve;
+  });
+  let denyUser = true;
+  const { session, requests } = await fixture(async (kind, body) => {
+    if (kind === "system_context") return {
+      ...allow,
+      decision: "replace",
+      replacement: { ...body, text: "APPROVED_SYSTEM" },
+    };
+    if (kind === "user_message" && denyUser) {
+      reached();
+      await hold;
+      return deny;
+    }
+    return kind === "provider_context" ? { ...allow, receipt: "receipt" } : allow;
+  });
+  assert.equal(session.systemPrompt, "APPROVED_SYSTEM");
+  const running = session.prompt("denied");
+  const rejected = assert.rejects(running);
+  await seen;
+  assert.equal(session.agent.state.systemPrompt, "APPROVED_SYSTEM");
+  release();
+  await rejected;
+  assert.equal(session.systemPrompt, "APPROVED_SYSTEM");
+  assert.equal(session.messages.length, 0);
+  denyUser = false;
+  await session.prompt("allowed");
+  assert.equal(requests[0].systemPrompt, "APPROVED_SYSTEM");
+  assert.equal(session.systemPrompt, "APPROVED_SYSTEM");
 });
 
 test("native session persists each approved message once and never renders tool details", async () => {
@@ -631,8 +676,17 @@ test("native alternate writes fail closed; /new reuses the admission factory", a
   assert.deepEqual(runtime.session.sessionManager.getEntries(), entries);
   await assert.rejects(readFile(join(cwd, "must-not-exist")));
   const previous = runtime.session;
+  previous.setAutoCompactionEnabled(false);
+  previous.setSteeringMode("all");
+  previous.setFollowUpMode("all");
+  assert.equal(previous.agent.sessionId, previous.sessionId);
   await runtime.newSession();
   assert.notEqual(runtime.session, previous);
+  assert.equal(runtime.session.autoCompactionEnabled, false);
+  assert.equal(runtime.session.steeringMode, "all");
+  assert.equal(runtime.session.followUpMode, "all");
+  assert.notEqual(runtime.session.sessionId, previous.sessionId);
+  assert.equal(runtime.session.agent.sessionId, runtime.session.sessionId);
   await runtime.session.bindExtensions({});
   await assert.rejects(runtime.session.prompt("DENIED"));
   assert.equal(runtime.session.messages.length, 0);

@@ -15,6 +15,7 @@ import {
 } from "../src/admission.js";
 import { AdmissionSession, createAdmissionRuntime } from "../src/session.js";
 import { loadSelectedModel } from "../src/model.js";
+import { assertProjectRead } from "../src/verify.js";
 
 const [endpoint, directory] = process.argv.slice(2);
 const model = await loadSelectedModel(join(directory, "image"));
@@ -58,16 +59,13 @@ assert.equal(session.history.length, 0);
 assert.equal(session.entries.length, 0);
 await session.prompt("Please repeat REDACT_THIS and café.");
 await session.prompt("/skill:review");
-const readResult = session.history.find(
-  (message) => message.role === "toolResult" && message.toolName === "read",
+assertProjectRead(session.history);
+assert.throws(() =>
+  assertProjectRead(session.history.map((message) =>
+    message.role === "toolResult" ? { ...message, isError: true } : message,
+  )),
 );
-assert.ok(readResult?.role === "toolResult");
-assert.equal(readResult.isError, false);
-assert.match(
-  JSON.stringify(readResult.content),
-  /This is a real file in the sandbox project\./,
-);
-assert.match(JSON.stringify(readResult.content), /\[REDACTED\]/);
+assert.throws(() => assertProjectRead([]));
 for (const snapshot of [
   JSON.stringify(session.history),
   await readFile(session.sessionFile, "utf8"),

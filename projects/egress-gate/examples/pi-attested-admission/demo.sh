@@ -20,6 +20,10 @@ fi
 service_host=${EGRESS_GATE_HOST:-YOUR_SERVICE_HOST}
 gateway=${OPENSHELL_GATEWAY:-YOUR_GATEWAY}
 openshell=(openshell --gateway "$gateway")
+pi_env=(/usr/bin/env)
+if [[ -n ${PI_CACHE_RETENTION:-} ]]; then
+  pi_env+=("PI_CACHE_RETENTION=$PI_CACHE_RETENTION")
+fi
 run() {
   if $print_only; then printf '%q ' "$@"; printf '\n'; else "$@"; fi
 }
@@ -108,11 +112,11 @@ case "$action" in
     ;;
   launch)
     if ! $print_only; then : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}" "${EGRESS_GATE_HOST:?Set the service host in .env}"; fi
-    run "${openshell[@]}" sandbox exec --tty --name pi-admission -- /usr/local/bin/node --disable-warning=UNDICI-EHPA /app/dist/src/cli.js --admission "https://$service_host:5443/v1/admission"
+    run "${openshell[@]}" sandbox exec --tty --name pi-admission -- "${pi_env[@]}" /usr/local/bin/node --disable-warning=UNDICI-EHPA /app/dist/src/cli.js --admission "https://$service_host:5443/v1/admission"
     ;;
   verify)
     if ! $print_only; then : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}" "${EGRESS_GATE_HOST:?Set the service host in .env}"; fi
-    run "${openshell[@]}" sandbox exec --no-tty --name pi-admission -- /usr/local/bin/node --disable-warning=UNDICI-EHPA /app/dist/src/verify.js --admission "https://$service_host:5443/v1/admission"
+    run "${openshell[@]}" sandbox exec --no-tty --name pi-admission -- "${pi_env[@]}" /usr/local/bin/node --disable-warning=UNDICI-EHPA /app/dist/src/verify.js --admission "https://$service_host:5443/v1/admission"
     ;;
   cleanup)
     if ! $print_only; then : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}"; fi

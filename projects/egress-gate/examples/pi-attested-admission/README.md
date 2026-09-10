@@ -70,6 +70,14 @@ Credentials and model caches stay in memory; no writable `/app/agent/auth.json`
 is needed.
 Compaction uses Pi's normal summary budget, bounded by the model's `maxTokens`.
 
+Prompt caching stays under Pi's control: the gate accepts its cache keys,
+retention fields, and compatibility-generated `cache_control` metadata without
+rewriting them. To request Pi's longer retention where supported, optionally set
+`PI_CACHE_RETENTION=long` in `.env` or export it before `launch`/`verify`; leave it
+unset for Pi's default. No rebuild is needed. Pi disables cache retention for
+one-off compaction requests. Redaction and compaction can change prompt content
+and therefore cache hits; approval receipts are not added to the prompt.
+
 If you used the earlier single-object `model.json`, start from the new template
 and transfer your endpoint and model settings; renaming the file alone is not enough.
 The catalog can contain many models, but each prepared demo uses **one**. To change
@@ -196,6 +204,9 @@ environment variables being inherited by `sandbox exec`.
 Use Ctrl+O to expand tool output and `/session` to inspect session information;
 Pi saves JSONL under `/sandbox/sessions`. The former custom `/history` and
 `/exit` commands are gone; use Pi's chat view and `/quit`.
+Preferences changed in the TUI survive `/new` within this running application;
+they are not saved across launcher restarts. Provider session-affinity/cache
+identity follows Pi's normal behavior, including a new identity for `/new`.
 Compaction retains the latest whole turn; older **approved** entries remain in
 the append-only file. Automatic compaction
 uses the same summary path at Pi's context thresholds, including between tool
@@ -203,6 +214,11 @@ turns. Esc cancels the current operation. Steering and follow-up inputs are
 admitted after skill expansion, before joining the transcript. Drafts and pending
 input queues are not approved history. An unfinished tool batch that cannot be
 safely closed requires `/new`.
+Turning automatic compaction off also disables automatic overflow recovery;
+manual `/compact` remains available. The whole-turn policy cannot compact a
+long first tool turn: there is no older turn to summarize. Transient chat and
+summary failures stop the operation rather than automatically retrying in this
+POC; unchecked provider errors are never appended to history.
 
 This POC deliberately blocks `!`/`!!`, resume/import, branching, renaming,
 model switching, and resource reload: these need additional handling before

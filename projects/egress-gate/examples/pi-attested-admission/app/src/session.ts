@@ -75,7 +75,8 @@ export class AdmissionSession extends AgentSession {
     try {
       await super.prompt(text, options);
     } catch (error) {
-      if (!(error instanceof ContextOverflowError)) throw error;
+      if (!(error instanceof ContextOverflowError) || !this.autoCompactionEnabled)
+        throw error;
       // The failed provider response was never published. Compact only approved
       // history, then retry that unfinished turn once.
       await this.compact();
@@ -142,6 +143,20 @@ function sessionFactory(options: SessionOptions) {
     new URL(options.model.baseUrl).protocol !== "https:"
   )
     throw new AdmissionError("unsupported");
+  // Preferences belong to the runtime, not to an individual conversation.
+  const settingsManager = SettingsManager.inMemory({
+    packages: [],
+    enableInstallTelemetry: false,
+    compaction: {
+      enabled: true,
+      keepRecentTokens: 0,
+      reserveTokens:
+        options.compactAtTokens === undefined
+          ? undefined
+          : options.model.contextWindow - options.compactAtTokens,
+    },
+    retry: { enabled: false },
+  });
   const stream: StreamFn = async (model, context, streamOptions) => {
     const receipt = await options.admission.receipt(
       context,
@@ -150,7 +165,6 @@ function sessionFactory(options: SessionOptions) {
     return (options.stream ?? streamSimple)(model, context, {
       ...streamOptions,
       apiKey: options.apiKey,
-      maxRetries: 0,
       headers: { ...streamOptions?.headers, [RECEIPT_HEADER]: receipt },
     });
   };
@@ -170,19 +184,7 @@ function sessionFactory(options: SessionOptions) {
         credentials: new InMemoryCredentialStore(),
         modelsPath: null,
       }),
-      settingsManager: SettingsManager.inMemory({
-        packages: [],
-        enableInstallTelemetry: false,
-        compaction: {
-          enabled: true,
-          keepRecentTokens: 0,
-          reserveTokens:
-            options.compactAtTokens === undefined
-              ? undefined
-              : options.model.contextWindow - options.compactAtTokens,
-        },
-        retry: { enabled: false },
-      }),
+      settingsManager,
       resourceLoaderOptions: {
         noExtensions: true,
         noPromptTemplates: true,
@@ -223,6 +225,8 @@ function sessionFactory(options: SessionOptions) {
                     stream,
                     undefined,
                     { enabled: false, maxRetries: 0, baseDelayMs: 0 },
+                    undefined,
+                    sessionManager.getSessionId(),
                   );
                   const approved = await options.admission.text(
                     "compaction_summary",
@@ -256,8 +260,12 @@ function sessionFactory(options: SessionOptions) {
       options.apiKey,
     );
     const tools = options.tools ?? projectTools(cwd);
+    const agent = new AdmissionAgent(options.model, stream, options.admission);
+    agent.sessionId = sessionManager.getSessionId();
+    agent.steeringMode = settingsManager.getSteeringMode();
+    agent.followUpMode = settingsManager.getFollowUpMode();
     const session = new AdmissionSession({
-      agent: new AdmissionAgent(options.model, stream, options.admission),
+      agent,
       cwd,
       sessionManager,
       sessionStartEvent,
@@ -271,10 +279,7 @@ function sessionFactory(options: SessionOptions) {
       allowedToolNames: tools.map((tool) => tool.name),
     });
     // Check project instructions and skill metadata before exposing the session.
-    session.agent.state.systemPrompt = await options.admission.text(
-      "system",
-      session.systemPrompt,
-    );
+    await agent.approveSystemPrompt();
     return {
       session,
       services,

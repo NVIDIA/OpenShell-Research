@@ -187,7 +187,7 @@ def select_model(
     overrides = provider.get("modelOverrides", {}).get(model["id"], {})
     if any(config.get("headers") for config in (provider, model, overrides)):
         raise ValueError("Custom model headers are unsupported; use PI_MODEL_API_KEY")
-    if provider.get("oauth") or provider.get("authHeader"):
+    if provider.get("oauth"):
         raise ValueError(
             "Custom provider authentication is unsupported; use PI_MODEL_API_KEY"
         )

@@ -272,7 +272,8 @@ class PiToolResultV1Adapter(_AppendHarnessAdapter):
         timeout: Timeout,
     ) -> PreparedHarnessRequest:
         native = _parse_pi_tool_result(request.request_body, timeout)
-        _tool_result_entry(native)
+        if any(block.type == "image" for block in native.content):
+            raise AdmissionShapeError("Pi tool-result images are unsupported")
         return PreparedHarnessRequest(
             native=native,
             projected_body=canonical_json_bytes(native),
@@ -388,9 +389,15 @@ class HarnessAdapterRegistry:
             ) from None
 
 
+class _ProviderCacheControl(StrictDomainModel):
+    type: Literal["ephemeral"]
+    ttl: Literal["1h"] | None = None
+
+
 class _ProviderTextBlock(StrictDomainModel):
     type: Literal["text"]
     text: ScalarString
+    cache_control: _ProviderCacheControl | None = None
 
 
 class _ProviderFunction(StrictDomainModel):
@@ -464,6 +471,7 @@ class _ProviderFunctionDefinition(StrictDomainModel):
 class _ProviderTool(StrictDomainModel):
     type: Literal["function"]
     function: _ProviderFunctionDefinition
+    cache_control: _ProviderCacheControl | None = None
 
 
 class _ProviderNamedChoiceFunction(StrictDomainModel):
@@ -489,7 +497,7 @@ class _ProviderRequest(StrictDomainModel):
     max_completion_tokens: int | None = Field(default=None, ge=1)
     max_tokens: int | None = Field(default=None, ge=1)
     stream: Literal[True]
-    stream_options: _ProviderStreamOptions
+    stream_options: _ProviderStreamOptions | None = None
     store: Literal[False] | None = None
     prompt_cache_key: ScalarString | None = None
     prompt_cache_retention: Literal["24h"] | None = None
@@ -505,7 +513,7 @@ class _ProviderRequest(StrictDomainModel):
     def _compatibility_fields_have_one_representation(self) -> _ProviderRequest:
         if (self.max_completion_tokens is None) == (self.max_tokens is None):
             raise ValueError("provider request requires exactly one max-token field")
-        for field_name in ("store", "enable_thinking"):
+        for field_name in ("store", "enable_thinking", "stream_options"):
             if (
                 field_name in self.model_fields_set
                 and getattr(self, field_name) is None
@@ -623,19 +631,6 @@ def _parse_pi_provider_context(body: bytes, timeout: Timeout) -> PiProviderConte
     if canonical_json_bytes(parsed) != body:
         raise AdmissionShapeError("Pi provider-context body is not canonical JSON")
     return parsed
-
-
-def _tool_result_entry(result: PiToolResultV1) -> ToolContextEntryV1:
-    if any(block.type == "image" for block in result.content):
-        raise AdmissionShapeError("Pi tool-result images are unsupported")
-    text = "\n".join(
-        block.text for block in result.content if isinstance(block, PiTextContentV1)
-    )
-    return ToolContextEntryV1(
-        role="tool",
-        text=text or "(no tool output)",
-        tool_call_id=_provider_tool_call_id(result.tool_call_id),
-    )
 
 
 def context_entries_subject(entries: AttestedEntries) -> tuple[str, int]:

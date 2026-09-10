@@ -78,8 +78,18 @@ needs a fresh receipt; its finished summary needs fresh insertion approval.
 The trusted `session_before_compact` extension supplies an admitted summary or
 explicitly cancels, including on failure; it never falls through to an unchecked
 default summary. Denial leaves the preceding context and file unchanged.
-Native automatic compaction also runs between tool turns; overflow gets at most
-one compact/retry. Old approved entries remain in the append-only JSONL file.
+Native automatic compaction also runs between tool turns; when enabled, overflow
+gets at most one compact/retry. Disabling it also disables automatic overflow
+recovery, not manual compaction. This whole-turn POC cannot compact a long first
+tool turn because no older user turn exists. Transient chat and summary failures
+are not automatically retried; unchecked provider errors stay out of history.
+Old approved entries remain in the append-only JSONL file.
+
+Pi's synchronous system-prompt rebuilds are staged as private candidates. Public
+agent/session state retains the last approved system prompt, including while a
+new user candidate is pending or denied. Provider calls use the newly approved
+snapshot. In-memory TUI preferences survive `/new`; conversation state and its
+provider session identity do not carry over.
 
 One cwd scopes resources, tools and storage. It is not confinement; OpenShell
 filesystem policy is. The application is installed outside the writable project
