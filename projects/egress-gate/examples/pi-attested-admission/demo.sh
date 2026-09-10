@@ -108,11 +108,11 @@ case "$action" in
     ;;
   launch)
     if ! $print_only; then : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}" "${EGRESS_GATE_HOST:?Set the service host in .env}"; fi
-    run "${openshell[@]}" sandbox exec --tty --name pi-admission -- /usr/local/bin/node /app/dist/src/cli.js --admission "https://$service_host:5443/v1/admission"
+    run "${openshell[@]}" sandbox exec --tty --name pi-admission -- /usr/local/bin/node --disable-warning=UNDICI-EHPA /app/dist/src/cli.js --admission "https://$service_host:5443/v1/admission"
     ;;
   verify)
     if ! $print_only; then : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}" "${EGRESS_GATE_HOST:?Set the service host in .env}"; fi
-    run "${openshell[@]}" sandbox exec --no-tty --name pi-admission -- /usr/local/bin/node /app/dist/src/verify.js --admission "https://$service_host:5443/v1/admission"
+    run "${openshell[@]}" sandbox exec --no-tty --name pi-admission -- /usr/local/bin/node --disable-warning=UNDICI-EHPA /app/dist/src/verify.js --admission "https://$service_host:5443/v1/admission"
     ;;
   cleanup)
     if ! $print_only; then : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}"; fi

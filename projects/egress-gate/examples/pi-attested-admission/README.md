@@ -185,8 +185,10 @@ boundary: OpenShell's filesystem policy supplies that boundary.
 
 Responses and tool output are buffered until approved, rather than streamed
 unchecked into the transcript. Pi still shows activity while waiting.
-The image suppresses only Node warning `UNDICI-EHPA` (the experimental
-`EnvHttpProxyAgent` notice); other warnings and errors remain visible.
+The launch and verification commands pass `--disable-warning=UNDICI-EHPA`
+directly to Node to hide only the experimental `EnvHttpProxyAgent` notice;
+other warnings and errors remain visible. This does not depend on Docker image
+environment variables being inherited by `sandbox exec`.
 Use Ctrl+O to expand tool output and `/session` to inspect session information;
 Pi saves JSONL under `/sandbox/sessions`. The former custom `/history` and
 `/exit` commands are gone; use Pi's chat view and `/quit`.

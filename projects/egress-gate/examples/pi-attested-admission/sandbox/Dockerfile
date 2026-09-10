@@ -21,7 +21,5 @@ COPY --chown=sandbox:sandbox project/ /sandbox/project/
 RUN mkdir /sandbox/sessions && chown sandbox:sandbox /sandbox/sessions \
     && chmod -R a+rX /app /sandbox/project
 ENV NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
-# Hide only EnvHttpProxyAgent's experimental warning, not other Node warnings.
-ENV NODE_OPTIONS="--disable-warning=UNDICI-EHPA"
 WORKDIR /sandbox/project
 USER sandbox

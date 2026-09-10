@@ -7,6 +7,7 @@ import ipaddress
 import json
 import os
 import runpy
+import shlex
 import shutil
 import ssl
 import subprocess
@@ -445,21 +446,28 @@ def test_prepare_requires_operator_model_configuration(tmp_path: Path) -> None:
     assert not (tmp_path / "models.json").exists()
 
 
-def test_image_suppresses_only_the_proxy_agent_warning() -> None:
-    dockerfile = (EXAMPLE / "sandbox/Dockerfile").read_text()
-    options = next(
-        line.removeprefix("ENV NODE_OPTIONS=").strip('"')
-        for line in dockerfile.splitlines()
-        if line.startswith("ENV NODE_OPTIONS=")
+@pytest.mark.parametrize("action", ["launch", "verify"])
+def test_commands_suppress_only_the_proxy_agent_warning(action: str) -> None:
+    printed = subprocess.run(
+        ["bash", str(EXAMPLE / "demo.sh"), "--print", action],
+        capture_output=True,
+        text=True,
+        check=True,
     )
+    command = shlex.split(printed.stdout)
+    node_index = command.index("/usr/local/bin/node")
+    assert command[node_index + 1] == "--disable-warning=UNDICI-EHPA"
+    environment = os.environ.copy()
+    environment.pop("NODE_OPTIONS", None)
     result = subprocess.run(
         [
             "node",
+            command[node_index + 1],
             "-e",
             "process.emitWarning('proxy notice', {code: 'UNDICI-EHPA'});"
             "process.emitWarning('unrelated notice', {code: 'OTHER_WARNING'});",
         ],
-        env=os.environ | {"NODE_OPTIONS": options},
+        env=environment,
         capture_output=True,
         text=True,
         check=True,
