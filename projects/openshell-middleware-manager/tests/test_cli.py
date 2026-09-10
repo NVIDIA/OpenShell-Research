@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+from importlib.metadata import version as distribution_version
 from pathlib import Path
 
 import pytest
@@ -18,12 +19,20 @@ def test_help_describes_required_choices() -> None:
     assert result.exit_code == 0
     assert "create" in result.stdout
     assert "update" in result.stdout
+    assert "--version" in result.stdout
 
     create_help = runner.invoke(cli.app, ["create", "--help"])
 
     assert create_help.exit_code == 0
     assert "--language" in create_help.stdout
     assert "--openshell-version" in create_help.stdout
+
+
+def test_version_reports_installed_distribution_version() -> None:
+    result = runner.invoke(cli.app, ["--version"])
+
+    assert result.exit_code == 0
+    assert result.stdout == f"omm {distribution_version('openshell-middleware-manager')}\n"
 
 
 def test_cli_reports_success(monkeypatch, tmp_path: Path) -> None:

@@ -12,11 +12,19 @@ from typing import Annotated
 
 import typer
 
+from openshell_middleware_manager import __version__
 from openshell_middleware_manager.generator import (
     ProjectError,
     create_project,
     update_project,
 )
+
+
+def version_callback(value: bool) -> None:
+    """Print the installed OMM version when requested."""
+    if value:
+        typer.echo(f"omm {__version__}")
+        raise typer.Exit()
 
 
 class Language(str, Enum):
@@ -32,6 +40,21 @@ app = typer.Typer(
     pretty_exceptions_enable=False,
     help="Create or update a version-matched OpenShell middleware project.",
 )
+
+
+@app.callback()
+def root(
+    version: Annotated[
+        bool | None,
+        typer.Option(
+            "--version",
+            callback=version_callback,
+            is_eager=True,
+            help="Show the installed OMM version and exit.",
+        ),
+    ] = None,
+) -> None:
+    """Create or update a version-matched OpenShell middleware project."""
 
 
 @app.command()

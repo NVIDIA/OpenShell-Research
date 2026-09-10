@@ -1,10 +1,11 @@
 [project]
 name = "openshell-middleware-manager"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Create and update version-matched OpenShell middleware projects."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [
     { name = "NVIDIA CORPORATION & AFFILIATES" },
 ]
@@ -27,8 +28,29 @@ dev = [
 ]
 
 [build-system]
-requires = ["uv_build>=0.11.8,<0.12.0"]
-build-backend = "uv_build"
+requires = ["hatchling", "uv-dynamic-versioning>=0.7.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "uv-dynamic-versioning"
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+pattern-prefix = "omm-"
+bump = true
+fallback-version = "0.1.0"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/openshell_middleware_manager"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src/openshell_middleware_manager",
+    "/LICENSE",
+    "/README.md",
+    "/pyproject.toml",
+]
 
 [tool.pytest.ini_options]
 addopts = [
