@@ -51,7 +51,10 @@ nav = [
       ]}
     ]},
     {"OpenShell Agent Runner" = [
-      "documentation/openshell-agent-runner/index.md"
+      "documentation/openshell-agent-runner/index.md",
+      {"Run reviews" = "documentation/openshell-agent-runner/reviews.md"},
+      {"Customize profiles" = "documentation/openshell-agent-runner/profiles.md"},
+      {"Command reference" = "documentation/openshell-agent-runner/reference.md"}
     ]}
   ]}
 ]

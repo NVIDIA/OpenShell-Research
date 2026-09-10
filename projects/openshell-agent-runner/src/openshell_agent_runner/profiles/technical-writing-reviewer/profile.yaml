@@ -1,0 +1,21 @@
+id: technical-writing-reviewer
+description: Review an input technical document for accuracy, clarity, and reader utility.
+
+sandbox:
+  policy: policy.yaml
+
+tasks:
+  review-document:
+    description: Review an input technical document and return a structured result.
+    required_input: document
+    prompt: prompt-document.md
+    prompt_variables:
+      focus:
+        description: Sections, claims, or writing concerns that deserve special attention.
+        default: Review the complete document.
+      context:
+        description: Audience, purpose, publication setting, constraints, or other useful context.
+        default: No additional context was provided.
+    output_schema: schemas/review.json
+    tools: [read, grep]
+    skills: [skills/review-technical-writing]

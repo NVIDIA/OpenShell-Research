@@ -1,12 +1,44 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import json
 import subprocess
+import sys
 
 import pytest
 
 from openshell_agent_runner.errors import ExecutionError
 from openshell_agent_runner.openshell import NativeTarget, doctor
+
+
+def test_native_commands_do_not_consume_the_callers_input_stream() -> None:
+    program = """
+import json
+import sys
+
+from openshell_agent_runner.openshell import run
+
+child = run(
+    [sys.executable, "-c", "import sys; print(sys.stdin.read(), end='')"],
+    timeout=5,
+    capture=True,
+)
+print(json.dumps({"child_input": child.stdout, "remaining_input": sys.stdin.read()}))
+"""
+    pending_tasks = "research-spike\nuse-case-example\n"
+    completed = subprocess.run(
+        [sys.executable, "-c", program],
+        input=pending_tasks,
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=10,
+    )
+
+    assert json.loads(completed.stdout) == {
+        "child_input": "",
+        "remaining_input": pending_tasks,
+    }
 
 
 def test_doctor_runs_only_read_only_checks(monkeypatch) -> None:

@@ -1,0 +1,178 @@
+name: OAR and PR review checks
+
+"on":
+  pull_request:
+    paths:
+      - .pre-commit-config.yaml
+      - .github/workflows/**
+      - .github/openshell-agents/**
+      - .github/scripts/**
+      - projects/PROJECT_GUIDELINES.md
+      - .github/actions/setup-review-gateway/**
+      - tests/*review*
+      - tests/test_ci_scope.py
+      - tests/test_github_api.py
+      - projects/openshell-agent-runner/**
+  push:
+    branches:
+      - main
+    paths:
+      - .pre-commit-config.yaml
+      - .github/workflows/**
+      - .github/openshell-agents/**
+      - .github/scripts/**
+      - projects/PROJECT_GUIDELINES.md
+      - .github/actions/setup-review-gateway/**
+      - tests/*review*
+      - tests/test_ci_scope.py
+      - tests/test_github_api.py
+      - projects/openshell-agent-runner/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oar-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check OAR and PR review (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.5"
+          python-version: ${{ matrix.python-version }}
+
+      - name: Configure isolated uv paths
+        run: |
+          echo "UV_CACHE_DIR=$RUNNER_TEMP/oar-checks-uv-cache" >> "$GITHUB_ENV"
+          echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/oar-checks-venv" >> "$GITHUB_ENV"
+
+      - name: Install locked dependencies
+        run: uv sync --project projects/openshell-agent-runner --locked
+
+      - name: Validate agent profiles
+        run: |
+          uv run --project projects/openshell-agent-runner oar validate \
+            .github/openshell-agents/profiles/ci-reviewer
+          for profile in code-reviewer technical-writing-reviewer; do
+            uv run --project projects/openshell-agent-runner oar validate \
+              "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/$profile"
+          done
+
+      - name: Preview agent execution
+        run: |
+          mkdir -p "$RUNNER_TEMP/review-context"
+          cp projects/PROJECT_GUIDELINES.md "$RUNNER_TEMP/review-context/PROJECT_GUIDELINES.md"
+          uv run --project projects/openshell-agent-runner oar run \
+            .github/openshell-agents/profiles/ci-reviewer \
+            --task review-tool \
+            --gateway openshell \
+            --input projects/openshell-agent-runner \
+            --upload "$RUNNER_TEMP/review-context:/workspace" \
+            --prompt-var guidelines_path=/workspace/review-context/PROJECT_GUIDELINES.md \
+            --output "$RUNNER_TEMP/project-review.json" \
+            --dry-run
+
+      - name: Test CI profile, routing, and reports
+        run: |
+          uv run --project projects/openshell-agent-runner pytest \
+            tests/test_ci_scope.py tests/test_github_api.py tests/test_*review*.py
+
+      - name: Validate agent workflow syntax
+        if: matrix.python-version == '3.12'
+        run: |
+          curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            | tar -xz -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" \
+            .github/workflows/oar-checks.yml \
+            .github/workflows/oar-smoke.yml \
+            .github/workflows/pr-review.yml
+
+      - name: Run project checks
+        working-directory: projects/openshell-agent-runner
+        run: |
+          uv run pre-commit validate-config ../../.pre-commit-config.yaml
+          make check
+
+      - name: Build distributions
+        working-directory: projects/openshell-agent-runner
+        run: |
+          make build
+          wheel="$(find dist -name '*.whl' -print -quit)"
+          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/image/Dockerfile'
+          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/image/exec.sh'
+          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/extensions/submit-result.ts'
+          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/extensions/validate-tools.ts'
+          python -m zipfile -l "$wheel" | grep -F 'profiles/code-reviewer/profile.yaml'
+          python -m zipfile -l "$wheel" | grep -F 'profiles/technical-writing-reviewer/profile.yaml'
+          python -m zipfile -l "$wheel" | grep -F 'dist-info/licenses/LICENSE'
+
+      - name: Verify the built wheel
+        working-directory: projects/openshell-agent-runner
+        run: |
+          wheel="$(find dist -name '*.whl' -print -quit)"
+          uvx --from "$wheel" oar init "$RUNNER_TEMP/profiles" \
+            --model provider/model
+          for profile in code-reviewer technical-writing-reviewer; do
+            uvx --from "$wheel" oar validate \
+              "$RUNNER_TEMP/profiles/$profile"
+          done
+          printf '# Review me\n\nA short document.\n' > "$RUNNER_TEMP/review-input.md"
+          uvx --from "$wheel" oar run \
+            "$RUNNER_TEMP/profiles/technical-writing-reviewer" \
+            --task review-document \
+            --input "$RUNNER_TEMP/review-input.md" \
+            --output "$RUNNER_TEMP/review-output.json" \
+            --dry-run
+          test ! -e "$RUNNER_TEMP/review-output.json"
+          uvx --from "$wheel" --with pytest pytest tests/test_lifecycle.py -k cli
+
+      - name: Build the Pi image
+        if: matrix.python-version == '3.12'
+        run: |
+          docker build \
+            --tag openshell-agent-runner-pi:ci \
+            projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/image
+          docker run --rm \
+            --entrypoint bash \
+            --volume "$RUNNER_TEMP/profiles/code-reviewer:/profile-source:ro" \
+            openshell-agent-runner-pi:ci \
+            -c "cp -R /profile-source /tmp/profile && \
+              PI_CODING_AGENT_DIR=/tmp/profile pi --offline --list-models openshell" \
+            | grep -F 'provider/model'
+
+      - name: Validate the Pi extensions
+        if: matrix.python-version == '3.12'
+        run: |
+          docker run --rm --network none \
+            --entrypoint bash \
+            --volume "$PWD/projects/openshell-agent-runner/tests/fixtures/format-output.schema.json:/sandbox/output.schema.json:ro" \
+            --volume "$PWD/projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/extensions/submit-result.ts:/sandbox/oar-submit-result.ts:ro" \
+            --volume "$PWD/projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/extensions/validate-tools.ts:/sandbox/oar-validate-tools.ts:ro" \
+            --volume "$PWD/projects/openshell-agent-runner/tests/fixtures/validate-pi-extensions.mjs:/sandbox/validate-pi-extensions.mjs:ro" \
+            openshell-agent-runner-pi:ci \
+            -c "ln -s /usr/local/lib/node_modules /sandbox/node_modules && \
+              node \
+              --experimental-strip-types --no-warnings \
+              /sandbox/validate-pi-extensions.mjs"
+
+      - name: Exercise the real Pi harness without network access
+        if: matrix.python-version == '3.12'
+        working-directory: projects/openshell-agent-runner
+        env:
+          OAR_PI_IMAGE: openshell-agent-runner-pi:ci
+        run: uv run --frozen pytest tests/harnesses/runtime_checks.py

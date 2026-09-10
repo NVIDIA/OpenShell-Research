@@ -1,179 +1,115 @@
 # OpenShell Agent Runner
 
-OpenShell Agent Runner (OAR) launches one ephemeral agent for one configured
-task. Each `oar run` creates an isolated OpenShell sandbox, runs Pi with the
-selected profile, publishes one result, and removes the sandbox. This bounded
-lifecycle works well in CI jobs and other automated workflows.
-
-OAR uses an existing OpenShell gateway, workspace, and inference route. It does
-not create or change providers, credentials, gateways, workspaces, or routes.
-
-## Requirements
-
-- [`uv`](https://docs.astral.sh/uv/)
-- OpenShell 0.0.111 or newer
-- A running OpenShell gateway
-- An inference route and its model ID
-
-## Quick start
-
-Create the profiles packaged with OAR. `MODEL_ID` is an ordinary shell variable;
-replace its value with the model ID configured on your inference route.
-
-```bash
-export MODEL_ID="provider/model"
-
-uvx --from openshell-agent-runner oar init ./profiles \
-  --model "$MODEL_ID"
-uvx --from openshell-agent-runner oar doctor --gateway openshell
-```
-
-Validate the included reviewer profile and preview its task:
-
-```bash
-printf '# Review me\n\nA short document.\n' > document.md
-uvx --from openshell-agent-runner oar validate ./profiles/reviewer
-
-uvx --from openshell-agent-runner oar run ./profiles/reviewer \
-  --task review-document \
-  --gateway openshell \
-  --input document.md \
-  --output /tmp/oar-review.md \
-  --dry-run
-```
-
-Replace `openshell` with your gateway name. Remove `--dry-run` to launch the
-agent and write its result to `/tmp/oar-review.md`.
-
-`oar init` copies the packaged profiles into an ordinary directory so you can
-inspect, edit, and commit them. Omit `--profile` to create all packaged profiles,
-or repeat `--profile NAME` to select a subset.
-
-## Profiles
-
-A profile contains `profile.yaml`, Pi's `models.json` and `settings.json`, an
-OpenShell policy, and the prompts or other files referenced by its tasks. The
-profile owns stable behavior and permissions; the CLI supplies values that vary
-for each run, such as the task, inputs, output path, gateway, and workspace.
-
-```yaml
-id: reviewer
-description: Review an uploaded document or code repository.
-
-sandbox:
-  policy: policy.yaml
-  upload: []
-  env: []
-
-tasks:
-  review-document:
-    required_input: document
-    prompt: prompt-document.md
-    prompt_variables:
-      focus:
-        description: Areas of the document that deserve special attention.
-        default: Review the complete document.
-      context:
-        description: Additional context that should inform the review.
-        default: No additional context was provided.
-    tools: [read, grep, find, ls, bash]
-    skills: []
-    extensions: []
-  review-repository:
-    required_input: repository
-    prompt: prompt-repository.md
-    prompt_variables:
-      focus:
-        description: Files or directories that deserve special attention.
-        default: Review the entire repository.
-      context:
-        description: Additional context that should inform the review.
-        default: No additional context was provided.
-    tools: [read, grep, find, ls, bash]
-    skills: []
-    extensions: []
-```
-
-`tools` is a strict allowlist. OAR recognizes Pi's built-in `bash`, `edit`,
-`find`, `grep`, `ls`, `read`, and `write` tools. Custom tools must be declared by
-an extension used by the same task:
-
-```yaml
-tasks:
-  check:
-    prompt: prompts/check.md
-    tools: [read, custom_check]
-    extensions:
-      - path: extensions/custom-check.ts
-        tools: [custom_check]
-```
-
-`oar validate` rejects unknown fields, missing or escaping resources, invalid
-schemas, and tools that are not built in or declared by a referenced extension.
-The runtime also verifies that Pi actually registered every selected tool before
-the first model request.
-
-Prompts support literal runtime substitution. Tasks declare named
-`prompt_variables` with optional defaults, and callers override them with a
-repeatable `--prompt-var NAME=VALUE`. Variables without defaults are required.
-OAR also supplies reserved input metadata such as `{{ oar.input_path }}` and
-`{{ oar.input_name }}`. Templates do not execute expressions or shell syntax.
-
-Add `output_schema` to a task when its result must be JSON. OAR exposes the
-built-in Pi `submit_result` extension for that task, lets Pi correct invalid
-submissions during the session, and validates the downloaded result against the
-same Draft 2020-12 schema before publishing it.
-
-## Commands
+OpenShell Agent Runner (OAR) runs an agent task in an isolated OpenShell sandbox
+and saves the result to a file. Use it to review code, review technical writing,
+or run your own tasks from a terminal or CI job.
 
 ```text
-oar init PROFILE_ROOT --model MODEL_ID [OPTIONS]
-oar validate PROFILE_DIRECTORY
-oar run PROFILE_DIRECTORY --task TASK --output PATH [OPTIONS]
-oar doctor [OPTIONS]
+Profile + input → OAR → Agent in a temporary sandbox → Result file
+                            sandbox removed when the run ends
 ```
 
-- `init` creates editable copies of profiles packaged with OAR.
-- `validate` checks a profile and all of its local resources without running it.
-- `doctor` performs read-only OpenShell gateway and inference checks.
-- `run` launches a task, or prints its resolved operations with `--dry-run`.
+A **profile** packages prompts, reusable skills, and settings. A **task** is one
+job in that profile; it selects the prompt and skills to use. OAR includes two
+ready-to-use reviewers:
 
-Run `oar COMMAND --help` for command options. For task-specific help, select the
-profile and task before `--help`:
+| Profile | Task | Input |
+| --- | --- | --- |
+| `code-reviewer` | `review-repository` | A local project directory |
+| `technical-writing-reviewer` | `review-document` | A text file, such as Markdown or `.txt` |
+
+## Get started
+
+You need [uv](https://docs.astral.sh/uv/getting-started/installation/) and
+OpenShell 0.0.111 or newer, with a running gateway and configured inference.
+If OpenShell is not ready, follow its
+[quickstart](https://docs.nvidia.com/openshell/latest/get-started/quickstart).
+OAR uses that setup to create sandboxes and reach your model.
+
+**1. Install OAR and check your connection.**
 
 ```bash
-uvx --from openshell-agent-runner oar run \
-  ./profiles/reviewer --task review-document --help
+uv tool install openshell-agent-runner
+oar doctor
 ```
 
-The reviewer also accepts a code repository directory:
+Alternatively, use `uvx --from openshell-agent-runner oar` in place of `oar`.
+
+These commands use your selected OpenShell gateway and its `default` workspace.
+For another target, add `--gateway NAME --workspace NAME` to `doctor` and `run`.
+
+**2. Create your profiles.** Replace `YOUR_MODEL_ID` with the model ID shown in
+the inference output from `oar doctor`.
 
 ```bash
-uvx --from openshell-agent-runner oar run ./profiles/reviewer \
+oar init ./profiles --model YOUR_MODEL_ID
+```
+
+This creates editable copies of both reviewers. For a model without reasoning
+support, add `--thinking off`.
+
+**3. Review a document.** Replace `./README.md` with an existing text file.
+
+```bash
+oar run ./profiles/technical-writing-reviewer \
+  --task review-document \
+  --input ./README.md \
+  --output ./review.json
+```
+
+Open `review.json` for the verdict, a score from 0 to 100, and specific findings.
+OAR saves the validated result and removes the sandbox. Add `--dry-run` to
+preview the operation without launching an agent.
+
+## Review code
+
+Pass a local project directory. Optional `focus` and `context` values help the
+reviewer understand what matters for this run:
+
+```bash
+oar run ./profiles/code-reviewer \
   --task review-repository \
-  --gateway openshell \
   --input ./my-project \
   --prompt-var focus="src/auth and tests/auth" \
-  --prompt-var context="Pre-release security review" \
-  --output /tmp/oar-repository-review.md
+  --prompt-var context="A small internal tool; keep recommendations proportionate." \
+  --output ./code-review.json
 ```
 
-## Documentation
+The agent works on an uploaded copy. Changes in the sandbox stay there; only the
+result is downloaded. A `focus` value guides attention but does not limit which
+files are uploaded.
 
-The [OAR guide](https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/)
-explains profile inputs, tools and extensions, uploads, the run lifecycle,
-structured results, security boundaries, and exit codes.
+## Learn more
 
-## Development
+- [Get started](https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/): setup and your first review.
+- [Run reviews](https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/reviews/): inputs, focus, context, and scores.
+- [Customize profiles](https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/profiles/): prompts, variables, skills, and output formats.
+- [Command reference](https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/reference/): options, CI behavior, and troubleshooting.
 
-From `projects/openshell-agent-runner`:
+For help with a specific task:
+
+```bash
+oar run ./profiles/code-reviewer --task review-repository --help
+```
+
+## Develop OAR
+
+From `projects/openshell-agent-runner`, run:
 
 ```bash
 make check
 make build
 ```
 
-Run a focused test with `make test PYTEST_ARGS="tests/test_config.py"`. Use
-`make clean` to remove generated build and cache files. See
+`make check` includes CLI workflows against a simulated OpenShell. With Docker,
+run `make test-runtime` to exercise the real Pi harness without external inference.
+For runtime changes, one live CI task checks input transfer, prompt variables,
+structured output, and sandbox cleanup. It does not grade reviewer opinions.
+
+Use `uv run --frozen oar` in this directory to run the checked-out code instead
+of the installed release. Run a focused test with
+`make test PYTEST_ARGS="tests/test_config.py"`. See
 [RELEASING.md](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-agent-runner/RELEASING.md)
-for the local PyPI release process.
+for publishing, and the
+[repository CI guide](https://github.com/NVIDIA/OpenShell-Research/blob/main/docs/development/ci.md)
+for automated project reviews and the live OAR smoke test.

@@ -7,7 +7,6 @@ from pathlib import Path
 
 import yaml
 
-from openshell_agent_runner.artifacts import ARTIFACT_PATH
 from openshell_agent_runner.config import load_profile
 from openshell_agent_runner.harnesses.pi.resources import (
     image_directory,
@@ -30,34 +29,24 @@ def test_pi_image_contract_is_pinned_and_least_privilege() -> None:
     assert "USER node" in dockerfile
 
 
-def test_pi_entrypoint_disables_automatic_resources() -> None:
-    script = (image_directory() / "exec.sh").read_text()
-    for flag in (
-        "--no-session",
-        "--no-extensions",
-        "--no-skills",
-        "--no-prompt-templates",
-        "--no-context-files",
-        "--offline",
-    ):
-        assert flag in script
-    assert Path(image_directory() / "exec.sh").is_file()
-    assert "agent_workdir=${REPOSITORY_ROOT:-/sandbox}" in script
-    assert 'cd "$agent_workdir"' in script
-    assert 'export OAR_MODEL_ID="$model_id"' in script
-    assert "REPOSITORY_ROOT is not a directory" in script
-    assert '[[ ! "$model_id" =~ ^[A-Za-z0-9._:/-]{1,256}$ ]]' in script
-    assert '"${arguments[$index]}" == "--model"' in script
-
-
 def test_schema_task_receives_generic_submission_protocol() -> None:
     resolved = load_profile(
-        REPOSITORY / ".github/openshell-agents/profiles/dev-note-reviewer"
+        REPOSITORY / ".github/openshell-agents/profiles/ci-reviewer"
     )
-    prepared = prepare_resources(resolved, "editorial")
+    prepared = prepare_resources(
+        resolved,
+        "review-tool",
+        {
+            "review_skill": "review-tool",
+            "guidelines_path": "/workspace/trusted-guidelines.md",
+            "focus": "Review the note.",
+            "context": "A new Dev Note.",
+            "oar.input_path": "/workspace/input/document.md",
+            "oar.input_name": "note.md",
+        },
+    )
     try:
         assert isinstance(prepared, PreparedResources)
-        assert "REPOSITORY_ROOT=/workspace/source" in resolved.profile.sandbox.env
         index = prepared.arguments.index("--tools")
         assert prepared.arguments[index + 1] == "read,grep,find,ls,bash,submit_result"
         assert "/sandbox/oar-runtime/extensions/oar-submit-result.ts" in (
@@ -83,7 +72,7 @@ def test_schema_task_receives_generic_submission_protocol() -> None:
             item for item in prepared.uploads if "output.schema.json" in item
         )
         schema = json.loads(Path(schema_upload.rpartition(":")[0]).read_text())
-        assert schema["title"] == "DevNoteReview"
+        assert schema["title"] == "NewProjectReview"
         assert schema == json.loads(
             (resolved.profile_dir / "schemas/review.json").read_text()
         )
@@ -117,13 +106,22 @@ def test_schema_task_receives_generic_submission_protocol() -> None:
         prepared.close()
 
 
-def test_plain_task_uses_final_response_without_submission_tool() -> None:
-    resolved = load_profile(
-        REPOSITORY
-        / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/reviewer"
+def test_packaged_review_tasks_stage_schema_skill_and_render_prompt() -> None:
+    profiles = (
+        ("code-reviewer", "review-repository", "repository", "review-code"),
+        (
+            "technical-writing-reviewer",
+            "review-document",
+            "document.txt",
+            "review-technical-writing",
+        ),
     )
-    for task_id in ("review-document", "review-repository"):
-        input_name = "document.txt" if task_id == "review-document" else "repository"
+    for profile_name, task_id, input_name, skill_name in profiles:
+        resolved = load_profile(
+            REPOSITORY
+            / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles"
+            / profile_name
+        )
         input_path = f"/workspace/input/{input_name}"
         prepared = prepare_resources(
             resolved,
@@ -136,10 +134,18 @@ def test_plain_task_uses_final_response_without_submission_tool() -> None:
             },
         )
         try:
-            assert "submit_result" not in prepared.arguments
-            assert not any(
-                "output.schema.json" in upload for upload in prepared.uploads
+            tools_index = prepared.arguments.index("--tools")
+            assert "submit_result" in prepared.arguments[tools_index + 1].split(",")
+            assert any(
+                upload.endswith(":/sandbox/oar-runtime/output.schema.json")
+                for upload in prepared.uploads
             )
+            skill_argument = next(
+                prepared.arguments[index + 1]
+                for index, argument in enumerate(prepared.arguments)
+                if argument == "--skill"
+            )
+            assert skill_argument.endswith(f"-{skill_name}")
             assert "/sandbox/oar-runtime/extensions/oar-validate-tools.ts" in (
                 prepared.arguments
             )
@@ -152,6 +158,7 @@ def test_plain_task_uses_final_response_without_submission_tool() -> None:
             assert input_path in prompt
             assert "Focus on authentication." in prompt
             assert "Pre-release review." in prompt
+            assert skill_name in prompt
             assert "{{" not in prompt
         finally:
             prepared.close()
@@ -160,7 +167,7 @@ def test_plain_task_uses_final_response_without_submission_tool() -> None:
 def test_custom_extension_and_declared_tool_are_staged(tmp_path: Path) -> None:
     source = (
         REPOSITORY
-        / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/reviewer"
+        / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/technical-writing-reviewer"
     )
     profile = tmp_path / "profile"
     shutil.copytree(source, profile)
@@ -198,41 +205,19 @@ def test_custom_extension_and_declared_tool_are_staged(tmp_path: Path) -> None:
         prepared.close()
 
 
-def test_generic_submission_extension_validates_and_saves_result() -> None:
-    extension = (
-        REPOSITORY
-        / "projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/extensions/submit-result.ts"
-    ).read_text()
-
-    assert 'import Ajv2020 from "ajv/dist/2020.js"' in extension
-    assert 'import { Type } from "typebox"' in extension
-    assert "strict: false" in extension
-    assert "validateFormats: false" in extension
-    assert "Type.Object({ result: Type.Unsafe(schema) })" in extension
-    assert "async execute(_toolCallId, { result })" in extension
-    assert 'name: "submit_result"' in extension
-    assert "const outputPath = `${outputDirectory}/result`" in extension
-    assert ARTIFACT_PATH == "/sandbox/artifacts/result"
-
-
-def test_tool_validator_checks_the_loaded_pi_registry_before_inference() -> None:
-    extension = (
-        REPOSITORY
-        / "projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/extensions/validate-tools.ts"
-    ).read_text()
-
-    assert 'pi.on("before_agent_start"' in extension
-    assert "context.getAllTools()" in extension
-    assert "context.getActiveTools()" in extension
-    assert "findMissingTools(requestedTools, availableTools)" in extension
-    assert "process.exit(2)" in extension
-
-
 def test_supplied_policies_allow_no_ordinary_network_egress() -> None:
     policies = [
-        REPOSITORY / ".github/openshell-agents/profiles/dev-note-reviewer/policy.yaml",
-        REPOSITORY
-        / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/reviewer/policy.yaml",
+        REPOSITORY / ".github/openshell-agents/profiles/ci-reviewer/policy.yaml",
+        *(
+            REPOSITORY
+            / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles"
+            / profile_name
+            / "policy.yaml"
+            for profile_name in (
+                "code-reviewer",
+                "technical-writing-reviewer",
+            )
+        ),
     ]
 
     for path in policies:

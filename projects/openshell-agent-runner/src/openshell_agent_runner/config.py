@@ -139,6 +139,11 @@ class TaskConfig(StrictModel):
                 f"{sorted(BUILTIN_PI_TOOLS)}; declare each custom tool under a "
                 "referenced extension"
             )
+        if self.skills and "read" not in self.tools:
+            raise ValueError(
+                "tasks with skills must include 'read' in tools so Pi can "
+                "discover and load the skills"
+            )
         return self
 
 

@@ -15,8 +15,9 @@ documentation for work that uses OpenShell as its runtime.
 
 Before changing a project, read that project's `README.md` and `pyproject.toml`;
 projects are self-contained and may have different platforms, dependencies, and
-validation commands. Before changing anything under `docs/` or `zensical.toml`,
-read `docs/development/index.md`.
+validation commands. When adding a project, also follow
+`projects/PROJECT_GUIDELINES.md`. Before changing anything under `docs/` or
+`zensical.toml`, read `docs/development/index.md`.
 
 ## Repository rules
 

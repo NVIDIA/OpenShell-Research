@@ -4,6 +4,9 @@ This directory contains self-contained research projects. Each project should
 live in its own subfolder with its own dependencies, runtime notes, and source
 layout.
 
+Adding a project? Start with the [project guidelines](PROJECT_GUIDELINES.md),
+including how to declare its kind for automated review.
+
 Current projects:
 
 - `long-horizon-agent-evals`: Persistent agent experiments over configurable time

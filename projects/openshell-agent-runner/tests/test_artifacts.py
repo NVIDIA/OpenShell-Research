@@ -14,9 +14,11 @@ from openshell_agent_runner.artifacts import (
 from openshell_agent_runner.errors import ArtifactError
 
 REPOSITORY = Path(__file__).resolve().parents[3]
-DEV_NOTE_SCHEMA = (
-    REPOSITORY
-    / ".github/openshell-agents/profiles/dev-note-reviewer/schemas/review.json"
+CI_REVIEW_SCHEMA = (
+    REPOSITORY / ".github/openshell-agents/profiles/ci-reviewer/schemas/review.json"
+)
+PACKAGED_PROFILE_SCHEMAS = (
+    REPOSITORY / "projects/openshell-agent-runner/src/openshell_agent_runner/profiles"
 )
 
 
@@ -63,41 +65,178 @@ def test_invalid_json_fails_when_schema_is_configured(tmp_path: Path) -> None:
         validate_artifact(source, schema)
 
 
-def test_dev_note_schema_requires_each_editorial_criterion_in_order(
+def test_ci_review_schema_requires_each_tool_criterion_in_order(
     tmp_path: Path,
 ) -> None:
     criteria = [
-        "formulaic_language",
-        "empty_emphasis",
-        "repetitive_cadence",
-        "unnecessary_summary",
-        "inflated_claims",
-        "vague_attribution",
-        "directness",
+        "correctness",
+        "robustness_security",
+        "maintainability_complexity",
+        "tests_verification",
+        "usability_integration",
     ]
     result = {
-        "reviewer_id": "editorial",
-        "model_id": "provider/model",
-        "source_revision": "abc123",
-        "source_content_digest": "0" * 64,
+        "task": "review-tool",
         "criterion_scores": [
-            {"criterion": criterion, "score": 3, "explanation": "Clear."}
+            {"criterion": criterion, "score": 95, "explanation": "Clear."}
             for criterion in criteria
         ],
-        "overall_score": 75,
+        "overall_score": 95,
         "verdict": "pass",
-        "confidence": "high",
         "findings": [],
-        "overall_assessment": "Ready.",
+        "summary": "Ready.",
+        "guidelines_assessment": {"verdict": "pass", "explanation": "Verified."},
+        "strengths": [],
+        "limitations": [],
     }
     source = tmp_path / "review.json"
     source.write_text(json.dumps(result))
-    validate_artifact(source, DEV_NOTE_SCHEMA)
+    validate_artifact(source, CI_REVIEW_SCHEMA)
 
-    result["criterion_scores"][1]["criterion"] = "formulaic_language"
+    result["criterion_scores"][1]["criterion"] = "correctness"
     source.write_text(json.dumps(result))
     with pytest.raises(ArtifactError, match="output schema validation"):
-        validate_artifact(source, DEV_NOTE_SCHEMA)
+        validate_artifact(source, CI_REVIEW_SCHEMA)
+
+
+@pytest.mark.parametrize(
+    ("profile_name", "result"),
+    [
+        (
+            "code-reviewer",
+            {
+                "verdict": "needs_changes",
+                "summary": "One material issue.",
+                "criterion_scores": [
+                    {
+                        "criterion": "correctness",
+                        "score": 70,
+                        "explanation": "A boundary defect affects valid requests.",
+                    },
+                    {
+                        "criterion": "robustness_security",
+                        "score": 85,
+                        "explanation": "No material robustness or security issue found.",
+                    },
+                    {
+                        "criterion": "maintainability_complexity",
+                        "score": 85,
+                        "explanation": "The affected logic remains easy to follow.",
+                    },
+                    {
+                        "criterion": "tests_verification",
+                        "score": 75,
+                        "explanation": "The boundary behavior lacks effective coverage.",
+                    },
+                    {
+                        "criterion": "usability_integration",
+                        "score": 85,
+                        "explanation": "Integration behavior is otherwise coherent.",
+                    },
+                ],
+                "overall_score": 80,
+                "findings": [
+                    {
+                        "severity": "high",
+                        "category": "correctness",
+                        "title": "Wrong boundary check",
+                        "path": "src/example.py",
+                        "line": 12,
+                        "evidence": "The final valid item is rejected.",
+                        "impact": "Valid requests fail.",
+                        "recommendation": "Use an inclusive upper bound.",
+                    }
+                ],
+                "strengths": [],
+                "limitations": [],
+            },
+        ),
+        (
+            "technical-writing-reviewer",
+            {
+                "verdict": "needs_changes",
+                "summary": "One unclear instruction.",
+                "criterion_scores": [
+                    {
+                        "criterion": "accuracy_grounding",
+                        "score": 90,
+                        "explanation": "The claims are adequately grounded.",
+                    },
+                    {
+                        "criterion": "clarity_precision",
+                        "score": 65,
+                        "explanation": "A key instruction is ambiguous.",
+                    },
+                    {
+                        "criterion": "completeness",
+                        "score": 75,
+                        "explanation": "The working-directory context is missing.",
+                    },
+                    {
+                        "criterion": "structure_navigation",
+                        "score": 85,
+                        "explanation": "The document is otherwise easy to navigate.",
+                    },
+                    {
+                        "criterion": "audience_fit",
+                        "score": 85,
+                        "explanation": "The depth suits the intended reader.",
+                    },
+                    {
+                        "criterion": "actionability_evidence",
+                        "score": 80,
+                        "explanation": "Most instructions support the intended task.",
+                    },
+                ],
+                "overall_score": 80,
+                "findings": [
+                    {
+                        "severity": "medium",
+                        "category": "clarity",
+                        "title": "Unspecified command location",
+                        "quote": "Run the command.",
+                        "line": 8,
+                        "explanation": "The reader cannot tell where to run it.",
+                        "recommendation": "Name the required working directory.",
+                    }
+                ],
+                "strengths": [],
+                "limitations": [],
+            },
+        ),
+    ],
+)
+def test_packaged_profile_schemas_accept_expected_results(
+    tmp_path: Path, profile_name: str, result: dict[str, object]
+) -> None:
+    source = tmp_path / "review.json"
+    source.write_text(json.dumps(result))
+    schema = PACKAGED_PROFILE_SCHEMAS / profile_name / "schemas/review.json"
+
+    validate_artifact(source, schema)
+
+    criterion_scores = result["criterion_scores"]
+    assert isinstance(criterion_scores, list)
+    first_score = criterion_scores[0]
+    assert isinstance(first_score, dict)
+    original_score = first_score["score"]
+    first_score["score"] = 101
+    source.write_text(json.dumps(result))
+    with pytest.raises(ArtifactError, match="output schema validation"):
+        validate_artifact(source, schema)
+
+    first_score["score"] = original_score
+    original_verdict = result["verdict"]
+    result["verdict"] = "findings"
+    source.write_text(json.dumps(result))
+    with pytest.raises(ArtifactError, match="output schema validation"):
+        validate_artifact(source, schema)
+    result["verdict"] = original_verdict
+
+    result["unexpected"] = True
+    source.write_text(json.dumps(result))
+    with pytest.raises(ArtifactError, match="output schema validation"):
+        validate_artifact(source, schema)
 
 
 @pytest.mark.parametrize("content", ["", "x" * (MAX_ARTIFACT_BYTES + 1)])

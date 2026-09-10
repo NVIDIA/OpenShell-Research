@@ -1,0 +1,42 @@
+name: Set up an ephemeral review gateway
+description: Start the pinned OpenShell gateway and configure the CI inference route.
+inputs:
+  api-key:
+    required: true
+    description: Inference provider credential
+  base-url:
+    required: true
+    description: OpenAI-compatible provider URL
+  model:
+    required: true
+    description: Inference model ID
+runs:
+  using: composite
+  steps:
+    - name: Install OpenShell
+      shell: bash
+      run: |
+        curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/v0.0.116/install.sh \
+          | OPENSHELL_VERSION=v0.0.116 sh
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+    - name: Wait for the gateway
+      shell: bash
+      run: |
+        for attempt in {1..30}; do
+          if openshell status; then exit 0; fi
+          sleep 2
+        done
+        openshell status
+    - name: Configure inference
+      shell: bash
+      env:
+        OPENAI_API_KEY: ${{ inputs.api-key }}
+        OPENAI_BASE_URL: ${{ inputs.base-url }}
+        REVIEW_MODEL: ${{ inputs.model }}
+      run: |
+        test -n "$OPENAI_API_KEY"
+        test -n "$OPENAI_BASE_URL"
+        test -n "$REVIEW_MODEL"
+        openshell provider create --name reviewer-ci --type openai \
+          --credential OPENAI_API_KEY --config "OPENAI_BASE_URL=$OPENAI_BASE_URL"
+        openshell inference set --provider reviewer-ci --model "$REVIEW_MODEL"

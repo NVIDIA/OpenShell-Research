@@ -193,12 +193,17 @@ def doctor(
         str, typer.Option("--workspace", help="OpenShell workspace name.")
     ] = "default",
 ) -> None:
-    """Check OpenShell readiness without changing its state."""
+    """Inspect OpenShell connection and configuration without changing its state."""
     try:
         checks = run_doctor(NativeTarget(gateway=gateway, workspace=workspace))
     except OarError as error:
         _fail(error)
     typer.echo("\n\n".join(result for _, result in checks))
+    typer.echo(
+        "\nThese are configuration checks, not an inference request. "
+        "Before running a task, confirm that an inference provider and model "
+        "are listed above."
+    )
 
 
 def _fail(error: OarError) -> NoReturn:

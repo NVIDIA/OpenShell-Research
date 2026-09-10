@@ -1,0 +1,21 @@
+id: code-reviewer
+description: Review an input code repository for concrete engineering issues.
+
+sandbox:
+  policy: policy.yaml
+
+tasks:
+  review-repository:
+    description: Review an input code repository and return a structured result.
+    required_input: repository
+    prompt: prompt-repository.md
+    prompt_variables:
+      focus:
+        description: Files, directories, behavior, or risks that deserve special attention.
+        default: Review the complete repository.
+      context:
+        description: Intent, constraints, non-goals, or maturity that should calibrate the review.
+        default: No additional context was provided.
+    output_schema: schemas/review.json
+    tools: [read, grep, find, ls, bash]
+    skills: [skills/review-code]

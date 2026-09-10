@@ -25,6 +25,7 @@ for required in "$payload/prompt.md" "$payload/models.json" "$payload/settings.j
     exit 2
   fi
 done
+ln -s /usr/local/lib/node_modules "$payload/node_modules"
 
 pi_home=/sandbox/pi-home
 mkdir -p "$pi_home/.pi/agent" /sandbox/artifacts /sandbox/tmp

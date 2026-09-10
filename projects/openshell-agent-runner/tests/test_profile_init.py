@@ -40,16 +40,15 @@ def test_omitting_profile_initializes_every_packaged_profile(tmp_path: Path) -> 
     )
 
     assert tuple(path.name for path in created) == PACKAGED_PROFILES
-    reviewer = destination / "reviewer"
-    resolved = load_profile(reviewer)
-    assert resolved.runtime.model == "provider/model"
-    assert resolved.runtime.thinking == "medium"
-    assert list(resolved.profile.tasks) == ["review-document", "review-repository"]
-    assert (reviewer / "prompt-document.md").is_file()
-    assert (reviewer / "prompt-repository.md").is_file()
-    models = json.loads((reviewer / "models.json").read_text())
-    model = models["providers"]["openshell"]["models"][0]
-    assert model == {"id": "provider/model", "reasoning": True}
+    for profile_name in PACKAGED_PROFILES:
+        profile = destination / profile_name
+        resolved = load_profile(profile)
+        assert resolved.runtime.model == "provider/model"
+        assert resolved.runtime.thinking == "medium"
+        assert (profile / "schemas/review.json").is_file()
+        models = json.loads((profile / "models.json").read_text())
+        model = models["providers"]["openshell"]["models"][0]
+        assert model == {"id": "provider/model", "reasoning": True}
 
 
 def test_selected_profile_is_initialized(tmp_path: Path) -> None:
@@ -57,12 +56,12 @@ def test_selected_profile_is_initialized(tmp_path: Path) -> None:
 
     created = initialize_profiles(
         destination,
-        ("reviewer",),
+        ("code-reviewer",),
         "provider/model",
         ThinkingLevel.HIGH,
     )
 
-    assert created == (destination / "reviewer",)
+    assert created == (destination / "code-reviewer",)
 
 
 def test_thinking_off_disables_model_reasoning(tmp_path: Path) -> None:
@@ -70,12 +69,14 @@ def test_thinking_off_disables_model_reasoning(tmp_path: Path) -> None:
 
     initialize_profiles(
         destination,
-        ("reviewer",),
+        ("technical-writing-reviewer",),
         "provider/model",
         ThinkingLevel.OFF,
     )
 
-    models = json.loads((destination / "reviewer/models.json").read_text())
+    models = json.loads(
+        (destination / "technical-writing-reviewer/models.json").read_text()
+    )
     assert models["providers"]["openshell"]["models"][0]["reasoning"] is False
 
 
@@ -83,8 +84,8 @@ def test_thinking_off_disables_model_reasoning(tmp_path: Path) -> None:
     ("profiles", "model", "message"),
     [
         (("missing",), "provider/model", "unknown packaged profile"),
-        (("reviewer", "reviewer"), "provider/model", "must be unique"),
-        (("reviewer",), "bad model", "valid model identifier"),
+        (("code-reviewer", "code-reviewer"), "provider/model", "must be unique"),
+        (("code-reviewer",), "bad model", "valid model identifier"),
     ],
 )
 def test_invalid_initialization_is_rejected_without_creating_profiles(
@@ -100,7 +101,7 @@ def test_invalid_initialization_is_rejected_without_creating_profiles(
 
 def test_existing_profile_is_not_modified(tmp_path: Path) -> None:
     destination = tmp_path / "profiles"
-    existing = destination / "reviewer"
+    existing = destination / "code-reviewer"
     existing.mkdir(parents=True)
     marker = existing / "keep.txt"
     marker.write_text("keep")
@@ -108,7 +109,7 @@ def test_existing_profile_is_not_modified(tmp_path: Path) -> None:
     with pytest.raises(ConfigurationError, match="already exists"):
         initialize_profiles(
             destination,
-            ("reviewer",),
+            ("code-reviewer",),
             "provider/model",
             ThinkingLevel.HIGH,
         )

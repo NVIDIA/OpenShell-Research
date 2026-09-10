@@ -7,6 +7,7 @@ description: Agent instructions for maintaining the OpenShell Research documenta
 
 For automated dependency policy checks, see
 [Dependency License Checks](dependency-licenses.md).
+For repository checks and agent review workflows, see [Repository CI](ci.md).
 
 Follow these instructions for changes under `docs/`, a project's `docs/` tree,
 `zensical.toml`, the Dev Notes renderer, or the documentation workflow. Run

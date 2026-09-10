@@ -1,0 +1,140 @@
+name: OAR pipeline smoke
+
+"on":
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - .github/workflows/oar-smoke.yml
+      - .github/actions/setup-review-gateway/**
+      - projects/openshell-agent-runner/src/**
+      - projects/openshell-agent-runner/pyproject.toml
+      - projects/openshell-agent-runner/uv.lock
+      - projects/openshell-agent-runner/tests/fixtures/pipeline-smoke/**
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/oar-smoke.yml
+      - .github/actions/setup-review-gateway/**
+      - projects/openshell-agent-runner/src/**
+      - projects/openshell-agent-runner/pyproject.toml
+      - projects/openshell-agent-runner/uv.lock
+      - projects/openshell-agent-runner/tests/fixtures/pipeline-smoke/**
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: oar-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Check installed OAR against a live gateway
+    # Candidate OAR code runs on the host: restrict secrets to trusted branches.
+    if: >-
+      (github.event_name == 'pull_request' &&
+       !github.event.pull_request.draft &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.actor != 'dependabot[bot]') ||
+      (github.event_name != 'pull_request' &&
+       github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.5"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: projects/openshell-agent-runner/uv.lock
+
+      - name: Install the wheel and prepare one input
+        working-directory: projects/openshell-agent-runner
+        env:
+          REVIEW_MODEL: ${{ secrets.MODEL_ID_TOP }}
+        run: |
+          uv build --no-sources --out-dir "$RUNNER_TEMP/wheels"
+          uv venv "$RUNNER_TEMP/oar-venv"
+          wheel=("$RUNNER_TEMP"/wheels/*.whl)
+          test "${#wheel[@]}" -eq 1
+          uv pip install --python "$RUNNER_TEMP/oar-venv/bin/python" "${wheel[0]}"
+          oar="$RUNNER_TEMP/oar-venv/bin/oar"
+          "$oar" init "$RUNNER_TEMP/profiles" --profile code-reviewer \
+            --model "$REVIEW_MODEL" --thinking off
+          cp tests/fixtures/pipeline-smoke/* "$RUNNER_TEMP/profiles/code-reviewer/"
+          "$oar" validate "$RUNNER_TEMP/profiles/code-reviewer"
+          mkdir -p "$RUNNER_TEMP/oar-results"
+          printf 'Input for workflow run %s, attempt %s.\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" \
+            > "$RUNNER_TEMP/oar-results/input.txt"
+
+      - name: Start ephemeral gateway
+        id: gateway
+        uses: ./.github/actions/setup-review-gateway
+        with:
+          api-key: ${{ secrets.INFERENCE_API_KEY }}
+          base-url: ${{ secrets.INFERENCE_BASE_URL }}
+          model: ${{ secrets.MODEL_ID_TOP }}
+
+      - name: Run the installed CLI
+        id: run
+        run: |
+          "$RUNNER_TEMP/oar-venv/bin/oar" run "$RUNNER_TEMP/profiles/code-reviewer" \
+            --task echo-input --input "$RUNNER_TEMP/oar-results/input.txt" \
+            --prompt-var "marker=$GITHUB_RUN_ID" --gateway openshell \
+            --timeout-seconds 300 --output "$RUNNER_TEMP/oar-results/result.json" \
+            > "$RUNNER_TEMP/oar-results/run.log" 2>&1
+
+      - name: Verify transferred input and prompt variable
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          results = Path(os.environ["RUNNER_TEMP"]) / "oar-results"
+          result = json.loads((results / "result.json").read_text())
+          assert result["content"] == (results / "input.txt").read_text().strip(), result
+          assert result["marker"] == os.environ["GITHUB_RUN_ID"], result
+          PY
+
+      - name: Verify sandbox cleanup
+        if: ${{ !cancelled() && steps.gateway.outcome == 'success' }}
+        run: |
+          openshell sandbox list --gateway openshell --names > "$RUNNER_TEMP/oar-results/remaining-sandboxes.txt"
+          test ! -s "$RUNNER_TEMP/oar-results/remaining-sandboxes.txt"
+
+      - name: Stop gateway
+        if: always() && steps.gateway.outcome != 'skipped'
+        run: systemctl --user stop openshell-gateway.service
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: oar-pipeline-smoke
+          path: ${{ runner.temp }}/oar-results
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Summarize pipeline check
+        if: always()
+        env:
+          OUTCOME: ${{ job.status }}
+        run: |
+          {
+            echo '## OAR pipeline smoke'
+            echo
+            echo "Outcome: **$OUTCOME**"
+            echo
+            echo 'One installed-CLI run checks input upload, prompt substitution, schema-validated output, and sandbox cleanup.'
+            echo 'This checks OAR execution, not review quality or the PR content. See the oar-pipeline-smoke artifact for evidence.'
+          } >> "$GITHUB_STEP_SUMMARY"
