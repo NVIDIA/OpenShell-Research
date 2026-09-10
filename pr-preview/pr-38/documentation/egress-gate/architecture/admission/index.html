@@ -1637,7 +1637,7 @@
 uses published Pi 0.85.1 packages with an existing OpenShell gateway (0.0.116
 is the tested protocol baseline). No upstream library,
 runtime, protobuf, or CLI patches are required. Its smaller surface is a
-Pi-powered application, not stock Pi CLI parity.</p>
+Pi application using the native TUI, not full stock Pi CLI parity.</p>
 <h2 id="the-two-boundaries">The two boundaries</h2>
 <p>Network enforcement cannot undo an earlier local-history write. For example,
 a tool may return sensitive text; blocking the next model request leaves that
@@ -1665,9 +1665,12 @@ application check alone does not prevent another client making a raw request.</p
 extension ran or that every historical append was checked. A compromised
 application or same-authority code can violate local storage integrity.</p>
 <h2 id="one-history-owner">One history owner</h2>
-<p>The application uses Pi's public model stream, resource loader, built-in tools,
-summary generator, and session storage. It does not run a second autonomous
-AgentSession or depend on late message notifications.</p>
+<p>The application supplies an admission-controlled <code>Agent</code> through the public
+<code>AgentSessionConfig.agent</code> SDK seam. Pi's native <code>InteractiveMode</code> and session
+runtime use that agent. It checks candidates before changing live state or
+emitting message events; the native <code>AgentSession</code> alone persists those approved
+events. It does not depend on late message notifications or remove content
+after insertion.</p>
 <table>
 <thead>
 <tr>
@@ -1700,7 +1703,10 @@ AgentSession or depend on late message notifications.</p>
 </table>
 <p>Tool-call fields are inspectable but immutable: attempted executable-argument
 redaction fails closed. Unsupported images/reasoning/provider state is rejected,
-not stored as unchecked sidecars. Tool details and progress are not transcripts.
+not stored as unchecked sidecars. Tool details and progress are not published;
+the TUI receives only admitted final results, with activity indicators while
+waiting. Editor drafts and pending input queues are distinct from admitted
+conversation history.
 Bash uses a bounded public operations wrapper to avoid Pi's output-log spill.</p>
 <p>On a denied tool result, the application stops model calls. It submits fixed,
 content-free failures for outstanding calls through the same boundary. If those
@@ -1708,9 +1714,11 @@ cannot be admitted, the session stops without claiming crash recovery.
 Tool side effects themselves are not reversible by result admission.</p>
 <p>Compaction keeps the latest whole user turn. Its summary-generation request
 needs a fresh receipt; its finished summary needs fresh insertion approval.
-Denial leaves the preceding context and file unchanged. Auto compaction runs
-between completed turns; overflow gets at most one compact/retry. Old approved
-entries remain in the append-only JSONL file.</p>
+The trusted <code>session_before_compact</code> extension supplies an admitted summary or
+explicitly cancels, including on failure; it never falls through to an unchecked
+default summary. Denial leaves the preceding context and file unchanged.
+Native automatic compaction also runs between tool turns; overflow gets at most
+one compact/retry. Old approved entries remain in the append-only JSONL file.</p>
 <p>One cwd scopes resources, tools and storage. It is not confinement; OpenShell
 filesystem policy is. The application is installed outside the writable project
 and does not load third-party extensions or implicitly resume saved transcripts.</p>
@@ -1770,8 +1778,13 @@ silently diverge from its approved history. There is one final middleware
 attachment; adding a later content-mutating middleware breaks that assumption.</p>
 <h2 id="deliberate-poc-limits">Deliberate POC limits</h2>
 <p>One text-only OpenAI-compatible Chat Completions model, sequential tools, fresh
-sessions and explicit skills. No TUI/RPC parity, arbitrary extensions, reasoning,
-images, WebSockets, transport switching, branching, or crash resume.
+sessions and explicit skills. The native TUI supports admitted chat, tool cards,
+steering/follow-ups, compaction and <code>/new</code>. Direct <code>!</code>/<code>!!</code> shell execution,
+custom extension messages, import/resume, branching, renaming, model switching,
+and resource reload are blocked at their public session/runtime entry points.
+Shell work through the model's bash tool remains supported.
+No RPC mode, arbitrary extensions, reasoning, images, WebSockets, transport
+switching, or crash resume.
 Network policy allows only the chosen POST model path and separately scopes the
 admission endpoint. Unknown shapes fail closed; admission requests do not
 recursively require model receipts.</p>
@@ -1785,11 +1798,17 @@ caller binding, upstream RPCs, receipts, policy decisions and header removal.
 A cross-language integration test also runs the actual Pi serializer and HTTP
 admission client against local HTTPS admission and provider endpoints. It checks
 redaction, skills, a real read-tool continuation, both compaction paths and
-receipt verification over authenticated gRPC. Only provider responses are
+receipt verification over authenticated gRPC. A pseudo-terminal variant drives
+the actual Pi TUI, including tool expansion, manual compaction, denial and
+<code>/new</code>, then inspects the saved JSONL. Only provider responses are
 controlled test data; it does not substitute for live OpenShell acceptance.
 The example's <code>demo.sh verify</code> is a separate real-model end-to-end acceptance
 command, not a simulated demonstration. Its success must be observed, not inferred
-from unit tests. See the PR validation record for the latest executed checks.</p>
+from unit tests.</p>
+<p>The native-TUI update was validated locally on <strong>2026-09-10</strong>: 387 Python tests,
+24 Node tests, lint/type checks, dependency audit and the documentation build
+passed. This includes the terminal-driven integration above, not a live
+OpenShell/real-model acceptance run.</p>
 <p>Protocol and application validation on <strong>2026-09-09</strong> used:</p>
 <table>
 <thead>
@@ -1823,7 +1842,7 @@ denial before history, and rejection of a raw provider request without a receipt
 Pi's actual tool-capable serialized request with a receipt passed the gate and
 received HTTP 401 from the real endpoint when deliberately given an invalid test
 credential. This establishes the transport seam, <strong>not</strong> successful model output.</p>
-<p><strong>Existing-gateway deployment and real-model acceptance remain unverified.</strong>
+<p><strong>The updated native-TUI workflow still needs live OpenShell/real-model acceptance.</strong>
 Preparation is tested with both DNS and IPv4 service addresses against a local
 mTLS discovery server. Local cross-language tests exercise service TLS and
 gateway public-key verification.
