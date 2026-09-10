@@ -87,8 +87,9 @@ The starter templates still use the older `max_body_bytes` binding field, so
 that starter. `omm update` can refresh an existing service already compatible
 with the newer contract, such as Egress Gate.
 
-Run `omm --help` for all options. By default, `omm` derives the Python package
-name from the project name. Use `--package-name` to set it yourself.
+Run `omm --help` for all options and `omm --version` for the installed OMM
+version. By default, `omm` derives the Python package name from the project
+name. Use `--package-name` to set it yourself.
 
 ## Update a project
 
