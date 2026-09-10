@@ -29,7 +29,7 @@ concurrency:
 
 jobs:
   reviewer-e2e:
-    name: Exercise the installed OAR wheel and three new-project review tasks
+    name: Exercise the installed wheel, packaged reviewers, and new-project tasks
     # This smoke executes candidate OAR code, so only same-repository PRs are
     # trusted. Fork PRs do not run live inference in this iteration.
     if: >-
@@ -148,6 +148,41 @@ jobs:
         run: |
           python3 .github/scripts/review_report.py verify \
             --request "$FIXTURES_DIR/cases.json" --results "$RESULTS_DIR"
+
+      - name: Review clean and flawed inputs with both packaged profiles
+        if: always() && steps.gateway.outcome == 'success' && steps.profiles.outcome == 'success'
+        run: |
+          failed=0
+          while IFS= read -r item; do
+            id=$(jq -r '.id' <<< "$item")
+            profile=$(jq -r '.profile' <<< "$item")
+            task=$(jq -r '.task' <<< "$item")
+            input=$(jq -r '.input' <<< "$item")
+            args=(--prompt-var 'context=Respect the stated purpose, audience, and prerequisites.')
+            if [[ "$profile" == technical-writing-reviewer ]]; then
+              args=(--upload "$FIXTURES_DIR/repository:/workspace"
+                --prompt-var 'context=Respect the stated purpose, audience, and prerequisites. Supporting source files are in /workspace/repository.')
+            fi
+            if "$UV_PROJECT_ENVIRONMENT/bin/oar" run "$PROFILES_DIR/$profile" \
+              --task "$task" --input "$FIXTURES_DIR/$input" "${args[@]}" \
+              --gateway openshell --timeout-seconds 300 \
+              --output "$RESULTS_DIR/$id.json" > "$RESULTS_DIR/$id.log" 2>&1; then
+              echo "$id completed"
+            else
+              echo "::error::$id did not complete; see its artifact log."
+              failed=1
+            fi
+          done < <(jq -c '.[]' "$FIXTURES_DIR/packaged-cases.json")
+          exit "$failed"
+
+      - name: Verify packaged reviewer behavior
+        if: always() && steps.profiles.outcome == 'success'
+        env:
+          OAR_REVIEW_RESULTS: ${{ env.RESULTS_DIR }}
+        run: |
+          "$UV_PROJECT_ENVIRONMENT/bin/python" -m pytest \
+            projects/openshell-agent-runner/tests/reviewer_smoke.py \
+            --junitxml="$RESULTS_DIR/packaged-reviewers.xml"
 
       - name: Stop the gateway
         id: cleanup

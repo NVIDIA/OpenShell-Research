@@ -113,11 +113,23 @@ uv run --project projects/openshell-agent-runner python -m unittest discover -s 
 uv run --project projects/openshell-agent-runner python -m unittest discover -s tests -p 'test_*review*.py'
 ```
 
-Run `make check` and `make build` from the OAR project directory.
-The live smoke workflow installs the built wheel and calls OAR directly on one
-internal fixture per kind. It validates results and score arithmetic and writes
-an Actions summary—never a separate smoke comment. Fixture verdicts need not
-pass: this checks the pipeline, not a preferred model opinion.
+Run `make check` and `make build` from the OAR project directory. `make check`
+includes CLI workflows against a simulated OpenShell; `make test-runtime` uses
+Docker to exercise real Pi sessions against local scripted inference, with no
+external network or credentials. CI runs both, plus the Pi extension SDK checks.
+
+The live smoke workflow installs the built wheel and calls OAR directly:
+
+- **New-project tasks:** one internal fixture per kind checks the pipeline,
+  result schema, and score arithmetic. No particular verdict is required.
+- **Packaged reviewers:** clean and deliberately flawed code and writing inputs
+  check that reviewers accept scoped work and catch known defects. Writing
+  quotes must match their source lines, and rubric totals must agree.
+
+Results, logs, and packaged-reviewer test results are uploaded as Actions
+artifacts. The workflow writes an Actions summary, never a separate smoke comment.
+To verify saved packaged results locally, set `OAR_REVIEW_RESULTS` to their
+directory and run `uv run pytest tests/reviewer_smoke.py` from the OAR project.
 
 Keep team expectations in the project guidelines. Change review judgment in the
 common or kind-specific skill, and change selection/reporting only when the

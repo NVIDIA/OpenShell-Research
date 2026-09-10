@@ -103,6 +103,10 @@ make check
 make build
 ```
 
+`make check` includes CLI workflows against a simulated OpenShell. With Docker,
+run `make test-runtime` to exercise the real Pi harness without external inference.
+Live CI also reviews clean and deliberately flawed inputs with both packaged profiles.
+
 Use `uv run --frozen oar` in this directory to run the checked-out code instead
 of the installed release. Run a focused test with
 `make test PYTEST_ARGS="tests/test_config.py"`. See

@@ -1,0 +1,22 @@
+# Check the supplied Totals example
+
+This quick reference is for Python developers using Python 3.12 or newer on Linux.
+Readers already have the Totals source directory. This is not an installation or
+API tutorial; its purpose is to run the supplied checks.
+
+In a terminal, change to that directory. It contains `README.md`, `checks.py`, and
+`src/totals.py`. Run:
+
+```bash
+python3 checks.py
+```
+
+Expect two passing tests and an `OK` line. Exit status 0 means the checks passed;
+a nonzero exit status means they failed. Read any reported error to investigate
+a failure. No environment creation or package installation is needed: the example
+uses only the Python standard library.
+
+The checks exercise `arithmetic_mean` with positive and mixed-sign inputs. They
+are not exhaustive. The function accepts non-empty lists of ordinary finite
+numbers; empty lists, input-type validation, extreme floating-point values, and
+production operation are outside its scope.
