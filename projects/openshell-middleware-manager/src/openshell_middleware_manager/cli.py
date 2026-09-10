@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import shlex
 from enum import Enum
 from pathlib import Path
 from typing import Annotated
@@ -101,12 +102,24 @@ def update(
             help="OpenShell release tag (for example v0.0.86), or latest.",
         ),
     ] = "latest",
+    check_command: Annotated[
+        str | None,
+        typer.Option(
+            "--check-command",
+            help="Python project validation command instead of pytest (no shell expansion).",
+        ),
+    ] = None,
 ) -> None:
     """Update an existing middleware project's OpenShell contract and generated files."""
     try:
+        try:
+            command = shlex.split(check_command) if check_command is not None else None
+        except ValueError as error:
+            raise ProjectError(f"invalid check command: {error}") from error
         result = update_project(
             project_dir=project,
             requested_version=openshell_version,
+            check_command=command,
         )
     except ProjectError as error:
         _report_error(error)

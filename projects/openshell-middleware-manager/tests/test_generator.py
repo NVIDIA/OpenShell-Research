@@ -137,6 +137,51 @@ def test_updates_python_generated_artifacts_and_preserves_user_code(tmp_path: Pa
     assert not list(tmp_path.glob(".audit-headers.openshell-middleware-manager.*"))
 
 
+@pytest.mark.parametrize("fails", [False, True])
+def test_update_custom_check_runs_before_publication(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, fails: bool
+) -> None:
+    destination = tmp_path / "audit"
+    create_project(
+        name="audit",
+        language="python",
+        requested_version="v0.0.86",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+    original = (destination / ".openshell-middleware-manifest.json").read_bytes()
+
+    def check(language, project, package, *, check_command) -> None:
+        assert project != destination
+        assert check_command == ("make", "check")
+        assert (destination / ".openshell-middleware-manifest.json").read_bytes() == original
+        no_op_runner(language, project, package)
+        if fails:
+            raise ProjectError("custom check failed")
+
+    monkeypatch.setattr(generator, "_preflight_language", lambda language: None)
+    monkeypatch.setattr(generator, "_prepare_project", check)
+
+    def update() -> None:
+        update_project(
+            project_dir=destination,
+            requested_version="v1.2.3",
+            download_proto=local_proto,
+            check_command=("make", "check"),
+        )
+
+    if fails:
+        with pytest.raises(ProjectError, match="custom check failed"):
+            update()
+        assert (destination / ".openshell-middleware-manifest.json").read_bytes() == original
+    else:
+        update()
+        assert (destination / ".openshell-middleware-manifest.json").read_bytes() != original
+    with pytest.raises(ProjectError, match="non-empty"):
+        update_project(project_dir=destination, check_command=())
+
+
 def test_failed_update_keeps_original_project_unchanged(tmp_path: Path) -> None:
     destination = tmp_path / "audit"
     create_project(
@@ -1230,7 +1275,7 @@ def test_prepare_project_dispatches_by_language(
     monkeypatch.setattr(
         generator,
         "_prepare_python_project",
-        lambda path, package: calls.append(("python", path, package)),
+        lambda path, package, *, check_command: calls.append(("python", path, package)),
     )
     monkeypatch.setattr(
         generator,
@@ -1268,8 +1313,9 @@ def test_run_passes_environment_to_subprocess(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.parametrize("check_command", [None, ("make", "check")])
 def test_prepare_python_generates_relative_import_and_smoke_checks(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, check_command: tuple[str, ...] | None
 ) -> None:
     bindings = tmp_path / "src" / "audit_headers" / "bindings"
     bindings.mkdir(parents=True)
@@ -1280,7 +1326,10 @@ def test_prepare_python_generates_relative_import_and_smoke_checks(
     monkeypatch.setattr(generator, "_require_command", lambda command: f"/tools/{command}")
 
     def fake_run(command, *, cwd, environment=None) -> None:
-        del cwd, environment
+        assert cwd == tmp_path
+        if "grpc_tools.protoc" not in command:
+            assert environment is not None
+            assert "UV_PROJECT_ENVIRONMENT" in environment
         calls.append(tuple(command))
         if "grpc_tools.protoc" in command:
             (bindings / "supervisor_middleware_pb2_grpc.py").write_text(
@@ -1289,13 +1338,19 @@ def test_prepare_python_generates_relative_import_and_smoke_checks(
 
     monkeypatch.setattr(generator, "_run", fake_run)
 
-    generator._prepare_python_project(tmp_path, "audit_headers")
+    generator._prepare_python_project(tmp_path, "audit_headers", check_command=check_command)
 
     generated = (bindings / "supervisor_middleware_pb2_grpc.py").read_text()
     assert generated.startswith("from . import supervisor_middleware_pb2")
     assert len(calls) == 3
     assert calls[1][1] == "sync"
-    assert calls[2][-1] == "pytest"
+    assert calls[2] == (
+        "/tools/uv",
+        "run",
+        "--project",
+        str(tmp_path),
+        *(check_command or ("pytest",)),
+    )
 
 
 def test_prepare_python_rejects_unexpected_generated_import(

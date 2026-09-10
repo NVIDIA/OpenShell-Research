@@ -26,6 +26,7 @@ from collections.abc import Callable, Mapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from functools import partial
 from importlib.resources import files
 from pathlib import Path
 
@@ -266,6 +267,7 @@ def update_project(
     *,
     project_dir: Path,
     requested_version: str = "latest",
+    check_command: Sequence[str] | None = None,
     download_proto: DownloadProto | None = None,
     command_runner: CommandRunner | None = None,
 ) -> ProjectResult:
@@ -276,11 +278,19 @@ def update_project(
     project_dir = project_dir.resolve()
     project_stat = project_dir.stat(follow_symlinks=False)
     metadata = _read_project_metadata(project_dir)
+    if check_command is not None and (not check_command or metadata.language != "python"):
+        raise ProjectError(
+            "check command must be non-empty and is supported for Python projects only"
+        )
     if command_runner is None:
         _preflight_language(metadata.language)
     version = _normalize_version(requested_version)
     downloader = download_proto if download_proto is not None else _download_proto
-    runner = command_runner if command_runner is not None else _prepare_project
+    runner = (
+        command_runner
+        if command_runner is not None
+        else partial(_prepare_project, check_command=check_command)
+    )
 
     legacy_reservation, reservation = _acquire_output_locks(project_dir, version)
     staging_path: Path | None = None
@@ -1066,9 +1076,15 @@ def _write_manifest(
     (project_dir / _MANIFEST_FILENAME).write_text(json.dumps(manifest, indent=2) + "\n")
 
 
-def _prepare_project(language: str, project_dir: Path, package_name: str) -> None:
+def _prepare_project(
+    language: str,
+    project_dir: Path,
+    package_name: str,
+    *,
+    check_command: Sequence[str] | None = None,
+) -> None:
     if language == "python":
-        _prepare_python_project(project_dir, package_name)
+        _prepare_python_project(project_dir, package_name, check_command=check_command)
     else:
         _prepare_rust_project(project_dir)
 
@@ -1103,7 +1119,9 @@ def _run(
         ) from error
 
 
-def _prepare_python_project(project_dir: Path, package_name: str) -> None:
+def _prepare_python_project(
+    project_dir: Path, package_name: str, *, check_command: Sequence[str] | None = None
+) -> None:
     uv = _require_command("uv")
     bindings_dir = project_dir / "src" / package_name / "bindings"
     proto_path = project_dir / "proto" / "supervisor_middleware.proto"
@@ -1151,7 +1169,7 @@ def _prepare_python_project(project_dir: Path, package_name: str) -> None:
                 "run",
                 "--project",
                 str(project_dir),
-                "pytest",
+                *(check_command if check_command is not None else ("pytest",)),
             ),
             cwd=project_dir,
             environment=process_environment,
