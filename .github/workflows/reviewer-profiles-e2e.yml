@@ -150,7 +150,7 @@ jobs:
             --request "$FIXTURES_DIR/cases.json" --results "$RESULTS_DIR"
 
       - name: Review clean and flawed inputs with both packaged profiles
-        if: always() && steps.gateway.outcome == 'success' && steps.profiles.outcome == 'success'
+        if: ${{ !cancelled() && steps.gateway.outcome == 'success' && steps.profiles.outcome == 'success' }}
         run: |
           failed=0
           while IFS= read -r item; do
