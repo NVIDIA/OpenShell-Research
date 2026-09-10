@@ -14,9 +14,10 @@
   JavaScript runtime or SDK directly. GitHub API calls use the installed `gh`
   CLI, without another Python dependency.
 - Run request and profile tests in the OAR uv environment (which supplies PyYAML).
-- Test routing with `python3 -m unittest discover -s tests -p test_ci_scope.py`,
-  GitHub transport with `python3 -m unittest discover -s tests -p test_github_api.py`,
-  and request/report/input handling with
-  `python3 -m unittest discover -s tests -p 'test_*review*.py'`.
+- Run offline routing, transport, input, and report tests, including the complete
+  PR-flow integration, with `uv run --project projects/openshell-agent-runner
+  pytest tests/test_ci_scope.py tests/test_github_api.py tests/test_*review*.py`.
+- Keep the live pipeline smoke focused on execution contracts, not expected
+  reviewer verdicts. It never posts a PR assessment.
 - Run CI profile contract tests in the OAR environment.
 - See `docs/development/ci.md` for triggers, trust boundaries, and local checks.

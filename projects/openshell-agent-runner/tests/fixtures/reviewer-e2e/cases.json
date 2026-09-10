@@ -1,5 +1,0 @@
-[
-  {"id": "tool", "task": "review-tool", "label": "Tool fixture", "input": "repository"},
-  {"id": "research-spike", "task": "review-research-spike", "label": "Research spike fixture", "input": "research-spike"},
-  {"id": "use-case-example", "task": "review-use-case-example", "label": "Use case fixture", "input": "use-case-example"}
-]

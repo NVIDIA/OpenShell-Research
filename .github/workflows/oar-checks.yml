@@ -1,4 +1,4 @@
-name: Repository agents
+name: OAR and PR review checks
 
 "on":
   pull_request:
@@ -33,12 +33,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: repository-agents-${{ github.workflow }}-${{ github.ref }}
+  group: oar-checks-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   check:
-    name: Check repository agents (Python ${{ matrix.python-version }})
+    name: Check OAR and PR review (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -58,8 +58,8 @@ jobs:
 
       - name: Configure isolated uv paths
         run: |
-          echo "UV_CACHE_DIR=$RUNNER_TEMP/repository-agents-uv-cache" >> "$GITHUB_ENV"
-          echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/repository-agents-venv" >> "$GITHUB_ENV"
+          echo "UV_CACHE_DIR=$RUNNER_TEMP/oar-checks-uv-cache" >> "$GITHUB_ENV"
+          echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/oar-checks-venv" >> "$GITHUB_ENV"
 
       - name: Install locked dependencies
         run: uv sync --project projects/openshell-agent-runner --locked
@@ -81,7 +81,7 @@ jobs:
             .github/openshell-agents/profiles/ci-reviewer \
             --task review-tool \
             --gateway openshell \
-            --input projects/openshell-agent-runner/tests/fixtures/reviewer-e2e/repository \
+            --input projects/openshell-agent-runner \
             --upload "$RUNNER_TEMP/review-context:/workspace" \
             --prompt-var guidelines_path=/workspace/review-context/PROJECT_GUIDELINES.md \
             --output "$RUNNER_TEMP/project-review.json" \
@@ -89,9 +89,8 @@ jobs:
 
       - name: Test CI profile, routing, and reports
         run: |
-          uv run --project projects/openshell-agent-runner python -m unittest discover -s tests -p test_ci_scope.py
-          uv run --project projects/openshell-agent-runner python -m unittest discover -s tests -p test_github_api.py
-          uv run --project projects/openshell-agent-runner python -m unittest discover -s tests -p 'test_*review*.py'
+          uv run --project projects/openshell-agent-runner pytest \
+            tests/test_ci_scope.py tests/test_github_api.py tests/test_*review*.py
 
       - name: Validate agent workflow syntax
         if: matrix.python-version == '3.12'
@@ -99,8 +98,8 @@ jobs:
           curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
             | tar -xz -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" \
-            .github/workflows/repository-agents.yml \
-            .github/workflows/reviewer-profiles-e2e.yml \
+            .github/workflows/oar-checks.yml \
+            .github/workflows/oar-smoke.yml \
             .github/workflows/pr-review.yml
 
       - name: Run project checks

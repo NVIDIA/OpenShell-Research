@@ -3,6 +3,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from dataclasses import replace
@@ -530,3 +531,39 @@ def test_cli_doctor_displays_configuration_without_claiming_inference_readiness(
     assert not state.exists()
     commands = [json.loads(line) for line in log.read_text().splitlines()]
     assert [command[0] for command in commands] == ["--version", "status", "inference"]
+
+
+def test_cli_runs_the_live_smoke_profile(tmp_path: Path, monkeypatch) -> None:
+    profile, _, state, log = prepare(tmp_path, monkeypatch)
+    shutil.copytree(
+        Path(__file__).parent / "fixtures/pipeline-smoke", profile, dirs_exist_ok=True
+    )
+    document = tmp_path / "input notes.txt"
+    document.write_text("Uploaded content.\n")
+    expected = {"content": "Uploaded content.", "marker": "12345"}
+    monkeypatch.setenv("FAKE_OUTPUT", json.dumps(expected))
+    output = tmp_path / "result.json"
+    completed = subprocess.run(
+        [
+            str(Path(sys.executable).with_name("oar")),
+            "run",
+            str(profile),
+            "--task",
+            "echo-input",
+            "--input",
+            str(document),
+            "--prompt-var",
+            "marker=12345",
+            "--output",
+            str(output),
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(output.read_text()) == expected
+    assert not state.exists()
+    prompt = log.with_name("uploaded-prompt.md").read_text()
+    assert "/workspace/input/document.txt" in prompt and "12345" in prompt

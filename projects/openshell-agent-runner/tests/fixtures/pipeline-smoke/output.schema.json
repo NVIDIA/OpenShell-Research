@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["content", "marker"],
+  "properties": {
+    "content": {"type": "string", "minLength": 1},
+    "marker": {"type": "string", "minLength": 1}
+  }
+}

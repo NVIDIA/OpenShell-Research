@@ -11,7 +11,6 @@ import sys
 from pathlib import Path
 
 REVIEW_MARKER = "<!-- oar-pr-review -->"
-SMOKE_MARKER = "<!-- reviewer-profiles-e2e -->"
 VERDICTS = {
     "pass": "✅ Pass",
     "needs_changes": "⚠️ Needs changes",
@@ -81,19 +80,16 @@ def read_results(directory, tasks):
     return reviews
 
 
-def render_report(*, request, reviews, run_url, run_id, outcome, smoke=False):
-    marker = SMOKE_MARKER if smoke else REVIEW_MARKER
+def render_report(*, request, reviews, run_url, run_id, outcome):
     reason = f" — {_escape_text(request['reason'])}" if request.get("reason") else ""
     lines = [
-        marker,
+        REVIEW_MARKER,
         f"<!-- oar-report-run:{run_id} -->",
-        f"## {'OAR pipeline smoke test' if smoke else 'New project review'}",
+        "## New project review",
         "",
         f"Revision: `{request['head']}` · [Workflow and result artifacts]({run_url})",
         "",
-        "These reviews assess test fixtures, **not this PR**."
-        if smoke
-        else "Review findings and scores are advisory. Required checks remain separate merge gates.",
+        "Review findings and scores are advisory. Required checks remain separate merge gates.",
         "",
         f"Execution: **{_escape_text(outcome)}**{reason}",
         "",
@@ -183,7 +179,7 @@ def render_report(*, request, reviews, run_url, run_id, outcome, smoke=False):
     return body
 
 
-def publish_report(github, request, body, run_id, marker=REVIEW_MARKER):
+def publish_report(github, request, body, run_id):
     number = request["number"]
     pr = github.request("GET", f"pulls/{number}")
     if pr["state"] != "open" or pr["head"]["sha"] != request["head"]:
@@ -194,7 +190,7 @@ def publish_report(github, request, body, run_id, marker=REVIEW_MARKER):
             comment
             for comment in comments
             if (comment.get("user") or {}).get("type") == "Bot"
-            and marker in (comment.get("body") or "")
+            and REVIEW_MARKER in (comment.get("body") or "")
         ),
         None,
     )
@@ -219,20 +215,14 @@ def main(argv=None):
     publish = commands.add_parser(
         "publish", help="Render and publish the current PR report"
     )
-    summary = commands.add_parser(
-        "summary", help="Render an Actions summary without posting a comment"
-    )
-    for command in (verify, publish, summary):
+    for command in (verify, publish):
         command.add_argument("--request", required=True, type=Path)
         command.add_argument("--results", required=True, type=Path)
-    for command in (publish, summary):
-        command.add_argument("--outcome", required=True)
-        command.add_argument("--output", type=Path, default=Path("report.md"))
-    summary.add_argument("--smoke", action="store_true")
+    publish.add_argument("--outcome", required=True)
+    publish.add_argument("--output", type=Path, default=Path("report.md"))
     args = parser.parse_args(argv)
     request = json.loads(args.request.read_text(encoding="utf-8"))
-    tasks = request if isinstance(request, list) else request["tasks"]
-    reviews = read_results(args.results, tasks)
+    reviews = read_results(args.results, request["tasks"])
     if args.command == "verify":
         errors = [
             f"{review['id']}: {review['error']}"
@@ -245,8 +235,6 @@ def main(argv=None):
         print(f"Validated {len(reviews)} review results.")
         return 0
     run_id = os.environ["GITHUB_RUN_ID"]
-    if isinstance(request, list):
-        request = {"head": os.environ["HEAD_SHA"], "tasks": request}
     run_url = (
         f"{os.environ.get('GITHUB_SERVER_URL', 'https://github.com')}/"
         f"{os.environ['GITHUB_REPOSITORY']}/actions/runs/{run_id}"
@@ -257,7 +245,6 @@ def main(argv=None):
         run_url=run_url,
         run_id=run_id,
         outcome=args.outcome,
-        smoke=getattr(args, "smoke", False),
     )
     args.output.write_text(body + "\n", encoding="utf-8")
     if os.environ.get("GITHUB_STEP_SUMMARY"):

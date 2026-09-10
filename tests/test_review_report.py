@@ -4,20 +4,17 @@
 """Report contracts, escaping, CLI behavior, and sticky-comment safety."""
 
 import json
-import os
 import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
-from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / ".github" / "scripts"))
 
 from review_report import (
     REVIEW_MARKER,
-    SMOKE_MARKER,
     main,
     publish_report,
     read_results,
@@ -181,7 +178,7 @@ class ReviewReportTests(unittest.TestCase):
         ):
             self.assertIn(expected, body)
 
-    def test_report_separates_actual_reviews_and_smoke(self):
+    def test_report_identifies_revision_guidelines_and_advisory_status(self):
         normal = render_report(**report_options())
         for expected in (
             REVIEW_MARKER,
@@ -191,10 +188,6 @@ class ReviewReportTests(unittest.TestCase):
             "c" * 40,
         ):
             self.assertIn(expected, normal)
-        smoke = render_report(**report_options(), smoke=True)
-        for expected in (SMOKE_MARKER, "fixtures, **not this PR**"):
-            self.assertIn(expected, smoke)
-        self.assertNotIn(REVIEW_MARKER, smoke)
 
     def test_report_escapes_reviewer_data(self):
         options = report_options()
@@ -214,7 +207,7 @@ class ReviewReportTests(unittest.TestCase):
             self.assertNotIn(unexpected, body)
         self.assertIn("&lt;img src=x&gt; &#64;team &#124; &#96;code&#96; next", body)
 
-    def test_smoke_retains_finding_evidence_and_impact(self):
+    def test_report_retains_finding_evidence_and_impact(self):
         options = report_options()
         options["reviews"][0]["result"]["findings"] = [
             {
@@ -225,7 +218,7 @@ class ReviewReportTests(unittest.TestCase):
                 "recommendation": "Use the installed command.",
             }
         ]
-        body = render_report(**options, smoke=True)
+        body = render_report(**options)
         self.assertIn("Run missing-command", body)
         self.assertIn("That executable is not installed.", body)
 
@@ -266,11 +259,11 @@ class ReviewReportTests(unittest.TestCase):
             any(method in ("PATCH", "POST") for method, _, _ in github.calls)
         )
 
-    def test_sticky_comments_do_not_edit_human_or_smoke_comments(self):
+    def test_sticky_comments_do_not_edit_human_or_unrelated_bot_comments(self):
         github = MockGitHub()
         github.comments = [
             {"id": 1, "user": {"type": "User"}, "body": REVIEW_MARKER},
-            {"id": 2, "user": {"type": "Bot"}, "body": SMOKE_MARKER},
+            {"id": 2, "user": {"type": "Bot"}, "body": "Documentation preview"},
             {
                 "id": 3,
                 "user": {"type": "Bot"},
@@ -286,7 +279,7 @@ class ReviewReportTests(unittest.TestCase):
         self.assertTrue(publish_report(github, {"number": 7, "head": HEAD}, "new", 101))
         self.assertIn(("POST", "issues/7/comments", {"body": "new"}), github.calls)
 
-    def test_verify_cli_accepts_request_and_fixture_inventory(self):
+    def test_verify_cli_reports_missing_results(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)
             tasks = [
@@ -300,96 +293,14 @@ class ReviewReportTests(unittest.TestCase):
                 directory,
             ]
             (path / "review-1.json").write_text(json.dumps(result()))
-            for request in (tasks, {"tasks": tasks}):
-                (path / "request.json").write_text(json.dumps(request))
-                with redirect_stdout(StringIO()) as output:
-                    self.assertEqual(main(args), 0)
-                self.assertIn("Validated 1", output.getvalue())
+            (path / "request.json").write_text(json.dumps({"tasks": tasks}))
+            with redirect_stdout(StringIO()) as output:
+                self.assertEqual(main(args), 0)
+            self.assertIn("Validated 1", output.getvalue())
             (path / "review-1.json").unlink()
             with redirect_stderr(StringIO()) as output:
                 self.assertEqual(main(args), 1)
             self.assertIn("review-1: No result produced.", output.getvalue())
-
-    def test_summary_cli_writes_report_and_appends_summary(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory)
-            request = {
-                "number": None,
-                "head": HEAD,
-                "tasks": [],
-                "reason": "No fixture result.",
-            }
-            (path / "request.json").write_text(json.dumps(request))
-            (path / "summary.md").write_text("Earlier step\n")
-            environment = {
-                "GITHUB_SERVER_URL": "https://github.example.com",
-                "GITHUB_REPOSITORY": "example/research",
-                "GITHUB_RUN_ID": "100",
-                "GITHUB_STEP_SUMMARY": str(path / "summary.md"),
-            }
-            with patch.dict(os.environ, environment):
-                self.assertEqual(
-                    main(
-                        [
-                            "summary",
-                            "--request",
-                            str(path / "request.json"),
-                            "--results",
-                            directory,
-                            "--outcome",
-                            "failure",
-                            "--smoke",
-                            "--output",
-                            str(path / "report.md"),
-                        ]
-                    ),
-                    0,
-                )
-            report = (path / "report.md").read_text()
-            self.assertIn(SMOKE_MARKER, report)
-            self.assertIn(
-                "https://github.example.com/example/research/actions/runs/100", report
-            )
-            self.assertIn("No fixture result.", report)
-            self.assertEqual(
-                (path / "summary.md").read_text(), "Earlier step\n" + report
-            )
-
-    def test_smoke_summary_never_posts_even_with_a_pr_number(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory)
-            request = {"number": 7, "head": HEAD, "tasks": []}
-            (path / "request.json").write_text(json.dumps(request))
-            github = MockGitHub()
-            github.comments = [{"id": 2, "user": {"type": "Bot"}, "body": SMOKE_MARKER}]
-            environment = {
-                "GITHUB_REPOSITORY": "example/research",
-                "GITHUB_RUN_ID": "100",
-            }
-            with (
-                patch.dict(os.environ, environment, clear=True),
-                patch("github_api.GitHub", return_value=github),
-            ):
-                self.assertEqual(
-                    main(
-                        [
-                            "summary",
-                            "--request",
-                            str(path / "request.json"),
-                            "--results",
-                            directory,
-                            "--outcome",
-                            "success",
-                            "--smoke",
-                            "--output",
-                            str(path / "report.md"),
-                        ]
-                    ),
-                    0,
-                )
-            writes = [call for call in github.calls if call[0] == "PATCH"]
-            self.assertEqual(writes, [])
-            self.assertEqual(github.calls, [])
 
 
 if __name__ == "__main__":

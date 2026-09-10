@@ -5,6 +5,18 @@ description: New-project assessments through OAR, separate from deterministic ch
 
 # Repository CI
 
+## Checks and reviews
+
+| Workflow | Purpose | When it runs |
+| --- | --- | --- |
+| OAR and PR review checks | Lint, types, tests, wheel installation, offline Pi sessions, and PR selection-to-report integration. No inference credentials. | OAR or review infrastructure changes. |
+| OAR pipeline smoke | One installed CLI run through a real gateway; checks input transfer, prompt variables, structured output, and sandbox cleanup. | OAR source, dependencies, smoke fixture, or gateway setup changes on trusted branches. |
+| New project review | An advisory assessment of each new project against its purpose and project guidelines, in one updated PR comment. | Eligible new-project PRs, as described below. |
+| Existing repository checks | Dependency licenses, source headers, project tests, documentation builds, and previews. | Their existing workflow triggers; independent of OAR reviews. |
+
+Model verdicts are not CI pass/fail expectations. The live smoke checks execution
+contracts; it does not evaluate reviewer quality or assess the PR's content.
+
 The first iteration answers: **Does this new project deliver what it claims,
 follow our project guidelines, and use an appropriate level of engineering?**
 
@@ -45,8 +57,8 @@ New-project PR
                  └─ oar run once per project
                       └─ Validated JSON → one current-revision PR comment
 
-Existing native checks ─── independent workflows
-OAR smoke fixtures ─────── Actions summary, not a PR assessment
+Native checks + offline integration ─── execution and policy checks
+One live OAR pipeline check ─────────── Actions summary, not a PR assessment
 ```
 
 The result includes an overall verdict, five fixed criterion scores (0–100,
@@ -83,8 +95,11 @@ authorization or waiting for other workflows.
   retained as Actions artifacts for 14 days.
 
 The workflow must first land on the default branch before it can review actual
-project additions. The introducing PR can exercise the candidate OAR wheel and
-all three review tasks using the separate smoke workflow.
+project additions. Before that, offline integration tests exercise selection,
+snapshot preparation, the real OAR CLI, and report creation/update together,
+with simulated GitHub and OpenShell boundaries. This does not claim a live
+GitHub comment has been tested. The separate smoke verifies real OpenShell
+execution using the candidate wheel.
 
 ## Setup
 
@@ -98,9 +113,8 @@ The shared gateway action installs pinned OpenShell v0.0.116, starts an ephemera
 gateway, and configures inference. Credentials stay with gateway configuration,
 not the sandbox or comment reporter. No persistent gateway is required.
 
-The automated dependency-license feature is isolated in
-[PR #58](https://github.com/NVIDIA/OpenShell-Research/pull/58), based on `main`.
-It neither uses OAR nor coordinates with this reviewer.
+Dependency-license checks are already part of the repository's CI. They neither
+use OAR nor coordinate with this reviewer; see [Dependency License Checks](dependency-licenses.md).
 
 ## Validation and evolution
 
@@ -108,9 +122,8 @@ CI scripts are Python; requests use PyYAML from OAR's locked environment and
 GitHub calls use the runner's `gh api`. Run from the repository root:
 
 ```sh
-uv run --project projects/openshell-agent-runner python -m unittest discover -s tests -p test_ci_scope.py
-uv run --project projects/openshell-agent-runner python -m unittest discover -s tests -p test_github_api.py
-uv run --project projects/openshell-agent-runner python -m unittest discover -s tests -p 'test_*review*.py'
+uv run --project projects/openshell-agent-runner pytest \
+  tests/test_ci_scope.py tests/test_github_api.py tests/test_*review*.py
 ```
 
 Run `make check` and `make build` from the OAR project directory. `make check`
@@ -118,18 +131,16 @@ includes CLI workflows against a simulated OpenShell; `make test-runtime` uses
 Docker to exercise real Pi sessions against local scripted inference, with no
 external network or credentials. CI runs both, plus the Pi extension SDK checks.
 
-The live smoke workflow installs the built wheel and calls OAR directly:
+The live smoke workflow (`.github/workflows/oar-smoke.yml`) installs the built
+wheel, configures a small task from `tests/fixtures/pipeline-smoke/`, and calls
+`oar run` directly. The agent reads an uploaded file and returns its contents
+plus a runtime prompt variable in a schema-validated result. CI checks those
+values and confirms that no sandbox remains on its dedicated gateway.
 
-- **New-project tasks:** one internal fixture per kind checks the pipeline,
-  result schema, and score arithmetic. No particular verdict is required.
-- **Packaged reviewers:** clean and deliberately flawed code and writing inputs
-  check that reviewers accept scoped work and catch known defects. Writing
-  quotes must match their source lines, and rubric totals must agree.
-
-Results, logs, and packaged-reviewer test results are uploaded as Actions
-artifacts. The workflow writes an Actions summary, never a separate smoke comment.
-To verify saved packaged results locally, set `OAR_REVIEW_RESULTS` to their
-directory and run `uv run pytest tests/reviewer_smoke.py` from the OAR project.
+The task has a five-minute timeout and the job has a 15-minute limit.
+Input, result, log, and sandbox inventory are uploaded as
+the `oar-pipeline-smoke` artifact. The workflow writes an Actions summary,
+never a PR comment. No clean/flawed reviewer experiments run in CI.
 
 Keep team expectations in the project guidelines. Change review judgment in the
 common or kind-specific skill, and change selection/reporting only when the

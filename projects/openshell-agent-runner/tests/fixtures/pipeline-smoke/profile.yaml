@@ -1,0 +1,13 @@
+id: pipeline-smoke
+description: Verify the installed CLI can transfer input and return structured output.
+sandbox:
+  policy: policy.yaml
+tasks:
+  echo-input:
+    required_input: document
+    prompt: prompt.md
+    prompt_variables:
+      marker:
+        description: Runtime value to include unchanged in the result.
+    output_schema: output.schema.json
+    tools: [read]

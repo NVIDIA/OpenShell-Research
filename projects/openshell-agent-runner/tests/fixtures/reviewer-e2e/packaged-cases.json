@@ -1,6 +1,0 @@
-[
-  {"id": "code-clean", "profile": "code-reviewer", "task": "review-repository", "input": "repository", "verdict": "pass"},
-  {"id": "code-defect", "profile": "code-reviewer", "task": "review-repository", "input": "incorrect-repository", "verdict": "needs_changes"},
-  {"id": "writing-clean", "profile": "technical-writing-reviewer", "task": "review-document", "input": "scoped-guide.md", "verdict": "pass"},
-  {"id": "writing-defect", "profile": "technical-writing-reviewer", "task": "review-document", "input": "incorrect-guide.txt", "verdict": "needs_changes"}
-]

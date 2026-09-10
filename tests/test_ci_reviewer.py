@@ -134,24 +134,23 @@ class CIReviewerTests(unittest.TestCase):
         from openshell_agent_runner.cli import app
         from typer.testing import CliRunner
 
-        fixtures = ROOT / "projects/openshell-agent-runner/tests/fixtures/reviewer-e2e"
         guidelines = ROOT / "projects/PROJECT_GUIDELINES.md"
         remote = "/workspace/review-context/PROJECT_GUIDELINES.md"
         with tempfile.TemporaryDirectory() as directory:
             context = Path(directory) / "review-context"
             context.mkdir()
             (context / guidelines.name).write_bytes(guidelines.read_bytes())
-            for case in json.loads((fixtures / "cases.json").read_text()):
-                output = Path(directory) / f"{case['id']}.json"
+            for task in CRITERIA:
+                output = Path(directory) / f"{task}.json"
                 result = CliRunner().invoke(
                     app,
                     [
                         "run",
                         str(PROFILE),
                         "--task",
-                        case["task"],
+                        task,
                         "--input",
-                        str(fixtures / case["input"]),
+                        directory,
                         "--upload",
                         f"{context}:/workspace",
                         "--prompt-var",
@@ -161,12 +160,12 @@ class CIReviewerTests(unittest.TestCase):
                         "--dry-run",
                     ],
                 )
-                with self.subTest(task=case["task"]):
+                with self.subTest(task=task):
                     self.assertEqual(result.exit_code, 0, result.output)
                     self.assertIn(str(context), result.output)
                     self.assertFalse(output.exists())
 
-    def test_workflows_keep_trusted_guidelines_separate_and_smoke_read_only(self):
+    def test_workflow_keeps_trusted_guidelines_and_report_permissions_separate(self):
         import yaml
 
         workflows = ROOT / ".github/workflows"
@@ -194,36 +193,6 @@ class CIReviewerTests(unittest.TestCase):
         self.assertEqual(jobs["review"]["permissions"], {"contents": "read"})
         self.assertEqual(jobs["report"]["permissions"]["pull-requests"], "write")
 
-        smoke = yaml.safe_load((workflows / "reviewer-profiles-e2e.yml").read_text())
-        self.assertEqual(set(smoke["jobs"]), {"reviewer-e2e"})
-        job = smoke["jobs"]["reviewer-e2e"]
-        self.assertEqual(job["permissions"], {"contents": "read"})
-        run = next(step["run"] for step in job["steps"] if step.get("id") == "reviews")
-        arguments = shlex.split(run)
-        upload = "$RUNNER_TEMP/review-context:/workspace"
-        self.assertIn(upload, arguments)
-        self.assertIn(
-            "guidelines_path=/workspace/review-context/PROJECT_GUIDELINES.md", arguments
-        )
-        preparation = next(
-            step["run"]
-            for step in job["steps"]
-            if step["name"] == "Configure isolated paths"
-        )
-        copy = next(
-            shlex.split(line)
-            for line in preparation.splitlines()
-            if line.strip().startswith("cp ")
-        )
-        self.assertEqual(
-            copy,
-            [
-                "cp",
-                "projects/PROJECT_GUIDELINES.md",
-                "$RUNNER_TEMP/review-context/PROJECT_GUIDELINES.md",
-            ],
-        )
-
     def test_guideline_assessment_is_part_of_every_result(self):
         for task in CRITERIA:
             result = example_result(task)
@@ -240,18 +209,6 @@ class CIReviewerTests(unittest.TestCase):
                 self.assertFalse(self.validator.is_valid(result))
                 result["verdict"] = verdict
                 self.assertTrue(self.validator.is_valid(result))
-
-    def test_smoke_inventory_exercises_all_tasks_with_declared_project_kinds(self):
-        import yaml
-
-        fixtures = ROOT / "projects/openshell-agent-runner/tests/fixtures/reviewer-e2e"
-        cases = json.loads((fixtures / "cases.json").read_text())
-        self.assertEqual({case["task"] for case in cases}, set(CRITERIA))
-        for case in cases:
-            project = fixtures / case["input"]
-            metadata = yaml.safe_load((project / "project.yaml").read_text())
-            self.assertEqual(case["task"], f"review-{metadata['kind']}")
-            self.assertTrue((project / "README.md").is_file())
 
     def test_trusted_guidelines_are_required_at_resolution(self):
         from openshell_agent_runner.errors import ConfigurationError
