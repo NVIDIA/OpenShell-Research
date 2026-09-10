@@ -49,8 +49,11 @@ you have access, not a requirement. Set:
 - `providers.<provider>.baseUrl`: the HTTPS API base, such as `https://your-provider.example/v1`;
   the application appends `/chat/completions`.
 - `contextWindow` and `maxTokens`: the model's context limit and your desired
-  response limit, in tokens. The POC caps each response at the smaller of
-  `maxTokens` and 4,096 tokens. The template's numbers are examples.
+  response limit, in tokens. Pi applies its normal context-fit adjustment; the
+  application adds no response-token cap. The template's numbers are examples.
+- `samplingParams`: Pi forwards model sampling settings such as `temperature`
+  and `top_p` without application overrides. The gate's supported request shape
+  still applies; unknown provider-specific fields are rejected, not dropped.
 - `compat.maxTokensField`: the field your provider accepts (`max_tokens` or
   `max_completion_tokens`). The other compatibility settings are conservative
   defaults; adjust them if your endpoint requires it.
@@ -65,6 +68,7 @@ Pi resolves its defaults and compatibility settings; a model-level `baseUrl` or
 at one of those levels. This POC does not support OAuth or custom headers.
 Credentials and model caches stay in memory; no writable `/app/agent/auth.json`
 is needed.
+Compaction uses Pi's normal summary budget, bounded by the model's `maxTokens`.
 
 If you used the earlier single-object `model.json`, start from the new template
 and transfer your endpoint and model settings; renaming the file alone is not enough.

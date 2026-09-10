@@ -161,10 +161,7 @@ export class AdmissionAgent extends Agent {
               messages: convertToLlm(this.live.messages),
               tools: this.live.tools,
             },
-            {
-              signal: this.signal,
-              maxTokens: Math.min(4096, this.live.model.maxTokens),
-            },
+            { signal: this.signal },
           )
         ).result();
         this.signal!.throwIfAborted();

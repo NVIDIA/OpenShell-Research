@@ -162,7 +162,6 @@ function sessionFactory(options: SessionOptions) {
   }: Parameters<CreateAgentSessionRuntimeFactory>[0]) => {
     if (sessionManager.getEntries().length)
       return unsupported("Restoring existing history");
-    const reserveTokens = Math.min(4096, options.model.maxTokens);
     const services = await createAgentSessionServices({
       cwd,
       agentDir,
@@ -179,7 +178,7 @@ function sessionFactory(options: SessionOptions) {
           keepRecentTokens: 0,
           reserveTokens:
             options.compactAtTokens === undefined
-              ? reserveTokens
+              ? undefined
               : options.model.contextWindow - options.compactAtTokens,
         },
         retry: { enabled: false },
@@ -213,7 +212,7 @@ function sessionFactory(options: SessionOptions) {
                   const summary = await generateSummaryWithUsage(
                     messages,
                     options.model,
-                    reserveTokens,
+                    event.preparation.settings.reserveTokens,
                     options.apiKey,
                     undefined,
                     event.signal,

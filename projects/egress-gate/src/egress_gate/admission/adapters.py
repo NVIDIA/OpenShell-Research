@@ -485,6 +485,7 @@ class _ProviderRequest(StrictDomainModel):
     tools: tuple[_ProviderTool, ...] = ()
     tool_choice: Literal["auto", "none", "required"] | _ProviderNamedToolChoice = "auto"
     temperature: int | float | None = Field(default=None, allow_inf_nan=False)
+    top_p: int | float | None = Field(default=None, allow_inf_nan=False)
     max_completion_tokens: int | None = Field(default=None, ge=1)
     max_tokens: int | None = Field(default=None, ge=1)
     stream: Literal[True]

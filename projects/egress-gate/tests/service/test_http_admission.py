@@ -154,10 +154,12 @@ def test_gateway_authentication_rejects_invalid_trust_claims(change: str) -> Non
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("tui", [False, True], ids=["sdk", "native-tui"])
+@pytest.mark.parametrize("max_tokens", [2048, 16384])
 async def test_pi_session_through_admission_and_authenticated_egress(
     tmp_path: Path,
     unused_tcp_port: int,
     tui: bool,
+    max_tokens: int,
 ) -> None:
     source = PROJECT / "examples/pi-attested-admission"
     example = tmp_path / "example"
@@ -168,7 +170,11 @@ async def test_pi_session_through_admission_and_authenticated_egress(
             ".env", "model.json", "models.json", "node_modules", "dist"
         ),
     )
-    shutil.copyfile(example / "models.json.example", example / "models.json")
+    catalog = json.loads((example / "models.json.example").read_text())
+    model = catalog["providers"]["example"]["models"][0]
+    model["maxTokens"] = max_tokens
+    model["samplingParams"] = {"temperature": 0.25, "top_p": 0.9}
+    (example / "models.json").write_text(json.dumps(catalog))
     # Match the image: the sandbox user cannot create Pi auth/cache files in /app.
     agent_dir = tmp_path / "agent"
     agent_dir.mkdir(mode=0o555)
@@ -212,6 +218,15 @@ async def test_pi_session_through_admission_and_authenticated_egress(
                 "REDACT_THIS" not in body.decode() and "DENY_THIS" not in body.decode()
             )
             calls.append(body)
+            payload = json.loads(body)
+            assert payload["temperature"] == 0.25
+            assert payload["top_p"] == 0.9
+            if len(calls) not in (4, 7):
+                # Real Pi serialization must honor limits below and above 4096.
+                assert payload["max_tokens"] == max_tokens
+            elif len(calls) == 4:
+                # Pi's default compaction reserve is 16384; its summary uses 80%.
+                assert payload["max_tokens"] == min(int(0.8 * 16384), max_tokens)
             if len(calls) == 1:
                 changed = json.loads(body)
                 next(m for m in changed["messages"] if m["role"] == "user")[
