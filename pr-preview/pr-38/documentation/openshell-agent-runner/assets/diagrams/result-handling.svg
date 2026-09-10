@@ -1,38 +1,116 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 600" role="img" aria-labelledby="title description">
-  <title id="title">OAR result handling</title>
-  <desc id="description">Tasks without an output schema capture Pi's final response. Tasks with a schema use submit_result and Ajv for in-session correction. Both results are downloaded, checked on the host, and atomically published.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 840" role="img" aria-labelledby="title description">
+  <title id="title">A profile-owned schema connects agent submission and host validation</title>
+  <desc id="description">In the code-reviewer profile, the review-repository task in profile.yaml names schemas/review.json as its output_schema. OAR uploads a copy with its submit_result tool to the sandbox. The agent submits JSON; invalid submissions return errors for correction. A valid submission is saved in the sandbox and downloaded by OAR. OAR checks that JSON against the profile's schema before replacing the caller's output file. Without output_schema, the agent's final text is checked for size and content, then saved without JSON schema validation.</desc>
   <defs>
     <style>
-      text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;fill:#1f2933}
-      .choice{fill:#fff5eb;stroke:#c86622;stroke-width:2}.plain{fill:#eef6ff;stroke:#3973ad;stroke-width:2}.structured{fill:#eef9f1;stroke:#2f855a;stroke-width:2}.host{fill:#f7f1ff;stroke:#8056a8;stroke-width:2}
-      .title{font-size:19px;font-weight:700}.subtitle{font-size:14px;fill:#5f6b76}.label{font-size:14px;font-weight:700;fill:#5f6b76}
-      .arrow{fill:none;stroke:#718096;stroke-width:2.5;marker-end:url(#arrow)}.retry{fill:none;stroke:#c86622;stroke-width:2.2;stroke-dasharray:7 5;marker-end:url(#arrow)}
-      @media(prefers-color-scheme:dark){text{fill:#edf2f7}.choice{fill:#3a2819;stroke:#f6ad55}.plain{fill:#162b3f;stroke:#7db6e8}.structured{fill:#143126;stroke:#68d391}.host{fill:#2d203a;stroke:#b794d4}.subtitle,.label{fill:#aeb8c5}.arrow{stroke:#8b98a5}.retry{stroke:#f6ad55}}
+      text{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;fill:#24352c}
+      .host{fill:#f4f5f2;stroke:#c8cec8;stroke-width:1.5}
+      .gateway{fill:#f5f9ee;stroke:#7da54b;stroke-width:2}
+      .sandbox{fill:#fff;stroke:#9dad9e;stroke-width:1.5;stroke-dasharray:5 4}
+      .card{fill:#fff;stroke:#b9c8bf;stroke-width:1.2}
+      .profile{fill:#edf4e3;stroke:#b5c99c;stroke-width:1.2}
+      .schema{fill:#eaf2f8;stroke:#8aa9c0;stroke-width:1.2}
+      .accent{fill:#eaf3dc;stroke:#8eaf62;stroke-width:1.2}
+      .heading{font-size:23px;font-weight:650}
+      .title{font-size:20px;font-weight:650}
+      .note{font-size:16px;fill:#53665a}
+      .small{font-size:14px;fill:#53665a}
+      .mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+      .flow{fill:none;stroke:#658941;stroke-width:2;marker-end:url(#arrow)}
+      .schema-flow{fill:none;stroke:#668ba9;stroke-width:2;stroke-dasharray:5 4;marker-end:url(#schema-arrow)}
+      .schema-label{font-size:14px;fill:#527997}
+      .retry{fill:none;stroke:#ad7738;stroke-width:1.8;marker-end:url(#retry-arrow)}
+      .retry-label{font-size:14px;fill:#95642c}
+      .inference{fill:none;stroke:#73877b;stroke-width:1.7;marker-start:url(#inference-arrow);marker-end:url(#inference-arrow)}
+      @media(prefers-color-scheme:dark){
+        text{fill:#edf3ee}
+        .host{fill:#202722;stroke:#59685e}
+        .gateway{fill:#23301b;stroke:#8eaf62}
+        .sandbox,.card{fill:#1c2720;stroke:#859788}
+        .profile,.accent{fill:#2b3b23;stroke:#7b9c57}
+        .schema{fill:#273b47;stroke:#799cac}
+        .note,.small{fill:#bdcbbf}
+        .schema-label{fill:#a7c6dd}
+        .schema-flow{stroke:#93b4ce}
+        .flow{stroke:#8eb55d}
+        .retry{stroke:#d6a15f}
+        .retry-label{fill:#e2b174}
+      }
     </style>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#718096"/></marker>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#719447"/>
+    </marker>
+    <marker id="schema-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#668ba9"/>
+    </marker>
+    <marker id="retry-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0 0 10 5 0 10Z" fill="#ad7738"/>
+    </marker>
+    <marker id="inference-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M0 0 10 5 0 10Z" fill="#73877b"/>
+    </marker>
   </defs>
 
-  <rect x="410" y="35" width="300" height="75" rx="15" class="choice"/>
-  <text x="560" y="66" text-anchor="middle" class="title">Task completes</text><text x="560" y="91" text-anchor="middle" class="subtitle">Does it declare output_schema?</text>
+  <!-- The profile and final output belong to the caller's machine. -->
+  <rect x="20" y="22" width="368" height="678" rx="16" class="host"/>
+  <text x="40" y="57" class="heading">OAR · your machine / CI</text>
+  <rect x="40" y="89" width="328" height="223" rx="10" class="profile"/>
+  <text x="60" y="119" class="mono title">code-reviewer/</text>
+  <text x="60" y="148" class="mono small">profile.yaml · review-repository</text>
+  <text x="60" y="177" class="mono note">output_schema:</text>
+  <text x="84" y="202" class="mono note">schemas/review.json</text>
+  <path d="M72 184v11h7" fill="none" stroke="#73877b" stroke-width="1.4"/>
+  <rect x="60" y="226" width="288" height="67" rx="6" class="schema"/>
+  <text x="78" y="252" class="mono note">schemas/review.json</text>
+  <text x="78" y="278" class="small">Required fields, types, bounds</text>
 
-  <text x="305" y="145" text-anchor="middle" class="label">No</text><text x="815" y="145" text-anchor="middle" class="label">Yes</text>
-  <rect x="90" y="165" width="430" height="85" rx="15" class="plain"/>
-  <text x="305" y="198" text-anchor="middle" class="title">Capture final Pi response</text><text x="305" y="224" text-anchor="middle" class="subtitle">stdout becomes the result artifact</text>
+  <!-- OAR supplies the generic submission tool; the profile supplies the schema. -->
+  <rect x="468" y="22" width="352" height="678" rx="16" class="gateway"/>
+  <text x="488" y="57" class="heading">OpenShell gateway</text>
+  <rect x="488" y="89" width="312" height="541" rx="10" class="sandbox"/>
+  <text x="508" y="124" class="title">Sandbox for this task</text>
+  <rect x="508" y="157" width="268" height="68" rx="7" class="card"/>
+  <text x="526" y="185" class="title">Pi agent</text>
+  <text x="526" y="210" class="small">Works from prompts + skills</text>
+  <path d="M642 225v40" class="flow"/>
+  <text x="654" y="252" class="small">submit JSON</text>
+  <rect x="508" y="267" width="268" height="120" rx="7" class="schema"/>
+  <text x="526" y="297" class="mono title">submit_result</text>
+  <text x="526" y="326" class="note">OAR-provided validation tool</text>
+  <text x="526" y="350" class="small">Uses the uploaded schema copy</text>
+  <text x="526" y="374" class="retry-label">Invalid: return errors to the agent</text>
+  <path d="M776 360h16V191h-14" class="retry"/>
 
-  <rect x="600" y="165" width="430" height="85" rx="15" class="structured"/>
-  <text x="815" y="198" text-anchor="middle" class="title">Call submit_result</text><text x="815" y="224" text-anchor="middle" class="subtitle">{ result: ... }</text>
-  <rect x="600" y="305" width="430" height="85" rx="15" class="structured"/>
-  <text x="815" y="338" text-anchor="middle" class="title">Ajv validates in session</text><text x="815" y="364" text-anchor="middle" class="subtitle">Draft 2020-12 schema</text>
+  <!-- Blue dashed arrows trace the schema, not the agent's result. -->
+  <path d="M348 284h158" class="schema-flow"/>
+  <text x="428" y="271" text-anchor="middle" class="schema-label">upload</text>
+  <text x="428" y="305" text-anchor="middle" class="schema-label">a copy</text>
+  <path d="M202 293v124" class="schema-flow"/>
+  <text x="216" y="365" class="schema-label">same schema</text>
 
-  <rect x="345" y="445" width="430" height="105" rx="15" class="host"/>
-  <text x="560" y="480" text-anchor="middle" class="title">Host acceptance boundary</text>
-  <text x="560" y="508" text-anchor="middle" class="subtitle">download · size check · optional schema validation</text>
-  <text x="560" y="532" text-anchor="middle" class="subtitle">atomic publication</text>
+  <path d="M642 387v33" class="flow"/>
+  <text x="654" y="409" class="small">valid</text>
+  <rect x="508" y="422" width="268" height="66" rx="7" class="accent"/>
+  <text x="526" y="449" class="title">JSON result</text>
+  <text x="526" y="475" class="small">Written after valid submission</text>
 
-  <path d="M480 110L340 165" class="arrow"/><path d="M640 110l140 55" class="arrow"/>
-  <path d="M815 250v55" class="arrow"/>
-  <path d="M600 347H555c-35 0-35-140 0-140h45" class="retry"/><text x="542" y="282" text-anchor="end" class="label">invalid: return errors</text>
-  <path d="M305 250v145c0 28 20 50 48 50h35" class="arrow"/>
-  <path d="M815 390v5c0 28-20 50-48 50h-35" class="arrow"/>
-  <text x="832" y="420" class="label">valid</text>
+  <rect x="40" y="419" width="328" height="98" rx="7" class="schema"/>
+  <text x="60" y="447" class="title">Validate downloaded JSON</text>
+  <text x="60" y="477" class="note">Against the profile's schema</text>
+  <text x="60" y="502" class="small">Also check file size and content</text>
+  <path d="M508 449H370" class="flow"/>
+  <text x="429" y="438" text-anchor="middle" class="small">download</text>
+
+  <path d="M204 517v38" class="flow"/>
+  <text x="216" y="543" class="small">valid</text>
+  <rect x="40" y="557" width="328" height="72" rx="7" class="accent"/>
+  <text x="60" y="586" class="mono title">--output review.json</text>
+  <text x="60" y="613" class="small">Replace only after validation</text>
+  <text x="40" y="660" class="small">If validation fails, existing output stays.</text>
+  <text x="488" y="660" class="small">OAR removes the sandbox after the run.</text>
+
+  <rect x="20" y="731" width="800" height="88" rx="10" class="card"/>
+  <text x="40" y="761" class="title">When the task omits output_schema</text>
+  <text x="40" y="788" class="note">Agent's final text → OAR checks size and content → your output file</text>
+  <text x="40" y="809" class="small">No JSON schema validation is applied.</text>
 </svg>

@@ -6,32 +6,32 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Technical guides for projects featured in OpenShell Dev Notes.">
+        <meta name="description" content="Adapt OAR tasks with prompts, runtime variables, skills, tools, and result schemas.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
       
       
-        <link rel="canonical" href="https://nvidia.github.io/OpenShell-Research/documentation/">
+        <link rel="canonical" href="https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/profiles/">
       
       
-        <link rel="prev" href="../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/">
+        <link rel="prev" href="../reviews/">
       
       
-        <link rel="next" href="./egress-gate/">
+        <link rel="next" href="../reference/">
       
       
         
       
       
-      <link rel="icon" href="../assets/brand/favicon.svg">
+      <link rel="icon" href="../../../assets/brand/favicon.svg">
       <meta name="generator" content="zensical-0.0.44">
     
     
   
     
       
-        <title>Documentation - OpenShell Research</title>
+        <title>Customize profiles - OpenShell Research</title>
       
     
   
@@ -40,12 +40,12 @@
       
         
       
-      <link rel="stylesheet" href="../assets/stylesheets/modern/main.fba56155.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/modern/main.fba56155.min.css">
       
         
           
         
-        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.dfe2e883.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/modern/palette.dfe2e883.min.css">
       
       
 
@@ -64,11 +64,11 @@
       
     
     
-      <link rel="stylesheet" href="../stylesheets/dev-notes.css">
+      <link rel="stylesheet" href="../../../stylesheets/dev-notes.css">
     
-      <link rel="stylesheet" href="../stylesheets/documentation.css">
+      <link rel="stylesheet" href="../../../stylesheets/documentation.css">
     
-    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    <script>__md_scope=new URL("../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
     
       
 
@@ -97,12 +97,12 @@
   
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="OpenShell Research">
-  <meta property="og:title" content="Documentation">
-  <meta property="og:description" content="Technical guides for projects featured in OpenShell Dev Notes.">
-  <meta property="og:url" content="https://nvidia.github.io/OpenShell-Research/documentation/">
+  <meta property="og:title" content="Customize profiles">
+  <meta property="og:description" content="Adapt OAR tasks with prompts, runtime variables, skills, tools, and result schemas.">
+  <meta property="og:url" content="https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/profiles/">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Documentation">
-  <meta name="twitter:description" content="Technical guides for projects featured in OpenShell Dev Notes.">
+  <meta name="twitter:title" content="Customize profiles">
+  <meta name="twitter:description" content="Adapt OAR tasks with prompts, runtime variables, skills, tools, and result schemas.">
   
   
   
@@ -118,7 +118,7 @@
     }
   </script>
   
-    <link rel="alternate" type="text/markdown" href="index.md" title="Markdown source">
+    <link rel="alternate" type="text/markdown" href="../profiles.md" title="Markdown source">
   
 
   </head>
@@ -140,7 +140,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#documentation" class="md-skip">
+        <a href="#customize-profiles" class="md-skip">
           Skip to content
         </a>
       
@@ -156,9 +156,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="./.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../../.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     <label class="md-header__button md-icon openshell-drawer-button" for="__drawer" role="button" tabindex="0" aria-label="Open navigation" aria-controls="primary-navigation" aria-expanded="false">
@@ -179,7 +179,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Documentation
+              Customize profiles
             
           </span>
         </div>
@@ -268,9 +268,9 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="./.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../../.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     OpenShell Research
@@ -322,7 +322,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../dev-notes/" class="md-nav__link ">
+            <a href="../../../dev-notes/" class="md-nav__link ">
               
   
   
@@ -419,7 +419,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dev-notes/posts/2026-08-27-adversarial-policy-review-long-horizon-agents/" class="md-nav__link">
+      <a href="../../../dev-notes/posts/2026-08-27-adversarial-policy-review-long-horizon-agents/" class="md-nav__link">
         
   
   
@@ -446,7 +446,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dev-notes/posts/2026-08-07-formal-methods-ai-generated-robot-actions/" class="md-nav__link">
+      <a href="../../../dev-notes/posts/2026-08-07-formal-methods-ai-generated-robot-actions/" class="md-nav__link">
         
   
   
@@ -473,7 +473,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
+      <a href="../../../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
         
   
   
@@ -544,7 +544,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="././" class="md-nav__link md-nav__link--active">
+            <a href="../../" class="md-nav__link ">
               
   
   
@@ -561,7 +561,7 @@
             </a>
             
               
-              <label class="md-nav__link md-nav__link--active" for="__nav_2" id="__nav_2_label" tabindex="">
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -614,7 +614,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="./egress-gate/" class="md-nav__link ">
+            <a href="../../egress-gate/" class="md-nav__link ">
               
   
   
@@ -713,7 +713,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/configuration/" class="md-nav__link">
+      <a href="../../egress-gate/configuration/" class="md-nav__link">
         
   
   
@@ -740,7 +740,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/request-content/" class="md-nav__link">
+      <a href="../../egress-gate/request-content/" class="md-nav__link">
         
   
   
@@ -767,7 +767,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/evaluation/" class="md-nav__link">
+      <a href="../../egress-gate/evaluation/" class="md-nav__link">
         
   
   
@@ -794,7 +794,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/operations/" class="md-nav__link">
+      <a href="../../egress-gate/operations/" class="md-nav__link">
         
   
   
@@ -853,7 +853,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="./egress-gate/gates/" class="md-nav__link ">
+            <a href="../../egress-gate/gates/" class="md-nav__link ">
               
   
   
@@ -895,7 +895,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/gates/regex/" class="md-nav__link">
+      <a href="../../egress-gate/gates/regex/" class="md-nav__link">
         
   
   
@@ -922,7 +922,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/gates/custom/" class="md-nav__link">
+      <a href="../../egress-gate/gates/custom/" class="md-nav__link">
         
   
   
@@ -983,7 +983,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="./egress-gate/architecture/" class="md-nav__link ">
+            <a href="../../egress-gate/architecture/" class="md-nav__link ">
               
   
   
@@ -1025,7 +1025,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/architecture/request-lifecycle/" class="md-nav__link">
+      <a href="../../egress-gate/architecture/request-lifecycle/" class="md-nav__link">
         
   
   
@@ -1052,7 +1052,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/architecture/admission/" class="md-nav__link">
+      <a href="../../egress-gate/architecture/admission/" class="md-nav__link">
         
   
   
@@ -1079,7 +1079,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/architecture/service-boundary/" class="md-nav__link">
+      <a href="../../egress-gate/architecture/service-boundary/" class="md-nav__link">
         
   
   
@@ -1165,7 +1165,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/reference/limits-and-failures/" class="md-nav__link">
+      <a href="../../egress-gate/reference/limits-and-failures/" class="md-nav__link">
         
   
   
@@ -1205,6 +1205,8 @@
                 
   
   
+    
+  
   
   
     
@@ -1226,15 +1228,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="./openshell-agent-runner/" class="md-nav__link ">
+            <a href="../" class="md-nav__link ">
               
   
   
@@ -1257,7 +1259,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1276,7 +1278,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./openshell-agent-runner/reviews/" class="md-nav__link">
+      <a href="../reviews/" class="md-nav__link">
         
   
   
@@ -1300,10 +1302,36 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="./openshell-agent-runner/profiles/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Customize profiles
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1318,6 +1346,93 @@
   
 
       </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-make-a-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Where to make a change
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-a-task-is-defined" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        How a task is defined
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#put-variables-in-a-prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Put variables in a prompt
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-tools-and-skills" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Choose tools and skills
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-the-result-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Choose the result format
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-your-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Check your changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1330,7 +1445,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./openshell-agent-runner/reference/" class="md-nav__link">
+      <a href="../reference/" class="md-nav__link">
         
   
   
@@ -1382,6 +1497,11 @@
                       
                     
                     
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
                   
                   <div class="md-sidebar__inner">
                     
@@ -1393,6 +1513,80 @@
   
     
   
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-make-a-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Where to make a change
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-a-task-is-defined" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        How a task is defined
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#put-variables-in-a-prompt" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Put variables in a prompt
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-tools-and-skills" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Choose tools and skills
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choose-the-result-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Choose the result format
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-your-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Check your changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -1417,7 +1611,7 @@
   
   
     <li class="md-path__item">
-      <a href="./.." class="md-path__link">
+      <a href="../../.." class="md-path__link">
         
   
   <span class="md-ellipsis">
@@ -1449,11 +1643,45 @@
     
     
       <li class="md-path__item">
-        <a href="././" class="md-path__link">
+        <a href="../../" class="md-path__link">
           
   
   <span class="md-ellipsis">
     Documentation
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    OpenShell Agent Runner
   </span>
 
         </a>
@@ -1475,20 +1703,192 @@
 
 
   
-  <a href="index.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
+  <a href="../profiles.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.56 18H3.44C2.65 18 2 17.37 2 16.59V7.41C2 6.63 2.65 6 3.44 6h17.12c.79 0 1.44.63 1.44 1.41v9.18c0 .78-.65 1.41-1.44 1.41M3.44 6.94c-.26 0-.48.21-.48.47v9.19c0 .25.22.46.48.46h17.12c.26 0 .48-.21.48-.46V7.41c0-.26-.22-.47-.48-.47zm1.45 8.25V8.81h1.92l1.92 2.35 1.92-2.35h1.93v6.38h-1.93v-3.66l-1.92 2.35-1.92-2.35v3.66zm12.01 0-2.9-3.1h1.94V8.81h1.92v3.28h1.93z"/></svg>
   </a>
 
 
-<h1 id="documentation">Documentation</h1>
-<p>Technical documentation and references for installing, using, and extending
-OpenShell Research projects.</p>
-<ul>
-<li><a href="egress-gate/">Egress Gate</a>: extensible middleware for applying gates
-  to outgoing HTTP requests.</li>
-<li><a href="openshell-agent-runner/">OpenShell Agent Runner</a>: launch ephemeral
-  agents for single, bounded tasks in CI and automated workflows.</li>
-</ul>
+<h1 id="customize-profiles">Customize profiles</h1>
+<p>Start with the folders created by <code>oar init</code>. They are ordinary files you can
+edit and commit with your project. A profile defines lasting behavior; command
+options supply the input, output, and context for one run.</p>
+<h2 id="where-to-make-a-change">Where to make a change</h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>code-reviewer/
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├── profile.yaml         Tasks and the files each task uses
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├── prompt-repository.md Instructions for this task
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>├── skills/              Reusable review guidance and rubric
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>├── schemas/review.json   Required shape of the result
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>├── policy.yaml          Sandbox file and network permissions
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>├── models.json          Model definition
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>└── settings.json        Selected model and thinking level
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>What you want to change</th>
+<th>Where to change it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>This run's focus or context</td>
+<td><code>--prompt-var</code> on the command line</td>
+</tr>
+<tr>
+<td>The instructions for every run</td>
+<td>The task's prompt file</td>
+</tr>
+<tr>
+<td>Shared judgment, conventions, or scoring</td>
+<td>A skill's <code>SKILL.md</code></td>
+</tr>
+<tr>
+<td>Tasks, tools, or which skills are loaded</td>
+<td><code>profile.yaml</code></td>
+</tr>
+<tr>
+<td>What the sandbox can access</td>
+<td><code>policy.yaml</code></td>
+</tr>
+<tr>
+<td>The model</td>
+<td>Keep the ID in <code>models.json</code> and <code>settings.json</code> in sync with your inference route</td>
+</tr>
+<tr>
+<td>The result's JSON fields</td>
+<td>The schema and the instructions that explain those fields</td>
+</tr>
+</tbody>
+</table>
+<h2 id="how-a-task-is-defined">How a task is defined</h2>
+<p>This is the shape of the packaged code review task, with shorter descriptions:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">code-reviewer</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Review a code repository.</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">sandbox</span><span class="p">:</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">policy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">policy.yaml</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nt">tasks</span><span class="p">:</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="nt">review-repository</span><span class="p">:</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="nt">required_input</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">repository</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="nt">prompt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prompt-repository.md</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">    </span><span class="nt">prompt_variables</span><span class="p">:</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">      </span><span class="nt">focus</span><span class="p">:</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">        </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">What deserves special attention.</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">        </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Review the complete repository.</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">      </span><span class="nt">context</span><span class="p">:</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">        </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Purpose and constraints.</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">        </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">No additional context was provided.</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span><span class="nt">tools</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">read</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">grep</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">find</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">ls</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">bash</span><span class="p p-Indicator">]</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">    </span><span class="nt">skills</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">skills/review-code</span><span class="p p-Indicator">]</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">    </span><span class="nt">output_schema</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">schemas/review.json</span>
+</span></code></pre></div>
+<p>Add another entry under <code>tasks</code> to define another job in the same profile. Each
+task chooses its own prompt, variables, tools, skills, extensions, and output
+schema. Set <code>required_input</code> to <code>document</code> for a file or <code>repository</code> for a
+directory. Omit it for a task that does not accept <code>--input</code>.</p>
+<p>Paths to prompts, skills, extensions, policies, and schemas are relative to the
+profile directory and must stay inside it. OAR also requires <code>models.json</code> and
+<code>settings.json</code>, which <code>init</code> supplies.</p>
+<h2 id="put-variables-in-a-prompt">Put variables in a prompt</h2>
+<p>Use double braces to insert a value:</p>
+<div class="language-markdown highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>Review {{ oar.input_path }}.
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>Original name: {{ oar.input_name }}.
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>Focus: {{ focus }}
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>Context: {{ context }}
+</span></code></pre></div>
+<p>There are two sources of values:</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Supplied by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>oar.input_path</code></td>
+<td>OAR: the input's path inside the sandbox</td>
+</tr>
+<tr>
+<td><code>oar.input_name</code></td>
+<td>OAR: the original file or directory name</td>
+</tr>
+<tr>
+<td><code>focus</code>, <code>context</code>, or another declared name</td>
+<td>The task's default, overridden by <code>--prompt-var NAME=VALUE</code></td>
+</tr>
+</tbody>
+</table>
+<p>The two <code>oar.*</code> values are available only when the task declares
+<code>required_input</code>. They cannot be overridden. They let the same document prompt
+work with <code>.md</code>, <code>.txt</code>, and other filenames without hard-coding a path.</p>
+<p>Declare each custom variable under <code>prompt_variables</code> in <code>profile.yaml</code> and use
+it in the prompt. A variable with no <code>default</code> must be provided on the command
+line. Names start with a lowercase letter and contain lowercase letters,
+numbers, or underscores, up to 63 characters.</p>
+<p>Repeat <code>--prompt-var</code> for multiple values. Values are non-empty strings;
+there is no separate YAML variables input. Substitution inserts the text once,
+literally: it does not evaluate expressions, loops, or nested placeholders.
+OAR rejects unknown names, unused declarations, missing values, repeated CLI
+assignments, and malformed placeholders before starting a sandbox.</p>
+<h2 id="choose-tools-and-skills">Choose tools and skills</h2>
+<p>OAR runs <strong>Pi</strong>, the agent inside the sandbox. A task's <code>tools</code> list selects
+which tools Pi may use: <code>read</code>, <code>grep</code>, <code>find</code>, <code>ls</code>, <code>bash</code>, <code>edit</code>, and <code>write</code>
+are built in. A skill is a directory containing a <code>SKILL.md</code> with reusable
+instructions; list the skills the task needs under <code>skills</code>.
+Tasks with skills must include <code>read</code> in <code>tools</code>: Pi uses it to expose the skill
+catalog and let the agent load the selected instructions.</p>
+<p>For a custom tool, declare its extension file and tool name, then add the name
+to the task's <code>tools</code> list. This fragment belongs under a task:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">tools</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">read</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">custom_check</span><span class="p p-Indicator">]</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">extensions</span><span class="p">:</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">extensions/custom-check.ts</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">tools</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">custom_check</span><span class="p p-Indicator">]</span>
+</span></code></pre></div>
+<p>The extension file must exist and register that tool through Pi. OAR checks the
+declarations locally and the registered tools before the first model request.
+Tool selection controls the agent interface; <code>policy.yaml</code> controls sandbox
+access, including commands run through <code>bash</code>.</p>
+<h2 id="choose-the-result-format">Choose the result format</h2>
+<p>The result schema is a JSON file <strong>in your profile</strong>. Each task names the file
+through <code>output_schema</code> in <code>profile.yaml</code>. For the included reviewers, <code>oar init</code>
+copies <code>schemas/review.json</code> into the profile; you can edit it to change the
+required fields, types, and bounds. OAR supplies the validation machinery.</p>
+<figure class="documentation-figure documentation-figure--wide">
+  <a href="../assets/diagrams/result-handling.svg" aria-label="Open the result validation diagram at full size">
+    <img src="../assets/diagrams/result-handling.svg" alt="The selected task points to a schema file in the profile. OAR uploads a copy for submit_result to check the agent's JSON in the sandbox, then checks the downloaded JSON against the profile's schema before saving the host output. Invalid submissions return errors to the agent for correction.">
+  </a>
+  <figcaption>The profile defines the format. OAR checks it in the sandbox and again on your machine. Select the diagram to view it at full size.</figcaption>
+</figure>
+
+<p>For a JSON task, OAR uploads a copy of that schema along with its built-in
+<code>submit_result</code> tool. Tell the agent to finish by calling the tool. Invalid
+submissions return errors so the agent can correct and resubmit. OAR downloads
+the result and validates it against the profile's schema before replacing the
+file at <code>--output</code>.</p>
+<p>Omit <code>output_schema</code> to save the agent's final text response instead. The
+<code>--output</code> option chooses only the destination. OAR still checks that the result
+is non-empty and within the size limit. The
+<a href="../reference/#what-happens-during-a-run">run lifecycle</a> shows how both formats fit
+into sandbox creation, execution, and cleanup.</p>
+<p>Use JSON Schema Draft 2020-12 with inline definitions. References (<code>$ref</code>,
+<code>$dynamicRef</code>, <code>$recursiveRef</code>) and regex keywords (<code>pattern</code>,
+<code>patternProperties</code>) are rejected. Use types, enums, required fields, lengths,
+and numeric bounds. <code>format</code> and custom keywords are annotations, not enforced
+checks.</p>
+<h2 id="check-your-changes">Check your changes</h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>oar<span class="w"> </span>validate<span class="w"> </span>./profiles/code-reviewer
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>oar<span class="w"> </span>run<span class="w"> </span>./profiles/code-reviewer<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--task<span class="w"> </span>review-repository<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>--input<span class="w"> </span>./my-project<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">  </span>--output<span class="w"> </span>./code-review.json<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">  </span>--dry-run
+</span></code></pre></div>
+<p><code>validate</code> checks every task and its resources. <code>--dry-run</code> also checks the
+selected task's input and variables and prints the planned commands. Neither
+runs the agent. When both succeed, remove <code>--dry-run</code> to try the task.</p>
 
 
 
@@ -1529,23 +1929,24 @@ OpenShell Research projects.</p>
       
       <nav class="md-footer__inner md-grid" aria-label="Continue reading" >
         
-          <a href="./.." class="md-footer__link md-footer__link--prev" aria-label="Back to OpenShell Research">
+          
+          <a href="../reviews/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Run reviews">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
             </div>
             <div class="md-footer__title">
-              <span class="md-footer__direction">Back</span>
-              <div class="md-ellipsis">OpenShell Research</div>
+              <span class="md-footer__direction">Previous</span>
+              <div class="md-ellipsis">Run reviews</div>
             </div>
           </a>
         
         
           
-          <a href="./egress-gate/" class="md-footer__link md-footer__link--next" aria-label="Next: Egress Gate">
+          <a href="../reference/" class="md-footer__link md-footer__link--next" aria-label="Next: Command reference">
             <div class="md-footer__title">
               <span class="md-footer__direction">Next</span>
-              <div class="md-ellipsis">Egress Gate</div>
+              <div class="md-ellipsis">Command reference</div>
             </div>
             <div class="md-footer__button md-icon">
               
@@ -1581,12 +1982,12 @@ OpenShell Research projects.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"search":"../../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
-      <script src="../assets/javascripts/bundle.6e5f0216.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.6e5f0216.min.js"></script>
       
-        <script src="../javascripts/navigation-drawer.js"></script>
+        <script src="../../../javascripts/navigation-drawer.js"></script>
       
     
   </body>

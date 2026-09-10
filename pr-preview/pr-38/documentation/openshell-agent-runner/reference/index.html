@@ -6,32 +6,30 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Technical guides for projects featured in OpenShell Dev Notes.">
+        <meta name="description" content="OAR commands, uploads, result handling, CI behavior, and troubleshooting.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
       
       
-        <link rel="canonical" href="https://nvidia.github.io/OpenShell-Research/documentation/">
+        <link rel="canonical" href="https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/reference/">
       
       
-        <link rel="prev" href="../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/">
+        <link rel="prev" href="../profiles/">
       
-      
-        <link rel="next" href="./egress-gate/">
       
       
         
       
       
-      <link rel="icon" href="../assets/brand/favicon.svg">
+      <link rel="icon" href="../../../assets/brand/favicon.svg">
       <meta name="generator" content="zensical-0.0.44">
     
     
   
     
       
-        <title>Documentation - OpenShell Research</title>
+        <title>Command reference - OpenShell Research</title>
       
     
   
@@ -40,12 +38,12 @@
       
         
       
-      <link rel="stylesheet" href="../assets/stylesheets/modern/main.fba56155.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/modern/main.fba56155.min.css">
       
         
           
         
-        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.dfe2e883.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/modern/palette.dfe2e883.min.css">
       
       
 
@@ -64,11 +62,11 @@
       
     
     
-      <link rel="stylesheet" href="../stylesheets/dev-notes.css">
+      <link rel="stylesheet" href="../../../stylesheets/dev-notes.css">
     
-      <link rel="stylesheet" href="../stylesheets/documentation.css">
+      <link rel="stylesheet" href="../../../stylesheets/documentation.css">
     
-    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    <script>__md_scope=new URL("../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
     
       
 
@@ -97,12 +95,12 @@
   
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="OpenShell Research">
-  <meta property="og:title" content="Documentation">
-  <meta property="og:description" content="Technical guides for projects featured in OpenShell Dev Notes.">
-  <meta property="og:url" content="https://nvidia.github.io/OpenShell-Research/documentation/">
+  <meta property="og:title" content="Command reference">
+  <meta property="og:description" content="OAR commands, uploads, result handling, CI behavior, and troubleshooting.">
+  <meta property="og:url" content="https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/reference/">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Documentation">
-  <meta name="twitter:description" content="Technical guides for projects featured in OpenShell Dev Notes.">
+  <meta name="twitter:title" content="Command reference">
+  <meta name="twitter:description" content="OAR commands, uploads, result handling, CI behavior, and troubleshooting.">
   
   
   
@@ -118,7 +116,7 @@
     }
   </script>
   
-    <link rel="alternate" type="text/markdown" href="index.md" title="Markdown source">
+    <link rel="alternate" type="text/markdown" href="../reference.md" title="Markdown source">
   
 
   </head>
@@ -140,7 +138,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#documentation" class="md-skip">
+        <a href="#command-reference" class="md-skip">
           Skip to content
         </a>
       
@@ -156,9 +154,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="./.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../../.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     <label class="md-header__button md-icon openshell-drawer-button" for="__drawer" role="button" tabindex="0" aria-label="Open navigation" aria-controls="primary-navigation" aria-expanded="false">
@@ -179,7 +177,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Documentation
+              Command reference
             
           </span>
         </div>
@@ -268,9 +266,9 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="./.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../../.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     OpenShell Research
@@ -322,7 +320,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../dev-notes/" class="md-nav__link ">
+            <a href="../../../dev-notes/" class="md-nav__link ">
               
   
   
@@ -419,7 +417,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dev-notes/posts/2026-08-27-adversarial-policy-review-long-horizon-agents/" class="md-nav__link">
+      <a href="../../../dev-notes/posts/2026-08-27-adversarial-policy-review-long-horizon-agents/" class="md-nav__link">
         
   
   
@@ -446,7 +444,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dev-notes/posts/2026-08-07-formal-methods-ai-generated-robot-actions/" class="md-nav__link">
+      <a href="../../../dev-notes/posts/2026-08-07-formal-methods-ai-generated-robot-actions/" class="md-nav__link">
         
   
   
@@ -473,7 +471,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
+      <a href="../../../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
         
   
   
@@ -544,7 +542,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="././" class="md-nav__link md-nav__link--active">
+            <a href="../../" class="md-nav__link ">
               
   
   
@@ -561,7 +559,7 @@
             </a>
             
               
-              <label class="md-nav__link md-nav__link--active" for="__nav_2" id="__nav_2_label" tabindex="">
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
@@ -614,7 +612,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="./egress-gate/" class="md-nav__link ">
+            <a href="../../egress-gate/" class="md-nav__link ">
               
   
   
@@ -713,7 +711,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/configuration/" class="md-nav__link">
+      <a href="../../egress-gate/configuration/" class="md-nav__link">
         
   
   
@@ -740,7 +738,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/request-content/" class="md-nav__link">
+      <a href="../../egress-gate/request-content/" class="md-nav__link">
         
   
   
@@ -767,7 +765,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/evaluation/" class="md-nav__link">
+      <a href="../../egress-gate/evaluation/" class="md-nav__link">
         
   
   
@@ -794,7 +792,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/operations/" class="md-nav__link">
+      <a href="../../egress-gate/operations/" class="md-nav__link">
         
   
   
@@ -853,7 +851,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="./egress-gate/gates/" class="md-nav__link ">
+            <a href="../../egress-gate/gates/" class="md-nav__link ">
               
   
   
@@ -895,7 +893,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/gates/regex/" class="md-nav__link">
+      <a href="../../egress-gate/gates/regex/" class="md-nav__link">
         
   
   
@@ -922,7 +920,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/gates/custom/" class="md-nav__link">
+      <a href="../../egress-gate/gates/custom/" class="md-nav__link">
         
   
   
@@ -983,7 +981,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="./egress-gate/architecture/" class="md-nav__link ">
+            <a href="../../egress-gate/architecture/" class="md-nav__link ">
               
   
   
@@ -1025,7 +1023,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/architecture/request-lifecycle/" class="md-nav__link">
+      <a href="../../egress-gate/architecture/request-lifecycle/" class="md-nav__link">
         
   
   
@@ -1052,7 +1050,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/architecture/admission/" class="md-nav__link">
+      <a href="../../egress-gate/architecture/admission/" class="md-nav__link">
         
   
   
@@ -1079,7 +1077,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/architecture/service-boundary/" class="md-nav__link">
+      <a href="../../egress-gate/architecture/service-boundary/" class="md-nav__link">
         
   
   
@@ -1165,7 +1163,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./egress-gate/reference/limits-and-failures/" class="md-nav__link">
+      <a href="../../egress-gate/reference/limits-and-failures/" class="md-nav__link">
         
   
   
@@ -1205,6 +1203,8 @@
                 
   
   
+    
+  
   
   
     
@@ -1226,15 +1226,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="./openshell-agent-runner/" class="md-nav__link ">
+            <a href="../" class="md-nav__link ">
               
   
   
@@ -1257,7 +1257,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1276,7 +1276,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./openshell-agent-runner/reviews/" class="md-nav__link">
+      <a href="../reviews/" class="md-nav__link">
         
   
   
@@ -1303,7 +1303,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./openshell-agent-runner/profiles/" class="md-nav__link">
+      <a href="../profiles/" class="md-nav__link">
         
   
   
@@ -1327,10 +1327,36 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="./openshell-agent-runner/reference/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Command reference
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1345,6 +1371,110 @@
   
 
       </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Commands
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Run options
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choose-a-gateway-and-workspace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Choose a gateway and workspace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upload-supporting-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Upload supporting files
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-happens-during-a-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        What happens during a run
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-oar-in-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Use OAR in CI
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Troubleshooting
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1382,6 +1512,11 @@
                       
                     
                     
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
                   
                   <div class="md-sidebar__inner">
                     
@@ -1393,6 +1528,97 @@
   
     
   
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Commands
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Commands">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#run-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Run options
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choose-a-gateway-and-workspace" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Choose a gateway and workspace
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#upload-supporting-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Upload supporting files
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-happens-during-a-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        What happens during a run
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-oar-in-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Use OAR in CI
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Troubleshooting
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -1417,7 +1643,7 @@
   
   
     <li class="md-path__item">
-      <a href="./.." class="md-path__link">
+      <a href="../../.." class="md-path__link">
         
   
   <span class="md-ellipsis">
@@ -1449,11 +1675,45 @@
     
     
       <li class="md-path__item">
-        <a href="././" class="md-path__link">
+        <a href="../../" class="md-path__link">
           
   
   <span class="md-ellipsis">
     Documentation
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    OpenShell Agent Runner
   </span>
 
         </a>
@@ -1475,20 +1735,277 @@
 
 
   
-  <a href="index.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
+  <a href="../reference.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.56 18H3.44C2.65 18 2 17.37 2 16.59V7.41C2 6.63 2.65 6 3.44 6h17.12c.79 0 1.44.63 1.44 1.41v9.18c0 .78-.65 1.41-1.44 1.41M3.44 6.94c-.26 0-.48.21-.48.47v9.19c0 .25.22.46.48.46h17.12c.26 0 .48-.21.48-.46V7.41c0-.26-.22-.47-.48-.47zm1.45 8.25V8.81h1.92l1.92 2.35 1.92-2.35h1.93v6.38h-1.93v-3.66l-1.92 2.35-1.92-2.35v3.66zm12.01 0-2.9-3.1h1.94V8.81h1.92v3.28h1.93z"/></svg>
   </a>
 
 
-<h1 id="documentation">Documentation</h1>
-<p>Technical documentation and references for installing, using, and extending
-OpenShell Research projects.</p>
-<ul>
-<li><a href="egress-gate/">Egress Gate</a>: extensible middleware for applying gates
-  to outgoing HTTP requests.</li>
-<li><a href="openshell-agent-runner/">OpenShell Agent Runner</a>: launch ephemeral
-  agents for single, bounded tasks in CI and automated workflows.</li>
-</ul>
+<h1 id="command-reference">Command reference</h1>
+<h2 id="commands">Commands</h2>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>oar --version</code></td>
+<td>Display the installed OAR version.</td>
+</tr>
+<tr>
+<td><code>oar init PROFILE_ROOT --model MODEL_ID</code></td>
+<td>Create editable copies of the packaged profiles.</td>
+</tr>
+<tr>
+<td><code>oar validate PROFILE_DIRECTORY</code></td>
+<td>Check the profile and its local resources.</td>
+</tr>
+<tr>
+<td><code>oar doctor</code></td>
+<td>Display the OpenShell version, gateway status, and inference configuration.</td>
+</tr>
+<tr>
+<td><code>oar run PROFILE_DIRECTORY --task TASK --output PATH</code></td>
+<td>Run a task and save its result.</td>
+</tr>
+</tbody>
+</table>
+<p><code>init</code> creates both profiles by default. Repeat <code>--profile NAME</code> to select
+which ones to create. It refuses to overwrite existing profile directories.
+<code>--thinking</code> accepts <code>off</code>, <code>minimal</code>, <code>low</code>, <code>medium</code>, <code>high</code> (default),
+<code>xhigh</code>, or <code>max</code>; choose a level your model supports.</p>
+<p>Use <code>oar COMMAND --help</code> for all options. For a task's inputs, variables, and
+output format, put the profile and task before <code>--help</code>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>oar<span class="w"> </span>run<span class="w"> </span>./profiles/code-reviewer<span class="w"> </span>--task<span class="w"> </span>review-repository<span class="w"> </span>--help
+</span></code></pre></div>
+<h3 id="run-options">Run options</h3>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Meaning / default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--task NAME</code></td>
+<td>Required. Select a task in the profile.</td>
+</tr>
+<tr>
+<td><code>--output PATH</code></td>
+<td>Required. Save the result to this path on your machine.</td>
+</tr>
+<tr>
+<td><code>--input PATH</code></td>
+<td>Required when the task declares a document or repository input.</td>
+</tr>
+<tr>
+<td><code>--prompt-var NAME=VALUE</code></td>
+<td>Set a declared prompt variable. Repeat for several.</td>
+</tr>
+<tr>
+<td><code>--upload SOURCE:DESTINATION</code></td>
+<td>Upload a supporting file or directory. Repeat for several.</td>
+</tr>
+<tr>
+<td><code>--env KEY=VALUE</code></td>
+<td>Add a non-secret sandbox environment value. Repeat for several.</td>
+</tr>
+<tr>
+<td><code>--gateway NAME</code></td>
+<td>Use this gateway; otherwise use OpenShell's selected gateway.</td>
+</tr>
+<tr>
+<td><code>--workspace NAME</code></td>
+<td>Use this OpenShell workspace. Default: <code>default</code>.</td>
+</tr>
+<tr>
+<td><code>--timeout-seconds N</code></td>
+<td>Timeout for sandbox creation and agent execution, applied separately. Default: <code>1200</code>.</td>
+</tr>
+<tr>
+<td><code>--dry-run</code></td>
+<td>Validate the request and print planned operations without executing them.</td>
+</tr>
+<tr>
+<td><code>--keep-sandbox</code></td>
+<td>Retain the sandbox and print its name for debugging.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="choose-a-gateway-and-workspace">Choose a gateway and workspace</h3>
+<p>A gateway runs your sandboxes and connects them to inference. A workspace is a
+named group of resources on that gateway. It is different from the
+<code>/workspace</code> directory inside a sandbox.</p>
+<p>Use the same <code>--gateway</code> and <code>--workspace</code> options with <code>doctor</code> and <code>run</code>.
+OAR uses existing gateways, workspaces, and inference configuration; manage
+them through OpenShell.</p>
+<p><code>doctor</code> displays configuration; it does not send a model request. Exit 0 means
+the inspection commands succeeded, not that inference is ready. If inference
+shows <code>Not configured</code>, configure a provider and route in OpenShell before
+running a task.</p>
+<h2 id="upload-supporting-files">Upload supporting files</h2>
+<p>Use <code>--input</code> for the task's main file or directory. Use <code>--upload</code> for
+additional material, with a local source on the left and a sandbox destination
+on the right:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Path the agent sees</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--input ./notes.txt</code> on a document task</td>
+<td><code>/workspace/input/document.txt</code></td>
+</tr>
+<tr>
+<td><code>--input ./my-project</code> on a repository task</td>
+<td><code>/workspace/input/my-project/</code></td>
+</tr>
+<tr>
+<td><code>--upload ./requirements.md:/workspace/requirements.md</code></td>
+<td><code>/workspace/requirements.md</code></td>
+</tr>
+<tr>
+<td><code>--upload ./references:/workspace</code></td>
+<td><code>/workspace/references/</code></td>
+</tr>
+</tbody>
+</table>
+<p>Document inputs preserve ordinary file extensions. Directory uploads place the
+source directory <strong>inside</strong> the destination, like <code>cp</code>. Point the prompt or
+<code>context</code> variable at supporting files so the agent knows why they are there.</p>
+<p>For uploads shared by every run, use <code>sandbox.upload</code> in <code>profile.yaml</code>.
+Uploads happen in order: profile uploads, required input, additional CLI
+uploads, then OAR's runtime files. Earlier files can be overwritten by later
+uploads. Relative upload sources are resolved from the caller's working
+directory. Use <code>/workspace</code> for your files; <code>/sandbox/oar-runtime</code> and
+<code>/sandbox/artifacts</code> are reserved for OAR.</p>
+<p>Upload only what the agent needs. The destination may be a remote machine.
+Keep secrets in OpenShell's provider configuration; prompt variables and
+<code>--env</code> are for non-secret values. Environment names use letters, numbers, and
+underscores, cannot start with a number, and cannot start with <code>OPENSHELL_</code>.</p>
+<h2 id="what-happens-during-a-run">What happens during a run</h2>
+<p>Each <code>oar run</code> moves work from your machine into a new sandbox and brings back
+one result. OAR checks the request before attempting to create the sandbox.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>1. PREPARE · your machine / CI
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>   Load profile + task + input
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>   Fill in prompt variables
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>              |
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>              v
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>2. RUN · new OpenShell sandbox
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>   Create using the profile's policy
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>   Upload input, prompt, skills + schema*
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>   Run the agent using gateway inference
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>              |
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>              v
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>3. COLLECT · your machine / CI
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>   Download and validate the result
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>   Pass --&gt; save to --output
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>   Fail --&gt; keep existing output
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>              |
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>              v
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>4. CLEAN UP · on success or failure
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>   Verify ownership, then delete sandbox
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>   --keep-sandbox skips deletion
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>   Gateway stays running
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>* If the selected task declares a schema.
+</span></code></pre></div>
+<p>OAR downloads only the result, which must be non-empty and no larger than
+1 MiB. For a JSON task, it must also match the
+<a href="../profiles/#choose-the-result-format">schema named by the profile task</a>. OAR
+replaces the host output only after validation succeeds; a failed download or
+invalid result leaves an existing output untouched.</p>
+<p>Once sandbox creation is attempted, any failure skips the remaining steps and
+goes to cleanup. OAR checks the sandbox name and its <code>oar-run-id</code> ownership label
+before deleting it; if that check fails, it leaves the sandbox alone.
+<code>--keep-sandbox</code> skips deletion. Cleanup can fail after the result has already
+been saved; it does not undo that output.</p>
+<h2 id="use-oar-in-ci">Use OAR in CI</h2>
+<p>A CI job uses the same <code>oar run</code> command as a terminal. Install OAR and OpenShell,
+make the gateway and inference route available, then run the profile and retain
+the output file. Version the profile alongside the project and pin the OAR
+release in the job.</p>
+<p>One gateway can serve several sequential runs; each run gets its own sandbox.
+Use the CI job's timeout to cap total wall time: <code>--timeout-seconds</code> applies to
+creation and execution separately, and uploads and cleanup take additional time.</p>
+<table>
+<thead>
+<tr>
+<th>Exit code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0</code></td>
+<td>The result was validated and saved, and requested cleanup succeeded.</td>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td>OpenShell execution, timeout, download, ownership checking, or cleanup failed.</td>
+</tr>
+<tr>
+<td><code>2</code></td>
+<td>A command argument, profile, input, or prompt variable was invalid.</td>
+</tr>
+<tr>
+<td><code>3</code></td>
+<td>The downloaded result was empty or failed validation.</td>
+</tr>
+</tbody>
+</table>
+<p>These are <strong>run</strong> outcomes. A reviewer can return <code>needs_changes</code> while OAR exits
+with <code>0</code>. Read the JSON verdict if your CI policy depends on the review.</p>
+<p>For this repository's workflow and PR reports, see the
+<a href="https://github.com/NVIDIA/OpenShell-Research/blob/main/docs/development/ci.md">repository CI guide</a>.</p>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Next step</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>oar: command not found</code> after installation</td>
+<td>Run <code>uv tool update-shell</code>, then open a new terminal.</td>
+</tr>
+<tr>
+<td><code>doctor</code> cannot connect</td>
+<td>Check OpenShell gateway status and that you selected the intended gateway.</td>
+</tr>
+<tr>
+<td>No inference route or model request fails</td>
+<td>Check the route in OpenShell, then the model ID and thinking level in your profile.</td>
+</tr>
+<tr>
+<td><code>init</code> says a profile already exists</td>
+<td>Use the existing profile or choose a new destination.</td>
+</tr>
+<tr>
+<td>Unknown task or prompt variable</td>
+<td>Run task-specific <code>--help</code> and check <code>profile.yaml</code>.</td>
+</tr>
+<tr>
+<td>Missing or invalid result</td>
+<td>Read the run's errors; use <code>--keep-sandbox</code> on the next run to inspect it.</td>
+</tr>
+<tr>
+<td>No output with <code>--dry-run</code></td>
+<td>Expected: the plan is printed, but no result file is created.</td>
+</tr>
+</tbody>
+</table>
+<p>To run the current source without installing a tool, use <code>uv run --frozen oar</code>
+from <code>projects/openshell-agent-runner</code>. See <a href="../#1-install-and-check-the-connection">installation</a>
+for making this version available as <code>oar</code> from any directory.</p>
 
 
 
@@ -1529,29 +2046,18 @@ OpenShell Research projects.</p>
       
       <nav class="md-footer__inner md-grid" aria-label="Continue reading" >
         
-          <a href="./.." class="md-footer__link md-footer__link--prev" aria-label="Back to OpenShell Research">
+          
+          <a href="../profiles/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Customize profiles">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
             </div>
             <div class="md-footer__title">
-              <span class="md-footer__direction">Back</span>
-              <div class="md-ellipsis">OpenShell Research</div>
+              <span class="md-footer__direction">Previous</span>
+              <div class="md-ellipsis">Customize profiles</div>
             </div>
           </a>
         
-        
-          
-          <a href="./egress-gate/" class="md-footer__link md-footer__link--next" aria-label="Next: Egress Gate">
-            <div class="md-footer__title">
-              <span class="md-footer__direction">Next</span>
-              <div class="md-ellipsis">Egress Gate</div>
-            </div>
-            <div class="md-footer__button md-icon">
-              
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </div>
-          </a>
         
       </nav>
     
@@ -1581,12 +2087,12 @@ OpenShell Research projects.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"search":"../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"search":"../../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
-      <script src="../assets/javascripts/bundle.6e5f0216.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.6e5f0216.min.js"></script>
       
-        <script src="../javascripts/navigation-drawer.js"></script>
+        <script src="../../../javascripts/navigation-drawer.js"></script>
       
     
   </body>

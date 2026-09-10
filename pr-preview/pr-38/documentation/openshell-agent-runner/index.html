@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Launch ephemeral agents for bounded tasks in CI and automated workflows.">
+        <meta name="description" content="Install OAR, connect to OpenShell, and run your first agent review.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
@@ -17,6 +17,8 @@
       
         <link rel="prev" href="../egress-gate/reference/limits-and-failures/">
       
+      
+        <link rel="next" href="./reviews/">
       
       
         
@@ -29,7 +31,7 @@
   
     
       
-        <title>Launch ephemeral agents with OpenShell Agent Runner - OpenShell Research</title>
+        <title>OpenShell Agent Runner - OpenShell Research</title>
       
     
   
@@ -95,12 +97,12 @@
   
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="OpenShell Research">
-  <meta property="og:title" content="Launch ephemeral agents with OpenShell Agent Runner">
-  <meta property="og:description" content="Launch ephemeral agents for bounded tasks in CI and automated workflows.">
+  <meta property="og:title" content="OpenShell Agent Runner">
+  <meta property="og:description" content="Install OAR, connect to OpenShell, and run your first agent review.">
   <meta property="og:url" content="https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Launch ephemeral agents with OpenShell Agent Runner">
-  <meta name="twitter:description" content="Launch ephemeral agents for bounded tasks in CI and automated workflows.">
+  <meta name="twitter:title" content="OpenShell Agent Runner">
+  <meta name="twitter:description" content="Install OAR, connect to OpenShell, and run your first agent review.">
   
   
   
@@ -138,7 +140,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#launch-ephemeral-agents-with-openshell-agent-runner-oar" class="md-skip">
+        <a href="#openshell-agent-runner" class="md-skip">
           Skip to content
         </a>
       
@@ -177,7 +179,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Launch ephemeral agents with OpenShell Agent Runner
+              OpenShell Agent Runner
             
           </span>
         </div>
@@ -1214,6 +1216,12 @@
           
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -1244,6 +1252,11 @@
 
             </a>
             
+              
+              <label class="md-nav__link md-nav__link--active" for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
           </div>
         
         <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="true">
@@ -1256,6 +1269,87 @@
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./reviews/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Run reviews
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Customize profiles
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Command reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
               
             
           </ul>
@@ -1314,10 +1408,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
+  <a href="#before-you-start" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Requirements
+        Before you start
       </span>
     </span>
   </a>
@@ -1325,10 +1419,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#run-the-starter-task" class="md-nav__link">
+  <a href="#1-install-and-check-the-connection" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Run the starter task
+        1. Install and check the connection
       </span>
     </span>
   </a>
@@ -1336,10 +1430,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#why-oar-fits-ci" class="md-nav__link">
+  <a href="#2-create-your-profiles" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Why OAR fits CI
+        2. Create your profiles
       </span>
     </span>
   </a>
@@ -1347,49 +1441,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#profile-inputs" class="md-nav__link">
+  <a href="#3-run-your-first-review" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Profile inputs
-      </span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Profile inputs">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#prompt-variables" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Prompt variables
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tools-and-extensions" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Tools and extensions
-      </span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#run-lifecycle" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Run lifecycle
+        3. Run your first review
       </span>
     </span>
   </a>
@@ -1397,10 +1452,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#uploads" class="md-nav__link">
+  <a href="#4-read-the-result" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Uploads
+        4. Read the result
       </span>
     </span>
   </a>
@@ -1408,54 +1463,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#result-handling" class="md-nav__link">
+  <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Result handling
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#native-command-sequence" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Native command sequence
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#security-boundaries" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Security boundaries
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#failure-boundaries" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Failure boundaries
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#develop-oar" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Develop OAR
+        Next steps
       </span>
     </span>
   </a>
@@ -1542,6 +1553,12 @@
           
         
       
+        
+      
+        
+      
+        
+      
     
     
     
@@ -1578,314 +1595,97 @@
   </a>
 
 
-<h1 id="launch-ephemeral-agents-with-openshell-agent-runner-oar">Launch ephemeral agents with OpenShell Agent Runner (OAR)</h1>
-<p>OpenShell Agent Runner (OAR) is a CLI for launching an ephemeral agent to
-accomplish one configurable task. Each <code>oar run</code> creates an isolated OpenShell
-sandbox, starts Pi with the selected profile, publishes one result, and removes
-the sandbox. The agent exists only for that run, making OAR well suited to CI
-jobs and other automated workflows.</p>
-<h2 id="requirements">Requirements</h2>
-<ul>
-<li><a href="https://docs.astral.sh/uv/"><code>uv</code></a>.</li>
-<li>OpenShell 0.0.111 or newer.</li>
-<li>A running OpenShell gateway that the host can reach.</li>
-<li>An inference route and its model ID.</li>
-</ul>
-<p>OAR uses this existing OpenShell configuration. It does not create gateways,
-providers, workspaces, inference routes, or credentials. It uses the gateway's
-<code>default</code> workspace unless you select another one. An OpenShell workspace is a
-gateway-side namespace for sandboxes, inference routes, and access controls; it
-is not the <code>/workspace</code> directory inside a sandbox.</p>
-<h2 id="run-the-starter-task">Run the starter task</h2>
-<p>Choose the model ID configured on your inference route. Create every profile
-packaged with OAR, then check the gateway:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">MODEL_ID</span><span class="o">=</span><span class="s2">"provider/model"</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>uvx<span class="w"> </span>--from<span class="w"> </span>openshell-agent-runner<span class="w"> </span>oar<span class="w"> </span>init<span class="w"> </span>./profiles<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--model<span class="w"> </span><span class="s2">"</span><span class="nv">$MODEL_ID</span><span class="s2">"</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>uvx<span class="w"> </span>--from<span class="w"> </span>openshell-agent-runner<span class="w"> </span>oar<span class="w"> </span>doctor<span class="w"> </span>--gateway<span class="w"> </span>openshell
-</span></code></pre></div>
-<p>Validate the included profile, then preview the run without creating a sandbox:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">printf</span><span class="w"> </span><span class="s1">'# Review me\n\nA short document.\n'</span><span class="w"> </span>&gt;<span class="w"> </span>document.md
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>uvx<span class="w"> </span>--from<span class="w"> </span>openshell-agent-runner<span class="w"> </span>oar<span class="w"> </span>validate<span class="w"> </span>./profiles/reviewer
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>uvx<span class="w"> </span>--from<span class="w"> </span>openshell-agent-runner<span class="w"> </span>oar<span class="w"> </span>run<span class="w"> </span>./profiles/reviewer<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span>--task<span class="w"> </span>review-document<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span>--gateway<span class="w"> </span>openshell<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span>--input<span class="w"> </span>document.md<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span>--output<span class="w"> </span>/tmp/oar-review.md<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span>--dry-run
-</span></code></pre></div>
-<p>Remove <code>--dry-run</code> to launch the agent. A successful run writes the review to
-<code>/tmp/oar-review.md</code>. Replace <code>provider/model</code> with the route's model ID and
-<code>openshell</code> with your gateway name.</p>
-<p><code>init</code> copies packaged profiles into an ordinary local directory so they can be
-inspected, edited, and committed. Omit <code>--profile</code> to create all packaged
-profiles. Use repeatable <code>--profile NAME</code> options to select a subset. The
-required <code>--model</code> value is written into Pi's model registry and runtime
-selection; OAR does not read <code>MODEL_ID</code> implicitly. Use <code>--thinking LEVEL</code> to
-override the default <code>high</code> thinking level, or <code>--thinking off</code> when the model
-does not support reasoning.</p>
-<h2 id="why-oar-fits-ci">Why OAR fits CI</h2>
-<p>This bounded lifecycle is designed for CI and other automated workflows: a job
-can provide explicit inputs, run one review or transformation, consume the
-result, and finish without maintaining a long-lived agent service. The profile
-defines the task behavior through its prompt, tools, skills, extensions,
-uploads, model settings, and sandbox policy.</p>
-<p>Profiles can be versioned with the repository, while stable exit codes and an
-explicit output path make the result available to later job steps. The CI worker
-must have access to an existing OpenShell gateway and inference route; OAR does
-not provision providers or credentials.</p>
+<h1 id="openshell-agent-runner">OpenShell Agent Runner</h1>
+<p>OpenShell Agent Runner (OAR) runs an agent task in an isolated OpenShell sandbox
+and saves the result to a file. Use it to review a project, improve a technical
+document, or run your own tasks from a terminal or CI job.</p>
 <figure class="documentation-figure documentation-figure--wide">
-  <img src="assets/diagrams/system-overview.svg" alt="A user or CI job invokes OAR for one task. OAR launches an ephemeral Pi agent in an OpenShell sandbox, publishes its result, and removes the sandbox.">
-  <figcaption>One CLI invocation launches one ephemeral agent, produces one result, and cleans up.</figcaption>
+  <a href="assets/diagrams/system-overview.svg" aria-label="Open the OAR architecture diagram at full size">
+    <img src="assets/diagrams/system-overview.svg" alt="Three independent OAR runs share one OpenShell gateway. Each sandbox uses a profile containing prompts and skills: code-reviewer for two runs and technical-writing-reviewer for one. Inputs and results remain separate for each run.">
+  </a>
+  <figcaption>Each profile supplies prompts and skills to its agent. Runs stay isolated, even when they share a profile. Select the diagram to view it at full size.</figcaption>
 </figure>
 
-<h2 id="profile-inputs">Profile inputs</h2>
-<p>A profile directory is the complete task configuration:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>profile/
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── profile.yaml       Task, sandbox policy, tools, skills, and extensions
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>├── models.json        Pi provider and model definition
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>├── settings.json      Pi model selection and thinking level
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>├── policy.yaml        OpenShell sandbox policy
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>├── prompts/           Task instructions
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>├── schemas/           Optional result schemas
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>├── skills/            Optional Pi skills
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>└── extensions/        Optional Pi extensions
+<p>A <strong>profile</strong> packages task prompts, reusable skills, model settings, and sandbox
+permissions. A <strong>task</strong> is one job defined in that profile; it selects the prompt
+and skills to use. You choose a profile, select a task, and provide the input and
+output paths.</p>
+<h2 id="before-you-start">Before you start</h2>
+<p>Install <a href="https://docs.astral.sh/uv/getting-started/installation/">uv</a> and set up
+OpenShell 0.0.111 or newer. You need a running <strong>gateway</strong> and configured
+<strong>inference</strong>: the connection that lets the agent use your model. Follow the
+<a href="https://docs.nvidia.com/openshell/latest/get-started/quickstart">OpenShell quickstart</a>
+if you have not set these up yet.</p>
+<p>OAR uses your existing OpenShell configuration. API keys and provider setup
+belong there.</p>
+<h2 id="1-install-and-check-the-connection">1. Install and check the connection</h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>openshell-agent-runner
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>oar<span class="w"> </span>doctor
 </span></code></pre></div>
-<p>The CLI supplies run-specific values:</p>
-<ul>
-<li><code>--task</code> selects a task from <code>profile.yaml</code>.</li>
-<li><code>--upload SOURCE:DESTINATION</code> uploads a file or directory using OpenShell's
-  native mapping format. It may be repeated.</li>
-<li><code>--input PATH</code> supplies the file or directory required by the selected task.
-  A <code>document</code> input is uploaded beneath <code>/workspace/input</code> with its ordinary
-  file extension preserved. A <code>repository</code> input is uploaded beneath the same
-  directory. OAR sets <code>REPOSITORY_ROOT</code> to the resulting document or repository
-  directory.</li>
-<li><code>--prompt-var NAME=VALUE</code> supplies a non-secret runtime prompt variable. It
-  may be repeated for tasks that declare more than one variable.</li>
-<li><code>--env KEY=VALUE</code> adds a sandbox environment value.</li>
-<li><code>--gateway</code> selects an existing OpenShell gateway.</li>
-<li><code>--workspace</code> selects a gateway-side OpenShell namespace. It defaults to
-  <code>default</code> and is unrelated to the sandbox's <code>/workspace</code> directory.</li>
-<li><code>--output</code> selects the host result path.</li>
-<li><code>--timeout-seconds</code> limits the agent run.</li>
-</ul>
-<p>Environment keys start with a letter or underscore and contain only letters,
-digits, and underscores. They cannot start with OpenShell's reserved
-<code>OPENSHELL_</code> prefix.</p>
-<h3 id="prompt-variables">Prompt variables</h3>
-<p>Tasks can declare string variables used by their prompt template:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">tasks</span><span class="p">:</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">review-repository</span><span class="p">:</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">required_input</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">repository</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">prompt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prompt-repository.md</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">prompt_variables</span><span class="p">:</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">      </span><span class="nt">focus</span><span class="p">:</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">        </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Files or directories that deserve special attention.</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">        </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Review the entire repository.</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">      </span><span class="nt">context</span><span class="p">:</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">        </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Additional context that should inform the review.</span>
+<p>Alternatively, use <code>uvx --from openshell-agent-runner oar</code> in place of <code>oar</code>.</p>
+<p><code>doctor</code> displays the OpenShell version, gateway status, and inference
+configuration. Check that a model is configured and note its model ID for the
+next step.</p>
+<p>The commands on this page use your selected gateway and its <code>default</code> workspace.
+To choose another target, add <code>--gateway NAME --workspace NAME</code> to <code>doctor</code> and
+<code>run</code>. See <a href="reference/#choose-a-gateway-and-workspace">connection options</a>.</p>
+<h2 id="2-create-your-profiles">2. Create your profiles</h2>
+<p>Replace <code>YOUR_MODEL_ID</code> with your configured inference model ID:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>oar<span class="w"> </span>init<span class="w"> </span>./profiles<span class="w"> </span>--model<span class="w"> </span>YOUR_MODEL_ID
 </span></code></pre></div>
-<p>Variables with defaults are optional; variables without defaults are required.
-Callers can supply several independent values by repeating the option:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>--prompt-var<span class="w"> </span><span class="nv">focus</span><span class="o">=</span><span class="s2">"src/auth and tests/auth"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>--prompt-var<span class="w"> </span><span class="nv">context</span><span class="o">=</span><span class="s2">"Pre-release security review"</span>
+<p>You now have two editable profiles:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>profiles/
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── code-reviewer/               Review a local project directory
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>└── technical-writing-reviewer/  Review a technical document
 </span></code></pre></div>
-<p>Templates reference declared variables by name and OAR metadata through the
-reserved <code>oar</code> namespace:</p>
-<div class="language-markdown highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>Inspect <span class="sb">`{{ oar.input_path }}`</span>, originally provided as
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="sb">`{{ oar.input_name }}`</span>.
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>Focus: {{ focus }}
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>Context: {{ context }}
+<p>The default thinking level is <code>high</code>. For a model without reasoning support,
+add <code>--thinking off</code> to <code>init</code>.</p>
+<h2 id="3-run-your-first-review">3. Run your first review</h2>
+<p>Choose an existing text file, such as a README, design note, or draft blog post.
+Replace <code>./README.md</code> with its path:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>oar<span class="w"> </span>run<span class="w"> </span>./profiles/technical-writing-reviewer<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--task<span class="w"> </span>review-document<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--input<span class="w"> </span>./README.md<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--output<span class="w"> </span>./review.json
 </span></code></pre></div>
-<p>Tasks with required inputs receive <code>oar.input_path</code> and <code>oar.input_name</code>.
-Substitution is literal: prompt templates do not support expressions,
-conditionals, loops, or shell evaluation. Unknown, duplicated, missing, unused,
-and malformed variables are rejected before the sandbox starts.</p>
-<h3 id="tools-and-extensions">Tools and extensions</h3>
-<p>Each task lists the tools Pi may use. OAR accepts Pi's built-in <code>bash</code>, <code>edit</code>,
-<code>find</code>, <code>grep</code>, <code>ls</code>, <code>read</code>, and <code>write</code> tools. Declare a custom tool alongside
-the extension that provides it:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">tasks</span><span class="p">:</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">check</span><span class="p">:</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="nt">prompt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prompts/check.md</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="nt">tools</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">read</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">custom_check</span><span class="p p-Indicator">]</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="nt">extensions</span><span class="p">:</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">extensions/custom-check.ts</span>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">        </span><span class="nt">tools</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">custom_check</span><span class="p p-Indicator">]</span>
-</span></code></pre></div>
-<p>Validation rejects unknown tools, missing extension files, and custom tools
-without a matching extension declaration. Before inference starts, OAR checks
-the tools Pi actually registered. A misspelled built-in or an extension that
-fails to register its declared tool stops the task instead of silently removing
-the tool.</p>
-<h2 id="run-lifecycle">Run lifecycle</h2>
-<figure class="documentation-figure documentation-figure--wide">
-  <img src="assets/diagrams/run-lifecycle.svg" alt="A run validates its profile, prepares runtime files, creates an OpenShell sandbox, starts Pi, downloads and validates the result, publishes it, verifies ownership, and deletes the sandbox.">
-  <figcaption>One run launches one ephemeral agent in one sandbox and produces one published result.</figcaption>
-</figure>
-
-<p>The sequence is:</p>
-<ol>
-<li>Load <code>profile.yaml</code>, <code>models.json</code>, and <code>settings.json</code>; validate every
-   referenced local resource.</li>
-<li>Resolve the selected task, uploads, environment, gateway, workspace, and
-   output path.</li>
-<li>Prepare a temporary Pi runtime bundle containing the prompt, model files,
-   configured skills and extensions, and optional output schema.</li>
-<li>Create a persistent sandbox with the packaged image context, sandbox policy,
-   and ownership label, then upload the task inputs and prepared runtime files.</li>
-<li>Run <code>/opt/oar/pi/exec.sh</code> with <code>openshell sandbox exec</code>. Inside the sandbox,
-   the script installs the Pi settings, changes
-   to <code>REPOSITORY_ROOT</code>, and passes the prompt to <code>pi --print</code> through standard
-   input:</li>
-</ol>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>pi<span class="w"> </span>--print<span class="w"> </span>...<span class="w"> </span>&lt;<span class="w"> </span>/sandbox/oar-runtime/prompt.md
-</span></code></pre></div>
-<ol>
-<li>Pi reads uploaded files, uses its declared tools, and accesses inference
-   through OpenShell's managed inference path.</li>
-<li>OAR downloads <code>/sandbox/artifacts/result</code> under a one-MiB file limit,
-   validates it, and atomically replaces the requested host output.</li>
-<li>OAR verifies the sandbox name and <code>oar-run-id</code> ownership label before
-   deleting it. <code>--keep-sandbox</code> skips this cleanup.</li>
-</ol>
-<h2 id="uploads">Uploads</h2>
-<p>OAR uses OpenShell's term <strong>upload</strong> for files transferred into the sandbox.
-General uploads accept files or directories:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>--upload<span class="w"> </span>./document.md:/workspace/document.md
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>--upload<span class="w"> </span>./repository:/workspace
-</span></code></pre></div>
-<p>OpenShell treats a directory destination like <code>cp</code>: it creates the source
-directory beneath that destination. Uploads run in declaration order, so more
-than one source can intentionally merge into the same destination.</p>
-<p>The packaged reviewer uses task-specific required inputs:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>oar<span class="w"> </span>run<span class="w"> </span>./profiles/reviewer<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span>--task<span class="w"> </span>review-document<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span>--input<span class="w"> </span>./document.md<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span>--output<span class="w"> </span>./document-review.md
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
-</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>oar<span class="w"> </span>run<span class="w"> </span>./profiles/reviewer<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span>--task<span class="w"> </span>review-repository<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span>--input<span class="w"> </span>./repository<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">  </span>--prompt-var<span class="w"> </span><span class="nv">focus</span><span class="o">=</span><span class="s2">"src/auth and tests/auth"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">  </span>--prompt-var<span class="w"> </span><span class="nv">context</span><span class="o">=</span><span class="s2">"Pre-release security review"</span><span class="w"> </span><span class="se">\</span>
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">  </span>--output<span class="w"> </span>./repository-review.md
-</span></code></pre></div>
-<p>Document tasks require a file and repository tasks require a directory. For a
-repository task, OAR makes the uploaded repository the agent's working
-directory. The repository is an uploaded snapshot; changes inside the sandbox
-are disposable and are not synchronized back to the host.</p>
-<p>Uploads come from three places:</p>
+<p>OAR uploads the file, runs the reviewer, saves the result, and removes the
+sandbox. Your original file is unchanged.</p>
+<p>To check the configuration and preview the commands first, add <code>--dry-run</code>.
+This does not contact the gateway or launch an agent.</p>
+<h2 id="4-read-the-result">4. Read the result</h2>
+<p>Open <code>review.json</code>. It contains a verdict, a summary, scores from 0 to 100,
+findings, strengths, and limitations. A higher score is better.</p>
 <table>
 <thead>
 <tr>
-<th>Source</th>
-<th>Contents</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Profile</td>
-<td><code>sandbox.upload</code> mappings shared by every run</td>
-</tr>
-<tr>
-<td>CLI</td>
-<td>Repeatable <code>--upload</code> mappings and the task's required <code>--input</code></td>
-</tr>
-<tr>
-<td>OAR</td>
-<td>Prompt, Pi model settings, skills, extensions, and optional schema</td>
-</tr>
-</tbody>
-</table>
-<p>Caller uploads normally live under <code>/workspace</code>. OAR runtime uploads live under
-<code>/sandbox/oar-runtime</code>, and results live under <code>/sandbox/artifacts</code>. Both
-<code>/sandbox</code> paths are reserved for OAR. Uploaded workspace changes are disposable
-and are not synchronized back to the host.</p>
-<h2 id="result-handling">Result handling</h2>
-<figure class="documentation-figure documentation-figure--wide">
-  <img src="assets/diagrams/result-handling.svg" alt="Without a schema, Pi's final response becomes the result. With a schema, Pi calls submit_result, receives Ajv errors until valid, and saves JSON. Both paths are downloaded, checked on the host, and atomically published.">
-  <figcaption>A task chooses plain output by default or structured output by declaring an output schema.</figcaption>
-</figure>
-
-<p>Without <code>output_schema</code>, Pi's final headless response becomes the result. OAR
-requires it to be present, non-empty, and no larger than one MiB.</p>
-<p>With <code>output_schema</code>, OAR automatically loads its built-in Pi extension and
-adds the generic <code>submit_result</code> tool to the agent session. Profiles do not need
-to provide this extension themselves. The tool uses TypeBox for its Pi tool
-parameters and Ajv for Draft 2020-12 validation. Invalid submissions return
-diagnostics to Pi, which can correct and resubmit inside the same agent session.
-OAR validates the downloaded JSON against the same schema again before
-publishing it.</p>
-<p>Both validators treat extension keywords and JSON Schema <code>format</code> values as
-annotations. OAR rejects <code>pattern</code> and <code>patternProperties</code> because Python and
-JavaScript use different regular-expression dialects. Use portable structural
-keywords such as <code>type</code>, <code>enum</code>, <code>const</code>, length, and numeric bounds instead.
-OAR also rejects <code>$ref</code>, <code>$dynamicRef</code>, and <code>$recursiveRef</code> because the built-in
-submission tool nests the schema under its <code>result</code> parameter. Inline the
-referenced schema definitions.</p>
-<p>The schema belongs to the profile. OAR has no built-in review or other
-task-specific result type.</p>
-<h2 id="native-command-sequence">Native command sequence</h2>
-<p>A normal run uses OpenShell's native sandbox operations in this order:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>openshell sandbox create ...
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>openshell sandbox upload ...
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>openshell sandbox exec ...
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>openshell sandbox download ...
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>openshell sandbox get ...
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>openshell sandbox delete ...
-</span></code></pre></div>
-<p>The upload command is repeated for each task input and runtime file.</p>
-<p>Use <code>--dry-run</code> to print the complete generated commands and host actions
-without creating a sandbox.</p>
-<h2 id="security-boundaries">Security boundaries</h2>
-<p>Use <code>--env</code> only for non-secret values. Credentials belong in OpenShell's
-provider and inference configuration, not in profiles or command arguments.
-Review uploads before sending private files to a remote gateway; uploaded files
-and sandbox changes are disposable and are not synchronized back to the host.
-OAR downloads only the task result. Its transport and optional schema checks
-validate the result's shape, not the truth of agent-produced claims.</p>
-<h2 id="failure-boundaries">Failure boundaries</h2>
-<table>
-<thead>
-<tr>
-<th>Exit code</th>
+<th>Verdict</th>
 <th>Meaning</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>0</code></td>
-<td>The result was validated and published.</td>
+<td><code>pass</code></td>
+<td>No material changes are needed.</td>
 </tr>
 <tr>
-<td><code>1</code></td>
-<td>OpenShell execution, timeout, missing remote output, download size limit, ownership inspection, or cleanup failed.</td>
+<td><code>needs_changes</code></td>
+<td>The reviewer found an issue worth fixing.</td>
 </tr>
 <tr>
-<td><code>2</code></td>
-<td>CLI input or profile configuration was invalid.</td>
-</tr>
-<tr>
-<td><code>3</code></td>
-<td>A downloaded result was empty, invalid, or failed its schema.</td>
+<td><code>inconclusive</code></td>
+<td>The reviewer needs more context to make a sound judgment.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="develop-oar">Develop OAR</h2>
-<p>From <code>projects/openshell-agent-runner</code>, run the full local checks and build both
-package distributions:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>make<span class="w"> </span>check
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>make<span class="w"> </span>build
-</span></code></pre></div>
-<p>Use <code>make test PYTEST_ARGS="tests/test_config.py"</code> for a focused test and
-<code>make clean</code> to remove generated build and cache files. The local PyPI workflow
-is documented in
-<a href="https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-agent-runner/RELEASING.md">RELEASING.md</a>.</p>
+<p>A successful command means OAR delivered a valid result. The review itself can
+still say <code>needs_changes</code>. See <a href="reviews/#understand-the-result">scores and findings</a>
+for the full meaning.</p>
+<h2 id="next-steps">Next steps</h2>
+<ul>
+<li><a href="reviews/">Run reviews</a>: review code, set a focus, and supply context.</li>
+<li><a href="profiles/">Customize profiles</a>: edit instructions or define your own tasks.</li>
+<li><a href="reference/">Command reference</a>: find options, CI behavior, and fixes for common problems.</li>
+</ul>
 
 
 
@@ -1938,6 +1738,18 @@ is documented in
             </div>
           </a>
         
+        
+          
+          <a href="./reviews/" class="md-footer__link md-footer__link--next" aria-label="Next: Run reviews">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">Next</span>
+              <div class="md-ellipsis">Run reviews</div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
         
       </nav>
     
