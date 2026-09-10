@@ -1590,12 +1590,11 @@ if you have not set these up yet.</p>
 <p>OAR uses your existing OpenShell configuration. API keys and provider setup
 belong there.</p>
 <h2 id="1-install-and-check-the-connection">1. Install and check the connection</h2>
-<p>These profiles are not included in PyPI 0.0.2. Use an
-<a href="https://github.com/NVIDIA/OpenShell-Research">OpenShell-Research checkout</a>
-containing these profiles and run the following from its root:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.12<span class="w"> </span>./projects/openshell-agent-runner
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>openshell-agent-runner
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>oar<span class="w"> </span>doctor
 </span></code></pre></div>
+<p>Prefer to run without installing the command? Replace <code>oar</code> in the commands
+below with <code>uvx --from openshell-agent-runner oar</code>.</p>
 <p><code>doctor</code> displays the OpenShell version, gateway status, and inference
 configuration. Check that a model is configured and note its model ID for the
 next step.</p>
