@@ -1809,6 +1809,10 @@ named group of resources on that gateway. It is different from the
 <p>Use the same <code>--gateway</code> and <code>--workspace</code> options with <code>doctor</code> and <code>run</code>.
 OAR uses existing gateways, workspaces, and inference configuration; manage
 them through OpenShell.</p>
+<p><code>doctor</code> displays configuration; it does not send a model request. Exit 0 means
+the inspection commands succeeded, not that inference is ready. If inference
+shows <code>Not configured</code>, configure a provider and route in OpenShell before
+running a task.</p>
 <h2 id="upload-supporting-files">Upload supporting files</h2>
 <p>Use <code>--input</code> for the task's main file or directory. Use <code>--upload</code> for
 additional material, with a local source on the left and a sandbox destination

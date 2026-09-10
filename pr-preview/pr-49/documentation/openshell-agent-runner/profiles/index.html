@@ -1808,7 +1808,9 @@ assignments, and malformed placeholders before starting a sandbox.</p>
 <p>OAR runs <strong>Pi</strong>, the agent inside the sandbox. A task's <code>tools</code> list selects
 which tools Pi may use: <code>read</code>, <code>grep</code>, <code>find</code>, <code>ls</code>, <code>bash</code>, <code>edit</code>, and <code>write</code>
 are built in. A skill is a directory containing a <code>SKILL.md</code> with reusable
-instructions; list the skills the task needs under <code>skills</code>.</p>
+instructions; list the skills the task needs under <code>skills</code>.
+Tasks with skills must include <code>read</code> in <code>tools</code>: Pi uses it to expose the skill
+catalog and let the agent load the selected instructions.</p>
 <p>For a custom tool, declare its extension file and tool name, then add the name
 to the task's <code>tools</code> list. This fragment belongs under a task:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">tools</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">read</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">custom_check</span><span class="p p-Indicator">]</span>

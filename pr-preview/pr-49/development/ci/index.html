@@ -1552,11 +1552,22 @@ GitHub calls use the runner's <code>gh api</code>. Run from the repository root:
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>uv<span class="w"> </span>run<span class="w"> </span>--project<span class="w"> </span>projects/openshell-agent-runner<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>discover<span class="w"> </span>-s<span class="w"> </span>tests<span class="w"> </span>-p<span class="w"> </span>test_github_api.py
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>uv<span class="w"> </span>run<span class="w"> </span>--project<span class="w"> </span>projects/openshell-agent-runner<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>unittest<span class="w"> </span>discover<span class="w"> </span>-s<span class="w"> </span>tests<span class="w"> </span>-p<span class="w"> </span><span class="s1">'test_*review*.py'</span>
 </span></code></pre></div>
-<p>Run <code>make check</code> and <code>make build</code> from the OAR project directory.
-The live smoke workflow installs the built wheel and calls OAR directly on one
-internal fixture per kind. It validates results and score arithmetic and writes
-an Actions summary—never a separate smoke comment. Fixture verdicts need not
-pass: this checks the pipeline, not a preferred model opinion.</p>
+<p>Run <code>make check</code> and <code>make build</code> from the OAR project directory. <code>make check</code>
+includes CLI workflows against a simulated OpenShell; <code>make test-runtime</code> uses
+Docker to exercise real Pi sessions against local scripted inference, with no
+external network or credentials. CI runs both, plus the Pi extension SDK checks.</p>
+<p>The live smoke workflow installs the built wheel and calls OAR directly:</p>
+<ul>
+<li><strong>New-project tasks:</strong> one internal fixture per kind checks the pipeline,
+  result schema, and score arithmetic. No particular verdict is required.</li>
+<li><strong>Packaged reviewers:</strong> clean and deliberately flawed code and writing inputs
+  check that reviewers accept scoped work and catch known defects. Writing
+  quotes must match their source lines, and rubric totals must agree.</li>
+</ul>
+<p>Results, logs, and packaged-reviewer test results are uploaded as Actions
+artifacts. The workflow writes an Actions summary, never a separate smoke comment.
+To verify saved packaged results locally, set <code>OAR_REVIEW_RESULTS</code> to their
+directory and run <code>uv run pytest tests/reviewer_smoke.py</code> from the OAR project.</p>
 <p>Keep team expectations in the project guidelines. Change review judgment in the
 common or kind-specific skill, and change selection/reporting only when the
 workflow needs it. Existing-project and document-only review, generic project
