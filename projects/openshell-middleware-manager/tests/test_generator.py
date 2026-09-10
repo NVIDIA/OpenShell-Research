@@ -1344,7 +1344,13 @@ def test_prepare_python_generates_relative_import_and_smoke_checks(
     assert generated.startswith("from . import supervisor_middleware_pb2")
     assert len(calls) == 3
     assert calls[1][1] == "sync"
-    assert calls[2] == (check_command or ("/tools/uv", "run", "--project", str(tmp_path), "pytest"))
+    assert calls[2] == (
+        "/tools/uv",
+        "run",
+        "--project",
+        str(tmp_path),
+        *(check_command or ("pytest",)),
+    )
 
 
 def test_prepare_python_rejects_unexpected_generated_import(

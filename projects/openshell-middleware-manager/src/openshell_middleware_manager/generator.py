@@ -1164,14 +1164,12 @@ def _prepare_python_project(
             environment=process_environment,
         )
         _run(
-            check_command
-            if check_command is not None
-            else (
+            (
                 uv,
                 "run",
                 "--project",
                 str(project_dir),
-                "pytest",
+                *(check_command if check_command is not None else ("pytest",)),
             ),
             cwd=project_dir,
             environment=process_environment,
