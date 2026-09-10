@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from rich.text import Text
 from typer.testing import CliRunner
 
 from openshell_agent_runner.cli import app
@@ -39,8 +40,9 @@ def test_root_help_lists_commands() -> None:
 def test_help_explains_how_to_start(command: str, arguments: list[str]) -> None:
     result = CliRunner().invoke(app, [command, "--help"])
     assert result.exit_code == 0
+    help_text = Text.from_ansi(result.stdout).plain
     for argument in arguments:
-        assert argument in result.stdout
+        assert argument in help_text
 
 
 def test_init_command_creates_a_valid_profile(tmp_path: Path) -> None:
