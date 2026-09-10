@@ -1175,6 +1175,18 @@ body[data-md-color-scheme="slate"] .openshell-home-brand__dark {
   line-height: 1.5;
 }
 
+.md-typeset .dev-note-equation {
+  margin: 1.4rem 0 1.7rem;
+  padding: 1.1rem 1.35rem;
+  border-left: 0.2rem solid var(--openshell-green);
+  border-radius: 0 0.45rem 0.45rem 0;
+  background: var(--openshell-paper-deep);
+  color: var(--openshell-ink);
+  font-family: var(--openshell-mono);
+  font-size: clamp(0.88rem, 1.7vw, 1.05rem);
+  line-height: 1.5;
+}
+
 .dev-note-byline {
   margin: -0.5rem 0 2rem;
   padding: 1rem 0;
