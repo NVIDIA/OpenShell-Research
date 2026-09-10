@@ -40,8 +40,7 @@ uv tool install openshell-agent-runner
 oar doctor
 ```
 
-Prefer to run without installing the command? Replace `oar` in the commands
-below with `uvx --from openshell-agent-runner oar`.
+Alternatively, use `uvx --from openshell-agent-runner oar` in place of `oar`.
 
 `doctor` displays the OpenShell version, gateway status, and inference
 configuration. Check that a model is configured and note its model ID for the

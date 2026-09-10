@@ -33,8 +33,7 @@ uv tool install openshell-agent-runner
 oar doctor
 ```
 
-Prefer to run without installing the command? Replace `oar` in the commands
-below with `uvx --from openshell-agent-runner oar`.
+Alternatively, use `uvx --from openshell-agent-runner oar` in place of `oar`.
 
 These commands use your selected OpenShell gateway and its `default` workspace.
 For another target, add `--gateway NAME --workspace NAME` to `doctor` and `run`.
