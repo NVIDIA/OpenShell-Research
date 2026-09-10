@@ -4,7 +4,8 @@ date: 2026-09-10
 description: "A practical introduction to Z3, policy containment, and the questions we are exploring in OpenShell."
 author: "Alex Watson"
 agent_markdown: true
-social_image: "assets/brand/openshell-research-light.png"
+hero_image: "../../assets/agent-policy-prover/hero-concept.png"
+social_image: "assets/agent-policy-prover/hero-concept.png"
 categories:
   - OpenShell
 tags:
@@ -45,47 +46,53 @@ card_tags:
 </div>
 <!-- dev-note:byline:end -->
 
-Suppose an agent is halfway through a task and hits a policy denial. It can
-explain why it needs more access and even draft the policy change that would
-unblock it. The hard question is whether the system should accept that change.
+<figure class="dev-note-figure dev-note-figure--hero">
+  <img src="../../assets/agent-policy-prover/hero-concept.png" alt="Nested translucent policy boundaries contain several green agent-action paths while a red path is stopped at the boundary and exposes a counterexample outside it.">
+</figure>
 
-This is a problem we have been working on in OpenShell, an open-source runtime
-for agents featuring policy-controlled sandboxes. OpenShell policies can
-constrain network endpoints, credentials, filesystem access, methods, paths,
-and protocol-specific operations. An agent doing useful work will eventually
-encounter something its current policy does not allow. One option is to send
-every proposed change to a human or model for review. But some permission
-questions have a more precise answer.
+We started exploring formal methods in OpenShell while working through a
+practical problem: how should a long-running agent request more authority after
+its policy blocks an action?
 
-If an operator has already defined the maximum authority an agent may obtain,
-we can ask, is:
+OpenShell runs agents in policy-controlled sandboxes that can constrain network
+endpoints, credentials, filesystem access, methods, paths, and protocol-specific
+operations. In our experiments, policy denials often arrived partway through a
+task, when the agent had enough context to explain what it needed and draft a
+possible change. We could send every proposal to a human or model, but we wanted
+to understand which part of the decision could be checked mechanically.
 
-```text
+Our first prototype focused on policy containment. If an operator defines the
+maximum authority an agent may obtain, the gateway can compose the policy that
+would result from a proposed change and ask:
+
+<div class="dev-note-equation">
 Allowed(candidate) ⊆ Allowed(maximum)?
-```
+</div>
 
-The candidate is the fully composed policy after the proposed change. The
-maximum is an operator-controlled ceiling on what that sandbox may ever be
-allowed to do. This sounds simple until policies start composing. A request for
-one GitHub endpoint might instead grant every method under a wildcard path. Raw
-L4 access can create a path around REST, GraphQL, or MCP inspection. A rule that
-looks reasonable by itself can interact with existing rules in ways that are
-difficult to catch by reading YAML.
+The candidate is the fully composed policy after the change. The maximum is an
+operator-controlled ceiling; it does not grant access by itself. Implementing
+this check showed us why reviewing one proposed rule at a time was not enough. A
+request for one GitHub endpoint could grant every method under a wildcard path,
+raw L4 access could bypass REST, GraphQL, or MCP inspection, and a reasonable
+rule could combine with existing rules to create broader authority.
 
-We use Z3 to search for a concrete action that the candidate allows and the
-maximum does not. If Z3 finds one, the proposed policy exceeds the boundary. If
-no such action exists under the modeled semantics, the candidate is contained.
+We encoded those policy semantics in [Z3](https://microsoft.github.io/z3guide/)
+and asked it to search for an action the candidate allowed but the maximum did
+not. A counterexample showed us the specific binary, endpoint, method, or path
+outside the boundary. If Z3 could not find one, containment held for the
+semantics represented in the model. That gave us inspectable evidence rather
+than a general risk score.
 
-That still leaves plenty of work for models and humans. A solver cannot
-determine whether a request makes sense for the user's task, whether an action
-is reversible, or whether an unusual combination deserves review. Those are
-contextual questions. The prover handles a narrower problem: given a model of
-policy semantics and a property we care about, can it find a violation?
+We also learned that proof and contextual judgment work best together. The
+agent's request and the prover's full findings go to a model or human reviewer.
+The request provides task context, while the prover shows whether the encoded
+policy invariants hold or supplies a concrete counterexample when they do not.
+That helps the reviewer catch an unexpected interaction buried in the composed
+policy that the agent or reviewer might otherwise miss.
 
-This post walks through that problem from the ground up: how the containment
-query works, how we encode OpenShell policy in Z3, where the model stops, and an
-experiment we are starting around least-privilege budgets for agent-authored
-policy changes.
+This post walks through the containment query, how we modeled OpenShell policy
+in Z3, where that model stops, and what we are learning from experiments with
+least-privilege budgets for agent-authored policy changes.
 
 ## Formal methods, at the scale of one decision
 
@@ -353,34 +360,6 @@ protocol-specific controls.
 That interaction is easy to miss when reviewing one rule at a time. In the
 logical model, the two grants denote different sets of actions.
 
-## Know what the prover does not model
-
-The hardest part of applying formal methods here is not writing the final Z3
-query. It is deciding what the formula actually means.
-
-Our initial maximum-policy envelope spike modeled L4, REST, and WebSocket
-authority. Policy surfaces that had not yet been encoded, including GraphQL and
-MCP, failed closed.
-
-OpenShell supports protocol-specific GraphQL and MCP controls, but a containment
-result should not claim coverage until their operation, field, tool, and
-resource semantics are represented faithfully in the model.
-
-Unsupported authority has to stay visible. Silently dropping it from the
-formula would make `unsat` mean less than the system claims.
-
-The current containment surface covers filesystem paths, L4, and enforced REST,
-including explicit REST denies and regions marked `review.required`. GraphQL,
-MCP, query matchers, and CIDR-based `allowed_ips` remain explicit modeling work
-rather than implicit approvals.
-
-Filesystem containment is part of the same admission result, but the current
-implementation checks normalized parent/child path coverage directly in Rust
-rather than representing that relationship inside the symbolic network-action
-model.
-
-Those implementation boundaries are part of the security claim.
-
 ## A managed maximum
 
 We use the containment query as the basis for a managed maximum.
@@ -406,51 +385,45 @@ immediately before persistence.
 That last step matters. A proposal that passed earlier is evidence that a
 particular state was acceptable; it is not a reusable capability token.
 
-## Why we moved away from a collection of risk checks
+## What we learned to model
 
-Our first experiments with formal verification in OpenShell asked several
-specialized security questions.
+Our first OpenShell experiments asked targeted questions: could a binary reach
+link-local metadata, did a proposal expand credential-bearing reach, could raw
+L4 access bypass L7 inspection, or did it add methods to an already reachable
+endpoint?
 
-- Could a binary reach link-local metadata?
-- Did a proposal expand credential-bearing reach?
-- Could raw L4 access bypass L7 inspection?
-- Did the change expand methods on an already reachable credentialed endpoint?
+Those checks were useful because they encoded security expertise and produced
+concrete evidence for reviewers. As we worked with them, we found two patterns
+worth separating.
 
-These checks were useful. They encoded security expertise and produced evidence
-a reviewer could inspect.
+The first was general policy comparison. A maximum-boundary check asks whether
+a candidate remains inside an operator-defined ceiling. A narrowness check asks
+how much authority the candidate adds relative to the action that caused the
+denial. Both apply broadly to agent permission changes without requiring us to
+predict every possible misuse.
 
-They also created another problem.
+The second was the value of domain-specific invariants. Subject-matter experts
+often know the properties they care most about preserving: an agent must not
+reach a metadata service, bypass required L7 inspection, or gain a credentialed
+mutation path to a protected resource. Encoding those properties in logic lets
+the prover search for a concrete counterexample as the policy changes.
 
-Each new risk category needed its own model, fixtures, reporting, suppression
-behavior, and a product decision about how that finding should affect
-admission. Over time, the collection of checks risked becoming a second
-definition of what authority was acceptable.
+We saw this in our [long-horizon adversarial experiment](./2026-08-27-adversarial-policy-review-long-horizon-agents.md).
+An agent proposed a GitHub write permission bound to an apparently constrained
+process. The prover reported the resulting credential-reach expansion, helping
+the reviewer recognize that the proposal still enabled the protected write.
 
-The managed-maximum design makes the approval boundary explicit:
+One practical lesson was to make each result's role explicit. Some invariants
+should prevent a change outright. Other findings are better presented as
+context for a reviewer. The managed maximum provides the general boundary
+around both.
 
-```text
-candidate policy ⊆ managed maximum policy
-```
-
-Credential-bearing reach and capability expansion can still be useful
-observations. They do not need to be independent approval systems when the
-complete candidate policy already has to fit within an operator-defined
-ceiling.
-
-If an organization wants some otherwise-contained authority to require review,
-it can mark that part of the maximum as `review.required`.
-
-We have found it useful to keep these concepts separate:
-
-```text
-runtime invariants      properties policy may never override
-active sandbox policy   authority enforced on each relevant action
-managed maximum         boundary for changing that authority
-advisories              context presented to a reviewer
-```
-
-The distinction keeps an advisory from quietly turning into an authorization
-rule.
+The other lesson was to keep the scope of the proof visible. Our initial model
+covered L4, REST, and WebSocket authority, while unsupported GraphQL and MCP
+surfaces failed closed. The current containment path also covers filesystem
+paths, although that comparison is implemented directly in Rust. GraphQL, MCP,
+query matchers, and CIDR-based `allowed_ips` still require additional modeling
+before a containment result can make claims about them.
 
 ## Can least privilege have a budget?
 

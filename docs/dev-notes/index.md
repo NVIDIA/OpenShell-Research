@@ -31,12 +31,10 @@ hide:
       <h2 id="featured-note-title">Featured note</h2>
       <span>Latest from the team</span>
     </div>
-    <article class="dev-note-card dev-note-card--featured dev-note-card--openshell">
+    <article class="dev-note-card dev-note-card--featured dev-note-card--openshell dev-note-card--has-image">
       <a class="dev-note-card__link" href="posts/2026-09-10-learning-formal-methods-agent-policy-prover/">
-      <div class="dev-note-card__visual dev-note-card__visual--openshell" aria-hidden="true">
-        <span class="dev-note-card__visual-label">Dev Note / OpenShell</span>
-        <span class="dev-note-card__visual-index">2026.09.10</span>
-        <span class="dev-note-card__visual-mark">&gt;_</span>
+      <div class="dev-note-card__visual dev-note-card__visual--openshell dev-note-card__visual--image" aria-hidden="true">
+        <img class="dev-note-card__visual-image" src="../assets/agent-policy-prover/hero-concept.png" alt="" loading="eager" fetchpriority="high">
       </div>
       <div class="dev-note-card__copy">
         <div class="dev-note-card__meta">
