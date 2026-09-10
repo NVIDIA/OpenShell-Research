@@ -681,10 +681,9 @@ def test_pi_dependencies_are_exact_upstream_packages() -> None:
 
 def test_middleware_manifest_matches_upstream_protocol() -> None:
     manifest = json.loads((PROJECT / ".openshell-middleware-manifest.json").read_text())
-    revision = "d1155aa70042d3e2ee49dbfa15346b108b7c1d92"
-    assert manifest["openshell_version"] == "0.0.116"
+    assert manifest["openshell_version"] == "v0.0.116"
     assert manifest["proto_source"] == (
-        f"https://raw.githubusercontent.com/NVIDIA/OpenShell/{revision}"
+        "https://raw.githubusercontent.com/NVIDIA/OpenShell/v0.0.116"
         "/proto/supervisor_middleware.proto"
     )
     assert (
@@ -693,6 +692,7 @@ def test_middleware_manifest_matches_upstream_protocol() -> None:
             (PROJECT / "proto/supervisor_middleware.proto").read_bytes()
         ).hexdigest()
     )
-    assert (
-        f"revision={revision}" in (PROJECT / "scripts/generate-bindings.sh").read_text()
-    )
+    script = (PROJECT / "scripts/generate-bindings.sh").read_text()
+    assert "--project ../openshell-middleware-manager omm update ." in script
+    assert "--openshell-version v0.0.116 --check-command 'make check'" in script
+    assert "grpc_tools.protoc" not in script and "curl" not in script

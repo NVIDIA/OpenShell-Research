@@ -166,3 +166,15 @@ make check
 
 Only `service/` imports generated protobuf/gRPC bindings. Do not edit
 `plans/egress-gate-refactor.md` as part of implementation work.
+
+Update the protocol and bindings only through the repository's
+`openshell-middleware-manager` package:
+
+```bash
+scripts/generate-bindings.sh
+```
+
+This delegates to `omm update` for the pinned OpenShell release, with `make check`
+as validation. The manager downloads the proto, regenerates bindings with an
+isolated compiler, and updates the lockfile and manifest together only after
+checks pass. Do not edit these generated artifacts or run protoc separately.

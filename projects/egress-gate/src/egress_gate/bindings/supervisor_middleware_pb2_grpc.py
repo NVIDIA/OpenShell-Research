@@ -3,8 +3,8 @@
 import grpc
 import warnings
 
-from egress_gate.bindings import supervisor_middleware_pb2 as egress__gate_dot_bindings_dot_supervisor__middleware__pb2
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
+from . import supervisor_middleware_pb2 as supervisor__middleware__pb2
 
 GRPC_GENERATED_VERSION = '1.81.1'
 GRPC_VERSION = grpc.__version__
@@ -19,7 +19,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in egress_gate/bindings/supervisor_middleware_pb2_grpc.py depends on'
+        + ' but the generated code in supervisor_middleware_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -41,22 +41,22 @@ class SupervisorMiddlewareStub:
         self.Describe = channel.unary_unary(
                 '/openshell.middleware.v1.SupervisorMiddleware/Describe',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.MiddlewareManifest.FromString,
+                response_deserializer=supervisor__middleware__pb2.MiddlewareManifest.FromString,
                 _registered_method=True)
         self.ValidateConfig = channel.unary_unary(
                 '/openshell.middleware.v1.SupervisorMiddleware/ValidateConfig',
-                request_serializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.ValidateConfigRequest.SerializeToString,
-                response_deserializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.ValidateConfigResponse.FromString,
+                request_serializer=supervisor__middleware__pb2.ValidateConfigRequest.SerializeToString,
+                response_deserializer=supervisor__middleware__pb2.ValidateConfigResponse.FromString,
                 _registered_method=True)
         self.EvaluateHttpRequest = channel.unary_unary(
                 '/openshell.middleware.v1.SupervisorMiddleware/EvaluateHttpRequest',
-                request_serializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.HttpRequestEvaluation.SerializeToString,
-                response_deserializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.HttpRequestResult.FromString,
+                request_serializer=supervisor__middleware__pb2.HttpRequestEvaluation.SerializeToString,
+                response_deserializer=supervisor__middleware__pb2.HttpRequestResult.FromString,
                 _registered_method=True)
         self.EvaluateWebSocketSession = channel.stream_stream(
                 '/openshell.middleware.v1.SupervisorMiddleware/EvaluateWebSocketSession',
-                request_serializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.WebSocketSessionEvent.SerializeToString,
-                response_deserializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.WebSocketSessionEventResult.FromString,
+                request_serializer=supervisor__middleware__pb2.WebSocketSessionEvent.SerializeToString,
+                response_deserializer=supervisor__middleware__pb2.WebSocketSessionEventResult.FromString,
                 _registered_method=True)
 
 
@@ -107,22 +107,22 @@ def add_SupervisorMiddlewareServicer_to_server(servicer, server):
             'Describe': grpc.unary_unary_rpc_method_handler(
                     servicer.Describe,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.MiddlewareManifest.SerializeToString,
+                    response_serializer=supervisor__middleware__pb2.MiddlewareManifest.SerializeToString,
             ),
             'ValidateConfig': grpc.unary_unary_rpc_method_handler(
                     servicer.ValidateConfig,
-                    request_deserializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.ValidateConfigRequest.FromString,
-                    response_serializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.ValidateConfigResponse.SerializeToString,
+                    request_deserializer=supervisor__middleware__pb2.ValidateConfigRequest.FromString,
+                    response_serializer=supervisor__middleware__pb2.ValidateConfigResponse.SerializeToString,
             ),
             'EvaluateHttpRequest': grpc.unary_unary_rpc_method_handler(
                     servicer.EvaluateHttpRequest,
-                    request_deserializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.HttpRequestEvaluation.FromString,
-                    response_serializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.HttpRequestResult.SerializeToString,
+                    request_deserializer=supervisor__middleware__pb2.HttpRequestEvaluation.FromString,
+                    response_serializer=supervisor__middleware__pb2.HttpRequestResult.SerializeToString,
             ),
             'EvaluateWebSocketSession': grpc.stream_stream_rpc_method_handler(
                     servicer.EvaluateWebSocketSession,
-                    request_deserializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.WebSocketSessionEvent.FromString,
-                    response_serializer=egress__gate_dot_bindings_dot_supervisor__middleware__pb2.WebSocketSessionEventResult.SerializeToString,
+                    request_deserializer=supervisor__middleware__pb2.WebSocketSessionEvent.FromString,
+                    response_serializer=supervisor__middleware__pb2.WebSocketSessionEventResult.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -154,7 +154,7 @@ class SupervisorMiddleware:
             target,
             '/openshell.middleware.v1.SupervisorMiddleware/Describe',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            egress__gate_dot_bindings_dot_supervisor__middleware__pb2.MiddlewareManifest.FromString,
+            supervisor__middleware__pb2.MiddlewareManifest.FromString,
             options,
             channel_credentials,
             insecure,
@@ -180,8 +180,8 @@ class SupervisorMiddleware:
             request,
             target,
             '/openshell.middleware.v1.SupervisorMiddleware/ValidateConfig',
-            egress__gate_dot_bindings_dot_supervisor__middleware__pb2.ValidateConfigRequest.SerializeToString,
-            egress__gate_dot_bindings_dot_supervisor__middleware__pb2.ValidateConfigResponse.FromString,
+            supervisor__middleware__pb2.ValidateConfigRequest.SerializeToString,
+            supervisor__middleware__pb2.ValidateConfigResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -207,8 +207,8 @@ class SupervisorMiddleware:
             request,
             target,
             '/openshell.middleware.v1.SupervisorMiddleware/EvaluateHttpRequest',
-            egress__gate_dot_bindings_dot_supervisor__middleware__pb2.HttpRequestEvaluation.SerializeToString,
-            egress__gate_dot_bindings_dot_supervisor__middleware__pb2.HttpRequestResult.FromString,
+            supervisor__middleware__pb2.HttpRequestEvaluation.SerializeToString,
+            supervisor__middleware__pb2.HttpRequestResult.FromString,
             options,
             channel_credentials,
             insecure,
@@ -234,8 +234,8 @@ class SupervisorMiddleware:
             request_iterator,
             target,
             '/openshell.middleware.v1.SupervisorMiddleware/EvaluateWebSocketSession',
-            egress__gate_dot_bindings_dot_supervisor__middleware__pb2.WebSocketSessionEvent.SerializeToString,
-            egress__gate_dot_bindings_dot_supervisor__middleware__pb2.WebSocketSessionEventResult.FromString,
+            supervisor__middleware__pb2.WebSocketSessionEvent.SerializeToString,
+            supervisor__middleware__pb2.WebSocketSessionEventResult.FromString,
             options,
             channel_credentials,
             insecure,
