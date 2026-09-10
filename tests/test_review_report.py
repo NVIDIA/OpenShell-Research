@@ -79,6 +79,8 @@ class MockGitHub:
             return self.pr
         if method in ("POST", "PATCH"):
             return data
+        if method == "DELETE" and path.startswith("issues/comments/"):
+            return None
         raise AssertionError(f"Unexpected request: {method} {path}")
 
     def paginate(self, path, key=None):
@@ -171,7 +173,6 @@ class ReviewReportTests(unittest.TestCase):
         options.update(reviews=reviews, outcome="failed")
         body = render_report(**options)
         for expected in (
-            "91/100",
             "Not completed",
             "Hardware not exercised.",
             "failed",
@@ -188,6 +189,8 @@ class ReviewReportTests(unittest.TestCase):
             "c" * 40,
         ):
             self.assertIn(expected, normal)
+        for omitted in ("91/100", "Criterion", "Supported."):
+            self.assertNotIn(omitted, normal)
 
     def test_report_escapes_reviewer_data(self):
         options = report_options()
@@ -195,7 +198,6 @@ class ReviewReportTests(unittest.TestCase):
         review = options["reviews"][0]
         review["label"] = unsafe
         review["result"]["summary"] = unsafe
-        review["result"]["criterion_scores"][0]["explanation"] = unsafe
         review["result"]["findings"] = [
             dict.fromkeys(
                 ("title", "path", "evidence", "impact", "recommendation"), unsafe
@@ -222,13 +224,33 @@ class ReviewReportTests(unittest.TestCase):
         self.assertIn("Run missing-command", body)
         self.assertIn("That executable is not installed.", body)
 
+    def test_finding_locations_link_to_the_reviewed_revision(self):
+        options = report_options()
+        options["reviews"][0]["result"]["findings"] = [
+            {
+                "severity": "medium",
+                "title": "Wrong command",
+                "path": "projects/new spike/README.md",
+                "line": 12,
+                "evidence": "The documented command is unavailable.",
+                "impact": "The first run fails.",
+                "recommendation": "Use the installed command.",
+            }
+        ]
+
+        body = render_report(**options)
+
+        self.assertIn(
+            f"https://github.com/example/research/blob/{HEAD}/projects/new%20spike/README.md#L12",
+            body,
+        )
+
     def test_large_details_keep_summary_and_artifact_link(self):
         options = report_options()
         options["reviews"][0]["result"]["summary"] = "Detailed evidence " * 5000
         body = render_report(**options)
         self.assertLessEqual(len(body), 55000)
         self.assertIn(options["run_url"], body)
-        self.assertIn("91/100", body)
 
     def test_stale_and_closed_prs_do_not_publish(self):
         for change in ("head", "closed"):
@@ -248,7 +270,7 @@ class ReviewReportTests(unittest.TestCase):
         github.comments = [
             {
                 "id": 5,
-                "user": {"type": "Bot"},
+                "user": {"type": "Bot", "login": "github-actions[bot]"},
                 "body": f"{REVIEW_MARKER}\n<!-- oar-report-run:101 -->",
             }
         ]
@@ -259,6 +281,24 @@ class ReviewReportTests(unittest.TestCase):
             any(method in ("PATCH", "POST") for method, _, _ in github.calls)
         )
 
+    def test_retirement_deletes_only_an_existing_current_report(self):
+        github = MockGitHub()
+        github.comments = [
+            {
+                "id": 5,
+                "user": {"type": "Bot", "login": "github-actions[bot]"},
+                "body": f"{REVIEW_MARKER}\n<!-- oar-report-run:99 -->",
+            }
+        ]
+
+        request = {"number": 7, "head": HEAD, "retire": True}
+        self.assertTrue(publish_report(github, request, "unused", 100))
+        self.assertIn(("DELETE", "issues/comments/5", None), github.calls)
+
+        github = MockGitHub()
+        self.assertFalse(publish_report(github, request, "unused", 100))
+        self.assertFalse(any(method == "DELETE" for method, _, _ in github.calls))
+
     def test_sticky_comments_do_not_edit_human_or_unrelated_bot_comments(self):
         github = MockGitHub()
         github.comments = [
@@ -266,14 +306,19 @@ class ReviewReportTests(unittest.TestCase):
             {"id": 2, "user": {"type": "Bot"}, "body": "Documentation preview"},
             {
                 "id": 3,
-                "user": {"type": "Bot"},
+                "user": {"type": "Bot", "login": "other-app[bot]"},
+                "body": f"{REVIEW_MARKER}\n<!-- oar-report-run:100 -->",
+            },
+            {
+                "id": 4,
+                "user": {"type": "Bot", "login": "github-actions[bot]"},
                 "body": f"{REVIEW_MARKER}\n<!-- oar-report-run:100 -->",
             },
         ]
         self.assertTrue(
             publish_report(github, {"number": 7, "head": HEAD}, "updated", 100)
         )
-        self.assertIn(("PATCH", "issues/comments/3", {"body": "updated"}), github.calls)
+        self.assertIn(("PATCH", "issues/comments/4", {"body": "updated"}), github.calls)
         github.calls.clear()
         github.comments.pop()
         self.assertTrue(publish_report(github, {"number": 7, "head": HEAD}, "new", 101))

@@ -17,7 +17,7 @@
 - Run offline routing, transport, input, and report tests, including the complete
   PR-flow integration, with `uv run --project projects/openshell-agent-runner
   pytest tests/test_ci_scope.py tests/test_github_api.py tests/test_*review*.py`.
-- Keep the live pipeline smoke focused on execution contracts, not expected
+- Keep the live integration focused on execution contracts, not expected
   reviewer verdicts. It never posts a PR assessment.
 - Run CI profile contract tests in the OAR environment.
 - See `docs/development/ci.md` for triggers, trust boundaries, and local checks.

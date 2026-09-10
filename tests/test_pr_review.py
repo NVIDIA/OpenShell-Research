@@ -18,6 +18,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / ".github/scripts"))
 
 from github_api import GitHubError
+from review_report import REVIEW_MARKER
 
 if importlib.util.find_spec("yaml") is None:
     raise unittest.SkipTest(
@@ -51,6 +52,7 @@ class MockGitHub:
         self.metadata = "kind: tool\n"
         self.metadata_type = "file"
         self.error = None
+        self.comments = []
         self.calls = []
 
     def request(self, method, path, data=None):
@@ -77,6 +79,8 @@ class MockGitHub:
         self.calls.append(("paginate", path, key))
         if path == "pulls/7/files?per_page=100":
             return self.files
+        if path == "issues/7/comments":
+            return self.comments
         raise AssertionError(f"Unexpected pagination: {path}")
 
 
@@ -116,7 +120,10 @@ class RequestTests(unittest.TestCase):
                 else:
                     github.pr["head"]["repo"] = None
                 self.assertIsNone(resolve_request(github, self.context))
-                self.assertEqual(github.calls, [("GET", "pulls/7", None)])
+                expected = [("GET", "pulls/7", None)]
+                if kind == "draft":
+                    expected.append(("paginate", "issues/7/comments", None))
+                self.assertEqual(github.calls, expected)
 
     def test_other_events_do_not_start_review(self):
         for event in ("workflow_dispatch", "workflow_run", "push"):
@@ -126,6 +133,24 @@ class RequestTests(unittest.TestCase):
         self.github.files[0]["filename"] = "projects/existing/new-file.py"
         self.assertIsNone(resolve_request(self.github, self.context))
         self.assertFalse(any("contents/" in path for _, path, _ in self.github.calls))
+
+    def test_existing_report_is_retired_when_review_no_longer_applies(self):
+        self.github.files[0]["filename"] = "projects/existing/new-file.py"
+        self.github.comments = [
+            {
+                "id": 9,
+                "user": {"type": "Bot", "login": "github-actions[bot]"},
+                "body": REVIEW_MARKER,
+            }
+        ]
+
+        request = resolve_request(self.github, self.context)
+
+        self.assertTrue(request["retire"])
+        self.assertEqual(request["tasks"], [])
+        self.github.pr["draft"] = True
+        request = resolve_request(self.github, self.context)
+        self.assertTrue(request["retire"])
 
     def test_no_base_projects_directory(self):
         self.github.base_tree = []
@@ -237,6 +262,49 @@ class RequestTests(unittest.TestCase):
                     git.call_args.args[0],
                     ["git", "-C", "trusted tooling", "rev-parse", "HEAD"],
                 )
+
+    def test_cli_marks_report_retirement_as_not_ready_for_inference(self):
+        self.github.files[0]["filename"] = "projects/existing/new-file.py"
+        self.github.comments = [
+            {
+                "id": 9,
+                "user": {"type": "Bot", "login": "github-actions[bot]"},
+                "body": REVIEW_MARKER,
+            }
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            event = root / "event.json"
+            event.write_text(json.dumps(self.context["payload"]))
+            request_file = root / "request/request.json"
+            output = root / "outputs"
+            environment = {
+                "GITHUB_EVENT_PATH": str(event),
+                "GITHUB_EVENT_NAME": "pull_request_target",
+                "GITHUB_OUTPUT": str(output),
+            }
+            with (
+                patch.dict(os.environ, environment),
+                patch("pr_review.GitHub", return_value=self.github),
+                patch(
+                    "sys.argv",
+                    [
+                        "pr_review.py",
+                        "--output",
+                        str(request_file),
+                        "--tooling",
+                        "trusted tooling",
+                    ],
+                ),
+                patch(
+                    "pr_review.subprocess.run",
+                    return_value=subprocess.CompletedProcess([], 0, "c" * 40 + "\n"),
+                ),
+            ):
+                main()
+
+            self.assertTrue(json.loads(request_file.read_text())["retire"])
+            self.assertIn("ready=false\n", output.read_text())
 
 
 if __name__ == "__main__":

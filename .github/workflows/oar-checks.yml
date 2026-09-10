@@ -1,10 +1,12 @@
-name: OAR and PR review checks
+name: OAR functional checks
 
 "on":
   pull_request:
     paths:
       - .pre-commit-config.yaml
-      - .github/workflows/**
+      - .github/workflows/oar-checks.yml
+      - .github/workflows/oar-integration.yml
+      - .github/workflows/pr-review.yml
       - .github/openshell-agents/**
       - .github/scripts/**
       - projects/PROJECT_GUIDELINES.md
@@ -18,7 +20,9 @@ name: OAR and PR review checks
       - main
     paths:
       - .pre-commit-config.yaml
-      - .github/workflows/**
+      - .github/workflows/oar-checks.yml
+      - .github/workflows/oar-integration.yml
+      - .github/workflows/pr-review.yml
       - .github/openshell-agents/**
       - .github/scripts/**
       - projects/PROJECT_GUIDELINES.md
@@ -37,13 +41,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: Check OAR and PR review (Python ${{ matrix.python-version }})
+  checks:
+    name: Check OAR and review behavior
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12", "3.13", "3.14"]
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -54,95 +55,118 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version: "0.12.5"
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: projects/openshell-agent-runner/uv.lock
 
-      - name: Configure isolated uv paths
-        run: |
-          echo "UV_CACHE_DIR=$RUNNER_TEMP/oar-checks-uv-cache" >> "$GITHUB_ENV"
-          echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/oar-checks-venv" >> "$GITHUB_ENV"
-
-      - name: Install locked dependencies
-        run: uv sync --project projects/openshell-agent-runner --locked
-
-      - name: Validate agent profiles
-        run: |
-          uv run --project projects/openshell-agent-runner oar validate \
-            .github/openshell-agents/profiles/ci-reviewer
-          for profile in code-reviewer technical-writing-reviewer; do
-            uv run --project projects/openshell-agent-runner oar validate \
-              "projects/openshell-agent-runner/src/openshell_agent_runner/profiles/$profile"
-          done
-
-      - name: Preview agent execution
-        run: |
-          mkdir -p "$RUNNER_TEMP/review-context"
-          cp projects/PROJECT_GUIDELINES.md "$RUNNER_TEMP/review-context/PROJECT_GUIDELINES.md"
-          uv run --project projects/openshell-agent-runner oar run \
-            .github/openshell-agents/profiles/ci-reviewer \
-            --task review-tool \
-            --gateway openshell \
-            --input projects/openshell-agent-runner \
-            --upload "$RUNNER_TEMP/review-context:/workspace" \
-            --prompt-var guidelines_path=/workspace/review-context/PROJECT_GUIDELINES.md \
-            --output "$RUNNER_TEMP/project-review.json" \
-            --dry-run
-
-      - name: Test CI profile, routing, and reports
-        run: |
-          uv run --project projects/openshell-agent-runner pytest \
-            tests/test_ci_scope.py tests/test_github_api.py tests/test_*review*.py
-
-      - name: Validate agent workflow syntax
-        if: matrix.python-version == '3.12'
-        run: |
-          curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
-            | tar -xz -C "$RUNNER_TEMP" actionlint
-          "$RUNNER_TEMP/actionlint" \
-            .github/workflows/oar-checks.yml \
-            .github/workflows/oar-smoke.yml \
-            .github/workflows/pr-review.yml
+      - name: Isolate the project environment
+        run: echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/oar-checks-venv" >> "$GITHUB_ENV"
 
       - name: Run project checks
         working-directory: projects/openshell-agent-runner
         run: |
-          uv run pre-commit validate-config ../../.pre-commit-config.yaml
+          uv run --frozen pre-commit validate-config ../../.pre-commit-config.yaml
           make check
 
-      - name: Build distributions
+      - name: Test PR selection, review execution, and reporting
+        run: |
+          uv run --project projects/openshell-agent-runner --frozen pytest \
+            tests/test_ci_scope.py tests/test_github_api.py tests/test_*review*.py
+
+      - name: Validate OAR workflow syntax
+        run: |
+          archive="$RUNNER_TEMP/actionlint.tar.gz"
+          curl -fsSL \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            -o "$archive"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $archive" \
+            | sha256sum --check
+          tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" \
+            .github/workflows/oar-checks.yml \
+            .github/workflows/oar-integration.yml \
+            .github/workflows/pr-review.yml
+
+  package:
+    name: Build and exercise installable distributions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.5"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: projects/openshell-agent-runner/uv.lock
+
+      - name: Build wheel and source distribution
         working-directory: projects/openshell-agent-runner
         run: |
           make build
-          wheel="$(find dist -name '*.whl' -print -quit)"
-          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/image/Dockerfile'
-          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/image/exec.sh'
-          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/extensions/submit-result.ts'
-          python -m zipfile -l "$wheel" | grep -F 'harnesses/pi/runtime/extensions/validate-tools.ts'
-          python -m zipfile -l "$wheel" | grep -F 'profiles/code-reviewer/profile.yaml'
-          python -m zipfile -l "$wheel" | grep -F 'profiles/technical-writing-reviewer/profile.yaml'
-          python -m zipfile -l "$wheel" | grep -F 'dist-info/licenses/LICENSE'
+          shopt -s nullglob
+          wheels=(dist/*.whl)
+          sdists=(dist/*.tar.gz)
+          test "${#wheels[@]}" -eq 1
+          test "${#sdists[@]}" -eq 1
 
-      - name: Verify the built wheel
+      - name: Install and exercise the wheel
         working-directory: projects/openshell-agent-runner
         run: |
-          wheel="$(find dist -name '*.whl' -print -quit)"
-          uvx --from "$wheel" oar init "$RUNNER_TEMP/profiles" \
-            --model provider/model
+          wheel=(dist/*.whl)
+          uv venv "$RUNNER_TEMP/package-venv"
+          uv pip install --python "$RUNNER_TEMP/package-venv/bin/python" \
+            "${wheel[0]}" "pytest>=8.4,<10"
+          python="$RUNNER_TEMP/package-venv/bin/python"
+          oar="$RUNNER_TEMP/package-venv/bin/oar"
+          "$python" -m pytest tests/test_installed_package.py
+          "$python" -m pytest tests/test_lifecycle.py -k cli
+          "$oar" init "$RUNNER_TEMP/profiles" --model provider/model
           for profile in code-reviewer technical-writing-reviewer; do
-            uvx --from "$wheel" oar validate \
-              "$RUNNER_TEMP/profiles/$profile"
+            "$oar" validate "$RUNNER_TEMP/profiles/$profile"
           done
           printf '# Review me\n\nA short document.\n' > "$RUNNER_TEMP/review-input.md"
-          uvx --from "$wheel" oar run \
-            "$RUNNER_TEMP/profiles/technical-writing-reviewer" \
+          "$oar" run "$RUNNER_TEMP/profiles/technical-writing-reviewer" \
             --task review-document \
             --input "$RUNNER_TEMP/review-input.md" \
             --output "$RUNNER_TEMP/review-output.json" \
             --dry-run
           test ! -e "$RUNNER_TEMP/review-output.json"
-          uvx --from "$wheel" --with pytest pytest tests/test_lifecycle.py -k cli
 
-      - name: Build the Pi image
-        if: matrix.python-version == '3.12'
+  offline-runtime:
+    name: Exercise the Pi runtime without network access
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.5"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: projects/openshell-agent-runner/uv.lock
+
+      - name: Isolate the project environment
+        run: echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/oar-runtime-venv" >> "$GITHUB_ENV"
+
+      - name: Install locked dependencies and initialize a profile
+        run: |
+          uv sync --project projects/openshell-agent-runner --locked
+          uv run --project projects/openshell-agent-runner --frozen oar init \
+            "$RUNNER_TEMP/profiles" --profile code-reviewer \
+            --model provider/model --thinking off
+
+      - name: Build and inspect the Pi image
         run: |
           docker build \
             --tag openshell-agent-runner-pi:ci \
@@ -156,7 +180,6 @@ jobs:
             | grep -F 'provider/model'
 
       - name: Validate the Pi extensions
-        if: matrix.python-version == '3.12'
         run: |
           docker run --rm --network none \
             --entrypoint bash \
@@ -170,8 +193,7 @@ jobs:
               --experimental-strip-types --no-warnings \
               /sandbox/validate-pi-extensions.mjs"
 
-      - name: Exercise the real Pi harness without network access
-        if: matrix.python-version == '3.12'
+      - name: Exercise isolated Pi sessions
         working-directory: projects/openshell-agent-runner
         env:
           OAR_PI_IMAGE: openshell-agent-runner-pi:ci

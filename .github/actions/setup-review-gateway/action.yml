@@ -16,7 +16,8 @@ runs:
     - name: Install OpenShell
       shell: bash
       run: |
-        curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/v0.0.116/install.sh \
+        # OpenShell v0.0.116, resolved to an immutable commit.
+        curl -LsSf https://raw.githubusercontent.com/NVIDIA/OpenShell/d1155aa70042d3e2ee49dbfa15346b108b7c1d92/install.sh \
           | OPENSHELL_VERSION=v0.0.116 sh
         echo "$HOME/.local/bin" >> "$GITHUB_PATH"
     - name: Wait for the gateway

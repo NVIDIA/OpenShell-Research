@@ -38,7 +38,13 @@ class ReviewGitHub:
             return self.responses[path]
         self.writes.append((method, path))
         if (method, path) == ("POST", "issues/7/comments"):
-            self.comments.append({"id": 1, "user": {"type": "Bot"}, **data})
+            self.comments.append(
+                {
+                    "id": 1,
+                    "user": {"type": "Bot", "login": "github-actions[bot]"},
+                    **data,
+                }
+            )
         elif (method, path) == ("PATCH", "issues/comments/1"):
             self.comments[0].update(data)
         else:

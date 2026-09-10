@@ -3,16 +3,22 @@ name: New project review
 "on":
   # Trusted workflow/tooling only. PR contents are uploaded as data, never run here.
   pull_request_target:
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
 
 permissions: {}
+
+concurrency:
+  group: oar-pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   request:
     name: Select new projects and validate their kinds
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
+      issues: read
       pull-requests: read
     outputs:
       number: ${{ steps.request.outputs.number }}
@@ -55,9 +61,6 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
-    concurrency:
-      group: oar-pr-review-${{ needs.request.outputs.number }}
-      cancel-in-progress: true
     steps:
       - name: Checkout trusted tooling
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -160,6 +163,7 @@ jobs:
     needs: [request, review]
     if: always() && needs.request.outputs.number != ''
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: write
