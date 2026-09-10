@@ -1,0 +1,2449 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A practical introduction to Z3, policy containment, and the questions we are exploring in OpenShell.">
+      
+      
+        <meta name="author" content="Alex Watson">
+      
+      
+        <link rel="canonical" href="https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-09-10-learning-formal-methods-agent-policy-prover/">
+      
+      
+        <link rel="prev" href="../../">
+      
+      
+        <link rel="next" href="../2026-08-27-adversarial-policy-review-long-horizon-agents/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/brand/favicon.svg">
+      <meta name="generator" content="zensical-0.0.44">
+    
+    
+  
+    
+      
+        <title>Learning Formal Methods by Building an Agent Policy Prover - OpenShell Research</title>
+      
+    
+  
+
+    
+      
+        
+      
+      <link rel="stylesheet" href="../../../assets/stylesheets/modern/main.fba56155.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/dev-notes.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/documentation.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  
+  
+
+
+  
+    
+    
+  
+    
+    
+  
+    
+    
+  
+
+
+
+
+  
+  
+  
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="OpenShell Research">
+  <meta property="og:title" content="Learning Formal Methods by Building an Agent Policy Prover">
+  <meta property="og:description" content="A practical introduction to Z3, policy containment, and the questions we are exploring in OpenShell.">
+  <meta property="og:url" content="https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-09-10-learning-formal-methods-agent-policy-prover/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Learning Formal Methods by Building an Agent Policy Prover">
+  <meta name="twitter:description" content="A practical introduction to Z3, policy containment, and the questions we are exploring in OpenShell.">
+  
+    
+    <meta property="og:image" content="https://nvidia.github.io/OpenShell-Research/assets/brand/openshell-research-light.png">
+    <meta property="og:image:alt" content="Learning Formal Methods by Building an Agent Policy Prover">
+    <meta name="twitter:image" content="https://nvidia.github.io/OpenShell-Research/assets/brand/openshell-research-light.png">
+    <meta name="twitter:image:alt" content="Learning Formal Methods by Building an Agent Policy Prover">
+  
+  
+    <meta property="article:published_time" content="2026-09-10">
+    <meta property="article:modified_time" content="2026-09-10">
+  
+  
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"Alex Watson"},"dateModified":"2026-09-10","datePublished":"2026-09-10","description":"A practical introduction to Z3, policy containment, and the questions we are exploring in OpenShell.","headline":"Learning Formal Methods by Building an Agent Policy Prover","image":"https://nvidia.github.io/OpenShell-Research/assets/brand/openshell-research-light.png","mainEntityOfPage":{"@id":"https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-09-10-learning-formal-methods-agent-policy-prover/","@type":"WebPage"}}</script>
+  
+
+  <script>
+    try {
+      document.documentElement.dataset.navigationDrawer =
+        window.sessionStorage.getItem("openshell.navigationDrawerOpen") === "true"
+          ? "open"
+          : "closed";
+    } catch {
+      document.documentElement.dataset.navigationDrawer = "closed";
+    }
+  </script>
+  
+    <link rel="alternate" type="text/markdown" href="../2026-09-10-learning-formal-methods-agent-policy-prover.md" title="Markdown source">
+  
+
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#learning-formal-methods-by-building-an-agent-policy-prover" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+      
+  <img src="../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+
+    </a>
+    <label class="md-header__button md-icon openshell-drawer-button" for="__drawer" role="button" tabindex="0" aria-label="Open navigation" aria-controls="primary-navigation" aria-expanded="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3.25" y="4" width="17.5" height="16" rx="2"></rect>
+        <path d="M8.25 4v16"></path>
+        <path class="openshell-drawer-icon-expand" d="m12 9 3 3-3 3"></path>
+        <path class="openshell-drawer-icon-collapse" d="m15 9-3 3 3 3"></path>
+      </svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            OpenShell Research
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Learning Formal Methods by Building an Agent Policy Prover
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/NVIDIA/OpenShell-Research" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    OpenShell Research on GitHub
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+      
+  <img src="../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+
+    </a>
+    OpenShell Research
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/NVIDIA/OpenShell-Research" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    OpenShell Research on GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Dev Notes
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_1" id="__nav_1_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Dev Notes
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_1_2" id="__nav_1_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Posts
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_1_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_1_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Posts
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Learning Formal Methods by Building an Agent Policy Prover
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Learning Formal Methods by Building an Agent Policy Prover
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#formal-methods-at-the-scale-of-one-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Formal methods, at the scale of one decision
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sat-smt-and-z3-in-five-minutes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SAT, SMT, and Z3 in five minutes
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-first-containment-query" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        A first containment query
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#encoding-openshell-policy-as-formal-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Encoding OpenShell policy as formal logic
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#know-what-the-prover-does-not-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Know what the prover does not model
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-managed-maximum" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        A managed maximum
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-we-moved-away-from-a-collection-of-risk-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Why we moved away from a collection of risk checks
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#can-least-privilege-have-a-budget" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Can least privilege have a budget?
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-models-still-belong" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Where models still belong
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#start-with-one-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Start with one decision
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Resources
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-08-27-adversarial-policy-review-long-horizon-agents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Adversarial prototype: AI policy auto-approval for long-horizon agents in OpenShell
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-08-07-formal-methods-ai-generated-robot-actions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Can Formal Methods Govern AI-Generated Robot Actions?
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Bringing Privacy and Security to the Edge with OpenShell
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../documentation/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Documentation
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Documentation
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../documentation/egress-gate/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Egress Gate
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Egress Gate
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_2_2" id="__nav_2_2_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Guides
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_2_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_2_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Guides
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation/egress-gate/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configure policies
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation/egress-gate/request-content/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Parse request content
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation/egress-gate/evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Test policies offline
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation/egress-gate/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Run and operate Egress Gate
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../documentation/egress-gate/gates/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Gates
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2_2_3" id="__nav_2_2_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Gates
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation/egress-gate/gates/regex/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Regex gate
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation/egress-gate/gates/custom/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Add a custom gate
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../documentation/egress-gate/architecture/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Architecture
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2_2_4" id="__nav_2_2_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_2_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_2_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Architecture
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation/egress-gate/architecture/request-lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Request lifecycle
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation/egress-gate/architecture/service-boundary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Service boundary
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_2_2_5" id="__nav_2_2_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Reference
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_2_2_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_2_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Reference
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation/egress-gate/reference/limits-and-failures/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Limits and failure behavior
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../../documentation/openshell-agent-runner/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  OpenShell Agent Runner
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2_3" id="__nav_2_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  OpenShell Agent Runner
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation/openshell-agent-runner/reviews/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Run reviews
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation/openshell-agent-runner/profiles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Customize profiles
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation/openshell-agent-runner/reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Command reference
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#formal-methods-at-the-scale-of-one-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Formal methods, at the scale of one decision
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sat-smt-and-z3-in-five-minutes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        SAT, SMT, and Z3 in five minutes
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-first-containment-query" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        A first containment query
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#encoding-openshell-policy-as-formal-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Encoding OpenShell policy as formal logic
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#know-what-the-prover-does-not-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Know what the prover does not model
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-managed-maximum" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        A managed maximum
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-we-moved-away-from-a-collection-of-risk-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Why we moved away from a collection of risk checks
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#can-least-privilege-have-a-budget" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Can least privilege have a budget?
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-models-still-belong" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Where models still belong
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#start-with-one-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Start with one decision
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#resources" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Resources
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../../.." class="md-path__link">
+        
+  
+  <span class="md-ellipsis">
+    OpenShell Research
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Dev Notes
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="././" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Posts
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+  
+  <a href="../2026-09-10-learning-formal-methods-agent-policy-prover.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.56 18H3.44C2.65 18 2 17.37 2 16.59V7.41C2 6.63 2.65 6 3.44 6h17.12c.79 0 1.44.63 1.44 1.41v9.18c0 .78-.65 1.41-1.44 1.41M3.44 6.94c-.26 0-.48.21-.48.47v9.19c0 .25.22.46.48.46h17.12c.26 0 .48-.21.48-.46V7.41c0-.26-.22-.47-.48-.47zm1.45 8.25V8.81h1.92l1.92 2.35 1.92-2.35h1.93v6.38h-1.93v-3.66l-1.92 2.35-1.92-2.35v3.66zm12.01 0-2.9-3.1h1.94V8.81h1.92v3.28h1.93z"/></svg>
+  </a>
+
+
+<h1 id="learning-formal-methods-by-building-an-agent-policy-prover">Learning Formal Methods by Building an Agent Policy Prover</h1>
+<!-- dev-note:byline:start -->
+<!-- Generated by scripts/render-dev-notes.py; edit front matter and authors.json. -->
+<div class="dev-note-byline">
+  <p class="dev-note-byline__label">
+    <span>Dev Note</span>
+    <time datetime="2026-09-10">September 10, 2026</time>
+    <span>OpenShell</span>
+  </p>
+  <div class="dev-note-byline__authors" aria-label="Author: Alex Watson">
+    <a class="dev-note-byline__author" href="https://github.com/zredlined">
+      <img src="https://github.com/zredlined.png?size=96" alt="" loading="lazy">
+      <span class="dev-note-byline__copy">
+        <strong>Alex Watson</strong>
+        <span>OpenShell Team @ NVIDIA</span>
+      </span>
+    </a>
+  </div>
+</div>
+<!-- dev-note:byline:end -->
+
+<p><em>Using Z3 to reason about permission changes in long-running AI agents.</em></p>
+<p>Suppose an agent is halfway through a task and hits a policy denial. It can
+explain why it needs more access and even draft the policy change that would
+unblock it.</p>
+<p>The hard question is whether the system should accept that change.</p>
+<p>This is a problem we have been working on in OpenShell, an open-source runtime
+for agents featuring policy-controlled sandboxes. OpenShell policies can
+constrain network endpoints, credentials, filesystem access, methods, paths,
+and protocol-specific operations. An agent doing useful work will eventually
+encounter something its current policy does not allow.</p>
+<p>One option is to send every proposed change to a human or model for review. But
+some permission questions have a more precise answer.</p>
+<p>If an operator has already defined the maximum authority an agent may obtain,
+we can ask, is:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Allowed(candidate) ⊆ Allowed(maximum)?
+</span></code></pre></div>
+<p>The candidate is the fully composed policy after the proposed change. The
+maximum is an operator-controlled ceiling on what that sandbox may ever be
+allowed to do.</p>
+<p>This sounds simple until policies start composing.</p>
+<p>A request for one GitHub endpoint might instead grant every method under a
+wildcard path. Raw L4 access can create a path around REST, GraphQL, or MCP
+inspection. A rule that looks reasonable by itself can interact with existing
+rules in ways that are difficult to catch by reading YAML.</p>
+<p>We use Z3 to search for a concrete action that the candidate allows and the
+maximum does not. If Z3 finds one, the proposed policy exceeds the boundary. If
+no such action exists under the modeled semantics, the candidate is contained.</p>
+<p>That still leaves plenty of work for models and humans. A solver cannot
+determine whether a request makes sense for the user's task, whether an action
+is reversible, or whether an unusual combination deserves review. Those are
+contextual questions.</p>
+<p>The prover handles a narrower problem: given a model of policy semantics and a
+property we care about, can it find a violation?</p>
+<p>This post walks through that problem from the ground up: how the containment
+query works, how we encode OpenShell policy in Z3, where the model stops, and an
+experiment we are starting around least-privilege budgets for agent-authored
+policy changes.</p>
+<h2 id="formal-methods-at-the-scale-of-one-decision">Formal methods, at the scale of one decision</h2>
+<p>Formal methods cover a large family of techniques for describing systems and
+properties mathematically and then reasoning about whether those properties
+hold. Model checking, theorem proving, abstract interpretation, SAT solving,
+and SMT solving all fall under that umbrella.</p>
+<p>For the problem here, we only need four pieces:</p>
+<ul>
+<li><strong>A model:</strong> a precise representation of the actions a policy permits.</li>
+<li><strong>A property:</strong> for example, “the candidate grants no action outside the managed
+  maximum.”</li>
+<li><strong>A decision procedure:</strong> Z3 searches for an assignment that satisfies the
+  logical query.</li>
+<li><strong>An enforcement point:</strong> the gateway acts on the result before committing the
+  policy change.</li>
+</ul>
+<p>The guarantee is relative to those pieces.</p>
+<p>If the model omits a policy field, the proof says nothing about that field. If
+the runtime and prover interpret a glob differently, they disagree about the
+boundary. If an agent has another path to the same effect, proving one admission
+decision correct does not give you complete mediation.</p>
+<p>So “formally verified” does not mean “the system is safe.” For this use case, it
+means something narrower: under the policy semantics represented in the model,
+the solver could not find an action that violates the property we asked it to
+check.</p>
+<p>That narrow statement is useful- A model reviewing a permission request can be
+influenced by the request's wording, miss an interaction, or make different
+decisions on two similar inputs. Z3 evaluates the formula it receives. The
+parts that deserve scrutiny are explicit: the specification, its encoding, the
+handoff from proof to commit, and the runtime enforcement semantics.</p>
+<h2 id="sat-smt-and-z3-in-five-minutes">SAT, SMT, and Z3 in five minutes</h2>
+<p>A SAT solver answers whether a Boolean formula is satisfiable.</p>
+<p>Given variables such as <code>a</code> and <code>b</code>, it can find an assignment that makes this
+formula true:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>a AND (NOT b)
+</span></code></pre></div>
+<p>An SMT solver extends that style of reasoning with theories: integers, real
+numbers, strings, regular languages, arrays, bit-vectors, and other useful
+domains.</p>
+<p>Z3 is an SMT solver and theorem prover developed by Microsoft Research. Its
+supported theories map conveniently to policy models:</p>
+<ul>
+<li>ports are integers;</li>
+<li>hosts and paths are strings;</li>
+<li>globs can be represented as regular expressions;</li>
+<li>policy composition becomes Boolean logic.</li>
+</ul>
+<p>The <a href="https://microsoft.github.io/z3guide/">Z3 Guide</a> is the best reference once
+the examples below feel familiar.</p>
+<p>A few constructs cover most of what we need:</p>
+<table>
+<thead>
+<tr>
+<th>Construct</th>
+<th>Meaning</th>
+<th>OpenShell example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Sort</td>
+<td>A type of value</td>
+<td>String for a host, Int for a port</td>
+</tr>
+<tr>
+<td>Symbol</td>
+<td>A value Z3 is free to choose</td>
+<td>the unknown action's method or path</td>
+</tr>
+<tr>
+<td>Constraint</td>
+<td>A formula that must hold</td>
+<td>1 &lt;= port &lt;= 65535</td>
+</tr>
+<tr>
+<td>And, Or, Not</td>
+<td>Logical composition</td>
+<td>candidate allows and maximum does not</td>
+</tr>
+<tr>
+<td>String/regex theory</td>
+<td>Constraints over text and languages</td>
+<td>a path belongs to a compiled glob</td>
+</tr>
+<tr>
+<td>Solver assertion</td>
+<td>Adds a required formula</td>
+<td>assert the existence of a violation</td>
+</tr>
+<tr>
+<td>sat</td>
+<td>A satisfying assignment exists</td>
+<td>there is an action outside the maximum</td>
+</tr>
+<tr>
+<td>Model</td>
+<td>One satisfying assignment</td>
+<td>a concrete binary, host, method, and path</td>
+</tr>
+<tr>
+<td>unsat</td>
+<td>No satisfying assignment exists</td>
+<td>containment is proved for the model</td>
+</tr>
+<tr>
+<td>unknown</td>
+<td>Z3 did not establish either result</td>
+<td>fail closed and request review/support</td>
+</tr>
+</tbody>
+</table>
+<p>The direction of the query is important.</p>
+<p>We do not ask Z3 to prove:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>candidate is safe
+</span></code></pre></div>
+<p>We ask it to find a violation:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>candidate_allows(action)
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>AND NOT maximum_allows(action)
+</span></code></pre></div>
+<p>The same thing can be written as a set difference:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Allowed(candidate) ∖ Allowed(maximum) = ∅
+</span></code></pre></div>
+<p>If the solver returns <code>sat</code>, the difference is non-empty and its model gives us
+a concrete member.</p>
+<p>If it returns <code>unsat</code>, no modeled counterexample exists.</p>
+<h2 id="a-first-containment-query">A first containment query</h2>
+<p>Here is a small example in Z3's native SMT-LIB format. Save it as
+<code>containment.smt2</code> and run:</p>
+<div class="language-console highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="go">z3 containment.smt2</span>
+</span></code></pre></div>
+<p>The example compares two candidate policies against the same maximum.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>(declare-const binary String)
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>(declare-const host String)
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>(declare-const port Int)
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>(declare-const method String)
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>(declare-const path String)
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>(define-fun maximum-allows () Bool
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>  (and (= binary "/usr/bin/gh")
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>       (= host "api.github.com")
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>       (= port 443)
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>       (= method "GET")
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>       (str.prefixof "/repos/NVIDIA/OpenShell/issues/" path)))
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>
+</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>(define-fun broad-candidate-allows () Bool
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>  (and (= binary "/usr/bin/gh")
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>       (= host "api.github.com")
+</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>       (= port 443)
+</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>       (= method "POST")
+</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>       (str.prefixof "/repos/NVIDIA/" path)))
+</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>
+</span><span id="__span-6-21"><a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>(define-fun narrow-candidate-allows () Bool
+</span><span id="__span-6-22"><a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>  (and (= binary "/usr/bin/gh")
+</span><span id="__span-6-23"><a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>       (= host "api.github.com")
+</span><span id="__span-6-24"><a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a>       (= port 443)
+</span><span id="__span-6-25"><a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>       (= method "GET")
+</span><span id="__span-6-26"><a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a>       (= path "/repos/NVIDIA/OpenShell/issues/123")))
+</span><span id="__span-6-27"><a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a>
+</span><span id="__span-6-28"><a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a>(push)
+</span><span id="__span-6-29"><a id="__codelineno-6-29" name="__codelineno-6-29" href="#__codelineno-6-29"></a>(assert (and broad-candidate-allows (not maximum-allows)))
+</span><span id="__span-6-30"><a id="__codelineno-6-30" name="__codelineno-6-30" href="#__codelineno-6-30"></a>(check-sat)
+</span><span id="__span-6-31"><a id="__codelineno-6-31" name="__codelineno-6-31" href="#__codelineno-6-31"></a>(get-model)
+</span><span id="__span-6-32"><a id="__codelineno-6-32" name="__codelineno-6-32" href="#__codelineno-6-32"></a>(pop)
+</span><span id="__span-6-33"><a id="__codelineno-6-33" name="__codelineno-6-33" href="#__codelineno-6-33"></a>
+</span><span id="__span-6-34"><a id="__codelineno-6-34" name="__codelineno-6-34" href="#__codelineno-6-34"></a>(push)
+</span><span id="__span-6-35"><a id="__codelineno-6-35" name="__codelineno-6-35" href="#__codelineno-6-35"></a>(assert (and narrow-candidate-allows (not maximum-allows)))
+</span><span id="__span-6-36"><a id="__codelineno-6-36" name="__codelineno-6-36" href="#__codelineno-6-36"></a>(check-sat)
+</span><span id="__span-6-37"><a id="__codelineno-6-37" name="__codelineno-6-37" href="#__codelineno-6-37"></a>(pop)
+</span></code></pre></div>
+<p>The first check returns <code>sat</code>.</p>
+<p>One possible model is:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>method = "POST"
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>path   = "/repos/NVIDIA/"
+</span></code></pre></div>
+<p>That action is permitted by the broad candidate and not by the read-only
+maximum.</p>
+<p>The narrow candidate returns <code>unsat</code>: its exact GET request is contained by the
+maximum.</p>
+<p><code>push</code> and <code>pop</code> create temporary solver scopes. They are convenient when
+several related queries share one base model. OpenShell's current containment
+function creates a fresh solver for each containment query; some earlier
+verification experiments used incremental scopes to run several risk queries
+over the same reachability model.</p>
+<p>There is also no explicit <code>exists</code> in the source.</p>
+<p>Because <code>binary</code>, <code>host</code>, <code>port</code>, <code>method</code>, and <code>path</code> are declared without fixed
+values, Z3 is free to choose them. Operationally, satisfiability is answering:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>exists action:
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    candidate_allows(action)
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    AND NOT maximum_allows(action)
+</span></code></pre></div>
+<p>Avoiding explicit quantifiers where possible keeps the SMT model simpler and
+tends to make solver behavior easier to reason about.</p>
+<h2 id="encoding-openshell-policy-as-formal-logic">Encoding OpenShell policy as formal logic</h2>
+<p>OpenShell models one symbolic network action:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>action = {
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  binary: String,
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>  host: String,
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>  port: Int,
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>  layer: String,
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>  method: String,
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>  path: String
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>}
+</span></code></pre></div>
+<p>Rust parses and normalizes the policy schema, then builds two Boolean predicates
+over the same symbolic action:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>candidate_allows(action)
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>maximum_allows(action)
+</span></code></pre></div>
+<p>At the center of the containment check is essentially:</p>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">candidate_allows</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">policy_allows</span><span class="p">(</span><span class="n">candidate</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">action</span><span class="p">);</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="kd">let</span><span class="w"> </span><span class="n">maximum_allows</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">policy_allows</span><span class="p">(</span><span class="n">maximum</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">action</span><span class="p">);</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">solver</span><span class="p">.</span><span class="n">assert</span><span class="p">(</span><span class="n">Bool</span><span class="p">::</span><span class="n">and</span><span class="p">(</span><span class="o">&amp;</span><span class="p">[</span>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">    </span><span class="n">candidate_allows</span><span class="p">,</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">    </span><span class="o">!</span><span class="n">maximum_allows</span><span class="p">,</span>
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="p">]));</span>
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="k">match</span><span class="w"> </span><span class="n">solver</span><span class="p">.</span><span class="n">check</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">    </span><span class="n">SatResult</span><span class="p">::</span><span class="n">Unsat</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">MaximumPolicyCheck</span><span class="p">::</span><span class="n">WithinMax</span><span class="p">,</span>
+</span><span id="__span-11-11"><a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">    </span><span class="n">SatResult</span><span class="p">::</span><span class="n">Sat</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-11-12"><a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="n">model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">solver</span><span class="p">.</span><span class="n">get_model</span><span class="p">().</span><span class="n">expect</span><span class="p">(</span><span class="s">"sat result has a model"</span><span class="p">);</span>
+</span><span id="__span-11-13"><a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="n">counterexample</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">counterexample_from_model</span><span class="p">(</span><span class="o">&amp;</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">action</span><span class="p">)</span>
+</span><span id="__span-11-14"><a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a><span class="w">            </span><span class="p">.</span><span class="n">expect</span><span class="p">(</span><span class="s">"model contains a symbolic action"</span><span class="p">);</span>
+</span><span id="__span-11-15"><a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a><span class="w">        </span><span class="n">MaximumPolicyCheck</span><span class="p">::</span><span class="n">ExceedsMax</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">counterexample</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-11-16"><a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-11-17"><a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a><span class="w">    </span><span class="n">SatResult</span><span class="p">::</span><span class="n">Unknown</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">MaximumPolicyCheck</span><span class="p">::</span><span class="n">Unsupported</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-11-18"><a id="__codelineno-11-18" name="__codelineno-11-18" href="#__codelineno-11-18"></a><span class="w">        </span><span class="n">reason</span><span class="p">:</span><span class="w"> </span><span class="s">"Z3 returned unknown"</span><span class="p">.</span><span class="n">to_owned</span><span class="p">(),</span>
+</span><span id="__span-11-19"><a id="__codelineno-11-19" name="__codelineno-11-19" href="#__codelineno-11-19"></a><span class="w">    </span><span class="p">},</span>
+</span><span id="__span-11-20"><a id="__codelineno-11-20" name="__codelineno-11-20" href="#__codelineno-11-20"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>The policy itself becomes nested conjunctions and disjunctions.</p>
+<p>Conceptually:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>policy_allows(a) = ⋁ rule_allows(rule, a)
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>rule_allows(rule, a) =
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>  binary_matches(rule, a) ∧ endpoint_matches(rule, a)
+</span></code></pre></div>
+<p>An endpoint constrains the host and port. When L7 inspection is active, it also
+constrains things such as methods and paths.</p>
+<p>OpenShell supports <code>*</code> and <code>**</code> glob semantics. These are compiled into Z3
+regular expressions. A single <code>*</code> cannot cross the relevant separator — <code>/</code> for
+paths or <code>.</code> for hosts — while <code>**</code> can. Z3's regular-expression theory then
+checks whether the symbolic string belongs to the resulting language.</p>
+<p>This matters because the network layer is part of the authority being proved.</p>
+<p>Raw L4 authority over a binary, host, and port is broader than inspected L7
+authority over the same connection. L4 does not preserve REST methods and
+paths, GraphQL operations and fields, or MCP tools and resources. A raw network
+grant can therefore include actions that would have been excluded by
+protocol-specific controls.</p>
+<p>That interaction is easy to miss when reviewing one rule at a time. In the
+logical model, the two grants denote different sets of actions.</p>
+<h2 id="know-what-the-prover-does-not-model">Know what the prover does not model</h2>
+<p>The hardest part of applying formal methods here is not writing the final Z3
+query. It is deciding what the formula actually means.</p>
+<p>Our initial maximum-policy envelope spike modeled L4, REST, and WebSocket
+authority. Policy surfaces that had not yet been encoded, including GraphQL and
+MCP, failed closed.</p>
+<p>OpenShell supports protocol-specific GraphQL and MCP controls, but a containment
+result should not claim coverage until their operation, field, tool, and
+resource semantics are represented faithfully in the model.</p>
+<p>Unsupported authority has to stay visible. Silently dropping it from the
+formula would make <code>unsat</code> mean less than the system claims.</p>
+<p>The current containment surface covers filesystem paths, L4, and enforced REST,
+including explicit REST denies and regions marked <code>review.required</code>. GraphQL,
+MCP, query matchers, and CIDR-based <code>allowed_ips</code> remain explicit modeling work
+rather than implicit approvals.</p>
+<p>Filesystem containment is part of the same admission result, but the current
+implementation checks normalized parent/child path coverage directly in Rust
+rather than representing that relationship inside the symbolic network-action
+model.</p>
+<p>Those implementation boundaries are part of the security claim.</p>
+<h2 id="a-managed-maximum">A managed maximum</h2>
+<p>We use the containment query as the basis for a managed maximum.</p>
+<p>The maximum is owned by the gateway and acts as a ceiling. It does not grant the
+sandbox access by itself.</p>
+<p>Before creating a sandbox or committing an authority-changing update, the
+gateway evaluates the fully composed sandbox and provider policy against that
+ceiling.</p>
+<p>For an agent-authored proposal, the result can be:</p>
+<ul>
+<li><strong>Apply:</strong> the proposed authority is inside the maximum's auto-eligible region.</li>
+<li><strong>Ask:</strong> it is inside the maximum but intersects authority marked for review,
+  or the sandbox is running in managed ask mode.</li>
+<li><strong>Reject:</strong> it exceeds the maximum or depends on a policy surface the prover
+  does not support.</li>
+</ul>
+<p>The gateway recomputes containment against live policy and provider state
+immediately before persistence.</p>
+<p>That last step matters. A proposal that passed earlier is evidence that a
+particular state was acceptable; it is not a reusable capability token.</p>
+<h2 id="why-we-moved-away-from-a-collection-of-risk-checks">Why we moved away from a collection of risk checks</h2>
+<p>Our first experiments with formal verification in OpenShell asked several
+specialized security questions.</p>
+<ul>
+<li>Could a binary reach link-local metadata?</li>
+<li>Did a proposal expand credential-bearing reach?</li>
+<li>Could raw L4 access bypass L7 inspection?</li>
+<li>Did the change expand methods on an already reachable credentialed endpoint?</li>
+</ul>
+<p>These checks were useful. They encoded security expertise and produced evidence
+a reviewer could inspect.</p>
+<p>They also created another problem.</p>
+<p>Each new risk category needed its own model, fixtures, reporting, suppression
+behavior, and a product decision about how that finding should affect
+admission. Over time, the collection of checks risked becoming a second
+definition of what authority was acceptable.</p>
+<p>The managed-maximum design makes the approval boundary explicit:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>candidate policy ⊆ managed maximum policy
+</span></code></pre></div>
+<p>Credential-bearing reach and capability expansion can still be useful
+observations. They do not need to be independent approval systems when the
+complete candidate policy already has to fit within an operator-defined
+ceiling.</p>
+<p>If an organization wants some otherwise-contained authority to require review,
+it can mark that part of the maximum as <code>review.required</code>.</p>
+<p>We have found it useful to keep these concepts separate:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>runtime invariants      properties policy may never override
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>active sandbox policy   authority enforced on each relevant action
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>managed maximum         boundary for changing that authority
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>advisories              context presented to a reviewer
+</span></code></pre></div>
+<p>The distinction keeps an advisory from quietly turning into an authorization
+rule.</p>
+<h2 id="can-least-privilege-have-a-budget">Can least privilege have a budget?</h2>
+<p>Containment tells us whether a candidate stays below the maximum.</p>
+<p>It does not tell us whether the candidate is a good response to the denial that
+caused the agent to request more access.</p>
+<p>Suppose the maximum allows read access across an organization's GitHub
+repositories. An agent needs to read one issue and proposes:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>GET /repos/NVIDIA/**
+</span></code></pre></div>
+<p>That proposal may be fully contained by the maximum while still being much
+broader than the task required.</p>
+<p>We have started experimenting with a second comparison:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>delta(action) =
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    candidate_allows(action)
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>    AND NOT current_policy_allows(action)
+</span></code></pre></div>
+<p>For each proposed grant, Z3 can determine whether it adds new authority and
+return a representative new action.</p>
+<p>The current spike then evaluates the shape of that grant in Rust.</p>
+<p>An exact addition can have a low cost. A wildcard costs more. A recursive <code>**</code>
+costs more again. Replacing inspected L7 authority with raw L4 access carries a
+much larger cost.</p>
+<p>A conservative budget could permit one exact addition while routing broader
+changes to review.</p>
+<p>This is deliberately a hybrid.</p>
+<p>Z3 is not measuring the cardinality of an often-infinite action set. It
+establishes that semantic expansion exists and can produce examples of that
+expansion. The budget is a product policy over structural features of the
+proposed grant.</p>
+<p>Whether those features and weights correspond well enough to operational risk
+is something we still need to test.</p>
+<p>Maximum containment is further along as an admission boundary. Least-privilege
+budgets are an experiment.</p>
+<p>A few questions we want to explore:</p>
+<ul>
+<li>Can denials and solver counterexamples help agents draft narrower policy
+  changes on the next attempt?</li>
+<li>Can we define useful notions of semantic breadth for GraphQL operations and
+  MCP tools without reducing them to fragile syntax scores?</li>
+<li>How should many individually small permission changes accumulate over a
+  long-running task or a tree of delegated agents?</li>
+</ul>
+<h2 id="where-models-still-belong">Where models still belong</h2>
+<p>A containment proof only answers the question encoded in the property.</p>
+<p>It does not know why an agent wants access. It does not know whether the user's
+request makes an action appropriate. It cannot weigh business context,
+reversibility, or unusual combinations that were never represented in the
+model.</p>
+<p>Those are reasons to keep model-based and human review in the system.</p>
+<p>An approval flow we are exploring looks roughly like this:</p>
+<figure class="dev-note-figure">
+  <img src="../../../assets/agent-policy-prover/approval-flow.svg" alt="A proposed policy change passes through within formal boundary and needs contextual judgment decisions before reject and counterexample, apply, model or human review, and enforce and audit outcomes. H also leads to enforce and audit.">
+</figure>
+
+<p>There is precedent for combining these kinds of mechanisms.</p>
+<p><a href="https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/#building-guardrails">OpenAI</a>
+describes combining model-based and rules-based guardrails.
+<a href="https://www.anthropic.com/research/trustworthy-agents">Anthropic's work on trustworthy agents</a>
+treats safety as a property of the model, harness, tools, and environment
+together. <a href="https://arxiv.org/abs/2510.05156">Google DeepMind's VeriGuard</a>
+similarly places verification between proposed agent behavior and execution.</p>
+<p>Our working rule is simple: use a formal check when the boundary can be stated
+precisely, and do not ask the formal model to answer questions it was not built
+to represent.</p>
+<p>Likewise, a contextual reviewer should not silently override a hard invariant
+just because the request sounds convincing.</p>
+<p>Keeping those roles explicit makes the resulting authority easier to reason
+about.</p>
+<h2 id="start-with-one-decision">Start with one decision</h2>
+<p>The core containment query is small:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>candidate_allows(x)
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>AND NOT maximum_allows(x)
+</span></code></pre></div>
+<p>You do not need to begin by formally specifying an entire agent or proving a
+neural network correct. Pick one consequential decision with inputs you can
+model, write down one property you want to preserve, and put the check somewhere
+that can actually enforce the result.</p>
+<p>For OpenShell, that decision is whether an agent may change its own sandbox
+authority.</p>
+<p>SMT solving gives us a different artifact from another review of the request:
+either a counterexample showing authority outside the maximum, or a proof that
+no such action exists under the modeled semantics.</p>
+<p>There is plenty we have not modeled yet, and least-privilege budgeting is still
+an experiment. That is part of what makes this area useful to work on in the
+open.</p>
+<p>If you are building agent policies, tool permissions, or another constrained
+action surface, try writing down the action space explicitly and asking the
+solver for the counterexample.</p>
+<p>Sometimes the useful part of formal methods is not proving a large system
+correct. It is making one boundary precise enough that the system can answer for
+itself.</p>
+<h2 id="resources">Resources</h2>
+<ul>
+<li><a href="https://microsoft.github.io/z3guide/">Z3 Guide</a></li>
+<li><a href="https://www.microsoft.com/en-us/research/?p=825739">Z3: An Efficient SMT Solver</a></li>
+<li><a href="https://microsoft.github.io/z3guide/docs/theories/Regular%20Expressions/">Z3 regular expressions</a></li>
+<li><a href="https://github.com/Z3Prover/z3">Z3 source and language bindings</a></li>
+<li><a href="https://arxiv.org/abs/2510.05156">VeriGuard: Enhancing LLM Agent Safety via Verified Code Generation</a></li>
+<li><a href="https://www.anthropic.com/research/trustworthy-agents">Trustworthy agents in practice</a></li>
+<li><a href="https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/">A practical guide to building AI agents</a></li>
+</ul>
+
+
+  <nav class="md-tags" >
+    
+      
+      
+      
+      
+        <span class="md-tag">openshell</span>
+      
+    
+      
+      
+      
+      
+        <span class="md-tag">formal-methods</span>
+      
+    
+      
+      
+      
+      
+        <span class="md-tag">z3</span>
+      
+    
+      
+      
+      
+      
+        <span class="md-tag">agents</span>
+      
+    
+      
+      
+      
+      
+        <span class="md-tag">security</span>
+      
+    
+  </nav>
+
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        
+<footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Continue reading" >
+        
+          
+          <a href="../../" class="md-footer__link md-footer__link--prev" aria-label="Previous: Dev Notes">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">Previous</span>
+              <div class="md-ellipsis">Dev Notes</div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../2026-08-27-adversarial-policy-review-long-horizon-agents/" class="md-footer__link md-footer__link--next" aria-label="Next: Adversarial prototype: AI policy auto-approval for long-horizon agents in OpenShell">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">Next</span>
+              <div class="md-ellipsis">Adversarial prototype: AI policy auto-approval for long-horizon agents in OpenShell</div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      <a href="https://github.com/NVIDIA/OpenShell">OpenShell on GitHub <span aria-hidden="true">↗</span></a>
+
+    </div>
+  
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"search":"../../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.6e5f0216.min.js"></script>
+      
+        <script src="../../../javascripts/navigation-drawer.js"></script>
+      
+    
+  </body>
+</html>

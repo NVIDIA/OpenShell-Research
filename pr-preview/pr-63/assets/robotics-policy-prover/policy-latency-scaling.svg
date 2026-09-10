@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600" role="img" aria-labelledby="title desc">
+<title id="title">Policy-prover p95 latency across tested paths</title>
+<desc id="desc">Measured p95 policy-decision latency stayed between 1.006 and 1.250 milliseconds for allow, deny, and constrain outcomes across three to forty-eight waypoints.</desc>
+<style>
+.bg{fill:#f7f8fa}.panel{fill:#fff;stroke:#d0d5dd;stroke-width:1.5}.grid{stroke:#eaecf0;stroke-width:1}.axis{stroke:#98a2b3;stroke-width:1.5}.title{font:700 25px Inter,system-ui,sans-serif;fill:#101828}.subtitle{font:14px Inter,system-ui,sans-serif;fill:#475467}.label{font:700 14px Inter,system-ui,sans-serif;fill:#344054}.tick{font:12px Inter,system-ui,sans-serif;fill:#667085}.note{font:13px Inter,system-ui,sans-serif;fill:#667085}.metric{font:700 18px Inter,system-ui,sans-serif;fill:#101828}
+</style>
+<rect class="bg" width="1200" height="600" rx="18"/>
+<rect class="panel" x="40" y="105" width="1120" height="430" rx="14"/>
+<text class="title" x="60" y="52">Policy admission stayed near 1 ms</text>
+<text class="subtitle" x="60" y="80">Release-mode, in-process benchmark · 5,000 samples per case after 1,000 warm-up decisions</text>
+<text class="metric" x="1140" y="52" text-anchor="end">p95: 1.006–1.250 ms</text>
+<text class="label" x="65" y="137">Decision latency (ms)</text>
+<line class="grid" x1="90" y1="490.0" x2="1110" y2="490.0"/>
+<text class="tick" x="76" y="494.0" text-anchor="end">0.00</text>
+<line class="grid" x1="90" y1="426.0" x2="1110" y2="426.0"/>
+<text class="tick" x="76" y="430.0" text-anchor="end">0.32</text>
+<line class="grid" x1="90" y1="362.0" x2="1110" y2="362.0"/>
+<text class="tick" x="76" y="366.0" text-anchor="end">0.64</text>
+<line class="grid" x1="90" y1="298.0" x2="1110" y2="298.0"/>
+<text class="tick" x="76" y="302.0" text-anchor="end">0.96</text>
+<line class="grid" x1="90" y1="234.0" x2="1110" y2="234.0"/>
+<text class="tick" x="76" y="238.0" text-anchor="end">1.28</text>
+<line class="grid" x1="90" y1="170.0" x2="1110" y2="170.0"/>
+<text class="tick" x="76" y="174.0" text-anchor="end">1.60</text>
+<line class="axis" x1="90" y1="170" x2="90" y2="490"/>
+<line class="axis" x1="90" y1="490" x2="1110" y2="490"/>
+<text class="tick" x="90.0" y="516" text-anchor="middle">3</text>
+<text class="tick" x="345.0" y="516" text-anchor="middle">6</text>
+<text class="tick" x="600.0" y="516" text-anchor="middle">12</text>
+<text class="tick" x="855.0" y="516" text-anchor="middle">24</text>
+<text class="tick" x="1110.0" y="516" text-anchor="middle">48</text>
+<text class="label" x="600.0" y="540" text-anchor="middle">Waypoints in proposed path</text>
+<polyline points="90.0,243.6 345.0,241.5 600.0,241.9 855.0,241.1 1110.0,240.4" fill="none" stroke="#76b900" stroke-width="3"/>
+<circle cx="90.0" cy="243.6" r="4.5" fill="#fff" stroke="#76b900" stroke-width="3"/>
+<circle cx="345.0" cy="241.5" r="4.5" fill="#fff" stroke="#76b900" stroke-width="3"/>
+<circle cx="600.0" cy="241.9" r="4.5" fill="#fff" stroke="#76b900" stroke-width="3"/>
+<circle cx="855.0" cy="241.1" r="4.5" fill="#fff" stroke="#76b900" stroke-width="3"/>
+<circle cx="1110.0" cy="240.4" r="4.5" fill="#fff" stroke="#76b900" stroke-width="3"/>
+<polyline points="90.0,242.0 345.0,240.2 600.0,241.7 855.0,288.3 1110.0,288.8" fill="none" stroke="#d92d20" stroke-width="3"/>
+<circle cx="90.0" cy="242.0" r="4.5" fill="#fff" stroke="#d92d20" stroke-width="3"/>
+<circle cx="345.0" cy="240.2" r="4.5" fill="#fff" stroke="#d92d20" stroke-width="3"/>
+<circle cx="600.0" cy="241.7" r="4.5" fill="#fff" stroke="#d92d20" stroke-width="3"/>
+<circle cx="855.0" cy="288.3" r="4.5" fill="#fff" stroke="#d92d20" stroke-width="3"/>
+<circle cx="1110.0" cy="288.8" r="4.5" fill="#fff" stroke="#d92d20" stroke-width="3"/>
+<polyline points="90.0,272.7 345.0,240.3 600.0,239.9 855.0,240.8 1110.0,279.1" fill="none" stroke="#1570ef" stroke-width="3"/>
+<circle cx="90.0" cy="272.7" r="4.5" fill="#fff" stroke="#1570ef" stroke-width="3"/>
+<circle cx="345.0" cy="240.3" r="4.5" fill="#fff" stroke="#1570ef" stroke-width="3"/>
+<circle cx="600.0" cy="239.9" r="4.5" fill="#fff" stroke="#1570ef" stroke-width="3"/>
+<circle cx="855.0" cy="240.8" r="4.5" fill="#fff" stroke="#1570ef" stroke-width="3"/>
+<circle cx="1110.0" cy="279.1" r="4.5" fill="#fff" stroke="#1570ef" stroke-width="3"/>
+<line x1="780" y1="132" x2="804" y2="132" stroke="#76b900" stroke-width="3"/>
+<text class="tick" x="811" y="136">allow</text>
+<line x1="890" y1="132" x2="914" y2="132" stroke="#d92d20" stroke-width="3"/>
+<text class="tick" x="921" y="136">deny</text>
+<line x1="1000" y1="132" x2="1024" y2="132" stroke="#1570ef" stroke-width="3"/>
+<text class="tick" x="1031" y="136">constrain</text>
+<text class="note" x="260" y="137">p95 · geometry checks + Z3 setup/checking</text>
+<text class="note" x="60" y="580">Platform: NVIDIA DGX Spark (GB10, 20-core Arm), Ubuntu 24.04 · power mode uncontrolled</text>
+</svg>
