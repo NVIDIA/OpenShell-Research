@@ -3,7 +3,7 @@ name: New project review
 "on":
   # Trusted workflow/tooling only. PR contents are uploaded as data, never run here.
   pull_request_target:
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
 
 permissions: {}
 
@@ -11,8 +11,10 @@ jobs:
   request:
     name: Select new projects and validate their kinds
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
+      issues: read
       pull-requests: read
     outputs:
       number: ${{ steps.request.outputs.number }}
@@ -160,6 +162,7 @@ jobs:
     needs: [request, review]
     if: always() && needs.request.outputs.number != ''
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: write

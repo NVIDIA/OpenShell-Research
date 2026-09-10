@@ -8,7 +8,8 @@ import json
 import os
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from urllib.parse import quote
 
 REVIEW_MARKER = "<!-- oar-pr-review -->"
 VERDICTS = {
@@ -82,6 +83,7 @@ def read_results(directory, tasks):
 
 def render_report(*, request, reviews, run_url, run_id, outcome):
     reason = f" — {_escape_text(request['reason'])}" if request.get("reason") else ""
+    source_url = f"{run_url.partition('/actions/')[0]}/blob/{request['head']}"
     lines = [
         REVIEW_MARKER,
         f"<!-- oar-report-run:{run_id} -->",
@@ -89,7 +91,7 @@ def render_report(*, request, reviews, run_url, run_id, outcome):
         "",
         f"Revision: `{request['head']}` · [Workflow and result artifacts]({run_url})",
         "",
-        "Review findings and scores are advisory. Required checks remain separate merge gates.",
+        "Review findings are advisory. Required checks remain separate merge gates.",
         "",
         f"Execution: **{_escape_text(outcome)}**{reason}",
         "",
@@ -101,17 +103,17 @@ def render_report(*, request, reviews, run_url, run_id, outcome):
             [
                 "### Reviews",
                 "",
-                "| Project | Verdict | Guidelines | Score | Findings |",
-                "| --- | --- | --- | ---: | ---: |",
+                "| Project | Verdict | Guidelines | Findings |",
+                "| --- | --- | --- | ---: |",
             ]
         )
         for review in reviews:
             label = _escape_text(review["label"])
             result = review.get("result")
             lines.append(
-                f"| {label} | {VERDICTS[result['verdict']]} | {VERDICTS[result['guidelines_assessment']['verdict']]} | {result['overall_score']}/100 | {len(result['findings'])} |"
+                f"| {label} | {VERDICTS[result['verdict']]} | {VERDICTS[result['guidelines_assessment']['verdict']]} | {len(result['findings'])} |"
                 if result
-                else f"| {label} | Not completed | — | — | — |"
+                else f"| {label} | Not completed | — | — |"
             )
         for review in reviews:
             lines.extend(
@@ -137,25 +139,19 @@ def render_report(*, request, reviews, run_url, run_id, outcome):
                         f"**Project guidelines: {VERDICTS[result['guidelines_assessment']['verdict']]}**",
                         "",
                         _escape_text(result["guidelines_assessment"]["explanation"]),
-                        "",
-                        "| Criterion | Score | Rationale |",
-                        "| --- | ---: | --- |",
                     ]
                 )
-                for item in result["criterion_scores"]:
-                    lines.append(
-                        f"| {_escape_text(item.get('criterion'))} | {item['score']} | {_escape_text(item.get('explanation'))} |"
-                    )
                 lines.extend(["", "#### Findings", ""])
                 if not result["findings"]:
                     lines.append("No actionable findings.")
                 for finding in result["findings"]:
-                    location = finding.get("path") or review["label"]
-                    line = f":{finding['line']}" if finding.get("line") else ""
+                    location = _finding_location(
+                        finding, review["label"], source_url=source_url
+                    )
                     evidence = finding["evidence"]
                     lines.extend(
                         [
-                            f"- **{_escape_text(finding.get('severity'))}: {_escape_text(finding.get('title'))}** — {_escape_text(location)}{line}",
+                            f"- **{_escape_text(finding.get('severity'))}: {_escape_text(finding.get('title'))}** — {location}",
                             f"  - Evidence: {_escape_text(evidence)}",
                             f"  - Recommendation: {_escape_text(finding.get('recommendation'))}",
                         ]
@@ -182,10 +178,35 @@ def render_report(*, request, reviews, run_url, run_id, outcome):
 def publish_report(github, request, body, run_id):
     number = request["number"]
     pr = github.request("GET", f"pulls/{number}")
-    if pr["state"] != "open" or pr["head"]["sha"] != request["head"]:
+    if (
+        pr["state"] != "open"
+        or pr["head"]["sha"] != request["head"]
+        or (pr.get("draft") and not request.get("retire"))
+    ):
         return False
     comments = github.paginate(f"issues/{number}/comments")
-    existing = next(
+    existing = find_existing_report(comments)
+    previous_run = (
+        re.search(r"<!-- oar-report-run:(\d+) -->", existing["body"])
+        if existing
+        else None
+    )
+    if previous_run and int(previous_run.group(1)) > int(run_id):
+        return False
+    if request.get("retire"):
+        if not existing:
+            return False
+        github.request("DELETE", f"issues/comments/{existing['id']}")
+        return True
+    if existing:
+        github.request("PATCH", f"issues/comments/{existing['id']}", {"body": body})
+    else:
+        github.request("POST", f"issues/{number}/comments", {"body": body})
+    return True
+
+
+def find_existing_report(comments):
+    return next(
         (
             comment
             for comment in comments
@@ -194,18 +215,6 @@ def publish_report(github, request, body, run_id):
         ),
         None,
     )
-    previous_run = (
-        re.search(r"<!-- oar-report-run:(\d+) -->", existing["body"])
-        if existing
-        else None
-    )
-    if previous_run and int(previous_run.group(1)) > int(run_id):
-        return False
-    if existing:
-        github.request("PATCH", f"issues/comments/{existing['id']}", {"body": body})
-    else:
-        github.request("POST", f"issues/{number}/comments", {"body": body})
-    return True
 
 
 def main(argv=None):
@@ -278,6 +287,17 @@ def _escape_text(value):
     ):
         text = text.replace(original, escaped)
     return re.sub(r"\r?\n", " ", text)
+
+
+def _finding_location(finding, fallback, *, source_url):
+    path = finding.get("path") or fallback
+    line = finding.get("line")
+    display = f"{path}:{line}" if line else path
+    candidate = PurePosixPath(path)
+    if candidate.is_absolute() or ".." in candidate.parts or str(candidate) != path:
+        return _escape_text(display)
+    anchor = f"#L{line}" if line else ""
+    return f"[{_escape_text(display)}]({source_url}/{quote(path, safe='/')}{anchor})"
 
 
 if __name__ == "__main__":

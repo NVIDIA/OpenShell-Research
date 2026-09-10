@@ -533,10 +533,12 @@ def test_cli_doctor_displays_configuration_without_claiming_inference_readiness(
     assert [command[0] for command in commands] == ["--version", "status", "inference"]
 
 
-def test_cli_runs_the_live_smoke_profile(tmp_path: Path, monkeypatch) -> None:
+def test_cli_runs_the_live_integration_profile(tmp_path: Path, monkeypatch) -> None:
     profile, _, state, log = prepare(tmp_path, monkeypatch)
     shutil.copytree(
-        Path(__file__).parent / "fixtures/pipeline-smoke", profile, dirs_exist_ok=True
+        Path(__file__).parent / "fixtures/pipeline-integration",
+        profile,
+        dirs_exist_ok=True,
     )
     document = tmp_path / "input notes.txt"
     document.write_text("Uploaded content.\n")

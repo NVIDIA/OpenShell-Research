@@ -1,35 +1,35 @@
-name: OAR pipeline smoke
+name: OAR live integration
 
 "on":
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
     paths:
-      - .github/workflows/oar-smoke.yml
+      - .github/workflows/oar-integration.yml
       - .github/actions/setup-review-gateway/**
       - projects/openshell-agent-runner/src/**
       - projects/openshell-agent-runner/pyproject.toml
       - projects/openshell-agent-runner/uv.lock
-      - projects/openshell-agent-runner/tests/fixtures/pipeline-smoke/**
+      - projects/openshell-agent-runner/tests/fixtures/pipeline-integration/**
   push:
     branches: [main]
     paths:
-      - .github/workflows/oar-smoke.yml
+      - .github/workflows/oar-integration.yml
       - .github/actions/setup-review-gateway/**
       - projects/openshell-agent-runner/src/**
       - projects/openshell-agent-runner/pyproject.toml
       - projects/openshell-agent-runner/uv.lock
-      - projects/openshell-agent-runner/tests/fixtures/pipeline-smoke/**
+      - projects/openshell-agent-runner/tests/fixtures/pipeline-integration/**
   workflow_dispatch:
 
 permissions: {}
 
 concurrency:
-  group: oar-smoke-${{ github.ref }}
+  group: oar-integration-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  smoke:
-    name: Check installed OAR against a live gateway
+  integration:
+    name: Run installed OAR through OpenShell
     # Candidate OAR code runs on the host: restrict secrets to trusted branches.
     if: >-
       (github.event_name == 'pull_request' &&
@@ -39,7 +39,7 @@ jobs:
       (github.event_name != 'pull_request' &&
        github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -57,7 +57,7 @@ jobs:
           enable-cache: true
           cache-dependency-glob: projects/openshell-agent-runner/uv.lock
 
-      - name: Install the wheel and prepare one input
+      - name: Install the wheel and prepare the contract input
         working-directory: projects/openshell-agent-runner
         env:
           REVIEW_MODEL: ${{ secrets.MODEL_ID_TOP }}
@@ -70,11 +70,11 @@ jobs:
           oar="$RUNNER_TEMP/oar-venv/bin/oar"
           "$oar" init "$RUNNER_TEMP/profiles" --profile code-reviewer \
             --model "$REVIEW_MODEL" --thinking off
-          cp tests/fixtures/pipeline-smoke/* "$RUNNER_TEMP/profiles/code-reviewer/"
+          cp tests/fixtures/pipeline-integration/* "$RUNNER_TEMP/profiles/code-reviewer/"
           "$oar" validate "$RUNNER_TEMP/profiles/code-reviewer"
-          mkdir -p "$RUNNER_TEMP/oar-results"
+          mkdir -p "$RUNNER_TEMP/oar-integration"
           printf 'Input for workflow run %s, attempt %s.\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" \
-            > "$RUNNER_TEMP/oar-results/input.txt"
+            > "$RUNNER_TEMP/oar-integration/input.txt"
 
       - name: Start ephemeral gateway
         id: gateway
@@ -84,23 +84,22 @@ jobs:
           base-url: ${{ secrets.INFERENCE_BASE_URL }}
           model: ${{ secrets.MODEL_ID_TOP }}
 
-      - name: Run the installed CLI
-        id: run
+      - name: Exercise the installed CLI
         run: |
           "$RUNNER_TEMP/oar-venv/bin/oar" run "$RUNNER_TEMP/profiles/code-reviewer" \
-            --task echo-input --input "$RUNNER_TEMP/oar-results/input.txt" \
+            --task echo-input --input "$RUNNER_TEMP/oar-integration/input.txt" \
             --prompt-var "marker=$GITHUB_RUN_ID" --gateway openshell \
-            --timeout-seconds 300 --output "$RUNNER_TEMP/oar-results/result.json" \
-            > "$RUNNER_TEMP/oar-results/run.log" 2>&1
+            --timeout-seconds 300 --output "$RUNNER_TEMP/oar-integration/result.json" \
+            > "$RUNNER_TEMP/oar-integration/run.log" 2>&1
 
-      - name: Verify transferred input and prompt variable
+      - name: Verify transfer, prompt substitution, and structured output
         run: |
           python3 - <<'PY'
           import json
           import os
           from pathlib import Path
 
-          results = Path(os.environ["RUNNER_TEMP"]) / "oar-results"
+          results = Path(os.environ["RUNNER_TEMP"]) / "oar-integration"
           result = json.loads((results / "result.json").read_text())
           assert result["content"] == (results / "input.txt").read_text().strip(), result
           assert result["marker"] == os.environ["GITHUB_RUN_ID"], result
@@ -109,32 +108,40 @@ jobs:
       - name: Verify sandbox cleanup
         if: ${{ !cancelled() && steps.gateway.outcome == 'success' }}
         run: |
-          openshell sandbox list --gateway openshell --names > "$RUNNER_TEMP/oar-results/remaining-sandboxes.txt"
-          test ! -s "$RUNNER_TEMP/oar-results/remaining-sandboxes.txt"
+          openshell sandbox list --gateway openshell --names \
+            > "$RUNNER_TEMP/oar-integration/remaining-sandboxes.txt"
+          test ! -s "$RUNNER_TEMP/oar-integration/remaining-sandboxes.txt"
+
+      - name: Capture safe diagnostics
+        if: always() && steps.gateway.outcome != 'skipped'
+        run: |
+          openshell --version > "$RUNNER_TEMP/oar-integration/openshell-version.txt" 2>&1 || true
+          openshell status > "$RUNNER_TEMP/oar-integration/gateway-status.txt" 2>&1 || true
 
       - name: Stop gateway
         if: always() && steps.gateway.outcome != 'skipped'
         run: systemctl --user stop openshell-gateway.service
 
-      - name: Upload evidence
+      - name: Upload integration evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: oar-pipeline-smoke
-          path: ${{ runner.temp }}/oar-results
+          name: oar-live-integration
+          path: ${{ runner.temp }}/oar-integration
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Summarize pipeline check
+      - name: Summarize integration check
         if: always()
         env:
           OUTCOME: ${{ job.status }}
         run: |
           {
-            echo '## OAR pipeline smoke'
+            echo '## OAR live integration'
             echo
             echo "Outcome: **$OUTCOME**"
             echo
-            echo 'One installed-CLI run checks input upload, prompt substitution, schema-validated output, and sandbox cleanup.'
-            echo 'This checks OAR execution, not review quality or the PR content. See the oar-pipeline-smoke artifact for evidence.'
+            echo 'An installed wheel ran through a real OpenShell gateway and inference route.'
+            echo 'The check verifies input transfer, prompt substitution, schema-validated output, and sandbox cleanup.'
+            echo 'It verifies execution contracts, not reviewer judgment or PR content.'
           } >> "$GITHUB_STEP_SUMMARY"

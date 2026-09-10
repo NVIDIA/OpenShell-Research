@@ -103,8 +103,9 @@ make build
 
 `make check` includes CLI workflows against a simulated OpenShell. With Docker,
 run `make test-runtime` to exercise the real Pi harness without external inference.
-For runtime changes, one live CI task checks input transfer, prompt variables,
-structured output, and sandbox cleanup. It does not grade reviewer opinions.
+For runtime changes, one live integration check runs the installed wheel through
+OpenShell and verifies input transfer, prompt variables, structured output, and
+sandbox cleanup. It does not grade reviewer opinions.
 
 Use `uv run --frozen oar` in this directory to run the checked-out code instead
 of the installed release. Run a focused test with

@@ -1,4 +1,4 @@
-id: pipeline-smoke
+id: pipeline-integration
 description: Verify the installed CLI can transfer input and return structured output.
 sandbox:
   policy: policy.yaml

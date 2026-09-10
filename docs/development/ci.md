@@ -9,13 +9,14 @@ description: New-project assessments through OAR, separate from deterministic ch
 
 | Workflow | Purpose | When it runs |
 | --- | --- | --- |
-| OAR and PR review checks | Lint, types, tests, wheel installation, offline Pi sessions, and PR selection-to-report integration. No inference credentials. | OAR or review infrastructure changes. |
-| OAR pipeline smoke | One installed CLI run through a real gateway; checks input transfer, prompt variables, structured output, and sandbox cleanup. | OAR source, dependencies, smoke fixture, or gateway setup changes on trusted branches. |
+| OAR functional checks | Independent Python 3.12 jobs check deterministic behavior, installable distributions, and offline Pi sessions. No inference credentials. | OAR or review infrastructure changes. |
+| OAR live integration | One installed CLI run through a real gateway checks input transfer, prompt variables, structured output, and sandbox cleanup. | OAR source, dependencies, integration fixture, or gateway setup changes on trusted branches. |
 | New project review | An advisory assessment of each new project against its purpose and project guidelines, in one updated PR comment. | Eligible new-project PRs, as described below. |
 | Existing repository checks | Dependency licenses, source headers, project tests, documentation builds, and previews. | Their existing workflow triggers; independent of OAR reviews. |
 
-Model verdicts are not CI pass/fail expectations. The live smoke checks execution
-contracts; it does not evaluate reviewer quality or assess the PR's content.
+Model verdicts are not CI pass/fail expectations. The live integration checks
+execution contracts; it does not evaluate reviewer quality or assess the PR's
+content.
 
 The first iteration answers: **Does this new project deliver what it claims,
 follow our project guidelines, and use an appropriate level of engineering?**
@@ -57,12 +58,14 @@ New-project PR
                  └─ oar run once per project
                       └─ Validated JSON → one current-revision PR comment
 
-Native checks + offline integration ─── execution and policy checks
-One live OAR pipeline check ─────────── Actions summary, not a PR assessment
+Deterministic, package, and offline runtime checks ─── functional contracts
+One live OAR integration ───────────────────────────── Actions summary, not a PR assessment
 ```
 
-The result includes an overall verdict, five fixed criterion scores (0–100,
-100 best), their rounded mean, findings, strengths, and limitations.
+The result artifact includes an overall verdict, five fixed criterion scores
+(0–100, 100 best), their rounded mean, findings, strengths, and limitations.
+The PR comment emphasizes verdicts and actionable findings rather than
+displaying the numerical scores.
 `guidelines_assessment` separately records a verdict and evidence-based
 explanation covering applicable requirements and material verification gaps.
 Findings cite specific guideline violations; they do not invent requirements.
@@ -74,7 +77,9 @@ findings are advisory; native checks remain separate merge gates.
 
 ## Execution and trust
 
-`New project review` runs on PR opening, reopening, new commits, and readiness.
+`New project review` runs on PR opening, reopening, new commits, readiness, and
+conversion back to draft. When a new project is removed from the PR or the PR
+returns to draft, the workflow removes its now-stale bot report.
 Draft, fork, and Dependabot PRs skip live review. There is no manual fork
 authorization or waiting for other workflows.
 
@@ -98,8 +103,8 @@ The workflow must first land on the default branch before it can review actual
 project additions. Before that, offline integration tests exercise selection,
 snapshot preparation, the real OAR CLI, and report creation/update together,
 with simulated GitHub and OpenShell boundaries. This does not claim a live
-GitHub comment has been tested. The separate smoke verifies real OpenShell
-execution using the candidate wheel.
+GitHub comment has been tested. The separate live integration verifies real
+OpenShell execution using the candidate wheel.
 
 ## Setup
 
@@ -127,20 +132,26 @@ uv run --project projects/openshell-agent-runner pytest \
 ```
 
 Run `make check` and `make build` from the OAR project directory. `make check`
-includes CLI workflows against a simulated OpenShell; `make test-runtime` uses
-Docker to exercise real Pi sessions against local scripted inference, with no
-external network or credentials. CI runs both, plus the Pi extension SDK checks.
+includes CLI workflows against a simulated OpenShell. CI runs deterministic
+checks, distribution checks, and offline runtime checks as independent Python
+3.12 jobs. The distribution job builds both artifacts, proves that the sdist can
+build a wheel, installs the release wheel, and exercises its CLI and packaged
+resources. The runtime job uses Docker to exercise real Pi sessions against
+local scripted inference, with no external network or credentials, and checks
+the Pi extensions directly.
 
-The live smoke workflow (`.github/workflows/oar-smoke.yml`) installs the built
-wheel, configures a small task from `tests/fixtures/pipeline-smoke/`, and calls
-`oar run` directly. The agent reads an uploaded file and returns its contents
-plus a runtime prompt variable in a schema-validated result. CI checks those
-values and confirms that no sandbox remains on its dedicated gateway.
+The live integration workflow (`.github/workflows/oar-integration.yml`) installs
+the built wheel, configures a small task from
+`tests/fixtures/pipeline-integration/`, and calls `oar run` directly. The agent
+reads an uploaded file and returns its contents plus a runtime prompt variable
+in a schema-validated result. CI checks those values and confirms that no
+sandbox remains on its dedicated gateway.
 
-The task has a five-minute timeout and the job has a 15-minute limit.
+The task has a five-minute timeout and the job has a 10-minute limit.
 Input, result, log, and sandbox inventory are uploaded as
-the `oar-pipeline-smoke` artifact. The workflow writes an Actions summary,
-never a PR comment. No clean/flawed reviewer experiments run in CI.
+the `oar-live-integration` artifact, together with safe OpenShell version and
+gateway-status diagnostics. The workflow writes an Actions summary, never a PR
+comment. No reviewer-opinion expectations run in CI.
 
 Keep team expectations in the project guidelines. Change review judgment in the
 common or kind-specific skill, and change selection/reporting only when the
