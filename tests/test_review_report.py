@@ -189,6 +189,8 @@ class ReviewReportTests(unittest.TestCase):
             "c" * 40,
         ):
             self.assertIn(expected, normal)
+        for omitted in ("91/100", "Criterion", "Supported."):
+            self.assertNotIn(omitted, normal)
 
     def test_report_escapes_reviewer_data(self):
         options = report_options()
@@ -196,7 +198,6 @@ class ReviewReportTests(unittest.TestCase):
         review = options["reviews"][0]
         review["label"] = unsafe
         review["result"]["summary"] = unsafe
-        review["result"]["criterion_scores"][0]["explanation"] = unsafe
         review["result"]["findings"] = [
             dict.fromkeys(
                 ("title", "path", "evidence", "impact", "recommendation"), unsafe
@@ -269,7 +270,7 @@ class ReviewReportTests(unittest.TestCase):
         github.comments = [
             {
                 "id": 5,
-                "user": {"type": "Bot"},
+                "user": {"type": "Bot", "login": "github-actions[bot]"},
                 "body": f"{REVIEW_MARKER}\n<!-- oar-report-run:101 -->",
             }
         ]
@@ -285,7 +286,7 @@ class ReviewReportTests(unittest.TestCase):
         github.comments = [
             {
                 "id": 5,
-                "user": {"type": "Bot"},
+                "user": {"type": "Bot", "login": "github-actions[bot]"},
                 "body": f"{REVIEW_MARKER}\n<!-- oar-report-run:99 -->",
             }
         ]
@@ -305,14 +306,19 @@ class ReviewReportTests(unittest.TestCase):
             {"id": 2, "user": {"type": "Bot"}, "body": "Documentation preview"},
             {
                 "id": 3,
-                "user": {"type": "Bot"},
+                "user": {"type": "Bot", "login": "other-app[bot]"},
+                "body": f"{REVIEW_MARKER}\n<!-- oar-report-run:100 -->",
+            },
+            {
+                "id": 4,
+                "user": {"type": "Bot", "login": "github-actions[bot]"},
                 "body": f"{REVIEW_MARKER}\n<!-- oar-report-run:100 -->",
             },
         ]
         self.assertTrue(
             publish_report(github, {"number": 7, "head": HEAD}, "updated", 100)
         )
-        self.assertIn(("PATCH", "issues/comments/3", {"body": "updated"}), github.calls)
+        self.assertIn(("PATCH", "issues/comments/4", {"body": "updated"}), github.calls)
         github.calls.clear()
         github.comments.pop()
         self.assertTrue(publish_report(github, {"number": 7, "head": HEAD}, "new", 101))

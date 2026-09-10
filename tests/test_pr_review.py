@@ -139,7 +139,7 @@ class RequestTests(unittest.TestCase):
         self.github.comments = [
             {
                 "id": 9,
-                "user": {"type": "Bot"},
+                "user": {"type": "Bot", "login": "github-actions[bot]"},
                 "body": REVIEW_MARKER,
             }
         ]
@@ -266,7 +266,11 @@ class RequestTests(unittest.TestCase):
     def test_cli_marks_report_retirement_as_not_ready_for_inference(self):
         self.github.files[0]["filename"] = "projects/existing/new-file.py"
         self.github.comments = [
-            {"id": 9, "user": {"type": "Bot"}, "body": REVIEW_MARKER}
+            {
+                "id": 9,
+                "user": {"type": "Bot", "login": "github-actions[bot]"},
+                "body": REVIEW_MARKER,
+            }
         ]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

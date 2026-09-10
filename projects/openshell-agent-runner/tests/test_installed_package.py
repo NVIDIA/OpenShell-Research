@@ -11,6 +11,10 @@ def test_distribution_exposes_both_cli_entry_points() -> None:
     package = distribution("openshell-agent-runner")
 
     assert package.version
+    assert any(
+        str(path).endswith(".dist-info/licenses/LICENSE")
+        for path in package.files or ()
+    )
     scripts = {
         entry_point.name: entry_point.value
         for entry_point in package.entry_points

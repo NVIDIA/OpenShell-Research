@@ -109,6 +109,7 @@ jobs:
         working-directory: projects/openshell-agent-runner
         run: |
           make build
+          shopt -s nullglob
           wheels=(dist/*.whl)
           sdists=(dist/*.tar.gz)
           test "${#wheels[@]}" -eq 1
@@ -120,7 +121,7 @@ jobs:
           wheel=(dist/*.whl)
           uv venv "$RUNNER_TEMP/package-venv"
           uv pip install --python "$RUNNER_TEMP/package-venv/bin/python" \
-            "${wheel[0]}" pytest
+            "${wheel[0]}" "pytest>=8.4,<10"
           python="$RUNNER_TEMP/package-venv/bin/python"
           oar="$RUNNER_TEMP/package-venv/bin/oar"
           "$python" -m pytest tests/test_installed_package.py

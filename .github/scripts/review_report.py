@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import quote
 
 REVIEW_MARKER = "<!-- oar-pr-review -->"
+REPORT_AUTHOR = "github-actions[bot]"
 VERDICTS = {
     "pass": "✅ Pass",
     "needs_changes": "⚠️ Needs changes",
@@ -211,6 +212,7 @@ def find_existing_report(comments):
             comment
             for comment in comments
             if (comment.get("user") or {}).get("type") == "Bot"
+            and (comment.get("user") or {}).get("login") == REPORT_AUTHOR
             and REVIEW_MARKER in (comment.get("body") or "")
         ),
         None,
