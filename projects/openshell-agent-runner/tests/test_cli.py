@@ -28,9 +28,10 @@ def test_root_help_lists_commands() -> None:
     result = CliRunner().invoke(app, ["--help"])
 
     assert result.exit_code == 0
+    help_text = Text.from_ansi(result.stdout).plain
     for command in ("init", "validate", "run", "doctor"):
-        assert command in result.stdout
-    assert "--version" in result.stdout
+        assert command in help_text
+    assert "--version" in help_text
 
 
 def test_version_reports_installed_distribution_version() -> None:
