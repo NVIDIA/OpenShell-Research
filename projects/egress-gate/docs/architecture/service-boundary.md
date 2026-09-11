@@ -10,6 +10,10 @@ The `service/` package is the only handwritten package that imports OpenShell
 protobuf/gRPC bindings. It owns exact encoded wire limits and transport status
 mapping. Domain models own protobuf-free invariants.
 
+The optional admission deployment adds a bounded HTTPS candidate endpoint and
+authenticates standard gRPC calls using OpenShell's existing extension JWTs.
+It does not add a protobuf RPC. See [Admission without forks](admission.md).
+
 The OpenShell supervisor owns the intercepted request. Egress Gate receives its
 request data over gRPC and works with local immutable `HttpRequest` snapshots.
 The Egress Gate service adapter returns a decision and final mutations; the

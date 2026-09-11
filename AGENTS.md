@@ -22,6 +22,12 @@ validation commands. When adding a project, also follow
 ## Repository rules
 
 - Make the smallest change that satisfies the task and preserve unrelated work.
+- Manage OpenShell middleware with `omm` from
+  `projects/openshell-middleware-manager/`, including project creation and
+  protocol, generated binding, and manifest updates. If functionality is missing,
+  open an issue for the manager; implement a fix only when explicitly requested.
+  Do not bypass the manager with standalone generators or hand-edit generated
+  artifacts.
 - Prefer explicit, clear names and language over concise but ambiguous
   alternatives. Value concision when it does not reduce clarity.
 - Use `uv` for Python dependency management, environments, locking, builds, and

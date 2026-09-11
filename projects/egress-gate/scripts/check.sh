@@ -15,11 +15,14 @@ if [[ $# -gt 0 ]]; then
   uv_run+=(--python "$2")
 fi
 
+npm --prefix examples/pi-attested-admission/pi-harness ci --ignore-scripts --no-audit --no-fund
+npm --prefix examples/pi-attested-admission/pi-harness run build
 "${uv_run[@]}" pytest -q
 "${uv_run[@]}" ruff format --check .
 "${uv_run[@]}" ruff check .
 "${uv_run[@]}" ty check
 "${uv_run[@]}" python -c "import egress_gate"
+npm --prefix examples/pi-attested-admission/pi-harness test
 "${uv_run[@]}" pip-audit \
   --progress-spinner off \
   --local

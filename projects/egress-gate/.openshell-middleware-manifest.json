@@ -1,7 +1,7 @@
 {
-  "openshell_version": "v0.0.97",
-  "proto_source": "https://raw.githubusercontent.com/NVIDIA/OpenShell/v0.0.97/proto/supervisor_middleware.proto",
-  "proto_sha256": "e9d5a992ff5b50a33e9625176aaf6df8496d6774aa2ef3afe5cae7bc83c01105",
+  "openshell_version": "v0.0.116",
+  "proto_source": "https://raw.githubusercontent.com/NVIDIA/OpenShell/v0.0.116/proto/supervisor_middleware.proto",
+  "proto_sha256": "d96a963321c74c261a912dcd0b8cda690741b32b8c3d90ff3ef38dafe6681bad",
   "languages": [
     "python"
   ],

@@ -154,6 +154,24 @@ async def test_generated_stub_round_trip_covers_manifest_and_gate_actions() -> N
 
 
 @pytest.mark.asyncio
+async def test_unmanaged_http_rejects_the_reserved_header() -> None:
+    middleware = EgressGateMiddleware(create_builtin_registry())
+    request = _evaluation(b"safe", action_kind="detect")
+    request.headers.append(
+        pb2.HttpHeader(
+            name="X-Egress-Admission",
+            value="eg1.untrusted",
+        )
+    )
+
+    async with _running_stub(middleware) as (stub, _):
+        response = await stub.EvaluateHttpRequest(request)
+
+    assert response.decision == pb2.DECISION_DENY
+    assert response.reason_code == "reserved_header_present"
+
+
+@pytest.mark.asyncio
 async def test_generated_stub_returns_three_gate_progressive_redaction() -> None:
     middleware = EgressGateMiddleware(create_builtin_registry())
     request = _evaluation(b"email=alice@example.com api_key=sk-123456 phone=555-0100")

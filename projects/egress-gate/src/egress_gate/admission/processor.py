@@ -1,0 +1,278 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""Harness-admission orchestration and attested network egress."""
+
+from __future__ import annotations
+
+import base64
+import binascii
+from typing import Literal
+
+from pydantic import ValidationError
+
+from egress_gate.admission.adapters import (
+    AdmissionMutationError,
+    AdmissionShapeError,
+    PiProviderContextV1,
+    ProviderShapeError,
+    context_entries_subject,
+    extract_provider_entries,
+    parse_pi_request,
+    validate_pi_replacement,
+)
+from egress_gate.admission.canonical import canonical_json_bytes
+from egress_gate.admission.models import (
+    MAX_ADMISSION_BODY_BYTES,
+    AdmissionDecision,
+    AdmissionHook,
+    HarnessAdmissionContext,
+    HarnessAdmissionRequest,
+    HarnessAdmissionResult,
+)
+from egress_gate.admission.receipts import ReceiptAuthority, ReceiptVerificationError
+from egress_gate.constants import MAX_AGENT_ATTESTATION_BYTES
+from egress_gate.errors import EgressGateError, GateError, TimeoutExpiredError
+from egress_gate.request import (
+    HttpRequest,
+    RemoveHeaderMutation,
+    RequestContext,
+    RequestMutations,
+)
+from egress_gate.request_processor import RequestProcessor, apply_request_mutations
+from egress_gate.result import (
+    DecisionSourceKind,
+    EgressDecision,
+    EgressResult,
+    GateDecisionSource,
+)
+from egress_gate.timeout import Timeout
+
+RECEIPT_HEADER = "x-egress-admission"
+
+
+class HarnessAdmissionProcessor:
+    """Apply the configured Gate pipeline through the fixed Pi admission shapes."""
+
+    def __init__(
+        self,
+        request_processor: RequestProcessor,
+        receipt_authority: ReceiptAuthority,
+    ) -> None:
+        fingerprint = request_processor.policy_fingerprint
+        if not fingerprint:
+            raise ValueError("admission requires a policy fingerprint")
+        self._request_processor = request_processor
+        self._receipt_authority = receipt_authority
+        self._policy_fingerprint = fingerprint
+
+    def process(
+        self,
+        request: HarnessAdmissionRequest,
+        context: HarnessAdmissionContext,
+        *,
+        timeout: Timeout,
+    ) -> HarnessAdmissionResult:
+        """Return an explicit allow, replacement, or fail-closed denial."""
+        try:
+            native = parse_pi_request(request.request_body, context, timeout)
+            projected_body = canonical_json_bytes(native)
+            projected = HttpRequest(
+                context=RequestContext(
+                    request_id=context.request_id,
+                    sandbox_id=context.sandbox_id,
+                ),
+                target=context.provider_target,
+                headers=(),
+                body=projected_body,
+            )
+            gate_result = self._request_processor.process(projected, timeout=timeout)
+            timeout.raise_if_expired()
+            if gate_result.decision is EgressDecision.DENY:
+                return HarnessAdmissionResult(
+                    hook=context.hook,
+                    decision=AdmissionDecision.DENY,
+                    findings=gate_result.findings,
+                    reason_code=gate_result.reason_code,
+                    policy_fingerprint=self._policy_fingerprint,
+                )
+            if gate_result.request_mutations.header_mutations:
+                raise AdmissionMutationError("admission cannot mutate HTTP headers")
+            final_request = apply_request_mutations(
+                projected, gate_result.request_mutations
+            )
+            final = parse_pi_request(final_request.body, context, timeout)
+            validate_pi_replacement(native, final)
+            encoded = canonical_json_bytes(final)
+            replacement = None if encoded == projected_body else encoded
+            if replacement is not None and len(replacement) > MAX_ADMISSION_BODY_BYTES:
+                raise AdmissionMutationError("admission replacement body is too large")
+            timeout.raise_if_expired()
+            attestation = None
+            if isinstance(final, PiProviderContextV1):
+                attestation = self._receipt_authority.issue_attestation(
+                    *context_entries_subject(final.entries),
+                    context,
+                    request.provenance,
+                    policy_fingerprint=self._policy_fingerprint,
+                )
+            timeout.raise_if_expired()
+            return HarnessAdmissionResult(
+                hook=context.hook,
+                decision=(
+                    AdmissionDecision.REPLACE
+                    if replacement is not None
+                    else AdmissionDecision.ALLOW
+                ),
+                replacement_body=replacement,
+                attestation=attestation,
+                findings=gate_result.findings,
+                policy_fingerprint=self._policy_fingerprint,
+            )
+        except (AdmissionShapeError, AdmissionMutationError, ValidationError):
+            return self._deny("admission_contract_invalid", context.hook)
+        except TimeoutExpiredError:
+            return self._deny("admission_unavailable", context.hook)
+        except (EgressGateError, GateError, ValueError):
+            return self._deny("admission_unavailable", context.hook)
+        except Exception:
+            return self._deny("admission_unavailable", context.hook)
+
+    def _deny(self, reason_code: str, hook: AdmissionHook) -> HarnessAdmissionResult:
+        return HarnessAdmissionResult(
+            hook=hook,
+            decision=AdmissionDecision.DENY,
+            reason_code=reason_code,
+            policy_fingerprint=self._policy_fingerprint,
+        )
+
+
+class AttestedEgressProcessor:
+    """Verify trusted agent attestation and reject context divergence."""
+
+    def __init__(
+        self,
+        request_processor: RequestProcessor,
+        receipt_authority: ReceiptAuthority,
+        *,
+        middleware_name: str,
+        harness_version: Literal["sdk-v1"],
+    ) -> None:
+        fingerprint = request_processor.policy_fingerprint
+        if not fingerprint:
+            raise ValueError("attested egress requires a policy fingerprint")
+        self._request_processor = request_processor
+        self._receipt_authority = receipt_authority
+        self._middleware_name = middleware_name
+        self._harness_version = harness_version
+        self._policy_fingerprint = fingerprint
+
+    def process(
+        self,
+        request: HttpRequest,
+        *,
+        timeout: Timeout,
+    ) -> EgressResult:
+        """Deny any unattested or semantically changed provider request."""
+        receipts = [
+            h.value for h in request.headers if h.name.lower() == RECEIPT_HEADER
+        ]
+        if not receipts:
+            return self._deny("attestation_missing")
+        if (
+            len(receipts) != 1
+            or len(receipts[0]) > MAX_AGENT_ATTESTATION_BYTES * 4 // 3 + 4
+        ):
+            return self._deny("attestation_malformed")
+        try:
+            agent_attestation = base64.b64decode(
+                receipts[0], altchars=b"-_", validate=True
+            )
+        except (ValueError, binascii.Error):
+            return self._deny("attestation_malformed")
+        if (
+            not agent_attestation
+            or len(agent_attestation) > MAX_AGENT_ATTESTATION_BYTES
+        ):
+            return self._deny("attestation_malformed")
+        request = request.model_copy(
+            update={
+                "headers": tuple(
+                    h for h in request.headers if h.name.lower() != RECEIPT_HEADER
+                )
+            }
+        )
+        try:
+            entries = extract_provider_entries(request, timeout)
+            subject_hash, entry_count = context_entries_subject(entries)
+            timeout.raise_if_expired()
+            context = HarnessAdmissionContext(
+                request_id=request.context.request_id,
+                sandbox_id=request.context.sandbox_id,
+                middleware_name=self._middleware_name,
+                harness="pi",
+                harness_version=self._harness_version,
+                hook=AdmissionHook.PROVIDER_CONTEXT,
+                schema_version="openshell.pi-provider-context.v1",
+                provider_target=request.target,
+                provider_adapter_schema="openai.request.v1",
+            )
+            self._receipt_authority.verify_attestation(
+                agent_attestation,
+                subject_hash,
+                entry_count,
+                context,
+                policy_fingerprint=self._policy_fingerprint,
+            )
+            timeout.raise_if_expired()
+            gate_result = self._request_processor.process(request, timeout=timeout)
+            timeout.raise_if_expired()
+            if gate_result.decision is EgressDecision.DENY:
+                return gate_result
+            final_request = apply_request_mutations(
+                request, gate_result.request_mutations
+            )
+            final_entries = extract_provider_entries(final_request, timeout)
+            if final_entries != entries:
+                return self._deny("semantic_mutation_denied")
+            timeout.raise_if_expired()
+            return gate_result.model_copy(
+                update={
+                    "request_mutations": RequestMutations(
+                        replacement_body=gate_result.request_mutations.replacement_body,
+                        header_mutations=(
+                            *gate_result.request_mutations.header_mutations,
+                            RemoveHeaderMutation(kind="remove", name=RECEIPT_HEADER),
+                        ),
+                    )
+                }
+            )
+        except ReceiptVerificationError as error:
+            return self._deny(error.reason_code)
+        except TimeoutExpiredError:
+            return self._deny("egress_verification_failed")
+        except (ProviderShapeError, ValidationError):
+            return self._deny("provider_shape_unsupported")
+        except (EgressGateError, GateError, ValueError):
+            return self._deny("egress_verification_failed")
+        except Exception:
+            return self._deny("egress_verification_failed")
+
+    def _deny(self, reason_code: str) -> EgressResult:
+        return EgressResult(
+            decision=EgressDecision.DENY,
+            decision_source=GateDecisionSource(
+                kind=DecisionSourceKind.GATE,
+                gate_name="agent-attestation-verifier",
+                gate_type="agent-attestation-verifier",
+            ),
+            reason_code=reason_code,
+            policy_fingerprint=self._policy_fingerprint,
+        )
+
+
+__all__ = [
+    "AttestedEgressProcessor",
+    "HarnessAdmissionProcessor",
+    "RECEIPT_HEADER",
+]

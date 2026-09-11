@@ -18,6 +18,16 @@ import grpc
 from google.protobuf import json_format
 from google.protobuf.message import Message
 
+from egress_gate.admission import (
+    PI_HARNESS_VERSION,
+    RECEIPT_HEADER,
+    AttestedEgressProcessor,
+    HarnessAdmissionContext,
+    HarnessAdmissionProcessor,
+    HarnessAdmissionRequest,
+    HarnessAdmissionResult,
+    ReceiptAuthority,
+)
 from egress_gate.bindings import supervisor_middleware_pb2 as pb2
 from egress_gate.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
 from egress_gate.config import EgressGateConfig
@@ -65,6 +75,7 @@ from egress_gate.result import (
     DecisionSourceKind,
     EgressDecision,
     EgressResult,
+    GateDecisionSource,
     SourcedFinding,
 )
 from egress_gate.string_validators import validate_bounded_metadata_string
@@ -83,6 +94,8 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         registry: GateRegistry,
         *,
         timeout_middleware_processing: float = DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING,
+        require_agent_attestation: bool = False,
+        expected_audience: str = "",
     ) -> None:
         registry.configuration_json_schema()
         self._registry = registry
@@ -90,6 +103,9 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
             validate_timeout_middleware_processing(timeout_middleware_processing)
         )
         self._policy = _ActivePolicy(registry)
+        self._receipt_authority = ReceiptAuthority()
+        self._require_agent_attestation = require_agent_attestation
+        self._expected_audience = expected_audience
         self._processing_slots = asyncio.Semaphore(MAX_CONCURRENT_PROCESSING)
         self._processing_executor = ThreadPoolExecutor(
             max_workers=MAX_CONCURRENT_PROCESSING,
@@ -120,12 +136,13 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         return pb2.MiddlewareManifest(
             name=SERVICE_NAME,
             service_version=SERVICE_VERSION,
+            expected_audience=self._expected_audience,
             bindings=[
                 pb2.MiddlewareBinding(
                     operation=pb2.SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_REQUEST,
                     phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS,
-                    max_body_bytes=MAX_BODY_BYTES,
-                )
+                    max_payload_bytes=MAX_BODY_BYTES,
+                ),
             ],
         )
 
@@ -151,6 +168,24 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         """Resolve the prepared pipeline and evaluate one current request."""
         return await self._evaluate_rpc(request, context)
 
+    async def admit(
+        self,
+        request: HarnessAdmissionRequest,
+        context: HarnessAdmissionContext,
+        policy: dict[str, object],
+    ) -> HarnessAdmissionResult:
+        """Evaluate a candidate with HTTP-service-owned identity and policy."""
+        if not self._require_agent_attestation:
+            raise ValueError("admission is disabled")
+        timeout = Timeout.from_seconds(self._timeout_middleware_processing_seconds)
+        return await self._run_in_worker(
+            lambda: HarnessAdmissionProcessor(
+                self._policy.processor_for(policy, timeout=timeout),
+                self._receipt_authority,
+            ).process(request, context, timeout=timeout),
+            timeout=timeout,
+        )
+
     def _validate_config(
         self,
         request: pb2.ValidateConfigRequest,
@@ -175,6 +210,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         request_id = _request_id_for_logging(request.context.request_id)
         failure: EgressGateError | None = None
         action = "error"
+        reason_code: str | None = None
         finding_count = 0
         source_kind = "none"
         try:
@@ -184,11 +220,13 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                 timeout,
             )
             action = "allow" if response.decision == pb2.DECISION_ALLOW else "deny"
+            reason_code = response.reason_code or None
             finding_count = sum(finding.count for finding in response.findings)
             return response
         except TimeoutExpiredError:
             response = _limit_deny()
             action = "deny"
+            reason_code = response.reason_code or None
             source_kind = DecisionSourceKind.RUNTIME_LIMIT.value
             return response
         except EgressGateError as error:
@@ -200,6 +238,7 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
                 request_id=request_id,
                 started=started,
                 action=action,
+                reason_code=reason_code,
                 finding_count=finding_count,
                 source_kind=source_kind,
                 failure=failure,
@@ -255,6 +294,29 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
             values,
             timeout=timeout,
         )
+        if self._require_agent_attestation:
+            return AttestedEgressProcessor(
+                processor,
+                self._receipt_authority,
+                middleware_name=request.middleware_name,
+                harness_version=PI_HARNESS_VERSION,
+            ).process(
+                domain_request,
+                timeout=timeout,
+            )
+        if any(
+            header.name.lower() == RECEIPT_HEADER for header in domain_request.headers
+        ):
+            return EgressResult(
+                decision=EgressDecision.DENY,
+                decision_source=GateDecisionSource(
+                    kind=DecisionSourceKind.GATE,
+                    gate_name="reserved-receipt-header",
+                    gate_type="reserved-receipt-header",
+                ),
+                reason_code="reserved_header_present",
+                policy_fingerprint=processor.policy_fingerprint,
+            )
         return processor.process(domain_request, timeout=timeout)
 
     async def _run_in_worker(
@@ -348,9 +410,11 @@ class _AbortContext(Protocol):
 
 
 class _EvaluationLogExtra(TypedDict):
+    event: str
     request_id: str
     duration_ms: float
     action: str
+    reason_code: str | None
     finding_count: int
     decision_source_kind: str
     error_code: str | None
@@ -361,14 +425,17 @@ def _evaluation_log_extra(
     request_id: str,
     started: float,
     action: str,
+    reason_code: str | None,
     finding_count: int,
     source_kind: str,
     failure: EgressGateError | None,
 ) -> _EvaluationLogExtra:
     return {
+        "event": "egress_gate_evaluation",
         "request_id": request_id,
         "duration_ms": round((time.monotonic() - started) * 1000, 3),
         "action": action,
+        "reason_code": reason_code,
         "finding_count": finding_count,
         "decision_source_kind": source_kind,
         "error_code": failure.code.value if failure is not None else None,

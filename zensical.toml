@@ -44,6 +44,7 @@ nav = [
       {"Architecture" = [
         "documentation/egress-gate/architecture/index.md",
         {"Request lifecycle" = "documentation/egress-gate/architecture/request-lifecycle.md"},
+        {"Admission without harness forks" = "documentation/egress-gate/architecture/admission.md"},
         {"Service boundary" = "documentation/egress-gate/architecture/service-boundary.md"}
       ]},
       {"Reference" = [

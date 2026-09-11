@@ -18,6 +18,11 @@ Run focused tests while working and `make check` before handoff.
 
 ## Engineering approach
 
+- Update the OpenShell protocol, generated bindings and manifest only through
+  `openshell-middleware-manager`. `scripts/generate-bindings.sh` delegates to it.
+  Open an issue for generator gaps; implement a fix only when explicitly
+  requested. Do not add a separate protoc workflow or edit generated artifacts
+  by hand.
 - Backwards compatibility with the removed legacy policy API is not a concern.
   Do not restore old schemas, imports, names, aliases, or obsolete pipeline terms.
 - Gates are trusted application code. Capabilities enforce declared output

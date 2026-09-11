@@ -1,0 +1,4 @@
+# Operator-owned model configuration, like the already ignored .env.
+# Keep the previous operator filename ignored during migration.
+/model.json
+/models.json

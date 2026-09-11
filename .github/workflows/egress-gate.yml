@@ -44,6 +44,11 @@ jobs:
           echo "UV_CACHE_DIR=$RUNNER_TEMP/egress-gate-uv-cache" >> "$GITHUB_ENV"
           echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/egress-gate-venv" >> "$GITHUB_ENV"
 
+      - name: Set up Node for the upstream Pi example
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.22.2"
+
       - name: Install locked dependencies
         run: uv sync --frozen
 

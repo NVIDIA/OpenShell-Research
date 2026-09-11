@@ -49,6 +49,13 @@ Use `0.0.0.0` only when the OpenShell supervisor must reach the service across
 network namespaces. The development server uses plaintext gRPC. Restrict its
 listen port to trusted networks.
 
+Ordinary HTTP middleware is the default. To require admission receipts, pass
+`--admission-config /absolute/path/to/admission.json`. That operator-owned
+configuration enables the additional authenticated HTTPS admission API and
+TLS/JWT authentication for the middleware listener. See the
+[no-fork Pi example](examples/pi-attested-admission/README.md) for a runnable
+upstream deployment, trust boundaries, and supported scope.
+
 ## Policy shape
 
 The registry builds an exact strict schema from installed gate types:
@@ -107,7 +114,9 @@ server = EgressGateServer(
 server.serve_sync("127.0.0.1:50051")
 ```
 
-In this example, `timeout_middleware_processing` gives each evaluation 10
+Pass an `AdmissionServerConfig` as `admission=` to enable the optional
+receipt-required deployment. In this ordinary middleware example,
+`timeout_middleware_processing` gives each evaluation 10
 seconds. Omitting it uses the one-second service default. The value is expressed
 in seconds, must be at least 10 milliseconds, and must resolve to whole
 milliseconds. The service passes one resulting `Timeout` through slot
@@ -136,10 +145,18 @@ timeout failures must deny.
 - [Architecture](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/architecture/index.md)
 - [Limits and failures](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/egress-gate/docs/reference/limits-and-failures.md)
 - [Regex redaction composition](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/regex-redaction)
+- [Pi attested-admission example](examples/pi-attested-admission/README.md)
 - [Function-based custom gate](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/custom-gate)
 - [Class-based custom gate](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/egress-gate/examples/class-based-gate)
 
 ## Development
+
+Full checks also require Node 22.19+ and npm for the locked upstream Pi example.
+The first run installs its JavaScript dependencies. `make check` builds the Pi
+application before running Python tests, including the local cross-language
+integration test. To run that test directly, first run
+`npm --prefix examples/pi-attested-admission/pi-harness ci --ignore-scripts` and
+`npm --prefix examples/pi-attested-admission/pi-harness run build`.
 
 ```bash
 make help
@@ -149,3 +166,15 @@ make check
 
 Only `service/` imports generated protobuf/gRPC bindings. Do not edit
 `plans/egress-gate-refactor.md` as part of implementation work.
+
+Update the protocol and bindings only through the repository's
+`openshell-middleware-manager` package:
+
+```bash
+scripts/generate-bindings.sh
+```
+
+This delegates to `omm update` for the pinned OpenShell release, with `make check`
+as validation. The manager downloads the proto, regenerates bindings with an
+isolated compiler, and updates the lockfile and manifest together only after
+checks pass. Do not edit these generated artifacts or run protoc separately.

@@ -167,9 +167,20 @@ def serve(
             ),
         ),
     ] = f"{DEFAULT_TIMEOUT_MIDDLEWARE_PROCESSING:g}s",
+    admission_config: Annotated[
+        Path | None,
+        typer.Option(
+            "--admission-config",
+            help=(
+                "Operator-owned JSON configuration for authenticated admission "
+                "and receipt-required egress."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Start the Egress Gate gRPC service and run until shutdown."""
     options = _command_options(context)
+    from egress_gate.service.admission import AdmissionServerConfig
     from egress_gate.service.server import EgressGateServer
 
     try:
@@ -206,13 +217,21 @@ def serve(
             remembered.config_path,
         )
     try:
+        admission = (
+            AdmissionServerConfig.model_validate_json(admission_config.read_bytes())
+            if admission_config is not None
+            else None
+        )
         EgressGateServer(
             options.registry,
             timeout_middleware_processing=timeout_middleware_processing,
+            admission=admission,
         ).serve_sync(listen)
     except EgressGateError as error:
         _render_egress_error("Egress Gate could not start", error)
         raise typer.Exit(code=1) from None
+    except (ValueError, OSError):
+        raise typer.BadParameter("Invalid admission service configuration") from None
 
 
 @app.command(
