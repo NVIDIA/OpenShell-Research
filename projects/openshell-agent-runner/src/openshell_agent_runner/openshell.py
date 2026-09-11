@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from openshell_agent_runner.artifacts import ARTIFACT_PATH
-from openshell_agent_runner.errors import ExecutionError
+from openshell_agent_runner.errors import ExecutionError, ExecutionTimeoutError
 
 if TYPE_CHECKING:
     from openshell_agent_runner.harnesses.resources import PreparedResources
@@ -141,14 +141,14 @@ def run(
                 else None
             ),
         )
-    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
-        raise ExecutionError(
-            f"command failed: {shlex.join(command)}: {error}"
+    except subprocess.TimeoutExpired as error:
+        raise ExecutionTimeoutError(
+            f"command timed out after {error.timeout} seconds: {_display_command(command)}"
         ) from error
-
-
-def _set_file_size_limit(max_file_bytes: int) -> None:
-    resource.setrlimit(resource.RLIMIT_FSIZE, (max_file_bytes, max_file_bytes))
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise ExecutionError(
+            f"command failed: {_display_command(command)}: {error}"
+        ) from error
 
 
 def doctor(target: NativeTarget) -> list[tuple[str, str]]:
@@ -192,3 +192,17 @@ def _run_read_only(
         raise ExecutionError(
             f"OpenShell check failed: {shlex.join(command)}: {error}"
         ) from error
+
+
+def _set_file_size_limit(max_file_bytes: int) -> None:
+    resource.setrlimit(resource.RLIMIT_FSIZE, (max_file_bytes, max_file_bytes))
+
+
+def _display_command(command: Sequence[str]) -> str:
+    """Render diagnostics without exposing the configured model secret."""
+
+    safe = list(command)
+    for index, argument in enumerate(safe[:-1]):
+        if argument == "--model":
+            safe[index + 1] = "<model>"
+    return shlex.join(safe)

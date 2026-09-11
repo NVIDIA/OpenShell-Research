@@ -158,9 +158,24 @@ class ReviewReportTests(unittest.TestCase):
                 json.dumps({**result(), "overall_score": 12})
             )
             (path / "wrong-task.json").write_text(json.dumps(result("review-tool")))
+            (path / "timeout.status.json").write_text(
+                json.dumps(
+                    {
+                        "status": "timed_out",
+                        "message": "Review timed out; no verdict was produced.",
+                    }
+                )
+            )
             tasks = [
                 {"id": name, "task": "review-research-spike", "label": name}
-                for name in ("good", "missing", "invalid", "wrong-score", "wrong-task")
+                for name in (
+                    "good",
+                    "missing",
+                    "invalid",
+                    "wrong-score",
+                    "wrong-task",
+                    "timeout",
+                )
             ]
             reviews = read_results(directory, tasks)
         self.assertEqual(reviews[0]["result"], result())
@@ -169,6 +184,7 @@ class ReviewReportTests(unittest.TestCase):
                 review.get("error") and "result" not in review for review in reviews[1:]
             )
         )
+        self.assertEqual(reviews[-1]["status"], "timed_out")
         options = report_options()
         options.update(reviews=reviews, outcome="failed")
         body = render_report(**options)
@@ -176,6 +192,8 @@ class ReviewReportTests(unittest.TestCase):
             "Not completed",
             "Hardware not exercised.",
             "failed",
+            "Timed out — no verdict",
+            "must not be treated as a pass",
         ):
             self.assertIn(expected, body)
 
@@ -191,6 +209,27 @@ class ReviewReportTests(unittest.TestCase):
             self.assertIn(expected, normal)
         for omitted in ("91/100", "Criterion", "Supported."):
             self.assertNotIn(omitted, normal)
+
+    def test_timeout_report_is_incomplete_non_blocking_and_never_a_pass(self):
+        options = report_options()
+        options["outcome"] = "success"
+        options["reviews"] = [
+            {
+                "id": "review-1",
+                "task": "review-research-spike",
+                "label": "projects/new-spike",
+                "status": "timed_out",
+                "error": "Review timed out; no verdict was produced.",
+            }
+        ]
+
+        body = render_report(**options)
+
+        self.assertIn("Execution: **incomplete", body)
+        self.assertIn("non-blocking", body)
+        self.assertIn("Timed out — no verdict", body)
+        self.assertIn("must not be treated as a pass", body)
+        self.assertNotIn("✅ Pass", body)
 
     def test_report_escapes_reviewer_data(self):
         options = report_options()
@@ -345,7 +384,53 @@ class ReviewReportTests(unittest.TestCase):
             (path / "review-1.json").unlink()
             with redirect_stderr(StringIO()) as output:
                 self.assertEqual(main(args), 1)
-            self.assertIn("review-1: No result produced.", output.getvalue())
+            self.assertIn("review-1: No result or execution status", output.getvalue())
+
+            (path / "review-1.status.json").write_text(
+                json.dumps(
+                    {
+                        "status": "timed_out",
+                        "message": "Review timed out; no verdict was produced.",
+                    }
+                )
+            )
+            with redirect_stdout(StringIO()) as output:
+                self.assertEqual(main(args), 0)
+            self.assertIn("0 review result(s); 1 timed out", output.getvalue())
+
+    def test_invalid_or_failed_execution_status_remains_blocking(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            request = path / "request.json"
+            request.write_text(
+                json.dumps(
+                    {
+                        "tasks": [
+                            {
+                                "id": "review-1",
+                                "task": "review-research-spike",
+                                "label": "note.md",
+                            }
+                        ]
+                    }
+                )
+            )
+            args = [
+                "verify",
+                "--request",
+                str(request),
+                "--results",
+                directory,
+            ]
+            for status in (
+                {"status": "failed", "message": "Gateway failed."},
+                {"status": "unknown", "message": "Unknown."},
+                {"status": "timed_out", "message": ""},
+            ):
+                with self.subTest(status=status):
+                    (path / "review-1.status.json").write_text(json.dumps(status))
+                    with redirect_stderr(StringIO()):
+                        self.assertEqual(main(args), 1)
 
 
 if __name__ == "__main__":

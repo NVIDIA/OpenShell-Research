@@ -193,6 +193,44 @@ class CIReviewerTests(unittest.TestCase):
         self.assertEqual(jobs["review"]["permissions"], {"contents": "read"})
         self.assertEqual(jobs["report"]["permissions"]["pull-requests"], "write")
 
+    def test_ci_review_is_bounded_and_timeouts_are_advisory(self):
+        import yaml
+
+        prompt = (PROFILE / "prompt.md").read_text()
+        normalized_prompt = " ".join(prompt.split())
+        settings = json.loads((PROFILE / "settings.json").read_text())
+        review = yaml.safe_load((ROOT / ".github/workflows/pr-review.yml").read_text())
+        gateway = yaml.safe_load(
+            (ROOT / ".github/actions/setup-review-gateway/action.yml").read_text()
+        )
+        review_job = review["jobs"]["review"]
+        review_step = next(
+            step
+            for step in review_job["steps"]
+            if step["name"] == "Review each selected input"
+        )
+
+        self.assertEqual(settings["defaultThinkingLevel"], "medium")
+        for expected in (
+            "bounded project-overview review",
+            "complete root README",
+            "every human-authored text document",
+            "all README files",
+            "Do not read every source file",
+            "does not certify all implementation details",
+        ):
+            self.assertIn(expected, normalized_prompt)
+        self.assertEqual(review_job["timeout-minutes"], 90)
+        self.assertEqual(review_step["env"]["REVIEW_TIMEOUT_SECONDS"], "1800")
+        self.assertIn('[[ "$status" -eq 4 ]]', review_step["run"])
+        self.assertIn('status: "timed_out"', review_step["run"])
+        self.assertIn("result-before-timeout.json", review_step["run"])
+        self.assertIn('status: "failed"', review_step["run"])
+        self.assertNotIn("review-inputs/source:/workspace/source", review_step["run"])
+        self.assertEqual(gateway["inputs"]["timeout-seconds"]["default"], "300")
+        configure = gateway["runs"]["steps"][-1]["run"]
+        self.assertIn('--timeout "${{ inputs.timeout-seconds }}"', configure)
+
     def test_guideline_assessment_is_part_of_every_result(self):
         for task in CRITERIA:
             result = example_result(task)

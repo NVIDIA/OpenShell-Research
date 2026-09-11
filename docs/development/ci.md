@@ -18,8 +18,10 @@ Model verdicts are not CI pass/fail expectations. The live integration checks
 execution contracts; it does not evaluate reviewer quality or assess the PR's
 content.
 
-The first iteration answers: **Does this new project deliver what it claims,
-follow our project guidelines, and use an appropriate level of engineering?**
+The first iteration answers: **What is this project contributing, is that big
+picture documented coherently, and does representative evidence support its
+readiness under our project guidelines?** It is intentionally not an exhaustive
+code review.
 
 ## Contributor workflow
 
@@ -32,16 +34,20 @@ follow our project guidelines, and use an appropriate level of engineering?**
 
 | `kind` | Task | Review emphasis |
 | --- | --- | --- |
-| `tool` | `review-tool` | Correctness, realistic failure handling, maintainability, verification, usability. |
-| `research-spike` | `review-research-spike` | Method, evidence, reproducibility, limitations, proportionate implementation. |
-| `use-case-example` | `review-use-case-example` | Working workflow, reproducibility, instructional clarity, safe configuration, appropriate scope. |
+| `tool` | `review-tool` | Documented behavior, project structure, representative implementation evidence, verification, and first use. |
+| `research-spike` | `review-research-spike` | Documented question and method, representative evidence, reproducibility, limitations, and proportionate structure. |
+| `use-case-example` | `review-use-case-example` | Documented workflow, representative integration evidence, reproducibility, safe configuration, and appropriate scope. |
 
 A project is new when its directory does not exist in the PR's base revision.
-Later commits on its introducing PR reassess the whole project, including its
-README and documentation. Multiple new projects receive separate assessments in
-the same comment. Renaming an existing project to a new directory counts as an
-addition. Missing or invalid kinds fail selection before inference and are
-reported with the file to fix; no project in that request runs until corrected.
+Later commits on its introducing PR reassess the project overview. The reviewer
+reads the complete root README and all human-authored project documentation,
+inventories the project, and samples only the manifests, entry points,
+configuration, implementation, and tests needed to check the documented big
+picture. It does not read every source line or run an exhaustive test suite.
+Multiple new projects receive separate assessments in the same comment.
+Renaming an existing project to a new directory counts as an addition. Missing
+or invalid kinds fail selection before inference and are reported with the file
+to fix; no project in that request runs until corrected.
 
 Existing-project changes, Dev Notes, and unrelated repository changes do not
 start live reviews. There is no central registry or metadata backfill.
@@ -88,12 +94,18 @@ authorization or waiting for other workflows.
 - PR code is checked out only as data. The snapshot preserves committed bytes,
   excludes Git metadata, removes symlinks, and records omitted symlinks/submodules.
   The host never runs contributor setup hooks or project code with inference secrets.
-- The sandbox receives the selected project, repository context, diff, and a
-  separately uploaded trusted guidelines file. Missing evidence is reported,
-  not treated as verified compliance.
+- The sandbox receives the selected project, a compact changed-file/statistics
+  summary, PR context, and a separately uploaded trusted guidelines file. It
+  does not receive the full repository or full patch. Missing evidence and
+  representative sampling are reported, not treated as verified compliance.
 - One ephemeral gateway serves sequential reviews. Each direct `oar run` gets
-  a fresh sandbox and a 600-second timeout; the job has a 45-minute limit.
-  Completed results survive later failures. Unfinished projects are visible.
+  a fresh sandbox and a 1,800-second timeout; inference requests have a
+  300-second timeout and the job has a 90-minute limit. The CI profile uses
+  medium reasoning. Completed results survive later failures.
+- A timeout produces no verdict and is prominently reported as an incomplete,
+  non-passing review. It is advisory and does not fail the workflow or block
+  merging. Other OAR failures and malformed results remain hard workflow
+  failures. Unfinished projects are visible either way.
 - A separate reporter can write comments but has no inference secrets. It
   checks that the PR is open and its head is current before updating the
   comment. Older runs cannot overwrite a newer report. JSON and logs are
@@ -155,5 +167,7 @@ comment. No reviewer-opinion expectations run in CI.
 
 Keep team expectations in the project guidelines. Change review judgment in the
 common or kind-specific skill, and change selection/reporting only when the
-workflow needs it. Existing-project and document-only review, generic project
-test orchestration, extra profiles, and new example projects are out of scope.
+workflow needs it. The initial reviewer deliberately prioritizes contribution
+overview and complete documentation over exhaustive code inspection. Existing-
+project and document-only review, generic project test orchestration, extra
+profiles, and new example projects are out of scope.

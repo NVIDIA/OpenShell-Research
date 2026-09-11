@@ -51,5 +51,11 @@ while IFS= read -r -d '' entry; do
       >> "$output_root/review-context/omitted-symlinks.txt"
   fi
 done < <(git -C "$checkout" ls-tree -rz "$head_sha")
-git -C "$checkout" diff --no-ext-diff --no-textconv "$base_sha...$head_sha" \
-  > "$output_root/review-context/changes.patch"
+{
+  printf 'Changed files:\n'
+  git -C "$checkout" diff --no-ext-diff --no-textconv --name-status \
+    --no-renames "$base_sha...$head_sha"
+  printf '\nDiff statistics:\n'
+  git -C "$checkout" diff --no-ext-diff --no-textconv --stat --summary \
+    --no-renames "$base_sha...$head_sha"
+} > "$output_root/review-context/changes-summary.txt"

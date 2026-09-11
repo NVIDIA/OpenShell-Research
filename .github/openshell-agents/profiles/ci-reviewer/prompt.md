@@ -10,13 +10,30 @@ Review focus: {{ focus }}
 
 Operator context: {{ context }}
 
-Read the trusted guidelines first, then assess the complete project: README,
-implementation, configuration, tests, and relevant documentation. Determine
-whether it delivers its claims, follows every applicable guideline, and uses
-an appropriate level of engineering for its purpose. A diff supplies context;
-it does not limit this assessment to particular files or lines. Read surrounding
-repository evidence only where needed to assess this project, not to audit
-existing projects.
+This is a bounded project-overview review, not an exhaustive code review. Read
+the trusted guidelines first. Inventory the project tree, then read the complete
+root README and every human-authored text document that serves as project
+documentation: all README files, the project's `docs/` tree, and root or nested
+guides such as contributing, security, architecture, deployment, and example
+instructions. Inventory non-text documentation assets. Do not skim or sample
+the required text documentation.
+
+Use the inventory and documentation to explain what is being contributed, who
+it serves, how its major pieces fit together, how a user starts, what evidence
+supports it, and which limitations are disclosed. Inspect manifests, lockfiles,
+licenses, example environment files, primary entry points, representative
+configuration, and a small sample of implementation and tests only as needed to
+check that documented claims and project structure are credible. Do not read
+every source file, trace every branch, perform a line-by-line audit, or run a
+broad test suite. A compact change summary supplies context; it does not require
+reviewing every changed line. Do not audit existing projects.
+
+Judge project-level coherence, documentation, integration readiness, evidence,
+and applicable guidelines. A pass means the documented project overview and
+representative evidence have no demonstrated material gap; it does not certify
+all implementation details. Put unexamined implementation and unrun checks in
+`limitations`. Use `inconclusive` when the required documentation or a material
+project-level claim cannot be responsibly assessed within this bounded scope.
 
 Report guideline compliance explicitly in `guidelines_assessment`. Use
 `pass` when all applicable requirements are supported, `needs_changes` for
@@ -28,7 +45,8 @@ deduction. Unreadable or missing guidelines must yield an inconclusive guideline
 assessment, never an assertion of compliance.
 
 Use original repository-relative paths when supplied, not sandbox upload paths.
-Disclose unavailable evidence and incomplete coverage. Do not edit source files
-or publish comments. Finish by calling `submit_result` with the configured
-result schema and `task` set to `{{ review_skill }}`. Correct rejected
-submissions and submit again.
+Disclose unavailable evidence, representative sampling, and unrun checks. Keep
+the summary concise and lead with the contribution's big picture. Do not edit
+source files or publish comments. Finish by calling `submit_result` with the
+configured result schema and `task` set to `{{ review_skill }}`. Correct
+rejected submissions and submit again.

@@ -82,7 +82,7 @@ def test_schema_task_receives_generic_submission_protocol() -> None:
             "--model",
             resolved.runtime.model,
             "--thinking",
-            "high",
+            "medium",
         )
         models_upload = next(
             item
