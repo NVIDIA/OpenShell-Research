@@ -143,7 +143,7 @@ def run(
         )
     except subprocess.TimeoutExpired as error:
         raise ExecutionTimeoutError(
-            f"command timed out after {error.timeout} seconds: {_display_command(command)}"
+            f"command timed out after {timeout} seconds: {_display_command(command)}"
         ) from error
     except (OSError, subprocess.CalledProcessError) as error:
         raise ExecutionError(

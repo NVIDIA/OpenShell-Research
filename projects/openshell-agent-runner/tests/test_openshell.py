@@ -43,7 +43,9 @@ print(json.dumps({"child_input": child.stdout, "remaining_input": sys.stdin.read
 
 def test_timeout_has_a_distinct_error_and_redacts_the_model(monkeypatch) -> None:
     def time_out(command, **kwargs):
-        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+        # Python may expose the fractional time remaining inside communicate(),
+        # rather than the configured subprocess timeout.
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"] - 0.25)
 
     monkeypatch.setattr(subprocess, "run", time_out)
 
