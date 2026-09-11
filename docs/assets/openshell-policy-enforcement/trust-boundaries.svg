@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 740" role="img" aria-labelledby="title desc">
+  <title id="title">Two boundaries, different authority</title>
+  <desc id="desc">The gateway delivers policy to a supervisor inside a Docker container. The supervisor launches an agent within an inner boundary enforced by Linux. Network requests pass from the restricted agent to the supervisor's proxy, then to an external service. The proxy is outside the agent's restricted boundary.</desc>
+  <defs>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #202a21; }
+      .heading { font-size: 25px; font-weight: 650; }
+      .label { font-size: 21px; font-weight: 600; }
+      .body { font-size: 18px; fill: #52604f; }
+      .eyebrow { font-size: 15px; font-weight: 650; letter-spacing: 1.5px; fill: #53664a; }
+      .control { fill: none; stroke: #74816f; stroke-width: 2; stroke-dasharray: 5 5; marker-end: url(#arrow); }
+      .flow { fill: none; stroke: #456d17; stroke-width: 2.5; marker-end: url(#green-arrow); }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#74816f" stroke-width="1.5"/></marker>
+    <marker id="green-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#456d17" stroke-width="1.5"/></marker>
+  </defs>
+  <rect width="720" height="740" rx="18" fill="#fcfdf9"/>
+  <text class="eyebrow" x="32" y="35">01 / THE TRUST BOUNDARIES</text>
+  <text class="heading" x="32" y="72">Same container. Different authority.</text>
+
+  <rect x="32" y="101" width="656" height="84" rx="12" fill="#fff" stroke="#d0d8cb"/>
+  <text class="label" x="54" y="134">Gateway</text>
+  <text class="body" x="54" y="162">Identity, lifecycle, policy, and configuration</text>
+  <text class="body" x="54" y="223">Authenticated policy delivery</text>
+
+  <rect x="32" y="245" width="656" height="361" rx="16" fill="#f3f5ef" stroke="#abb8a1" stroke-width="1.5"/>
+  <text class="eyebrow" x="54" y="272">DOCKER CONTAINER / OUTER BOUNDARY</text>
+  <path class="control" d="M620 185 V282"/>
+
+  <rect x="54" y="288" width="612" height="84" rx="12" fill="#fff" stroke="#9daa91"/>
+  <text class="label" x="74" y="321">Trusted supervisor</text>
+  <text class="body" x="74" y="349">Starts first · prepares and applies policy</text>
+
+  <path class="control" d="M217 372 V420"/>
+  <text class="body" x="70" y="403">Launches</text>
+  <path class="control" d="M549 372 V441"/>
+  <text class="body" x="565" y="405">Runs</text>
+
+  <rect x="54" y="426" width="322" height="157" rx="12" fill="#eaf2df" stroke="#72964d" stroke-width="2"/>
+  <text class="eyebrow" x="72" y="454">INNER BOUNDARY</text>
+  <text class="label" x="72" y="486">Agent + descendants</text>
+  <text class="body" x="72" y="519">Landlock · seccomp</text>
+  <text class="body" x="72" y="546">Reduced privileges</text>
+  <text class="body" x="72" y="571">Private network namespace</text>
+
+  <path class="flow" d="M376 485 H441"/>
+  <text class="body" x="407" y="531" text-anchor="middle">Egress</text>
+  <rect x="448" y="447" width="218" height="77" rx="12" fill="#fff" stroke="#72964d" stroke-width="2"/>
+  <text class="label" x="557" y="478" text-anchor="middle">Policy proxy</text>
+  <text class="body" x="557" y="505" text-anchor="middle">Checks requests</text>
+  <path class="flow" d="M557 524 V650"/>
+  <rect x="577" y="614" width="120" height="28" fill="#fcfdf9"/>
+  <text class="body" x="586" y="634">If allowed</text>
+
+  <rect x="32" y="657" width="656" height="58" rx="12" fill="#fff" stroke="#d0d8cb"/>
+  <text class="label" x="360" y="693" text-anchor="middle">External services</text>
+</svg>

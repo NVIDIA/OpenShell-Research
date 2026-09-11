@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 970" role="img" aria-labelledby="title desc">
+  <title id="title">One HTTPS request, two authorization checks</title>
+  <desc id="desc">Curl requests a GitHub issue through the policy proxy using TLS connection A. The proxy checks executable identity, host, and port. It terminates TLS and checks the HTTP method and path. PATCH is denied while the allowed GET continues through configured middleware and endpoint-bound credential injection. TLS connection B carries the allowed request to GitHub. No matching connection or request permission means denial.</desc>
+  <defs>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #202a21; }
+      .heading { font-size: 25px; font-weight: 650; }
+      .label { font-size: 21px; font-weight: 600; }
+      .body { font-size: 18px; fill: #52604f; }
+      .eyebrow { font-size: 15px; font-weight: 650; letter-spacing: 1.5px; fill: #53664a; }
+      .mono { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 17px; }
+      .denied { fill: #993d37; }
+      .flow { fill: none; stroke: #456d17; stroke-width: 2.5; marker-end: url(#arrow); }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M1 1 L9 5 L1 9" fill="none" stroke="#456d17" stroke-width="1.5"/></marker>
+  </defs>
+  <rect width="720" height="970" rx="18" fill="#fcfdf9"/>
+  <text class="eyebrow" x="32" y="35">03 / INSPECTED HTTPS IN ENFORCE MODE</text>
+  <text class="heading" x="32" y="72">Check the connection. Then the request.</text>
+
+  <rect x="100" y="104" width="520" height="62" rx="12" fill="#eaf2df" stroke="#72964d"/>
+  <text class="label" x="360" y="142" text-anchor="middle">Restricted curl process</text>
+  <path class="flow" d="M360 166 V239"/>
+  <text class="body" x="380" y="202">TLS connection A</text>
+  <text class="body" x="380" y="229">Child trusts sandbox CA</text>
+
+  <rect x="32" y="249" width="656" height="535" rx="16" fill="#f3f5ef" stroke="#abb8a1" stroke-width="1.5"/>
+  <text class="eyebrow" x="54" y="279">TRUSTED PROXY / INSIDE THE SUPERVISOR</text>
+  <rect x="100" y="301" width="520" height="91" rx="12" fill="#fff" stroke="#9daa91"/>
+  <text class="label" x="122" y="334">1. Authorize the connection</text>
+  <text class="body" x="122" y="365">Executable identity + api.github.com:443</text>
+  <path class="flow" d="M360 392 V435"/>
+
+  <rect x="100" y="442" width="520" height="121" rx="12" fill="#fff" stroke="#9daa91"/>
+  <text class="label" x="122" y="475">2. Inspect the decrypted request</text>
+  <text class="body" x="122" y="507">Check the HTTP method and path</text>
+  <text class="mono" x="122" y="538">/repos/acme/project/issues/42</text>
+
+  <path d="M495 563 V592" fill="none" stroke="#993d37" stroke-width="2"/>
+  <rect x="433" y="592" width="187" height="53" rx="10" fill="#f9eeeb" stroke="#b46d66"/>
+  <text class="label denied" x="527" y="625" text-anchor="middle">PATCH denied</text>
+  <path class="flow" d="M250 563 V675"/>
+  <text class="body" x="117" y="622">GET allowed</text>
+
+  <rect x="100" y="682" width="520" height="77" rx="12" fill="#eaf2df" stroke="#72964d"/>
+  <text class="body" x="122" y="713">Run any configured middleware</text>
+  <text class="body" x="122" y="742">Inject any bound credential after admission</text>
+  <path class="flow" d="M360 759 V895"/>
+  <text class="body" x="380" y="819">TLS connection B</text>
+  <text class="body" x="380" y="846">Verify the upstream certificate</text>
+
+  <rect x="100" y="902" width="520" height="44" rx="10" fill="#fff" stroke="#d0d8cb"/>
+  <text class="label" x="360" y="932" text-anchor="middle">GitHub receives the allowed request</text>
+</svg>
