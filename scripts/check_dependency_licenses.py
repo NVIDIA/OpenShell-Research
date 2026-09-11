@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -24,16 +25,19 @@ from urllib.request import Request, urlopen
 import tomllib
 
 POLICY_PATH = ".github/dependency-license-policy.toml"
-LOCK_NAMES = {"uv.lock", "package-lock.json", "Cargo.lock"}
+GO_MODULE_SOURCE = "https://proxy.golang.org"
+LOCK_NAMES = {"uv.lock", "package-lock.json", "Cargo.lock", "go.mod"}
 MANIFEST_LOCKS = {
     "pyproject.toml": "uv.lock",
     "package.json": "package-lock.json",
     "Cargo.toml": "Cargo.lock",
+    "go.mod": "go.sum",
 }
 MANIFEST_MANAGERS = {
     "pyproject.toml": "uv",
     "package.json": "npm",
     "Cargo.toml": "cargo",
+    "go.mod": "go",
 }
 
 
@@ -45,9 +49,74 @@ class Dependency:
     source: str
 
 
+def go_mod_requirements(content: str) -> list[tuple[str, str, bool]]:
+    """Return effective external Go requirements and whether each is indirect."""
+    requirements = []
+    replacements: dict[tuple[str, str], tuple[str, str] | None] = {}
+    block = ""
+    for line_number, raw_line in enumerate(content.splitlines(), 1):
+        code, _, comment = raw_line.partition("//")
+        try:
+            lexer = shlex.shlex(code, posix=True, punctuation_chars="()=>")
+            lexer.commenters = ""
+            lexer.whitespace_split = True
+            tokens = list(lexer)
+        except ValueError as error:
+            raise ValueError(f"go.mod:{line_number}: {error}") from error
+        if not tokens:
+            continue
+        if block:
+            if tokens == [")"]:
+                block = ""
+                continue
+            directive, values = block, tokens
+        else:
+            directive, values = tokens[0], tokens[1:]
+            if values == ["("]:
+                if directive not in ("require", "replace"):
+                    continue
+                block = directive
+                continue
+        if directive == "require":
+            if len(values) != 2:
+                raise ValueError(
+                    f"go.mod:{line_number}: require needs a module and version"
+                )
+            requirements.append((values[0], values[1], comment.strip() == "indirect"))
+        elif directive == "replace":
+            if "=>" not in values:
+                raise ValueError(f"go.mod:{line_number}: replace is missing =>")
+            separator = values.index("=>")
+            old, new = values[:separator], values[separator + 1 :]
+            if len(old) not in (1, 2) or len(new) not in (1, 2):
+                raise ValueError(f"go.mod:{line_number}: invalid replace directive")
+            replacements[(old[0], old[1] if len(old) == 2 else "")] = (
+                (new[0], new[1]) if len(new) == 2 else None
+            )
+    if block:
+        raise ValueError(f"go.mod: unterminated {block} block")
+
+    result = []
+    for name, version, indirect in requirements:
+        replacement = replacements.get((name, version), replacements.get((name, "")))
+        if replacement is None and (
+            (name, version) in replacements or (name, "") in replacements
+        ):
+            continue  # A local replacement is repository-controlled source.
+        if replacement:
+            name, version = replacement
+        result.append((name, version, indirect))
+    return result
+
+
 def inventory(path: str, content: str) -> set[Dependency]:
     """Include every locked external package, irrespective of groups or platform."""
     result = set()
+    if Path(path).name == "go.mod":
+        return {
+            Dependency("go", name, version, GO_MODULE_SOURCE)
+            for name, version, _ in go_mod_requirements(content)
+        }
     if Path(path).name == "package-lock.json":
         lock = json.loads(content)
         if lock.get("lockfileVersion") not in (2, 3) or "packages" not in lock:
@@ -102,6 +171,12 @@ def inventory(path: str, content: str) -> set[Dependency]:
 
 def direct_inventory(path: str, content: str) -> set[Dependency]:
     """Return locked packages declared directly by the project or script."""
+    if Path(path).name == "go.mod":
+        return {
+            Dependency("go", name, version, GO_MODULE_SOURCE)
+            for name, version, indirect in go_mod_requirements(content)
+            if not indirect
+        }
     lock = (
         json.loads(content)
         if Path(path).name == "package-lock.json"
@@ -275,6 +350,29 @@ def package_license(dependency: Dependency) -> str:
         if info.get("dist", {}).get("tarball") != dependency.source:
             raise ValueError("registry tarball does not match locked source")
         return info.get("license") or ""
+    if dependency.ecosystem == "go":
+        if dependency.source != GO_MODULE_SOURCE:
+            raise ValueError(
+                "unsupported Go source; provide an exact-source clarification"
+            )
+        info = fetch_json(
+            f"https://api.deps.dev/v3/systems/GO/packages/{name}/versions/{version}"
+        )
+        key = info.get("versionKey", {})
+        if (
+            key.get("system") != "GO"
+            or key.get("name") != dependency.name
+            or key.get("version") != dependency.version
+        ):
+            raise ValueError("deps.dev response does not match requested Go module")
+        licenses = info.get("licenses", [])
+        if not isinstance(licenses, list) or any(
+            not isinstance(value, str) or not value.strip() for value in licenses
+        ):
+            raise ValueError("invalid deps.dev license metadata")
+        if len(licenses) == 1:
+            return licenses[0]
+        return " AND ".join(f"({value})" for value in licenses)
     if dependency.source not in (
         "registry+https://github.com/rust-lang/crates.io-index",
         "sparse+https://index.crates.io/",
@@ -365,6 +463,8 @@ def manifest_dependencies(name: str, data: dict) -> list:
                 "target",
             )
         ] + [data.get("workspace")]
+    if name == "go.mod":
+        raise AssertionError("Go module dependencies are parsed from source text")
     return [
         data.get(key)
         for key in (
@@ -466,17 +566,24 @@ def check_manifest_coverage(
         if manifest.name not in MANIFEST_LOCKS:
             continue
         content = git_text(root, "show", f"{head}:{path}")
-        parse = json.loads if manifest.name == "package.json" else tomllib.loads
-        dependencies = manifest_dependencies(manifest.name, parse(content))
+        if manifest.name == "go.mod":
+            parse = None
+            dependencies = [go_mod_requirements(content)]
+        else:
+            parse = json.loads if manifest.name == "package.json" else tomllib.loads
+            dependencies = manifest_dependencies(manifest.name, parse(content))
         lock_name = MANIFEST_LOCKS[manifest.name]
         direct_lock = (manifest.parent / lock_name).as_posix()
-        previous_dependencies = (
-            manifest_dependencies(
+        if path not in base_paths:
+            previous_dependencies = []
+        elif manifest.name == "go.mod":
+            previous_dependencies = [
+                go_mod_requirements(git_text(root, "show", f"{base}:{path}"))
+            ]
+        else:
+            previous_dependencies = manifest_dependencies(
                 manifest.name, parse(git_text(root, "show", f"{base}:{path}"))
             )
-            if path in base_paths
-            else []
-        )
         if (
             not any(dependencies)
             and not any(previous_dependencies)
@@ -508,6 +615,8 @@ def check_manifest_coverage(
                 if manifest.name == "package.json"
                 else tomllib.loads(workspace_content)
             )
+            if manifest.name == "go.mod":
+                continue  # Go workspaces still keep dependency files per module.
             if manifest.name == "package.json":
                 members = workspace.get("workspaces", [])
             elif manifest.name == "pyproject.toml":
