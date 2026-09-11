@@ -21,5 +21,5 @@ Try this prompt:
 ## Projects
 
 - [Pi subagents in OpenShell sandboxes](projects/pi-openshell-subagent-poc/README.md) —
-  run a Pi subagent in a dedicated, parent-policy-scoped OpenShell sandbox and
-  exercise human approval through OpenShell Policy Advisor.
+  run a Pi subagent in a separate OpenShell sandbox with a parent-authored
+  policy, an LLM-based permission review, and optional human policy approval.
