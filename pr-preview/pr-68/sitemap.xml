@@ -70,4 +70,16 @@
       <url>
         <loc>https://nvidia.github.io/OpenShell-Research/documentation/openshell-exporter/</loc>
       </url>
+      <url>
+        <loc>https://nvidia.github.io/OpenShell-Research/documentation/openshell-exporter/docker/</loc>
+      </url>
+      <url>
+        <loc>https://nvidia.github.io/OpenShell-Research/documentation/openshell-exporter/podman/</loc>
+      </url>
+      <url>
+        <loc>https://nvidia.github.io/OpenShell-Research/documentation/openshell-exporter/helm/</loc>
+      </url>
+      <url>
+        <loc>https://nvidia.github.io/OpenShell-Research/documentation/openshell-exporter/configuration/</loc>
+      </url>
 </urlset>

@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+# SPDX-License-Identifier: Apache-2.0
+services:
+  exporter:
+    image: ${EXPORTER_IMAGE:-ghcr.io/nvidia/openshell-exporter:v0.0.5-rc.1}
+    user: "${EXPORTER_UID:?Set EXPORTER_UID in .env}:${EXPORTER_GID:?Set EXPORTER_GID in .env}"
+    command: ["--config", "/etc/exporter.yaml"]
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    restart: unless-stopped
+    ports: ["127.0.0.1:23133:13133"]
+    environment:
+      OPENSHELL_ENDPOINT: ${OPENSHELL_ENDPOINT:-}
+      OPENSHELL_GATEWAY_ID: ${OPENSHELL_GATEWAY_ID:-local-gateway}
+      OPENSHELL_WORKSPACE: ${OPENSHELL_WORKSPACE:-default}
+      OPENSHELL_SANDBOX_NAME: ${OPENSHELL_SANDBOX_NAME:-}
+      OPENSHELL_EXPORT_URL: ${OPENSHELL_EXPORT_URL:-}
+    volumes:
+      - ./config.yaml:/etc/exporter.yaml:ro,Z
+      - ./input:/input:ro,Z
+      - ./state:/state:Z
+      - ./output:/output:Z
+      - ./secrets:/run/secrets:ro,Z

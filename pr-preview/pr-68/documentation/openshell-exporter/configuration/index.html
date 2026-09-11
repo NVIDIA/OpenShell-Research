@@ -6,28 +6,30 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Research engineering Dev Notes and documentation for secure AI agents, policy enforcement, automation, and robotics with OpenShell.">
+        <meta name="description" content="Choose local files or an existing gateway and configure credentials, destinations, and durable storage.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
       
       
-        <link rel="canonical" href="https://nvidia.github.io/OpenShell-Research/projects/reachy-mini-openshell-demo-tutorial/">
+        <link rel="canonical" href="https://nvidia.github.io/OpenShell-Research/documentation/openshell-exporter/configuration/">
       
+      
+        <link rel="prev" href="../helm/">
       
       
       
         
       
       
-      <link rel="icon" href="../../assets/brand/favicon.svg">
+      <link rel="icon" href="../../../assets/brand/favicon.svg">
       <meta name="generator" content="zensical-0.0.44">
     
     
   
     
       
-        <title>Reachy Mini + OpenShell: Dev Note and Setup Tutorial - OpenShell Research</title>
+        <title>Configure sources and delivery - OpenShell Research</title>
       
     
   
@@ -36,12 +38,12 @@
       
         
       
-      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.fba56155.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/modern/main.fba56155.min.css">
       
         
           
         
-        <link rel="stylesheet" href="../../assets/stylesheets/modern/palette.dfe2e883.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/modern/palette.dfe2e883.min.css">
       
       
 
@@ -60,27 +62,25 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/dev-notes.css">
+      <link rel="stylesheet" href="../../../stylesheets/dev-notes.css">
     
-      <link rel="stylesheet" href="../../stylesheets/documentation.css">
+      <link rel="stylesheet" href="../../../stylesheets/documentation.css">
     
-    <script>__md_scope=new URL("../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
-    
-      
-
-    
-    
-  
-  
-
-
-  
-    
-    
-  
-    
+    <script>__md_scope=new URL("../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
     
       
+
+    
+    
+  
+  
+
+
+  
+    
+    
+  
+    
     
   
     
@@ -89,8 +89,21 @@
 
 
 
-  <meta name="robots" content="noindex, follow">
 
+  
+  
+  
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="OpenShell Research">
+  <meta property="og:title" content="Configure sources and delivery">
+  <meta property="og:description" content="Choose local files or an existing gateway and configure credentials, destinations, and durable storage.">
+  <meta property="og:url" content="https://nvidia.github.io/OpenShell-Research/documentation/openshell-exporter/configuration/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Configure sources and delivery">
+  <meta name="twitter:description" content="Choose local files or an existing gateway and configure credentials, destinations, and durable storage.">
+  
+  
+  
 
   <script>
     try {
@@ -102,6 +115,8 @@
       document.documentElement.dataset.navigationDrawer = "closed";
     }
   </script>
+  
+    <link rel="alternate" type="text/markdown" href="../configuration.md" title="Markdown source">
   
 
   </head>
@@ -123,7 +138,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#reachy-mini-openshell-dev-note-and-setup-tutorial" class="md-skip">
+        <a href="#configure-sources-and-delivery" class="md-skip">
           Skip to content
         </a>
       
@@ -139,9 +154,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../../.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     <label class="md-header__button md-icon openshell-drawer-button" for="__drawer" role="button" tabindex="0" aria-label="Open navigation" aria-controls="primary-navigation" aria-expanded="false">
@@ -162,7 +177,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Reachy Mini + OpenShell: Dev Note and Setup Tutorial
+              Configure sources and delivery
             
           </span>
         </div>
@@ -251,9 +266,9 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../../.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     OpenShell Research
@@ -305,7 +320,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../dev-notes/" class="md-nav__link ">
+            <a href="../../../dev-notes/" class="md-nav__link ">
               
   
   
@@ -402,7 +417,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev-notes/posts/2026-08-27-adversarial-policy-review-long-horizon-agents/" class="md-nav__link">
+      <a href="../../../dev-notes/posts/2026-08-27-adversarial-policy-review-long-horizon-agents/" class="md-nav__link">
         
   
   
@@ -429,7 +444,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev-notes/posts/2026-08-07-formal-methods-ai-generated-robot-actions/" class="md-nav__link">
+      <a href="../../../dev-notes/posts/2026-08-07-formal-methods-ai-generated-robot-actions/" class="md-nav__link">
         
   
   
@@ -456,7 +471,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
+      <a href="../../../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
         
   
   
@@ -495,6 +510,8 @@
       
   
   
+    
+  
   
   
     
@@ -519,15 +536,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../documentation/" class="md-nav__link ">
+            <a href="../../" class="md-nav__link ">
               
   
   
@@ -550,7 +567,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -597,7 +614,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../documentation/egress-gate/" class="md-nav__link ">
+            <a href="../../egress-gate/" class="md-nav__link ">
               
   
   
@@ -696,7 +713,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/configuration/" class="md-nav__link">
+      <a href="../../egress-gate/configuration/" class="md-nav__link">
         
   
   
@@ -723,7 +740,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/request-content/" class="md-nav__link">
+      <a href="../../egress-gate/request-content/" class="md-nav__link">
         
   
   
@@ -750,7 +767,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/evaluation/" class="md-nav__link">
+      <a href="../../egress-gate/evaluation/" class="md-nav__link">
         
   
   
@@ -777,7 +794,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/operations/" class="md-nav__link">
+      <a href="../../egress-gate/operations/" class="md-nav__link">
         
   
   
@@ -836,7 +853,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../documentation/egress-gate/gates/" class="md-nav__link ">
+            <a href="../../egress-gate/gates/" class="md-nav__link ">
               
   
   
@@ -878,7 +895,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/gates/regex/" class="md-nav__link">
+      <a href="../../egress-gate/gates/regex/" class="md-nav__link">
         
   
   
@@ -905,7 +922,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/gates/custom/" class="md-nav__link">
+      <a href="../../egress-gate/gates/custom/" class="md-nav__link">
         
   
   
@@ -964,7 +981,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../documentation/egress-gate/architecture/" class="md-nav__link ">
+            <a href="../../egress-gate/architecture/" class="md-nav__link ">
               
   
   
@@ -1006,7 +1023,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/architecture/request-lifecycle/" class="md-nav__link">
+      <a href="../../egress-gate/architecture/request-lifecycle/" class="md-nav__link">
         
   
   
@@ -1033,7 +1050,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/architecture/service-boundary/" class="md-nav__link">
+      <a href="../../egress-gate/architecture/service-boundary/" class="md-nav__link">
         
   
   
@@ -1119,7 +1136,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/egress-gate/reference/limits-and-failures/" class="md-nav__link">
+      <a href="../../egress-gate/reference/limits-and-failures/" class="md-nav__link">
         
   
   
@@ -1188,7 +1205,7 @@
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../documentation/openshell-agent-runner/" class="md-nav__link ">
+            <a href="../../openshell-agent-runner/" class="md-nav__link ">
               
   
   
@@ -1230,7 +1247,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/openshell-agent-runner/reviews/" class="md-nav__link">
+      <a href="../../openshell-agent-runner/reviews/" class="md-nav__link">
         
   
   
@@ -1257,7 +1274,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/openshell-agent-runner/profiles/" class="md-nav__link">
+      <a href="../../openshell-agent-runner/profiles/" class="md-nav__link">
         
   
   
@@ -1284,7 +1301,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/openshell-agent-runner/reference/" class="md-nav__link">
+      <a href="../../openshell-agent-runner/reference/" class="md-nav__link">
         
   
   
@@ -1316,6 +1333,8 @@
                 
   
   
+    
+  
   
   
     
@@ -1339,15 +1358,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_4" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../documentation/openshell-exporter/" class="md-nav__link ">
+            <a href="../" class="md-nav__link ">
               
   
   
@@ -1370,7 +1389,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1389,7 +1408,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/openshell-exporter/docker/" class="md-nav__link">
+      <a href="../docker/" class="md-nav__link">
         
   
   
@@ -1416,7 +1435,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/openshell-exporter/podman/" class="md-nav__link">
+      <a href="../podman/" class="md-nav__link">
         
   
   
@@ -1443,7 +1462,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../documentation/openshell-exporter/helm/" class="md-nav__link">
+      <a href="../helm/" class="md-nav__link">
         
   
   
@@ -1467,10 +1486,36 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../documentation/openshell-exporter/configuration/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configure sources and delivery
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1485,6 +1530,60 @@
   
 
       </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#read-existing-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Read existing files
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connect-a-gateway-and-destination" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Connect a gateway and destination
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operate-and-extend" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Operate and extend
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1522,6 +1621,11 @@
                       
                     
                     
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
                   
                   <div class="md-sidebar__inner">
                     
@@ -1533,6 +1637,47 @@
   
     
   
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#read-existing-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Read existing files
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connect-a-gateway-and-destination" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Connect a gateway and destination
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#operate-and-extend" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Operate and extend
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
   
 </nav>
                   </div>
@@ -1550,6 +1695,99 @@
   
 
 
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../../.." class="md-path__link">
+        
+  
+  <span class="md-ellipsis">
+    OpenShell Research
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    Documentation
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    OpenShell Event Exporter
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
               
               <article class="md-content__inner md-typeset">
                 
@@ -1559,29 +1797,103 @@
   
 
 
-
-<h1 id="reachy-mini-openshell-dev-note-and-setup-tutorial">Reachy Mini + OpenShell: Dev Note and Setup Tutorial</h1>
-<p>The original combined guide has been split into two focused documents:</p>
-<ul>
-<li>Read <strong><a href="../../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/">Designing OpenShell for the Edge: Why Policy Has to Live Next to the
-  Action</a></strong>
-  for the reusable edge architecture, design decisions, challenges, and results.</li>
-<li>Follow the <strong><a href="https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/ONBOARD_SETUP.md">project-local onboard setup
-  tutorial</a></strong>
-  for build, installation, validation, policy switching, and troubleshooting
-  commands.</li>
-</ul>
-<p>Keeping the tutorial next to the Dockerfile, policies, native controller, and
-application source makes it easier to update the procedure whenever the
-implementation changes.</p>
+  
+  <a href="../configuration.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.56 18H3.44C2.65 18 2 17.37 2 16.59V7.41C2 6.63 2.65 6 3.44 6h17.12c.79 0 1.44.63 1.44 1.41v9.18c0 .78-.65 1.41-1.44 1.41M3.44 6.94c-.26 0-.48.21-.48.47v9.19c0 .25.22.46.48.46h17.12c.26 0 .48-.21.48-.46V7.41c0-.26-.22-.47-.48-.47zm1.45 8.25V8.81h1.92l1.92 2.35 1.92-2.35h1.93v6.38h-1.93v-3.66l-1.92 2.35-1.92-2.35v3.66zm12.01 0-2.9-3.1h1.94V8.81h1.92v3.28h1.93z"/></svg>
+  </a>
 
 
+<h1 id="configure-sources-and-delivery">Configure sources and delivery</h1>
+<p>All deployment paths run the same image and accept standard Collector YAML.
+Choose one of these ready-to-edit configurations:</p>
+<table>
+<thead>
+<tr>
+<th>Configuration</th>
+<th>Input</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../config.yaml">config.yaml</a></td>
+<td>Local OCSF JSONL files</td>
+<td>Normalized recovery records in <code>/output/events.json</code>.</td>
+</tr>
+<tr>
+<td><a href="../gateway.yaml">gateway.yaml</a></td>
+<td>WatchSandbox and policy snapshots from an existing gateway</td>
+<td>HTTPS CloudEvents plus local recovery records.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="read-existing-files">Read existing files</h2>
+<p>With the starter configuration, place authorized OCSF JSONL files in <code>input/</code>.
+Each file must end in <code>.jsonl</code>, with one JSON object per line. Replace the
+processor's <code>gateway_id</code> and <code>workspace</code> with your source identity. Keep these
+values, <code>source_instance</code>, and file paths stable across restarts.</p>
+<p>Retain files, including rotated files, until collected. One exporter owns each
+writable checkpoint directory. Do not also collect the same files through a
+forwarder.</p>
+<h2 id="connect-a-gateway-and-destination">Connect a gateway and destination</h2>
+<p>You need an existing HTTPS gateway, read-only gateway credentials, an authorized
+sandbox name, and an HTTPS receiver that accepts CloudEvents JSON batches. This
+setup does not create a gateway, agent, inference route, or destination.</p>
+<p>For Docker or Podman, download the gateway profile as your active configuration:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>-fL<span class="w"> </span>https://nvidia.github.io/OpenShell-Research/documentation/openshell-exporter/gateway.yaml<span class="w"> </span>-o<span class="w"> </span>config.yaml
+</span></code></pre></div>
+<p>Add these non-secret settings to <code>.env</code>, replacing the examples. Keep the UID/GID
+entries already created by the Docker quickstart:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>OPENSHELL_ENDPOINT=https://gateway.example.com:8080
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>OPENSHELL_GATEWAY_ID=gateway-1
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>OPENSHELL_WORKSPACE=default
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>OPENSHELL_SANDBOX_NAME=my-sandbox
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>OPENSHELL_EXPORT_URL=https://receiver.example.com/v1/events
+</span></code></pre></div>
+<p>Place the raw gateway token in <code>secrets/gateway-token</code> and the separate raw
+destination token in <code>secrets/destination-token</code>, without the <code>Bearer</code> prefix.
+Make the files readable only by the user running the exporter, for example with
+<code>chmod 600 secrets/gateway-token secrets/destination-token</code>. Keep credentials
+out of <code>.env</code> and version control.</p>
+<p>For private CAs, place certificates in <code>secrets/</code> and add <code>tls.ca_file</code> under the
+appropriate receiver/exporter, using paths such as <code>/run/secrets/gateway-ca.pem</code>.
+For mTLS, add paired <code>tls.cert_file</code> and <code>tls.key_file</code> paths. Retain verified TLS;
+do not disable verification to work around a missing CA.</p>
+<p>Validate and recreate the container using the <a href="../docker/">Docker</a> or
+<a href="../podman/">Podman</a> instructions. For Kubernetes, the <a href="../helm/">Helm guide</a> mounts
+these same files from a Secret and supplies settings through values.</p>
+<p>Generate authorized activity in the selected sandbox and confirm records arrive
+at your destination. Check the recovery file too when running locally. A healthy
+process does not establish end-to-end delivery.</p>
+<h2 id="operate-and-extend">Operate and extend</h2>
+<p>Keep <code>/state/checkpoints</code>, <code>/state/cloudevents-queue</code>, and <code>/output</code> persistent.
+Recovery output appends across restarts. Queue capacity is bounded; monitor disk
+space, restrict access to retained evidence, and arrange retention according to
+your environment. Never delete state automatically to recover space.</p>
+<p>CloudEvents receivers must deduplicate by <code>(source,id)</code> because delivery can be
+retried. WatchSandbox cannot resume a disconnected stream; policy snapshots do
+not reconstruct every missed change. Malformed input is marked rather than
+silently dropped.</p>
+<p>Inspect additional components with <code>docker run --rm IMAGE components</code> (or
+<code>podman run --rm IMAGE components</code>), replacing <code>IMAGE</code> with your pinned exporter
+image. Relay and native OTLP need separate pipelines, authenticated TLS inputs,
+and their own destination queues. Use the <code>relay</code> processor with
+<code>privacy.mode: allow</code> for Relay input before delivery.</p>
+<p>The optional <code>ghcr.io/nvidia/openshell-otlp-proxy:v0.0.5-rc.1</code> image adds a
+workload-local OTLP/HTTP queue. It does not filter content; its queue may retain
+unfiltered input. The basic deployments above do not need this proxy. See the
+<a href="../">release status</a> before using either image.</p>
 
 
 
 
 
 
+
+
+
+  
+  
 
 
 
@@ -1607,6 +1919,24 @@ implementation changes.</p>
         
 <footer class="md-footer">
   
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Continue reading" >
+        
+          
+          <a href="../helm/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Helm">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">Previous</span>
+              <div class="md-ellipsis">Helm</div>
+            </div>
+          </a>
+        
+        
+      </nav>
     
   
   <div class="md-footer-meta md-typeset">
@@ -1634,12 +1964,12 @@ implementation changes.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"search":"../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"search":"../../../assets/javascripts/workers/search.e2d2d235.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.6e5f0216.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.6e5f0216.min.js"></script>
       
-        <script src="../../javascripts/navigation-drawer.js"></script>
+        <script src="../../../javascripts/navigation-drawer.js"></script>
       
     
   </body>
