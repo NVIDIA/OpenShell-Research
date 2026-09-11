@@ -226,6 +226,13 @@ access, including commands run through `bash`.
 
 ## Choose the result format
 
+The result file is what OAR returns to the caller. A task can also modify files
+or act on external services when its tools, credentials, and sandbox policy
+allow it. OAR currently downloads only the result file; it does not synchronize
+code changes back to your machine. Work that must persist needs to be exported
+or pushed before sandbox cleanup. Removing the sandbox does not undo actions
+already taken on external services, such as opening a pull request.
+
 The result schema is a JSON file **in your profile**. Each task names the file
 through `output_schema` in `profile.yaml`. For the included reviewers, `oar init`
 copies `schemas/review.json` into the profile; you can edit it to change the

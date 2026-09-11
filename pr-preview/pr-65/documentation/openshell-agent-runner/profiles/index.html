@@ -1990,6 +1990,12 @@ declarations locally and the registered tools before the first model request.
 Tool selection controls the agent interface; <code>policy.yaml</code> controls sandbox
 access, including commands run through <code>bash</code>.</p>
 <h2 id="choose-the-result-format">Choose the result format</h2>
+<p>The result file is what OAR returns to the caller. A task can also modify files
+or act on external services when its tools, credentials, and sandbox policy
+allow it. OAR currently downloads only the result file; it does not synchronize
+code changes back to your machine. Work that must persist needs to be exported
+or pushed before sandbox cleanup. Removing the sandbox does not undo actions
+already taken on external services, such as opening a pull request.</p>
 <p>The result schema is a JSON file <strong>in your profile</strong>. Each task names the file
 through <code>output_schema</code> in <code>profile.yaml</code>. For the included reviewers, <code>oar init</code>
 copies <code>schemas/review.json</code> into the profile; you can edit it to change the
