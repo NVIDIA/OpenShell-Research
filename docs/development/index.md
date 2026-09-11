@@ -73,6 +73,11 @@ Commit any generated changes with the source change.
 
 ## Theme and brand assets
 
+Project logos shared by a README and the site belong in `projects/<name>/assets/`.
+Register that directory in `PROJECT_ASSETS` in `scripts/stage-project-docs.py`;
+the build copies it into the staged documentation's `assets/` directory.
+README image links should be relative so they work on feature branches.
+
 Keep shared brand assets in `docs/assets/brand/`. Use the compact SVG mark for
 `project.theme.logo`, `favicon.svg` for the browser icon, and the light and dark
 PNG banners for full OpenShell Research lockups. Never reference files from a

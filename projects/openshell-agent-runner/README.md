@@ -1,7 +1,7 @@
 # OpenShell Agent Runner
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/NVIDIA/OpenShell-Research/main/projects/openshell-agent-runner/docs/assets/oar-logo.svg" alt="OAR — OpenShell Agent Runner" width="360">
+  <img src="assets/oar-logo.svg" alt="OAR — OpenShell Agent Runner" width="360">
 </p>
 
 OpenShell Agent Runner (OAR) launches ephemeral
