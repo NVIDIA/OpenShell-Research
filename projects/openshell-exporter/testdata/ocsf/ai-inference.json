@@ -1,0 +1,36 @@
+{
+  "activity_id": 99,
+  "activity_name": "Other",
+  "ai_model": {
+    "name": "nvidia/nemotron-3-super",
+    "provider": "NVIDIA"
+  },
+  "api": {
+    "operation": "chat.completions"
+  },
+  "category_uid": 6,
+  "class_uid": 6003,
+  "class_name": "API Activity",
+  "metadata": {
+    "product": {
+      "name": "OpenShell"
+    },
+    "profiles": [
+      "container",
+      "host",
+      "ai_operation"
+    ],
+    "version": "1.8.0"
+  },
+  "severity_id": 1,
+  "time": 1787073600000,
+  "type_uid": 600399,
+  "unmapped": {
+    "agent_session_id": "session-fixture-1",
+    "input_tokens": 128,
+    "latency_ms": 42,
+    "output_tokens": 64,
+    "sandbox_id": "sandbox-fixture-1",
+    "trace_id": "00112233445566778899aabbccddeeff"
+  }
+}
