@@ -56,7 +56,13 @@ nav = [
       {"Customize profiles" = "documentation/openshell-agent-runner/profiles.md"},
       {"Command reference" = "documentation/openshell-agent-runner/reference.md"}
     ]},
-    {"OpenShell Event Exporter" = "documentation/openshell-exporter/index.md"}
+    {"OpenShell Event Exporter" = [
+      "documentation/openshell-exporter/index.md",
+      {"Docker" = "documentation/openshell-exporter/docker.md"},
+      {"Podman" = "documentation/openshell-exporter/podman.md"},
+      {"Helm" = "documentation/openshell-exporter/helm.md"},
+      {"Configure sources and delivery" = "documentation/openshell-exporter/configuration.md"}
+    ]}
   ]}
 ]
 
