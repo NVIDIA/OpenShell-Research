@@ -9,6 +9,7 @@ import {
   type StreamFn,
 } from "@earendil-works/pi-agent-core";
 import {
+  clampThinkingLevel,
   isContextOverflow,
   validateToolArguments,
   type AssistantMessage,
@@ -44,7 +45,11 @@ export class AdmissionAgent extends Agent {
     streamFn: StreamFn,
     private readonly admission: Admission,
   ) {
-    super({ initialState: { model, thinkingLevel: "off" }, streamFn });
+    // Match Pi's default thinking level; the session's native controls can change it.
+    super({
+      initialState: { model, thinkingLevel: clampThinkingLevel(model, "medium") },
+      streamFn,
+    });
     // Pi's base lifecycle fields are readonly. This engine owns its own public
     // state and lifecycle; it never invokes the base execution/state reducer.
     const owner = this;
@@ -182,7 +187,11 @@ export class AdmissionAgent extends Agent {
               messages: convertToLlm(this.live.messages),
               tools: this.live.tools,
             },
-            { signal: this.signal, sessionId: this.sessionId },
+            {
+              signal: this.signal,
+              sessionId: this.sessionId,
+              reasoning: this.live.thinkingLevel === "off" ? undefined : this.live.thinkingLevel,
+            },
           )
         ).result();
         this.signal!.throwIfAborted();
@@ -195,16 +204,7 @@ export class AdmissionAgent extends Agent {
           throw new Error(
             "Model request failed or was cancelled; no response was saved.",
           );
-        const assistant = (await this.admit({
-          role: "assistant",
-          content: response.content,
-          api: this.live.model.api,
-          provider: this.live.model.provider,
-          model: this.live.model.id,
-          usage: retainedUsage(response.usage),
-          stopReason: response.stopReason,
-          timestamp: Date.now(),
-        })) as AssistantMessage;
+        const assistant = (await this.admit(response)) as AssistantMessage;
         await this.publish(assistant, published);
         const calls = assistant.content.filter(
           (block) => block.type === "toolCall",
@@ -231,18 +231,13 @@ export class AdmissionAgent extends Agent {
             });
             try {
               if (!tool) throw new Error("Requested tool is not available.");
-              args = validateToolArguments(tool, call);
-              const before = await this.beforeToolCall?.(
-                {
-                  assistantMessage: assistant,
-                  toolCall: call,
-                  args,
-                  context: this.context(),
-                },
-                this.signal,
-              );
-              if (before?.block)
-                throw new Error(before.reason ?? "Tool execution blocked.");
+              // Pi's edit tool normalizes common model argument shapes in place.
+              // Keep that preparation separate from the already-approved message.
+              const prepared = structuredClone(call);
+              prepared.arguments = (tool.prepareArguments
+                ? tool.prepareArguments(prepared.arguments)
+                : prepared.arguments) as typeof prepared.arguments;
+              args = validateToolArguments(tool, prepared);
               // No onUpdate callback: partial tool output is not approved yet.
               result = await tool.execute(call.id, args, this.signal);
             } catch (error) {
@@ -260,23 +255,12 @@ export class AdmissionAgent extends Agent {
                 details: undefined,
               };
             }
-            const after = await this.afterToolCall?.(
-              {
-                assistantMessage: assistant,
-                toolCall: call,
-                args,
-                result,
-                isError,
-                context: this.context(),
-              },
-              this.signal,
-            );
             const approved = (await this.admit({
               role: "toolResult",
               toolCallId: call.id,
               toolName: call.name,
-              content: after?.content ?? result.content,
-              isError: after?.isError ?? isError,
+              content: result.content,
+              isError: isError,
               timestamp: Date.now(),
             })) as ToolResultMessage;
             await this.publishTool(approved, published);

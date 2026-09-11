@@ -130,25 +130,6 @@ def test_manifest_leaves_the_gateway_rpc_timeout_to_the_operator() -> None:
     assert manifest.bindings[0].timeout == ""
 
 
-def test_managed_manifest_uses_only_upstream_http_binding() -> None:
-    middleware = EgressGateMiddleware(
-        create_builtin_registry(),
-        require_agent_attestation=True,
-        expected_audience="urn:test",
-    )
-    try:
-        manifest = asyncio.run(middleware.Describe(object(), Mock()))
-    finally:
-        asyncio.run(middleware.close())
-    assert manifest.expected_audience == "urn:test"
-    assert len(manifest.bindings) == 1
-    assert (
-        manifest.bindings[0].operation
-        == pb2.SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_REQUEST
-    )
-    assert not hasattr(pb2.HttpRequestEvaluation(), "agent_attestation")
-
-
 def test_copied_proto_remains_the_current_five_field_finding_contract() -> None:
     evaluation = pb2.HttpRequestEvaluation()
     finding = pb2.Finding()

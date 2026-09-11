@@ -122,6 +122,7 @@ async function fixture(
     stream,
     compactAtTokens,
   });
+  session.settingsManager.applyOverrides({ compaction: { keepRecentTokens: 5 } });
   return { session, cwd, requests, kinds };
 }
 
@@ -138,6 +139,10 @@ for (const [kind, marker, prompt, responses] of [
   ["user_message", "CANDIDATE", "CANDIDATE", [answer("done")]],
   ["user_message", "SKILL_CANDIDATE", "/skill:example", [answer("done")]],
   ["assistant_message", "CANDIDATE", "hello", [answer("CANDIDATE")]],
+  ["assistant_message", "REASONING_CANDIDATE", "hello", [{
+    ...answer("done"),
+    content: [{ type: "thinking", thinking: "REASONING_CANDIDATE" }, { type: "text", text: "done" }] as AssistantMessage["content"],
+  }]],
   [
     "tool_result",
     "CANDIDATE",
@@ -196,100 +201,87 @@ for (const [kind, marker, prompt, responses] of [
   });
 }
 
-test("redacted real tool output is the only version saved and sent on continuation", async () => {
-  const { session, cwd, requests } = await fixture(
-    async (kind, body) => {
-      if (kind === "tool_result")
-        return {
-          decision: "replace",
-          replacement: {
-            ...body,
-            content: [{ type: "text", text: "[REDACTED]" }],
-          },
-          receipt: null,
-        };
-      return kind === "provider_context"
-        ? { ...allow, receipt: "receipt" }
-        : allow;
-    },
-    [
-      answer("", [
-        { id: "call", name: "read", arguments: { path: "candidate.txt" } },
-      ]),
-      answer("Finished"),
-    ],
-  );
-  await writeFile(join(cwd, "candidate.txt"), "RAW_TOOL_CONTENT");
-  await session.prompt("Read candidate.txt");
-  assert.equal(requests.length, 2);
-  assert.ok(JSON.stringify(requests[1]).includes("[REDACTED]"));
-  assert.ok(!JSON.stringify(session.entries).includes("RAW_TOOL_CONTENT"));
-  assert.ok(!(await disk(session)).includes("RAW_TOOL_CONTENT"));
-  assert.ok((await disk(session)).includes("[REDACTED]"));
-});
+for (const [shape, edits] of [
+  ["JSON string", { edits: JSON.stringify([{ oldText: "before", newText: "after" }]) }],
+  ["single edit", { edits: { oldText: "before", newText: "after" } }],
+  ["legacy", { oldText: "before", newText: "after" }],
+] as const) {
+  test(`native edit preparation preserves approved ${shape} arguments`, async () => {
+    const args = { path: "edit.txt", ...edits };
+    const { session, cwd } = await fixture(undefined, [
+      answer("", [{ id: "edit", name: "edit", arguments: args }]),
+      answer("Done"),
+    ]);
+    await writeFile(join(cwd, "edit.txt"), "before");
+    await session.prompt("Edit the file");
+    assert.equal(await readFile(join(cwd, "edit.txt"), "utf8"), "after");
+    const assistant = session.history.find(
+      (message) => message.role === "assistant",
+    )!;
+    const call = assistant.content.find((block) => block.type === "toolCall")!;
+    assert.deepEqual(call.arguments, args);
+    const saved = (await disk(session))
+      .trim().split("\n").map((line) => JSON.parse(line));
+    assert.deepEqual(
+      saved.find((entry) => entry.message?.role === "assistant").message.content
+        .find((block: { type: string }) => block.type === "toolCall").arguments,
+      args,
+    );
+  });
+}
 
-test("manual compaction waits for approval and preserves the latest whole turn", async () => {
-  let release!: (result: AdmissionResponse) => void;
-  let reached!: () => void;
-  const seen = new Promise<void>((resolve) => {
-    reached = resolve;
-  });
-  const pending = new Promise<AdmissionResponse>((resolve) => {
-    release = resolve;
-  });
-  let summaryBody: Record<string, unknown> = {};
-  const { session, requests } = await fixture(
-    async (kind, body) => {
+for (const decision of ["deny", "replace"] as const) {
+  test(`split-turn compaction waits for admission: ${decision}`, async () => {
+    let release!: (result: AdmissionResponse) => void;
+    let reached!: () => void;
+    const pending = new Promise<AdmissionResponse>((resolve) => { release = resolve; });
+    const seen = new Promise<void>((resolve) => { reached = resolve; });
+    let candidate: Record<string, unknown> = {};
+    const { session, cwd } = await fixture(async (kind, body) => {
       if (kind === "compaction_summary") {
-        summaryBody = body;
+        candidate = body;
         reached();
         return pending;
       }
-      return kind === "provider_context"
-        ? { ...allow, receipt: "receipt" }
-        : allow;
-    },
-    [answer("first"), answer("second"), answer("SUMMARY_CANDIDATE")],
-  );
-  await session.prompt("first turn");
-  await session.prompt("second turn");
-  const before = session.entries;
-  const fileBefore = await disk(session);
-  const compact = session.compact();
-  await seen;
-  assert.deepEqual(session.entries, before);
-  assert.equal(await disk(session), fileBefore);
-  release({
-    decision: "replace",
-    replacement: { ...summaryBody, text: "Approved summary" },
-    receipt: null,
+      return kind === "provider_context" ? { ...allow, receipt: "receipt" } : allow;
+    }, [
+      answer("", [{ id: "read", name: "read", arguments: { path: "notes.txt" } }]),
+      answer("Done"),
+      answer("RAW_SUMMARY"),
+    ]);
+    await writeFile(join(cwd, "notes.txt"), "Approved note");
+    await session.prompt("Read notes.txt");
+    session.settingsManager.applyOverrides({ compaction: { keepRecentTokens: 1 } });
+    const before = structuredClone(session.history);
+    const saved = await disk(session);
+    const compact = session.compact();
+    const settled = decision === "deny" ? assert.rejects(compact) : compact;
+    await seen;
+    // Native compaction appends file-operation text; that must be admitted too.
+    assert.ok(String(candidate.text).includes("RAW_SUMMARY"));
+    assert.ok(String(candidate.text).includes("notes.txt"));
+    assert.deepEqual(session.history, before);
+    assert.equal(await disk(session), saved);
+    release({
+      decision,
+      replacement: decision === "replace" ? { ...candidate, text: "APPROVED_SUMMARY" } : null,
+      receipt: null,
+    });
+    await settled;
+    if (decision === "deny") {
+      assert.deepEqual(session.history, before);
+      assert.equal(await disk(session), saved);
+    } else {
+      const entry = session.entries.find((entry) => entry.type === "compaction")!;
+      assert.equal(entry.summary, "APPROVED_SUMMARY");
+      assert.equal(entry.details, undefined);
+      assert.ok(JSON.stringify(session.history).includes("APPROVED_SUMMARY"));
+      assert.ok((await disk(session)).includes("Read notes.txt"), "history is append-only");
+    }
+    for (const snapshot of [JSON.stringify(session.history), await disk(session)])
+      assert.ok(!snapshot.includes("RAW_SUMMARY"));
   });
-  assert.equal((await compact).summary, "Approved summary");
-  assert.equal(requests.length, 3);
-  assert.ok(!JSON.stringify(session.history).includes("SUMMARY_CANDIDATE"));
-  assert.ok(JSON.stringify(session.history).includes("Approved summary"));
-  assert.ok(JSON.stringify(session.history).includes("second turn"));
-  assert.ok(!(await disk(session)).includes("SUMMARY_CANDIDATE"));
-  assert.ok(
-    (await disk(session)).includes("first turn"),
-    "compaction is append-only",
-  );
-});
-
-test("automatic compaction uses the same admitted summary path", async () => {
-  const { session, kinds } = await fixture(
-    undefined,
-    [answer("first"), answer("second"), answer("summary")],
-    1,
-  );
-  await session.prompt("one");
-  await session.prompt("two");
-  assert.equal(kinds.filter((kind) => kind === "compaction_summary").length, 1);
-  assert.equal(
-    session.entries.filter((entry) => entry.type === "compaction").length,
-    1,
-  );
-});
+}
 
 test("real bash is bounded before Pi can spill an unchecked output log", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pi-bash-test-"));
@@ -306,25 +298,6 @@ test("real bash is bounded before Pi can spill an unchecked output log", async (
     name.startsWith("pi-bash-"),
   );
   assert.deepEqual(after, before);
-});
-
-test("denied summary leaves both histories unchanged", async () => {
-  const { session } = await fixture(
-    async (kind) =>
-      kind === "compaction_summary"
-        ? deny
-        : kind === "provider_context"
-          ? { ...allow, receipt: "receipt" }
-          : allow,
-    [answer("first"), answer("second"), answer("UNAPPROVED_SUMMARY")],
-  );
-  await session.prompt("first turn");
-  await session.prompt("second turn");
-  const before = session.entries;
-  const saved = await disk(session);
-  await assert.rejects(session.compact());
-  assert.deepEqual(session.entries, before);
-  assert.equal(await disk(session), saved);
 });
 
 test("provider errors and partial responses never become history", async () => {
@@ -433,6 +406,7 @@ for (const enabled of [true, false]) {
     ]);
     await session.prompt("first turn");
     session.setAutoCompactionEnabled(enabled);
+    session.settingsManager.applyOverrides({ compaction: { keepRecentTokens: 5 } });
     if (enabled) await session.prompt("next turn");
     else await assert.rejects(session.prompt("next turn"), /Context is too large/);
     assert.equal(requests.length, enabled ? 4 : 2);

@@ -84,6 +84,8 @@ async function verify(): Promise<void> {
     "/skill:review Use the read tool to read notes.txt; do not guess its contents.",
   );
   assertProjectRead(session.history);
+  // Force a short-demo compaction without changing the interactive launcher defaults.
+  session.settingsManager.applyOverrides({ compaction: { keepRecentTokens: 1 } });
   assert.ok(
     await session.compact(),
     "Manual compaction must summarize an older turn",
@@ -103,6 +105,7 @@ async function verify(): Promise<void> {
     "PASS real model, redacted input, rendered skill, tool continuation, manual compaction, and JSONL history",
   );
   const automatic = await makeSession(1);
+  automatic.settingsManager.applyOverrides({ compaction: { keepRecentTokens: 1 } });
   await automatic.prompt("Reply with a brief greeting.");
   await automatic.prompt("Reply with a brief farewell.");
   assert.ok(automatic.entries.some((entry) => entry.type === "compaction"));

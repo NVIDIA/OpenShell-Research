@@ -1,14 +1,14 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Registered Pi and provider request-shape adapters."""
+"""Pi admission shapes and provider request validation."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 import math
-from typing import Literal, Protocol, TypeAlias
+from typing import Literal, TypeAlias
 
 from pydantic import (
     Field,
@@ -22,7 +22,6 @@ from egress_gate.admission.canonical import canonical_json_bytes
 from egress_gate.admission.models import (
     AdmissionHook,
     HarnessAdmissionContext,
-    HarnessAdmissionRequest,
 )
 from egress_gate.base import StrictDomainModel
 from egress_gate.errors import BodyFormatError, GateInputError
@@ -62,21 +61,13 @@ class PiTextContentV1(StrictDomainModel):
     text: ScalarString
 
 
-class PiImageContentV1(StrictDomainModel):
-    """One Pi image content block."""
-
-    type: Literal["image"]
-    data: ScalarString
-    mimeType: ScalarString
-
-
 class PiToolResultV1(StrictDomainModel):
     """Provider-relevant fields from one Pi tool-result message."""
 
     schema_version: Literal["openshell.pi-tool-result.v1"]
     tool_call_id: ScalarString
     tool_name: ScalarString
-    content: tuple[PiTextContentV1 | PiImageContentV1, ...]
+    content: tuple[PiTextContentV1, ...]
     is_error: bool
 
     @field_validator("content", mode="before")
@@ -91,6 +82,14 @@ class PiAssistantToolCallV1(StrictDomainModel):
     id: ScalarString
     name: ScalarString
     arguments: dict[str, object]
+    thought_signature: ScalarString | None = None
+
+
+class PiThinkingContentV1(StrictDomainModel):
+    """Reasoning text with immutable provider replay metadata."""
+
+    text: ScalarString
+    signature: ScalarString | None = None
 
 
 class PiAssistantMessageV1(StrictDomainModel):
@@ -99,8 +98,9 @@ class PiAssistantMessageV1(StrictDomainModel):
     schema_version: Literal["openshell.pi-assistant-message.v1"]
     text: ScalarString
     tool_calls: tuple[PiAssistantToolCallV1, ...]
+    thinking: tuple[PiThinkingContentV1, ...] = ()
 
-    @field_validator("tool_calls", mode="before")
+    @field_validator("tool_calls", "thinking", mode="before")
     @classmethod
     def _tool_calls_are_a_tuple(cls, value: object) -> object:
         return tuple(value) if isinstance(value, list) else value
@@ -142,251 +142,56 @@ HarnessNative: TypeAlias = (
 AttestedEntries: TypeAlias = tuple[ContextEntryV1, ...]
 
 
-class PreparedHarnessRequest:
-    """Parsed Pi request plus its canonical Gate projection."""
-
-    def __init__(
-        self,
-        *,
-        native: HarnessNative,
-        projected_body: bytes,
-    ) -> None:
-        self.native = native
-        self.projected_body = projected_body
-
-
-class HarnessAdapter(Protocol):
-    """Fixed-authority translation for one registered harness hook."""
-
-    def prepare(
-        self,
-        request: HarnessAdmissionRequest,
-        context: HarnessAdmissionContext,
-        timeout: Timeout,
-    ) -> PreparedHarnessRequest: ...
-
-    def validate_result(
-        self,
-        prepared: PreparedHarnessRequest,
-        projected_body: bytes,
-        context: HarnessAdmissionContext,
-        timeout: Timeout,
-    ) -> tuple[bytes | None, HarnessNative]: ...
-
-    def attestation_subject(
-        self,
-        prepared: PreparedHarnessRequest,
-        final: HarnessNative,
-    ) -> tuple[str, int] | None: ...
+def parse_pi_request(
+    body: bytes, context: HarnessAdmissionContext, timeout: Timeout
+) -> HarnessNative:
+    """Validate one fixed Pi hook/schema pair before and after policy execution."""
+    if context.harness != "pi":
+        raise AdmissionShapeError("harness admission shape is unsupported")
+    model = _PI_SHAPES[context.hook]
+    value = _load_json(body, AdmissionShapeError, timeout)
+    try:
+        native = model.model_validate(value, strict=True)
+    except ValidationError:
+        raise AdmissionShapeError("Pi request body is unsupported") from None
+    if native.schema_version != context.schema_version:
+        raise AdmissionShapeError("Pi request schema is unsupported")
+    if isinstance(native, PiMessageV1) and native.origin != _PI_ORIGINS[context.hook]:
+        raise AdmissionShapeError("Pi message origin is unsupported")
+    if isinstance(native, PiMessageV1 | PiProviderContextV1):
+        if canonical_json_bytes(native) != body:
+            raise AdmissionShapeError("Pi request body is not canonical JSON")
+    return native
 
 
-class _AppendHarnessAdapter:
-    def attestation_subject(
-        self,
-        prepared: PreparedHarnessRequest,
-        final: HarnessNative,
-    ) -> None:
-        return None
-
-
-class PiMessageV1Adapter(_AppendHarnessAdapter):
-    """Strict adapter for one text-bearing Pi origin."""
-
-    def __init__(self, accepted_origin: PiMessageOrigin) -> None:
-        self._accepted_origin = accepted_origin
-
-    def prepare(
-        self,
-        request: HarnessAdmissionRequest,
-        context: HarnessAdmissionContext,
-        timeout: Timeout,
-    ) -> PreparedHarnessRequest:
-        native = _parse_pi_body(
-            request.request_body, timeout, accepted_origin=self._accepted_origin
-        )
-        return PreparedHarnessRequest(
-            native=native,
-            projected_body=canonical_json_bytes(native),
-        )
-
-    def validate_result(
-        self,
-        prepared: PreparedHarnessRequest,
-        projected_body: bytes,
-        context: HarnessAdmissionContext,
-        timeout: Timeout,
-    ) -> tuple[bytes | None, PiMessageV1]:
-        updated = _parse_pi_body(
-            projected_body, timeout, accepted_origin=self._accepted_origin
-        )
-        encoded = canonical_json_bytes(updated)
-        replacement = (
-            None
-            if canonical_json_bytes(updated) == canonical_json_bytes(prepared.native)
-            else encoded
-        )
-        return replacement, updated
-
-
-class PiAssistantMessageV1Adapter(_AppendHarnessAdapter):
-    """Strict adapter for Pi assistant text and tool calls."""
-
-    def prepare(
-        self,
-        request: HarnessAdmissionRequest,
-        context: HarnessAdmissionContext,
-        timeout: Timeout,
-    ) -> PreparedHarnessRequest:
-        native = _parse_pi_assistant_message(request.request_body, timeout)
-        return PreparedHarnessRequest(
-            native=native,
-            projected_body=canonical_json_bytes(native),
-        )
-
-    def validate_result(
-        self,
-        prepared: PreparedHarnessRequest,
-        projected_body: bytes,
-        context: HarnessAdmissionContext,
-        timeout: Timeout,
-    ) -> tuple[bytes | None, PiAssistantMessageV1]:
-        updated = _parse_pi_assistant_message(projected_body, timeout)
-        if not isinstance(prepared.native, PiAssistantMessageV1):
-            raise AdmissionMutationError("assistant admission state is invalid")
-        if updated.tool_calls != prepared.native.tool_calls:
+def validate_pi_replacement(before: HarnessNative, after: HarnessNative) -> None:
+    """Allow text replacement without changing executable fields or entry identity."""
+    if isinstance(before, PiAssistantMessageV1) and isinstance(
+        after, PiAssistantMessageV1
+    ):
+        if before.tool_calls != after.tool_calls:
             raise AdmissionMutationError("admission changed assistant tool calls")
-        encoded = canonical_json_bytes(updated)
-        replacement = (
-            None if encoded == canonical_json_bytes(prepared.native) else encoded
-        )
-        return replacement, updated
-
-
-class PiToolResultV1Adapter(_AppendHarnessAdapter):
-    """Strict adapter for Pi tool-result content blocks."""
-
-    def prepare(
-        self,
-        request: HarnessAdmissionRequest,
-        context: HarnessAdmissionContext,
-        timeout: Timeout,
-    ) -> PreparedHarnessRequest:
-        native = _parse_pi_tool_result(request.request_body, timeout)
-        if any(block.type == "image" for block in native.content):
-            raise AdmissionShapeError("Pi tool-result images are unsupported")
-        return PreparedHarnessRequest(
-            native=native,
-            projected_body=canonical_json_bytes(native),
-        )
-
-    def validate_result(
-        self,
-        prepared: PreparedHarnessRequest,
-        projected_body: bytes,
-        context: HarnessAdmissionContext,
-        timeout: Timeout,
-    ) -> tuple[bytes | None, PiToolResultV1]:
-        updated = _parse_pi_tool_result(projected_body, timeout)
-        if not isinstance(prepared.native, PiToolResultV1):
-            raise AdmissionMutationError("tool-result admission state is invalid")
-        immutable_before = (
-            prepared.native.schema_version,
-            prepared.native.tool_call_id,
-            prepared.native.tool_name,
-            prepared.native.is_error,
-        )
-        immutable_after = (
-            updated.schema_version,
-            updated.tool_call_id,
-            updated.tool_name,
-            updated.is_error,
-        )
-        if immutable_after != immutable_before:
+        if len(before.thinking) != len(after.thinking):
+            raise AdmissionMutationError("admission changed reasoning structure")
+        for original, replacement in zip(before.thinking, after.thinking):
+            if original.signature != replacement.signature or (
+                original.signature
+                not in (None, "reasoning", "reasoning_content", "reasoning_text")
+                and original.text != replacement.text
+            ):
+                raise AdmissionMutationError("admission changed reasoning replay data")
+    elif isinstance(before, PiToolResultV1) and isinstance(after, PiToolResultV1):
+        if before.model_dump(exclude={"content"}) != after.model_dump(
+            exclude={"content"}
+        ):
             raise AdmissionMutationError("admission changed tool-result metadata")
-        encoded = canonical_json_bytes(updated)
-        replacement = (
-            None if encoded == canonical_json_bytes(prepared.native) else encoded
-        )
-        return replacement, updated
-
-
-class PiProviderContextV1Adapter:
-    """Strict adapter for the complete ordered provider context."""
-
-    def prepare(
-        self,
-        request: HarnessAdmissionRequest,
-        context: HarnessAdmissionContext,
-        timeout: Timeout,
-    ) -> PreparedHarnessRequest:
-        native = _parse_pi_provider_context(request.request_body, timeout)
-        return PreparedHarnessRequest(
-            native=native,
-            projected_body=canonical_json_bytes(native),
-        )
-
-    def validate_result(
-        self,
-        prepared: PreparedHarnessRequest,
-        projected_body: bytes,
-        context: HarnessAdmissionContext,
-        timeout: Timeout,
-    ) -> tuple[bytes | None, PiProviderContextV1]:
-        updated = _parse_pi_provider_context(projected_body, timeout)
-        if not isinstance(prepared.native, PiProviderContextV1):
-            raise AdmissionMutationError("provider-context admission state is invalid")
-        before = tuple(
-            (entry.role, getattr(entry, "tool_call_id", None))
-            for entry in prepared.native.entries
-        )
-        after = tuple(
-            (entry.role, getattr(entry, "tool_call_id", None))
-            for entry in updated.entries
-        )
-        if after != before:
+    elif isinstance(before, PiProviderContextV1) and isinstance(
+        after, PiProviderContextV1
+    ):
+        if tuple(
+            (e.role, getattr(e, "tool_call_id", None)) for e in before.entries
+        ) != tuple((e.role, getattr(e, "tool_call_id", None)) for e in after.entries):
             raise AdmissionMutationError("admission changed provider-context structure")
-        encoded = canonical_json_bytes(updated)
-        replacement = (
-            None if encoded == canonical_json_bytes(prepared.native) else encoded
-        )
-        return replacement, updated
-
-    def attestation_subject(
-        self,
-        prepared: PreparedHarnessRequest,
-        final: HarnessNative,
-    ) -> tuple[str, int]:
-        if not isinstance(final, PiProviderContextV1):
-            raise AdmissionMutationError("provider-context admission state is invalid")
-        return context_entries_subject(final.entries)
-
-
-class HarnessAdapterRegistry:
-    """Small explicit registry for supported harness admission shapes."""
-
-    def __init__(self) -> None:
-        self._adapters: dict[tuple[str, str, str], HarnessAdapter] = {}
-
-    def register(
-        self,
-        harness: str,
-        hook: AdmissionHook,
-        schema_version: str,
-        adapter: HarnessAdapter,
-    ) -> None:
-        key = (harness, hook.value, schema_version)
-        if key in self._adapters:
-            raise ValueError("harness adapter is already registered")
-        self._adapters[key] = adapter
-
-    def resolve(self, context: HarnessAdmissionContext) -> HarnessAdapter:
-        key = (context.harness, context.hook.value, context.schema_version)
-        try:
-            return self._adapters[key]
-        except KeyError:
-            raise AdmissionShapeError(
-                "harness admission shape is unsupported"
-            ) from None
 
 
 class _ProviderCacheControl(StrictDomainModel):
@@ -418,8 +223,12 @@ class _ProviderMessage(StrictDomainModel):
     tool_call_id: ScalarString | None = None
     tool_calls: tuple[_ProviderToolCall, ...] = ()
     reasoning_content: ScalarString | None = None
+    reasoning: ScalarString | None = None
+    reasoning_text: ScalarString | None = None
+    # Provider-owned replay objects are inspected by request policy, never rewritten.
+    reasoning_details: tuple[dict[str, object], ...] = ()
 
-    @field_validator("content", "tool_calls", mode="before")
+    @field_validator("content", "tool_calls", "reasoning_details", mode="before")
     @classmethod
     def _provider_sequences_are_tuples(cls, value: object) -> object:
         return tuple(value) if isinstance(value, list) else value
@@ -433,7 +242,17 @@ class _ProviderMessage(StrictDomainModel):
             raise ValueError("only tool messages may carry tool_call_id")
         if self.tool_calls and self.role != "assistant":
             raise ValueError("only assistant messages may carry tool calls")
-        if self.content is None and not self.tool_calls:
+        has_reasoning = any(
+            (
+                self.reasoning,
+                self.reasoning_text,
+                self.reasoning_content,
+                self.reasoning_details,
+            )
+        )
+        if has_reasoning and self.role != "assistant":
+            raise ValueError("only assistant messages may carry reasoning")
+        if self.content is None and not self.tool_calls and not has_reasoning:
             raise ValueError("messages require content or tool calls")
         return self
 
@@ -487,6 +306,11 @@ class _ProviderStreamOptions(StrictDomainModel):
     include_usage: Literal[True]
 
 
+class _ProviderReasoning(StrictDomainModel):
+    effort: ScalarString | None = None
+    enabled: bool | None = None
+
+
 class _ProviderRequest(StrictDomainModel):
     model: ScalarString
     messages: tuple[_ProviderMessage, ...]
@@ -502,6 +326,7 @@ class _ProviderRequest(StrictDomainModel):
     prompt_cache_key: ScalarString | None = None
     prompt_cache_retention: Literal["24h"] | None = None
     reasoning_effort: ScalarString | None = None
+    reasoning: _ProviderReasoning | None = None
     enable_thinking: bool | None = None
 
     @field_validator("messages", "tools", mode="before")
@@ -554,85 +379,6 @@ def extract_provider_entries(request: HttpRequest, timeout: Timeout) -> Attested
     return tuple(entries)
 
 
-def create_pi_adapter_registry() -> HarnessAdapterRegistry:
-    """Return the built-in Pi v1 admission registry."""
-    registry = HarnessAdapterRegistry()
-    for hook, origin in (
-        (AdmissionHook.USER_MESSAGE, "user"),
-        (AdmissionHook.SYSTEM_CONTEXT, "system"),
-        (AdmissionHook.COMPACTION_SUMMARY, "compaction_summary"),
-    ):
-        registry.register(
-            "pi",
-            hook,
-            "openshell.pi-message.v1",
-            PiMessageV1Adapter(origin),
-        )
-    registry.register(
-        "pi",
-        AdmissionHook.TOOL_RESULT,
-        "openshell.pi-tool-result.v1",
-        PiToolResultV1Adapter(),
-    )
-    registry.register(
-        "pi",
-        AdmissionHook.ASSISTANT_MESSAGE,
-        "openshell.pi-assistant-message.v1",
-        PiAssistantMessageV1Adapter(),
-    )
-    registry.register(
-        "pi",
-        AdmissionHook.PROVIDER_CONTEXT,
-        "openshell.pi-provider-context.v1",
-        PiProviderContextV1Adapter(),
-    )
-    return registry
-
-
-def _parse_pi_body(
-    body: bytes, timeout: Timeout, *, accepted_origin: PiMessageOrigin = "user"
-) -> PiMessageV1:
-    value = _load_json(body, AdmissionShapeError, timeout)
-    try:
-        parsed = _PI_ADAPTER.validate_python(value, strict=True)
-    except ValidationError:
-        raise AdmissionShapeError("Pi request body is unsupported") from None
-    if parsed.origin != accepted_origin:
-        raise AdmissionShapeError("Pi message origin is unsupported")
-    if canonical_json_bytes(parsed) != body:
-        raise AdmissionShapeError("Pi request body is not canonical JSON")
-    return parsed
-
-
-def _parse_pi_assistant_message(body: bytes, timeout: Timeout) -> PiAssistantMessageV1:
-    value = _load_json(body, AdmissionShapeError, timeout)
-    try:
-        parsed = _PI_ASSISTANT_MESSAGE_ADAPTER.validate_python(value, strict=True)
-    except ValidationError:
-        raise AdmissionShapeError("Pi assistant-message body is unsupported") from None
-    return parsed
-
-
-def _parse_pi_tool_result(body: bytes, timeout: Timeout) -> PiToolResultV1:
-    value = _load_json(body, AdmissionShapeError, timeout)
-    try:
-        parsed = _PI_TOOL_RESULT_ADAPTER.validate_python(value, strict=True)
-    except ValidationError:
-        raise AdmissionShapeError("Pi tool-result body is unsupported") from None
-    return parsed
-
-
-def _parse_pi_provider_context(body: bytes, timeout: Timeout) -> PiProviderContextV1:
-    value = _load_json(body, AdmissionShapeError, timeout)
-    try:
-        parsed = _PI_PROVIDER_CONTEXT_ADAPTER.validate_python(value, strict=True)
-    except ValidationError:
-        raise AdmissionShapeError("Pi provider-context body is unsupported") from None
-    if canonical_json_bytes(parsed) != body:
-        raise AdmissionShapeError("Pi provider-context body is not canonical JSON")
-    return parsed
-
-
 def context_entries_subject(entries: AttestedEntries) -> tuple[str, int]:
     """Return the v2 hash and count for one ordered entry list."""
     body = json.dumps(
@@ -682,10 +428,19 @@ def _finite_json_float(value: str) -> float:
     return number
 
 
-_PI_ADAPTER = TypeAdapter(PiMessageV1)
-_PI_TOOL_RESULT_ADAPTER = TypeAdapter(PiToolResultV1)
-_PI_ASSISTANT_MESSAGE_ADAPTER = TypeAdapter(PiAssistantMessageV1)
-_PI_PROVIDER_CONTEXT_ADAPTER = TypeAdapter(PiProviderContextV1)
+_PI_ORIGINS = {
+    AdmissionHook.USER_MESSAGE: "user",
+    AdmissionHook.SYSTEM_CONTEXT: "system",
+    AdmissionHook.COMPACTION_SUMMARY: "compaction_summary",
+}
+_PI_SHAPES: dict[AdmissionHook, type[HarnessNative]] = {
+    AdmissionHook.USER_MESSAGE: PiMessageV1,
+    AdmissionHook.SYSTEM_CONTEXT: PiMessageV1,
+    AdmissionHook.COMPACTION_SUMMARY: PiMessageV1,
+    AdmissionHook.TOOL_RESULT: PiToolResultV1,
+    AdmissionHook.ASSISTANT_MESSAGE: PiAssistantMessageV1,
+    AdmissionHook.PROVIDER_CONTEXT: PiProviderContextV1,
+}
 _PROVIDER_ADAPTER = TypeAdapter(_ProviderRequest)
 
 
@@ -694,24 +449,17 @@ __all__ = [
     "AdmissionShapeError",
     "AttestedEntries",
     "ContextEntryV1",
-    "HarnessAdapter",
-    "HarnessAdapterRegistry",
     "PiMessageV1",
-    "PiImageContentV1",
     "PiAssistantMessageV1",
-    "PiAssistantMessageV1Adapter",
     "PiAssistantToolCallV1",
     "PiTextContentV1",
     "PiToolResultV1",
-    "PiToolResultV1Adapter",
-    "PiMessageV1Adapter",
     "PiProviderContextV1",
-    "PiProviderContextV1Adapter",
-    "PreparedHarnessRequest",
     "ProviderShapeError",
     "ToolContextEntryV1",
     "UserContextEntryV1",
+    "parse_pi_request",
+    "validate_pi_replacement",
     "extract_provider_entries",
     "context_entries_subject",
-    "create_pi_adapter_registry",
 ]

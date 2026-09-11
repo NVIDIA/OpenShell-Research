@@ -43,7 +43,8 @@ def configure(action: str, state: Path, gateway: str) -> None:
 
     config, restart = _local_service()
     registration = {"gateway": gateway, "config": str(config)}
-    if record.exists() and json.loads(record.read_text()) != registration:
+    saved = json.loads(record.read_text()) if record.exists() else None
+    if saved is not None and any(saved.get(k) != v for k, v in registration.items()):
         raise ValueError(
             "Gateway/config changed; restore the previous selection to clean up first."
         )
@@ -61,7 +62,7 @@ def configure(action: str, state: Path, gateway: str) -> None:
         if matches:
             entries = tomllib.loads(original)["openshell"]["supervisor"]["middleware"]
             existing = [entry for entry in entries if entry.get("name") == "pi-egress"]
-            if existing != [desired] or not record.exists():
+            if existing != [desired] or saved is None or saved.get("entry") != desired:
                 raise ValueError(
                     "pi-egress is already registered; refusing to overwrite it."
                 )
@@ -69,7 +70,7 @@ def configure(action: str, state: Path, gateway: str) -> None:
             updated = original.rstrip() + "\n\n" + fragment
             tomllib.loads(updated)
             # Remember ownership so cleanup also works after a failed restart.
-            record.write_text(json.dumps(registration) + "\n")
+            record.write_text(json.dumps({**registration, "entry": desired}) + "\n")
             config.parent.mkdir(parents=True, exist_ok=True)
             with tempfile.NamedTemporaryFile(
                 mode="w", dir=config.parent, delete=False
@@ -84,6 +85,19 @@ def configure(action: str, state: Path, gateway: str) -> None:
                     Path(temporary.name).unlink(missing_ok=True)
         print(f"Registered pi-egress in {config}", flush=True)
     else:
+        entries = (
+            (
+                tomllib.loads(config.read_text())
+                .get("openshell", {})
+                .get("supervisor", {})
+                .get("middleware", [])
+            )
+            if config.exists()
+            else []
+        )
+        existing = [entry for entry in entries if entry.get("name") == "pi-egress"]
+        if existing and (saved is None or existing != [saved.get("entry")]):
+            raise ValueError("pi-egress registration changed; refusing to remove it.")
         remove_gateway_config(config, middleware_name="pi-egress")
         print(f"Removed pi-egress from {config}", flush=True)
 

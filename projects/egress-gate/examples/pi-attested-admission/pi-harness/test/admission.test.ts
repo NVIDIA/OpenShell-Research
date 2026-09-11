@@ -11,7 +11,7 @@ import {
   textOnly,
 } from "../src/admission.js";
 
-test("unsupported content and changed executable fields fail closed", async () => {
+test("allow preserves native messages; executable and signed reasoning changes fail closed", async () => {
   assert.throws(() => textOnly([{ type: "image" }]), AdmissionError);
   const message: AssistantMessage = {
     role: "assistant",
@@ -21,12 +21,16 @@ test("unsupported content and changed executable fields fail closed", async () =
     timestamp: 0,
     stopReason: "toolUse",
     content: [
+      { type: "text", text: "before" },
+      { type: "thinking", thinking: "private reasoning", thinkingSignature: "provider-signature" },
       {
         type: "toolCall",
         id: "call",
         name: "bash",
         arguments: { command: "original" },
+        thoughtSignature: "tool-signature",
       },
+      { type: "text", text: "after", textSignature: "text-signature" },
     ],
     usage: {
       input: 0,
@@ -37,6 +41,24 @@ test("unsupported content and changed executable fields fail closed", async () =
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     },
   };
+  const allowed = new Admission(async () => ({ decision: "allow", replacement: null, receipt: null }));
+  assert.strictEqual(await allowed.message(message), message);
+  for (const role of ["user", "toolResult"] as const) {
+    const candidate = { role, content: [{ type: "text" as const, text: "one" }, { type: "text" as const, text: "two" }],
+      timestamp: 1, toolCallId: "call", toolName: "read", isError: false };
+    assert.strictEqual(await allowed.message(candidate), candidate);
+  }
+  const signedChange = new Admission(async (_kind, body) => ({
+    decision: "replace", receipt: null,
+    replacement: { ...body, thinking: [{ text: "changed", signature: "provider-signature" }] },
+  }));
+  await assert.rejects(signedChange.message(message), AdmissionError);
+  const unsigned = { ...message, content: [{ type: "thinking" as const, thinking: "private reasoning" }] };
+  const redactor = new Admission(async (_kind, body) => ({
+    decision: "replace", receipt: null,
+    replacement: { ...body, thinking: [{ text: "approved reasoning", signature: null }] },
+  }));
+  assert.deepEqual((await redactor.message(unsigned)).content, [{ type: "thinking", thinking: "approved reasoning" }]);
   const admission = new Admission(async (_kind, body) => ({
     decision: "replace",
     replacement: { ...body, tool_calls: [] },

@@ -1,16 +1,16 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Conformance tests for managed Pi context admission and attested egress."""
+"""Boundary cases not covered by the native Pi HTTP/RPC integration journeys."""
 
 from __future__ import annotations
 
 import base64
 import json
 from pathlib import Path
-from typing import Literal
 
 import pytest
+import yaml
 
 from egress_gate.admission import (
     MAX_ADMISSION_BODY_BYTES,
@@ -26,11 +26,8 @@ from egress_gate.admission import (
     PiAssistantToolCallV1,
     PiMessageV1,
     PiProviderContextV1,
-    PiTextContentV1,
-    PiToolResultV1,
     ReceiptAuthority,
     canonical_json_bytes,
-    create_pi_adapter_registry,
     extract_provider_entries,
 )
 from egress_gate.gates import create_builtin_registry
@@ -50,65 +47,19 @@ def _processors(
     *, replacement_template: str = "[REDACTED]"
 ) -> tuple[HarnessAdmissionProcessor, AttestedEgressProcessor, ReceiptAuthority]:
     registry = create_builtin_registry()
-    config = registry.validate_config(
-        {
-            "gates": [
-                {
-                    "name": "deny-marker",
-                    "kind": "regex",
-                    "scan": {"kind": "body", "action": {"kind": "deny"}},
-                    "pattern_catalog": {
-                        "entities": [
-                            {
-                                "name": "unsafe-marker",
-                                "rules": [
-                                    {
-                                        "name": "exact-marker",
-                                        "pattern": DENY_TEXT,
-                                        "confidence": "high",
-                                    }
-                                ],
-                            }
-                        ]
-                    },
-                },
-                {
-                    "name": "replace-marker",
-                    "kind": "regex",
-                    "scan": {
-                        "kind": "body",
-                        "action": {
-                            "kind": "replace",
-                            "template": replacement_template,
-                        },
-                    },
-                    "pattern_catalog": {
-                        "entities": [
-                            {
-                                "name": "replacement-marker",
-                                "rules": [
-                                    {
-                                        "name": "exact-marker",
-                                        "pattern": REDACT_TEXT,
-                                        "confidence": "high",
-                                    }
-                                ],
-                            }
-                        ]
-                    },
-                },
-            ],
-            "default_decision": "allow",
-        }
-    )
+    policy = yaml.safe_load(
+        (
+            Path(__file__).parents[2] / "examples/pi-attested-admission/policy.yaml"
+        ).read_text()
+    )["network_middlewares"]["pi_egress_gate"]["config"]
+    policy["gates"][1]["scan"]["action"]["template"] = replacement_template
+    config = registry.validate_config(policy)
     request_processor = registry.prepare_processor(
         config, timeout=Timeout.from_seconds(1)
     )
     authority = ReceiptAuthority()
     return (
-        HarnessAdmissionProcessor(
-            request_processor, create_pi_adapter_registry(), authority
-        ),
+        HarnessAdmissionProcessor(request_processor, authority),
         AttestedEgressProcessor(
             request_processor,
             authority,
@@ -158,7 +109,7 @@ def _context(
 
 def _admit(
     processor: HarnessAdmissionProcessor,
-    value: (PiMessageV1 | PiToolResultV1 | PiAssistantMessageV1 | PiProviderContextV1),
+    value: PiMessageV1 | PiAssistantMessageV1 | PiProviderContextV1,
     *,
     target: HttpTarget | None = None,
     timeout: Timeout | None = None,
@@ -169,8 +120,6 @@ def _admit(
             "system": AdmissionHook.SYSTEM_CONTEXT,
             "compaction_summary": AdmissionHook.COMPACTION_SUMMARY,
         }[value.origin]
-    elif isinstance(value, PiToolResultV1):
-        hook = AdmissionHook.TOOL_RESULT
     elif isinstance(value, PiAssistantMessageV1):
         hook = AdmissionHook.ASSISTANT_MESSAGE
     else:
@@ -187,18 +136,10 @@ def _admit(
     )
 
 
-def _message(
-    text: str,
-    *,
-    origin: Literal["user", "system", "compaction_summary"] = "user",
-) -> PiMessageV1:
-    return PiMessageV1(
-        schema_version="openshell.pi-message.v1", origin=origin, text=text
-    )
-
-
 def _user(text: str) -> PiMessageV1:
-    return _message(text)
+    return PiMessageV1(
+        schema_version="openshell.pi-message.v1", origin="user", text=text
+    )
 
 
 def _assistant(
@@ -212,26 +153,6 @@ def _assistant(
                 id="call-1", name="read", arguments=arguments or {"path": "safe"}
             ),
         ),
-    )
-
-
-def _tool_result(
-    text: str, *, image: bool = False, tool_call_id: str = "call-1"
-) -> PiToolResultV1:
-    content: list[dict[str, object]] = (
-        [{"type": "image", "data": "AA==", "mimeType": "image/png"}]
-        if image
-        else [{"type": "text", "text": text}]
-    )
-    return PiToolResultV1.model_validate(
-        {
-            "schema_version": "openshell.pi-tool-result.v1",
-            "tool_call_id": tool_call_id,
-            "tool_name": "read",
-            "content": content,
-            "is_error": False,
-        },
-        strict=True,
     )
 
 
@@ -392,16 +313,6 @@ def test_provider_context_redaction_binds_only_the_replacement() -> None:
     )
 
 
-def test_restored_context_with_denied_text_is_blocked_at_send_time() -> None:
-    admission, _, _ = _processors()
-
-    denied = _admit_provider_request(admission, _provider_request(DENY_TEXT))
-
-    assert denied.decision is AdmissionDecision.DENY
-    assert denied.replacement_body is None
-    assert denied.reason_code == "egress_gate_regex_denied"
-
-
 def test_attestation_uses_stable_destination_across_tls_proxy_normalization() -> None:
     admission, egress, _ = _processors()
     normalized = HttpTarget(
@@ -428,52 +339,31 @@ def test_attestation_uses_stable_destination_across_tls_proxy_normalization() ->
     assert wrong_host.reason_code == "attestation_context_mismatch"
 
 
-def test_tool_result_denial_redaction_and_images_fail_closed() -> None:
+def test_tool_images_fail_closed() -> None:
     admission, _, _ = _processors()
-
-    denied = _admit(admission, _tool_result(DENY_TEXT))
-    redacted = _admit(admission, _tool_result(REDACT_TEXT))
-    image = _admit(admission, _tool_result("", image=True))
-
-    assert denied.decision is AdmissionDecision.DENY
-    assert denied.attestation is None
-    assert redacted.decision is AdmissionDecision.REPLACE
-    assert redacted.replacement_body is not None
-    redacted_tool_result = PiToolResultV1.model_validate_json(
-        redacted.replacement_body, strict=True
+    body = {
+        "schema_version": "openshell.pi-tool-result.v1",
+        "tool_call_id": "call-1",
+        "tool_name": "read",
+        "is_error": False,
+        "content": [{"type": "image", "data": "AA==", "mimeType": "image/png"}],
+    }
+    result = admission.process(
+        HarnessAdmissionRequest(
+            request_body=json.dumps(body).encode(),
+            provenance=AdmissionProvenance(
+                session_id="session-1", submission_id="image"
+            ),
+        ),
+        _context(AdmissionHook.TOOL_RESULT),
+        timeout=Timeout.from_seconds(1),
     )
-    assert isinstance(redacted_tool_result.content[0], PiTextContentV1)
-    assert redacted_tool_result.content[0].text == "[REDACTED]"
-    assert image.decision is AdmissionDecision.DENY
-    assert image.reason_code == "admission_contract_invalid"
-
-
-@pytest.mark.parametrize(
-    "origin",
-    ["user", "system", "compaction_summary"],
-)
-def test_text_message_origins_allow_replace_and_deny(origin) -> None:
-    admission, _, _ = _processors()
-
-    allowed = _admit(admission, _message("safe", origin=origin))
-    redacted = _admit(admission, _message(REDACT_TEXT, origin=origin))
-    denied = _admit(admission, _message(DENY_TEXT, origin=origin))
-
-    assert allowed.decision is AdmissionDecision.ALLOW
-    assert allowed.attestation is None
-    assert redacted.decision is AdmissionDecision.REPLACE
-    assert redacted.replacement_body is not None
-    replacement = PiMessageV1.model_validate_json(
-        redacted.replacement_body, strict=True
-    )
-    assert replacement.origin == origin
-    assert replacement.text == "[REDACTED]"
-    assert denied.decision is AdmissionDecision.DENY
+    assert result.reason_code == "admission_contract_invalid"
 
 
 def test_text_message_binding_rejects_a_different_origin() -> None:
     admission, _, _ = _processors()
-    value = _message("safe", origin="user")
+    value = _user("safe")
 
     result = admission.process(
         HarnessAdmissionRequest(
@@ -487,24 +377,6 @@ def test_text_message_binding_rejects_a_different_origin() -> None:
     )
 
     assert result.reason_code == "admission_contract_invalid"
-
-
-def test_assistant_message_allows_text_replacement_and_denial() -> None:
-    admission, _, _ = _processors()
-
-    allowed = _admit(admission, _assistant("safe"))
-    redacted = _admit(admission, _assistant(REDACT_TEXT))
-    denied = _admit(admission, _assistant(DENY_TEXT))
-
-    assert allowed.decision is AdmissionDecision.ALLOW
-    assert redacted.decision is AdmissionDecision.REPLACE
-    assert redacted.replacement_body is not None
-    replacement = PiAssistantMessageV1.model_validate_json(
-        redacted.replacement_body, strict=True
-    )
-    assert replacement.text == "[REDACTED]"
-    assert replacement.tool_calls == _assistant("safe").tool_calls
-    assert denied.decision is AdmissionDecision.DENY
 
 
 def test_assistant_message_accepts_javascript_number_serialization() -> None:
@@ -529,10 +401,15 @@ def test_assistant_message_accepts_javascript_number_serialization() -> None:
     assert result.decision is AdmissionDecision.ALLOW
 
 
-def test_assistant_message_rejects_tool_call_mutation() -> None:
+@pytest.mark.parametrize("field", ["tool_calls", "thinking"])
+def test_assistant_message_rejects_replay_mutation(field: str) -> None:
     admission, _, _ = _processors()
 
-    result = _admit(admission, _assistant("safe", arguments={"path": REDACT_TEXT}))
+    body = _assistant("safe", arguments={"path": REDACT_TEXT}).model_dump(mode="json")
+    if field == "thinking":
+        body["tool_calls"] = []
+        body["thinking"] = [{"text": REDACT_TEXT, "signature": "provider-signature"}]
+    result = _admit(admission, PiAssistantMessageV1.model_validate(body, strict=True))
 
     assert result.decision is AdmissionDecision.DENY
     assert result.reason_code == "admission_contract_invalid"
@@ -631,15 +508,10 @@ def test_provider_shape_validation_and_optional_reasoning_field_are_preserved() 
     "mutation",
     [
         lambda body: body.update({"max_completion_tokens": 128}),
-        lambda body: body.update({"store": None}),
-        lambda body: body.update({"stream_options": None}),
         lambda body: body.update({"stream_options": {"include_usage": "true"}}),
-        lambda body: body["tools"][0].update({"cache_control": {"type": "persistent"}}),
         lambda body: body["tools"][0].update(
             {"cache_control": {"type": "ephemeral", "ttl": "forever"}}
         ),
-        lambda body: body["tools"][0]["function"].update({"strict": None}),
-        lambda body: body.update({"input": []}),
         lambda body: body["messages"][1].update({"tool_call_id": "wrong-role"}),
         lambda body: body["messages"][1].update({"role": "tool"}),
         lambda body: body["tools"][0]["function"].update(

@@ -14,11 +14,14 @@ from pydantic import ValidationError
 from egress_gate.admission.adapters import (
     AdmissionMutationError,
     AdmissionShapeError,
-    HarnessAdapterRegistry,
+    PiProviderContextV1,
     ProviderShapeError,
     context_entries_subject,
     extract_provider_entries,
+    parse_pi_request,
+    validate_pi_replacement,
 )
+from egress_gate.admission.canonical import canonical_json_bytes
 from egress_gate.admission.models import (
     MAX_ADMISSION_BODY_BYTES,
     AdmissionDecision,
@@ -31,8 +34,6 @@ from egress_gate.admission.receipts import ReceiptAuthority, ReceiptVerification
 from egress_gate.constants import MAX_AGENT_ATTESTATION_BYTES
 from egress_gate.errors import EgressGateError, GateError, TimeoutExpiredError
 from egress_gate.request import (
-    EnforcementPoint,
-    HarnessAdmissionMetadata,
     HttpRequest,
     RemoveHeaderMutation,
     RequestContext,
@@ -51,19 +52,17 @@ RECEIPT_HEADER = "x-egress-admission"
 
 
 class HarnessAdmissionProcessor:
-    """Apply the configured Gate pipeline through one registered harness adapter."""
+    """Apply the configured Gate pipeline through the fixed Pi admission shapes."""
 
     def __init__(
         self,
         request_processor: RequestProcessor,
-        adapters: HarnessAdapterRegistry,
         receipt_authority: ReceiptAuthority,
     ) -> None:
         fingerprint = request_processor.policy_fingerprint
         if not fingerprint:
             raise ValueError("admission requires a policy fingerprint")
         self._request_processor = request_processor
-        self._adapters = adapters
         self._receipt_authority = receipt_authority
         self._policy_fingerprint = fingerprint
 
@@ -76,23 +75,16 @@ class HarnessAdmissionProcessor:
     ) -> HarnessAdmissionResult:
         """Return an explicit allow, replacement, or fail-closed denial."""
         try:
-            adapter = self._adapters.resolve(context)
-            prepared = adapter.prepare(request, context, timeout)
+            native = parse_pi_request(request.request_body, context, timeout)
+            projected_body = canonical_json_bytes(native)
             projected = HttpRequest(
                 context=RequestContext(
                     request_id=context.request_id,
                     sandbox_id=context.sandbox_id,
-                    enforcement_point=EnforcementPoint.HARNESS_ADMISSION,
-                    harness_admission=HarnessAdmissionMetadata(
-                        harness=context.harness,
-                        harness_version=context.harness_version,
-                        hook=context.hook.value,
-                        schema_version=context.schema_version,
-                    ),
                 ),
                 target=context.provider_target,
                 headers=(),
-                body=prepared.projected_body,
+                body=projected_body,
             )
             gate_result = self._request_processor.process(projected, timeout=timeout)
             timeout.raise_if_expired()
@@ -109,17 +101,17 @@ class HarnessAdmissionProcessor:
             final_request = apply_request_mutations(
                 projected, gate_result.request_mutations
             )
-            replacement, final = adapter.validate_result(
-                prepared, final_request.body, context, timeout
-            )
+            final = parse_pi_request(final_request.body, context, timeout)
+            validate_pi_replacement(native, final)
+            encoded = canonical_json_bytes(final)
+            replacement = None if encoded == projected_body else encoded
             if replacement is not None and len(replacement) > MAX_ADMISSION_BODY_BYTES:
                 raise AdmissionMutationError("admission replacement body is too large")
             timeout.raise_if_expired()
-            subject = adapter.attestation_subject(prepared, final)
             attestation = None
-            if subject is not None:
+            if isinstance(final, PiProviderContextV1):
                 attestation = self._receipt_authority.issue_attestation(
-                    *subject,
+                    *context_entries_subject(final.entries),
                     context,
                     request.provenance,
                     policy_fingerprint=self._policy_fingerprint,
@@ -182,8 +174,6 @@ class AttestedEgressProcessor:
         timeout: Timeout,
     ) -> EgressResult:
         """Deny any unattested or semantically changed provider request."""
-        if request.context.enforcement_point is not EnforcementPoint.NETWORK_EGRESS:
-            return self._deny("network_context_invalid")
         receipts = [
             h.value for h in request.headers if h.name.lower() == RECEIPT_HEADER
         ]

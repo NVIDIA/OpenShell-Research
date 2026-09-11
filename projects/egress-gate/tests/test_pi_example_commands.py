@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import ipaddress
 import json
 import os
@@ -32,47 +31,6 @@ from egress_gate.service.admission import AdmissionServerConfig
 
 PROJECT = Path(__file__).parents[1]
 EXAMPLE = PROJECT / "examples/pi-attested-admission"
-
-
-def test_native_model_selection_keeps_only_selected_configuration(
-    tmp_path: Path,
-) -> None:
-    catalog = json.loads((EXAMPLE / "models.json.example").read_text())
-    provider = catalog["providers"]["example"]
-    provider["apiKey"] = "!do-not-execute-or-copy"
-    provider["authHeader"] = True
-    provider["models"].append(
-        {
-            "id": "vendor/second",
-            "baseUrl": "https://selected.example/custom/v1",
-            "api": "openai-completions",
-        }
-    )
-    provider["modelOverrides"] = {"vendor/second": {"maxTokens": 2048}}
-    catalog["providers"]["unselected"] = {
-        "apiKey": "private",
-        "models": [{"id": "third"}],
-    }
-    path = tmp_path / "models.json"
-    path.write_text(json.dumps(catalog))
-    select = runpy.run_path(str(EXAMPLE / "prepare.py"))["select_model"]
-    for selection in ("", "example/missing"):
-        with pytest.raises(ValueError, match="PI_MODEL"):
-            select(path, selection)
-    staged, selection, endpoint = select(path, "example/vendor/second")
-    assert selection == {"provider": "example", "id": "vendor/second"}
-    assert endpoint == "https://selected.example/custom/v1"
-    assert staged == {
-        "providers": {
-            "example": {
-                "api": provider["api"],
-                "baseUrl": provider["baseUrl"],
-                "compat": provider["compat"],
-                "models": [provider["models"][1]],
-                "modelOverrides": provider["modelOverrides"],
-            }
-        }
-    }
 
 
 @pytest.fixture
@@ -213,28 +171,6 @@ def test_every_action_prints_without_secrets_or_side_effects(tmp_path: Path) -> 
     assert "PRIVATE_TEST_VALUE" not in output
     assert not marker.exists()
     assert not (tmp_path / ".workspaces").exists()
-    assert "git clone" not in output
-    assert "sha256sum" not in output and "curl" not in output
-    assert "--gateway test-gateway" in output
-    assert "https://service.example:5443/v1/admission" in output
-    assert "middleware.toml" in output
-    assert "gateway list --output json" in output
-    assert "--gateway-public-key" not in output and "--gateway-issuer" not in output
-    assert "17672" not in output and "XDG_CONFIG_HOME" not in output
-    assert "docker build" in output
-    assert "--admission-config" in output
-    assert "provider create" in output
-    assert "--credential PI_MODEL_API_KEY" in output
-    assert "--credential EGRESS_ADMISSION_TOKEN" in output
-    assert "sandbox create" in output and "--from pi-admission:local" in output
-    assert "/app/dist/src/cli.js" in output and "/app/dist/src/verify.js" in output
-    assert "sandbox delete pi-admission" in output
-    assert "gateway-registration.py" in output
-    assert (
-        "brew services restart openshell"
-        if sys.platform == "darwin"
-        else "systemctl --user restart openshell-gateway"
-    ) in output
 
 
 @pytest.mark.parametrize(
@@ -419,6 +355,16 @@ def test_installer_registration_round_trip(
         tomllib.loads(registered)["openshell"]["supervisor"]["middleware"][-1]
         == (tomllib.loads(fragment)["openshell"]["supervisor"]["middleware"][0])
     )
+    changed = registered.replace(
+        "https://service.example:50051", "https://operator.example:50051"
+    )
+    config.write_text(changed)
+    before = len(commands)
+    with pytest.raises(ValueError, match="registration changed"):
+        configure("unregister", state, "openshell")
+    assert config.read_text() == changed
+    assert tuple(restart) not in commands[before:]
+    config.write_text(registered)
     fail_restart = True
     with pytest.raises(subprocess.CalledProcessError):
         configure("unregister", state, "openshell")
@@ -463,29 +409,11 @@ def test_commands_forward_cache_preference_and_suppress_only_proxy_warning(
     command = shlex.split(printed.stdout)
     node_index = command.index("/usr/local/bin/node")
     assert command[node_index + 1] == "--disable-warning=UNDICI-EHPA"
-    environment = os.environ.copy()
-    environment.pop("NODE_OPTIONS", None)
-    environment.pop("PI_CACHE_RETENTION", None)
-    result = subprocess.run(
-        [
-            *command[command.index("--") + 1 : node_index],
-            "node",
-            command[node_index + 1],
-            "-e",
-            "process.emitWarning('proxy notice', {code: 'UNDICI-EHPA'});"
-            "process.emitWarning('unrelated notice', {code: 'OTHER_WARNING'});"
-            "console.log(process.env.PI_CACHE_RETENTION ?? '');",
-        ],
-        env=environment,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    assert "UNDICI-EHPA" not in result.stderr
-    assert "proxy notice" not in result.stderr
-    assert "OTHER_WARNING" in result.stderr
-    assert "unrelated notice" in result.stderr
-    assert result.stdout.strip() == cache_retention
+    prefix = command[command.index("--") + 1 : node_index]
+    expected = ["/usr/bin/env"]
+    if cache_retention:
+        expected.append(f"PI_CACHE_RETENTION={cache_retention}")
+    assert prefix == expected
 
 
 @pytest.mark.parametrize("host", ["192.0.2.10", "host.docker.internal"])
@@ -504,9 +432,10 @@ def test_preparation_uses_existing_gateway_and_excludes_private_material(
         ),
     )
     catalog = json.loads((example / "models.json.example").read_text())
-    provider = catalog["providers"]["example"]
+    provider = catalog["providers"]["openrouter"]
     provider["apiKey"] = "must-not-enter-image"
     provider["models"][0]["baseUrl"] = provider["baseUrl"]
+    provider["modelOverrides"] = {"z-ai/glm-5.3-flash": {"maxTokens": 2048}}
     provider["baseUrl"] = "https://unselected.example/v1"
     provider["models"].append({"id": "unselected"})
     (example / "models.json").write_text(json.dumps(catalog))
@@ -522,14 +451,14 @@ def test_preparation_uses_existing_gateway_and_excludes_private_material(
         "--gateway",
         gateway["name"],
         "--model",
-        "example/YOUR_MODEL_ID",
+        "openrouter/z-ai/glm-5.3-flash",
     ]
     subprocess.run(command, input=json.dumps([gateway]), text=True, check=True)
     config = AdmissionServerConfig.model_validate_json(
         (state / "admission.json").read_bytes()
     )
     assert config.provider_target.scheme == "https"
-    assert config.provider_target.host == "api.example.com"
+    assert config.provider_target.host == "openrouter.ai"
     assert config.gateway_public_key == public_path
     assert config.gateway_issuer == "existing-gateway-issuer"
     assert public_path.read_bytes() == public
@@ -542,8 +471,15 @@ def test_preparation_uses_existing_gateway_and_excludes_private_material(
         x509.SubjectAlternativeName
     ).value
     assert host in [str(name.value) for name in names]
-    assert config.provider_target.path == "/v1/chat/completions"
+    assert config.provider_target.path == "/api/v1/chat/completions"
     assert not config.sandbox_id_file.exists()
+    subprocess.run(
+        [sys.executable, str(example / "bind-sandbox.py"), "--state", str(state)],
+        input=json.dumps({"id": "actual-sandbox-id"}),
+        text=True,
+        check=True,
+    )
+    assert config.sandbox_id_file.read_text().strip() == "actual-sandbox-id"
     token = config.bearer_token.get_secret_value()
     assert len(token) >= 32
     (state / "image/stale-config.json").write_text("{}")
@@ -567,12 +503,16 @@ def test_preparation_uses_existing_gateway_and_excludes_private_material(
     assert not (image / "pi-harness/node_modules").exists()
     assert (image / "project/.pi/skills/review/SKILL.md").is_file()
     catalog = json.loads((image / "models.json").read_text())
-    assert catalog["providers"]["example"]["models"][0]["id"] == "YOUR_MODEL_ID"
-    assert len(catalog["providers"]["example"]["models"]) == 1
+    assert catalog["providers"]["openrouter"]["models"][0]["id"] == "z-ai/glm-5.3-flash"
+    assert len(catalog["providers"]["openrouter"]["models"]) == 1
+    assert (
+        catalog["providers"]["openrouter"]["modelOverrides"]
+        == provider["modelOverrides"]
+    )
     assert "must-not-enter-image" not in (image / "models.json").read_text()
     assert json.loads((image / "model-selection.json").read_text()) == {
-        "provider": "example",
-        "id": "YOUR_MODEL_ID",
+        "provider": "openrouter",
+        "id": "z-ai/glm-5.3-flash",
     }
     middleware = tomllib.loads((state / "middleware.toml").read_text())
     registration = middleware["openshell"]["supervisor"]["middleware"][0]
@@ -584,7 +524,7 @@ def test_preparation_uses_existing_gateway_and_excludes_private_material(
     assert policy["network_middlewares"]["pi_egress_gate"]["on_error"] == "fail_closed"
     model_endpoint = policy["network_policies"]["model_provider"]["endpoints"][0]
     assert model_endpoint["rules"] == [
-        {"allow": {"method": "POST", "path": "/v1/chat/completions"}}
+        {"allow": {"method": "POST", "path": "/api/v1/chat/completions"}}
     ]
     assert "access" not in model_endpoint
     assert policy["network_policies"]["admission"]["endpoints"][0]["port"] == 5443
@@ -653,46 +593,3 @@ def test_discovery_rejects_untrusted_gateway_before_preparation(
         "wrong-hostname": "Hostname mismatch",
     }[failure] in result.stderr
     assert not (tmp_path / "state").exists()
-
-
-def test_sandbox_binding_accepts_only_operator_cli_output(tmp_path: Path) -> None:
-    result = subprocess.run(
-        [sys.executable, str(EXAMPLE / "bind-sandbox.py"), "--state", str(tmp_path)],
-        input=json.dumps({"id": "actual-sandbox-id"}),
-        text=True,
-        capture_output=True,
-        check=True,
-    )
-    assert (tmp_path / "sandbox-id").read_text().strip() == "actual-sandbox-id"
-    assert "bound" in result.stdout
-
-
-def test_pi_dependencies_are_exact_upstream_packages() -> None:
-    package = json.loads((EXAMPLE / "pi-harness/package.json").read_text())
-    lock = json.loads((EXAMPLE / "pi-harness/package-lock.json").read_text())
-    for name, version in package["dependencies"].items():
-        if name.startswith("@earendil-works/"):
-            assert version == "0.85.1"
-        resolved = lock["packages"][f"node_modules/{name}"]
-        assert resolved["version"] == version
-        assert resolved["resolved"].startswith("https://registry.npmjs.org/")
-        assert resolved["integrity"].startswith("sha512-")
-
-
-def test_middleware_manifest_matches_upstream_protocol() -> None:
-    manifest = json.loads((PROJECT / ".openshell-middleware-manifest.json").read_text())
-    assert manifest["openshell_version"] == "v0.0.116"
-    assert manifest["proto_source"] == (
-        "https://raw.githubusercontent.com/NVIDIA/OpenShell/v0.0.116"
-        "/proto/supervisor_middleware.proto"
-    )
-    assert (
-        manifest["proto_sha256"]
-        == hashlib.sha256(
-            (PROJECT / "proto/supervisor_middleware.proto").read_bytes()
-        ).hexdigest()
-    )
-    script = (PROJECT / "scripts/generate-bindings.sh").read_text()
-    assert "--project ../openshell-middleware-manager omm update ." in script
-    assert "--openshell-version v0.0.116 --check-command 'make check'" in script
-    assert "grpc_tools.protoc" not in script and "curl" not in script

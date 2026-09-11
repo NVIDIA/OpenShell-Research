@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { resolve } from "node:path";
-import type { AgentTool, StreamFn } from "@earendil-works/pi-agent-core";
+import type { StreamFn } from "@earendil-works/pi-agent-core";
 import { InMemoryCredentialStore, type Model } from "@earendil-works/pi-ai";
 import { streamSimple } from "@earendil-works/pi-ai/compat";
 import {
@@ -13,8 +13,7 @@ import {
   ModelRuntime,
   createAgentSessionServices,
   convertToLlm,
-  generateSummaryWithUsage,
-  sessionEntryToContextMessages,
+  compact,
   type CreateAgentSessionRuntimeFactory,
   type PromptOptions,
 } from "@earendil-works/pi-coding-agent";
@@ -37,7 +36,6 @@ export interface SessionOptions {
   admission: Admission;
   /** Deterministic integration tests use Pi's public stream/tool seams. */
   stream?: StreamFn;
-  tools?: AgentTool[];
   compactAtTokens?: number;
 }
 
@@ -138,7 +136,6 @@ export async function createAdmissionRuntime(
 function sessionFactory(options: SessionOptions) {
   if (
     options.model.api !== "openai-completions" ||
-    options.model.reasoning ||
     options.model.input.some((type) => type !== "text") ||
     new URL(options.model.baseUrl).protocol !== "https:"
   )
@@ -149,7 +146,6 @@ function sessionFactory(options: SessionOptions) {
     enableInstallTelemetry: false,
     compaction: {
       enabled: true,
-      keepRecentTokens: 0,
       reserveTokens:
         options.compactAtTokens === undefined
           ? undefined
@@ -198,30 +194,14 @@ function sessionFactory(options: SessionOptions) {
                 // throwing from an extension handler could fall back to Pi's
                 // unchecked default summarizer.
                 try {
-                  const entries = sessionManager.buildContextEntries();
-                  const keepIndex = entries.findLastIndex(
-                    (entry) =>
-                      entry.type === "message" && entry.message.role === "user",
-                  );
-                  if (keepIndex <= 0) return { cancel: true };
-                  const previous = entries.slice(0, keepIndex);
-                  const messages = previous.flatMap((entry) =>
-                    entry.type === "compaction"
-                      ? []
-                      : sessionEntryToContextMessages(entry),
-                  );
-                  if (!messages.length) return { cancel: true };
-                  const summary = await generateSummaryWithUsage(
-                    messages,
+                  const summary = await compact(
+                    event.preparation,
                     options.model,
-                    event.preparation.settings.reserveTokens,
                     options.apiKey,
                     undefined,
-                    event.signal,
                     event.customInstructions,
-                    previous.find((entry) => entry.type === "compaction")
-                      ?.summary,
-                    "off",
+                    event.signal,
+                    session.thinkingLevel,
                     stream,
                     undefined,
                     { enabled: false, maxRetries: 0, baseDelayMs: 0 },
@@ -230,15 +210,17 @@ function sessionFactory(options: SessionOptions) {
                   );
                   const approved = await options.admission.text(
                     "compaction_summary",
-                    summary.text,
+                    summary.summary,
                     event.signal,
                   );
                   return {
                     compaction: {
                       summary: approved,
-                      firstKeptEntryId: entries[keepIndex].id,
+                      firstKeptEntryId: summary.firstKeptEntryId,
                       tokensBefore: event.preparation.tokensBefore,
-                      usage: retainedUsage(summary.usage),
+                      ...(summary.usage
+                        ? { usage: retainedUsage(summary.usage) }
+                        : {}),
                     },
                   };
                 } catch {
@@ -259,7 +241,7 @@ function sessionFactory(options: SessionOptions) {
       options.model.provider,
       options.apiKey,
     );
-    const tools = options.tools ?? projectTools(cwd);
+    const tools = projectTools(cwd);
     const agent = new AdmissionAgent(options.model, stream, options.admission);
     agent.sessionId = sessionManager.getSessionId();
     agent.steeringMode = settingsManager.getSteeringMode();

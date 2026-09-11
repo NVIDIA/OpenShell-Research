@@ -27,7 +27,6 @@ from egress_gate.admission import (
     HarnessAdmissionRequest,
     HarnessAdmissionResult,
     ReceiptAuthority,
-    create_pi_adapter_registry,
 )
 from egress_gate.bindings import supervisor_middleware_pb2 as pb2
 from egress_gate.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
@@ -105,7 +104,6 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         )
         self._policy = _ActivePolicy(registry)
         self._receipt_authority = ReceiptAuthority()
-        self._admission_adapters = create_pi_adapter_registry()
         self._require_agent_attestation = require_agent_attestation
         self._expected_audience = expected_audience
         self._processing_slots = asyncio.Semaphore(MAX_CONCURRENT_PROCESSING)
@@ -183,7 +181,6 @@ class EgressGateMiddleware(pb2_grpc.SupervisorMiddlewareServicer):
         return await self._run_in_worker(
             lambda: HarnessAdmissionProcessor(
                 self._policy.processor_for(policy, timeout=timeout),
-                self._admission_adapters,
                 self._receipt_authority,
             ).process(request, context, timeout=timeout),
             timeout=timeout,

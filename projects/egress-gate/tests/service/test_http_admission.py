@@ -81,6 +81,7 @@ async def test_http_admission_allow_deny_replace_and_authentication(
 @pytest.mark.asyncio
 async def test_http_receipt_is_verified_and_stripped_by_standard_authenticated_rpc(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async with _clients(tmp_path) as (client, stub, config, token, _):
         response = await client.post(
@@ -111,12 +112,30 @@ async def test_http_receipt_is_verified_and_stripped_by_standard_authenticated_r
         request.headers.add(name=RECEIPT_HEADER, value=result["receipt"])
         denied = await stub.EvaluateHttpRequest(request, metadata=metadata)
         assert denied.reason_code == "attestation_malformed"
+        # Issue a genuinely signed but expired receipt, without a wall-clock wait.
+        with monkeypatch.context() as clock:
+            clock.setattr("egress_gate.admission.receipts._now_seconds", lambda: 0)
+            response = await client.post(
+                "/v1/admission",
+                json=_call("safe", kind="provider_context"),
+                headers=AUTHORIZATION,
+            )
+        expired = await response.json()
+        denied = await stub.EvaluateHttpRequest(
+            _network(config, expired["receipt"]), metadata=metadata
+        )
+        assert denied.reason_code == "attestation_expired"
         empty = message_factory.GetMessageClass(
             empty_pb2.DESCRIPTOR.message_types_by_name["Empty"]
         )()
         manifest = await stub.Describe(empty, metadata=metadata)
         assert manifest.expected_audience == AUDIENCE
         assert len(manifest.bindings) == 1
+        assert (
+            manifest.bindings[0].operation
+            == pb.SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_REQUEST
+        )
+        assert not hasattr(pb.HttpRequestEvaluation(), "agent_attestation")
 
 
 @pytest.mark.parametrize("change", ["issuer", "audience", "expired", "type", "key"])
@@ -153,20 +172,26 @@ def test_gateway_authentication_rejects_invalid_trust_claims(change: str) -> Non
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("tui", [False, True], ids=["sdk", "native-tui"])
 @pytest.mark.parametrize(
-    ("max_tokens", "cache_control", "cache_retention"),
-    [(2048, False, ""), (16384, True, ""), (16384, True, "long")],
-    ids=["default-cache", "compat-cache", "long-cache"],
+    ("mode", "max_tokens", "cache_control", "cache_retention"),
+    [
+        ("tui", 2048, False, ""),
+        ("sdk", 16384, True, "long"),
+        ("settings", 2048, True, ""),
+        ("settings", 16384, False, ""),
+    ],
+    ids=["native-tui", "sdk-long-cache", "compat-cache", "default-cache"],
 )
 async def test_pi_session_through_admission_and_authenticated_egress(
     tmp_path: Path,
     unused_tcp_port: int,
-    tui: bool,
+    mode: str,
     max_tokens: int,
     cache_control: bool,
     cache_retention: str,
 ) -> None:
+    tui = mode == "tui"
+    settings_only = mode == "settings"
     source = PROJECT / "examples/pi-attested-admission"
     example = tmp_path / "example"
     shutil.copytree(
@@ -177,7 +202,7 @@ async def test_pi_session_through_admission_and_authenticated_egress(
         ),
     )
     catalog = json.loads((example / "models.json.example").read_text())
-    model = catalog["providers"]["example"]["models"][0]
+    model = catalog["providers"]["openrouter"]["models"][0]
     model["maxTokens"] = max_tokens
     model["samplingParams"] = {"temperature": 0.25, "top_p": 0.9}
     model["compat"] = {
@@ -205,12 +230,18 @@ async def test_pi_session_through_admission_and_authenticated_egress(
                 "tls_certificate": tmp_path / "tls/server/tls.crt",
                 "tls_private_key": tmp_path / "tls/server/tls.key",
                 "provider_target": config.provider_target.model_copy(
-                    update={"host": "127.0.0.1", "port": unused_tcp_port}
+                    update={
+                        "host": "127.0.0.1",
+                        "port": unused_tcp_port,
+                        "path": "/api/v1/chat/completions",
+                    }
                 ),
             }
         )
         calls: list[bytes] = []
         session_ids: list[str | None] = []
+        chat_calls: list[bytes] = []
+        summary_calls: list[bytes] = []
 
         async def provider(request: web.Request) -> web.Response:
             body = await request.read()
@@ -234,11 +265,16 @@ async def test_pi_session_through_admission_and_authenticated_egress(
                 "REDACT_THIS" not in body.decode() and "DENY_THIS" not in body.decode()
             )
             calls.append(body)
-            session_ids.append(request.headers.get("x-session-affinity"))
-            # Pi deliberately disables cache/affinity headers for summaries.
-            assert (session_ids[-1] is None) == (len(calls) in (4, 7))
             payload = json.loads(body)
-            summary = len(calls) in (4, 7)
+            summary = "You are a context summarization assistant." in json.dumps(
+                payload["messages"][0]
+            )
+            (summary_calls if summary else chat_calls).append(body)
+            affinity = request.headers.get("x-session-affinity")
+            # Both native history and split-turn summaries disable caching.
+            assert (affinity is None) == summary
+            if not summary:
+                session_ids.append(affinity)
             if cache_retention == "long" and not summary:
                 assert payload["prompt_cache_key"] == session_ids[-1]
                 assert payload["prompt_cache_retention"] == "24h"
@@ -261,10 +297,23 @@ async def test_pi_session_through_admission_and_authenticated_egress(
             assert ("stream_options" in payload) is not tui
             assert payload["temperature"] == 0.25
             assert payload["top_p"] == 0.9
-            if len(calls) not in (4, 7):
+            assert payload["reasoning"] == {"effort": "high"}
+            if len(chat_calls) == 3 and not summary:
+                assistant = next(
+                    m for m in reversed(payload["messages"]) if m["role"] == "assistant"
+                )
+                assert assistant["reasoning_details"] == [
+                    {
+                        "type": "reasoning.text",
+                        "text": "APPROVED_REASONING",
+                        "signature": "provider-signature",
+                        "id": "reasoning-1",
+                    }
+                ]
+            if not summary:
                 # Real Pi serialization must honor limits below and above 4096.
                 assert payload["max_tokens"] == max_tokens
-            elif len(calls) == 4:
+            elif not tui and len(chat_calls) == 3 and len(summary_calls) == 1:
                 # Pi's default compaction reserve is 16384; its summary uses 80%.
                 assert payload["max_tokens"] == min(int(0.8 * 16384), max_tokens)
             if len(calls) == 1:
@@ -275,12 +324,22 @@ async def test_pi_session_through_admission_and_authenticated_egress(
                 evaluation.body = json.dumps(changed).encode()
                 denied = await stub.EvaluateHttpRequest(evaluation, metadata=metadata)
                 assert denied.reason_code == "context_hash_mismatch"
-            assert len(calls) <= 7, "unexpected model call"
+            assert len(chat_calls) <= 5, "unexpected chat call"
             delta: dict[str, object] = {"role": "assistant", "content": "REDACT_THIS"}
+            delta["reasoning"] = "REDACT_THIS"
             finish = "stop"
-            if len(calls) == 2:
+            if not summary and len(chat_calls) == 2:
                 delta = {
                     "role": "assistant",
+                    "reasoning": "APPROVED_REASONING",
+                    "reasoning_details": [
+                        {
+                            "type": "reasoning.text",
+                            "text": "APPROVED_REASONING",
+                            "signature": "provider-signature",
+                            "id": "reasoning-1",
+                        }
+                    ],
                     "tool_calls": [
                         {
                             "index": 0,
@@ -294,7 +353,7 @@ async def test_pi_session_through_admission_and_authenticated_egress(
                     ],
                 }
                 finish = "tool_calls"
-            elif len(calls) in (4, 7):
+            elif summary:
                 delta["content"] = "Approved summary"
             chunk = {
                 "id": "local",
@@ -309,7 +368,7 @@ async def test_pi_session_through_admission_and_authenticated_egress(
             )
 
         application = create_admission_application(middleware, config)
-        application.router.add_post("/v1/chat/completions", provider)
+        application.router.add_post("/api/v1/chat/completions", provider)
         server = TestServer(application, scheme="https", port=unused_tcp_port)
         await server.start_server(ssl=admission_tls_context(config))
         terminal: tuple[int, int] | None = None
@@ -323,7 +382,7 @@ async def test_pi_session_through_admission_and_authenticated_egress(
                 str(source / "pi-harness/dist/test/service-integration.js"),
                 str(server.make_url("/")).rstrip("/"),
                 str(tmp_path),
-                *(["--tui"] if tui else []),
+                *(["--tui"] if tui else ["--settings"] if settings_only else []),
                 env=os.environ
                 | {
                     "NODE_EXTRA_CA_CERTS": str(tmp_path / "tls/ca.crt"),
@@ -368,12 +427,17 @@ async def test_pi_session_through_admission_and_authenticated_egress(
             assert not list(agent_dir.iterdir()), (
                 "Pi must not write auth or model caches"
             )
-            assert len(calls) == (4 if tui else 7)
+            assert len(chat_calls) == (1 if settings_only else 3 if tui else 5)
+            # Native split-turn compaction may issue multiple summary requests.
+            assert bool(summary_calls) == (not settings_only)
             assert len(set(session_ids[:3])) == 1
-            if not tui:
-                assert len(set(session_ids[4:6])) == 1
-                assert session_ids[0] != session_ids[4]
-            assert any(m["role"] == "tool" for m in json.loads(calls[2])["messages"])
+            if not tui and not settings_only:
+                assert len(set(session_ids[3:5])) == 1
+                assert session_ids[0] != session_ids[3]
+            if not settings_only:
+                assert any(
+                    m["role"] == "tool" for m in json.loads(calls[2])["messages"]
+                )
         finally:
             if terminal:
                 os.close(terminal[0])

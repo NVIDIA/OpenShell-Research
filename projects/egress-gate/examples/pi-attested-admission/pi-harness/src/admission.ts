@@ -7,7 +7,6 @@ import type {
   Context,
   Message,
   TextContent,
-  ToolResultMessage,
 } from "@earendil-works/pi-ai";
 
 export const RECEIPT_HEADER = "x-egress-admission";
@@ -43,7 +42,7 @@ export class AdmissionError extends Error {
         unavailable:
           "Admission is unavailable; no unchecked content will be added.",
         unsupported:
-          "This example supports text content without reasoning payloads only.",
+          "This content is outside the example’s supported Chat Completions format.",
         invalid:
           "Admission returned an inconsistent result; the operation was stopped.",
       }[kind],
@@ -146,88 +145,91 @@ export class Admission {
 
   async message(message: Message, signal?: AbortSignal): Promise<Message> {
     if (message.role === "user") {
-      return {
-        role: "user",
-        content: await this.text("user", textOnly(message.content), signal),
-        timestamp: message.timestamp,
-      };
+      const original = textOnly(message.content);
+      const approved = await this.text("user", original, signal);
+      if (approved === original) return message;
+      if (typeof message.content === "string")
+        return { ...message, content: approved };
+      if (message.content.length !== 1 || message.content[0].type !== "text" ||
+          message.content[0].textSignature)
+        throw new AdmissionError("invalid");
+      return { ...message, content: [{ ...message.content[0], text: approved }] };
     }
     if (message.role === "assistant") {
-      if (
-        message.content.some(
-          (block) => block.type !== "text" && block.type !== "toolCall",
-        )
-      )
+      if (message.content.some((block) =>
+        block.type !== "text" && block.type !== "toolCall" && block.type !== "thinking"))
         throw new AdmissionError("unsupported");
-      const calls = message.content
-        .filter((block) => block.type === "toolCall")
-        .map(({ id, name, arguments: args }) => ({
-          id,
-          name,
-          arguments: args,
-        }));
+      const texts = message.content.filter((block) => block.type === "text");
+      const thinking = message.content.filter((block) => block.type === "thinking");
+      const calls = message.content.filter((block) => block.type === "toolCall").map((call) => ({
+        id: call.id, name: call.name, arguments: call.arguments,
+        thought_signature: call.thoughtSignature ?? null,
+      }));
       const envelope = {
         schema_version: "openshell.pi-assistant-message.v1",
-        text: message.content
-          .filter((block) => block.type === "text")
-          .map((block) => block.text)
-          .join("\n"),
+        text: texts.map((block) => block.text).join("\n"),
         tool_calls: calls,
+        thinking: thinking.map((block) => ({
+          text: block.thinking, signature: block.thinkingSignature ?? null,
+        })),
       };
       const admitted = await this.apply("assistant_message", envelope, signal);
-      if (
-        typeof admitted.text !== "string" ||
-        !isDeepStrictEqual(admitted.tool_calls, calls)
-      )
+      // Preserve the complete native message on allow, including block order,
+      // signatures, usage and provider metadata.
+      if (admitted === envelope) return message;
+      if (typeof admitted.text !== "string" ||
+          !isDeepStrictEqual(admitted.tool_calls, calls) ||
+          !Array.isArray(admitted.thinking) || admitted.thinking.length !== thinking.length)
         throw new AdmissionError("invalid");
+      const changedText = admitted.text !== envelope.text;
+      // A joined text projection cannot safely identify edits across multiple blocks.
+      if (changedText && (texts.length !== 1 || texts[0].textSignature))
+        throw new AdmissionError("invalid");
+      const replacements = admitted.thinking.map((value: unknown, index: number) => {
+        const original = envelope.thinking[index];
+        if (!isRecord(value) || typeof value.text !== "string" ||
+            value.signature !== original.signature ||
+            (original.signature !== null &&
+              !["reasoning", "reasoning_content", "reasoning_text"].includes(original.signature) &&
+              value.text !== original.text))
+          throw new AdmissionError("invalid");
+        return value.text;
+      });
+      let index = 0;
       return {
-        role: "assistant",
-        api: message.api,
-        provider: message.provider,
-        model: message.model,
-        usage: message.usage,
-        stopReason: message.stopReason,
-        timestamp: message.timestamp,
-        content: [
-          ...(admitted.text
-            ? [{ type: "text" as const, text: admitted.text }]
-            : []),
-          ...calls.map((call) => ({ type: "toolCall" as const, ...call })),
-        ],
+        ...message,
+        content: message.content.map((block) => {
+          if (block.type === "text" && changedText)
+            return { ...block, text: admitted.text as string };
+          if (block.type === "thinking")
+            return { ...block, thinking: replacements[index++] };
+          return block;
+        }),
       };
     }
+    // Keep text block boundaries and metadata; images remain outside this POC.
+    textOnly(message.content);
     const envelope = {
       schema_version: "openshell.pi-tool-result.v1",
       tool_call_id: message.toolCallId,
       tool_name: message.toolName,
-      content: [{ type: "text", text: textOnly(message.content) }],
+      content: message.content.map((block) => ({ type: "text", text: (block as TextContent).text })),
       is_error: message.isError,
     };
     const admitted = await this.apply("tool_result", envelope, signal);
-    if (
-      admitted.tool_call_id !== message.toolCallId ||
-      admitted.tool_name !== message.toolName ||
-      admitted.is_error !== message.isError ||
-      !Array.isArray(admitted.content)
-    )
+    if (admitted === envelope) return message;
+    if (admitted.tool_call_id !== message.toolCallId ||
+        admitted.tool_name !== message.toolName || admitted.is_error !== message.isError ||
+        !Array.isArray(admitted.content) || admitted.content.length !== message.content.length)
       throw new AdmissionError("invalid");
-    const content = admitted.content.map((block: unknown): TextContent => {
-      if (
-        !isRecord(block) ||
-        block.type !== "text" ||
-        typeof block.text !== "string"
-      )
+    const content = admitted.content.map((value: unknown, index: number): TextContent => {
+      const original = message.content[index] as TextContent;
+      if (!isRecord(value) || value.type !== "text" || typeof value.text !== "string" ||
+          (original.textSignature && value.text !== original.text))
         throw new AdmissionError("invalid");
-      return { type: "text", text: block.text };
+      return { ...original, text: value.text };
     });
-    return {
-      role: "toolResult",
-      toolCallId: message.toolCallId,
-      toolName: message.toolName,
-      content,
-      isError: message.isError,
-      timestamp: message.timestamp,
-    } satisfies ToolResultMessage;
+    return { ...message, content };
   }
 
   async receipt(context: Context, signal?: AbortSignal): Promise<string> {

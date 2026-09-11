@@ -56,12 +56,15 @@ after insertion.
 | --- | --- |
 | User / explicit skill | Final text after supported skill rendering |
 | Project context | Loaded project instructions and model-visible skill metadata |
-| Assistant | Finalized text and tool-call IDs, names, arguments |
+| Assistant | Finalized answer/reasoning text, replay metadata and tool calls |
 | Tool | Final output, including invalid-argument, missing-tool and execution errors |
 | Compaction | Complete summary, for both manual and automatic triggers |
 
 Tool-call fields are inspectable but immutable: attempted executable-argument
-redaction fails closed. Unsupported images/reasoning/provider state is rejected,
+redaction fails closed. Reasoning text is admitted along with immutable replay
+metadata; plain reasoning can be redacted, but reasoning with signed or structured replay metadata
+cannot be changed independently. Allowed native messages retain their block
+order, signatures and metadata. Unsupported images/provider state is rejected,
 not stored as unchecked sidecars. Tool details and progress are not published;
 the TUI receives only admitted final results, with activity indicators while
 waiting. Editor drafts and pending input queues are distinct from admitted
@@ -73,17 +76,21 @@ content-free failures for outstanding calls through the same boundary. If those
 cannot be admitted, the session stops without claiming crash recovery.
 Tool side effects themselves are not reversible by result admission.
 
-Compaction keeps the latest whole user turn. Its summary-generation request
-needs a fresh receipt; its finished summary needs fresh insertion approval.
-The trusted `session_before_compact` extension supplies an admitted summary or
-explicitly cancels, including on failure; it never falls through to an unchecked
-default summary. Denial leaves the preceding context and file unchanged.
-Native automatic compaction also runs between tool turns; when enabled, overflow
-gets at most one compact/retry. Disabling it also disables automatic overflow
-recovery, not manual compaction. This whole-turn POC cannot compact a long first
-tool turn because no older user turn exists. Transient chat and summary failures
-are not automatically retried; unchecked provider errors stay out of history.
-Old approved entries remain in the append-only JSONL file.
+Compaction uses Pi's public `compact()` computation and native recent-context
+retention, including split turns. Its model requests pass through the
+receipt-wrapped stream. The complete returned summary, including file-operation
+text, is admitted before the trusted `session_before_compact` extension returns
+it. Unchecked `details` are omitted. Failure explicitly cancels; it never falls
+through to an unchecked default summary. Denial leaves the preceding context and
+file unchanged.
+
+Manual and automatic compaction use that same checked path. Native automatic
+compaction also runs between tool turns; when enabled, overflow gets at most one
+compact/retry. Disabling it disables automatic overflow recovery, not manual
+compaction. Short sessions may have nothing to compact under Pi's retention
+budget. Transient failures are not automatically retried, and unchecked provider
+errors stay out of history. Old approved entries remain in the append-only JSONL
+file.
 
 Pi's synchronous system-prompt rebuilds are staged as private candidates. Public
 agent/session state retains the last approved system prompt, including while a
@@ -99,7 +106,7 @@ and does not load third-party extensions or implicitly resume saved transcripts.
 
 The service adds one bounded `POST /v1/admission` HTTPS endpoint alongside
 ordinary OpenShell middleware gRPC. It reuses the transport-neutral admission
-models, shape adapters, policy pipeline and receipt authority. Provider validation
+models, fixed Pi shape validation, policy pipeline and receipt authority. Provider validation
 supports Chat Completions only and extracts ordered user/tool entries directly;
 there is no second normalized model-request representation. Branching, extension
 messages and standalone bash-execution envelopes are not admission APIs in this
@@ -119,11 +126,9 @@ and derives the endpoint policy from it. Pi's own parser resolves model defaults
 and compatibility settings. Credential and model-cache stores are in memory;
 the image does not need a writable `auth.json`. Changing the selection requires
 repreparing and recreating the demo, not live switching.
-For local installer-managed gateways, the same `register` command selects the
-config and service manager (Homebrew or the DEB/RPM user service), adds the demo's
-middleware entry, and restarts the gateway; `cleanup` removes that entry and
-restarts it again. Other deployments use the printed
-registration with their own gateway operator. The demo does not generate
+For local installer-managed gateways, `register` adds the demo entry and restarts
+the service; `cleanup` removes it only if it still matches the recorded entry.
+Other deployments use operator-managed registration. The demo does not generate
 gateway credentials or download OpenShell binaries.
 The sandbox cannot select its authoritative
 identity or submit a policy. The single host-owned identity file is populated
@@ -154,7 +159,7 @@ At egress the verifier:
 5. rechecks that mutations did not change receipt-covered content; and
 6. removes the receipt header before forwarding.
 
-The existing `agent-attestation.v2` wire claim format is retained internally.
+Receipts use the internal `agent-attestation.v2` claim format.
 Its ephemeral service signing key and five-minute lifetime permit identical
 retries, not one-time delivery. Restarting the service invalidates old receipts.
 
@@ -172,7 +177,8 @@ steering/follow-ups, compaction and `/new`. Direct `!`/`!!` shell execution,
 custom extension messages, import/resume, branching, renaming, model switching,
 and resource reload are blocked at their public session/runtime entry points.
 Shell work through the model's bash tool remains supported.
-No RPC mode, arbitrary extensions, reasoning, images, WebSockets, transport
+OpenRouter reasoning requests and replay are supported without a Pi patch.
+No RPC mode, arbitrary extensions, images, WebSockets, transport
 switching, or crash resume.
 Network policy allows only the chosen POST model path and separately scopes the
 admission endpoint. Unknown shapes fail closed; admission requests do not
@@ -198,37 +204,17 @@ The example's `demo.sh verify` is a separate real-model end-to-end acceptance
 command, not a simulated demonstration. Its success must be observed, not inferred
 from unit tests.
 
-The native-TUI update was validated locally on **2026-09-10**: 387 Python tests,
-24 Node tests, lint/type checks, dependency audit and the documentation build
-passed. This includes the terminal-driven integration above, not a live
-OpenShell/real-model acceptance run.
+The deterministic integration uses HTTPS admission/provider endpoints and gateway
+JWT authentication over a local insecure gRPC channel. It does not exercise
+production TLS gRPC startup or a live OpenShell gateway.
 
-Protocol and application validation on **2026-09-09** used:
-
-| Component | Tested pin |
-| --- | --- |
-| Pi public npm packages | `0.85.1`, exact dependencies and integrity hashes in the example lockfile |
-| OpenShell CLI, gateway and supervisor | `0.0.116`, release commit `d1155aa70042d3e2ee49dbfa15346b108b7c1d92`; the launcher now uses the operator's installed runtime |
-| Node image | `22.22.2-bookworm-slim@sha256:9f6d5975c7dca860947d3915877f85607946403fc55349f39b4bc3688448bb6e` |
-| HTTP client | Undici `8.9.0`; explicit public proxy configuration after loading Pi |
-
-Earlier validation using the now-removed isolated launcher exercised TLS/JWT bootstrap,
-endpoint-bound admission credentials, allow/deny/replacement, a real Pi session
-denial before history, and rejection of a raw provider request without a receipt.
-Pi's actual tool-capable serialized request with a receipt passed the gate and
-received HTTP 401 from the real endpoint when deliberately given an invalid test
-credential. This establishes the transport seam, **not** successful model output.
-
-**The updated native-TUI workflow still needs live OpenShell/real-model acceptance.**
-Preparation is tested with both DNS and IPv4 service addresses against a local
-mTLS discovery server. Local cross-language tests exercise service TLS and
-gateway public-key verification.
-The host launcher contains no Linux-specific binary bootstrap; Linux tests do
-not establish macOS deployment support. The checked-in
-verification command passed its bypass/denial checks and then failed at the model
-call with that invalid credential; it did not skip ahead. Tool continuations,
-skills and compaction have deterministic application coverage but must also pass
-that real-model command before describing the whole example as e2e-verified.
+**The native-TUI workflow still needs live OpenShell/real-model acceptance.**
+Run `demo.sh verify` with a valid provider credential before describing the
+deployment as e2e-verified. The verifier deliberately lowers retention thresholds
+for its short conversations; the interactive launcher keeps native Pi defaults.
+The pinned package/image versions are recorded in the example's package lock,
+Dockerfile and middleware manifest. Current validation results belong in the PR,
+not a second historical log here.
 
 A useful Dev Note, **“Gating at the network layer is not enough,”** can follow:
 

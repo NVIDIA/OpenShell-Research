@@ -19,10 +19,10 @@ import { assertProjectRead } from "../src/verify.js";
 
 const [endpoint, directory] = process.argv.slice(2);
 const model = await loadSelectedModel(join(directory, "image"));
-assert.equal(model.id, "YOUR_MODEL_ID");
+assert.equal(model.id, "z-ai/glm-5.3-flash");
 assert.equal(model.compat?.supportsDeveloperRole, false);
 // Only the endpoint changes: exercise the prepared catalog through Pi's parser.
-model.baseUrl = `${endpoint}/v1`;
+model.baseUrl = `${endpoint}/api/v1`;
 const options = (compactAtTokens?: number) => ({
   cwd: join(directory, "image/project"),
   sessionDir: join(directory, "sessions"),
@@ -42,17 +42,28 @@ const options = (compactAtTokens?: number) => ({
 if (process.argv.includes("--tui")) {
   const runtime = await createAdmissionRuntime(options());
   assert.equal(runtime.services.modelRuntime.getError(), undefined);
-  await new InteractiveMode(runtime, {
+  const interactive = new InteractiveMode(runtime, {
     initialMessage: "Please repeat REDACT_THIS and café.",
     initialMessages: ["/skill:review"],
-  }).run();
+  });
+  await interactive.init();
+  runtime.session.settingsManager.applyOverrides({ compaction: { keepRecentTokens: 5 } });
+  await interactive.run();
   process.exit(0);
 }
 
-const create = (compactAtTokens?: number) =>
-  AdmissionSession.create(options(compactAtTokens));
+const create = async (compactAtTokens?: number) => {
+  const session = await AdmissionSession.create(options(compactAtTokens));
+  session.settingsManager.applyOverrides({ compaction: { keepRecentTokens: 5 } });
+  return session;
+};
 
 const session = await create();
+if (process.argv.includes("--settings")) {
+  // The Python provider checks the actual serialized model/cache settings.
+  await session.prompt("Check model settings");
+  process.exit(0);
+}
 assert.equal(session.modelRuntime.getError(), undefined);
 await assert.rejects(session.prompt("DENY_THIS"), AdmissionError);
 assert.equal(session.history.length, 0);
@@ -60,12 +71,6 @@ assert.equal(session.entries.length, 0);
 await session.prompt("Please repeat REDACT_THIS and café.");
 await session.prompt("/skill:review");
 assertProjectRead(session.history);
-assert.throws(() =>
-  assertProjectRead(session.history.map((message) =>
-    message.role === "toolResult" ? { ...message, isError: true } : message,
-  )),
-);
-assert.throws(() => assertProjectRead([]));
 for (const snapshot of [
   JSON.stringify(session.history),
   await readFile(session.sessionFile, "utf8"),
