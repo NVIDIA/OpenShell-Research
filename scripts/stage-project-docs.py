@@ -14,15 +14,17 @@ import shutil
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT_DOCUMENTATION = {
     "egress-gate": ROOT / "projects" / "egress-gate" / "docs",
-    "openshell-agent-runner": ROOT
-    / "projects"
-    / "openshell-agent-runner"
-    / "docs",
+    "openshell-agent-runner": ROOT / "projects" / "openshell-agent-runner" / "docs",
 }
 DOCUMENTATION_ROOT = ROOT / "docs" / "documentation"
+PROJECT_ASSETS = {
+    "openshell-agent-runner": ROOT / "projects" / "openshell-agent-runner" / "assets",
+}
 
 
-def stage_project_docs(source: Path, destination: Path) -> None:
+def stage_project_docs(
+    source: Path, destination: Path, assets: Path | None = None
+) -> None:
     """Replace one generated site mirror with its canonical project-docs tree."""
 
     source = source.resolve()
@@ -31,7 +33,9 @@ def stage_project_docs(source: Path, destination: Path) -> None:
     if not source.is_dir():
         raise ValueError(f"documentation source does not exist: {source}")
     if destination_is_symlink:
-        raise ValueError(f"documentation destination must not be a symlink: {destination}")
+        raise ValueError(
+            f"documentation destination must not be a symlink: {destination}"
+        )
     if source.is_relative_to(destination) or destination.is_relative_to(source):
         raise ValueError("documentation source and destination must not overlap")
 
@@ -40,11 +44,27 @@ def stage_project_docs(source: Path, destination: Path) -> None:
         paths = "\n".join(f"  - {path}" for path in symlinks)
         raise ValueError(f"project documentation must not contain symlinks:\n{paths}")
 
+    if assets is not None:
+        if assets.is_symlink() or any(path.is_symlink() for path in assets.rglob("*")):
+            raise ValueError("project assets must not contain symlinks")
+        if not assets.is_dir():
+            raise ValueError(f"project assets directory does not exist: {assets}")
+        for path in assets.rglob("*"):
+            if (
+                path.is_file()
+                and (source / "assets" / path.relative_to(assets)).exists()
+            ):
+                raise ValueError(
+                    f"project asset conflicts with documentation asset: {path}"
+                )
+
     destination.parent.mkdir(parents=True, exist_ok=True)
     staging = destination.with_name(f".{destination.name}.staging")
     if staging.exists():
         shutil.rmtree(staging)
     shutil.copytree(source, staging)
+    if assets is not None:
+        shutil.copytree(assets, staging / "assets", dirs_exist_ok=True)
 
     if destination.exists():
         shutil.rmtree(destination)
@@ -53,7 +73,9 @@ def stage_project_docs(source: Path, destination: Path) -> None:
 
 def main() -> int:
     for project, source in PROJECT_DOCUMENTATION.items():
-        stage_project_docs(source, DOCUMENTATION_ROOT / project)
+        stage_project_docs(
+            source, DOCUMENTATION_ROOT / project, PROJECT_ASSETS.get(project)
+        )
         print(f"Staged {project} documentation from {source}.")
     return 0
 
