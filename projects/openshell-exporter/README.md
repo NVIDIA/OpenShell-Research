@@ -20,7 +20,7 @@ to run a real agent task and view its exported evidence.
 | Export OCSF or operational files | [Configuration examples](docs/configuration.md) |
 | Add Relay or native gateway traces | [Trace configuration](docs/configuration.md#traces-and-privacy) |
 | Investigate in Elastic/Kibana | [Local Elastic demo](examples/demo/real-gateway/elastic/README.md) or [integration pack](integrations/elastic/README.md) |
-| Run on Kubernetes with sandbox forwarding | [Helm setup](deploy/kubernetes/README.md) or [local demo](examples/demo/kubernetes/README.md) |
+| Run on Kubernetes with sandbox forwarding | [Helm setup](deploy/kubernetes/README.md) |
 | Connect your own Hermes agent | [Hermes integration](integrations/hermes/README.md) |
 | Run without Docker | [Rootless Podman](deploy/podman/README.md) or [source build](docs/configuration.md#run-a-file-source) |
 | Separate collection and delivery | [Edge/central profiles](docs/configuration.md#deployment-profiles) |

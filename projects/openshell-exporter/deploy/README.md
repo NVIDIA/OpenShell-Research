@@ -85,8 +85,6 @@ helm upgrade --install exporter deploy/kubernetes/chart \
 
 The overlay uses an explicit local tag, empty digest, and `pullPolicy: Never`.
 When using `deploy.sh`, copy that image block into your configured values file.
-The [complete Minikube demo](../examples/demo/kubernetes/README.md) also builds
-and imports its images locally.
 
 ## Configure, run, verify, stop
 

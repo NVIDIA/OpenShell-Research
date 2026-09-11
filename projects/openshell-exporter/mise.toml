@@ -11,11 +11,11 @@ GOCACHE = "{{config_root}}/.cache/go-build"
 
 [tasks.fmt]
 description = "Format Go source"
-run = "gofmt -w cmd conformance processor exporter receiver extension sandboxinjector otlpproxy integration api deploy examples/demo/real-gateway/webapp examples/demo/kubernetes integrations/elastic"
+run = "gofmt -w cmd conformance processor exporter receiver extension sandboxinjector otlpproxy integration api deploy examples/demo/real-gateway/webapp integrations/elastic"
 
 [tasks.fmt-check]
 description = "Fail when Go source is not formatted"
-run = "test -z \"$(gofmt -l cmd conformance processor exporter receiver extension sandboxinjector otlpproxy integration api deploy examples/demo/real-gateway/webapp examples/demo/kubernetes integrations/elastic)\""
+run = "test -z \"$(gofmt -l cmd conformance processor exporter receiver extension sandboxinjector otlpproxy integration api deploy examples/demo/real-gateway/webapp integrations/elastic)\""
 
 [tasks.vet]
 run = "go vet ./..."

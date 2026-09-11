@@ -41,7 +41,6 @@ func TestCustomMetricConsumersReferenceImplementedInstruments(t *testing.T) {
 		"../docs/operations.md",
 		"../examples/demo/real-gateway/monitoring/grafana/dashboards/openshell-exporter-operations.json",
 		"../operations/alerts/exporter.yaml",
-		"qualification/qualify-node-restart.sh",
 	} {
 		encoded, err := os.ReadFile(filepath.Clean(relative))
 		if err != nil {
