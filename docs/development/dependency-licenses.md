@@ -22,15 +22,19 @@ The checker searches the complete tracked Git tree, regardless of folder. It
 reads files from the committed base and head revisions, so untracked, ignored,
 and uncommitted files are outside the check.
 
-Supported lockfiles are:
+Supported dependency inventories are:
 
 - Python: `uv.lock` and uv script lockfiles (`*.py.lock`).
 - JavaScript: npm v2/v3 `package-lock.json`.
 - Rust: `Cargo.lock`.
+- Go: `go.mod`, with `go.sum` required when it declares external modules.
 
 The inventory includes external packages declared directly by each project,
 including development, optional, and platform-specific direct dependencies.
 Transitive packages and first-party project or workspace packages are excluded.
+For Go, requirements marked `// indirect` are transitive. Versioned `replace`
+directives identify the replacement module that is checked; local-directory
+replacements are repository-controlled source and are excluded.
 
 For a pull request, a package is checked when its locked name, version, source,
 or lockfile location is added or changed. Removed packages do not fail the
@@ -38,24 +42,28 @@ check. The report still includes unchanged current direct dependencies so that
 every run provides a repository-wide view. Only additions and changes affect
 the status of an ordinary pull request.
 
-Changed `pyproject.toml`, `package.json`, `Cargo.toml`, and PEP 723 inline-script
-metadata must have a corresponding lockfile or belong to a declared locked
-workspace. The workflow asks the native package manager to confirm that each
-affected lock is current:
+Changed `pyproject.toml`, `package.json`, `Cargo.toml`, `go.mod`, and PEP 723
+inline-script metadata must have the corresponding dependency files or belong
+to a supported declared workspace. The workflow asks the native package manager
+to confirm that each affected dependency inventory is current:
 
 - uv projects: `uv lock --check`
 - uv inline scripts: `uv lock --script SCRIPT --check`
 - npm projects: `npm ci --ignore-scripts --no-audit --no-fund`
 - Cargo projects: `cargo metadata --locked`
+- Go modules: `go mod tidy -diff`, followed by `go mod verify`
 
 The npm command installs locked packages without lifecycle scripts. Cargo
-metadata does not build project code. A compatible constraint edit does not
-need to rewrite a lockfile when the native check accepts it.
+metadata and the Go module commands do not build or run project code. Go
+validation disables workspace discovery and automatic toolchain downloads so
+that each module is checked independently with the CI-pinned toolchain. A
+compatible constraint edit does not need to rewrite a lockfile when the native
+check accepts it.
 
 The checker does not inventory vendored code, datasets, model weights,
 container or system packages, unsupported package managers, or dependencies
-that are absent from a supported lockfile. A passing check is therefore not a
-complete legal clearance.
+that are absent from a supported dependency inventory. A passing check is
+therefore not a complete legal clearance.
 
 ## Policy and unresolved results
 
@@ -66,9 +74,12 @@ outages are unresolved rather than being treated as successful lookups. An
 unresolved addition or change fails the pull request; an unresolved unchanged
 dependency contributes no license to the report.
 
-Public metadata comes from PyPI, npm, or crates.io. Private registries, Git
-dependencies, and other unsupported source forms require reviewed, exact-source
-clarification.
+Public metadata comes from PyPI, npm, crates.io, or the stable deps.dev API. Go
+license metadata covers exact public module versions known to proxy.golang.org;
+when deps.dev reports multiple licenses, every reported license must satisfy the
+policy because their relationship is unspecified. Private modules, private
+registries, Git dependencies in other ecosystems, and other unsupported source
+forms require reviewed, exact-source clarification.
 
 If metadata is incomplete, a maintainer can add a `[[clarification]]` entry with
 `ecosystem`, `name`, `version`, `source`, `license`, and an HTTPS `evidence` URL.
@@ -86,8 +97,8 @@ itself from changes made in the same pull request.
 The workflow publishes the `Check dependency licenses` status and uploads a
 compact `dependency-licenses.json` artifact with three fields:
 
-- `folders` maps every scanned project folder to the lockfiles inspected there
-  and its direct-dependency licenses.
+- `folders` maps every scanned project folder to the dependency inventories
+  inspected there and its direct-dependency licenses.
 - `licenses` maps every unique reported license value to the project folders
   that depend on it.
 - `failures` maps affected project folders to the licenses that fail the check.
@@ -96,9 +107,11 @@ compact `dependency-licenses.json` artifact with three fields:
 The report contains no package-level records and does not list transitive
 dependency licenses.
 
-The lockfiles identify each direct dependency and its exact resolved version.
-The reported license value comes from that version's package-registry metadata
-or a reviewed policy clarification, not from the lockfile itself.
+The dependency inventory identifies each direct dependency and its exact
+resolved version. For Go, `go.mod` provides the version selection while `go.sum`
+provides integrity hashes; `go.sum` is not treated as a lockfile or package
+list. The reported license value comes from that version's public metadata or a
+reviewed policy clarification, not from the dependency file itself.
 
 For a failure:
 
