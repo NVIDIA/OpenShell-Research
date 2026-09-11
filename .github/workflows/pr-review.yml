@@ -58,7 +58,9 @@ jobs:
     needs: request
     if: needs.request.outputs.ready == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # Leave ample headroom for several sequential 30-minute reviews to finish
+    # their timeout reporting and artifact upload before GitHub cancels the job.
+    timeout-minutes: 360
     permissions:
       contents: read
     steps:

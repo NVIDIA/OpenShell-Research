@@ -220,7 +220,7 @@ class CIReviewerTests(unittest.TestCase):
             "does not certify all implementation details",
         ):
             self.assertIn(expected, normalized_prompt)
-        self.assertEqual(review_job["timeout-minutes"], 90)
+        self.assertEqual(review_job["timeout-minutes"], 360)
         self.assertEqual(review_step["env"]["REVIEW_TIMEOUT_SECONDS"], "1800")
         self.assertIn('[[ "$status" -eq 4 ]]', review_step["run"])
         self.assertIn('status: "timed_out"', review_step["run"])

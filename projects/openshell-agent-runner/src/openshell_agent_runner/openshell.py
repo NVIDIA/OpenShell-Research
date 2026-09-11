@@ -145,7 +145,12 @@ def run(
         raise ExecutionTimeoutError(
             f"command timed out after {timeout} seconds: {_display_command(command)}"
         ) from error
-    except (OSError, subprocess.CalledProcessError) as error:
+    except subprocess.CalledProcessError as error:
+        raise ExecutionError(
+            f"command failed with exit code {error.returncode}: "
+            f"{_display_command(command)}"
+        ) from error
+    except OSError as error:
         raise ExecutionError(
             f"command failed: {_display_command(command)}: {error}"
         ) from error

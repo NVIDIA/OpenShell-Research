@@ -58,6 +58,21 @@ def test_timeout_has_a_distinct_error_and_redacts_the_model(monkeypatch) -> None
     assert "<model>" in message
 
 
+def test_failed_command_redacts_the_model(monkeypatch) -> None:
+    def fail(command, **_kwargs):
+        raise subprocess.CalledProcessError(17, command)
+
+    monkeypatch.setattr(subprocess, "run", fail)
+
+    with pytest.raises(ExecutionError) as raised:
+        run(["openshell", "sandbox", "exec", "--model", "secret-model"], 30)
+
+    message = str(raised.value)
+    assert "exit code 17" in message
+    assert "secret-model" not in message
+    assert "<model>" in message
+
+
 def test_doctor_runs_only_read_only_checks(monkeypatch) -> None:
     commands: list[list[str]] = []
 
