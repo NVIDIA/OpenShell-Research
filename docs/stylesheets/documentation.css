@@ -1,6 +1,19 @@
 /* SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved. */
 /* SPDX-License-Identifier: Apache-2.0 */
 
+.md-typeset .documentation-logo {
+  display: block;
+  width: 360px;
+  max-width: 100%;
+  height: auto;
+  margin: 1.5rem auto 2rem;
+  color-scheme: light;
+}
+
+body[data-md-color-scheme="slate"] .md-typeset .documentation-logo {
+  color-scheme: dark;
+}
+
 /* Documentation figures use one quiet visual treatment across light and dark pages. */
 .md-typeset .documentation-figure {
   width: 100%;

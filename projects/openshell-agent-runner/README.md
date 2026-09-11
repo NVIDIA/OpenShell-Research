@@ -1,5 +1,9 @@
 # OpenShell Agent Runner
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/NVIDIA/OpenShell-Research/main/projects/openshell-agent-runner/docs/assets/oar-logo.svg" alt="OAR — OpenShell Agent Runner" width="360">
+</p>
+
 OpenShell Agent Runner (OAR) launches ephemeral
 [Pi coding agents](https://github.com/earendil-works/pi/tree/main/packages/coding-agent)
 in OpenShell sandboxes. Each agent works on a task using the prompts, skills,
