@@ -69,7 +69,7 @@ state. For SSH access, custom prompts, and troubleshooting, see the
 | Export OCSF or operational files | [Configuration examples](configuration.md) |
 | Add Relay or native gateway traces | [Trace configuration](configuration.md#traces-and-privacy) |
 | Investigate in Elastic/Kibana | [Local Elastic demo](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-exporter/examples/demo/real-gateway/elastic/README.md) or [integration pack](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-exporter/integrations/elastic/README.md) |
-| Run on Kubernetes with sandbox forwarding | [Helm setup](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-exporter/deploy/kubernetes/README.md) or [local demo](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-exporter/examples/demo/kubernetes/README.md) |
+| Run on Kubernetes with sandbox forwarding | [Helm setup](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-exporter/deploy/kubernetes/README.md) |
 | Connect your own Hermes agent | [Hermes integration](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-exporter/integrations/hermes/README.md) |
 | Run without Docker | [Rootless Podman](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/openshell-exporter/deploy/podman/README.md) or [source build](configuration.md#run-a-file-source) |
 | Separate collection and delivery | [Edge/central profiles](configuration.md#deployment-profiles) |
