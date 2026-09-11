@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+# SPDX-License-Identifier: Apache-2.0
+global:
+  scrape_interval: 5s
+  scrape_protocols:
+    - PrometheusText0.0.4
+  evaluation_interval: 5s
+scrape_configs:
+  - job_name: openshell-event-exporter
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["exporter:8888"]
+        labels:
+          environment: real-gateway-demo

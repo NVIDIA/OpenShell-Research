@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:openshell:elastic-soc-shift-report:1.1",
+  "title": "OpenShell Elastic SOC shift report v1.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "checked_at", "pack_version", "target", "checks", "failures"],
+  "properties": {
+    "schema_version": { "const": "1.1" },
+    "status": { "enum": ["passed", "failed"] },
+    "checked_at": { "type": "string", "format": "date-time" },
+    "pack_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment", "kibana_space"],
+      "properties": {
+        "environment": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,31}$" },
+        "kibana_space": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$" }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["security_evidence", "agent_traces", "detections", "escalation_routing", "cases"],
+      "properties": {
+        "security_evidence": { "$ref": "#/$defs/evidenceLane" },
+        "agent_traces": { "$ref": "#/$defs/evidenceLane" },
+        "detections": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "expected_rules", "healthy_rules"],
+          "properties": {
+            "status": { "enum": ["healthy", "degraded"] },
+            "expected_rules": { "const": 11 },
+            "healthy_rules": { "type": "integer", "minimum": 0, "maximum": 11 }
+          }
+        },
+        "escalation_routing": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "expected_actions", "verified_actions", "connector_id", "connector_type", "connector_status"],
+          "properties": {
+            "status": { "enum": ["healthy", "degraded"] },
+            "expected_actions": { "const": 6 },
+            "verified_actions": { "type": "integer", "minimum": 0, "maximum": 6 },
+            "connector_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,35}$" },
+            "connector_type": { "enum": [".webhook", ".index"] },
+            "connector_status": { "enum": ["healthy", "degraded"] }
+          }
+        },
+        "cases": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "total", "open", "in_progress", "closed"],
+          "properties": {
+            "status": { "enum": ["observed", "unreachable"] },
+            "total": { "type": "integer", "minimum": 0 },
+            "open": { "type": "integer", "minimum": 0 },
+            "in_progress": { "type": "integer", "minimum": 0 },
+            "closed": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "failures": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 },
+      "uniqueItems": true
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "passed" } } },
+      "then": {
+        "properties": {
+          "failures": { "maxItems": 0 },
+          "checks": {
+            "properties": {
+              "security_evidence": { "properties": { "status": { "const": "healthy" } } },
+              "agent_traces": { "properties": { "status": { "enum": ["healthy", "disabled"] } } },
+              "detections": {
+                "properties": {
+                  "status": { "const": "healthy" },
+                  "healthy_rules": { "const": 11 }
+                }
+              },
+              "escalation_routing": {
+                "properties": {
+                  "status": { "const": "healthy" },
+                  "verified_actions": { "const": 6 },
+                  "connector_status": { "const": "healthy" }
+                }
+              },
+              "cases": { "properties": { "status": { "const": "observed" } } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "failed" } } },
+      "then": { "properties": { "failures": { "minItems": 1 } } }
+    }
+  ],
+  "$defs": {
+    "evidenceLane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "status", "index", "document_count", "source_recent_document_count", "delivery_recent_document_count", "latest_source_timestamp", "latest_ingested_timestamp", "max_age_seconds"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "status": { "enum": ["healthy", "empty", "source_stale", "delivery_stale", "stale", "disabled", "unreachable", "invalid_response"] },
+        "index": { "type": "string", "pattern": "^(logs-openshell\\.security|traces-openshell\\.agent)-[a-z0-9][a-z0-9-]{0,31}-v1$" },
+        "document_count": { "type": "integer", "minimum": 0 },
+        "source_recent_document_count": { "type": "integer", "minimum": 0 },
+        "delivery_recent_document_count": { "type": "integer", "minimum": 0 },
+        "latest_source_timestamp": { "type": ["string", "null"], "format": "date-time" },
+        "latest_ingested_timestamp": { "type": ["string", "null"], "format": "date-time" },
+        "max_age_seconds": { "type": "integer", "minimum": 10, "maximum": 9999999 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "healthy" } } },
+          "then": { "properties": { "enabled": { "const": true }, "document_count": { "minimum": 1 }, "source_recent_document_count": { "minimum": 1 }, "delivery_recent_document_count": { "minimum": 1 }, "latest_source_timestamp": { "type": "string" }, "latest_ingested_timestamp": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "empty" } } },
+          "then": { "properties": { "enabled": { "const": true }, "document_count": { "const": 0 }, "source_recent_document_count": { "const": 0 }, "delivery_recent_document_count": { "const": 0 }, "latest_source_timestamp": { "const": null }, "latest_ingested_timestamp": { "const": null } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "source_stale" } } },
+          "then": { "properties": { "enabled": { "const": true }, "document_count": { "minimum": 1 }, "source_recent_document_count": { "const": 0 }, "delivery_recent_document_count": { "minimum": 1 }, "latest_source_timestamp": { "type": "string" }, "latest_ingested_timestamp": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "delivery_stale" } } },
+          "then": { "properties": { "enabled": { "const": true }, "document_count": { "minimum": 1 }, "source_recent_document_count": { "minimum": 1 }, "delivery_recent_document_count": { "const": 0 }, "latest_source_timestamp": { "type": "string" }, "latest_ingested_timestamp": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "stale" } } },
+          "then": { "properties": { "enabled": { "const": true }, "document_count": { "minimum": 1 }, "source_recent_document_count": { "const": 0 }, "delivery_recent_document_count": { "const": 0 }, "latest_source_timestamp": { "type": "string" }, "latest_ingested_timestamp": { "type": "string" } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "disabled" } } },
+          "then": { "properties": { "enabled": { "const": false }, "document_count": { "const": 0 }, "source_recent_document_count": { "const": 0 }, "delivery_recent_document_count": { "const": 0 }, "latest_source_timestamp": { "const": null }, "latest_ingested_timestamp": { "const": null } } }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["unreachable", "invalid_response"] } } },
+          "then": { "properties": { "enabled": { "const": true }, "document_count": { "const": 0 }, "source_recent_document_count": { "const": 0 }, "delivery_recent_document_count": { "const": 0 }, "latest_source_timestamp": { "const": null }, "latest_ingested_timestamp": { "const": null } } }
+        }
+      ]
+    }
+  }
+}

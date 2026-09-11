@@ -1,0 +1,53 @@
+{
+  "elasticsearch": {
+    "cluster": [],
+    "indices": [
+      {
+        "names": [
+          "logs-openshell.security-*",
+          "traces-openshell.agent-*-v1"
+        ],
+        "privileges": [
+          "read",
+          "view_index_metadata"
+        ],
+        "allow_restricted_indices": false
+      }
+    ],
+    "run_as": []
+  },
+  "kibana": [
+    {
+      "base": [],
+      "feature": {
+        "discover_v2": [
+          "read"
+        ],
+        "dashboard_v2": [
+          "read"
+        ],
+        "siemV5": [
+          "read"
+        ],
+        "securitySolutionTimeline": [
+          "read"
+        ],
+        "securitySolutionNotes": [
+          "read"
+        ],
+        "securitySolutionAlertsV1": [
+          "read"
+        ],
+        "securitySolutionCasesV3": [
+          "read"
+        ],
+        "securitySolutionRulesV4": [
+          "read"
+        ]
+      },
+      "spaces": [
+        "default"
+      ]
+    }
+  ]
+}

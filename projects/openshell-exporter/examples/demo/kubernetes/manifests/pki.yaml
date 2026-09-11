@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: openshell-exporter-selfsigned-bootstrap
+  labels: {app.kubernetes.io/part-of: openshell-kubernetes-demo}
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: openshell-exporter-root-ca
+  namespace: cert-manager
+  labels: {app.kubernetes.io/part-of: openshell-kubernetes-demo}
+spec:
+  isCA: true
+  commonName: OpenShell Exporter Kubernetes Demo CA
+  secretName: openshell-exporter-root-ca
+  duration: 2160h
+  renewBefore: 360h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  issuerRef:
+    name: openshell-exporter-selfsigned-bootstrap
+    kind: ClusterIssuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: openshell-exporter-pki
+  labels: {app.kubernetes.io/part-of: openshell-kubernetes-demo}
+spec:
+  ca:
+    secretName: openshell-exporter-root-ca

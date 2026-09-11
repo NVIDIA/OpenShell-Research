@@ -1,0 +1,104 @@
+{{- if and (eq (include "openshell-event-exporter.module.cloudEvents" .) "true") (not .Values.persistence.queue.existingClaim) (ne (include "openshell-event-exporter.centralStateful" .) "true") }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "openshell-event-exporter.queueClaim" . }}
+  labels:
+    {{- include "openshell-event-exporter.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: {{ toYaml .Values.persistence.queue.accessModes | nindent 4 }}
+  {{- if eq .Values.persistence.queue.storageClass "-" }}
+  storageClassName: ""
+  {{- else if .Values.persistence.queue.storageClass }}
+  storageClassName: {{ .Values.persistence.queue.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.queue.size }}
+---
+{{- end }}
+{{- if and (eq (include "openshell-event-exporter.module.recovery" .) "true") (not .Values.persistence.recovery.existingClaim) (ne (include "openshell-event-exporter.centralStateful" .) "true") }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "openshell-event-exporter.recoveryClaim" . }}
+  labels:
+    {{- include "openshell-event-exporter.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: {{ toYaml .Values.persistence.recovery.accessModes | nindent 4 }}
+  {{- if eq .Values.persistence.recovery.storageClass "-" }}
+  storageClassName: ""
+  {{- else if .Values.persistence.recovery.storageClass }}
+  storageClassName: {{ .Values.persistence.recovery.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.recovery.size }}
+---
+{{- end }}
+{{- if and (eq (include "openshell-event-exporter.module.checkpoints" .) "true") (not .Values.persistence.checkpoints.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "openshell-event-exporter.checkpointClaim" . }}
+  labels:
+    {{- include "openshell-event-exporter.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: {{ toYaml .Values.persistence.checkpoints.accessModes | nindent 4 }}
+  {{- if eq .Values.persistence.checkpoints.storageClass "-" }}
+  storageClassName: ""
+  {{- else if .Values.persistence.checkpoints.storageClass }}
+  storageClassName: {{ .Values.persistence.checkpoints.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.checkpoints.size }}
+---
+{{- end }}
+{{- if and (eq (include "openshell-event-exporter.module.otlpGrpc" .) "true") (not .Values.persistence.otlpGrpcQueue.existingClaim) (ne (include "openshell-event-exporter.centralStateful" .) "true") }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "openshell-event-exporter.otlpGrpcQueueClaim" . }}
+  labels:
+    {{- include "openshell-event-exporter.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: {{ toYaml .Values.persistence.otlpGrpcQueue.accessModes | nindent 4 }}
+  {{- if eq .Values.persistence.otlpGrpcQueue.storageClass "-" }}
+  storageClassName: ""
+  {{- else if .Values.persistence.otlpGrpcQueue.storageClass }}
+  storageClassName: {{ .Values.persistence.otlpGrpcQueue.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.otlpGrpcQueue.size }}
+---
+{{- end }}
+{{- if and (eq (include "openshell-event-exporter.module.otlpHttp" .) "true") (not .Values.persistence.otlpHttpQueue.existingClaim) (ne (include "openshell-event-exporter.centralStateful" .) "true") }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "openshell-event-exporter.otlpHttpQueueClaim" . }}
+  labels:
+    {{- include "openshell-event-exporter.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: {{ toYaml .Values.persistence.otlpHttpQueue.accessModes | nindent 4 }}
+  {{- if eq .Values.persistence.otlpHttpQueue.storageClass "-" }}
+  storageClassName: ""
+  {{- else if .Values.persistence.otlpHttpQueue.storageClass }}
+  storageClassName: {{ .Values.persistence.otlpHttpQueue.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.otlpHttpQueue.size }}
+{{- end }}

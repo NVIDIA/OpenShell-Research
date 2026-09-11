@@ -1,0 +1,17 @@
+services:
+  exporter:
+    environment:
+      OPENSHELL_NATIVE_OTLP_GRPC_LISTEN: ${OPENSHELL_NATIVE_OTLP_GRPC_LISTEN:-0.0.0.0:4319}
+      OPENSHELL_NATIVE_OTLP_TLS_CERT_FILE: /run/secrets/native-otlp-input/tls.crt
+      OPENSHELL_NATIVE_OTLP_TLS_KEY_FILE: /run/secrets/native-otlp-input/tls.key
+      FORWARDED_OCSF_TOKEN_FILE: /run/secrets/forwarded-ocsf-input/token
+      FORWARDED_OCSF_TLS_CERT_FILE: /run/secrets/forwarded-ocsf-input/tls.crt
+      FORWARDED_OCSF_TLS_KEY_FILE: /run/secrets/forwarded-ocsf-input/tls.key
+      FORWARDED_OCSF_CLIENT_CA_FILE: /run/secrets/forwarded-ocsf-input/client-ca.pem
+      FORWARDED_OCSF_OTLP_HTTP_LISTEN: ${FORWARDED_OCSF_OTLP_HTTP_LISTEN:-0.0.0.0:4320}
+    ports:
+      - "${OPENSHELL_NATIVE_OTLP_PUBLISH_ADDRESS:-127.0.0.1}:4319:4319"
+      - "${FORWARDED_OCSF_PUBLISH_ADDRESS:-127.0.0.1}:4320:4320"
+    volumes:
+      - ${OPENSHELL_NATIVE_OTLP_INPUT_SECRETS_DIR:?set the native OpenShell OTLP input secrets directory}:/run/secrets/native-otlp-input:ro
+      - ${FORWARDED_OCSF_INPUT_SECRETS_DIR:?set the forwarded OCSF input secrets directory}:/run/secrets/forwarded-ocsf-input:ro

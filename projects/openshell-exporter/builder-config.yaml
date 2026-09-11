@@ -1,0 +1,57 @@
+dist:
+  module: github.com/NVIDIA/OpenShell-Research/projects/openshell-exporter/distribution
+  name: openshell-event-exporter
+  description: OpenShell Event Exporter
+  version: 0.0.4
+  output_path: ./_build
+  build_tags: grpcnotrace
+
+receivers:
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.160.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.160.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.160.0
+  - gomod: github.com/NVIDIA/OpenShell-Research/projects/openshell-exporter v0.0.4
+    import: github.com/NVIDIA/OpenShell-Research/projects/openshell-exporter/receiver/watchsandboxreceiver
+    name: watchsandboxreceiver
+    path: .
+
+processors:
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.160.0
+  - gomod: go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.160.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.160.0
+  - gomod: github.com/NVIDIA/OpenShell-Research/projects/openshell-exporter v0.0.4
+    import: github.com/NVIDIA/OpenShell-Research/projects/openshell-exporter/processor/evidencecontractprocessor
+    name: evidencecontractprocessor
+    path: .
+  - gomod: github.com/NVIDIA/OpenShell-Research/projects/openshell-exporter v0.0.4
+    import: github.com/NVIDIA/OpenShell-Research/projects/openshell-exporter/processor/openshellprocessor
+    name: openshellprocessor
+    path: .
+  - gomod: github.com/NVIDIA/OpenShell-Research/projects/openshell-exporter v0.0.4
+    import: github.com/NVIDIA/OpenShell-Research/projects/openshell-exporter/processor/relayprocessor
+    name: relayprocessor
+    path: .
+
+exporters:
+  - gomod: go.opentelemetry.io/collector/exporter/otlpexporter v0.160.0
+  - gomod: go.opentelemetry.io/collector/exporter/otlphttpexporter v0.160.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.160.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.160.0
+  - gomod: github.com/NVIDIA/OpenShell-Research/projects/openshell-exporter v0.0.4
+    import: github.com/NVIDIA/OpenShell-Research/projects/openshell-exporter/exporter/cloudeventsexporter
+    name: cloudeventsexporter
+    path: .
+
+extensions:
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.160.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.160.0
+  - gomod: github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.160.0
+  - gomod: github.com/NVIDIA/OpenShell-Research/projects/openshell-exporter v0.0.4
+    import: github.com/NVIDIA/OpenShell-Research/projects/openshell-exporter/extension/storagehealthextension
+    name: storagehealthextension
+    path: .
+
+providers:
+  - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.66.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.66.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.66.0

@@ -1,0 +1,77 @@
+{
+  "specversion": "1.0",
+  "id": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "source": "openshell://gateway-prod-1/workspaces/default/sandboxes/sandbox-123/sources/policy.draft.chunk",
+  "type": "com.nvidia.openshell.policy.draft.chunk.v1",
+  "dataschema": "urn:openshell:event-envelope:1",
+  "datacontenttype": "application/json",
+  "subject": "sandboxes/sandbox-123",
+  "time": "2026-08-25T12:00:00Z",
+  "data": {
+    "schema_version": "1.0",
+    "observed_time": "2026-08-25T12:00:02Z",
+    "acquisition": {
+      "kind": "policy.draft.chunk",
+      "durability": "checkpointed_api_snapshot",
+      "source_instance": "policy-reconciliation",
+      "transport": "grpc",
+      "api_operation": "openshell.v1.OpenShell/GetDraftPolicy",
+      "payload_type": "openshell.v1.PolicyChunk",
+      "reconciliation_trigger": "watch_notification",
+      "notification_draft_version": 18,
+      "consistency": "matched",
+      "replay_limitations": "authoritative read snapshot with no event cursor; file_storage suppresses unchanged snapshots and downstream source+id deduplicates replay",
+      "coverage": {
+        "status": "observed",
+        "source_profile": "policy.reconciliation",
+        "payload_preservation": "full_public_proto_json",
+        "known_limitations": [
+          "read_only_polling_snapshot_without_event_cursor",
+          "review_tokens_are_never_exported",
+          "effective_policy_bodies_require_explicit_opt_in"
+        ]
+      }
+    },
+    "openshell": {
+      "gateway_id": "gateway-prod-1",
+      "gateway_version": "0.0.113",
+      "workspace": "default",
+      "sandbox_id": "sandbox-123",
+      "sandbox_name": "research-agent",
+      "policy_revision": 18
+    },
+    "security": {
+      "validation": {"status": "not_applicable", "errors": []},
+      "redaction": {"profile_id": "openshell-default", "profile_version": "1", "applied": false, "count": 0}
+    },
+    "correlation": {
+      "openshell.gateway.id": "gateway-prod-1",
+      "openshell.workspace": "default",
+      "openshell.sandbox.id": "sandbox-123",
+      "request_id": "request-123",
+      "policy_chunk_id": "chunk-denial-1"
+    },
+    "original": {
+      "sandbox_id": "sandbox-123",
+      "draft_version": 18,
+      "policy_chunk_id": "chunk-denial-1",
+      "status": "POLICY_CHUNK_STATUS_PENDING_REVIEW",
+      "stage": "POLICY_CHUNK_STAGE_NETWORK",
+      "review_token_present": true,
+      "effective_policies_included": false,
+      "example_join": {
+        "method": "direct_identifier",
+        "shared_request_id": "request-123",
+        "denial_event_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "causal_proof": false
+      },
+      "source_payload": {
+        "id": "chunk-denial-1",
+        "status": "POLICY_CHUNK_STATUS_PENDING_REVIEW",
+        "stage": "POLICY_CHUNK_STAGE_NETWORK",
+        "created_at_ms": "1787659200000",
+        "future_policy_field": "preserved"
+      }
+    }
+  }
+}

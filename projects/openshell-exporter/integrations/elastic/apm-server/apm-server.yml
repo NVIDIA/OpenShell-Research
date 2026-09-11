@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+# SPDX-License-Identifier: Apache-2.0
+apm-server:
+  host: 0.0.0.0:8200
+  agent:
+    config:
+      elasticsearch:
+        enabled: false
+  kibana:
+    enabled: false
+  auth:
+    secret_token: ${ELASTIC_APM_SECRET_TOKEN}
+  ssl:
+    enabled: true
+    certificate: /run/secrets/apm-server.crt
+    key: /run/secrets/apm-server.key
+
+output.elasticsearch:
+  hosts: ["https://elasticsearch:9200"]
+  username: openshell_otlp
+  password: ${ELASTIC_OTLP_PASSWORD}
+  ssl.certificate_authorities: ["/run/secrets/ca.crt"]
+
+logging.json: true
+logging.metrics.enabled: false
+monitoring.enabled: false

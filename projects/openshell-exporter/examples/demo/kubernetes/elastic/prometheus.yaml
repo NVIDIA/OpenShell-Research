@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+scrape_configs:
+  - job_name: openshell-event-exporter
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["openshell-exporter-openshell-event-exporter.openshell-observability.svc.cluster.local:8888"]
+        labels: {environment: kubernetes-demo}

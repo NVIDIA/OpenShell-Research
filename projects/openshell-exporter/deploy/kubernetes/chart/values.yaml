@@ -1,0 +1,260 @@
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  # Local builds: set local=true, a tag, digest="", and pullPolicy=Never.
+  # Shared clusters: use your own registry repository and pushed digest.
+  local: false
+  tag: ""
+  repository: registry.example.invalid/openshell-event-exporter
+  digest: sha256:REPLACE_WITH_64_LOWERCASE_HEX_CHARACTERS
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+profile: stream
+
+# One image supports Grafana-style deployment roles. standalone is the
+# existing all-in-one behavior. edge acquires and safely processes evidence
+# before durable OTLP forwarding. central accepts only contract-marked OTLP
+# from edge instances and owns customer delivery.
+topology:
+  role: standalone
+  tenantId: default
+  central:
+    replicas: 1
+    shardRouting:
+      enabled: false
+      hostname: openshell-event-exporter-central-headless.observability.svc.cluster.local
+      port: "4330"
+      interval: 30s
+      timeout: 5s
+
+# `custom` exposes the Collector's component model without introducing another
+# configuration language. `stream` and `complete` are the supported presets. Processing
+# safety invariants (stable identity, validation, redaction, context, and gap
+# diagnostics) are always applied to the acquisition lanes that need them.
+modules:
+  acquisition:
+    watchSandbox: true
+    policyReconciliation: true
+    ocsfFiles: false
+    sandboxFileLogs: false
+    relayFileLogs: false
+    relayOtlp: false
+    nativeOtlp: false
+    forwardedSandboxFiles: false
+    kubernetesContext: false
+    internalOtlp: false
+  delivery:
+    cloudEvents: true
+    otlpGrpc: false
+    otlpHttp: false
+    recovery: true
+
+source:
+  endpoint: https://openshell.example.internal:50051
+  gatewayId: REPLACE_STABLE_GATEWAY_ID
+  workspace: default
+  sandboxSelector: ""
+  sourceInstance: kubernetes-gateway
+  authSecret: openshell-exporter-source-auth
+  bearerEnabled: true
+  tlsSecret: openshell-exporter-source-tls
+  mtlsEnabled: true
+
+destination:
+  cloudEvents:
+    endpoint: https://events.example.internal/v1/events
+    authSecret: openshell-exporter-destination-auth
+    tlsSecret: openshell-exporter-destination-tls
+    mtlsEnabled: false
+  otlp:
+    grpcEndpoint: otel.example.internal:4317
+    httpEndpoint: https://otel.example.internal:4318
+    authSecret: openshell-exporter-otlp-destination-auth
+    tlsSecret: openshell-exporter-otlp-destination-tls
+    mtlsEnabled: false
+
+files:
+  openshell:
+    enabled: false
+    existingClaim: ""
+    mountPath: /var/log/openshell
+    ocsfGlob: /var/log/openshell/sandboxes/*/openshell-ocsf.*.log
+    operationalGlob: /var/log/openshell/sandboxes/*/openshell.*.log
+  relay:
+    enabled: false
+    existingClaim: ""
+    mountPath: /var/log/nemo-relay
+    glob: /var/log/nemo-relay/*.jsonl
+
+relay:
+  input:
+    enabled: false
+    mtlsEnabled: true
+    authSecret: openshell-exporter-relay-input-auth
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+    tlsSecret: openshell-exporter-relay-input-tls
+    grpcEndpoint: 0.0.0.0:4317
+    httpEndpoint: 0.0.0.0:4318
+
+nativeOtlp:
+  enabled: false
+  grpcEndpoint: 0.0.0.0:4319
+  tlsSecret: openshell-exporter-native-otlp-tls
+
+internalOtlp:
+  enabled: false
+  authSecret: openshell-exporter-internal-input-auth
+  tlsSecret: openshell-exporter-internal-input-tls
+  grpcEndpoint: 0.0.0.0:4330
+  httpEndpoint: 0.0.0.0:4331
+  mtlsEnabled: true
+
+forwardedOcsf:
+  enabled: false
+  authSecret: openshell-exporter-forwarded-ocsf-auth
+  tlsSecret: openshell-exporter-forwarded-ocsf-tls
+  httpEndpoint: 0.0.0.0:4320
+
+sandboxInjection:
+  enabled: false
+  replicas: 2
+  webhookTLSSecret: openshell-sandbox-injector-tls
+  webhookCABundle: ""
+  namespaceSelector:
+    labelKey: observability.openshell.nvidia.com/inject
+    labelValue: enabled
+  allowedNamespaces: []
+  allowedGatewayUsernames: []
+  forwarderTLSSecret: openshell-ocsf-forwarder-tls
+  forwarderAuthSecret: openshell-ocsf-forwarder-auth
+  evidencePersistence:
+    storageClass: ""
+    size: 2Gi
+  statePersistence:
+    storageClass: ""
+    size: 1Gi
+  fluentBit:
+    repository: docker.io/fluent/fluent-bit
+    digest: sha256:aff743e1a5e61d036d10a4472d67cdd7a6b408c92218eb86e3f301e2bac7817a
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+certManager:
+  enabled: false
+  issuerRef:
+    name: ""
+    kind: ClusterIssuer
+    group: cert-manager.io
+  duration: 2160h
+  renewBefore: 360h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  relayClientNamespaces: []
+  relayClientTLSSecret: openshell-exporter-relay-client-tls
+
+kubernetesContext:
+  enabled: false
+  namespaces: []
+
+networkPolicy:
+  enabled: true
+  additionalSourceNamespaces: []
+  monitoringNamespaces: []
+
+persistence:
+  queue:
+    existingClaim: ""
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    size: 20Gi
+  recovery:
+    existingClaim: ""
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    size: 20Gi
+  checkpoints:
+    existingClaim: ""
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    size: 5Gi
+  otlpGrpcQueue:
+    existingClaim: ""
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    size: 20Gi
+  otlpHttpQueue:
+    existingClaim: ""
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    size: 20Gi
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+service:
+  type: ClusterIP
+  annotations: {}
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+
+podAnnotations: {}
+podLabels: {}
+priorityClassName: ""
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "2"
+    memory: 768Mi
+
+terminationGracePeriodSeconds: 45
+revisionHistoryLimit: 3

@@ -1,0 +1,36 @@
+{
+  "cluster": [
+    "monitor",
+    "read_pipeline"
+  ],
+  "indices": [
+    {
+      "names": [
+        "traces-apm*",
+        "logs-apm*",
+        "metrics-apm*"
+      ],
+      "privileges": [
+        "auto_configure",
+        "create_doc",
+        "view_index_metadata"
+      ],
+      "allow_restricted_indices": false
+    },
+    {
+      "names": [
+        ".apm-agent-configuration"
+      ],
+      "privileges": [
+        "read"
+      ],
+      "allow_restricted_indices": true
+    }
+  ],
+  "applications": [],
+  "run_as": [],
+  "metadata": {
+    "managed_by": "openshell-event-exporter-reference",
+    "purpose": "native OTLP trace ingestion for the privacy-filtered Relay lane"
+  }
+}

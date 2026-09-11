@@ -9,6 +9,8 @@ including how to declare its kind for automated review.
 
 Current projects:
 
+- `openshell-exporter`: Experimental OpenShell event and agent-trace exporter
+  with local image builds and Docker, Podman, and Helm deployment examples.
 - `long-horizon-agent-evals`: Persistent agent experiments over configurable time
   horizons and repeated parallel attempts, starting with GitHub policy review.
 - `openshell-middleware-manager`: `omm` CLI that creates and updates version-matched

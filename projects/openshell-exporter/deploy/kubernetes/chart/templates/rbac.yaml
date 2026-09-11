@@ -1,0 +1,37 @@
+{{- if eq (include "openshell-event-exporter.module.kubernetesContext" .) "true" }}
+{{- range $index, $namespace := .Values.kubernetesContext.namespaces }}
+{{- if $index }}
+---
+{{- end }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "openshell-event-exporter.fullname" $ }}-context-reader
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "openshell-event-exporter.labels" $ | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["events.k8s.io"]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "openshell-event-exporter.fullname" $ }}-context-reader
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "openshell-event-exporter.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "openshell-event-exporter.fullname" $ }}-context-reader
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "openshell-event-exporter.serviceAccountName" $ }}
+    namespace: {{ $.Release.Namespace }}
+{{- end }}
+{{- end }}

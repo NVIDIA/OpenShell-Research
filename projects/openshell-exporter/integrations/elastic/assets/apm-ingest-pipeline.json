@@ -1,0 +1,33 @@
+{
+  "description": "Additive ECS/OpenShell aliases for privacy-filtered NeMo Relay spans received through APM Server; native APM fields are retained.",
+  "version": 1,
+  "processors": [
+    {
+      "set": {
+        "field": "event.ingested",
+        "value": "{{{_ingest.timestamp}}}"
+      }
+    },
+    {
+      "script": {
+        "lang": "painless",
+        "source": "def labels = ctx.labels instanceof Map ? ctx.labels : [:]; def numeric = ctx.numeric_labels instanceof Map ? ctx.numeric_labels : [:]; if (!(ctx.event instanceof Map)) { ctx.event = [:]; } ctx.event.dataset = 'openshell.agent'; ctx.event.module = 'openshell'; ctx.event.provider = 'NVIDIA NeMo Relay'; def stage = labels.openinference_span_kind; if (stage == null && ctx.span instanceof Map) { stage = ctx.span.name; } if (stage != null) { ctx.event.action = stage.toString().toLowerCase().replace('relay.', ''); } if (ctx.message == null && ctx.span instanceof Map) { ctx.message = ctx.span.name; } if (!(ctx.openshell instanceof Map)) { ctx.openshell = [:]; } if (!(ctx.openshell.gateway instanceof Map)) { ctx.openshell.gateway = [:]; } if (!(ctx.openshell.sandbox instanceof Map)) { ctx.openshell.sandbox = [:]; } if (!(ctx.openshell.correlation instanceof Map)) { ctx.openshell.correlation = [:]; } if (!(ctx.openshell.policy instanceof Map)) { ctx.openshell.policy = [:]; } if (labels.openshell_gateway_id != null) { ctx.openshell.gateway.id = labels.openshell_gateway_id; } if (labels.openshell_workspace != null) { ctx.openshell.workspace = labels.openshell_workspace; } if (labels.openshell_sandbox_id != null) { ctx.openshell.sandbox.id = labels.openshell_sandbox_id; } if (labels.openshell_sandbox_name != null) { ctx.openshell.sandbox.name = labels.openshell_sandbox_name; } if (labels.openshell_correlation_status != null) { ctx.openshell.correlation.status = labels.openshell_correlation_status; } if (labels.openshell_correlation_missing != null) { ctx.openshell.correlation.missing = labels.openshell_correlation_missing; } if (labels.openshell_correlation_invalid != null) { ctx.openshell.correlation.invalid = labels.openshell_correlation_invalid; } if (numeric.openshell_policy_version != null) { ctx.openshell.policy.version = numeric.openshell_policy_version; } else if (labels.openshell_policy_version != null) { ctx.openshell.policy.version = labels.openshell_policy_version; } if (labels.agent_session_id != null) { if (!(ctx.session instanceof Map)) { ctx.session = [:]; } ctx.session.id = labels.agent_session_id; } if (labels.request_id != null) { if (!(ctx.transaction instanceof Map)) { ctx.transaction = [:]; } ctx.transaction.id = labels.request_id; if (!(ctx.openshell.request instanceof Map)) { ctx.openshell.request = [:]; } ctx.openshell.request.id = labels.request_id; } if (labels.tool_call_id != null) { if (!(ctx.openshell.tool_call instanceof Map)) { ctx.openshell.tool_call = [:]; } ctx.openshell.tool_call.id = labels.tool_call_id; } if (labels.policy_chunk_id != null) { if (!(ctx.openshell.policy_chunk instanceof Map)) { ctx.openshell.policy_chunk = [:]; } ctx.openshell.policy_chunk.id = labels.policy_chunk_id; } if (ctx.trace instanceof Map && ctx.trace.id != null && ctx.span instanceof Map && ctx.span.id != null) { ctx.event.id = ctx.trace.id + ':' + ctx.span.id; } if (!(ctx.observer instanceof Map)) { ctx.observer = [:]; } if (labels.openshell_gateway_id != null) { ctx.observer.name = labels.openshell_gateway_id; } ctx.observer.vendor = 'NVIDIA'; ctx.observer.product = 'OpenShell'; if (!(ctx.nemo_relay instanceof Map)) { ctx.nemo_relay = [:]; } ctx.nemo_relay.privacy = ['applied': true, 'mode': 'allow', 'profile': 'relay-default-allowlist-v1']; if (!(ctx.nemo_relay.span instanceof Map)) { ctx.nemo_relay.span = [:]; } if (stage != null) { ctx.nemo_relay.span.kind = stage.toString().toLowerCase(); } def tags = ctx.tags instanceof List ? ctx.tags : []; for (def tag : ['openshell', 'nemo-relay', 'agent-telemetry', 'privacy-filtered']) { if (!tags.contains(tag)) { tags.add(tag); } } if (labels.openshell_correlation_status != null) { def correlationTag = 'correlation-' + labels.openshell_correlation_status; if (!tags.contains(correlationTag)) { tags.add(correlationTag); } } ctx.tags = tags;"
+      }
+    }
+  ],
+  "on_failure": [
+    {
+      "set": {
+        "field": "error.message",
+        "value": "OpenShell Relay normalization failed: {{{_ingest.on_failure_message}}}"
+      }
+    },
+    {
+      "append": {
+        "field": "tags",
+        "value": "openshell-relay-normalization-failure",
+        "allow_duplicates": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+version = 1
+
+[[components]]
+kind = "observability"
+enabled = true
+
+[components.config]
+version = 3
+
+[components.config.atof]
+enabled = true
+
+[[components.config.atof.sinks]]
+type = "file"
+output_directory = "/sandbox/telemetry/atof"
+filename = "hermes-atof.jsonl"
+mode = "append"
+
+[components.config.atif]
+enabled = true
+output_directory = "/sandbox/telemetry/atif"
+filename_template = "hermes-atif-{session_id}.json"
+agent_name = "Hermes Agent"
+agent_version = "0.20.2"
+
+[components.config.opentelemetry]
+enabled = true
+
+[[components.config.opentelemetry.endpoints]]
+type = "openinference"
+endpoint = "https://openshell-exporter-openshell-event-exporter.openshell-observability.svc.cluster.local:4318/v1/traces"
+transport = "http_binary"
+service_name = "hermes-agent"
+service_namespace = "openshell-kubernetes-demo"
+service_version = "0.20.2"
+instrumentation_scope = "nemo-relay-openinference"
+timeout_millis = 5000
+
+[components.config.opentelemetry.endpoints.resource_attributes]
+"telemetry.source" = "nemo_relay"
+"deployment.environment" = "kubernetes-demo"
+"openshell.gateway.id" = "omnistation-kubernetes-demo"
+"openshell.workspace" = "default"
+"openshell.sandbox.id" = "__OPENSHELL_SANDBOX_ID__"
+"openshell.sandbox.name" = "__OPENSHELL_SANDBOX_NAME__"
+"openshell.policy.version" = "__OPENSHELL_POLICY_VERSION__"
+
+[components.config.opentelemetry.endpoints.header_env]
+authorization = "NEMO_RELAY_OTEL_AUTHORIZATION"

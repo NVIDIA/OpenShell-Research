@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/NVIDIA/OpenShell-Research/main/projects/openshell-exporter/integration/qualification/policy-api-report-v1.schema.json",
+  "title": "OpenShell read-only policy API qualification report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generated_at", "complete", "candidate", "gateway", "scope", "api_probes", "export_evidence", "unobserved_variants", "limitations"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "complete": {"type": "boolean"},
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "worktree_clean", "bound"],
+      "properties": {
+        "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "worktree_clean": {"type": "boolean"},
+        "bound": {"type": "boolean"}
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["endpoint_security", "image", "expected_version", "version_matched"],
+      "properties": {
+        "endpoint_security": {"enum": ["tls", "plaintext_fixture"]},
+        "image": {"type": "string", "pattern": "^.+@sha256:[0-9a-f]{64}$"},
+        "expected_version": {"type": "string", "minLength": 1},
+        "observed_version": {"type": "string"},
+        "version_matched": {"type": "boolean"}
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workspace", "sandbox_name", "sandbox_id"],
+      "properties": {
+        "workspace": {"type": "string", "minLength": 1},
+        "sandbox_name": {"type": "string", "minLength": 1},
+        "sandbox_id": {"type": "string", "minLength": 1}
+      }
+    },
+    "api_probes": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {"$ref": "#/$defs/probe"}
+    },
+    "export_evidence": {"$ref": "#/$defs/exportEvidence"},
+    "unobserved_variants": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "limitations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+  },
+  "$defs": {
+    "probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "expectation", "configured", "matched", "operations"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "expectation": {"type": "string", "minLength": 1},
+        "configured": {"type": "boolean"},
+        "matched": {"type": "boolean"},
+        "operations": {"type": "array", "maxItems": 4, "items": {"$ref": "#/$defs/operation"}}
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "request", "started_at", "finished_at", "grpc_code", "authorization", "variant", "sensitive_fields_excluded"],
+      "properties": {
+        "operation": {"type": "string", "pattern": "^openshell\\.v1\\.OpenShell/(GetDraftPolicy|GetDraftHistory|GetSandboxPolicyStatus|ListSandboxPolicies)$"},
+        "request": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["workspace", "sandbox_name", "global"],
+          "properties": {
+            "workspace": {"type": "string", "minLength": 1},
+            "sandbox_name": {"type": "string", "minLength": 1},
+            "global": {"const": false}
+          }
+        },
+        "started_at": {"type": "string", "format": "date-time"},
+        "finished_at": {"type": "string", "format": "date-time"},
+        "grpc_code": {"type": "string", "minLength": 1},
+        "authorization": {"enum": ["authorized", "denied", "not_authenticated", "not_determined"]},
+        "variant": {"type": "string", "minLength": 1},
+        "sensitive_fields_excluded": {"type": "integer", "minimum": 0},
+        "response_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "summary": {"type": "object"}
+      }
+    },
+    "exportEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["configured", "matched_sandbox_events", "expected_types", "missing_types", "sensitive_key_leaks", "sensitive_value_leaks", "events"],
+      "properties": {
+        "configured": {"type": "boolean"},
+        "matched_sandbox_events": {"type": "integer", "minimum": 0},
+        "expected_types": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "missing_types": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "sensitive_key_leaks": {"type": "integer", "minimum": 0},
+        "sensitive_value_leaks": {"type": "integer", "minimum": 0},
+        "events": {"type": "array", "items": {"$ref": "#/$defs/cloudEvent"}}
+      }
+    },
+    "cloudEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "source", "id", "observed_time", "consistency", "acquisition_kind"],
+      "properties": {
+        "type": {"type": "string", "pattern": "^com\\.nvidia\\.openshell\\.policy\\..+\\.v1$"},
+        "source": {"type": "string", "pattern": "^openshell://"},
+        "id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "source_time": {"type": "string", "format": "date-time"},
+        "observed_time": {"type": "string", "format": "date-time"},
+        "consistency": {"type": "string", "minLength": 1},
+        "acquisition_kind": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

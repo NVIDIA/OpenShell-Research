@@ -1,0 +1,113 @@
+extensions:
+  file_storage/checkpoints:
+    directory: ./state/checkpoints
+    create_directory: true
+  file_storage/cloudevents_queue:
+    directory: ./state/cloudevents-queue
+    create_directory: true
+  storagehealth:
+    interval: 30s
+    max_entries: 1024
+    paths:
+      checkpoints: ./state/checkpoints
+      cloudevents_queue: ./state/cloudevents-queue
+      recovery: ./output/openshell-sandbox-log-events.json
+  health_check:
+    endpoint: 127.0.0.1:13133
+
+receivers:
+  file_log/openshell_sandbox:
+    include:
+      - /var/log/openshell.*.log
+    start_at: beginning
+    storage: file_storage/checkpoints
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+    include_file_path: true
+    include_file_path_resolved: true
+    include_file_record_offset: true
+    include_file_record_number: true
+    on_truncate: read_whole_file
+    max_log_size: 8MiB
+    max_log_size_behavior: split
+    attributes:
+      openshell.acquisition.kind: sandbox.file_log
+      openshell.acquisition.source_instance: sandbox-operational-log
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+  openshell:
+    source_profiles: [openshell.log]
+    gateway_id: ${env:OPENSHELL_GATEWAY_ID}
+    workspace: ${env:OPENSHELL_WORKSPACE}
+    source_instance: sandbox-operational-log
+    default_sandbox_id: unknown
+    validation:
+      mode: mark
+exporters:
+  cloudevents:
+    endpoint: ${env:OPENSHELL_EXPORT_URL}
+    timeout: 15s
+    max_events: 500
+    max_event_bytes: 1048576
+    max_request_bytes: 4194304
+    tls:
+      ca_file: ${env:OPENSHELL_EXPORT_CA_FILE}
+      cert_file: ${env:OPENSHELL_EXPORT_CLIENT_CERT_FILE}
+      key_file: ${env:OPENSHELL_EXPORT_CLIENT_KEY_FILE}
+    headers:
+      Authorization: Bearer ${env:OPENSHELL_EXPORT_TOKEN}
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage/cloudevents_queue
+      sizer: requests
+      queue_size: 10000
+      num_consumers: 4
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 512
+        max_size: 1024
+        sizer: items
+  file/archive:
+    path: ./output/openshell-sandbox-log-events.json
+    format: json
+
+service:
+  telemetry:
+    logs:
+      encoding: json
+    metrics:
+      level: normal
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 127.0.0.1
+                port: 8888
+  extensions:
+    - file_storage/checkpoints
+    - file_storage/cloudevents_queue
+    - storagehealth
+    - health_check
+  pipelines:
+    logs:
+      receivers:
+        - file_log/openshell_sandbox
+      processors:
+        - memory_limiter
+        - openshell
+      exporters:
+        - cloudevents
+        - file/archive

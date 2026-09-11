@@ -1,0 +1,7 @@
+# Overlay after your configured values. Load the image into every eligible node.
+image:
+  local: true
+  repository: localhost/openshell-event-exporter
+  tag: v0.0.4
+  digest: ""
+  pullPolicy: Never

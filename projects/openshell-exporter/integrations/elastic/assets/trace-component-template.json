@@ -1,0 +1,203 @@
+{
+  "version": 1,
+  "_meta": {
+    "description": "ECS mappings for privacy-filtered NeMo Relay agent traces",
+    "managed_by": "openshell-event-exporter-reference"
+  },
+  "template": {
+    "settings": {
+      "index.mapping.total_fields.limit": 1200,
+      "index.mapping.ignore_malformed": false
+    },
+    "mappings": {
+      "_meta": {
+        "openshell_trace_mapping_version": 1,
+        "privacy_profile": "relay-default-allowlist-v1"
+      },
+      "dynamic": false,
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "message": {
+          "type": "match_only_text"
+        },
+        "tags": {
+          "type": "keyword"
+        },
+        "event": {
+          "properties": {
+            "id": {
+              "type": "keyword",
+              "ignore_above": 1024
+            },
+            "kind": {
+              "type": "keyword"
+            },
+            "category": {
+              "type": "keyword"
+            },
+            "type": {
+              "type": "keyword"
+            },
+            "action": {
+              "type": "keyword",
+              "ignore_above": 1024
+            },
+            "outcome": {
+              "type": "keyword"
+            },
+            "duration": {
+              "type": "long"
+            },
+            "dataset": {
+              "type": "keyword"
+            },
+            "module": {
+              "type": "keyword"
+            },
+            "provider": {
+              "type": "keyword"
+            },
+            "ingested": {
+              "type": "date"
+            }
+          }
+        },
+        "observer": {
+          "properties": {
+            "name": {
+              "type": "keyword",
+              "ignore_above": 1024
+            },
+            "vendor": {
+              "type": "keyword"
+            },
+            "product": {
+              "type": "keyword"
+            }
+          }
+        },
+        "service": {
+          "properties": {
+            "name": {
+              "type": "keyword",
+              "ignore_above": 1024
+            },
+            "namespace": {
+              "type": "keyword",
+              "ignore_above": 1024
+            },
+            "version": {
+              "type": "keyword",
+              "ignore_above": 1024
+            }
+          }
+        },
+        "trace": {
+          "properties": {
+            "id": {
+              "type": "keyword",
+              "ignore_above": 64
+            }
+          }
+        },
+        "span": {
+          "properties": {
+            "id": {
+              "type": "keyword",
+              "ignore_above": 32
+            }
+          }
+        },
+        "parent": {
+          "properties": {
+            "id": {
+              "type": "keyword",
+              "ignore_above": 32
+            }
+          }
+        },
+        "session": {
+          "properties": {
+            "id": {
+              "type": "keyword",
+              "ignore_above": 1024
+            }
+          }
+        },
+        "transaction": {
+          "properties": {
+            "id": {
+              "type": "keyword",
+              "ignore_above": 1024
+            }
+          }
+        },
+        "openshell": {
+          "properties": {
+            "gateway": {
+              "properties": {
+                "id": {
+                  "type": "keyword",
+                  "ignore_above": 1024
+                }
+              }
+            },
+            "workspace": {
+              "type": "keyword",
+              "ignore_above": 1024
+            },
+            "sandbox": {
+              "properties": {
+                "id": {
+                  "type": "keyword",
+                  "ignore_above": 1024
+                },
+                "name": {
+                  "type": "keyword",
+                  "ignore_above": 1024
+                }
+              }
+            },
+            "policy": {
+              "properties": {
+                "version": {
+                  "type": "keyword",
+                  "ignore_above": 1024
+                }
+              }
+            },
+            "correlation": {
+              "type": "flattened"
+            }
+          }
+        },
+        "nemo_relay": {
+          "properties": {
+            "privacy": {
+              "type": "flattened"
+            },
+            "span": {
+              "properties": {
+                "kind": {
+                  "type": "keyword",
+                  "ignore_above": 256
+                },
+                "attributes": {
+                  "type": "flattened"
+                }
+              }
+            },
+            "resource": {
+              "type": "flattened"
+            },
+            "instrumentation_scope": {
+              "type": "flattened"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,64 @@
+# Maximum supported Kubernetes collection. Replace every endpoint, digest, Secret, and namespace.
+profile: complete
+image:
+  repository: registry.example.internal/openshell-event-exporter
+  digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+source:
+  endpoint: https://openshell.openshell.svc.cluster.local:50051
+  gatewayId: production-gateway-1
+  workspace: default
+files:
+  openshell:
+    enabled: false
+  relay:
+    enabled: false
+relay:
+  input:
+    enabled: true
+    mtlsEnabled: true
+nativeOtlp:
+  enabled: true
+forwardedOcsf:
+  enabled: true
+sandboxInjection:
+  enabled: true
+  # cert-manager's CA injector fills the webhook caBundle.
+  webhookCABundle: ""
+  allowedNamespaces:
+    - openshell-sandboxes
+  allowedGatewayUsernames:
+    - system:serviceaccount:openshell:openshell-gateway
+  evidencePersistence:
+    storageClass: csi-rwop
+    size: 2Gi
+  statePersistence:
+    storageClass: csi-rwop
+    size: 1Gi
+certManager:
+  enabled: true
+  # Use a dedicated issuer that returns ca.crt. A ClusterIssuer is required
+  # when client Certificates are created in multiple namespaces.
+  issuerRef:
+    name: openshell-exporter-pki
+    kind: ClusterIssuer
+    group: cert-manager.io
+  relayClientNamespaces:
+    - openshell-sandboxes
+kubernetesContext:
+  enabled: true
+  namespaces:
+    - openshell
+    - openshell-sandboxes
+networkPolicy:
+  enabled: true
+  additionalSourceNamespaces:
+    - openshell
+    - openshell-sandboxes
+  monitoringNamespaces:
+    - monitoring
+destination:
+  cloudEvents:
+    endpoint: https://events.customer.example/v1/events
+  otlp:
+    grpcEndpoint: otel.customer.example:4317
+    httpEndpoint: https://otel.customer.example:4318

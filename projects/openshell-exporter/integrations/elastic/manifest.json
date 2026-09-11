@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "pack_version": "1.10.0",
+  "validated_elasticsearch_version": "9.4.3",
+  "validated_kibana_version": "9.4.3",
+  "cloud_events_schema": "1.0",
+  "ocsf_version": "1.8.0",
+  "security_index_pattern": "logs-openshell.security-*-v1",
+  "trace_index_pattern": "traces-openshell.agent-*-v1",
+  "rule_count": 11,
+  "saved_object_count": 26,
+  "runtime_identity": {
+    "cluster_privileges": [
+      "monitor"
+    ],
+    "index_privileges": [
+      "create_doc",
+      "view_index_metadata"
+    ]
+  },
+  "role_count": 3
+}

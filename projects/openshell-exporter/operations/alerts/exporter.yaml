@@ -1,0 +1,124 @@
+groups:
+  - name: openshell-event-exporter
+    rules:
+      - record: openshell_exporter:policy_reconciliation_age_seconds
+        expr: max(openshell_exporter_policy_reconciliation_age_seconds)
+      - record: openshell_exporter:policy_reconciliation_failures_10m
+        expr: sum(increase(openshell_exporter_policy_reconciliation_failures[10m]))
+      - record: openshell_exporter:policy_reconciliation_queue_utilization
+        expr: max(openshell_exporter_policy_reconciliation_queue_utilization)
+
+      - alert: OpenShellExporterStreamGap
+        expr: increase(openshell_exporter_stream_gap_warnings[5m]) > 0
+        for: 0m
+        labels: {severity: warning}
+        annotations:
+          summary: WatchSandbox reported an observable non-resumable gap
+          runbook: docs/operations.md#stream-reconnecting-or-warning
+      - alert: OpenShellExporterPermanentResponse
+        expr: increase(openshell_exporter_delivery_permanent_rejections[5m]) > 0
+        for: 0m
+        labels: {severity: critical}
+        annotations:
+          summary: A CloudEvents batch received a permanent response
+          runbook: docs/operations.md#destination-outage-or-throttle
+      - alert: OpenShellExporterQueueHigh
+        expr: otelcol_exporter_queue_size / otelcol_exporter_queue_capacity > 0.8
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: An exporter persistent queue is above 80 percent
+          runbook: docs/operations.md#destination-outage-or-throttle
+      - alert: OpenShellExporterQueueEnqueueFailure
+        expr: sum by (exporter) (increase(otelcol_exporter_enqueue_failed_log_records[5m])) > 0
+        for: 0m
+        labels: {severity: critical}
+        annotations:
+          summary: A persistent exporter queue rejected log evidence
+          runbook: docs/operations.md#queue-enqueue-failure
+      - alert: OpenShellExporterDestinationStale
+        expr: time() - openshell_exporter_destination_last_success_unixtime > 300
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: No successful CloudEvents delivery has been observed
+          runbook: docs/operations.md#destination-outage-or-throttle
+      - alert: OpenShellExporterPolicyReconciliationStale
+        expr: max(openshell_exporter_policy_reconciliation_configured) == 1 and openshell_exporter:policy_reconciliation_age_seconds > 300
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: Read-only policy reconciliation is stale
+          runbook: docs/operations.md#stale-policy-reconciliation
+      - alert: OpenShellExporterPolicyReconciliationFailing
+        expr: openshell_exporter:policy_reconciliation_failures_10m > 2
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: Read-only policy reconciliation is repeatedly failing
+          runbook: docs/operations.md#repeated-policy-reconciliation-failures
+      - alert: OpenShellExporterPolicyReconciliationQueueHigh
+        expr: openshell_exporter:policy_reconciliation_queue_utilization > 0.8
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: Read-only policy reconciliation queue is saturated
+          runbook: docs/operations.md#policy-reconciliation-queue-saturation
+      - record: openshell_exporter:source_age_seconds
+        expr: max by (source) (time() - openshell_exporter_source_last_success_unixtime)
+      - alert: OpenShellExporterSourceConfiguredButUnobserved
+        expr: max by (source) (openshell_exporter_source_configured) == 1 and on (source) max by (source) (openshell_exporter_source_observed) == 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: A configured OpenShell evidence lane has not been observed
+          runbook: docs/operations.md#source-inactive
+      - alert: OpenShellExporterSourceStale
+        expr: max by (source) (openshell_exporter_source_configured) == 1 and on (source) max by (source) (openshell_exporter_source_observed) == 1 and on (source) openshell_exporter:source_age_seconds > 600
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: An observed OpenShell evidence lane is stale
+          runbook: docs/operations.md#source-inactive
+      - alert: OpenShellExporterSourceGapReported
+        expr: max by (source) (openshell_exporter_source_health_class) == 3
+        for: 0m
+        labels: {severity: warning}
+        annotations:
+          summary: An OpenShell evidence lane reported incomplete coverage
+          runbook: docs/operations.md#source-gap-reported
+      - alert: OpenShellExporterStorageUnavailable
+        expr: openshell_exporter_storage_available == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: A configured durable exporter path is unavailable
+          runbook: docs/operations.md#durable-storage-unavailable-or-low
+      - alert: OpenShellExporterStorageLowBytes
+        expr: openshell_exporter_storage_available == 1 and openshell_exporter_storage_free_bytes < 1073741824
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: A durable exporter path has less than 1 GiB free
+          runbook: docs/operations.md#durable-storage-unavailable-or-low
+      - alert: OpenShellExporterStorageLowInodes
+        expr: openshell_exporter_storage_available == 1 and openshell_exporter_storage_free_inodes < 10000
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: A durable exporter path has fewer than 10000 free inodes
+          runbook: docs/operations.md#durable-storage-unavailable-or-low
+      - alert: OpenShellExporterCheckpointStateStale
+        expr: openshell_exporter_storage_state_present{storage="checkpoints"} == 1 and openshell_exporter_storage_state_age_seconds{storage="checkpoints"} > 600 and on (instance, job) (time() - max by (instance, job) (openshell_exporter_source_last_success_unixtime{source=~"ocsf_files|operational_files|relay_files"}) < 300)
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: File evidence is active but checkpoint state is stale
+          runbook: docs/operations.md#stale-checkpoint-state
+      - alert: OpenShellExporterStorageStateScanTruncated
+        expr: openshell_exporter_storage_scan_truncated == 1
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: A durable path exceeded its bounded state-age scan limit
+          runbook: docs/operations.md#storage-state-scan-truncated

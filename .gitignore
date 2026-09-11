@@ -126,6 +126,7 @@ public/
 site/
 docs/documentation/egress-gate/
 docs/documentation/openshell-agent-runner/
+docs/documentation/openshell-exporter/
 .docusaurus/
 .vitepress/cache/
 .vitepress/dist/

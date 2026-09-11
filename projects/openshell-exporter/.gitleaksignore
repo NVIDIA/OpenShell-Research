@@ -1,0 +1,3 @@
+# Exact deterministic test constants; these values are not credentials.
+98cfb28954ab84df2a44f6ac957fc946037fa08e:examples/demo/real-gateway/webapp/main_test.go:generic-api-key:17
+8cc749c98ef45f9ccf8d9434b005fe9fdd2e3687:decisionreceiver/server_test.go:generic-api-key:20

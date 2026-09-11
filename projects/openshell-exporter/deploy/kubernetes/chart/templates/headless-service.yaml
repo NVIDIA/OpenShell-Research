@@ -1,0 +1,19 @@
+{{- if eq (include "openshell-event-exporter.centralStateful" .) "true" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "openshell-event-exporter.fullname" . }}-headless
+  labels:
+    {{- include "openshell-event-exporter.labels" . | nindent 4 }}
+    app.kubernetes.io/component: central
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: false
+  selector:
+    {{- include "openshell-event-exporter.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: central
+  ports:
+    - name: internal-grpc
+      port: 4330
+      targetPort: internal-grpc
+{{- end }}

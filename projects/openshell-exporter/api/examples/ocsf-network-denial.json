@@ -1,0 +1,80 @@
+{
+  "specversion": "1.0",
+  "id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "source": "openshell://gateway-prod-1/workspaces/default/sandboxes/sandbox-123/sources/ocsf.file",
+  "type": "com.nvidia.openshell.ocsf.4001.v1",
+  "dataschema": "urn:openshell:event-envelope:1",
+  "datacontenttype": "application/json",
+  "subject": "sandboxes/sandbox-123",
+  "time": "2026-08-11T12:00:00Z",
+  "data": {
+    "schema_version": "1.0",
+    "observed_time": "2026-08-11T12:00:00.125Z",
+    "acquisition": {
+      "kind": "ocsf.file",
+      "durability": "checkpointed_file",
+      "source_instance": "gateway-ocsf-jsonl",
+      "file_path": "/var/log/openshell/openshell-ocsf.0.log",
+      "record_offset": 128,
+      "record_number": 3,
+      "transport": "file",
+      "payload_type": "source_record",
+      "coverage": {
+        "status": "observed",
+        "source_profile": "ocsf.file",
+        "payload_preservation": "redacted_source_record",
+        "known_limitations": [
+          "durability_requires_persistent_upstream_file_and_checkpoint_storage"
+        ]
+      }
+    },
+    "openshell": {
+      "gateway_id": "gateway-prod-1",
+      "workspace": "default",
+      "sandbox_id": "sandbox-123",
+      "sandbox_name": "research-agent"
+    },
+    "security": {
+      "ocsf": {
+        "version": "1.8.0",
+        "class_uid": 4001,
+        "category_uid": 4,
+        "activity_id": 1,
+        "type_uid": 400101,
+        "severity_id": 4
+      },
+      "validation": {
+        "status": "valid",
+        "errors": []
+      },
+      "redaction": {
+        "profile_id": "openshell-default",
+        "profile_version": "1",
+        "applied": false,
+        "count": 0
+      }
+    },
+    "correlation": {
+      "openshell.gateway.id": "gateway-prod-1",
+      "openshell.sandbox.id": "sandbox-123",
+      "openshell.workspace": "default",
+      "request_id": "request-123"
+    },
+    "original": {
+      "activity_id": 1,
+      "category_uid": 4,
+      "class_uid": 4001,
+      "message": "CONNECT denied api.example.com:443",
+      "metadata": {
+        "version": "1.8.0"
+      },
+      "severity_id": 4,
+      "time": 1786449600000,
+      "type_uid": 400101,
+      "unmapped": {
+        "request_id": "request-123",
+        "sandbox_id": "sandbox-123"
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+# SPDX-License-Identifier: Apache-2.0
+# Applied only after the development conformance receiver has qualified the run.
+service:
+  pipelines:
+    logs/openshell_files:
+      exporters:
+        - cloudevents/elastic_logstash
+        - file/recovery_events
+    logs/watchsandbox:
+      exporters:
+        - cloudevents/elastic_logstash
+        - file/recovery_events
+    traces/nemo_relay:
+      exporters:
+        - otlphttp/elastic_otlp
+        - file/recovery_traces

@@ -1,0 +1,66 @@
+# Focused per-sandbox files-to-CloudEvents deployment. The admission injector
+# adds one reviewed Fluent Bit sidecar to newly created, authorized Sandboxes;
+# the exporter accepts its records over authenticated OTLP/HTTP.
+profile: custom
+
+image:
+  repository: registry.example.internal/openshell-event-exporter
+  digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+
+modules:
+  acquisition:
+    watchSandbox: false
+    policyReconciliation: false
+    ocsfFiles: false
+    sandboxFileLogs: false
+    relayFileLogs: false
+    relayOtlp: false
+    nativeOtlp: false
+    forwardedSandboxFiles: true
+    kubernetesContext: false
+    internalOtlp: false
+  delivery:
+    cloudEvents: true
+    otlpGrpc: false
+    otlpHttp: false
+    recovery: true
+
+source:
+  endpoint: https://openshell.openshell.svc.cluster.local:50051
+  gatewayId: production-gateway-1
+  workspace: default
+
+forwardedOcsf:
+  enabled: true
+
+sandboxInjection:
+  enabled: true
+  webhookCABundle: ""
+  allowedNamespaces:
+    - openshell-sandboxes
+  allowedGatewayUsernames:
+    - system:serviceaccount:openshell:openshell-gateway
+  evidencePersistence:
+    storageClass: csi-rwop
+    size: 2Gi
+  statePersistence:
+    storageClass: csi-rwop
+    size: 1Gi
+
+certManager:
+  enabled: true
+  issuerRef:
+    name: openshell-exporter-pki
+    kind: ClusterIssuer
+    group: cert-manager.io
+
+destination:
+  cloudEvents:
+    endpoint: https://events.customer.example/v1/events
+
+networkPolicy:
+  enabled: true
+  additionalSourceNamespaces:
+    - openshell-sandboxes
+  monitoringNamespaces:
+    - monitoring

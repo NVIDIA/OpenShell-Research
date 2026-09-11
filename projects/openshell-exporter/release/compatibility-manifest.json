@@ -1,0 +1,19 @@
+{
+  "candidate": "v0.0.4",
+  "status": "experimental-research-example",
+  "openshell_gateway": "v0.0.113",
+  "openshell_go_sdk": "v0.0.0-20260825132042-455883905a7a",
+  "ocsf": "1.8.0",
+  "ocsf_replay": ["1.7.0"],
+  "collector_contrib": "v0.160.0",
+  "collector_core": "v1.66.0",
+  "go": "1.26.8",
+  "nemo_relay": "v0.7.1",
+  "envelope": "urn:openshell:event-envelope:1",
+  "architectures": ["linux/amd64", "linux/arm64"],
+  "images": [
+    "openshell-event-exporter",
+    "openshell-otlp-proxy"
+  ],
+  "external_gates": "docs/compatibility.md"
+}

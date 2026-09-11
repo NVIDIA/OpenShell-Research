@@ -1,0 +1,134 @@
+extensions:
+  bearertokenauth/nemo_relay:
+    token: ${env:NEMO_RELAY_OTLP_TOKEN}
+  file_storage/otlp_queue:
+    directory: ./state/nemo-relay/otlp-queue
+    create_directory: true
+  file_storage/otlphttp_queue:
+    directory: ./state/nemo-relay/otlphttp-queue
+    create_directory: true
+  storagehealth:
+    interval: 30s
+    max_entries: 1024
+    paths:
+      otlp_grpc_queue: ./state/nemo-relay/otlp-queue
+      otlp_http_queue: ./state/nemo-relay/otlphttp-queue
+  health_check:
+    endpoint: 127.0.0.1:13133
+
+receivers:
+  otlp/nemo_relay:
+    protocols:
+      grpc:
+        endpoint: ${env:NEMO_RELAY_OTLP_GRPC_LISTEN}
+        auth:
+          authenticator: bearertokenauth/nemo_relay
+        tls:
+          cert_file: ${env:NEMO_RELAY_OTLP_TLS_CERT_FILE}
+          key_file: ${env:NEMO_RELAY_OTLP_TLS_KEY_FILE}
+          client_ca_file: ${env:NEMO_RELAY_OTLP_CLIENT_CA_FILE}
+      http:
+        endpoint: ${env:NEMO_RELAY_OTLP_HTTP_LISTEN}
+        auth:
+          authenticator: bearertokenauth/nemo_relay
+        tls:
+          cert_file: ${env:NEMO_RELAY_OTLP_TLS_CERT_FILE}
+          key_file: ${env:NEMO_RELAY_OTLP_TLS_KEY_FILE}
+          client_ca_file: ${env:NEMO_RELAY_OTLP_CLIENT_CA_FILE}
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+  resource/nemo_relay:
+    attributes:
+      - key: telemetry.source
+        value: nemo_relay
+        action: upsert
+      - key: openshell.gateway.id
+        value: ${env:OPENSHELL_GATEWAY_ID}
+        action: upsert
+      - key: openshell.workspace
+        value: ${env:OPENSHELL_WORKSPACE}
+        action: upsert
+  relay:
+    gateway_id: ${env:OPENSHELL_GATEWAY_ID}
+    workspace: ${env:OPENSHELL_WORKSPACE}
+    privacy:
+      mode: allow
+exporters:
+  otlp:
+    endpoint: ${env:OTLP_GRPC_ENDPOINT}
+    headers:
+      authorization: Bearer ${env:OTLP_EXPORT_TOKEN}
+    tls:
+      ca_file: ${env:OTLP_CA_FILE}
+      cert_file: ${env:OTLP_CLIENT_CERT_FILE}
+      key_file: ${env:OTLP_CLIENT_KEY_FILE}
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage/otlp_queue
+      queue_size: 10000
+      num_consumers: 4
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 512
+        max_size: 1024
+        sizer: items
+  otlphttp:
+    endpoint: ${env:OTLP_HTTP_ENDPOINT}
+    headers:
+      authorization: Bearer ${env:OTLP_EXPORT_TOKEN}
+    tls:
+      ca_file: ${env:OTLP_CA_FILE}
+      cert_file: ${env:OTLP_CLIENT_CERT_FILE}
+      key_file: ${env:OTLP_CLIENT_KEY_FILE}
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage/otlphttp_queue
+      queue_size: 10000
+      num_consumers: 4
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 512
+        max_size: 1024
+        sizer: items
+
+service:
+  telemetry:
+    logs:
+      encoding: json
+    metrics:
+      level: normal
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 127.0.0.1
+                port: 8888
+  extensions:
+    - bearertokenauth/nemo_relay
+    - file_storage/otlp_queue
+    - file_storage/otlphttp_queue
+    - storagehealth
+    - health_check
+  pipelines:
+    traces/nemo_relay:
+      receivers:
+        - otlp/nemo_relay
+      processors:
+        - memory_limiter
+        - resource/nemo_relay
+        - relay
+      exporters:
+        - otlp
+        - otlphttp

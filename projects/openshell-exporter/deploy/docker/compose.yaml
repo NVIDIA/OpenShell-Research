@@ -1,0 +1,64 @@
+services:
+  exporter:
+    image: ${OPENSHELL_EXPORTER_IMAGE:?set a locally built or digest-pinned registry image}
+    pull_policy: ${OPENSHELL_EXPORTER_PULL_POLICY:-never}
+    restart: unless-stopped
+    stop_grace_period: 45s
+    user: "65532:65532"
+    read_only: true
+    init: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    cpus: "2.0"
+    mem_limit: 768m
+    mem_reservation: 512m
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=32m,uid=65532,gid=65532,mode=0700
+    environment:
+      OPENSHELL_ENDPOINT: ${OPENSHELL_ENDPOINT:?set the gateway HTTPS endpoint}
+      OPENSHELL_ALLOW_INSECURE_HTTP: "false"
+      OPENSHELL_GATEWAY_ID: ${OPENSHELL_GATEWAY_ID:?set a stable gateway identifier}
+      OPENSHELL_WORKSPACE: ${OPENSHELL_WORKSPACE:-default}
+      OPENSHELL_SANDBOX_SELECTOR: ${OPENSHELL_SANDBOX_SELECTOR:-}
+      OPENSHELL_EXPORT_URL: ${OPENSHELL_EXPORT_URL:?set the CloudEvents HTTPS endpoint}
+      OPENSHELL_TOKEN_FILE: ${OPENSHELL_TOKEN_FILE_INTERNAL-/run/secrets/source/token}
+      OPENSHELL_CA_FILE: /run/secrets/source/ca.pem
+      OPENSHELL_CLIENT_CERT_FILE: ${OPENSHELL_CLIENT_CERT_FILE_INTERNAL:-}
+      OPENSHELL_CLIENT_KEY_FILE: ${OPENSHELL_CLIENT_KEY_FILE_INTERNAL:-}
+      OPENSHELL_OCSF_LOG_GLOB: /var/log/openshell/openshell-ocsf.*.log
+      OPENSHELL_OPERATIONAL_LOG_GLOB: /var/log/openshell/openshell.*.log
+      DESTINATION_TOKEN_FILE_INTERNAL: /run/secrets/destination/token
+      DESTINATION_CA_FILE_INTERNAL: /run/secrets/destination/ca.pem
+      DESTINATION_CLIENT_CERT_FILE: ${DESTINATION_CLIENT_CERT_FILE_INTERNAL:-}
+      DESTINATION_CLIENT_KEY_FILE: ${DESTINATION_CLIENT_KEY_FILE_INTERNAL:-}
+      EXPORTER_CHECKPOINT_DIR: /var/lib/openshell-exporter/checkpoints
+      EXPORTER_QUEUE_DIR: /var/lib/openshell-exporter/queues/cloudevents
+      EXPORTER_RECOVERY_FILE: /var/lib/openshell-exporter/recovery/openshell-events.json
+      EXPORTER_HEALTH_ENDPOINT: 0.0.0.0:13133
+      EXPORTER_METRICS_HOST: 0.0.0.0
+      EXPORTER_SOURCE_INSTANCE: docker-compose-gateway
+    ports:
+      - "127.0.0.1:13133:13133"
+      - "127.0.0.1:8888:8888"
+    volumes:
+      - ${EXPORTER_CONFIG_FILE:-./config.yaml}:/etc/openshell-event-exporter/config.yaml:ro
+      - ${OPENSHELL_LOG_DIR:?set the allow-listed OCSF log directory}:/var/log/openshell:ro
+      - ${SOURCE_SECRETS_DIR:?set the dedicated OpenShell source secrets directory}:/run/secrets/source:ro
+      - ${DESTINATION_SECRETS_DIR:?set the dedicated destination secrets directory}:/run/secrets/destination:ro
+      - ${CHECKPOINT_DIR:?set the host checkpoint directory}:/var/lib/openshell-exporter/checkpoints
+      - ${QUEUE_DIR:?set the host CloudEvents queue directory}:/var/lib/openshell-exporter/queues/cloudevents
+      - ${RECOVERY_DIR:?set the host recovery directory}:/var/lib/openshell-exporter/recovery
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+    logging:
+      driver: local
+      options:
+        max-size: "20m"
+        max-file: "5"

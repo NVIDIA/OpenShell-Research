@@ -1,0 +1,16 @@
+# Opt-in overlay for the real external timeline gate.
+services:
+  exporter:
+    command:
+      - --config
+      - /etc/openshell-exporter/exporter.yaml
+      - --config
+      - /etc/openshell-exporter/exporter.external.yaml
+    environment:
+      DEMO_EXTERNAL_CLOUDEVENTS_URL: ${DEMO_EXTERNAL_CLOUDEVENTS_URL}
+      DEMO_EXTERNAL_OTLP_HTTP_ENDPOINT: ${DEMO_EXTERNAL_OTLP_HTTP_ENDPOINT}
+      DEMO_EXTERNAL_CA_FILE: ${DEMO_EXTERNAL_CA_FILE}
+    volumes:
+      - ./exporter.external.yaml:/etc/openshell-exporter/exporter.external.yaml:ro
+      - ./runtime/tls/external-destination-ca.crt:/run/secrets/external-destination-ca.crt:ro
+      - ./runtime/tls/external-destination-token:/run/secrets/external-destination-token:ro

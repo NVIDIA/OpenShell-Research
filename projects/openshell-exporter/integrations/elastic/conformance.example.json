@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0",
+  "status": "passed",
+  "verified_at": "2026-08-21T12:00:00Z",
+  "integration": {
+    "name": "openshell-elastic-soc",
+    "pack_version": "1.10.0",
+    "asset_set_sha256": "5e0d4b53fe0b8aa35429732970f772dec7c74a4f832521e97ac6c3a08ba878fc",
+    "manifest_sha256": "dfad3266e598958a3c6c73e4764e9010a1644cde99386dc5ce9b9c2f235545c6",
+    "verifier_sha256": "1be85944fae2bf1cd78f369a6d64401981629bff99b7339e14300b2ba590bd57",
+    "schema_sha256": "c4bf9473e926f2e33da991f6306d01212df7ab9c0b4216c0dcdb2e3b88cf4d4b",
+    "action_binder_sha256": "64498c0d61f9925c99a6fcefb1374c0af33a7d3d108f9c1831c20673ca11c246",
+    "shift_checker_sha256": "6df8ee81709a5e3196b4639415f0b1e20cbaf2e61cd5d6f4edddfdaf3e10a266",
+    "shift_report_schema_sha256": "b5f42678ad70789dabfa124176ddbaf3c5cb1537aec9b5ac67416c9a37c88b1c"
+  },
+  "target": {
+    "environment": "production",
+    "kibana_space": "openshell-production",
+    "elasticsearch": {
+      "version": "9.4.3",
+      "cluster_status": "green",
+      "node_count": 3,
+      "data_node_count": 2
+    },
+    "kibana": {
+      "version": "9.4.3",
+      "status": "available"
+    },
+    "indices": {
+      "security": "logs-openshell.security-production-v1",
+      "agent_traces": "traces-openshell.agent-production-v1"
+    }
+  },
+  "controls": {
+    "templates_and_roles_match": true,
+    "indices_green_with_replicas": true,
+    "runtime_identity_create_only": true,
+    "runtime_identity_admin_read_delete_denied": true,
+    "detections_enabled_and_healthy": true,
+    "rule_count": 11,
+    "detection_principal": "openshell-detection-production",
+    "snapshot_repository": "security-evidence",
+    "retention_approval": "PRIVACY-456",
+    "lifecycle_management_running": true,
+    "indices_lifecycle_managed": true,
+    "security_lifecycle_policy": "openshell-security-production",
+    "agent_lifecycle_policy": "openshell-agent-production",
+    "soc_role_separation_verified": true
+  },
+  "external_gates": {
+    "status": "unexecuted",
+    "required": [
+      "sso_and_analyst_access",
+      "mtls_and_credential_rotation",
+      "snapshot_restore",
+      "retention_and_deletion",
+      "outage_drain_and_capacity",
+      "connector_delivery",
+      "soc_shift_acceptance",
+      "canary_and_multi_gateway_pilot"
+    ]
+  }
+}

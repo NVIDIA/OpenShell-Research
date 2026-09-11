@@ -1,0 +1,398 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:openshell:event-envelope:1",
+  "title": "OpenShell event envelope v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "observed_time",
+    "acquisition",
+    "openshell",
+    "security",
+    "correlation",
+    "original"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "observed_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "acquisition": {
+      "type": "object",
+      "required": [
+        "kind",
+        "durability",
+        "source_instance"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "ocsf.file",
+            "nemo_relay.log",
+            "sandbox.file_log",
+            "sandbox.lifecycle",
+            "gateway.log",
+            "sandbox.log",
+            "platform.event",
+            "policy.draft_updated",
+            "policy.draft.snapshot",
+            "policy.draft.chunk",
+            "policy.draft.history",
+            "policy.status",
+            "policy.revision",
+            "policy.reconciliation.warning",
+            "stream.warning",
+            "ocsf.forwarded",
+            "openshell.log.forwarded",
+            "kubernetes.context",
+            "source.capability"
+          ]
+        },
+        "durability": {
+          "enum": [
+            "checkpointed_file",
+            "non_resumable_stream",
+            "upstream_checkpointed_file",
+            "resource_version_checkpointed_api",
+            "checkpointed_api_snapshot",
+            "upstream_buffered_diagnostic"
+          ]
+        },
+        "source_instance": {
+          "type": "string",
+          "minLength": 1
+        },
+        "file_path": {
+          "type": "string"
+        },
+        "file_path_resolved": {
+          "type": "string"
+        },
+        "record_offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "record_number": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "replay_limitations": {
+          "type": "string"
+        },
+        "transport": {
+          "enum": [
+            "file",
+            "grpc",
+            "otlp_http",
+            "kubernetes_api"
+          ]
+        },
+        "api_operation": {
+          "type": "string"
+        },
+        "payload_type": {
+          "type": "string"
+        },
+        "stream_resumable": {
+          "type": "boolean"
+        },
+        "follow_status": {
+          "type": "boolean"
+        },
+        "follow_logs": {
+          "type": "boolean"
+        },
+        "follow_events": {
+          "type": "boolean"
+        },
+        "stop_on_terminal": {
+          "type": "boolean"
+        },
+        "log_since_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "log_sources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "log_min_level": {
+          "type": "string"
+        },
+        "log_tail_lines": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "event_tail": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reconciliation_trigger": {
+          "type": "string"
+        },
+        "notification_draft_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "consistency": {
+          "enum": [
+            "matched",
+            "gateway_ahead",
+            "notification_ahead",
+            "not_compared",
+            "unavailable"
+          ]
+        },
+        "coverage": {
+          "type": "object",
+          "required": [
+            "status",
+            "source_profile",
+            "payload_preservation",
+            "known_limitations"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "observed",
+                "gap_reported"
+              ]
+            },
+            "source_profile": {
+              "enum": [
+                "ocsf.file",
+                "openshell.log",
+                "watchsandbox",
+                "policy.reconciliation",
+                "nemo_relay.log",
+                "unsupported",
+                "ocsf.forwarded",
+                "openshell.log.forwarded",
+                "kubernetes.context",
+                "sandbox.forwarder"
+              ]
+            },
+            "payload_preservation": {
+              "enum": [
+                "redacted_source_record",
+                "full_public_proto_json",
+                "exporter_diagnostic",
+                "redacted_kubernetes_api_object"
+              ]
+            },
+            "known_limitations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "openshell": {
+      "type": "object",
+      "required": [
+        "gateway_id",
+        "workspace",
+        "sandbox_id"
+      ],
+      "properties": {
+        "gateway_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gateway_version": {
+          "type": "string"
+        },
+        "workspace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sandbox_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sandbox_name": {
+          "type": "string"
+        },
+        "policy_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "policy_revision": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "security": {
+      "type": "object",
+      "required": [
+        "validation",
+        "redaction"
+      ],
+      "properties": {
+        "ocsf": {
+          "type": "object",
+          "properties": {
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "class_uid": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "category_uid": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "activity_id": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "type_uid": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "severity_id": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": true
+        },
+        "validation": {
+          "type": "object",
+          "required": [
+            "status",
+            "errors"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "valid",
+                "invalid",
+                "not_applicable"
+              ]
+            },
+            "errors": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": true
+        },
+        "redaction": {
+          "type": "object",
+          "required": [
+            "profile_id",
+            "profile_version",
+            "applied",
+            "count"
+          ],
+          "properties": {
+            "profile_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "profile_version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "applied": {
+              "type": "boolean"
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "correlation": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "integer",
+          "boolean"
+        ]
+      }
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "workload": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "original": {},
+    "source_attributes": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "acquisition": {
+            "properties": {
+              "kind": {
+                "const": "ocsf.file"
+              }
+            }
+          },
+          "security": {
+            "properties": {
+              "validation": {
+                "properties": {
+                  "status": {
+                    "const": "valid"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "security": {
+            "required": [
+              "ocsf"
+            ],
+            "properties": {
+              "ocsf": {
+                "required": [
+                  "version",
+                  "class_uid",
+                  "category_uid",
+                  "activity_id",
+                  "type_uid"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": true
+}

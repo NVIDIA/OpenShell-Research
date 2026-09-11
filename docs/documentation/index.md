@@ -9,6 +9,8 @@ agent_markdown: true
 Technical documentation and references for installing, using, and extending
 OpenShell Research projects.
 
+- [OpenShell Event Exporter](openshell-exporter/index.md): collect and export
+  OpenShell events and agent traces to security and observability tools.
 - [Egress Gate](egress-gate/index.md): extensible middleware for applying gates
   to outgoing HTTP requests.
 - [OpenShell Agent Runner](openshell-agent-runner/index.md): launch ephemeral

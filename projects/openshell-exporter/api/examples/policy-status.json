@@ -1,0 +1,74 @@
+{
+  "specversion": "1.0",
+  "id": "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "source": "openshell://gateway-prod-1/workspaces/default/sandboxes/sandbox-123/sources/policy.status",
+  "type": "com.nvidia.openshell.policy.status.v1",
+  "dataschema": "urn:openshell:event-envelope:1",
+  "datacontenttype": "application/json",
+  "subject": "sandboxes/sandbox-123",
+  "time": "2026-08-25T11:59:50Z",
+  "data": {
+    "schema_version": "1.0",
+    "observed_time": "2026-08-25T12:00:04Z",
+    "acquisition": {
+      "kind": "policy.status",
+      "durability": "checkpointed_api_snapshot",
+      "source_instance": "policy-reconciliation",
+      "transport": "grpc",
+      "api_operation": "openshell.v1.OpenShell/GetSandboxPolicyStatus",
+      "payload_type": "openshell.v1.GetSandboxPolicyStatusResponse",
+      "reconciliation_trigger": "reconnect",
+      "consistency": "not_compared",
+      "replay_limitations": "authoritative read snapshot with no event cursor; file_storage suppresses unchanged snapshots and downstream source+id deduplicates replay",
+      "coverage": {
+        "status": "observed",
+        "source_profile": "policy.reconciliation",
+        "payload_preservation": "full_public_proto_json",
+        "known_limitations": [
+          "read_only_polling_snapshot_without_event_cursor",
+          "review_tokens_are_never_exported",
+          "effective_policy_bodies_require_explicit_opt_in"
+        ]
+      }
+    },
+    "openshell": {
+      "gateway_id": "gateway-prod-1",
+      "gateway_version": "0.0.113",
+      "workspace": "default",
+      "sandbox_id": "sandbox-123",
+      "sandbox_name": "research-agent",
+      "policy_version": 17,
+      "policy_revision": 17
+    },
+    "security": {
+      "validation": {"status": "not_applicable", "errors": []},
+      "redaction": {"profile_id": "openshell-default", "profile_version": "1", "applied": false, "count": 0}
+    },
+    "correlation": {
+      "openshell.gateway.id": "gateway-prod-1",
+      "openshell.workspace": "default",
+      "openshell.sandbox.id": "sandbox-123",
+      "openshell.policy.version": 17
+    },
+    "original": {
+      "sandbox_id": "sandbox-123",
+      "active_version": 17,
+      "example_join": {
+        "method": "temporal_context",
+        "same_sandbox": true,
+        "bounded_source_time_window_seconds": 30,
+        "causal_proof": false
+      },
+      "source_payload": {
+        "active_version": "17",
+        "revision": {
+          "version": "17",
+          "policy_hash": "sha256:9ec3f5d1",
+          "status": "SANDBOX_POLICY_REVISION_STATUS_ACTIVE",
+          "created_at_ms": "1787659190000"
+        },
+        "future_policy_field": "preserved"
+      }
+    }
+  }
+}

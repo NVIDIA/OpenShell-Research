@@ -1,0 +1,25 @@
+{
+  "cluster": [
+    "monitor"
+  ],
+  "indices": [
+    {
+      "names": [
+        "logs-openshell.security-*-v1",
+        "logs-openshell.security-*-v2",
+        "traces-openshell.agent-*-v1"
+      ],
+      "privileges": [
+        "create_doc",
+        "view_index_metadata"
+      ],
+      "allow_restricted_indices": false
+    }
+  ],
+  "applications": [],
+  "run_as": [],
+  "metadata": {
+    "managed_by": "openshell-event-exporter-reference",
+    "purpose": "create-only OpenShell security evidence ingestion"
+  }
+}

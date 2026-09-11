@@ -1,0 +1,34 @@
+{
+  "intent_summary": "Allow curl to retrieve the OpenShell SOC demonstration page from example.com exactly once after human review.",
+  "operations": [
+    {
+      "addRule": {
+        "ruleName": "soc_demo_example_get",
+        "rule": {
+          "name": "soc_demo_example_get",
+          "endpoints": [
+            {
+              "host": "example.com",
+              "port": 443,
+              "protocol": "rest",
+              "enforcement": "enforce",
+              "rules": [
+                {
+                  "allow": {
+                    "method": "GET",
+                    "path": "/"
+                  }
+                }
+              ]
+            }
+          ],
+          "binaries": [
+            {
+              "path": "/usr/bin/curl"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

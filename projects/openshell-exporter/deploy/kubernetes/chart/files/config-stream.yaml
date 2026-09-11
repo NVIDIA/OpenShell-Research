@@ -1,0 +1,123 @@
+extensions:
+  bearertokenauth/destination:
+    filename: ${env:DESTINATION_TOKEN_FILE_INTERNAL}
+  file_storage/checkpoints:
+    directory: ${env:EXPORTER_CHECKPOINT_DIR}
+    create_directory: false
+  file_storage/cloudevents_queue:
+    directory: ${env:EXPORTER_QUEUE_DIR}
+    create_directory: false
+  storagehealth:
+    interval: 30s
+    max_entries: 1024
+    paths:
+      checkpoints: ${env:EXPORTER_CHECKPOINT_DIR}
+      cloudevents_queue: ${env:EXPORTER_QUEUE_DIR}
+      recovery: ${env:EXPORTER_RECOVERY_FILE}
+  health_check:
+    endpoint: ${env:EXPORTER_HEALTH_ENDPOINT}
+
+receivers:
+  watchsandbox:
+    endpoint: ${env:OPENSHELL_ENDPOINT}
+    allow_insecure_http: ${env:OPENSHELL_ALLOW_INSECURE_HTTP}
+    workspace: ${env:OPENSHELL_WORKSPACE}
+    gateway_id: ${env:OPENSHELL_GATEWAY_ID}
+    label_selector: ${env:OPENSHELL_SANDBOX_SELECTOR}
+    discovery_interval: 30s
+    token_env: ""
+    token_file: ${env:OPENSHELL_TOKEN_FILE}
+    log_tail_lines: 200
+    event_tail: 200
+    reconnect_initial: 1s
+    reconnect_max: 30s
+    policy_reconciliation:
+      enabled: true
+      interval: 5m
+      timeout: 15s
+      workers: 2
+      queue_size: 128
+      max_revisions: 10000
+      include_history: true
+      include_effective_policies: false
+      storage: file_storage/checkpoints
+    tls:
+      ca_file: ${env:OPENSHELL_CA_FILE}
+      cert_file: ${env:OPENSHELL_CLIENT_CERT_FILE}
+      key_file: ${env:OPENSHELL_CLIENT_KEY_FILE}
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+  openshell:
+    source_profiles: [watchsandbox, policy.reconciliation]
+    gateway_id: ${env:OPENSHELL_GATEWAY_ID}
+    workspace: ${env:OPENSHELL_WORKSPACE}
+    source_instance: ${env:EXPORTER_SOURCE_INSTANCE}
+    default_sandbox_id: unknown
+    validation:
+      mode: mark
+exporters:
+  cloudevents:
+    endpoint: ${env:OPENSHELL_EXPORT_URL}
+    timeout: 15s
+    max_events: 500
+    max_event_bytes: 1048576
+    max_request_bytes: 4194304
+    auth:
+      authenticator: bearertokenauth/destination
+    tls:
+      ca_file: ${env:DESTINATION_CA_FILE_INTERNAL}
+      cert_file: ${env:DESTINATION_CLIENT_CERT_FILE}
+      key_file: ${env:DESTINATION_CLIENT_KEY_FILE}
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage/cloudevents_queue
+      sizer: requests
+      queue_size: 10000
+      num_consumers: 4
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 512
+        max_size: 1024
+        sizer: items
+  file/recovery:
+    path: ${env:EXPORTER_RECOVERY_FILE}
+    format: json
+
+service:
+  telemetry:
+    logs:
+      encoding: json
+    metrics:
+      level: normal
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: ${env:EXPORTER_METRICS_HOST}
+                port: 8888
+  extensions:
+    - bearertokenauth/destination
+    - file_storage/checkpoints
+    - file_storage/cloudevents_queue
+    - storagehealth
+    - health_check
+  pipelines:
+    logs:
+      receivers:
+        - watchsandbox
+      processors:
+        - memory_limiter
+        - openshell
+      exporters:
+        - cloudevents
+        - file/recovery

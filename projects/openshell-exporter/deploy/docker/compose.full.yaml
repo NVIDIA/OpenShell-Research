@@ -1,0 +1,25 @@
+services:
+  exporter:
+    environment:
+      NEMO_RELAY_LOG_GLOB: /var/log/nemo-relay/*.jsonl
+      NEMO_RELAY_OTLP_TOKEN_FILE: /run/secrets/nemo-relay-input/token
+      NEMO_RELAY_OTLP_TLS_CERT_FILE: /run/secrets/nemo-relay-input/tls.crt
+      NEMO_RELAY_OTLP_TLS_KEY_FILE: /run/secrets/nemo-relay-input/tls.key
+      NEMO_RELAY_OTLP_CLIENT_CA_FILE: /run/secrets/nemo-relay-input/client-ca.pem
+      OTLP_DESTINATION_TOKEN_FILE: /run/secrets/otlp-destination/token
+      OTLP_CA_FILE: /run/secrets/otlp-destination/ca.pem
+      OTLP_CLIENT_CERT_FILE: ${OTLP_CLIENT_CERT_FILE_INTERNAL:-}
+      OTLP_CLIENT_KEY_FILE: ${OTLP_CLIENT_KEY_FILE_INTERNAL:-}
+      OTLP_GRPC_ENDPOINT: ${OTLP_GRPC_ENDPOINT:?set the OTLP gRPC destination}
+      OTLP_HTTP_ENDPOINT: ${OTLP_HTTP_ENDPOINT:?set the OTLP HTTP destination}
+      EXPORTER_OTLP_GRPC_QUEUE_DIR: /var/lib/openshell-exporter/queues/otlp-grpc
+      EXPORTER_OTLP_HTTP_QUEUE_DIR: /var/lib/openshell-exporter/queues/otlp-http
+    ports:
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - ${NEMO_RELAY_LOG_DIR:?set the allow-listed Relay log directory}:/var/log/nemo-relay:ro
+      - ${NEMO_RELAY_INPUT_SECRETS_DIR:?set the Relay input secrets directory}:/run/secrets/nemo-relay-input:ro
+      - ${OTLP_DESTINATION_SECRETS_DIR:?set the OTLP destination secrets directory}:/run/secrets/otlp-destination:ro
+      - ${OTLP_GRPC_QUEUE_DIR:?set the OTLP gRPC queue directory}:/var/lib/openshell-exporter/queues/otlp-grpc
+      - ${OTLP_HTTP_QUEUE_DIR:?set the OTLP HTTP queue directory}:/var/lib/openshell-exporter/queues/otlp-http

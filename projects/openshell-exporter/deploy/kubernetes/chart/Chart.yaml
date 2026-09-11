@@ -1,0 +1,12 @@
+apiVersion: v2
+name: openshell-event-exporter
+description: Gateway-local OpenShell evidence exporter
+type: application
+version: 0.0.4
+appVersion: "0.0.4"
+kubeVersion: ">=1.29.0-0"
+home: https://github.com/NVIDIA/OpenShell-Research
+sources:
+  - https://github.com/NVIDIA/OpenShell-Research
+annotations:
+  artifacthub.io/license: Apache-2.0

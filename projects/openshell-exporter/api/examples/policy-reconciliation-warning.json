@@ -1,0 +1,57 @@
+{
+  "specversion": "1.0",
+  "id": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "source": "openshell://gateway-prod-1/workspaces/default/sandboxes/sandbox-123/sources/policy.reconciliation.warning",
+  "type": "com.nvidia.openshell.policy.reconciliation.warning.v1",
+  "dataschema": "urn:openshell:event-envelope:1",
+  "datacontenttype": "application/json",
+  "subject": "sandboxes/sandbox-123",
+  "data": {
+    "schema_version": "1.0",
+    "observed_time": "2026-08-25T12:00:07Z",
+    "acquisition": {
+      "kind": "policy.reconciliation.warning",
+      "durability": "checkpointed_api_snapshot",
+      "source_instance": "policy-reconciliation",
+      "transport": "grpc",
+      "api_operation": "openshell.v1.OpenShell/GetDraftPolicy",
+      "payload_type": "openshell.exporter.policy.Diagnostic",
+      "reconciliation_trigger": "periodic",
+      "consistency": "unavailable",
+      "replay_limitations": "authoritative read snapshot with no event cursor; file_storage suppresses unchanged snapshots and downstream source+id deduplicates replay",
+      "coverage": {
+        "status": "gap_reported",
+        "source_profile": "policy.reconciliation",
+        "payload_preservation": "exporter_diagnostic",
+        "known_limitations": [
+          "read_only_polling_snapshot_without_event_cursor",
+          "review_tokens_are_never_exported",
+          "effective_policy_bodies_require_explicit_opt_in"
+        ]
+      }
+    },
+    "openshell": {
+      "gateway_id": "gateway-prod-1",
+      "gateway_version": "0.0.113",
+      "workspace": "default",
+      "sandbox_id": "sandbox-123",
+      "sandbox_name": "research-agent"
+    },
+    "security": {
+      "validation": {"status": "not_applicable", "errors": []},
+      "redaction": {"profile_id": "openshell-default", "profile_version": "1", "applied": false, "count": 0}
+    },
+    "correlation": {
+      "openshell.gateway.id": "gateway-prod-1",
+      "openshell.workspace": "default",
+      "openshell.sandbox.id": "sandbox-123"
+    },
+    "original": {
+      "sandbox_id": "sandbox-123",
+      "code": "UNAVAILABLE",
+      "message": "policy reconciliation read failed; a coverage gap may exist",
+      "api_operation": "openshell.v1.OpenShell/GetDraftPolicy",
+      "future_policy_field": "preserved"
+    }
+  }
+}

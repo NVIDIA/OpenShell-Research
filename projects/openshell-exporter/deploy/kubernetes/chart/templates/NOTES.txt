@@ -1,0 +1,13 @@
+OpenShell Event Exporter is installed as {{ include "openshell-event-exporter.fullname" . }}.
+
+Profile: {{ .Values.profile }}
+Health:  {{ include "openshell-event-exporter.fullname" . }}:13133
+Metrics: {{ include "openshell-event-exporter.fullname" . }}:8888
+
+Persistent queue and recovery PVCs use helm.sh/resource-policy=keep. Helm uninstall
+does not delete customer evidence. Delete retained PVCs only through the approved
+retention process.
+
+Verify:
+  kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "openshell-event-exporter.fullname" . }}
+  kubectl -n {{ .Release.Namespace }} logs deployment/{{ include "openshell-event-exporter.fullname" . }} -c exporter

@@ -1,0 +1,10 @@
+image:
+  repository: registry.example.internal/openshell-event-exporter
+  digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+profile: stream
+source:
+  endpoint: https://openshell.openshell.svc.cluster.local:50051
+  gatewayId: ci-gateway
+destination:
+  cloudEvents:
+    endpoint: https://events.example.internal/v1/events

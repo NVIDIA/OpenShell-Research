@@ -1,0 +1,40 @@
+# A focused gateway-stream-to-CloudEvents deployment. Start with this file,
+# enable only the lanes and destinations that are authorized, then satisfy the
+# companion transport settings for each enabled module.
+profile: custom
+
+image:
+  repository: registry.example.internal/openshell-event-exporter
+  digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+
+modules:
+  acquisition:
+    watchSandbox: true
+    policyReconciliation: true
+    ocsfFiles: false
+    sandboxFileLogs: false
+    relayFileLogs: false
+    relayOtlp: false
+    nativeOtlp: false
+    forwardedSandboxFiles: false
+    kubernetesContext: false
+    internalOtlp: false
+  delivery:
+    cloudEvents: true
+    otlpGrpc: false
+    otlpHttp: false
+    recovery: true
+
+source:
+  endpoint: https://openshell.openshell.svc.cluster.local:50051
+  gatewayId: production-gateway-1
+  workspace: default
+
+destination:
+  cloudEvents:
+    endpoint: https://events.customer.example/v1/events
+
+networkPolicy:
+  enabled: true
+  monitoringNamespaces:
+    - monitoring

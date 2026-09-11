@@ -1,0 +1,25 @@
+{
+  "cluster": [
+    "manage_index_templates",
+    "manage_security"
+  ],
+  "indices": [
+    {
+      "names": [
+        "logs-openshell.security-*-v1",
+        "traces-openshell.agent-*-v1"
+      ],
+      "privileges": [
+        "create_index",
+        "manage"
+      ],
+      "allow_restricted_indices": false
+    }
+  ],
+  "applications": [],
+  "run_as": [],
+  "metadata": {
+    "managed_by": "openshell-event-exporter-reference",
+    "purpose": "temporary OpenShell SOC asset bootstrap; revoke after installation"
+  }
+}

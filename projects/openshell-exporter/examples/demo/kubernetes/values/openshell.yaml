@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+# SPDX-License-Identifier: Apache-2.0
+fullnameOverride: openshell
+image:
+  repository: ghcr.io/nvidia/openshell/gateway
+  tag: 0.0.113
+  pullPolicy: IfNotPresent
+supervisor:
+  sideloadMethod: init-container
+  topology: combined
+  image:
+    repository: ghcr.io/nvidia/openshell/supervisor
+    tag: 0.0.113
+    pullPolicy: IfNotPresent
+serviceAccount:
+  create: true
+  name: openshell
+sandboxServiceAccount:
+  create: true
+  name: openshell-sandbox
+certManager:
+  enabled: true
+server:
+  logLevel: info
+  telemetryEnabled: false
+  sandboxNamespace: openshell-sandboxes
+  sandboxImage: docker.io/library/busybox:1.36.1
+  sandboxImagePullPolicy: IfNotPresent
+  workspaceStorageClass: csi-hostpath-sc
+  workspaceDefaultStorageSize: 1Gi
+  credentialDrivers:
+    kubernetesSecrets:
+      enabled: true
+      namespace: openshell-provider-credentials
+      allowReferenceNamespace: false
+      rbac: {create: true}
+  auth:
+    # Local fixture only. Transport still uses chart-managed mTLS.
+    allowUnauthenticatedUsers: true
+persistence:
+  enabled: true
+  storageClass: csi-hostpath-sc
+  size: 2Gi
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "2"
+    memory: 1Gi

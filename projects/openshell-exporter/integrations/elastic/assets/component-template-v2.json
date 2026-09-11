@@ -1,0 +1,205 @@
+{
+  "version": 2,
+  "_meta": {
+    "description": "ECS and lossless OpenShell security evidence mappings",
+    "managed_by": "openshell-event-exporter-reference"
+  },
+  "template": {
+    "settings": {
+      "index.mapping.total_fields.limit": 2000,
+      "index.mapping.ignore_malformed": false
+    },
+    "mappings": {
+      "_meta": {
+        "openshell_mapping_version": 2,
+        "cloud_events_envelope_version": "1.0"
+      },
+      "dynamic": false,
+      "properties": {
+        "@timestamp": {"type": "date"},
+        "message": {"type": "match_only_text"},
+        "tags": {"type": "keyword"},
+        "event": {
+          "properties": {
+            "id": {"type": "keyword", "ignore_above": 1024},
+            "kind": {"type": "keyword"},
+            "category": {"type": "keyword"},
+            "type": {"type": "keyword"},
+            "action": {"type": "keyword", "ignore_above": 1024},
+            "outcome": {"type": "keyword"},
+            "reason": {"type": "keyword", "ignore_above": 4096},
+            "dataset": {"type": "keyword"},
+            "module": {"type": "keyword"},
+            "provider": {"type": "keyword"},
+            "original": {"type": "text", "index": false},
+            "ingested": {"type": "date"}
+          }
+        },
+        "observer": {
+          "properties": {
+            "name": {"type": "keyword", "ignore_above": 1024},
+            "vendor": {"type": "keyword"},
+            "product": {"type": "keyword"},
+            "version": {"type": "keyword", "ignore_above": 256}
+          }
+        },
+        "service": {"properties": {"name": {"type": "keyword", "ignore_above": 1024}}},
+        "trace": {"properties": {"id": {"type": "keyword", "ignore_above": 64}}},
+        "span": {"properties": {"id": {"type": "keyword", "ignore_above": 32}}},
+        "transaction": {"properties": {"id": {"type": "keyword", "ignore_above": 1024}}},
+        "session": {"properties": {"id": {"type": "keyword", "ignore_above": 1024}}},
+        "process": {
+          "properties": {
+            "executable": {"type": "keyword", "ignore_above": 4096},
+            "name": {"type": "keyword", "ignore_above": 1024},
+            "pid": {"type": "long"},
+            "command_line": {"type": "wildcard"},
+            "parent": {
+              "properties": {
+                "executable": {"type": "keyword", "ignore_above": 4096},
+                "name": {"type": "keyword", "ignore_above": 1024},
+                "pid": {"type": "long"}
+              }
+            }
+          }
+        },
+        "container": {
+          "properties": {
+            "id": {"type": "keyword", "ignore_above": 1024},
+            "name": {"type": "keyword", "ignore_above": 1024},
+            "image": {"properties": {"name": {"type": "keyword", "ignore_above": 2048}}}
+          }
+        },
+        "source": {
+          "properties": {
+            "ip": {"type": "ip"},
+            "port": {"type": "long"},
+            "address": {"type": "keyword", "ignore_above": 2048},
+            "domain": {"type": "keyword", "ignore_above": 2048}
+          }
+        },
+        "destination": {
+          "properties": {
+            "ip": {"type": "ip"},
+            "port": {"type": "long"},
+            "address": {"type": "keyword", "ignore_above": 2048},
+            "domain": {"type": "keyword", "ignore_above": 2048}
+          }
+        },
+        "network": {
+          "properties": {
+            "transport": {"type": "keyword"},
+            "protocol": {"type": "keyword"},
+            "direction": {"type": "keyword"}
+          }
+        },
+        "rule": {
+          "properties": {
+            "id": {"type": "keyword", "ignore_above": 1024},
+            "name": {"type": "keyword", "ignore_above": 2048},
+            "category": {"type": "keyword", "ignore_above": 1024},
+            "ruleset": {"type": "keyword", "ignore_above": 2048}
+          }
+        },
+        "host": {
+          "properties": {
+            "hostname": {"type": "keyword", "ignore_above": 1024},
+            "name": {"type": "keyword", "ignore_above": 1024},
+            "os": {
+              "properties": {
+                "name": {"type": "keyword", "ignore_above": 1024},
+                "version": {"type": "keyword", "ignore_above": 1024}
+              }
+            }
+          }
+        },
+        "user": {
+          "properties": {
+            "id": {"type": "keyword", "ignore_above": 1024},
+            "name": {"type": "keyword", "ignore_above": 1024}
+          }
+        },
+        "file": {
+          "properties": {
+            "path": {"type": "keyword", "ignore_above": 4096},
+            "name": {"type": "keyword", "ignore_above": 1024},
+            "directory": {"type": "keyword", "ignore_above": 4096},
+            "extension": {"type": "keyword", "ignore_above": 256},
+            "size": {"type": "long"},
+            "hash": {"type": "flattened"}
+          }
+        },
+        "url": {
+          "properties": {
+            "full": {"type": "wildcard"},
+            "scheme": {"type": "keyword"},
+            "domain": {"type": "keyword", "ignore_above": 2048},
+            "port": {"type": "long"},
+            "path": {"type": "wildcard"},
+            "query": {"type": "wildcard"}
+          }
+        },
+        "http": {
+          "properties": {
+            "request": {
+              "properties": {
+                "method": {"type": "keyword"},
+                "referrer": {"type": "keyword", "ignore_above": 4096}
+              }
+            },
+            "response": {"properties": {"status_code": {"type": "long"}}}
+          }
+        },
+        "dns": {"properties": {"question": {"properties": {"name": {"type": "keyword", "ignore_above": 2048}}}}},
+        "openshell": {
+          "properties": {
+            "cloud_event": {
+              "properties": {
+                "id": {"type": "keyword", "ignore_above": 1024},
+                "source": {"type": "keyword", "ignore_above": 2048},
+                "type": {"type": "keyword", "ignore_above": 1024},
+                "subject": {"type": "keyword", "ignore_above": 1024},
+                "specversion": {"type": "keyword"},
+                "dataschema": {"type": "keyword", "ignore_above": 1024},
+                "extensions": {"type": "flattened", "depth_limit": 30}
+              }
+            },
+            "gateway": {
+              "properties": {
+                "id": {"type": "keyword", "ignore_above": 1024},
+                "version": {"type": "keyword", "ignore_above": 256}
+              }
+            },
+            "workspace": {"type": "keyword", "ignore_above": 1024},
+            "sandbox": {
+              "properties": {
+                "id": {"type": "keyword", "ignore_above": 1024},
+                "name": {"type": "keyword", "ignore_above": 1024},
+                "phase": {"type": "keyword", "ignore_above": 1024},
+                "resource_version": {"type": "keyword", "ignore_above": 1024},
+                "lifecycle_event": {"type": "keyword", "ignore_above": 1024},
+                "state_observed_at": {"type": "date"},
+                "status": {"type": "flattened", "depth_limit": 30}
+              }
+            },
+            "policy": {
+              "properties": {
+                "version": {"type": "keyword", "ignore_above": 1024},
+                "revision": {"type": "keyword", "ignore_above": 1024}
+              }
+            },
+            "request": {"properties": {"id": {"type": "keyword", "ignore_above": 1024}}},
+            "tool_call": {"properties": {"id": {"type": "keyword", "ignore_above": 1024}}},
+            "policy_chunk": {"properties": {"id": {"type": "keyword", "ignore_above": 1024}}},
+            "acquisition": {"type": "flattened", "depth_limit": 30},
+            "ocsf": {"type": "flattened", "depth_limit": 30},
+            "validation": {"type": "flattened", "depth_limit": 30},
+            "redaction": {"type": "flattened", "depth_limit": 30},
+            "correlation": {"type": "flattened", "depth_limit": 30},
+            "source": {"type": "flattened", "depth_limit": 30}
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,549 @@
+extensions:
+{{- if eq (include "openshell-event-exporter.module.cloudEvents" .) "true" }}
+  bearertokenauth/destination:
+    filename: ${env:DESTINATION_TOKEN_FILE_INTERNAL}
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.relayOtlp" .) "true" }}
+  bearertokenauth/nemo_relay:
+    filename: ${env:NEMO_RELAY_OTLP_TOKEN_FILE}
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.forwardedSandboxFiles" .) "true" }}
+  bearertokenauth/forwarded_ocsf:
+    filename: ${env:FORWARDED_OCSF_TOKEN_FILE}
+{{- end }}
+{{- if or (eq (include "openshell-event-exporter.module.otlpGrpc" .) "true") (eq (include "openshell-event-exporter.module.otlpHttp" .) "true") }}
+  bearertokenauth/otlp_destination:
+    filename: ${env:OTLP_DESTINATION_TOKEN_FILE}
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.checkpoints" .) "true" }}
+  file_storage/checkpoints:
+    directory: ${env:EXPORTER_CHECKPOINT_DIR}
+    create_directory: false
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.cloudEvents" .) "true" }}
+  file_storage/cloudevents_queue:
+    directory: ${env:EXPORTER_QUEUE_DIR}
+    create_directory: false
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.otlpGrpc" .) "true" }}
+  file_storage/otlp_queue:
+    directory: ${env:EXPORTER_OTLP_GRPC_QUEUE_DIR}
+    create_directory: false
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.otlpHttp" .) "true" }}
+  file_storage/otlphttp_queue:
+    directory: ${env:EXPORTER_OTLP_HTTP_QUEUE_DIR}
+    create_directory: false
+{{- end }}
+  storagehealth:
+    interval: 30s
+    max_entries: 1024
+    paths:
+{{- if eq (include "openshell-event-exporter.module.checkpoints" .) "true" }}
+      checkpoints: ${env:EXPORTER_CHECKPOINT_DIR}
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.cloudEvents" .) "true" }}
+      cloudevents_queue: ${env:EXPORTER_QUEUE_DIR}
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.otlpGrpc" .) "true" }}
+      otlp_grpc_queue: ${env:EXPORTER_OTLP_GRPC_QUEUE_DIR}
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.otlpHttp" .) "true" }}
+      otlp_http_queue: ${env:EXPORTER_OTLP_HTTP_QUEUE_DIR}
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.recovery" .) "true" }}
+      recovery: ${env:EXPORTER_RECOVERY_FILE}
+{{- end }}
+  health_check:
+    endpoint: ${env:EXPORTER_HEALTH_ENDPOINT}
+
+receivers:
+{{- if eq (include "openshell-event-exporter.module.watchSandbox" .) "true" }}
+  watchsandbox:
+    endpoint: ${env:OPENSHELL_ENDPOINT}
+    allow_insecure_http: ${env:OPENSHELL_ALLOW_INSECURE_HTTP}
+    workspace: ${env:OPENSHELL_WORKSPACE}
+    gateway_id: ${env:OPENSHELL_GATEWAY_ID}
+    label_selector: ${env:OPENSHELL_SANDBOX_SELECTOR}
+    discovery_interval: 30s
+    token_env: ""
+    token_file: ${env:OPENSHELL_TOKEN_FILE}
+    log_tail_lines: 200
+    event_tail: 200
+    reconnect_initial: 1s
+    reconnect_max: 30s
+    policy_reconciliation:
+      enabled: {{ eq (include "openshell-event-exporter.module.policyReconciliation" .) "true" }}
+      interval: 5m
+      timeout: 15s
+      workers: 2
+      queue_size: 128
+      max_revisions: 10000
+      include_history: true
+      include_effective_policies: false
+      storage: file_storage/checkpoints
+    tls:
+      ca_file: ${env:OPENSHELL_CA_FILE}
+      cert_file: ${env:OPENSHELL_CLIENT_CERT_FILE}
+      key_file: ${env:OPENSHELL_CLIENT_KEY_FILE}
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.ocsfFiles" .) "true" }}
+  file_log/openshell_ocsf:
+    include: ["${env:OPENSHELL_OCSF_LOG_GLOB}"]
+    start_at: beginning
+    storage: file_storage/checkpoints
+    retry_on_failure: &durable_file_retry
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+    include_file_path: true
+    include_file_path_resolved: true
+    include_file_record_offset: true
+    include_file_record_number: true
+    on_truncate: read_whole_file
+    max_log_size: 8MiB
+    max_log_size_behavior: split
+    attributes:
+      openshell.acquisition.kind: ocsf.file
+      openshell.acquisition.source_instance: sandbox-ocsf-jsonl
+    operators:
+      - type: json_parser
+        parse_from: body
+        parse_to: body
+        on_error: send
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.sandboxFileLogs" .) "true" }}
+  file_log/openshell_sandbox:
+    include: ["${env:OPENSHELL_OPERATIONAL_LOG_GLOB}"]
+    start_at: beginning
+    storage: file_storage/checkpoints
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+    include_file_path: true
+    include_file_path_resolved: true
+    include_file_record_offset: true
+    include_file_record_number: true
+    on_truncate: read_whole_file
+    max_log_size: 8MiB
+    max_log_size_behavior: split
+    attributes:
+      openshell.acquisition.kind: sandbox.file_log
+      openshell.acquisition.source_instance: sandbox-operational-log
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.relayFileLogs" .) "true" }}
+  file_log/nemo_relay:
+    include: [${env:NEMO_RELAY_LOG_GLOB}]
+    start_at: beginning
+    storage: file_storage/checkpoints
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+    include_file_path: true
+    include_file_path_resolved: true
+    include_file_record_offset: true
+    include_file_record_number: true
+    on_truncate: read_whole_file
+    max_log_size: 8MiB
+    max_log_size_behavior: split
+    attributes:
+      openshell.acquisition.kind: nemo_relay.log
+      openshell.acquisition.source_instance: nemo-relay-file
+    operators:
+      - type: json_parser
+        parse_from: body
+        parse_to: body
+        on_error: send
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.relayOtlp" .) "true" }}
+  otlp/nemo_relay:
+    protocols:
+      grpc:
+        endpoint: ${env:NEMO_RELAY_OTLP_GRPC_LISTEN}
+        auth:
+          authenticator: bearertokenauth/nemo_relay
+        tls:
+          cert_file: ${env:NEMO_RELAY_OTLP_TLS_CERT_FILE}
+          key_file: ${env:NEMO_RELAY_OTLP_TLS_KEY_FILE}
+          reload_interval: 1m
+          client_ca_file_reload: true
+          client_ca_file: ${env:NEMO_RELAY_OTLP_CLIENT_CA_FILE}
+      http:
+        endpoint: ${env:NEMO_RELAY_OTLP_HTTP_LISTEN}
+        auth:
+          authenticator: bearertokenauth/nemo_relay
+        tls:
+          cert_file: ${env:NEMO_RELAY_OTLP_TLS_CERT_FILE}
+          key_file: ${env:NEMO_RELAY_OTLP_TLS_KEY_FILE}
+          reload_interval: 1m
+          client_ca_file_reload: true
+          client_ca_file: ${env:NEMO_RELAY_OTLP_CLIENT_CA_FILE}
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.nativeOtlp" .) "true" }}
+  otlp/openshell_native:
+    protocols:
+      grpc:
+        endpoint: ${env:OPENSHELL_NATIVE_OTLP_GRPC_LISTEN}
+        tls:
+          cert_file: ${env:OPENSHELL_NATIVE_OTLP_TLS_CERT_FILE}
+          key_file: ${env:OPENSHELL_NATIVE_OTLP_TLS_KEY_FILE}
+          reload_interval: 1m
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.forwardedSandboxFiles" .) "true" }}
+  otlp/forwarded_ocsf:
+    protocols:
+      http:
+        endpoint: ${env:FORWARDED_OCSF_OTLP_HTTP_LISTEN}
+        auth:
+          authenticator: bearertokenauth/forwarded_ocsf
+        tls:
+          cert_file: ${env:FORWARDED_OCSF_TLS_CERT_FILE}
+          key_file: ${env:FORWARDED_OCSF_TLS_KEY_FILE}
+          reload_interval: 1m
+          client_ca_file_reload: true
+          client_ca_file: ${env:FORWARDED_OCSF_CLIENT_CA_FILE}
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.kubernetesContext" .) "true" }}
+  k8s_objects:
+    auth_type: serviceAccount
+    storage: file_storage/checkpoints
+    error_mode: propagate
+    include_initial_state: true
+    objects:
+      - name: pods
+        mode: watch
+        namespaces:
+{{ toYaml .Values.kubernetesContext.namespaces | indent 10 }}
+      - name: events
+        group: events.k8s.io
+        mode: watch
+        namespaces:
+{{ toYaml .Values.kubernetesContext.namespaces | indent 10 }}
+{{- end }}
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+{{- if eq .Values.topology.role "edge" }}
+  evidencecontract/stamp:
+    mode: stamp
+    contract_version: "1.0"
+    tenant_id: {{ .Values.topology.tenantId | quote }}
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.hasLogs" .) "true" }}
+  openshell:
+    source_profiles:
+{{- if eq (include "openshell-event-exporter.module.watchSandbox" .) "true" }}
+      - watchsandbox
+{{- if eq (include "openshell-event-exporter.module.policyReconciliation" .) "true" }}
+      - policy.reconciliation
+{{- end }}
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.ocsfFiles" .) "true" }}
+      - ocsf.file
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.sandboxFileLogs" .) "true" }}
+      - openshell.log
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.relayFileLogs" .) "true" }}
+      - nemo_relay.log
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.forwardedSandboxFiles" .) "true" }}
+      - ocsf.forwarded
+      - openshell.log.forwarded
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.kubernetesContext" .) "true" }}
+      - kubernetes.context
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.relayOtlp" .) "true" }}
+      - nemo_relay.trace
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.nativeOtlp" .) "true" }}
+      - openshell.trace
+{{- end }}
+    gateway_id: ${env:OPENSHELL_GATEWAY_ID}
+    workspace: ${env:OPENSHELL_WORKSPACE}
+    source_instance: ${env:EXPORTER_SOURCE_INSTANCE}
+    default_sandbox_id: unknown
+    validation:
+      mode: mark
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.relayOtlp" .) "true" }}
+  resource/nemo_relay:
+    attributes:
+      - key: telemetry.source
+        value: nemo_relay
+        action: upsert
+      - key: openshell.gateway.id
+        value: ${env:OPENSHELL_GATEWAY_ID}
+        action: upsert
+      - key: openshell.workspace
+        value: ${env:OPENSHELL_WORKSPACE}
+        action: upsert
+  relay/nemo_relay:
+    gateway_id: ${env:OPENSHELL_GATEWAY_ID}
+    workspace: ${env:OPENSHELL_WORKSPACE}
+    telemetry_source: nemo_relay
+    canonicalize_span_names: true
+    required_correlation_attributes: [openshell.sandbox.id, agent.session.id]
+    privacy:
+      mode: allow
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.nativeOtlp" .) "true" }}
+  resource/openshell_native:
+    attributes:
+      - key: telemetry.source
+        value: openshell_native
+        action: upsert
+      - key: openshell.gateway.id
+        value: ${env:OPENSHELL_GATEWAY_ID}
+        action: upsert
+      - key: openshell.workspace
+        value: ${env:OPENSHELL_WORKSPACE}
+        action: upsert
+  relay/openshell_native:
+    gateway_id: ${env:OPENSHELL_GATEWAY_ID}
+    workspace: ${env:OPENSHELL_WORKSPACE}
+    telemetry_source: openshell_native
+    canonicalize_span_names: false
+    required_correlation_attributes: []
+    privacy:
+      mode: deny
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.forwardedSandboxFiles" .) "true" }}
+  attributes/forwarded_files:
+    actions:
+      - key: openshell.acquisition.source_instance
+        value: sandbox-ocsf-forwarder
+        action: insert
+      - key: openshell.acquisition.transport
+        value: otlp_http
+        action: upsert
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.kubernetesContext" .) "true" }}
+  attributes/kubernetes_context:
+    actions:
+      - key: openshell.acquisition.kind
+        value: kubernetes.context
+        action: upsert
+      - key: openshell.acquisition.source_instance
+        value: kubernetes-api
+        action: upsert
+      - key: openshell.acquisition.transport
+        value: kubernetes_api
+        action: upsert
+{{- end }}
+exporters:
+{{- if eq (include "openshell-event-exporter.edgeShardRouting" .) "true" }}
+  load_balancing/internal:
+    routing_key: attributes
+    routing_attributes: [openshell.exporter.tenant.id, openshell.exporter.shard.key]
+    timeout: 15s
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage/otlp_queue
+      queue_size: 10000
+      num_consumers: 4
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 512
+        max_size: 1024
+        sizer: items
+    protocol:
+      otlp:
+        auth:
+          authenticator: bearertokenauth/otlp_destination
+        tls:
+          ca_file: ${env:OTLP_CA_FILE}
+          cert_file: ${env:OTLP_CLIENT_CERT_FILE}
+          key_file: ${env:OTLP_CLIENT_KEY_FILE}
+          server_name_override: ${env:CENTRAL_SHARD_TLS_SERVER_NAME}
+        retry_on_failure:
+          enabled: true
+          max_elapsed_time: 0s
+    resolver:
+      dns:
+        hostname: ${env:CENTRAL_SHARD_DNS_HOSTNAME}
+        port: ${env:CENTRAL_SHARD_PORT}
+        interval: ${env:CENTRAL_SHARD_DNS_INTERVAL}
+        timeout: ${env:CENTRAL_SHARD_DNS_TIMEOUT}
+{{- else if eq (include "openshell-event-exporter.module.otlpGrpc" .) "true" }}
+  otlp:
+    endpoint: ${env:OTLP_GRPC_ENDPOINT}
+    auth:
+      authenticator: bearertokenauth/otlp_destination
+    tls:
+      ca_file: ${env:OTLP_CA_FILE}
+      cert_file: ${env:OTLP_CLIENT_CERT_FILE}
+      key_file: ${env:OTLP_CLIENT_KEY_FILE}
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage/otlp_queue
+      queue_size: 10000
+      num_consumers: 4
+      block_on_overflow: true
+      batch: &destination_queue_batch
+        flush_timeout: 1s
+        min_size: 512
+        max_size: 1024
+        sizer: items
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.otlpHttp" .) "true" }}
+  otlphttp:
+    endpoint: ${env:OTLP_HTTP_ENDPOINT}
+    auth:
+      authenticator: bearertokenauth/otlp_destination
+    tls:
+      ca_file: ${env:OTLP_CA_FILE}
+      cert_file: ${env:OTLP_CLIENT_CERT_FILE}
+      key_file: ${env:OTLP_CLIENT_KEY_FILE}
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage/otlphttp_queue
+      queue_size: 10000
+      num_consumers: 4
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 512
+        max_size: 1024
+        sizer: items
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.cloudEvents" .) "true" }}
+  cloudevents:
+    endpoint: ${env:OPENSHELL_EXPORT_URL}
+    timeout: 15s
+    max_events: 500
+    max_event_bytes: 1048576
+    max_request_bytes: 4194304
+    auth:
+      authenticator: bearertokenauth/destination
+    tls:
+      ca_file: ${env:DESTINATION_CA_FILE_INTERNAL}
+      cert_file: ${env:DESTINATION_CLIENT_CERT_FILE}
+      key_file: ${env:DESTINATION_CLIENT_KEY_FILE}
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage/cloudevents_queue
+      sizer: requests
+      queue_size: 10000
+      num_consumers: 4
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 512
+        max_size: 1024
+        sizer: items
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.recovery" .) "true" }}
+  file/recovery:
+    path: ${env:EXPORTER_RECOVERY_FILE}
+    format: json
+{{- end }}
+
+service:
+  telemetry:
+    logs:
+      encoding: json
+    metrics:
+      level: normal
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: ${env:EXPORTER_METRICS_HOST}
+                port: 8888
+  extensions:
+{{- if eq (include "openshell-event-exporter.module.cloudEvents" .) "true" }}
+    - bearertokenauth/destination
+    - file_storage/cloudevents_queue
+{{- end }}
+{{- if or (eq (include "openshell-event-exporter.module.otlpGrpc" .) "true") (eq (include "openshell-event-exporter.module.otlpHttp" .) "true") }}
+    - bearertokenauth/otlp_destination
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.checkpoints" .) "true" }}
+    - file_storage/checkpoints
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.otlpGrpc" .) "true" }}
+    - file_storage/otlp_queue
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.otlpHttp" .) "true" }}
+    - file_storage/otlphttp_queue
+{{- end }}
+    - storagehealth
+    - health_check
+{{- if eq (include "openshell-event-exporter.module.relayOtlp" .) "true" }}
+    - bearertokenauth/nemo_relay
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.forwardedSandboxFiles" .) "true" }}
+    - bearertokenauth/forwarded_ocsf
+{{- end }}
+  pipelines:
+{{- if eq (include "openshell-event-exporter.module.watchSandbox" .) "true" }}
+    logs/watchsandbox:
+      receivers:
+        - watchsandbox
+      processors: [memory_limiter, openshell{{ if eq .Values.topology.role "edge" }}, evidencecontract/stamp{{ end }}]
+      exporters: [{{ include "openshell-event-exporter.logExporters" . }}]
+{{- end }}
+{{- if or (eq (include "openshell-event-exporter.module.ocsfFiles" .) "true") (eq (include "openshell-event-exporter.module.sandboxFileLogs" .) "true") (eq (include "openshell-event-exporter.module.relayFileLogs" .) "true") }}
+    logs/files:
+      receivers:
+{{- if eq (include "openshell-event-exporter.module.ocsfFiles" .) "true" }}
+        - file_log/openshell_ocsf
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.sandboxFileLogs" .) "true" }}
+        - file_log/openshell_sandbox
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.relayFileLogs" .) "true" }}
+        - file_log/nemo_relay
+{{- end }}
+      processors: [memory_limiter, openshell{{ if eq .Values.topology.role "edge" }}, evidencecontract/stamp{{ end }}]
+      exporters: [{{ include "openshell-event-exporter.logExporters" . }}]
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.forwardedSandboxFiles" .) "true" }}
+    logs/forwarded_ocsf:
+      receivers: [otlp/forwarded_ocsf]
+      processors: [memory_limiter, attributes/forwarded_files, openshell{{ if eq .Values.topology.role "edge" }}, evidencecontract/stamp{{ end }}]
+      exporters: [{{ include "openshell-event-exporter.logExporters" . }}]
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.kubernetesContext" .) "true" }}
+    logs/kubernetes_context:
+      receivers: [k8s_objects]
+      processors: [memory_limiter, attributes/kubernetes_context, openshell{{ if eq .Values.topology.role "edge" }}, evidencecontract/stamp{{ end }}]
+      exporters: [{{ include "openshell-event-exporter.logExporters" . }}]
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.relayOtlp" .) "true" }}
+    traces/nemo_relay:
+      receivers: [otlp/nemo_relay]
+      processors: [memory_limiter, resource/nemo_relay, relay/nemo_relay{{ if eq .Values.topology.role "edge" }}, evidencecontract/stamp{{ end }}]
+      exporters: [{{ include "openshell-event-exporter.traceExporters" . }}]
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.nativeOtlp" .) "true" }}
+    traces/openshell_native:
+      receivers: [otlp/openshell_native]
+      processors: [memory_limiter, resource/openshell_native, relay/openshell_native{{ if eq .Values.topology.role "edge" }}, evidencecontract/stamp{{ end }}]
+      exporters: [{{ include "openshell-event-exporter.traceExporters" . }}]
+{{- end }}

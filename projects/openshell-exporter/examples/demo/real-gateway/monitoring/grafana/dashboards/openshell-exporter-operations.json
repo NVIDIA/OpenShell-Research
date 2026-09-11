@@ -1,0 +1,1638 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 4
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "# OpenShell Exporter — Operations Command Center\n### Are all evidence lanes observable, flowing, and delivering?\nThis dashboard monitors the **headless exporter**, not agent behavior. Green means the collection and delivery path is moving. Orange or red means investigate source freshness, persistent queues, validation, reconnects, or destination delivery before trusting apparent silence in the SOC."
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Healthy evidence lanes",
+      "description": "Percentage of configured bounded evidence lanes currently reporting healthy capability state. Waiting, gap-reported, unavailable, and disabled lanes are not counted as healthy.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (sum(max by (source) ({__name__=~\"openshell_exporter_source_health_class|openshell\\\\.exporter\\\\.source\\\\.health_class\",source=~\"$source\"} == bool 2) * on (source) max by (source) ({__name__=~\"openshell_exporter_source_configured|openshell\\\\.exporter\\\\.source\\\\.(configured|enabled)\",source=~\"$source\"})) or vector(0)) / clamp_min(sum(max by (source) ({__name__=~\"openshell_exporter_source_configured|openshell\\\\.exporter\\\\.source\\\\.(configured|enabled)\",source=~\"$source\"})), 1)",
+          "legendFormat": "healthy",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 80
+              },
+              {
+                "color": "green",
+                "value": 100
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "Health metric unavailable"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Evidence in selected window",
+      "description": "OpenShell records normalized during the dashboard time range. This avoids hiding recent inactivity behind a large process-lifetime counter.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 4,
+        "y": 4,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase({__name__=~\"openshell_exporter_records_received|openshell\\\\.exporter\\\\.records\\\\.received\",source=~\"$source\"}[$__range])) or vector(0)",
+          "legendFormat": "records in range",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1000000000
+              },
+              {
+                "color": "red",
+                "value": 1000000001
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Delivery success · 5m",
+      "description": "Percentage of CloudEvents delivery responses in the last five minutes that were successful. No delivery traffic is shown as no data rather than a false success.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 4,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * sum(rate({__name__=~\"openshell_exporter_delivery_events|openshell\\\\.exporter\\\\.delivery\\\\.events\",status_code=~\"2..\"}[5m])) / clamp_min(sum(rate({__name__=~\"openshell_exporter_delivery_events|openshell\\\\.exporter\\\\.delivery\\\\.events\"}[5m])), 0.000000001)",
+          "legendFormat": "success",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 99
+              },
+              {
+                "color": "green",
+                "value": 99.9
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "No traffic"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Highest queue use",
+      "description": "Largest persistent exporter queue as a percentage of configured capacity.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(100 * otelcol_exporter_queue_size{exporter=~\"$exporter\"} / clamp_min(otelcol_exporter_queue_capacity{exporter=~\"$exporter\"}, 1)) or vector(0)",
+          "legendFormat": "queue",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 85
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Stalest source activity",
+      "description": "Seconds since the least-recently active observed source. This exposes a stale lane even when another source is still healthy.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 4,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(1, max by (source) (time() - {__name__=~\"openshell_exporter_source_last_success_unixtime|openshell\\\\.exporter\\\\.source\\\\.last_success_unixtime\",source=~\"$source\"}))",
+          "legendFormat": "{{source}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 120
+              },
+              {
+                "color": "red",
+                "value": 600
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "Waiting"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Attention signals · 1h",
+      "description": "Invalid evidence, source-gap warnings, discovery failures, and failed exports observed in the last hour.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 20,
+        "y": 4,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum(increase({__name__=~\"openshell_exporter_records_invalid|openshell\\\\.exporter\\\\.records\\\\.invalid\"}[1h])) or vector(0)) + (sum(increase({__name__=~\"openshell_exporter_stream_gap_warnings|openshell\\\\.exporter\\\\.stream\\\\.gap_warnings\"}[1h])) or vector(0)) + (sum(increase({__name__=~\"openshell_exporter_discovery_failures|openshell\\\\.exporter\\\\.discovery\\\\.failures\"}[1h])) or vector(0)) + (sum(increase(otelcol_exporter_send_failed_log_records[1h])) or vector(0)) + (sum(increase(otelcol_exporter_send_failed_spans[1h])) or vector(0))",
+          "legendFormat": "signals",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Evidence intake rate by source",
+      "description": "Normalized records per second. A flat line is expected only when the corresponding source is genuinely idle.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (source, validation_status) (rate({__name__=~\"openshell_exporter_records_received|openshell\\\\.exporter\\\\.records\\\\.received\",source=~\"$source\"}[$__rate_interval]))",
+          "legendFormat": "{{source}} · {{validation_status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 18,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Persistent queue utilization",
+      "description": "Current retry-queue occupancy. Sustained growth means a destination is slow or unavailable; file checkpoints and independent queues protect durable lanes while storage remains available.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 9,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * otelcol_exporter_queue_size{exporter=~\"$exporter\"} / clamp_min(otelcol_exporter_queue_capacity{exporter=~\"$exporter\"}, 1)",
+          "legendFormat": "{{exporter}} · {{data_type}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 85
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "bargauge",
+      "title": "Source capability health",
+      "description": "Every bounded source lane: Disabled, Waiting for first record, Healthy, Gap reported, or Unavailable. WatchEvents remains explicitly unavailable.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{__name__=~\"openshell_exporter_source_health_class|openshell\\\\.exporter\\\\.source\\\\.health_class\",source=~\"$source\"}",
+          "legendFormat": "{{source}}",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "max": 4,
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Disabled",
+                  "color": "gray",
+                  "index": 0
+                },
+                "1": {
+                  "text": "Waiting for first record",
+                  "color": "orange",
+                  "index": 1
+                },
+                "2": {
+                  "text": "Healthy",
+                  "color": "green",
+                  "index": 2
+                },
+                "3": {
+                  "text": "Gap reported",
+                  "color": "red",
+                  "index": 3
+                },
+                "4": {
+                  "text": "Unavailable",
+                  "color": "gray",
+                  "index": 4
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "green",
+                "value": 2
+              },
+              {
+                "color": "red",
+                "value": 3
+              },
+              {
+                "color": "gray",
+                "value": 4
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "Health metric unavailable"
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "valueMode": "color"
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Destination delivery rate",
+      "description": "CloudEvents delivery responses per second by HTTP status. Non-2xx responses require destination-path investigation; latency is shown separately.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 18,
+        "w": 4,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (status_code) (rate({__name__=~\"openshell_exporter_delivery_events|openshell\\\\.exporter\\\\.delivery\\\\.events\"}[$__rate_interval]))",
+          "legendFormat": "HTTP {{status_code}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Stream continuity and backpressure",
+      "description": "WatchSandbox reconnects, explicit source-gap warnings, discovery failures, and backpressure retries. Any non-zero source-gap warning is evidence that the stream is not durable.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 18,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate({__name__=~\"openshell_exporter_stream_reconnects|openshell\\\\.exporter\\\\.stream\\\\.reconnects\",source=~\"$source\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "Reconnects"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate({__name__=~\"openshell_exporter_stream_gap_warnings|openshell\\\\.exporter\\\\.stream\\\\.gap_warnings\",source=~\"$source\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "Source-gap warnings"
+        },
+        {
+          "refId": "C",
+          "expr": "sum(rate({__name__=~\"openshell_exporter_discovery_failures|openshell\\\\.exporter\\\\.discovery\\\\.failures\",source=~\"$source\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "Discovery failures"
+        },
+        {
+          "refId": "D",
+          "expr": "sum(rate({__name__=~\"openshell_exporter_stream_backpressure_retries|openshell\\\\.exporter\\\\.stream\\\\.backpressure_retries\",source=~\"$source\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "Backpressure retries"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Validation and redaction controls",
+      "description": "Invalid structural evidence must remain visible. Redactions prove sensitive values were removed before queues and destinations; zero redactions can be normal when no sensitive value was present.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (source) (rate({__name__=~\"openshell_exporter_records_invalid|openshell\\\\.exporter\\\\.records\\\\.invalid\",source=~\"$source\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "Invalid · {{source}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (source, profile) (rate({__name__=~\"openshell_exporter_redactions|openshell\\\\.exporter\\\\.redactions\",source=~\"$source\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "Redacted · {{source}} · {{profile}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 45,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "total"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "NeMo Relay span flow",
+      "description": "Privacy-gated Relay spans accepted, normalized, and sent by the exporter. These metrics are bounded by component and correlation status; they never expose sandbox, session, trace, prompt, response, or tool identifiers.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 27,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(otelcol_receiver_accepted_spans{receiver=~\"otlp.*\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "Accepted"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (correlation_status, privacy_mode) (rate({__name__=~\"openshell_exporter_relay_spans|openshell\\\\.exporter\\\\.relay\\\\.spans\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "Processed · {{correlation_status}} · privacy {{privacy_mode}}"
+        },
+        {
+          "refId": "C",
+          "expr": "sum by (exporter) (rate(otelcol_exporter_sent_spans{exporter=~\"$exporter\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "Sent · {{exporter}}"
+        },
+        {
+          "refId": "D",
+          "expr": "sum(rate(otelcol_receiver_refused_spans{receiver=~\"otlp.*\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "Refused"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 18,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "total"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "NeMo Relay privacy and correlation",
+      "description": "Relay correlation outcomes and attributes removed by the configured privacy profile. A partial correlation is observable context, not causal proof; removed attributes are intentionally unavailable downstream.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 27,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (correlation_status) (rate({__name__=~\"openshell_exporter_relay_spans|openshell\\\\.exporter\\\\.relay\\\\.spans\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "Correlation · {{correlation_status}}"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (scope) (rate({__name__=~\"openshell_exporter_relay_attributes_removed|openshell\\\\.exporter\\\\.relay\\\\.attributes_removed\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "Attributes removed · {{scope}}"
+        },
+        {
+          "refId": "C",
+          "expr": "sum(rate(otelcol_exporter_send_failed_spans{exporter=~\"$exporter\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "Delivery failures"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 45,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "total"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Exporter process resources",
+      "description": "CPU and resident memory for the exporter process. Use this view to spot unbounded growth during sustained collection or destination outages.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(otelcol_process_cpu_seconds[$__rate_interval])",
+          "legendFormat": "CPU cores"
+        },
+        {
+          "refId": "B",
+          "expr": "otelcol_process_memory_rss",
+          "legendFormat": "Resident memory"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Resident memory"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "text",
+      "title": "Operator workflow and SOC handoff",
+      "gridPos": {
+        "x": 0,
+        "y": 61,
+        "w": 24,
+        "h": 5
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### Establish pipeline trust before drawing security conclusions\n1. Confirm **healthy lanes** and inspect the **stalest source**.  2. Check queue use, delivery success, response classes, and p95/p99 latency.  3. Treat source gaps as explicit missing-context evidence.  4. Verify durable storage and checkpoint freshness.  5. Confirm the **Relay receive → privacy → correlation → delivery** flow before expecting agent traces.  6. Open **Kibana → OpenShell SOC - Analyst Triage and Investigation** for alerts, sandbox timelines, privacy-filtered agent traces, and policy-enforcement evidence.\n\nMetrics intentionally exclude sandbox, event, trace, session, request, URL, and customer identifiers to keep cardinality bounded."
+      }
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "Durable storage capacity",
+      "description": "Free bytes and inodes visible to the exporter for each fixed checkpoint, queue, and recovery role. Paths are never labels. Size alerts from measured outage headroom rather than the demo threshold.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 44,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "min by (storage) ({__name__=~\"openshell_exporter_storage_free_bytes|openshell\\\\.exporter\\\\.storage\\\\.free_bytes\",storage=~\"$storage\"})",
+          "legendFormat": "Free bytes · {{storage}}"
+        },
+        {
+          "refId": "B",
+          "expr": "min by (storage) ({__name__=~\"openshell_exporter_storage_free_inodes|openshell\\\\.exporter\\\\.storage\\\\.free_inodes\",storage=~\"$storage\"})",
+          "legendFormat": "Free inodes · {{storage}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never"
+          },
+          "noValue": "Storage metrics unavailable"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "min"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "asc"
+        }
+      }
+    },
+    {
+      "id": 19,
+      "type": "bargauge",
+      "title": "Durable storage health",
+      "description": "One means the filesystem containing the configured durable role is available to the exporter; zero requires immediate investigation. No data means the storage-health extension is not being scraped.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 8,
+        "y": 44,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "min by (storage) ({__name__=~\"openshell_exporter_storage_available|openshell\\\\.exporter\\\\.storage\\\\.available\",storage=~\"$storage\"})",
+          "legendFormat": "{{storage}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Unavailable",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "Available",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "noValue": "Storage metrics unavailable"
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "showUnfilled": true
+      }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Durable state freshness",
+      "description": "Age of the newest direct state entry, state presence, and bounded-scan truncation by durable role. Missing state can be normal before first use; truncation means age coverage is incomplete, not that capacity data is missing.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 44,
+        "w": 8,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max by (storage) ({__name__=~\"openshell_exporter_storage_state_age_seconds|openshell\\\\.exporter\\\\.storage\\\\.state_age_seconds\",storage=~\"$storage\"})",
+          "legendFormat": "Age · {{storage}}"
+        },
+        {
+          "refId": "B",
+          "expr": "max by (storage) ({__name__=~\"openshell_exporter_storage_state_present|openshell\\\\.exporter\\\\.storage\\\\.state_present\",storage=~\"$storage\"})",
+          "legendFormat": "State present · {{storage}}"
+        },
+        {
+          "refId": "C",
+          "expr": "max by (storage) ({__name__=~\"openshell_exporter_storage_scan_truncated|openshell\\\\.exporter\\\\.storage\\\\.scan_truncated\",storage=~\"$storage\"})",
+          "legendFormat": "Scan truncated · {{storage}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never"
+          },
+          "noValue": "No durable state yet"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "bars"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Destination latency percentiles",
+      "description": "CloudEvents destination latency percentiles in milliseconds. Sustained p95 or p99 growth can indicate downstream throttling, outage recovery, or queue drain.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 18,
+        "w": 4,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate({__name__=~\"openshell_exporter_destination_latency_bucket|openshell\\\\.exporter\\\\.destination\\\\.latency_bucket\"}[$__rate_interval])))",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate({__name__=~\"openshell_exporter_destination_latency_bucket|openshell\\\\.exporter\\\\.destination\\\\.latency_bucket\"}[$__rate_interval])))",
+          "legendFormat": "p95"
+        },
+        {
+          "refId": "C",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate({__name__=~\"openshell_exporter_destination_latency_bucket|openshell\\\\.exporter\\\\.destination\\\\.latency_bucket\"}[$__rate_interval])))",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "never"
+          },
+          "noValue": "No delivery traffic"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 22,
+      "type": "stat",
+      "title": "Policy snapshot freshness",
+      "description": "Seconds since read-only policy reconciliation was configured or last completed successfully. This is downstream context freshness, not policy authority.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 53,
+        "w": 6,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max({__name__=~\"openshell_exporter_policy_reconciliation_age_seconds|openshell\\\\.exporter\\\\.policy\\\\.reconciliation\\\\.age_seconds\"})",
+          "legendFormat": "snapshot age",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 300
+              },
+              {
+                "color": "red",
+                "value": 900
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "Reconciliation disabled"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 23,
+      "type": "stat",
+      "title": "Policy work queue",
+      "description": "Current bounded read-only policy-reconciliation queue utilization. Sustained saturation can delay snapshot enrichment and emits explicit gap evidence.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 53,
+        "w": 6,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * max({__name__=~\"openshell_exporter_policy_reconciliation_queue_utilization|openshell\\\\.exporter\\\\.policy\\\\.reconciliation\\\\.queue_utilization\"})",
+          "legendFormat": "queue use",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 85
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "noValue": "Reconciliation disabled"
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      }
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "Policy reconciliation outcomes",
+      "description": "Rates of successful read-only reconciliations, failures, observable queue/snapshot gaps, and notification-versus-snapshot consistency differences.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "openshell-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 53,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate({__name__=~\"openshell_exporter_policy_reconciliations|openshell\\\\.exporter\\\\.policy\\\\.reconciliations\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "successful"
+        },
+        {
+          "refId": "B",
+          "expr": "sum by (reason) (rate({__name__=~\"openshell_exporter_policy_reconciliation_failures|openshell\\\\.exporter\\\\.policy\\\\.reconciliation_failures\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "failure · {{reason}}"
+        },
+        {
+          "refId": "C",
+          "expr": "sum by (reason) (rate({__name__=~\"openshell_exporter_policy_gap_warnings|openshell\\\\.exporter\\\\.policy\\\\.gap_warnings\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "gap · {{reason}}"
+        },
+        {
+          "refId": "D",
+          "expr": "sum by (state) (rate({__name__=~\"openshell_exporter_policy_reconciliation_consistency_gaps|openshell\\\\.exporter\\\\.policy\\\\.reconciliation\\\\.consistency_gaps\"}[$__rate_interval])) or vector(0)",
+          "legendFormat": "consistency · {{state}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "showPoints": "never"
+          },
+          "thresholds": null
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 41,
+  "tags": [
+    "OpenShell",
+    "exporter",
+    "operations",
+    "Prometheus"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "source",
+        "label": "Evidence source",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "openshell-prometheus"
+        },
+        "definition": "label_values({__name__=~\"openshell_exporter_source_configured|openshell\\\\.exporter\\\\.source\\\\.(configured|enabled)\"}, source)",
+        "query": {
+          "query": "label_values({__name__=~\"openshell_exporter_source_configured|openshell\\\\.exporter\\\\.source\\\\.(configured|enabled)\"}, source)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 1,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      },
+      {
+        "name": "exporter",
+        "label": "Destination exporter",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "openshell-prometheus"
+        },
+        "definition": "label_values(otelcol_exporter_queue_capacity, exporter)",
+        "query": {
+          "query": "label_values(otelcol_exporter_queue_capacity, exporter)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 1,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      },
+      {
+        "name": "storage",
+        "label": "Durable storage role",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "openshell-prometheus"
+        },
+        "definition": "label_values({__name__=~\"openshell_exporter_storage_available|openshell\\\\.exporter\\\\.storage\\\\.available\"}, storage)",
+        "query": {
+          "query": "label_values({__name__=~\"openshell_exporter_storage_available|openshell\\\\.exporter\\\\.storage\\\\.available\"}, storage)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "refresh": 1,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "15s",
+      "30s",
+      "1m",
+      "5m"
+    ]
+  },
+  "timezone": "browser",
+  "title": "OpenShell Exporter — Operations Command Center",
+  "uid": "openshell-exporter-operations",
+  "version": 1
+}

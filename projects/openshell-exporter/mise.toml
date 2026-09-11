@@ -1,0 +1,89 @@
+[tools]
+go = "1.26.8"
+"go:go.opentelemetry.io/collector/cmd/builder" = "0.160.0"
+"go:github.com/golangci/golangci-lint/v2/cmd/golangci-lint" = "2.13.2"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.6.0"
+"go:github.com/google/go-licenses/v2" = "2.0.1"
+"aqua:helm/helm" = "3.22.0"
+
+[env]
+GOCACHE = "{{config_root}}/.cache/go-build"
+
+[tasks.fmt]
+description = "Format Go source"
+run = "gofmt -w cmd conformance processor exporter receiver extension sandboxinjector otlpproxy integration api deploy examples/demo/real-gateway/webapp examples/demo/kubernetes integrations/elastic"
+
+[tasks.fmt-check]
+description = "Fail when Go source is not formatted"
+run = "test -z \"$(gofmt -l cmd conformance processor exporter receiver extension sandboxinjector otlpproxy integration api deploy examples/demo/real-gateway/webapp examples/demo/kubernetes integrations/elastic)\""
+
+[tasks.vet]
+run = "go vet ./..."
+
+[tasks.test]
+run = "go test ./..."
+
+[tasks.test-race]
+run = "go test -race ./..."
+
+[tasks.lint]
+run = "golangci-lint run ./..."
+
+[tasks.vuln]
+run = "govulncheck ./..."
+
+[tasks.fuzz]
+run = """
+go test ./processor/openshellprocessor -run=^$ -fuzz=FuzzMalformedEvidenceIsRetained -fuzztime=15s
+go test ./processor/relayprocessor -run=^$ -fuzz=FuzzAllowListNeverSerializesUntrustedContent -fuzztime=15s
+go test ./exporter/cloudeventsexporter -run=^$ -fuzz=FuzzBatchLimitsAreNeverExceeded -fuzztime=15s
+go test ./exporter/cloudeventsexporter -run=^$ -fuzz=FuzzConfigTransportInvariants -fuzztime=15s
+go test ./receiver/watchsandboxreceiver -run=^$ -fuzz=FuzzPolicyStateDecoder -fuzztime=15s
+go test ./receiver/watchsandboxreceiver -run=^$ -fuzz=FuzzPolicyRevisionAccumulator -fuzztime=15s
+"""
+
+[tasks.quality]
+description = "Enforce coverage budgets and run hot-path benchmarks"
+run = """
+mkdir -p dist
+go test -covermode=atomic -coverprofile=dist/coverage.out ./...
+./scripts/check-quality-budgets.sh coverage dist/coverage.out
+go test -covermode=atomic -coverprofile=dist/watchsandbox-coverage.out ./receiver/watchsandboxreceiver
+./scripts/check-quality-budgets.sh watchsandbox-coverage dist/watchsandbox-coverage.out
+go test -covermode=atomic -coverprofile=dist/cloudevents-coverage.out ./exporter/cloudeventsexporter
+./scripts/check-quality-budgets.sh cloudevents-coverage dist/cloudevents-coverage.out
+./scripts/check-quality-budgets-test.sh
+go test ./processor/openshellprocessor ./processor/relayprocessor ./exporter/cloudeventsexporter ./receiver/watchsandboxreceiver -run=^$ -bench='^Benchmark' -benchmem -benchtime=100x > dist/benchmarks.txt
+cat dist/benchmarks.txt
+./scripts/check-quality-budgets.sh benchmarks dist/benchmarks.txt
+"""
+
+[tasks.license]
+run = "go-licenses check --include_tests ./..."
+
+[tasks.version]
+run = "./scripts/check-version.sh"
+
+[tasks.build]
+run = "builder --config builder-config.yaml"
+
+[tasks.build-proxy]
+description = "Build the first-class minimal OpenShell OTLP Proxy"
+run = "builder --config otlpproxy/builder-config.yaml"
+
+[tasks.container]
+run = "./scripts/build-images.sh"
+
+[tasks.container-proxy]
+description = "Build the OpenShell OTLP Proxy image"
+run = "./scripts/build-images.sh proxy"
+
+[tasks.docs-check]
+description = "Check active documentation release and policy contract consistency"
+run = "./scripts/check-doc-consistency.sh"
+
+[tasks.pre-commit]
+depends = ["docs-check", "fmt-check", "vet", "test", "lint"]
+
+[tasks.ci]
+depends = ["pre-commit", "test-race", "fuzz", "quality", "vuln", "build", "build-proxy"]

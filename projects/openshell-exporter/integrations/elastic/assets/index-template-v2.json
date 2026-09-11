@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "_meta": {
+    "description": "OpenShell canonical security evidence index, representation v2",
+    "managed_by": "openshell-event-exporter-reference"
+  },
+  "index_patterns": ["logs-openshell.security-*-v2"],
+  "priority": 610,
+  "composed_of": ["openshell-security-ecs-v2"],
+  "template": {
+    "settings": {
+      "index.number_of_shards": 3,
+      "index.auto_expand_replicas": "0-1"
+    }
+  }
+}

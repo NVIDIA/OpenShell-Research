@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:openshell:correlation-context:1",
+  "title": "OpenShell correlation context v1",
+  "type": "object",
+  "properties": {
+    "openshell.gateway.id": { "type": "string", "pattern": "^[A-Za-z0-9._:/@+-]{1,256}$" },
+    "openshell.workspace": { "type": "string", "pattern": "^[A-Za-z0-9._:/@+-]{1,256}$" },
+    "openshell.sandbox.id": { "type": "string", "pattern": "^[A-Za-z0-9._:/@+-]{1,256}$" },
+    "agent.session.id": { "type": "string", "pattern": "^[A-Za-z0-9._:/@+-]{1,256}$" },
+    "trace_id": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+    "request_id": { "type": "string", "pattern": "^[A-Za-z0-9._:/@+-]{1,256}$" },
+    "tool_call_id": { "type": "string", "pattern": "^[A-Za-z0-9._:/@+-]{1,256}$" },
+    "openshell.policy.version": {
+      "type": ["string", "integer"],
+      "pattern": "^[A-Za-z0-9._:/@+-]{1,256}$",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": true
+}

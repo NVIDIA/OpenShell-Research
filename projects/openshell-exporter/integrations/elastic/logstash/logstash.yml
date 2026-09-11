@@ -1,0 +1,14 @@
+api.http.host: 0.0.0.0
+api.http.port: 9600
+config.reload.automatic: false
+dead_letter_queue.enable: true
+dead_letter_queue.max_bytes: 268435456
+log.format: json
+pipeline.ecs_compatibility: v8
+pipeline.ordered: true
+pipeline.workers: 1
+queue.checkpoint.writes: 1
+queue.drain: true
+queue.max_bytes: 536870912
+queue.type: persisted
+xpack.monitoring.enabled: false

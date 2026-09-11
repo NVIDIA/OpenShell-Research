@@ -1,0 +1,75 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+# SPDX-License-Identifier: Apache-2.0
+# Merge with exporter.yaml only for the optional local Elastic Security demo.
+extensions:
+  bearertokenauth/elastic_apm:
+    filename: /run/secrets/elastic-apm-secret-token
+
+exporters:
+  cloudevents/elastic_logstash:
+    endpoint: https://logstash.demo.internal:8443/v1/events
+    max_events: 500
+    max_event_bytes: 1048576
+    max_request_bytes: 4194304
+    tls:
+      ca_file: /run/secrets/elastic-ca.crt
+      cert_file: /run/secrets/elastic-logstash-client.crt
+      key_file: /run/secrets/elastic-logstash-client.key
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage
+      queue_size: 20000
+      num_consumers: 4
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 256
+        max_size: 512
+        sizer: items
+  otlphttp/elastic_otlp:
+    endpoint: https://apm-server.demo.internal:8200
+    compression: gzip
+    auth:
+      authenticator: bearertokenauth/elastic_apm
+    tls:
+      ca_file: /run/secrets/elastic-ca.crt
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage
+      queue_size: 20000
+      num_consumers: 4
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 256
+        max_size: 512
+        sizer: items
+
+service:
+  extensions:
+    - bearertokenauth/nemo_relay
+    - bearertokenauth/elastic_apm
+    - file_storage
+    - health_check
+  pipelines:
+    logs/openshell_files:
+      exporters:
+        - cloudevents/dashboard
+        - cloudevents/elastic_logstash
+        - file/recovery_events
+    logs/watchsandbox:
+      exporters:
+        - cloudevents/dashboard
+        - cloudevents/elastic_logstash
+        - file/recovery_events
+    traces/nemo_relay:
+      exporters:
+        - otlphttp/dashboard
+        - otlphttp/elastic_otlp
+        - file/recovery_traces

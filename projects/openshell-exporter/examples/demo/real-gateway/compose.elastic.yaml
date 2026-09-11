@@ -1,0 +1,312 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+# SPDX-License-Identifier: Apache-2.0
+# Optional local-only Elastic Security destination for the real gateway demo.
+services:
+  elastic-certs:
+    image: docker.io/curlimages/curl:8.16.0@sha256:463eaf6072688fe96ac64fa623fe73e1dbe25d8ad6c34404a669ad3ce1f104b6
+    user: "0:0"
+    restart: "no"
+    volumes:
+      - ./runtime/tls/ca.crt:/source/ca.crt:ro
+      - ./runtime/tls/elasticsearch-server.crt:/source/elasticsearch-server.crt:ro
+      - ./runtime/tls/elasticsearch-server.key:/source/elasticsearch-server.key:ro
+      - ./runtime/tls/kibana-server.crt:/source/kibana-server.crt:ro
+      - ./runtime/tls/kibana-server.key:/source/kibana-server.key:ro
+      - ./runtime/tls/logstash-server.crt:/source/logstash-server.crt:ro
+      - ./runtime/tls/logstash-server.key:/source/logstash-server.key:ro
+      - ./runtime/tls/elastic-ingest-password:/source/elasticsearch-password:ro
+      - ./runtime/tls/elastic-otlp-password:/source/apm-elasticsearch-password:ro
+      - ./runtime/tls/apm-server.crt:/source/apm-server.crt:ro
+      - ./runtime/tls/apm-server.key:/source/apm-server.key:ro
+      - ./runtime/tls/elastic-apm-secret-token:/source/apm-secret-token:ro
+      - elasticsearch-certs:/certs
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - >-
+        cp /source/* /certs/;
+        chown 1000:0 /certs/*;
+        chmod 0400 /certs/elasticsearch-password;
+        chmod 0444 /certs/ca.crt /certs/*.crt;
+        chmod 0440 /certs/*.key
+    networks:
+      - demo
+
+  elasticsearch:
+    image: docker.io/library/elasticsearch:9.4.3@sha256:fa8f4ebbc41c2d8b88c3371d4159893364ae0ea8306dc62aefecaa1643f2d137
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      cluster.name: openshell-security-demo
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+      ES_JAVA_OPTS: -Xms768m -Xmx768m
+      xpack.security.enabled: "true"
+      xpack.security.http.ssl.enabled: "true"
+      xpack.security.http.ssl.key: certs/elasticsearch-server.key
+      xpack.security.http.ssl.certificate: certs/elasticsearch-server.crt
+      xpack.security.http.ssl.certificate_authorities: certs/ca.crt
+      ingest.geoip.downloader.enabled: "false"
+    depends_on:
+      elastic-certs:
+        condition: service_completed_successfully
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+      - elasticsearch-certs:/usr/share/elasticsearch/config/certs:ro
+    ports:
+      - "127.0.0.1:9200:9200"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          auth=$$(printf 'elastic:%s' "$${ELASTIC_PASSWORD}" | base64 -w0);
+          curl --fail --silent --cacert config/certs/ca.crt
+          --header "Authorization: Basic $$auth"
+          https://127.0.0.1:9200/_cluster/health >/dev/null
+      interval: 5s
+      timeout: 5s
+      retries: 60
+    networks:
+      - demo
+
+  elastic-init:
+    image: docker.io/curlimages/curl:8.16.0@sha256:463eaf6072688fe96ac64fa623fe73e1dbe25d8ad6c34404a669ad3ce1f104b6
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+      ELASTIC_INGEST_PASSWORD: ${ELASTIC_INGEST_PASSWORD}
+      ELASTIC_OTLP_PASSWORD: ${ELASTIC_OTLP_PASSWORD}
+      KIBANA_SYSTEM_PASSWORD: ${KIBANA_SYSTEM_PASSWORD}
+    volumes:
+      - ./elastic/provision-elasticsearch.sh:/provision-elasticsearch.sh:ro
+      - ../../../integrations/elastic/assets/component-template.json:/component-template.json:ro
+      - ../../../integrations/elastic/assets/index-template.json:/index-template.json:ro
+      - ../../../integrations/elastic/assets/trace-component-template.json:/trace-component-template.json:ro
+      - ../../../integrations/elastic/assets/trace-index-template.json:/trace-index-template.json:ro
+      - ../../../integrations/elastic/assets/ingest-role.json:/ingest-role.json:ro
+      - ../../../integrations/elastic/assets/otlp-ingest-role.json:/otlp-ingest-role.json:ro
+      - ../../../integrations/elastic/assets/component-template-v2.json:/component-template-v2.json:ro
+      - ../../../integrations/elastic/assets/index-template-v2.json:/index-template-v2.json:ro
+      - ../../../integrations/elastic/assets/apm-ingest-pipeline.json:/apm-ingest-pipeline.json:ro
+      - elasticsearch-certs:/certs:ro
+    entrypoint: ["/bin/sh", "/provision-elasticsearch.sh"]
+    networks:
+      - demo
+
+  kibana:
+    image: docker.io/library/kibana:9.4.3@sha256:cb05cc9f3c719bd304be6252950bd1691ff6a0eec560a045f9928ed235e3fac6
+    restart: unless-stopped
+    depends_on:
+      elastic-init:
+        condition: service_completed_successfully
+    environment:
+      SERVER_NAME: kibana.demo.internal
+      SERVER_HOST: 0.0.0.0
+      SERVER_PUBLICBASEURL: https://127.0.0.1:5601
+      SERVER_SSL_ENABLED: "true"
+      SERVER_SSL_CERTIFICATE: /usr/share/kibana/config/certs/kibana-server.crt
+      SERVER_SSL_KEY: /usr/share/kibana/config/certs/kibana-server.key
+      ELASTICSEARCH_HOSTS: https://elasticsearch:9200
+      ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES: /usr/share/kibana/config/certs/ca.crt
+      ELASTICSEARCH_USERNAME: kibana_system
+      ELASTICSEARCH_PASSWORD: ${KIBANA_SYSTEM_PASSWORD}
+      XPACK_SECURITY_ENCRYPTIONKEY: ${KIBANA_SECURITY_KEY}
+      XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY: ${KIBANA_SAVED_OBJECTS_KEY}
+      XPACK_REPORTING_ENCRYPTIONKEY: ${KIBANA_REPORTING_KEY}
+      TELEMETRY_OPTIN: "false"
+      TELEMETRY_ALLOWCHANGINGOPTINSTATUS: "false"
+    volumes:
+      - elasticsearch-certs:/usr/share/kibana/config/certs:ro
+    ports:
+      - "127.0.0.1:5601:5601"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --cacert config/certs/ca.crt https://127.0.0.1:5601/api/status >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 90
+    networks:
+      - demo
+
+  prometheus:
+    image: docker.io/prom/prometheus:v3.13.1@sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=24h
+      - --web.enable-lifecycle
+    depends_on:
+      - exporter
+    volumes:
+      - ./monitoring/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=0700
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9090/-/ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks:
+      - demo
+
+  grafana:
+    image: docker.io/grafana/grafana:13.1.3@sha256:ab5cb380e3ff3172d6c8bd2e7cfd31cce977d2881b260e1f5bc089bf0b759b43
+    restart: unless-stopped
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    environment:
+      GF_SERVER_ROOT_URL: http://127.0.0.1:3000
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_PLUGINS_PREINSTALL: ""
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      GF_PLUGINS_PLUGIN_ADMIN_ENABLED: "false"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/openshell-exporter-operations.json
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - demo
+
+
+  logstash:
+    image: docker.io/library/logstash:9.4.3@sha256:52744e5617894d71fd40eb09d2235b8dcb0f744aff7a4f7c34926d77c1ad3d00
+    restart: unless-stopped
+    depends_on:
+      elastic-init:
+        condition: service_completed_successfully
+    environment:
+      LS_JAVA_OPTS: -Xms512m -Xmx512m
+    entrypoint: ["/usr/share/logstash/openshell-entrypoint.sh"]
+    volumes:
+      - ../../../integrations/elastic/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ../../../integrations/elastic/logstash/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
+      - ../../../integrations/elastic/logstash/openshell-cloudevents.conf:/usr/share/logstash/pipeline/openshell-cloudevents.conf:ro
+      - ../../../integrations/elastic/logstash/cloud_events.rb:/usr/share/logstash/transform/cloud_events.rb:ro
+      - ../../../integrations/elastic/logstash/entrypoint.sh:/usr/share/logstash/openshell-entrypoint.sh:ro
+      - elasticsearch-certs:/run/secrets:ro
+      - logstash-data:/usr/share/logstash/data
+    ports:
+      - "127.0.0.1:18443:8443"
+      - "127.0.0.1:19600:9600"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      demo:
+        aliases:
+          - logstash.demo.internal
+
+  apm-data-init:
+    image: docker.io/curlimages/curl:8.16.0@sha256:463eaf6072688fe96ac64fa623fe73e1dbe25d8ad6c34404a669ad3ce1f104b6
+    user: "0:0"
+    restart: "no"
+    volumes:
+      - apm-server-data:/data
+    entrypoint: ["/bin/sh", "-ec", "chown -R 1000:1000 /data; chmod 0750 /data"]
+
+  apm-server:
+    image: docker.io/elastic/apm-server:9.4.3@sha256:504abe10e8ebe56edb26bc6c11cfd72323b4a43fb8d9f43e6aa9d2df4ccf1db3
+    restart: unless-stopped
+    depends_on:
+      elastic-init:
+        condition: service_completed_successfully
+      apm-data-init:
+        condition: service_completed_successfully
+    entrypoint: ["/usr/share/apm-server/openshell-entrypoint.sh"]
+    command: ["-e", "-c", "/usr/share/apm-server/apm-server.yml", "--strict.perms=false"]
+    volumes:
+      - ../../../integrations/elastic/apm-server/apm-server.yml:/usr/share/apm-server/apm-server.yml:ro
+      - ../../../integrations/elastic/apm-server/entrypoint.sh:/usr/share/apm-server/openshell-entrypoint.sh:ro
+      - elasticsearch-certs:/run/secrets:ro
+      - apm-server-data:/usr/share/apm-server/data
+    ports:
+      - "127.0.0.1:18200:8200"
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=0700
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      demo:
+        aliases:
+          - apm-server.demo.internal
+
+  kibana-setup:
+    image: docker.io/curlimages/curl:8.16.0@sha256:463eaf6072688fe96ac64fa623fe73e1dbe25d8ad6c34404a669ad3ce1f104b6
+    user: "${DEMO_UID}:${DEMO_GID}"
+    profiles: ["tools"]
+    environment:
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+    volumes:
+      - ./elastic/provision-kibana.sh:/provision-kibana.sh:ro
+      - ../../../integrations/elastic/assets/soc-rules.ndjson:/soc-rules.ndjson:ro
+      - ../../../integrations/elastic/assets/soc-saved-objects.ndjson:/soc-saved-objects.ndjson:ro
+      - ../../../integrations/elastic/assets/soc-investigation-saved-objects.ndjson:/soc-investigation-saved-objects.ndjson:ro
+      - ../../../integrations/elastic/assets/policy-engine-saved-objects.ndjson:/policy-engine-saved-objects.ndjson:ro
+      - ../../../integrations/elastic/assets/soc-viewer-role.json:/soc-viewer-role.json:ro
+      - ../../../integrations/elastic/assets/soc-analyst-role.json:/soc-analyst-role.json:ro
+      - ../../../integrations/elastic/assets/soc-detection-engineer-role.json:/soc-detection-engineer-role.json:ro
+      - ../../../integrations/elastic/assets/soc-webhook-body.json:/soc-webhook-body.json:ro
+      - ./runtime/tls/elastic-detection-password:/run/secrets/elastic-detection-password:ro
+      - elasticsearch-certs:/certs:ro
+    entrypoint: ["/bin/sh", "/provision-kibana.sh"]
+    networks:
+      - demo
+
+  exporter:
+    command:
+      - --config
+      - /etc/openshell-exporter/exporter.yaml
+      - --config
+      - /etc/openshell-exporter/exporter.elastic.yaml
+    volumes:
+      - ./exporter.elastic.yaml:/etc/openshell-exporter/exporter.elastic.yaml:ro
+      - ./runtime/tls/ca.crt:/run/secrets/elastic-ca.crt:ro
+      - ./runtime/tls/logstash-client.crt:/run/secrets/elastic-logstash-client.crt:ro
+      - ./runtime/tls/logstash-client.key:/run/secrets/elastic-logstash-client.key:ro
+      - ./runtime/tls/elastic-apm-secret-token:/run/secrets/elastic-apm-secret-token:ro
+
+volumes:
+  elasticsearch-data:
+    name: openshell-exporter-demo-elasticsearch
+  elasticsearch-certs:
+    name: openshell-exporter-demo-elastic-certs
+  logstash-data:
+    name: openshell-exporter-demo-logstash
+  prometheus-data:
+    name: openshell-exporter-demo-prometheus
+  grafana-data:
+    name: openshell-exporter-demo-grafana
+  apm-server-data:
+    name: openshell-exporter-demo-apm-server

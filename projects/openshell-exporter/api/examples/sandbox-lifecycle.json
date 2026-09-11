@@ -1,0 +1,112 @@
+{
+  "specversion": "1.0",
+  "id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "source": "openshell://gateway-prod-1/workspaces/default/sandboxes/sandbox-123/sources/sandbox.lifecycle",
+  "type": "com.nvidia.openshell.sandbox.lifecycle.v1",
+  "dataschema": "urn:openshell:event-envelope:1",
+  "datacontenttype": "application/json",
+  "subject": "sandboxes/sandbox-123",
+  "data": {
+    "schema_version": "1.0",
+    "observed_time": "2026-08-11T12:00:01Z",
+    "acquisition": {
+      "kind": "sandbox.lifecycle",
+      "durability": "non_resumable_stream",
+      "source_instance": "watchsandbox",
+      "replay_limitations": "non-resumable stream; configured tails reduce but do not eliminate gaps",
+      "transport": "grpc",
+      "api_operation": "openshell.v1.OpenShell/WatchSandbox",
+      "payload_type": "openshell.v1.Sandbox",
+      "stream_resumable": false,
+      "follow_status": true,
+      "follow_logs": true,
+      "follow_events": true,
+      "stop_on_terminal": false,
+      "log_since_ms": 0,
+      "log_sources": [
+        "gateway",
+        "sandbox"
+      ],
+      "log_min_level": "",
+      "log_tail_lines": 200,
+      "event_tail": 200,
+      "coverage": {
+        "status": "observed",
+        "source_profile": "watchsandbox",
+        "payload_preservation": "full_public_proto_json",
+        "known_limitations": [
+          "non_resumable",
+          "best_effort_reconnect_tails",
+          "watch_events_unavailable"
+        ]
+      }
+    },
+    "openshell": {
+      "gateway_id": "gateway-prod-1",
+      "gateway_version": "0.1.0-alpha",
+      "workspace": "default",
+      "sandbox_id": "sandbox-123",
+      "sandbox_name": "research-agent",
+      "policy_version": 17
+    },
+    "security": {
+      "validation": {
+        "status": "not_applicable",
+        "errors": []
+      },
+      "redaction": {
+        "profile_id": "openshell-default",
+        "profile_version": "1",
+        "applied": false,
+        "count": 0
+      }
+    },
+    "correlation": {
+      "openshell.gateway.id": "gateway-prod-1",
+      "openshell.policy.version": 17,
+      "openshell.sandbox.id": "sandbox-123",
+      "openshell.workspace": "default"
+    },
+    "original": {
+      "event_type": "MODIFIED",
+      "sandbox": {
+        "id": "sandbox-123",
+        "name": "research-agent",
+        "workspace": "default",
+        "resource_version": 42,
+        "phase": "SANDBOX_PHASE_READY",
+        "policy_version": 17
+      },
+      "source_payload": {
+        "metadata": {
+          "id": "sandbox-123",
+          "name": "research-agent",
+          "labels": {
+            "team": "security"
+          },
+          "resource_version": "42",
+          "workspace": "default"
+        },
+        "spec": {
+          "log_level": "info",
+          "providers": [
+            "nvidia"
+          ]
+        },
+        "status": {
+          "sandbox_name": "driver-sandbox-123",
+          "agent_pod": "agent-pod-123",
+          "conditions": [
+            {
+              "type": "Ready",
+              "status": "True",
+              "reason": "Provisioned"
+            }
+          ],
+          "phase": "SANDBOX_PHASE_READY",
+          "current_policy_version": 17
+        }
+      }
+    }
+  }
+}

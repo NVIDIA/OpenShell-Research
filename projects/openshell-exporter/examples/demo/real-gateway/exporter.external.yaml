@@ -1,0 +1,72 @@
+# Merge with exporter.yaml only for the operator-approved external timeline gate.
+extensions:
+  bearertokenauth/external_destination:
+    filename: /run/secrets/external-destination-token
+
+exporters:
+  cloudevents/external:
+    endpoint: ${env:DEMO_EXTERNAL_CLOUDEVENTS_URL}
+    max_events: 500
+    max_event_bytes: 1048576
+    max_request_bytes: 4194304
+    auth:
+      authenticator: bearertokenauth/external_destination
+    tls:
+      ca_file: ${env:DEMO_EXTERNAL_CA_FILE}
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage
+      queue_size: 10000
+      num_consumers: 4
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 256
+        max_size: 512
+        sizer: items
+  otlphttp/external:
+    endpoint: ${env:DEMO_EXTERNAL_OTLP_HTTP_ENDPOINT}
+    auth:
+      authenticator: bearertokenauth/external_destination
+    tls:
+      ca_file: ${env:DEMO_EXTERNAL_CA_FILE}
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage
+      queue_size: 10000
+      num_consumers: 4
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 256
+        max_size: 512
+        sizer: items
+
+service:
+  extensions:
+    - bearertokenauth/nemo_relay
+    - bearertokenauth/external_destination
+    - file_storage
+    - health_check
+  pipelines:
+    logs/openshell_files:
+      exporters:
+        - cloudevents/dashboard
+        - cloudevents/external
+        - file/recovery_events
+    logs/watchsandbox:
+      exporters:
+        - cloudevents/dashboard
+        - cloudevents/external
+        - file/recovery_events
+    traces/nemo_relay:
+      exporters:
+        - otlphttp/dashboard
+        - otlphttp/external
+        - file/recovery_traces

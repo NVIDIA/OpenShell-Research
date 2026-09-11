@@ -1,0 +1,54 @@
+{
+  "specversion": "1.0",
+  "id": "sha256:4af7d9ae1d56fb730a32517619f8dbc172ca7c46868d8f05d9de81aa65f4fe89",
+  "source": "openshell://gateway-beta/workspaces/default/sandboxes/sandbox-7/sources/nemo_relay.log",
+  "type": "com.nvidia.openshell.nemo_relay.log.v1",
+  "dataschema": "urn:openshell:event-envelope:1",
+  "datacontenttype": "application/json",
+  "subject": "sandboxes/sandbox-7",
+  "data": {
+    "schema_version": "1.0",
+    "observed_time": "2026-08-18T12:00:00Z",
+    "acquisition": {
+      "kind": "nemo_relay.log",
+      "durability": "checkpointed_file",
+      "source_instance": "relay-operational-log",
+      "file_path": "/var/log/nemo-relay/relay.jsonl",
+      "file_path_resolved": "/var/log/nemo-relay/relay.jsonl",
+      "record_offset": 1024,
+      "record_number": 9
+    },
+    "openshell": {
+      "gateway_id": "gateway-beta",
+      "workspace": "default",
+      "sandbox_id": "sandbox-7"
+    },
+    "security": {
+      "validation": {
+        "status": "not_applicable",
+        "errors": []
+      },
+      "redaction": {
+        "profile_id": "default",
+        "profile_version": "1",
+        "applied": true,
+        "count": 1
+      }
+    },
+    "correlation": {
+      "openshell.gateway.id": "gateway-beta",
+      "openshell.sandbox.id": "sandbox-7",
+      "openshell.workspace": "default",
+      "trace_id": "58e7249fba2d4d60a8ea54ba73812a11"
+    },
+    "original": {
+      "level": "INFO",
+      "message": "relay request completed",
+      "trace_id": "58e7249fba2d4d60a8ea54ba73812a11",
+      "authorization": "[REDACTED]",
+      "relay_extension": {
+        "retained_unknown": true
+      }
+    }
+  }
+}

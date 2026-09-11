@@ -1,0 +1,137 @@
+name: openshell-exporter-real-demo
+
+services:
+  gateway:
+    platform: linux/amd64
+    image: ghcr.io/nvidia/openshell/gateway:0.0.113@sha256:0f8210db6590f02a2007271794104a6fcdcec0cee7a97a1cb015fafd1609ff9d
+    restart: unless-stopped
+    command: []
+    user: "0"
+    ports:
+      - "8080:8080"
+      - "127.0.0.1:8081:8081"
+    volumes:
+      - ${DEMO_DOCKER_SOCKET}:/var/run/docker.sock
+      - type: bind
+        source: ${DEMO_GATEWAY_DATA_DIR}
+        target: ${DEMO_GATEWAY_DATA_DIR}
+        bind:
+          create_host_path: true
+      - ./gateway.toml:/etc/openshell/gateway.toml:ro
+      - ./runtime/jwt:/etc/openshell/jwt:ro
+    environment:
+      OPENSHELL_GATEWAY_CONFIG: /etc/openshell/gateway.toml
+      OPENSHELL_DB_URL: sqlite:${DEMO_GATEWAY_DATA_DIR}/gateway.db?mode=rwc
+      XDG_DATA_HOME: ${DEMO_GATEWAY_DATA_DIR}
+      HOME: ${DEMO_GATEWAY_DATA_DIR}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "host.openshell.internal:host-gateway"
+    networks:
+      demo:
+        aliases:
+          - gateway.demo.internal
+
+  conformance-receiver:
+    platform: linux/amd64
+    build:
+      context: ../../..
+      dockerfile: examples/demo/real-gateway/webapp/Dockerfile
+    restart: unless-stopped
+    user: "${DEMO_UID}:${DEMO_GID}"
+    environment:
+      WEBAPP_INGEST_TOKEN: ${WEBAPP_INGEST_TOKEN}
+      WEBAPP_EVENT_CAPACITY: "2000"
+      WEBAPP_TLS_CERT_FILE: /run/secrets/conformance-receiver.crt
+      WEBAPP_TLS_KEY_FILE: /run/secrets/conformance-receiver.key
+    volumes:
+      - ./runtime/tls/conformance-receiver.crt:/run/secrets/conformance-receiver.crt:ro
+      - ./runtime/tls/conformance-receiver.key:/run/secrets/conformance-receiver.key:ro
+    ports:
+      - "127.0.0.1:8088:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=0700
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      demo:
+        aliases:
+          - conformance-receiver.demo.internal
+
+  exporter:
+    platform: linux/amd64
+    build:
+      context: ../../..
+      dockerfile: Dockerfile
+      args:
+        VERSION: ${DEMO_EXPORTER_VERSION}
+        VCS_REF: ${DEMO_REPOSITORY_COMMIT}
+        CREATED: ${DEMO_BUILD_CREATED}
+    user: "${DEMO_UID}:${DEMO_GID}"
+    restart: unless-stopped
+    depends_on:
+      - gateway
+      - conformance-receiver
+    command:
+      - --config
+      - /etc/openshell-exporter/exporter.yaml
+    environment:
+      NEMO_RELAY_OTLP_TOKEN: ${NEMO_RELAY_OTLP_TOKEN}
+      WEBAPP_INGEST_TOKEN: ${WEBAPP_INGEST_TOKEN}
+      OPENSHELL_DEMO_SANDBOX_ID: ${OPENSHELL_DEMO_SANDBOX_ID}
+    volumes:
+      - ./exporter.yaml:/etc/openshell-exporter/exporter.yaml:ro
+      - openshell-ocsf:/var/log/openshell:ro
+      - ./runtime/tls/exporter-server.crt:/run/secrets/exporter-server.crt:ro
+      - ./runtime/tls/exporter-server.key:/run/secrets/exporter-server.key:ro
+      - ./runtime/tls/ca.crt:/run/secrets/demo-ca.crt:ro
+      - ./runtime/state:/var/lib/openshell-exporter/state
+      - ./runtime/recovery:/var/lib/openshell-exporter/recovery
+    ports:
+      - "127.0.0.1:${DEMO_HEALTH_PORT:-13133}:13133"
+      - "127.0.0.1:${DEMO_METRICS_PORT:-8888}:8888"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=0700
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      demo:
+        aliases:
+          - exporter.demo.internal
+
+  control:
+    platform: linux/amd64
+    profiles: ["tools"]
+    build:
+      context: ../../..
+      dockerfile: examples/demo/real-gateway/control/Dockerfile
+    environment:
+      OPENSHELL_GATEWAY_ENDPOINT: http://gateway:8080
+      OPENSHELL_WORKSPACE: default
+    volumes:
+      - ./:/demo:ro
+    networks:
+      - demo
+
+  hermes-image:
+    platform: linux/amd64
+    profiles: ["tools"]
+    image: openshell-exporter-demo-hermes:0.20.2
+    build:
+      context: ../../..
+      dockerfile: examples/demo/real-gateway/sandbox/Dockerfile
+    command: ["true"]
+
+networks:
+  demo:
+    name: openshell-exporter-demo
+
+volumes:
+  openshell-ocsf:
+    name: openshell-exporter-demo-ocsf

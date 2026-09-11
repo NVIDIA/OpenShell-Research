@@ -1,0 +1,92 @@
+{
+  "specversion": "1.0",
+  "id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "source": "openshell://gateway-prod-1/workspaces/default/sandboxes/sandbox-123/sources/ocsf.file",
+  "type": "com.nvidia.openshell.ocsf.6003.v1",
+  "dataschema": "urn:openshell:event-envelope:1",
+  "datacontenttype": "application/json",
+  "subject": "sandboxes/sandbox-123",
+  "time": "2026-08-18T17:20:00Z",
+  "data": {
+    "schema_version": "1.0",
+    "observed_time": "2026-08-18T17:20:00.125Z",
+    "acquisition": {
+      "kind": "ocsf.file",
+      "durability": "checkpointed_file",
+      "source_instance": "gateway-ocsf-jsonl",
+      "file_path": "/var/log/openshell/openshell-ocsf.2026-08-18.log",
+      "record_offset": 512,
+      "record_number": 9
+    },
+    "openshell": {
+      "gateway_id": "gateway-prod-1",
+      "workspace": "default",
+      "sandbox_id": "sandbox-123",
+      "sandbox_name": "research-agent"
+    },
+    "security": {
+      "ocsf": {
+        "version": "1.8.0",
+        "class_uid": 6003,
+        "category_uid": 6,
+        "activity_id": 99,
+        "type_uid": 600399,
+        "severity_id": 1
+      },
+      "validation": {
+        "status": "valid",
+        "errors": []
+      },
+      "redaction": {
+        "profile_id": "openshell-default",
+        "profile_version": "1",
+        "applied": false,
+        "count": 0
+      }
+    },
+    "correlation": {
+      "agent.session.id": "session-fixture-1",
+      "agent_session_id": "session-fixture-1",
+      "openshell.gateway.id": "gateway-prod-1",
+      "openshell.sandbox.id": "sandbox-123",
+      "openshell.workspace": "default",
+      "trace_id": "00112233445566778899aabbccddeeff"
+    },
+    "original": {
+      "activity_id": 99,
+      "activity_name": "Other",
+      "ai_model": {
+        "name": "nvidia/nemotron-3-super",
+        "provider": "NVIDIA"
+      },
+      "api": {
+        "operation": "chat.completions"
+      },
+      "category_uid": 6,
+      "class_uid": 6003,
+      "class_name": "API Activity",
+      "metadata": {
+        "product": {
+          "name": "OpenShell"
+        },
+        "profiles": [
+          "container",
+          "host",
+          "ai_operation"
+        ],
+        "version": "1.8.0"
+      },
+      "severity_id": 1,
+      "time": 1787073600000,
+      "type_uid": 600399,
+      "unmapped": {
+        "agent_session_id": "session-fixture-1",
+        "input_tokens": 128,
+        "latency_ms": 42,
+        "output_tokens": 64,
+        "sandbox_id": "sandbox-123",
+        "trace_id": "00112233445566778899aabbccddeeff"
+      }
+    }
+  }
+}

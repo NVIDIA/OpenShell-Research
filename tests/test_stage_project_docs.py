@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+import re
 import tempfile
 import unittest
 
@@ -23,7 +24,7 @@ class StageProjectDocsTests(unittest.TestCase):
     def test_configures_every_published_project(self) -> None:
         self.assertEqual(
             set(STAGER.PROJECT_DOCUMENTATION),
-            {"egress-gate", "openshell-agent-runner"},
+            {"egress-gate", "openshell-agent-runner", "openshell-exporter"},
         )
         for source in STAGER.PROJECT_DOCUMENTATION.values():
             self.assertTrue((source / "index.md").is_file())
@@ -79,6 +80,19 @@ class StageProjectDocsTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "must not overlap"):
                 STAGER.stage_project_docs(source, destination)
+
+
+def test_exporter_guide_links_stay_in_published_tree() -> None:
+    source = STAGER.PROJECT_DOCUMENTATION["openshell-exporter"]
+    for page in source.rglob("*.md"):
+        contents = page.read_text(encoding="utf-8")
+        assert "agent_markdown: true" in contents
+        for link in re.findall(r"\]\(([^)]+)\)", contents):
+            if link.startswith(("https:", "http:", "mailto:", "#")):
+                continue
+            target = (page.parent / link.split("#", 1)[0]).resolve()
+            assert target.is_relative_to(source.resolve()), (page, link)
+            assert target.is_file(), (page, link)
 
 
 if __name__ == "__main__":

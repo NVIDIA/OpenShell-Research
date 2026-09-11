@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:openshell:elastic-soc-conformance:1",
+  "title": "OpenShell Elastic SOC conformance evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "verified_at",
+    "integration",
+    "target",
+    "controls",
+    "external_gates"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "status": {
+      "const": "passed"
+    },
+    "verified_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "integration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "pack_version",
+        "asset_set_sha256",
+        "manifest_sha256",
+        "verifier_sha256",
+        "action_binder_sha256",
+        "schema_sha256",
+        "shift_checker_sha256",
+        "shift_report_schema_sha256"
+      ],
+      "properties": {
+        "name": {
+          "const": "openshell-elastic-soc"
+        },
+        "pack_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "asset_set_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "manifest_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "verifier_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "action_binder_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "schema_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "shift_checker_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "shift_report_schema_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "environment",
+        "kibana_space",
+        "elasticsearch",
+        "kibana",
+        "indices"
+      ],
+      "properties": {
+        "environment": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+        },
+        "kibana_space": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"
+        },
+        "elasticsearch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "cluster_status",
+            "node_count",
+            "data_node_count"
+          ],
+          "properties": {
+            "version": {
+              "type": "string"
+            },
+            "cluster_status": {
+              "const": "green"
+            },
+            "node_count": {
+              "type": "integer",
+              "minimum": 3
+            },
+            "data_node_count": {
+              "type": "integer",
+              "minimum": 2
+            }
+          }
+        },
+        "kibana": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "version",
+            "status"
+          ],
+          "properties": {
+            "version": {
+              "type": "string"
+            },
+            "status": {
+              "const": "available"
+            }
+          }
+        },
+        "indices": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "security",
+            "agent_traces"
+          ],
+          "properties": {
+            "security": {
+              "type": "string",
+              "pattern": "^logs-openshell\\.security-[a-z0-9-]+-v1$"
+            },
+            "agent_traces": {
+              "type": "string",
+              "pattern": "^traces-openshell\\.agent-[a-z0-9-]+-v1$"
+            }
+          }
+        }
+      }
+    },
+    "controls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "templates_and_roles_match",
+        "indices_green_with_replicas",
+        "runtime_identity_create_only",
+        "runtime_identity_admin_read_delete_denied",
+        "detections_enabled_and_healthy",
+        "rule_count",
+        "detection_principal",
+        "snapshot_repository",
+        "retention_approval",
+        "lifecycle_management_running",
+        "indices_lifecycle_managed",
+        "security_lifecycle_policy",
+        "agent_lifecycle_policy",
+        "soc_role_separation_verified"
+      ],
+      "properties": {
+        "templates_and_roles_match": {
+          "const": true
+        },
+        "indices_green_with_replicas": {
+          "const": true
+        },
+        "runtime_identity_create_only": {
+          "const": true
+        },
+        "runtime_identity_admin_read_delete_denied": {
+          "const": true
+        },
+        "detections_enabled_and_healthy": {
+          "const": true
+        },
+        "rule_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "detection_principal": {
+          "type": "string",
+          "minLength": 1
+        },
+        "snapshot_repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retention_approval": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lifecycle_management_running": {
+          "const": true
+        },
+        "indices_lifecycle_managed": {
+          "const": true
+        },
+        "security_lifecycle_policy": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "agent_lifecycle_policy": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "soc_role_separation_verified": {
+          "const": true
+        }
+      }
+    },
+    "external_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "required"
+      ],
+      "properties": {
+        "status": {
+          "const": "unexecuted"
+        },
+        "required": {
+          "type": "array",
+          "minItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

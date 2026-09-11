@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
+# SPDX-License-Identifier: Apache-2.0
+# Final presentation override: remove the development conformance receiver from
+# both exporter pipelines after its qualification checks have passed.
+services:
+  exporter:
+    depends_on: !override
+      - gateway
+    command:
+      - --config
+      - /etc/openshell-exporter/exporter.yaml
+      - --config
+      - /etc/openshell-exporter/exporter.elastic.yaml
+      - --config
+      - /etc/openshell-exporter/exporter.elastic-headless.yaml
+    volumes:
+      - ./exporter.elastic-headless.yaml:/etc/openshell-exporter/exporter.elastic-headless.yaml:ro

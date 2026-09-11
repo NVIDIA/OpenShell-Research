@@ -1,0 +1,199 @@
+extensions:
+  bearertokenauth/nemo_relay:
+    token: ${env:NEMO_RELAY_OTLP_TOKEN}
+  file_storage:
+    directory: /var/lib/openshell-exporter/state
+    create_directory: true
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+receivers:
+  file_log/openshell_ocsf:
+    include:
+      - /var/log/openshell/openshell-ocsf.*.log
+    start_at: beginning
+    storage: file_storage
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+    include_file_path: true
+    include_file_path_resolved: true
+    include_file_record_offset: true
+    include_file_record_number: true
+    on_truncate: read_whole_file
+    max_log_size: 8MiB
+    max_log_size_behavior: split
+    attributes:
+      openshell.acquisition.kind: ocsf.file
+    operators:
+      - type: json_parser
+        parse_from: body
+        parse_to: body
+        on_error: send
+  watchsandbox:
+    endpoint: http://gateway:8080
+    workspace: default
+    gateway_id: docker-demo-gateway
+    sandbox_names:
+      - hermes-demo
+    discovery_interval: 3s
+    token_env: ""
+    allow_insecure_http: true
+    log_tail_lines: 200
+    event_tail: 200
+    reconnect_initial: 1s
+    reconnect_max: 30s
+    policy_reconciliation:
+      enabled: true
+      interval: 5m
+      timeout: 15s
+      workers: 2
+      queue_size: 128
+      max_revisions: 10000
+      include_history: true
+      include_effective_policies: false
+      storage: file_storage
+  otlp/nemo_relay:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        auth:
+          authenticator: bearertokenauth/nemo_relay
+        tls:
+          cert_file: /run/secrets/exporter-server.crt
+          key_file: /run/secrets/exporter-server.key
+      http:
+        endpoint: 0.0.0.0:4318
+        auth:
+          authenticator: bearertokenauth/nemo_relay
+        tls:
+          cert_file: /run/secrets/exporter-server.crt
+          key_file: /run/secrets/exporter-server.key
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+  openshell:
+    source_profiles: [ocsf.file, watchsandbox, policy.reconciliation, nemo_relay.trace]
+    gateway_id: docker-demo-gateway
+    workspace: default
+    source_instance: docker-demo-ocsf-jsonl
+    default_sandbox_id: ${env:OPENSHELL_DEMO_SANDBOX_ID}
+    validation:
+      mode: mark
+  resource/nemo_relay:
+    attributes:
+      - key: telemetry.source
+        value: nemo_relay
+        action: upsert
+      - key: openshell.gateway.id
+        value: docker-demo-gateway
+        action: upsert
+      - key: openshell.workspace
+        value: default
+        action: upsert
+  relay:
+    gateway_id: docker-demo-gateway
+    workspace: default
+    privacy:
+      mode: allow
+exporters:
+  cloudevents/dashboard:
+    endpoint: https://conformance-receiver:8080/v1/events
+    max_events: 500
+    max_event_bytes: 1048576
+    max_request_bytes: 4194304
+    headers:
+      Authorization: Bearer ${env:WEBAPP_INGEST_TOKEN}
+    tls:
+      ca_file: /run/secrets/demo-ca.crt
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage
+      queue_size: 10000
+      num_consumers: 4
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 256
+        max_size: 512
+        sizer: items
+  otlphttp/dashboard:
+    endpoint: https://conformance-receiver:8080
+    headers:
+      Authorization: Bearer ${env:WEBAPP_INGEST_TOKEN}
+    tls:
+      ca_file: /run/secrets/demo-ca.crt
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage
+      queue_size: 10000
+      num_consumers: 4
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 256
+        max_size: 512
+        sizer: items
+  file/recovery_events:
+    path: /var/lib/openshell-exporter/recovery/openshell-events.json
+    format: json
+  file/recovery_traces:
+    path: /var/lib/openshell-exporter/recovery/nemo-relay-traces.json
+    format: json
+
+service:
+  telemetry:
+    logs:
+      encoding: json
+    metrics:
+      level: normal
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+  extensions:
+    - bearertokenauth/nemo_relay
+    - file_storage
+    - health_check
+  pipelines:
+    logs/openshell_files:
+      receivers:
+        - file_log/openshell_ocsf
+      processors:
+        - memory_limiter
+        - openshell
+      exporters:
+        - cloudevents/dashboard
+        - file/recovery_events
+    logs/watchsandbox:
+      receivers:
+        - watchsandbox
+      processors:
+        - memory_limiter
+        - openshell
+      exporters:
+        - cloudevents/dashboard
+        - file/recovery_events
+    traces/nemo_relay:
+      receivers:
+        - otlp/nemo_relay
+      processors:
+        - memory_limiter
+        - resource/nemo_relay
+        - relay
+      exporters:
+        - otlphttp/dashboard
+        - file/recovery_traces

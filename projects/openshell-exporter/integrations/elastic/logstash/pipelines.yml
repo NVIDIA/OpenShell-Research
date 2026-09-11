@@ -1,0 +1,5 @@
+- pipeline.id: openshell-cloudevents
+  path.config: /usr/share/logstash/pipeline/openshell-cloudevents.conf
+  pipeline.ecs_compatibility: v8
+  pipeline.workers: 1
+  queue.type: persisted

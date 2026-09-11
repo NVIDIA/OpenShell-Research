@@ -1,0 +1,57 @@
+# Install this release in the observability tier. It accepts only mTLS- and
+# bearer-authenticated evidence carrying the verified internal contract, then
+# owns persistent customer delivery and recovery.
+fullnameOverride: openshell-exporter-central
+profile: custom
+topology:
+  role: central
+  tenantId: customer-a
+  central:
+    replicas: 3
+    shardRouting:
+      enabled: true
+      hostname: openshell-exporter-central-headless.observability.svc.cluster.local
+      port: "4330"
+      interval: 30s
+      timeout: 5s
+
+image:
+  repository: registry.example.internal/openshell-event-exporter
+  digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+
+modules:
+  acquisition:
+    watchSandbox: false
+    policyReconciliation: false
+    ocsfFiles: false
+    sandboxFileLogs: false
+    relayFileLogs: false
+    relayOtlp: false
+    nativeOtlp: false
+    forwardedSandboxFiles: false
+    kubernetesContext: false
+    internalOtlp: true
+  delivery:
+    cloudEvents: true
+    otlpGrpc: true
+    otlpHttp: false
+    recovery: true
+
+internalOtlp:
+  enabled: true
+  authSecret: openshell-exporter-internal-input-auth
+  tlsSecret: openshell-exporter-internal-input-tls
+  grpcEndpoint: 0.0.0.0:4330
+  httpEndpoint: 0.0.0.0:4331
+  mtlsEnabled: true
+
+destination:
+  cloudEvents:
+    endpoint: https://events.customer.example/v1/events
+  otlp:
+    grpcEndpoint: otel.customer.example:4317
+
+networkPolicy:
+  enabled: true
+  additionalSourceNamespaces: [openshell]
+  monitoringNamespaces: [monitoring]

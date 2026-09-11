@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "producer": "elastic-security",
+  "environment": "production",
+  "occurred_at": "{{date}}",
+  "rule": {
+    "id": "{{context.rule.rule_id}}",
+    "name": "{{context.rule.name}}",
+    "severity": "{{context.rule.severity}}",
+    "space_id": "{{rule.spaceId}}"
+  },
+  "alert": {
+    "id": "{{alert.id}}"
+  },
+  "url": "{{{context.results_link}}}"
+}

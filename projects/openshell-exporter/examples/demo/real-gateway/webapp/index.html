@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenShell Correlated Agent Evidence</title>
+  <style>
+    :root { color-scheme:dark; --bg:#06100c; --panel:#0b1b13; --line:#214332; --text:#e9fff2; --muted:#91b6a1; --green:#76e7a7; --cyan:#75d8ef; --amber:#ffc66d; --red:#ff7c83; --purple:#c4a7ff; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Inter,ui-sans-serif,system-ui,sans-serif; background:radial-gradient(circle at 20% -10%,#174a32 0,transparent 35%),var(--bg); color:var(--text); }
+    header { padding:28px clamp(18px,5vw,64px) 18px; border-bottom:1px solid var(--line); display:flex; gap:24px; justify-content:space-between; align-items:end; }
+    h1 { margin:0; font-size:clamp(25px,4vw,42px); letter-spacing:-.04em; }
+    h2 { margin:0; font-size:18px; }
+    .eyebrow { color:var(--green); font-size:12px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
+    .live { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; }
+    .dot { width:9px; height:9px; border-radius:50%; background:var(--green); box-shadow:0 0 18px var(--green); }
+    main { max-width:1500px; margin:auto; padding:24px clamp(18px,5vw,64px) 60px; }
+    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; }
+    .card,.timeline-panel,.story-panel { background:linear-gradient(145deg,rgba(17,43,30,.96),rgba(9,26,18,.96)); border:1px solid var(--line); border-radius:16px; }
+    .card { padding:17px; }
+    .card strong { display:block; font-size:30px; letter-spacing:-.04em; margin-top:8px; }
+    .label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.1em; }
+    .story-grid { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(300px,.8fr); gap:12px; margin-top:12px; }
+    .story-panel { padding:18px; }
+    .story-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+    .story-head p,.boundary { color:var(--muted); font-size:12px; line-height:1.5; margin:5px 0 0; }
+    .proof { color:var(--green); border:1px solid #2d6b49; background:#102a1b; border-radius:999px; padding:6px 9px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; white-space:nowrap; }
+    .proof.waiting { color:var(--amber); border-color:#6d5127; background:#2a2112; }
+    .journey { display:grid; grid-template-columns:repeat(6,minmax(90px,1fr)); gap:7px; margin-top:15px; }
+    .journey-step { min-height:82px; padding:10px; border:1px solid var(--line); border-radius:11px; background:#07140e; position:relative; }
+    .journey-step:not(:last-child)::after { content:'→'; color:var(--muted); position:absolute; right:-8px; top:30px; z-index:2; }
+    .journey-step b { display:block; font-size:11px; margin-top:5px; }
+    .journey-step small { color:var(--muted); font-size:10px; line-height:1.35; }
+    .journey-step .status { color:var(--muted); font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.09em; }
+    .journey-step.observed { border-color:#2d6b49; box-shadow:inset 0 0 0 1px rgba(118,231,167,.08); }
+    .journey-step.observed .status { color:var(--green); }
+    .finding { margin-top:16px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+    .finding div { padding:10px; border:1px solid var(--line); border-radius:10px; background:#081710; min-width:0; }
+    .finding strong { display:block; margin-top:5px; font-size:12px; overflow-wrap:anywhere; }
+    .finding-actions { display:flex; gap:8px; align-items:center; margin-top:13px; flex-wrap:wrap; }
+    .handoff { border-color:#634ba0; background:linear-gradient(145deg,rgba(38,29,63,.9),rgba(13,23,20,.96)); }
+    .handoff-flow { margin:15px 0; display:grid; gap:8px; }
+    .handoff-row { display:grid; grid-template-columns:90px 1fr; gap:10px; align-items:start; font-size:12px; }
+    .handoff-row b { color:var(--purple); }
+    .no-write { color:var(--green); font-size:11px; font-weight:800; margin-top:12px; }
+    .timeline-panel { margin:22px 0; padding:18px; }
+    .timeline-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+    .timeline-note { color:var(--muted); font-size:12px; margin-top:5px; }
+    .identity { display:flex; flex-wrap:wrap; gap:7px; margin:14px 0; }
+    .identity span,.chip { padding:7px 10px; border:1px solid var(--line); border-radius:999px; font-size:12px; color:var(--muted); background:#081710; }
+    .timeline { display:flex; gap:9px; overflow:auto; padding:4px 0 8px; }
+    .step { min-width:165px; max-width:220px; padding:12px; border:1px solid var(--line); border-radius:13px; background:#07140e; position:relative; }
+    .step:not(:last-child)::after { content:'→'; position:absolute; right:-9px; top:24px; color:var(--green); z-index:2; }
+    .stage { color:var(--cyan); text-transform:uppercase; letter-spacing:.1em; font-size:10px; font-weight:900; }
+    .stage.network,.stage.policy,.stage.gap { color:var(--amber); }
+    .stage.process,.stage.file,.stage.security { color:var(--green); }
+    .step strong { display:block; font-size:12px; margin:7px 0; overflow-wrap:anywhere; }
+    .step small { color:var(--muted); }
+    .outcome { display:inline-block; margin-top:7px; padding:3px 6px; border-radius:999px; background:#14281d; color:var(--muted); font-size:10px; font-style:normal; text-transform:uppercase; }
+    .outcome.denied,.outcome.error,.outcome.invalid { color:var(--amber); border:1px solid #6d5127; }
+    .controls { margin:22px 0 14px; display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+    input,select { background:#0a1811; color:var(--text); border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
+    input { min-width:280px; flex:1; }
+    #types { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 16px; }
+    .chip b { color:var(--text); margin-left:5px; }
+    .table-wrap { overflow:auto; border:1px solid var(--line); border-radius:16px; background:rgba(8,22,15,.9); }
+    table { width:100%; border-collapse:collapse; min-width:1100px; }
+    th { text-align:left; color:var(--muted); font-size:11px; letter-spacing:.09em; text-transform:uppercase; padding:13px 14px; border-bottom:1px solid var(--line); position:sticky; top:0; background:#0c1c14; }
+    td { padding:12px 14px; border-bottom:1px solid rgba(33,67,50,.65); font-size:13px; vertical-align:top; }
+    tr { cursor:pointer; } tr:hover { background:#122a1d; }
+    .kind { font-weight:800; color:var(--cyan); } .kind.openshell_event { color:var(--green); }
+    .bad { color:var(--red); } code { color:#c2f7d5; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+    dialog { width:min(920px,92vw); max-height:86vh; color:var(--text); background:#07130d; border:1px solid var(--line); border-radius:18px; padding:0; }
+    dialog::backdrop { background:rgba(0,0,0,.72); }
+    .dialog-head { padding:16px 20px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; }
+    .dialog-body { padding:18px 20px; overflow:auto; max-height:72vh; }
+    pre { white-space:pre-wrap; word-break:break-word; color:#c9eed7; font-size:12px; line-height:1.5; }
+    button { border:1px solid var(--line); background:#10261a; color:var(--text); padding:8px 12px; border-radius:9px; cursor:pointer; }
+    .empty { text-align:center; color:var(--muted); padding:32px; }
+    @media (max-width:1050px) { .cards { grid-template-columns:repeat(2,1fr); } .story-grid { grid-template-columns:1fr; } .journey { grid-template-columns:repeat(3,1fr); } .journey-step::after { display:none; } }
+    @media (max-width:800px) { header { align-items:start; flex-direction:column; } }
+  </style>
+</head>
+<body>
+<header>
+  <div><div class="eyebrow">Real gateway · real sandbox · real model</div><h1>OpenShell Correlated Agent Evidence</h1></div>
+  <div class="live"><span class="dot"></span><span id="connection">Connecting to stream</span></div>
+</header>
+<main>
+  <section class="cards">
+    <div class="card"><span class="label">Evidence received</span><strong id="total">0</strong></div>
+    <div class="card"><span class="label">OpenShell events & logs</span><strong id="logs">0</strong></div>
+    <div class="card"><span class="label">NeMo Relay spans</span><strong id="traces">0</strong></div>
+    <div class="card"><span class="label">Correlation complete</span><strong id="correlated">0</strong></div>
+    <div class="card"><span class="label">Structurally invalid</span><strong id="invalid">0</strong></div>
+    <div class="card"><span class="label">Session security evidence</span><strong id="security">0</strong></div>
+    <div class="card"><span class="label">Session latency</span><strong id="latency">—</strong></div>
+    <div class="card"><span class="label">Observed tokens in / out</span><strong id="tokens">—</strong></div>
+    <div class="card"><span class="label">Failures / policy denials</span><strong id="failures">0</strong></div>
+  </section>
+  <section class="story-grid" aria-label="Security pitch narrative">
+    <article class="story-panel">
+      <div class="story-head">
+        <div><span class="label">One execution · one evidence story</span><h2>Agent intent to security outcome</h2><p>Every observed stage comes from the real Hermes, NeMo Relay, OpenShell, OCSF, or exporter path.</p></div>
+        <span id="story-proof" class="proof waiting">Waiting for proof</span>
+      </div>
+      <div class="journey">
+        <div id="journey-agent" class="journey-step"><span class="status">Waiting</span><b>Agent intent</b><small>Hermes session</small></div>
+        <div id="journey-model" class="journey-step"><span class="status">Waiting</span><b>Model</b><small>Relay span</small></div>
+        <div id="journey-tool" class="journey-step"><span class="status">Waiting</span><b>Tool action</b><small>Terminal call</small></div>
+        <div id="journey-workload" class="journey-step"><span class="status">Waiting</span><b>Workload</b><small>Process / file</small></div>
+        <div id="journey-policy" class="journey-step"><span class="status">Waiting</span><b>Policy</b><small>Network enforcement</small></div>
+        <div id="journey-delivery" class="journey-step"><span class="status">Waiting</span><b>Partner delivery</b><small>CloudEvents + OTLP</small></div>
+      </div>
+      <div class="finding">
+        <div><span class="label">Security outcome</span><strong id="finding-outcome">Waiting for policy evidence</strong></div>
+        <div><span class="label">Policy context</span><strong id="finding-policy">Not observed</strong></div>
+        <div><span class="label">Evidence identity</span><strong id="finding-id">Not observed</strong></div>
+      </div>
+      <div class="finding-actions"><button id="show-denials">Inspect denial evidence</button><span class="boundary">The UI reports observed evidence; it does not infer intent or causal relationships.</span></div>
+    </article>
+    <article class="story-panel handoff">
+      <span class="label">Customer-controlled next step</span><h2>Security and policy-engine handoff</h2>
+      <div class="handoff-flow">
+        <div class="handoff-row"><b>Exporter</b><span>Collects, normalizes, redacts, correlates identifiers, and ships evidence.</span></div>
+        <div class="handoff-row"><b>Protocols</b><span>CloudEvents HTTPS for security evidence and OTLP gRPC/HTTP for telemetry.</span></div>
+        <div class="handoff-row"><b>Partner</b><span>A SIEM can investigate; a separate policy engine can evaluate evidence and propose an exact change.</span></div>
+        <div class="handoff-row"><b>Actuator</b><span>Any approval or mutation uses a separate identity and an independently governed system.</span></div>
+      </div>
+      <div class="no-write">Exporter has no policy-write credential or mutation client.</div>
+    </article>
+  </section>
+  <section class="timeline-panel">
+    <div class="timeline-head"><div><h2>Latest sandbox timeline</h2><div class="timeline-note">Direct IDs are preserved. OpenShell evidence without a session/trace ID is joined by sandbox and event time, so this view is temporal correlation—not causal proof.</div></div><select id="sandbox"><option value="">Waiting for sandbox identity</option></select></div>
+    <div id="identity" class="identity"></div>
+    <div id="timeline" class="timeline"><div class="empty">Waiting for correlated Relay and OpenShell signals…</div></div>
+  </section>
+  <section class="controls">
+    <input id="search" placeholder="Filter type, stage, sandbox, session, trace, request, tool…" autocomplete="off">
+    <select id="kind"><option value="">All transports</option><option value="openshell_event">OpenShell CloudEvents</option><option value="nemo_relay_trace">NeMo Relay OTLP</option></select>
+  </section>
+  <section id="types"></section>
+  <section class="table-wrap">
+    <table><thead><tr><th>Occurred</th><th>Stage</th><th>Transport</th><th>Type</th><th>Summary</th><th>Correlation</th><th>ID</th></tr></thead><tbody id="rows"></tbody></table>
+    <div id="empty" class="empty">Waiting for real OpenShell activity…</div>
+  </section>
+</main>
+<dialog id="detail"><div class="dialog-head"><strong id="detail-title">Evidence detail</strong><button id="close">Close</button></div><div class="dialog-body"><pre id="payload"></pre></div></dialog>
+<script>
+  const state={items:[],seen:new Set(),sandbox:''};
+  const el=id=>document.getElementById(id);
+  const escapeHTML=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  const when=i=>new Date(i.occurred_at||i.received_at);
+  function insert(item){const key=item.sequence||`${item.kind}:${item.id}:${item.received_at}`;if(state.seen.has(key))return;state.seen.add(key);state.items.unshift(item);if(state.items.length>2000)state.items.pop();render();}
+  function stats(){const byKind={},byType={};let invalid=0,correlated=0;for(const i of state.items){byKind[i.kind]=(byKind[i.kind]||0)+1;byType[i.type]=(byType[i.type]||0)+1;if(i.valid===false)invalid++;if(i.correlation?.['openshell.sandbox.id']&&(i.kind==='openshell_event'||i.correlation?.['agent.session.id']))correlated++;}el('total').textContent=state.items.length;el('logs').textContent=byKind.openshell_event||0;el('traces').textContent=byKind.nemo_relay_trace||0;el('correlated').textContent=correlated;el('invalid').textContent=invalid;el('types').innerHTML=Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,18).map(([k,v])=>`<span class="chip">${escapeHTML(k)}<b>${v}</b></span>`).join('');}
+  function selectedSessionView(){
+    const sandboxItems=state.items.filter(i=>i.correlation?.['openshell.sandbox.id']===state.sandbox);
+    const relay=sandboxItems.filter(i=>i.kind==='nemo_relay_trace'&&i.correlation?.['agent.session.id']).sort((a,b)=>when(a)-when(b));
+    if(!relay.length)return {items:[],relay:[],session:'',started:0,finished:0};
+    const session=relay.at(-1).correlation['agent.session.id'];
+    const sessionRelay=relay.filter(i=>i.correlation?.['agent.session.id']===session);
+    const started=Math.min(...sessionRelay.map(i=>when(i).getTime()));
+    const finished=Math.max(...sessionRelay.map(i=>when(i).getTime()+Number(i.duration_ms||0)));
+    const items=sandboxItems.filter(i=>{
+      if(i.kind==='nemo_relay_trace')return i.correlation?.['agent.session.id']===session;
+      const timestamp=when(i).getTime();
+      return timestamp>=started-5000&&timestamp<=finished+30000;
+    }).sort((a,b)=>when(a)-when(b));
+    return {items,relay:sessionRelay,session,started,finished};
+  }
+  function formatDuration(milliseconds){
+    if(!Number.isFinite(milliseconds)||milliseconds<0)return '—';
+    return milliseconds>=1000?(milliseconds/1000).toFixed(1)+'s':Math.round(milliseconds)+'ms';
+  }
+  function renderTimeline(){
+    const sandboxes=[...new Set(state.items.map(i=>i.correlation?.['openshell.sandbox.id']).filter(Boolean))];
+    if(!state.sandbox||!sandboxes.includes(state.sandbox))state.sandbox=sandboxes[0]||'';
+    el('sandbox').innerHTML=sandboxes.length?sandboxes.map(id=>'<option value="'+escapeHTML(id)+'" '+(id===state.sandbox?'selected':'')+'>'+escapeHTML(id)+'</option>').join(''):'<option value="">Waiting for sandbox identity</option>';
+    const view=selectedSessionView();
+    const ids={};
+    [...view.items].reverse().forEach(item=>Object.entries(item.correlation||{}).forEach(([key,value])=>{if(!(key in ids))ids[key]=value;}));
+    el('identity').innerHTML=Object.entries(ids).filter(([key])=>['openshell.gateway.id','openshell.workspace','openshell.sandbox.id','agent.session.id','trace_id','request_id','tool_call_id','openshell.policy.version'].includes(key)).map(([key,value])=>'<span><b>'+escapeHTML(key)+'</b> '+escapeHTML(value)+'</span>').join('');
+    const security=view.items.filter(i=>i.kind==='openshell_event').length;
+    const tokenSpans=view.relay.filter(i=>i.token_usage_status==='observed');
+    const inputTokens=Math.max(0,...tokenSpans.map(i=>Number(i.input_tokens||0)));
+    const outputTokens=Math.max(0,...tokenSpans.map(i=>Number(i.output_tokens||0)));
+    const totalTokens=Math.max(0,...tokenSpans.map(i=>Number(i.total_tokens||0)));
+    const tokenObserved=tokenSpans.length>0;
+    const failures=view.items.filter(i=>i.outcome==='error'||i.outcome==='invalid').length;
+    const denials=view.items.filter(i=>i.outcome==='denied').length;
+    el('security').textContent=security;
+    el('latency').textContent=view.relay.length?formatDuration(view.finished-view.started):'—';
+    el('tokens').textContent=tokenObserved?((inputTokens||outputTokens)?inputTokens+' / '+outputTokens:totalTokens+' total'):(view.relay.length?'Not emitted':'—');
+    el('failures').textContent=failures+' / '+denials;
+    renderPitchStory(view);
+    const items=view.items.slice(-40);
+    el('timeline').innerHTML=items.length?items.map(i=>'<article class="step" data-sequence="'+i.sequence+'"><span class="stage '+escapeHTML(i.stage)+'">'+escapeHTML(i.stage)+'</span><strong>'+escapeHTML(i.summary||i.type)+'</strong><small>'+when(i).toLocaleTimeString()+' · '+(i.kind==='openshell_event'?'CloudEvent':'OTLP')+(i.duration_ms?' · '+formatDuration(i.duration_ms):'')+'</small>'+(i.outcome?'<em class="outcome '+escapeHTML(i.outcome)+'">'+escapeHTML(i.outcome)+'</em>':'')+'</article>').join(''):'<div class="empty">Waiting for one correlated Hermes session…</div>';
+    document.querySelectorAll('.step').forEach(node=>node.onclick=()=>show(state.items.find(i=>String(i.sequence)===node.dataset.sequence)));
+  }
+
+  function markJourney(id,observed){const node=el(id);node.classList.toggle('observed',observed);node.querySelector('.status').textContent=observed?'Observed':'Waiting';}
+  function renderPitchStory(view){
+    const hasAgent=view.relay.some(i=>i.stage==='prompt');
+    const hasModel=view.relay.some(i=>i.stage==='model');
+    const hasTool=view.relay.some(i=>i.stage==='tool');
+    const hasProcess=view.items.some(i=>i.stage==='process');
+    const hasFile=view.items.some(i=>i.stage==='file');
+    const denied=view.items.filter(i=>i.outcome==='denied');
+    const delivered=view.items.some(i=>i.kind==='openshell_event')&&view.relay.length>0;
+    markJourney('journey-agent',hasAgent);markJourney('journey-model',hasModel);markJourney('journey-tool',hasTool);markJourney('journey-workload',hasProcess||hasFile);markJourney('journey-policy',denied.length>0);markJourney('journey-delivery',delivered);
+    const complete=hasAgent&&hasModel&&hasTool&&(hasProcess||hasFile)&&denied.length>0&&delivered;
+    el('story-proof').textContent=complete?'Real path observed':'Waiting for proof';
+    el('story-proof').classList.toggle('waiting',!complete);
+    const latest=denied.at(-1);
+    el('finding-outcome').textContent=latest?'Connection denied by OpenShell policy':'Waiting for policy evidence';
+    el('finding-policy').textContent=latest?.correlation?.['openshell.policy.version']?'Version '+latest.correlation['openshell.policy.version']:'Version not emitted';
+    el('finding-id').textContent=latest?.id||'Not observed';
+    el('show-denials').disabled=!latest;
+  }
+
+  function render(){stats();renderTimeline();const query=el('search').value.toLowerCase(),kind=el('kind').value;const rows=state.items.filter(i=>(!kind||i.kind===kind)&&(!query||JSON.stringify(i).toLowerCase().includes(query))).slice(0,500);el('empty').style.display=rows.length?'none':'block';el('rows').innerHTML=rows.map(i=>`<tr data-sequence="${i.sequence}"><td>${when(i).toLocaleTimeString()}</td><td><span class="stage ${escapeHTML(i.stage)}">${escapeHTML(i.stage)}</span></td><td><span class="kind ${escapeHTML(i.kind)}">${i.kind==='openshell_event'?'CloudEvent':'OTLP trace'}</span></td><td class="${i.valid===false?'bad':''}">${escapeHTML(i.type)}</td><td>${escapeHTML(i.summary||'—')}</td><td><code>${escapeHTML(i.correlation?.['agent.session.id']||i.correlation?.trace_id||i.correlation?.['openshell.sandbox.id']||'—').slice(0,28)}</code></td><td><code>${escapeHTML((i.id||'').slice(0,24))}</code></td></tr>`).join('');document.querySelectorAll('tbody tr').forEach(row=>row.onclick=()=>show(state.items.find(i=>String(i.sequence)===row.dataset.sequence)));}
+  function show(item){if(!item)return;el('detail-title').textContent=`${item.stage} · ${item.type}`;el('payload').textContent=JSON.stringify(item,null,2);el('detail').showModal();}
+  async function load(){const response=await fetch('/api/events?limit=500');for(const item of (await response.json()).reverse())insert(item);}
+  function connect(){const stream=new EventSource('/api/stream');stream.onopen=()=>el('connection').textContent='Live stream connected';stream.onmessage=e=>insert(JSON.parse(e.data));stream.onerror=()=>el('connection').textContent='Reconnecting…';}
+  el('search').addEventListener('input',render);el('kind').addEventListener('change',render);el('sandbox').addEventListener('change',event=>{state.sandbox=event.target.value;renderTimeline();});el('show-denials').onclick=()=>{el('search').value='denied';el('kind').value='openshell_event';render();el('rows').closest('.table-wrap').scrollIntoView({behavior:'smooth'});};el('close').onclick=()=>el('detail').close();
+  load().then(connect).catch(error=>{el('connection').textContent=error.message;setTimeout(()=>location.reload(),3000);});
+</script>
+</body>
+</html>

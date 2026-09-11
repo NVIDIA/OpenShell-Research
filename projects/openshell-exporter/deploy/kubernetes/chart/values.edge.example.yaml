@@ -1,0 +1,54 @@
+# Install this release beside an OpenShell gateway. It acquires authorized raw
+# sources, applies the mandatory identity/validation/redaction/privacy chain,
+# stamps internal contract 1.0, and durably forwards to a central release.
+fullnameOverride: openshell-exporter-edge
+profile: custom
+topology:
+  role: edge
+  tenantId: customer-a
+  central:
+    replicas: 1
+    shardRouting:
+      enabled: true
+      hostname: openshell-exporter-central-headless.observability.svc.cluster.local
+      port: "4330"
+      interval: 30s
+      timeout: 5s
+
+image:
+  repository: registry.example.internal/openshell-event-exporter
+  digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+
+modules:
+  acquisition:
+    watchSandbox: true
+    policyReconciliation: true
+    ocsfFiles: false
+    sandboxFileLogs: false
+    relayFileLogs: false
+    relayOtlp: false
+    nativeOtlp: false
+    forwardedSandboxFiles: false
+    kubernetesContext: false
+    internalOtlp: false
+  delivery:
+    cloudEvents: false
+    otlpGrpc: true
+    otlpHttp: false
+    recovery: false
+
+source:
+  endpoint: https://openshell.openshell.svc.cluster.local:50051
+  gatewayId: gateway-1
+  workspace: default
+
+destination:
+  otlp:
+    grpcEndpoint: openshell-exporter-central.observability.svc.cluster.local:4330
+    authSecret: openshell-exporter-edge-to-central-auth
+    tlsSecret: openshell-exporter-edge-to-central-tls
+    mtlsEnabled: true
+
+networkPolicy:
+  enabled: true
+  monitoringNamespaces: [monitoring]

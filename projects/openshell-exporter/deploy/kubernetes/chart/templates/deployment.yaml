@@ -1,0 +1,654 @@
+apiVersion: apps/v1
+kind: {{ ternary "StatefulSet" "Deployment" (eq (include "openshell-event-exporter.centralStateful" .) "true") }}
+metadata:
+  name: {{ include "openshell-event-exporter.fullname" . }}
+  labels:
+    {{- include "openshell-event-exporter.labels" . | nindent 4 }}
+spec:
+  replicas: {{ ternary .Values.topology.central.replicas 1 (eq (include "openshell-event-exporter.centralStateful" .) "true") }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  {{- if eq (include "openshell-event-exporter.centralStateful" .) "true" }}
+  serviceName: {{ include "openshell-event-exporter.fullname" . }}-headless
+  podManagementPolicy: OrderedReady
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  updateStrategy:
+    type: RollingUpdate
+  {{- else }}
+  strategy:
+    type: Recreate
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "openshell-event-exporter.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "openshell-event-exporter.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/part-of: openshell
+        app.kubernetes.io/component: {{ .Values.topology.role | quote }}
+        observability.openshell.nvidia.com/tenant: {{ .Values.topology.tenantId | quote }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include "openshell-event-exporter.renderConfig" . | sha256sum }}
+        checksum/secret-contract: {{ printf "%s/%s/%t/%s/%s/%s/%s/%s/%t/%t/%t/%t" .Values.source.authSecret .Values.source.tlsSecret .Values.source.bearerEnabled .Values.destination.cloudEvents.authSecret .Values.destination.cloudEvents.tlsSecret .Values.relay.input.authSecret .Values.forwardedOcsf.authSecret .Values.nativeOtlp.tlsSecret .Values.source.mtlsEnabled .Values.destination.cloudEvents.mtlsEnabled .Values.relay.input.mtlsEnabled .Values.certManager.enabled | sha256sum }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8888"
+        prometheus.io/path: /metrics
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "openshell-event-exporter.serviceAccountName" . }}
+      automountServiceAccountToken: {{ eq (include "openshell-event-exporter.module.kubernetesContext" .) "true" }}
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . }}
+        {{- end }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      initContainers:
+        - name: verify-persistence
+          image: {{ include "openshell-event-exporter.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/usr/local/bin/healthcheck"]
+          args:
+            - --writable
+            {{- if eq (include "openshell-event-exporter.module.cloudEvents" .) "true" }}
+            - /var/lib/openshell-exporter/queue
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.recovery" .) "true" }}
+            - /var/lib/openshell-exporter/recovery
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.checkpoints" .) "true" }}
+            - /var/lib/openshell-exporter/checkpoints
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.otlpGrpc" .) "true" }}
+            - /var/lib/openshell-exporter/queues/otlp-grpc
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.otlpHttp" .) "true" }}
+            - /var/lib/openshell-exporter/queues/otlp-http
+            {{- end }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+            {{- if eq (include "openshell-event-exporter.module.cloudEvents" .) "true" }}
+            - name: queue
+              mountPath: /var/lib/openshell-exporter/queue
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.recovery" .) "true" }}
+            - name: recovery
+              mountPath: /var/lib/openshell-exporter/recovery
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.checkpoints" .) "true" }}
+            - name: checkpoints
+              mountPath: /var/lib/openshell-exporter/checkpoints
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.otlpGrpc" .) "true" }}
+            - name: otlp-grpc-queue
+              mountPath: /var/lib/openshell-exporter/queues/otlp-grpc
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.otlpHttp" .) "true" }}
+            - name: otlp-http-queue
+              mountPath: /var/lib/openshell-exporter/queues/otlp-http
+            {{- end }}
+      containers:
+        - name: exporter
+          image: {{ include "openshell-event-exporter.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["--config", "/etc/openshell-event-exporter/config.yaml"]
+          env:
+            {{- if eq (include "openshell-event-exporter.module.watchSandbox" .) "true" }}
+            - name: OPENSHELL_ENDPOINT
+              value: {{ .Values.source.endpoint | quote }}
+            - name: OPENSHELL_ALLOW_INSECURE_HTTP
+              value: "false"
+            - name: OPENSHELL_SANDBOX_SELECTOR
+              value: {{ .Values.source.sandboxSelector | quote }}
+            - name: OPENSHELL_TOKEN_FILE
+              value: {{ ternary "/run/secrets/source-auth/token" "" .Values.source.bearerEnabled | quote }}
+            - name: OPENSHELL_CA_FILE
+              value: /run/secrets/source-tls/ca.pem
+            - name: OPENSHELL_CLIENT_CERT_FILE
+              value: {{ ternary "/run/secrets/source-tls/tls.crt" "" .Values.source.mtlsEnabled | quote }}
+            - name: OPENSHELL_CLIENT_KEY_FILE
+              value: {{ ternary "/run/secrets/source-tls/tls.key" "" .Values.source.mtlsEnabled | quote }}
+            {{- end }}
+            - name: OPENSHELL_GATEWAY_ID
+              value: {{ .Values.source.gatewayId | quote }}
+            - name: OPENSHELL_WORKSPACE
+              value: {{ .Values.source.workspace | quote }}
+            {{- if eq (include "openshell-event-exporter.module.cloudEvents" .) "true" }}
+            - name: OPENSHELL_EXPORT_URL
+              value: {{ .Values.destination.cloudEvents.endpoint | quote }}
+            - name: DESTINATION_TOKEN_FILE_INTERNAL
+              value: /run/secrets/destination-auth/token
+            - name: DESTINATION_CA_FILE_INTERNAL
+              value: /run/secrets/destination-tls/ca.pem
+            - name: DESTINATION_CLIENT_CERT_FILE
+              value: {{ ternary "/run/secrets/destination-tls/tls.crt" "" .Values.destination.cloudEvents.mtlsEnabled | quote }}
+            - name: DESTINATION_CLIENT_KEY_FILE
+              value: {{ ternary "/run/secrets/destination-tls/tls.key" "" .Values.destination.cloudEvents.mtlsEnabled | quote }}
+            - name: EXPORTER_QUEUE_DIR
+              value: /var/lib/openshell-exporter/queue
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.recovery" .) "true" }}
+            - name: EXPORTER_RECOVERY_FILE
+              value: /var/lib/openshell-exporter/recovery/openshell-events.json
+            {{- end }}
+            - name: EXPORTER_HEALTH_ENDPOINT
+              value: 0.0.0.0:13133
+            - name: EXPORTER_METRICS_HOST
+              value: 0.0.0.0
+            - name: EXPORTER_SOURCE_INSTANCE
+              value: {{ .Values.source.sourceInstance | quote }}
+            {{- if eq (include "openshell-event-exporter.module.checkpoints" .) "true" }}
+            - name: EXPORTER_CHECKPOINT_DIR
+              value: /var/lib/openshell-exporter/checkpoints
+            {{- end }}
+            {{- if or (eq (include "openshell-event-exporter.module.ocsfFiles" .) "true") (eq (include "openshell-event-exporter.module.sandboxFileLogs" .) "true") }}
+            - name: OPENSHELL_OCSF_LOG_GLOB
+              value: {{ .Values.files.openshell.ocsfGlob | quote }}
+            - name: OPENSHELL_OPERATIONAL_LOG_GLOB
+              value: {{ .Values.files.openshell.operationalGlob | quote }}
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.relayFileLogs" .) "true" }}
+            - name: NEMO_RELAY_LOG_GLOB
+              value: {{ .Values.files.relay.glob | quote }}
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.relayOtlp" .) "true" }}
+            - name: NEMO_RELAY_OTLP_TOKEN_FILE
+              value: /run/secrets/relay-input-auth/token
+            - name: NEMO_RELAY_OTLP_TLS_CERT_FILE
+              value: /run/secrets/relay-input-tls/tls.crt
+            - name: NEMO_RELAY_OTLP_TLS_KEY_FILE
+              value: /run/secrets/relay-input-tls/tls.key
+            {{- if .Values.relay.input.mtlsEnabled }}
+            - name: NEMO_RELAY_OTLP_CLIENT_CA_FILE
+              value: /run/secrets/relay-input-tls/client-ca.pem
+            {{- end }}
+            - name: NEMO_RELAY_OTLP_GRPC_LISTEN
+              value: {{ .Values.relay.input.grpcEndpoint | quote }}
+            - name: NEMO_RELAY_OTLP_HTTP_LISTEN
+              value: {{ .Values.relay.input.httpEndpoint | quote }}
+            {{- end }}
+            {{- if or (eq (include "openshell-event-exporter.module.otlpGrpc" .) "true") (eq (include "openshell-event-exporter.module.otlpHttp" .) "true") }}
+            - name: OTLP_DESTINATION_TOKEN_FILE
+              value: /run/secrets/otlp-destination-auth/token
+            - name: OTLP_CA_FILE
+              value: /run/secrets/otlp-destination-tls/ca.pem
+            - name: OTLP_CLIENT_CERT_FILE
+              value: {{ ternary "/run/secrets/otlp-destination-tls/tls.crt" "" .Values.destination.otlp.mtlsEnabled | quote }}
+            - name: OTLP_CLIENT_KEY_FILE
+              value: {{ ternary "/run/secrets/otlp-destination-tls/tls.key" "" .Values.destination.otlp.mtlsEnabled | quote }}
+            - name: OTLP_GRPC_ENDPOINT
+              value: {{ .Values.destination.otlp.grpcEndpoint | quote }}
+            - name: OTLP_HTTP_ENDPOINT
+              value: {{ .Values.destination.otlp.httpEndpoint | quote }}
+            {{- if eq (include "openshell-event-exporter.edgeShardRouting" .) "true" }}
+            - name: CENTRAL_SHARD_DNS_HOSTNAME
+              value: {{ .Values.topology.central.shardRouting.hostname | quote }}
+            - name: CENTRAL_SHARD_PORT
+              value: {{ .Values.topology.central.shardRouting.port | quote }}
+            - name: CENTRAL_SHARD_DNS_INTERVAL
+              value: {{ .Values.topology.central.shardRouting.interval | quote }}
+            - name: CENTRAL_SHARD_DNS_TIMEOUT
+              value: {{ .Values.topology.central.shardRouting.timeout | quote }}
+            - name: CENTRAL_SHARD_TLS_SERVER_NAME
+              value: {{ .Values.topology.central.shardRouting.hostname | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.otlpGrpc" .) "true" }}
+            - name: EXPORTER_OTLP_GRPC_QUEUE_DIR
+              value: /var/lib/openshell-exporter/queues/otlp-grpc
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.otlpHttp" .) "true" }}
+            - name: EXPORTER_OTLP_HTTP_QUEUE_DIR
+              value: /var/lib/openshell-exporter/queues/otlp-http
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.nativeOtlp" .) "true" }}
+            - name: OPENSHELL_NATIVE_OTLP_GRPC_LISTEN
+              value: {{ .Values.nativeOtlp.grpcEndpoint | quote }}
+            - name: OPENSHELL_NATIVE_OTLP_TLS_CERT_FILE
+              value: /run/secrets/native-otlp-tls/tls.crt
+            - name: OPENSHELL_NATIVE_OTLP_TLS_KEY_FILE
+              value: /run/secrets/native-otlp-tls/tls.key
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.forwardedSandboxFiles" .) "true" }}
+            - name: FORWARDED_OCSF_TOKEN_FILE
+              value: /run/secrets/forwarded-ocsf-auth/token
+            - name: FORWARDED_OCSF_TLS_CERT_FILE
+              value: /run/secrets/forwarded-ocsf-tls/tls.crt
+            - name: FORWARDED_OCSF_TLS_KEY_FILE
+              value: /run/secrets/forwarded-ocsf-tls/tls.key
+            - name: FORWARDED_OCSF_CLIENT_CA_FILE
+              value: /run/secrets/forwarded-ocsf-tls/client-ca.pem
+            - name: FORWARDED_OCSF_OTLP_HTTP_LISTEN
+              value: {{ .Values.forwardedOcsf.httpEndpoint | quote }}
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.internalOtlp" .) "true" }}
+            - name: INTERNAL_OTLP_TOKEN_FILE
+              value: /run/secrets/internal-input-auth/token
+            - name: INTERNAL_OTLP_TLS_CERT_FILE
+              value: /run/secrets/internal-input-tls/tls.crt
+            - name: INTERNAL_OTLP_TLS_KEY_FILE
+              value: /run/secrets/internal-input-tls/tls.key
+            - name: INTERNAL_OTLP_CLIENT_CA_FILE
+              value: /run/secrets/internal-input-tls/client-ca.pem
+            - name: INTERNAL_OTLP_GRPC_LISTEN
+              value: {{ .Values.internalOtlp.grpcEndpoint | quote }}
+            - name: INTERNAL_OTLP_HTTP_LISTEN
+              value: {{ .Values.internalOtlp.httpEndpoint | quote }}
+            {{- end }}
+          ports:
+            - name: health
+              containerPort: 13133
+            - name: metrics
+              containerPort: 8888
+            {{- if eq (include "openshell-event-exporter.module.relayOtlp" .) "true" }}
+            - name: relay-otlp-grpc
+              containerPort: 4317
+            - name: relay-otlp-http
+              containerPort: 4318
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.nativeOtlp" .) "true" }}
+            - name: native-otlp
+              containerPort: 4319
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.forwardedSandboxFiles" .) "true" }}
+            - name: forwarded-otlp
+              containerPort: 4320
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.internalOtlp" .) "true" }}
+            - name: internal-grpc
+              containerPort: 4330
+            - name: internal-http
+              containerPort: 4331
+            {{- end }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /
+              port: health
+            periodSeconds: 2
+            timeoutSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: health
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: health
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: config
+              mountPath: /etc/openshell-event-exporter
+              readOnly: true
+            {{- if and (eq (include "openshell-event-exporter.module.watchSandbox" .) "true") .Values.source.bearerEnabled }}
+            - name: source-auth
+              mountPath: /run/secrets/source-auth
+              readOnly: true
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.watchSandbox" .) "true" }}
+            - name: source-tls
+              mountPath: /run/secrets/source-tls
+              readOnly: true
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.cloudEvents" .) "true" }}
+            - name: destination-auth
+              mountPath: /run/secrets/destination-auth
+              readOnly: true
+            - name: destination-tls
+              mountPath: /run/secrets/destination-tls
+              readOnly: true
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.cloudEvents" .) "true" }}
+            - name: queue
+              mountPath: /var/lib/openshell-exporter/queue
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.recovery" .) "true" }}
+            - name: recovery
+              mountPath: /var/lib/openshell-exporter/recovery
+            {{- end }}
+            - name: tmp
+              mountPath: /tmp
+            {{- if eq (include "openshell-event-exporter.module.checkpoints" .) "true" }}
+            - name: checkpoints
+              mountPath: /var/lib/openshell-exporter/checkpoints
+            {{- end }}
+            {{- if or (eq (include "openshell-event-exporter.module.ocsfFiles" .) "true") (eq (include "openshell-event-exporter.module.sandboxFileLogs" .) "true") }}
+            - name: openshell-logs
+              mountPath: {{ .Values.files.openshell.mountPath }}
+              readOnly: true
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.relayFileLogs" .) "true" }}
+            - name: relay-logs
+              mountPath: {{ .Values.files.relay.mountPath }}
+              readOnly: true
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.relayOtlp" .) "true" }}
+            - name: relay-input-auth
+              mountPath: /run/secrets/relay-input-auth
+              readOnly: true
+            - name: relay-input-tls
+              mountPath: /run/secrets/relay-input-tls
+              readOnly: true
+            {{- end }}
+            {{- if or (eq (include "openshell-event-exporter.module.otlpGrpc" .) "true") (eq (include "openshell-event-exporter.module.otlpHttp" .) "true") }}
+            - name: otlp-destination-auth
+              mountPath: /run/secrets/otlp-destination-auth
+              readOnly: true
+            - name: otlp-destination-tls
+              mountPath: /run/secrets/otlp-destination-tls
+              readOnly: true
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.otlpGrpc" .) "true" }}
+            - name: otlp-grpc-queue
+              mountPath: /var/lib/openshell-exporter/queues/otlp-grpc
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.otlpHttp" .) "true" }}
+            - name: otlp-http-queue
+              mountPath: /var/lib/openshell-exporter/queues/otlp-http
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.nativeOtlp" .) "true" }}
+            - name: native-otlp-tls
+              mountPath: /run/secrets/native-otlp-tls
+              readOnly: true
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.forwardedSandboxFiles" .) "true" }}
+            - name: forwarded-ocsf-auth
+              mountPath: /run/secrets/forwarded-ocsf-auth
+              readOnly: true
+            - name: forwarded-ocsf-tls
+              mountPath: /run/secrets/forwarded-ocsf-tls
+              readOnly: true
+            {{- end }}
+            {{- if eq (include "openshell-event-exporter.module.internalOtlp" .) "true" }}
+            - name: internal-input-auth
+              mountPath: /run/secrets/internal-input-auth
+              readOnly: true
+            - name: internal-input-tls
+              mountPath: /run/secrets/internal-input-tls
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "openshell-event-exporter.fullname" . }}-config
+        {{- if and (eq (include "openshell-event-exporter.module.watchSandbox" .) "true") .Values.source.bearerEnabled }}
+        - name: source-auth
+          secret:
+            secretName: {{ .Values.source.authSecret }}
+            defaultMode: 0440
+            items:
+              - key: token
+                path: token
+        {{- end }}
+        {{- if eq (include "openshell-event-exporter.module.watchSandbox" .) "true" }}
+        - name: source-tls
+          secret:
+            secretName: {{ .Values.source.tlsSecret }}
+            defaultMode: 0440
+            items:
+              - key: ca.crt
+                path: ca.pem
+              {{- if .Values.source.mtlsEnabled }}
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+              {{- end }}
+        {{- end }}
+        {{- if eq (include "openshell-event-exporter.module.cloudEvents" .) "true" }}
+        - name: destination-auth
+          secret:
+            secretName: {{ .Values.destination.cloudEvents.authSecret }}
+            defaultMode: 0440
+            items:
+              - key: token
+                path: token
+        - name: destination-tls
+          secret:
+            secretName: {{ .Values.destination.cloudEvents.tlsSecret }}
+            defaultMode: 0440
+            items:
+              - key: ca.crt
+                path: ca.pem
+              {{- if .Values.destination.cloudEvents.mtlsEnabled }}
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+              {{- end }}
+        {{- end }}
+        {{- if and (eq (include "openshell-event-exporter.module.cloudEvents" .) "true") (ne (include "openshell-event-exporter.centralStateful" .) "true") }}
+        - name: queue
+          persistentVolumeClaim:
+            claimName: {{ include "openshell-event-exporter.queueClaim" . }}
+        {{- end }}
+        {{- if and (eq (include "openshell-event-exporter.module.recovery" .) "true") (ne (include "openshell-event-exporter.centralStateful" .) "true") }}
+        - name: recovery
+          persistentVolumeClaim:
+            claimName: {{ include "openshell-event-exporter.recoveryClaim" . }}
+        {{- end }}
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 32Mi
+        {{- if eq (include "openshell-event-exporter.module.checkpoints" .) "true" }}
+        - name: checkpoints
+          persistentVolumeClaim:
+            claimName: {{ include "openshell-event-exporter.checkpointClaim" . }}
+        {{- end }}
+        {{- if or (eq (include "openshell-event-exporter.module.ocsfFiles" .) "true") (eq (include "openshell-event-exporter.module.sandboxFileLogs" .) "true") }}
+        - name: openshell-logs
+          persistentVolumeClaim:
+            claimName: {{ required "files.openshell.existingClaim is required when direct file modules are enabled" .Values.files.openshell.existingClaim }}
+            readOnly: true
+        {{- end }}
+        {{- if eq (include "openshell-event-exporter.module.relayFileLogs" .) "true" }}
+        - name: relay-logs
+          persistentVolumeClaim:
+            claimName: {{ required "files.relay.existingClaim is required when Relay file collection is enabled" .Values.files.relay.existingClaim }}
+            readOnly: true
+        {{- end }}
+        {{- if eq (include "openshell-event-exporter.module.relayOtlp" .) "true" }}
+        - name: relay-input-auth
+          secret:
+            secretName: {{ .Values.relay.input.authSecret }}
+            defaultMode: 0440
+            items:
+              - key: token
+                path: token
+        - name: relay-input-tls
+          secret:
+            secretName: {{ .Values.relay.input.tlsSecret }}
+            defaultMode: 0440
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+              {{- if .Values.relay.input.mtlsEnabled }}
+              - key: {{ ternary "ca.crt" "client-ca.crt" .Values.certManager.enabled }}
+                path: client-ca.pem
+              {{- end }}
+        {{- end }}
+        {{- if or (eq (include "openshell-event-exporter.module.otlpGrpc" .) "true") (eq (include "openshell-event-exporter.module.otlpHttp" .) "true") }}
+        - name: otlp-destination-auth
+          secret:
+            secretName: {{ .Values.destination.otlp.authSecret }}
+            defaultMode: 0440
+            items:
+              - key: token
+                path: token
+        - name: otlp-destination-tls
+          secret:
+            secretName: {{ .Values.destination.otlp.tlsSecret }}
+            defaultMode: 0440
+            items:
+              - key: ca.crt
+                path: ca.pem
+              {{- if .Values.destination.otlp.mtlsEnabled }}
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+              {{- end }}
+        {{- end }}
+        {{- if and (eq (include "openshell-event-exporter.module.otlpGrpc" .) "true") (ne (include "openshell-event-exporter.centralStateful" .) "true") }}
+        - name: otlp-grpc-queue
+          persistentVolumeClaim:
+            claimName: {{ include "openshell-event-exporter.otlpGrpcQueueClaim" . }}
+        {{- end }}
+        {{- if and (eq (include "openshell-event-exporter.module.otlpHttp" .) "true") (ne (include "openshell-event-exporter.centralStateful" .) "true") }}
+        - name: otlp-http-queue
+          persistentVolumeClaim:
+            claimName: {{ include "openshell-event-exporter.otlpHttpQueueClaim" . }}
+        {{- end }}
+        {{- if eq (include "openshell-event-exporter.module.nativeOtlp" .) "true" }}
+        - name: native-otlp-tls
+          secret:
+            secretName: {{ .Values.nativeOtlp.tlsSecret }}
+            defaultMode: 0440
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+        {{- end }}
+        {{- if eq (include "openshell-event-exporter.module.forwardedSandboxFiles" .) "true" }}
+        - name: forwarded-ocsf-auth
+          secret:
+            secretName: {{ .Values.forwardedOcsf.authSecret }}
+            defaultMode: 0440
+            items:
+              - key: token
+                path: token
+        - name: forwarded-ocsf-tls
+          secret:
+            secretName: {{ .Values.forwardedOcsf.tlsSecret }}
+            defaultMode: 0440
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+              - key: {{ ternary "ca.crt" "client-ca.crt" .Values.certManager.enabled }}
+                path: client-ca.pem
+        {{- end }}
+        {{- if eq (include "openshell-event-exporter.module.internalOtlp" .) "true" }}
+        - name: internal-input-auth
+          secret:
+            secretName: {{ .Values.internalOtlp.authSecret }}
+            defaultMode: 0440
+            items:
+              - key: token
+                path: token
+        - name: internal-input-tls
+          secret:
+            secretName: {{ .Values.internalOtlp.tlsSecret }}
+            defaultMode: 0440
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+              - key: {{ ternary "ca.crt" "client-ca.crt" .Values.certManager.enabled }}
+                path: client-ca.pem
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+{{- if eq (include "openshell-event-exporter.centralStateful" .) "true" }}
+  volumeClaimTemplates:
+  {{- if eq (include "openshell-event-exporter.module.cloudEvents" .) "true" }}
+    - metadata:
+        name: queue
+      spec:
+        accessModes: {{ toYaml .Values.persistence.queue.accessModes | nindent 10 }}
+        {{- if eq .Values.persistence.queue.storageClass "-" }}
+        storageClassName: ""
+        {{- else if .Values.persistence.queue.storageClass }}
+        storageClassName: {{ .Values.persistence.queue.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.queue.size }}
+  {{- end }}
+  {{- if eq (include "openshell-event-exporter.module.recovery" .) "true" }}
+    - metadata:
+        name: recovery
+      spec:
+        accessModes: {{ toYaml .Values.persistence.recovery.accessModes | nindent 10 }}
+        {{- if eq .Values.persistence.recovery.storageClass "-" }}
+        storageClassName: ""
+        {{- else if .Values.persistence.recovery.storageClass }}
+        storageClassName: {{ .Values.persistence.recovery.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.recovery.size }}
+  {{- end }}
+  {{- if eq (include "openshell-event-exporter.module.otlpGrpc" .) "true" }}
+    - metadata:
+        name: otlp-grpc-queue
+      spec:
+        accessModes: {{ toYaml .Values.persistence.otlpGrpcQueue.accessModes | nindent 10 }}
+        {{- if eq .Values.persistence.otlpGrpcQueue.storageClass "-" }}
+        storageClassName: ""
+        {{- else if .Values.persistence.otlpGrpcQueue.storageClass }}
+        storageClassName: {{ .Values.persistence.otlpGrpcQueue.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.otlpGrpcQueue.size }}
+  {{- end }}
+  {{- if eq (include "openshell-event-exporter.module.otlpHttp" .) "true" }}
+    - metadata:
+        name: otlp-http-queue
+      spec:
+        accessModes: {{ toYaml .Values.persistence.otlpHttpQueue.accessModes | nindent 10 }}
+        {{- if eq .Values.persistence.otlpHttpQueue.storageClass "-" }}
+        storageClassName: ""
+        {{- else if .Values.persistence.otlpHttpQueue.storageClass }}
+        storageClassName: {{ .Values.persistence.otlpHttpQueue.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.otlpHttpQueue.size }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "openshell-event-exporter.fullname" . }}
+  labels:
+    {{- include "openshell-event-exporter.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "openshell-event-exporter.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: {{ .Values.topology.role | quote }}
+  ports:
+    - name: health
+      port: 13133
+      targetPort: health
+    - name: metrics
+      port: 8888
+      targetPort: metrics
+    {{- if eq (include "openshell-event-exporter.module.relayOtlp" .) "true" }}
+    - name: relay-otlp-grpc
+      port: 4317
+      targetPort: relay-otlp-grpc
+    - name: relay-otlp-http
+      port: 4318
+      targetPort: relay-otlp-http
+    {{- end }}
+    {{- if eq (include "openshell-event-exporter.module.nativeOtlp" .) "true" }}
+    - name: native-otlp
+      port: 4319
+      targetPort: native-otlp
+    {{- end }}
+    {{- if eq (include "openshell-event-exporter.module.forwardedSandboxFiles" .) "true" }}
+    - name: forwarded-otlp
+      port: 4320
+      targetPort: forwarded-otlp
+    {{- end }}
+    {{- if eq (include "openshell-event-exporter.module.internalOtlp" .) "true" }}
+    - name: internal-grpc
+      port: 4330
+      targetPort: internal-grpc
+    - name: internal-http
+      port: 4331
+      targetPort: internal-http
+    {{- end }}

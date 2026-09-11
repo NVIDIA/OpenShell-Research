@@ -1,0 +1,296 @@
+extensions:
+  bearertokenauth/destination:
+    filename: ${env:DESTINATION_TOKEN_FILE_INTERNAL}
+  bearertokenauth/nemo_relay:
+    filename: ${env:NEMO_RELAY_OTLP_TOKEN_FILE}
+  bearertokenauth/otlp_destination:
+    filename: ${env:OTLP_DESTINATION_TOKEN_FILE}
+  file_storage/checkpoints:
+    directory: ${env:EXPORTER_CHECKPOINT_DIR}
+    create_directory: false
+  file_storage/cloudevents_queue:
+    directory: ${env:EXPORTER_QUEUE_DIR}
+    create_directory: false
+  file_storage/otlp_queue:
+    directory: ${env:EXPORTER_OTLP_GRPC_QUEUE_DIR}
+    create_directory: false
+  file_storage/otlphttp_queue:
+    directory: ${env:EXPORTER_OTLP_HTTP_QUEUE_DIR}
+    create_directory: false
+  storagehealth:
+    interval: 30s
+    max_entries: 1024
+    paths:
+      checkpoints: ${env:EXPORTER_CHECKPOINT_DIR}
+      cloudevents_queue: ${env:EXPORTER_QUEUE_DIR}
+      otlp_grpc_queue: ${env:EXPORTER_OTLP_GRPC_QUEUE_DIR}
+      otlp_http_queue: ${env:EXPORTER_OTLP_HTTP_QUEUE_DIR}
+      recovery: ${env:EXPORTER_RECOVERY_FILE}
+  health_check:
+    endpoint: ${env:EXPORTER_HEALTH_ENDPOINT}
+
+receivers:
+  otlp/nemo_relay:
+    protocols:
+      grpc:
+        endpoint: ${env:NEMO_RELAY_OTLP_GRPC_LISTEN}
+        auth:
+          authenticator: bearertokenauth/nemo_relay
+        tls:
+          cert_file: ${env:NEMO_RELAY_OTLP_TLS_CERT_FILE}
+          key_file: ${env:NEMO_RELAY_OTLP_TLS_KEY_FILE}
+          client_ca_file: ${env:NEMO_RELAY_OTLP_CLIENT_CA_FILE}
+      http:
+        endpoint: ${env:NEMO_RELAY_OTLP_HTTP_LISTEN}
+        auth:
+          authenticator: bearertokenauth/nemo_relay
+        tls:
+          cert_file: ${env:NEMO_RELAY_OTLP_TLS_CERT_FILE}
+          key_file: ${env:NEMO_RELAY_OTLP_TLS_KEY_FILE}
+          client_ca_file: ${env:NEMO_RELAY_OTLP_CLIENT_CA_FILE}
+  file_log/openshell_ocsf:
+    include:
+      - ${env:OPENSHELL_OCSF_LOG_GLOB}
+    start_at: beginning
+    storage: file_storage/checkpoints
+    retry_on_failure: &durable_file_retry
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+    include_file_path: true
+    include_file_path_resolved: true
+    include_file_record_offset: true
+    include_file_record_number: true
+    on_truncate: read_whole_file
+    max_log_size: 8MiB
+    max_log_size_behavior: split
+    attributes:
+      openshell.acquisition.kind: ocsf.file
+      openshell.acquisition.source_instance: sandbox-ocsf-jsonl
+    operators:
+      - type: json_parser
+        parse_from: body
+        parse_to: body
+        on_error: send
+  file_log/openshell_sandbox:
+    include:
+      - ${env:OPENSHELL_OPERATIONAL_LOG_GLOB}
+    start_at: beginning
+    storage: file_storage/checkpoints
+    retry_on_failure: *durable_file_retry
+    include_file_path: true
+    include_file_path_resolved: true
+    include_file_record_offset: true
+    include_file_record_number: true
+    on_truncate: read_whole_file
+    max_log_size: 8MiB
+    max_log_size_behavior: split
+    attributes:
+      openshell.acquisition.kind: sandbox.file_log
+      openshell.acquisition.source_instance: sandbox-operational-log
+  file_log/nemo_relay:
+    include:
+      - ${env:NEMO_RELAY_LOG_GLOB}
+    start_at: beginning
+    storage: file_storage/checkpoints
+    retry_on_failure: *durable_file_retry
+    include_file_path: true
+    include_file_path_resolved: true
+    include_file_record_offset: true
+    include_file_record_number: true
+    on_truncate: read_whole_file
+    max_log_size: 8MiB
+    max_log_size_behavior: split
+    attributes:
+      openshell.acquisition.kind: nemo_relay.log
+      openshell.acquisition.source_instance: nemo-relay-file
+    operators:
+      - type: json_parser
+        parse_from: body
+        parse_to: body
+        on_error: send
+  watchsandbox:
+    endpoint: ${env:OPENSHELL_ENDPOINT}
+    allow_insecure_http: ${env:OPENSHELL_ALLOW_INSECURE_HTTP}
+    workspace: ${env:OPENSHELL_WORKSPACE}
+    gateway_id: ${env:OPENSHELL_GATEWAY_ID}
+    label_selector: ${env:OPENSHELL_SANDBOX_SELECTOR}
+    discovery_interval: 30s
+    token_env: ""
+    token_file: ${env:OPENSHELL_TOKEN_FILE}
+    log_tail_lines: 200
+    event_tail: 200
+    reconnect_initial: 1s
+    reconnect_max: 30s
+    policy_reconciliation:
+      enabled: true
+      interval: 5m
+      timeout: 15s
+      workers: 2
+      queue_size: 128
+      max_revisions: 10000
+      include_history: true
+      include_effective_policies: false
+      storage: file_storage/checkpoints
+    tls:
+      ca_file: ${env:OPENSHELL_CA_FILE}
+      cert_file: ${env:OPENSHELL_CLIENT_CERT_FILE}
+      key_file: ${env:OPENSHELL_CLIENT_KEY_FILE}
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+  openshell:
+    source_profiles: [ocsf.file, openshell.log, watchsandbox, policy.reconciliation, nemo_relay.log]
+    gateway_id: ${env:OPENSHELL_GATEWAY_ID}
+    workspace: ${env:OPENSHELL_WORKSPACE}
+    source_instance: ${env:EXPORTER_SOURCE_INSTANCE}
+    default_sandbox_id: unknown
+    validation:
+      mode: mark
+  resource/nemo_relay:
+    attributes:
+      - key: telemetry.source
+        value: nemo_relay
+        action: upsert
+      - key: openshell.gateway.id
+        value: ${env:OPENSHELL_GATEWAY_ID}
+        action: upsert
+      - key: openshell.workspace
+        value: ${env:OPENSHELL_WORKSPACE}
+        action: upsert
+  relay:
+    gateway_id: ${env:OPENSHELL_GATEWAY_ID}
+    workspace: ${env:OPENSHELL_WORKSPACE}
+    privacy:
+      mode: allow
+exporters:
+  otlp:
+    endpoint: ${env:OTLP_GRPC_ENDPOINT}
+    auth:
+      authenticator: bearertokenauth/otlp_destination
+    tls:
+      ca_file: ${env:OTLP_CA_FILE}
+      cert_file: ${env:OTLP_CLIENT_CERT_FILE}
+      key_file: ${env:OTLP_CLIENT_KEY_FILE}
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage/otlp_queue
+      queue_size: 10000
+      num_consumers: 4
+      block_on_overflow: true
+      batch: &destination_queue_batch
+        flush_timeout: 1s
+        min_size: 512
+        max_size: 1024
+        sizer: items
+  otlphttp:
+    endpoint: ${env:OTLP_HTTP_ENDPOINT}
+    auth:
+      authenticator: bearertokenauth/otlp_destination
+    tls:
+      ca_file: ${env:OTLP_CA_FILE}
+      cert_file: ${env:OTLP_CLIENT_CERT_FILE}
+      key_file: ${env:OTLP_CLIENT_KEY_FILE}
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage/otlphttp_queue
+      queue_size: 10000
+      num_consumers: 4
+      block_on_overflow: true
+      batch: *destination_queue_batch
+  cloudevents:
+    endpoint: ${env:OPENSHELL_EXPORT_URL}
+    timeout: 15s
+    max_events: 500
+    max_event_bytes: 1048576
+    max_request_bytes: 4194304
+    auth:
+      authenticator: bearertokenauth/destination
+    tls:
+      ca_file: ${env:DESTINATION_CA_FILE_INTERNAL}
+      cert_file: ${env:DESTINATION_CLIENT_CERT_FILE}
+      key_file: ${env:DESTINATION_CLIENT_KEY_FILE}
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage/cloudevents_queue
+      sizer: requests
+      queue_size: 10000
+      num_consumers: 4
+      block_on_overflow: true
+      batch: *destination_queue_batch
+  file/recovery:
+    path: ${env:EXPORTER_RECOVERY_FILE}
+    format: json
+
+service:
+  telemetry:
+    logs:
+      encoding: json
+    metrics:
+      level: normal
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: ${env:EXPORTER_METRICS_HOST}
+                port: 8888
+  extensions:
+    - bearertokenauth/destination
+    - bearertokenauth/nemo_relay
+    - bearertokenauth/otlp_destination
+    - file_storage/checkpoints
+    - file_storage/cloudevents_queue
+    - file_storage/otlp_queue
+    - file_storage/otlphttp_queue
+    - storagehealth
+    - health_check
+  pipelines:
+    logs/files:
+      receivers:
+        - file_log/openshell_ocsf
+        - file_log/openshell_sandbox
+        - file_log/nemo_relay
+      processors:
+        - memory_limiter
+        - openshell
+      exporters:
+        - otlp
+        - otlphttp
+        - cloudevents
+        - file/recovery
+    logs/watchsandbox:
+      receivers:
+        - watchsandbox
+      processors:
+        - memory_limiter
+        - openshell
+      exporters:
+        - otlp
+        - otlphttp
+        - cloudevents
+        - file/recovery
+    traces/nemo_relay:
+      receivers:
+        - otlp/nemo_relay
+      processors:
+        - memory_limiter
+        - resource/nemo_relay
+        - relay
+      exporters:
+        - otlp
+        - otlphttp

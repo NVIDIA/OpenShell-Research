@@ -1,0 +1,208 @@
+{{- if .Values.certManager.enabled }}
+{{- $root := . }}
+{{- $fullname := include "openshell-event-exporter.fullname" . }}
+{{- $issuer := .Values.certManager.issuerRef }}
+{{- if .Values.sandboxInjection.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ printf "%s-injector" $fullname | trunc 63 | trimSuffix "-" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openshell-event-exporter.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sandbox-injector
+spec:
+  secretName: {{ .Values.sandboxInjection.webhookTLSSecret }}
+  duration: {{ .Values.certManager.duration }}
+  renewBefore: {{ .Values.certManager.renewBefore }}
+  privateKey:
+    {{- toYaml .Values.certManager.privateKey | nindent 4 }}
+  usages: [server auth]
+  dnsNames:
+    - {{ printf "%s-injector" $fullname | quote }}
+    - {{ printf "%s-injector.%s" $fullname .Release.Namespace | quote }}
+    - {{ printf "%s-injector.%s.svc" $fullname .Release.Namespace | quote }}
+    - {{ printf "%s-injector.%s.svc.cluster.local" $fullname .Release.Namespace | quote }}
+  issuerRef:
+    {{- toYaml $issuer | nindent 4 }}
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.forwardedSandboxFiles" .) "true" }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ printf "%s-forwarded-ocsf" $fullname | trunc 63 | trimSuffix "-" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openshell-event-exporter.labels" . | nindent 4 }}
+    app.kubernetes.io/component: forwarded-file-receiver
+spec:
+  secretName: {{ .Values.forwardedOcsf.tlsSecret }}
+  duration: {{ .Values.certManager.duration }}
+  renewBefore: {{ .Values.certManager.renewBefore }}
+  privateKey:
+    {{- toYaml .Values.certManager.privateKey | nindent 4 }}
+  usages: [server auth]
+  dnsNames:
+    - {{ $fullname | quote }}
+    - {{ printf "%s.%s" $fullname .Release.Namespace | quote }}
+    - {{ printf "%s.%s.svc" $fullname .Release.Namespace | quote }}
+    - {{ printf "%s.%s.svc.cluster.local" $fullname .Release.Namespace | quote }}
+  issuerRef:
+    {{- toYaml $issuer | nindent 4 }}
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.relayOtlp" .) "true" }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ printf "%s-relay-input" $fullname | trunc 63 | trimSuffix "-" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openshell-event-exporter.labels" . | nindent 4 }}
+    app.kubernetes.io/component: relay-receiver
+spec:
+  secretName: {{ .Values.relay.input.tlsSecret }}
+  duration: {{ .Values.certManager.duration }}
+  renewBefore: {{ .Values.certManager.renewBefore }}
+  privateKey:
+    {{- toYaml .Values.certManager.privateKey | nindent 4 }}
+  usages: [server auth]
+  dnsNames:
+    - {{ $fullname | quote }}
+    - {{ printf "%s.%s" $fullname .Release.Namespace | quote }}
+    - {{ printf "%s.%s.svc" $fullname .Release.Namespace | quote }}
+    - {{ printf "%s.%s.svc.cluster.local" $fullname .Release.Namespace | quote }}
+  issuerRef:
+    {{- toYaml $issuer | nindent 4 }}
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.nativeOtlp" .) "true" }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ printf "%s-native-otlp" $fullname | trunc 63 | trimSuffix "-" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openshell-event-exporter.labels" . | nindent 4 }}
+    app.kubernetes.io/component: native-otlp-receiver
+spec:
+  secretName: {{ .Values.nativeOtlp.tlsSecret }}
+  duration: {{ .Values.certManager.duration }}
+  renewBefore: {{ .Values.certManager.renewBefore }}
+  privateKey:
+    {{- toYaml .Values.certManager.privateKey | nindent 4 }}
+  usages: [server auth]
+  dnsNames:
+    - {{ $fullname | quote }}
+    - {{ printf "%s.%s" $fullname .Release.Namespace | quote }}
+    - {{ printf "%s.%s.svc" $fullname .Release.Namespace | quote }}
+    - {{ printf "%s.%s.svc.cluster.local" $fullname .Release.Namespace | quote }}
+  issuerRef:
+    {{- toYaml $issuer | nindent 4 }}
+{{- end }}
+{{- if eq (include "openshell-event-exporter.module.internalOtlp" .) "true" }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ printf "%s-internal-otlp" $fullname | trunc 63 | trimSuffix "-" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openshell-event-exporter.labels" . | nindent 4 }}
+    app.kubernetes.io/component: internal-otlp-receiver
+spec:
+  secretName: {{ .Values.internalOtlp.tlsSecret }}
+  duration: {{ .Values.certManager.duration }}
+  renewBefore: {{ .Values.certManager.renewBefore }}
+  privateKey:
+    {{- toYaml .Values.certManager.privateKey | nindent 4 }}
+  usages: [server auth]
+  dnsNames:
+    - {{ $fullname | quote }}
+    - {{ printf "%s.%s" $fullname .Release.Namespace | quote }}
+    - {{ printf "%s.%s.svc" $fullname .Release.Namespace | quote }}
+    - {{ printf "%s.%s.svc.cluster.local" $fullname .Release.Namespace | quote }}
+    {{- if eq (include "openshell-event-exporter.centralStateful" .) "true" }}
+    - {{ printf "%s-headless" $fullname | quote }}
+    - {{ printf "%s-headless.%s" $fullname .Release.Namespace | quote }}
+    - {{ printf "%s-headless.%s.svc" $fullname .Release.Namespace | quote }}
+    - {{ printf "%s-headless.%s.svc.cluster.local" $fullname .Release.Namespace | quote }}
+    {{- end }}
+  issuerRef:
+    {{- toYaml $issuer | nindent 4 }}
+{{- end }}
+{{- if and (eq .Values.topology.role "edge") (or (eq (include "openshell-event-exporter.module.otlpGrpc" .) "true") (eq (include "openshell-event-exporter.module.otlpHttp" .) "true")) .Values.destination.otlp.mtlsEnabled }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ printf "%s-internal-client" $fullname | trunc 63 | trimSuffix "-" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "openshell-event-exporter.labels" . | nindent 4 }}
+    app.kubernetes.io/component: edge-internal-otlp-client
+spec:
+  secretName: {{ .Values.destination.otlp.tlsSecret }}
+  duration: {{ .Values.certManager.duration }}
+  renewBefore: {{ .Values.certManager.renewBefore }}
+  privateKey:
+    {{- toYaml .Values.certManager.privateKey | nindent 4 }}
+  commonName: {{ printf "%s.%s.edge.openshell" $fullname .Release.Namespace | trunc 64 | trimSuffix "-" | quote }}
+  subject:
+    organizations: [openshell-exporter-edges]
+  usages: [client auth]
+  issuerRef:
+    {{- toYaml $issuer | nindent 4 }}
+{{- end }}
+{{- if .Values.sandboxInjection.enabled }}
+{{- range .Values.sandboxInjection.allowedNamespaces }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ printf "%s-forwarder" $fullname | trunc 63 | trimSuffix "-" }}
+  namespace: {{ . }}
+  labels:
+    {{- include "openshell-event-exporter.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: sandbox-forwarder
+spec:
+  secretName: {{ $root.Values.sandboxInjection.forwarderTLSSecret }}
+  duration: {{ $root.Values.certManager.duration }}
+  renewBefore: {{ $root.Values.certManager.renewBefore }}
+  privateKey:
+    {{- toYaml $root.Values.certManager.privateKey | nindent 4 }}
+  commonName: {{ printf "forwarder.%s.openshell" . | trunc 64 | trimSuffix "-" | quote }}
+  subject:
+    organizations: [openshell-sandbox-forwarders]
+  usages: [client auth]
+  issuerRef:
+    {{- toYaml $issuer | nindent 4 }}
+{{- end }}
+{{- end }}
+{{- if and (eq (include "openshell-event-exporter.module.relayOtlp" .) "true") .Values.relay.input.mtlsEnabled }}
+{{- range .Values.certManager.relayClientNamespaces }}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ printf "%s-relay-client" $fullname | trunc 63 | trimSuffix "-" }}
+  namespace: {{ . }}
+  labels:
+    {{- include "openshell-event-exporter.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: relay-client
+spec:
+  secretName: {{ $root.Values.certManager.relayClientTLSSecret }}
+  duration: {{ $root.Values.certManager.duration }}
+  renewBefore: {{ $root.Values.certManager.renewBefore }}
+  privateKey:
+    {{- toYaml $root.Values.certManager.privateKey | nindent 4 }}
+  commonName: {{ printf "relay.%s.openshell" . | trunc 64 | trimSuffix "-" | quote }}
+  subject:
+    organizations: [openshell-relay-clients]
+  usages: [client auth]
+  issuerRef:
+    {{- toYaml $issuer | nindent 4 }}
+{{- end }}
+{{- end }}
+{{- end }}
