@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+.git
+.state
+.venv
+dist
+node_modules
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+tests
