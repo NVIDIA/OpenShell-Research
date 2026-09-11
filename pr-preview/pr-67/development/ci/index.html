@@ -1580,8 +1580,10 @@ authorization or waiting for other workflows.</p>
   representative sampling are reported, not treated as verified compliance.</li>
 <li>One ephemeral gateway serves sequential reviews. Each direct <code>oar run</code> gets
   a fresh sandbox and a 1,800-second timeout; inference requests have a
-  300-second timeout and the job has a 90-minute limit. The CI profile uses
-  medium reasoning. Completed results survive later failures.</li>
+  300-second timeout and the job uses GitHub's six-hour maximum to leave
+  headroom for several sequential project reviews and their final reporting.
+  The CI profile uses medium reasoning. Completed results survive later
+  failures.</li>
 <li>A timeout produces no verdict and is prominently reported as an incomplete,
   non-passing review. It is advisory and does not fail the workflow or block
   merging. Other OAR failures and malformed results remain hard workflow
