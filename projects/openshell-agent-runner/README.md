@@ -2,9 +2,11 @@
 
 OpenShell Agent Runner (OAR) launches ephemeral
 [Pi coding agents](https://github.com/earendil-works/pi/tree/main/packages/coding-agent)
-in OpenShell sandboxes. Each run executes one task, saves its result to a file,
-and removes the sandbox. Use it to review code, review technical writing, or
-run your own tasks from a terminal or CI job.
+in OpenShell sandboxes. Each agent works on a task using the prompts, skills,
+tools, and permissions defined by its profile. OAR manages task setup,
+execution, result collection, and sandbox cleanup.
+
+The included code and technical writing reviewers follow this workflow:
 
 ```text
 Profile + input → OAR → Pi in a temporary sandbox → Result file
