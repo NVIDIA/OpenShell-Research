@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="350 220 1060 420" width="1060" height="420" role="img" aria-labelledby="oar-title oar-description">
+  <title id="oar-title">OAR — OpenShell Agent Runner</title>
+  <desc id="oar-description">An oar forms the left stroke of the A, with a terminal prompt cut out of its blade and two water ripples. NVIDIA green accents remain constant; lettering adapts to light and dark color schemes.</desc>
+  <style>
+    .lettering { fill: #1e1e1e; }
+    .accent { fill: #76b900; }
+    @media (prefers-color-scheme: dark) {
+      .lettering { fill: #f5f5f5; }
+    }
+    /* Optional override when this SVG is embedded inline. */
+    svg[data-theme="light"] .lettering { fill: #1e1e1e; }
+    svg[data-theme="dark"] .lettering { fill: #f5f5f5; }
+  </style>
+  <g class="lettering" fill="#1e1e1e">
+    <path fill-rule="evenodd" d="M479 301H609C668 301 699 330 699 385V489C699 545 668 573 609 573H479C422 573 394 545 394 489V385C394 330 422 301 479 301ZM489 361C471 361 463 369 463 387V486C463 507 472 514 489 514H604C621 514 629 506 629 486V387C629 369 621 361 604 361Z"/>
+    <path d="M851 301H922L1042 573H968L939 502H831L822 451H916L864 333Z"/>
+    <path fill-rule="evenodd" d="M1067 301H1265C1333 301 1369 328 1369 388V400C1369 443 1347 469 1307 479L1369 573H1287L1230 482H1136V573H1067ZM1136 363V428H1266C1287 428 1298 420 1298 398V392C1298 372 1287 363 1266 363Z"/>
+  </g>
+  <g class="accent" fill="#76b900">
+    <!-- The two inner subpaths are genuine transparent prompt cutouts. -->
+    <path fill-rule="evenodd" d="M870 264C873 256 880 252 888 255C896 258 899 265 895 273L807 456C806 463 809 474 812 487C818 512 812 535 803 561L796 580C793 590 786 595 775 595H712C699 595 692 587 697 574L720 511C728 487 742 473 763 461ZM737 510C739 510 740 511 742 513L759 532C762 535 762 539 759 542L739 562C735 566 728 562 730 557L747 537L731 520C727 515 731 510 737 510ZM764 551H785C787 551 789 553 789 555V558C789 561 787 562 785 562H764C761 562 760 560 760 558V555C760 552 761 551 764 551Z"/>
+    <path d="M823 555C833 540 843 537 857 543L871 549C885 555 892 546 902 546L916 547C910 562 900 569 887 569C877 569 868 566 858 561C846 555 838 558 830 563C825 566 818 562 823 555Z"/>
+    <path d="M809 584C819 570 830 568 844 574L858 580C872 586 880 577 890 577L900 578C894 592 885 599 872 599C861 599 851 595 842 591C830 585 822 589 815 593C810 596 803 591 809 584Z"/>
+  </g>
+</svg>
