@@ -148,9 +148,10 @@ creation and execution separately, and uploads and cleanup take additional time.
 | Exit code | Meaning |
 | --- | --- |
 | `0` | The result was validated and saved, and requested cleanup succeeded. |
-| `1` | OpenShell execution, timeout, download, ownership checking, or cleanup failed. |
+| `1` | OpenShell execution, download, ownership checking, or cleanup failed. |
 | `2` | A command argument, profile, input, or prompt variable was invalid. |
 | `3` | The downloaded result was empty or failed validation. |
+| `4` | Sandbox creation, agent execution, download, or cleanup exceeded its timeout. |
 
 These are **run** outcomes. A reviewer can return `needs_changes` while OAR exits
 with `0`. Read the JSON verdict if your CI policy depends on the review.

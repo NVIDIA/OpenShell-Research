@@ -16,7 +16,12 @@ from typer._click import Context
 from typer.core import TyperCommand
 
 from openshell_agent_runner.config import ResolvedProfile, load_profile, resolve_task
-from openshell_agent_runner.errors import ArtifactError, ConfigurationError, OarError
+from openshell_agent_runner.errors import (
+    ArtifactError,
+    ConfigurationError,
+    ExecutionTimeoutError,
+    OarError,
+)
 from openshell_agent_runner.openshell import NativeTarget
 from openshell_agent_runner.openshell import doctor as run_doctor
 from openshell_agent_runner.profile_init import ThinkingLevel, initialize_profiles
@@ -237,6 +242,8 @@ def _fail(error: OarError) -> NoReturn:
         raise typer.Exit(3)
     if isinstance(error, ConfigurationError):
         raise typer.Exit(2)
+    if isinstance(error, ExecutionTimeoutError):
+        raise typer.Exit(4)
     raise typer.Exit(1)
 
 
