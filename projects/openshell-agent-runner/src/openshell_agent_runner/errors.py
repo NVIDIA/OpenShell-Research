@@ -16,5 +16,9 @@ class ExecutionError(OarError):
     """OpenShell or agent execution failure (exit code 1)."""
 
 
+class ExecutionTimeoutError(ExecutionError):
+    """OpenShell operation exceeded its configured timeout (exit code 4)."""
+
+
 class ArtifactError(OarError):
     """Missing or invalid required artifact (exit code 3)."""

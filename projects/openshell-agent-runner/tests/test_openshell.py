@@ -7,8 +7,8 @@ import sys
 
 import pytest
 
-from openshell_agent_runner.errors import ExecutionError
-from openshell_agent_runner.openshell import NativeTarget, doctor
+from openshell_agent_runner.errors import ExecutionError, ExecutionTimeoutError
+from openshell_agent_runner.openshell import NativeTarget, doctor, run
 
 
 def test_native_commands_do_not_consume_the_callers_input_stream() -> None:
@@ -39,6 +39,38 @@ print(json.dumps({"child_input": child.stdout, "remaining_input": sys.stdin.read
         "child_input": "",
         "remaining_input": pending_tasks,
     }
+
+
+def test_timeout_has_a_distinct_error_and_redacts_the_model(monkeypatch) -> None:
+    def time_out(command, **kwargs):
+        # Python may expose the fractional time remaining inside communicate(),
+        # rather than the configured subprocess timeout.
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"] - 0.25)
+
+    monkeypatch.setattr(subprocess, "run", time_out)
+
+    with pytest.raises(ExecutionTimeoutError) as raised:
+        run(["openshell", "sandbox", "exec", "--model", "secret-model"], 30)
+
+    message = str(raised.value)
+    assert "timed out after 30 seconds" in message
+    assert "secret-model" not in message
+    assert "<model>" in message
+
+
+def test_failed_command_redacts_the_model(monkeypatch) -> None:
+    def fail(command, **_kwargs):
+        raise subprocess.CalledProcessError(17, command)
+
+    monkeypatch.setattr(subprocess, "run", fail)
+
+    with pytest.raises(ExecutionError) as raised:
+        run(["openshell", "sandbox", "exec", "--model", "secret-model"], 30)
+
+    message = str(raised.value)
+    assert "exit code 17" in message
+    assert "secret-model" not in message
+    assert "<model>" in message
 
 
 def test_doctor_runs_only_read_only_checks(monkeypatch) -> None:

@@ -10,6 +10,10 @@ inputs:
   model:
     required: true
     description: Inference model ID
+  timeout-seconds:
+    required: false
+    default: "300"
+    description: Maximum duration of each inference request
 runs:
   using: composite
   steps:
@@ -40,4 +44,5 @@ runs:
         test -n "$REVIEW_MODEL"
         openshell provider create --name reviewer-ci --type openai \
           --credential OPENAI_API_KEY --config "OPENAI_BASE_URL=$OPENAI_BASE_URL"
-        openshell inference set --provider reviewer-ci --model "$REVIEW_MODEL"
+        openshell inference set --provider reviewer-ci --model "$REVIEW_MODEL" \
+          --timeout "${{ inputs.timeout-seconds }}"

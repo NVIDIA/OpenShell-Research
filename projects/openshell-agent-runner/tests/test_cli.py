@@ -12,6 +12,7 @@ from rich.text import Text
 from typer.testing import CliRunner
 
 from openshell_agent_runner.cli import app
+from openshell_agent_runner.errors import ExecutionTimeoutError
 
 REPOSITORY = Path(__file__).resolve().parents[3]
 CODE_REVIEWER = (
@@ -174,6 +175,34 @@ def test_run_dry_run_does_not_publish_output(tmp_path: Path) -> None:
     assert "/workspace/input/document.md" in result.stdout
     assert "--env REPOSITORY_ROOT=/workspace/input" in result.stdout
     assert not output.exists()
+
+
+def test_run_uses_a_distinct_timeout_exit_code(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    document = tmp_path / "document.md"
+    document.write_text("# Document\n")
+
+    def time_out(_request) -> None:
+        raise ExecutionTimeoutError("command timed out after 30 seconds")
+
+    monkeypatch.setattr("openshell_agent_runner.cli.run_agent", time_out)
+    result = CliRunner().invoke(
+        app,
+        [
+            "run",
+            str(TECHNICAL_WRITING_REVIEWER),
+            "--task",
+            "review-document",
+            "--output",
+            str(tmp_path / "review.json"),
+            "--input",
+            str(document),
+        ],
+    )
+
+    assert result.exit_code == 4
+    assert "timed out after 30 seconds" in result.stderr
 
 
 def test_document_task_requires_input() -> None:
