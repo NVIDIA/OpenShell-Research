@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560" role="img" aria-labelledby="title desc">
+  <title id="title">Agent-authored policy approval flow</title>
+  <desc id="desc">A proposed policy change is checked against a formal boundary, then either rejected with a counterexample, applied, or sent for model or human review before enforcement and audit. An additional node labeled H also leads to enforcement and audit.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#55635d"/>
+    </marker>
+    <style>
+      .node { fill: #f7f6ef; stroke: #53615b; stroke-width: 2; }
+      .decision { fill: #eef4eb; stroke: #3f604d; stroke-width: 2; }
+      .reject { fill: #f6ece8; stroke: #8c5544; stroke-width: 2; }
+      .apply { fill: #e9f3ea; stroke: #426b4d; stroke-width: 2; }
+      .review { fill: #f1efe8; stroke: #6d6757; stroke-width: 2; }
+      .final { fill: #202723; stroke: #202723; stroke-width: 2; }
+      .edge { fill: none; stroke: #55635d; stroke-width: 2; marker-end: url(#arrow); }
+      .label { fill: #202723; font: 600 18px system-ui, sans-serif; text-anchor: middle; dominant-baseline: middle; }
+      .final-label { fill: #ffffff; font: 600 18px system-ui, sans-serif; text-anchor: middle; dominant-baseline: middle; }
+      .edge-label { fill: #4a5650; font: 600 15px system-ui, sans-serif; text-anchor: middle; }
+    </style>
+  </defs>
+
+  <rect class="node" x="40" y="52" width="230" height="72" rx="12"/>
+  <text class="label" x="155" y="88">proposed policy change</text>
+
+  <path class="decision" d="M 450 30 L 600 88 L 450 146 L 300 88 Z"/>
+  <text class="label" x="450" y="81">within formal</text>
+  <text class="label" x="450" y="103">boundary?</text>
+
+  <rect class="reject" x="650" y="52" width="260" height="72" rx="12"/>
+  <text class="label" x="780" y="88">reject + counterexample</text>
+
+  <path class="decision" d="M 450 188 L 615 254 L 450 320 L 285 254 Z"/>
+  <text class="label" x="450" y="247">needs contextual</text>
+  <text class="label" x="450" y="269">judgment?</text>
+
+  <rect class="apply" x="120" y="350" width="180" height="68" rx="12"/>
+  <text class="label" x="210" y="384">apply</text>
+
+  <rect class="review" x="610" y="350" width="280" height="68" rx="12"/>
+  <text class="label" x="750" y="384">model / human review</text>
+
+  <rect class="node" x="36" y="464" width="70" height="58" rx="12"/>
+  <text class="label" x="71" y="493">H</text>
+
+  <rect class="final" x="340" y="458" width="250" height="70" rx="12"/>
+  <text class="final-label" x="465" y="493">enforce + audit</text>
+
+  <path class="edge" d="M 270 88 H 298"/>
+  <path class="edge" d="M 602 88 H 648"/>
+  <text class="edge-label" x="625" y="76">no</text>
+  <path class="edge" d="M 450 148 V 186"/>
+  <text class="edge-label" x="472" y="171">yes</text>
+  <path class="edge" d="M 330 301 L 253 348"/>
+  <text class="edge-label" x="276" y="316">no</text>
+  <path class="edge" d="M 570 301 L 690 348"/>
+  <text class="edge-label" x="654" y="316">yes</text>
+  <path class="edge" d="M 210 420 V 493 H 338"/>
+  <path class="edge" d="M 750 420 V 493 H 592"/>
+  <path class="edge" d="M 108 493 H 338"/>
+</svg>
