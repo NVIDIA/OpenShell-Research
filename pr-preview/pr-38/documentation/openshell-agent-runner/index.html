@@ -1596,14 +1596,20 @@
 
 
 <h1 id="openshell-agent-runner">OpenShell Agent Runner</h1>
-<p>OpenShell Agent Runner (OAR) runs an agent task in an isolated OpenShell sandbox
-and saves the result to a file. Use it to review a project, improve a technical
-document, or run your own tasks from a terminal or CI job.</p>
+<p><img class="documentation-logo" src="assets/oar-logo.svg" alt="OAR — OpenShell Agent Runner" width="540"></p>
+<p>OpenShell Agent Runner (OAR) launches ephemeral
+<a href="https://github.com/earendil-works/pi/tree/main/packages/coding-agent">Pi coding agents</a>
+in OpenShell sandboxes. Each agent works on a task using the prompts, skills,
+tools, and permissions defined by its profile. Use OAR to run the included
+reviewers or your own agent workflows from a terminal or CI job.</p>
+<p>Pi supplies the agent loop, tools, skills, and model client. OAR prepares the
+task, launches Pi, collects the result, and removes the sandbox. OpenShell
+provides isolation and routes Pi's inference requests to your model.</p>
 <figure class="documentation-figure documentation-figure--wide">
   <a href="assets/diagrams/system-overview.svg" aria-label="Open the OAR architecture diagram at full size">
-    <img src="assets/diagrams/system-overview.svg" alt="Three independent OAR runs share one OpenShell gateway. Each sandbox uses a profile containing prompts and skills: code-reviewer for two runs and technical-writing-reviewer for one. Inputs and results remain separate for each run.">
+    <img src="assets/diagrams/system-overview.svg" alt="Three independent OAR runs share one OpenShell gateway. Pi runs in each sandbox with a profile containing prompts and skills: code-reviewer for two runs and technical-writing-reviewer for one. Inputs and results remain separate for each run.">
   </a>
-  <figcaption>Each profile supplies prompts and skills to its agent. Runs stay isolated, even when they share a profile. Select the diagram to view it at full size.</figcaption>
+  <figcaption>Each profile supplies prompts and skills to Pi. Runs stay isolated, even when they share a profile. Select the diagram to view it at full size.</figcaption>
 </figure>
 
 <p>A <strong>profile</strong> packages task prompts, reusable skills, model settings, and sandbox
@@ -1617,7 +1623,9 @@ OpenShell 0.0.111 or newer. You need a running <strong>gateway</strong> and conf
 <a href="https://docs.nvidia.com/openshell/latest/get-started/quickstart">OpenShell quickstart</a>
 if you have not set these up yet.</p>
 <p>OAR uses your existing OpenShell configuration. API keys and provider setup
-belong there.</p>
+belong there. The packaged profiles configure Pi to send OpenAI-compatible
+Chat Completions requests to <code>https://inference.local/v1</code>. Choose a model and
+endpoint that support that API and tool calling.</p>
 <h2 id="1-install-and-check-the-connection">1. Install and check the connection</h2>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>openshell-agent-runner
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>oar<span class="w"> </span>doctor
@@ -1639,7 +1647,11 @@ To choose another target, add <code>--gateway NAME --workspace NAME</code> to <c
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>└── technical-writing-reviewer/  Review a technical document
 </span></code></pre></div>
 <p>The default thinking level is <code>high</code>. For a model without reasoning support,
-add <code>--thinking off</code> to <code>init</code>.</p>
+add <code>--thinking off</code> to <code>init</code>; it also sets <code>reasoning: false</code> in Pi's model
+definition. <code>init</code> writes the model ID into the profile's <code>models.json</code> and
+<code>settings.json</code>. It does not configure or change OpenShell's inference route.
+See <a href="profiles/#configure-pis-model-and-inference">model and inference configuration</a>
+to understand these files or adapt them to your endpoint.</p>
 <h2 id="3-run-your-first-review">3. Run your first review</h2>
 <p>Choose an existing text file, such as a README, design note, or draft blog post.
 Replace <code>./README.md</code> with its path:</p>

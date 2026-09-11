@@ -1525,6 +1525,10 @@ instead of generated artwork. Hero images must live under <code>docs/</code>.</p
 </span></code></pre></div>
 <p>Commit any generated changes with the source change.</p>
 <h2 id="theme-and-brand-assets">Theme and brand assets</h2>
+<p>Project logos shared by a README and the site belong in <code>projects/&lt;name&gt;/assets/</code>.
+Register that directory in <code>PROJECT_ASSETS</code> in <code>scripts/stage-project-docs.py</code>;
+the build copies it into the staged documentation's <code>assets/</code> directory.
+README image links should be relative so they work on feature branches.</p>
 <p>Keep shared brand assets in <code>docs/assets/brand/</code>. Use the compact SVG mark for
 <code>project.theme.logo</code>, <code>favicon.svg</code> for the browser icon, and the light and dark
 PNG banners for full OpenShell Research lockups. Never reference files from a
