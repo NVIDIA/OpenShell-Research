@@ -18,7 +18,7 @@ Each release image targets Linux AMD64 and ARM64. Docker Desktop on Apple Silico
 Macs runs the Linux ARM64 image in its VM; Intel Macs use Linux AMD64. The same
 image reference selects the matching architecture automatically.
 
-> **Release pending:** the `v0.0.5-rc.1` image references in these guides are
+> **Release pending:** the `v0.0.5-rc.1` images and `0.0.5-rc.1` Helm chart are
 > awaiting public publication and anonymous-pull verification.
 
 ## Choose your deployment
@@ -27,7 +27,7 @@ image reference selects the matching architecture automatically.
 | --- | --- |
 | Docker / Docker Desktop | Try the quickstart below, then [manage the Compose deployment](docker.md). |
 | Rootless Podman on Linux | [Run the same image with Podman](podman.md). |
-| Kubernetes with Helm | [Install with the OpenTelemetry Helm chart](helm.md). |
+| Kubernetes with Helm | [Install with the exporter Helm chart](helm.md). |
 
 ## Quickstart with Docker
 

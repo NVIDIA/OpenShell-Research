@@ -1,113 +1,29 @@
-# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES.
-# SPDX-License-Identifier: Apache-2.0
-# For open-telemetry/opentelemetry-collector chart 0.173.0.
-mode: statefulset
+# The published chart supplies the matching multi-platform image digest.
 fullnameOverride: openshell-exporter
-replicaCount: 1
+profile: stream
+
+source:
+  endpoint: https://gateway.example.com:8080
+  gatewayId: gateway-1
+  workspace: default
+  # Replace with a label selector matching only your authorized sandboxes.
+  sandboxSelector: observability=enabled
+  sourceInstance: kubernetes-gateway
+  bearerEnabled: true
+  mtlsEnabled: false
+
+destination:
+  cloudEvents:
+    endpoint: https://receiver.example.com/v1/events
+    mtlsEnabled: false
+
 nodeSelector:
   kubernetes.io/os: linux
-image:
-  repository: ghcr.io/nvidia/openshell-exporter
-  tag: v0.0.5-rc.1
-command:
-  name: usr/local/bin/openshell-event-exporter
-configMap:
-  create: false
-  existingName: openshell-exporter-config
-serviceAccount:
-  automountServiceAccountToken: false
-clusterRole:
-  create: false
-podSecurityContext:
-  runAsNonRoot: true
-  runAsUser: 65532
-  runAsGroup: 65532
-  fsGroup: 65532
-  fsGroupChangePolicy: OnRootMismatch
-  seccompProfile:
-    type: RuntimeDefault
-securityContext:
-  readOnlyRootFilesystem: true
-  allowPrivilegeEscalation: false
-  capabilities:
-    drop: [ALL]
-resources:
-  requests:
-    cpu: 100m
-    memory: 128Mi
-  limits:
-    cpu: "1"
-    memory: 512Mi
-extraEnvs:
-  - name: OPENSHELL_ENDPOINT
-    value: https://gateway.example.com:8080
-  - name: OPENSHELL_GATEWAY_ID
-    value: gateway-1
-  - name: OPENSHELL_WORKSPACE
-    value: default
-  - name: OPENSHELL_SANDBOX_NAME
-    value: my-sandbox
-  - name: OPENSHELL_EXPORT_URL
-    value: https://receiver.example.com/v1/events
-extraVolumes:
-  - name: credentials
-    secret:
-      secretName: openshell-exporter-auth
-      defaultMode: 0440
-  - name: input
-    emptyDir: {}
-  - name: tmp
-    emptyDir:
-      medium: Memory
-      sizeLimit: 16Mi
-extraVolumeMounts:
-  - name: credentials
-    mountPath: /run/secrets
-    readOnly: true
-  - name: input
-    mountPath: /input
-    readOnly: true
-  - name: state
-    mountPath: /state
-  - name: output
-    mountPath: /output
-  - name: tmp
-    mountPath: /tmp
-statefulset:
-  volumeClaimTemplates:
-    - metadata:
-        name: state
-      spec:
-        accessModes: [ReadWriteOnce]
-        resources:
-          requests:
-            storage: 1Gi
-    - metadata:
-        name: output
-      spec:
-        accessModes: [ReadWriteOnce]
-        resources:
-          requests:
-            storage: 5Gi
-ports:
-  otlp:
-    enabled: false
-  otlp-http:
-    enabled: false
-  jaeger-compact:
-    enabled: false
-  jaeger-thrift:
-    enabled: false
-  jaeger-grpc:
-    enabled: false
-  zipkin:
-    enabled: false
-  metrics:
-    enabled: false
-  health:
-    enabled: true
-    containerPort: 13133
-    servicePort: 13133
-    protocol: TCP
-service:
-  type: ClusterIP
+
+persistence:
+  queue:
+    size: 5Gi
+  recovery:
+    size: 5Gi
+  checkpoints:
+    size: 1Gi

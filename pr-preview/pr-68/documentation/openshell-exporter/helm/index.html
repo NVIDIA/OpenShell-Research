@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Install the exporter image on Kubernetes using the upstream OpenTelemetry Collector chart.">
+        <meta name="description" content="Install the exporter on Kubernetes using its own Helm chart from GHCR.">
       
       
         <meta name="author" content="OpenShell Research Engineering">
@@ -98,11 +98,11 @@
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="OpenShell Research">
   <meta property="og:title" content="Deploy with Helm">
-  <meta property="og:description" content="Install the exporter image on Kubernetes using the upstream OpenTelemetry Collector chart.">
+  <meta property="og:description" content="Install the exporter on Kubernetes using its own Helm chart from GHCR.">
   <meta property="og:url" content="https://nvidia.github.io/OpenShell-Research/documentation/openshell-exporter/helm/">
   <meta name="twitter:card" content="summary">
   <meta name="twitter:title" content="Deploy with Helm">
-  <meta name="twitter:description" content="Install the exporter image on Kubernetes using the upstream OpenTelemetry Collector chart.">
+  <meta name="twitter:description" content="Install the exporter on Kubernetes using its own Helm chart from GHCR.">
   
   
   
@@ -1545,10 +1545,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#update-or-remove" class="md-nav__link">
+  <a href="#configure-update-or-remove" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Update or remove
+        Configure, update, or remove
       </span>
     </span>
   </a>
@@ -1669,10 +1669,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#update-or-remove" class="md-nav__link">
+  <a href="#configure-update-or-remove" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Update or remove
+        Configure, update, or remove
       </span>
     </span>
   </a>
@@ -1806,69 +1806,80 @@
 
 
 <h1 id="deploy-with-helm">Deploy with Helm</h1>
-<p>Use the upstream <a href="https://github.com/open-telemetry/opentelemetry-helm-charts/tree/opentelemetry-collector-0.173.0/charts/opentelemetry-collector">OpenTelemetry Collector Helm chart</a>
-with the exporter image and <a href="../helm-values.yaml">helm-values.yaml</a>. Research supplies
-configuration; the upstream project maintains the chart. The chart version is
-independent of the exporter image version selected in the values file.</p>
-<p>You need Helm 4, <code>kubectl</code>, access to a Kubernetes 1.24+ cluster with a default
-StorageClass, and the gateway/destination credentials described in
-<a href="../configuration/#connect-a-gateway-and-destination">configuration</a>. The cluster
-must reach those endpoints and pull the image. See the <a href="../">release status</a>.
-AMD64 and ARM64 Linux nodes use the same image reference; the node's container
-runtime selects the matching manifest. An Apple Silicon development cluster
-running Linux ARM64 nodes uses the ARM64 image.</p>
+<p>Use the exporter's <code>openshell-event-exporter</code> chart, packaged from its maintained
+<code>deploy/kubernetes/chart/</code> directory and distributed through GHCR. The chart
+configures the exporter, credentials, health checks, and persistent storage.
+You do not need access to the source repository.</p>
+<p>You need Helm 3.22+, <code>kubectl</code>, Kubernetes 1.29+ with a default StorageClass,
+and an existing HTTPS gateway and CloudEvents destination. The cluster must
+reach both endpoints and pull the image. See the <a href="../">release status</a>.
+The published chart pins the matching multi-platform image by digest. Linux
+AMD64 and ARM64 nodes, including Linux ARM64 clusters on Apple Silicon, use the
+same chart and image reference.</p>
 <h2 id="prepare">Prepare</h2>
-<p>Download the files into your deployment directory:</p>
+<p>Download the small values file into your deployment directory:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">DOCS_URL</span><span class="o">=</span>https://nvidia.github.io/OpenShell-Research/documentation/openshell-exporter
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>curl<span class="w"> </span>-fL<span class="w"> </span><span class="s2">"</span><span class="nv">$DOCS_URL</span><span class="s2">/gateway.yaml"</span><span class="w"> </span>-o<span class="w"> </span>config.yaml
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>curl<span class="w"> </span>-fL<span class="w"> </span><span class="s2">"</span><span class="nv">$DOCS_URL</span><span class="s2">/helm-values.yaml"</span><span class="w"> </span>-o<span class="w"> </span>helm-values.yaml
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">CHART</span><span class="o">=</span>oci://ghcr.io/nvidia/charts/openshell-event-exporter
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nb">export</span><span class="w"> </span><span class="nv">VERSION</span><span class="o">=</span><span class="m">0</span>.0.5-rc.1
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>curl<span class="w"> </span>-fL<span class="w"> </span><span class="s2">"</span><span class="nv">$DOCS_URL</span><span class="s2">/helm-values.yaml"</span><span class="w"> </span>-o<span class="w"> </span>helm-values.yaml
 </span></code></pre></div>
-<p>Edit <code>extraEnvs</code> in <code>helm-values.yaml</code> to select your gateway, stable identity,
-workspace, authorized sandbox, and HTTPS destination. Adjust storage requests
-and set <code>spec.storageClassName</code> in each volume claim if the cluster has no default
-StorageClass. Keep one replica for this gateway collection profile.</p>
-<p>Create a namespace, a Secret from your existing token files, and the configuration
-ConfigMap. Replace the two token file paths:</p>
+<p>Edit <code>source</code> and <code>destination</code> in <code>helm-values.yaml</code>: set the gateway URL,
+stable gateway identity, workspace, authorized sandbox label selector, and
+CloudEvents URL. An empty selector collects all accessible sandboxes. Adjust
+storage sizes; set <code>storageClass</code> under each persistence entry if needed.
+The <code>stream</code> profile collects WatchSandbox activity and policy snapshots with
+one exporter replica, durable delivery, and local recovery output.</p>
+<p>Create the namespace and Secrets from existing raw token and CA certificate
+files. Replace the paths below. Tokens must not include the <code>Bearer</code> prefix.
+Use a CA bundle that verifies each endpoint, including its public trust chain
+when applicable:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>kubectl<span class="w"> </span>create<span class="w"> </span>namespace<span class="w"> </span>openshell-observability
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>openshell-observability<span class="w"> </span>create<span class="w"> </span>secret<span class="w"> </span>generic<span class="w"> </span>openshell-exporter-auth<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--from-file<span class="o">=</span>gateway-token<span class="o">=</span>/path/to/gateway-token<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>--from-file<span class="o">=</span>destination-token<span class="o">=</span>/path/to/destination-token
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>openshell-observability<span class="w"> </span>create<span class="w"> </span>configmap<span class="w"> </span>openshell-exporter-config<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span>--from-file<span class="o">=</span><span class="nv">relay</span><span class="o">=</span>config.yaml
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>openshell-observability<span class="w"> </span>create<span class="w"> </span>secret<span class="w"> </span>generic<span class="w"> </span>openshell-exporter-source-auth<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>--from-file<span class="o">=</span><span class="nv">token</span><span class="o">=</span>/path/to/gateway-token
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>openshell-observability<span class="w"> </span>create<span class="w"> </span>secret<span class="w"> </span>generic<span class="w"> </span>openshell-exporter-source-tls<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span>--from-file<span class="o">=</span>ca.crt<span class="o">=</span>/path/to/gateway-ca.pem
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>openshell-observability<span class="w"> </span>create<span class="w"> </span>secret<span class="w"> </span>generic<span class="w"> </span>openshell-exporter-destination-auth<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span>--from-file<span class="o">=</span><span class="nv">token</span><span class="o">=</span>/path/to/destination-token
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>openshell-observability<span class="w"> </span>create<span class="w"> </span>secret<span class="w"> </span>generic<span class="w"> </span>openshell-exporter-destination-tls<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span>--from-file<span class="o">=</span>ca.crt<span class="o">=</span>/path/to/destination-ca.pem
 </span></code></pre></div>
-<p>The upstream chart expects the configuration key to be named <code>relay</code>; this does
-not enable NeMo Relay. For private CAs or mTLS, include the corresponding files in
-the Secret and set <code>/run/secrets/...</code> TLS paths in <code>config.yaml</code> before creating
-the ConfigMap.</p>
+<p>For mTLS, set <code>source.mtlsEnabled</code> or <code>destination.cloudEvents.mtlsEnabled</code> to
+<code>true</code> and add <code>--from-file=tls.crt=/path/to/client.crt</code> and
+<code>--from-file=tls.key=/path/to/client.key</code> to that TLS Secret's creation command.
+For a gateway authenticated only by mTLS, also set <code>source.bearerEnabled: false</code>
+and omit the source token Secret. Keep TLS verification enabled.</p>
 <h2 id="install-and-verify">Install and verify</h2>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>helm<span class="w"> </span>repo<span class="w"> </span>add<span class="w"> </span>open-telemetry<span class="w"> </span>https://open-telemetry.github.io/opentelemetry-helm-charts
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>helm<span class="w"> </span>repo<span class="w"> </span>update<span class="w"> </span>open-telemetry
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>helm<span class="w"> </span>upgrade<span class="w"> </span>--install<span class="w"> </span>openshell-exporter<span class="w"> </span>open-telemetry/opentelemetry-collector<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>--version<span class="w"> </span><span class="m">0</span>.173.0<span class="w"> </span>--namespace<span class="w"> </span>openshell-observability<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span>--values<span class="w"> </span>helm-values.yaml<span class="w"> </span>--wait<span class="w"> </span>--timeout<span class="w"> </span>5m
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>openshell-observability<span class="w"> </span>rollout<span class="w"> </span>status<span class="w"> </span>statefulset/openshell-exporter
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>openshell-observability<span class="w"> </span>logs<span class="w"> </span>openshell-exporter-0<span class="w"> </span>--tail<span class="o">=</span><span class="m">30</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>openshell-observability<span class="w"> </span>port-forward<span class="w"> </span>service/openshell-exporter<span class="w"> </span><span class="m">23133</span>:13133
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>helm<span class="w"> </span>upgrade<span class="w"> </span>--install<span class="w"> </span>openshell-exporter<span class="w"> </span><span class="s2">"</span><span class="nv">$CHART</span><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>--version<span class="w"> </span><span class="s2">"</span><span class="nv">$VERSION</span><span class="s2">"</span><span class="w"> </span>--namespace<span class="w"> </span>openshell-observability<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>--values<span class="w"> </span>helm-values.yaml<span class="w"> </span>--wait<span class="w"> </span>--timeout<span class="w"> </span>5m
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>openshell-observability<span class="w"> </span>rollout<span class="w"> </span>status<span class="w"> </span>deployment/openshell-exporter
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>openshell-observability<span class="w"> </span>logs<span class="w"> </span>deployment/openshell-exporter<span class="w"> </span>-c<span class="w"> </span>exporter<span class="w"> </span>--tail<span class="o">=</span><span class="m">30</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>openshell-observability<span class="w"> </span>port-forward<span class="w"> </span>service/openshell-exporter<span class="w"> </span><span class="m">23133</span>:13133
 </span></code></pre></div>
 <p>In another terminal, run <code>curl --fail http://127.0.0.1:23133/</code>. Generate authorized
-sandbox activity and confirm CloudEvents arrive at your destination. Port
-forwarding checks health; it does not prove delivery. The deployment uses separate
-persistent claims for state and recovery, runs non-root, and mounts no Kubernetes
-API token. It does not install a gateway or cluster-wide log collection.</p>
-<h2 id="update-or-remove">Update or remove</h2>
-<p>After editing configuration, update the ConfigMap and restart the workload:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>openshell-observability<span class="w"> </span>create<span class="w"> </span>configmap<span class="w"> </span>openshell-exporter-config<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--from-file<span class="o">=</span><span class="nv">relay</span><span class="o">=</span>config.yaml<span class="w"> </span>--dry-run<span class="o">=</span>client<span class="w"> </span>-o<span class="w"> </span>yaml<span class="w"> </span><span class="p">|</span><span class="w"> </span>kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>-
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>openshell-observability<span class="w"> </span>rollout<span class="w"> </span>restart<span class="w"> </span>statefulset/openshell-exporter
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>openshell-observability<span class="w"> </span>rollout<span class="w"> </span>status<span class="w"> </span>statefulset/openshell-exporter
+sandbox activity and confirm CloudEvents arrive at your destination. Health
+alone does not prove delivery. The chart creates separate queue, recovery, and
+checkpoint PVCs, runs non-root, and uses no Kubernetes API token in this profile.
+Recovery records append to <code>/var/lib/openshell-exporter/recovery/openshell-events.json</code>.
+Monitor storage usage and arrange retention; delivery can retry, so destinations
+must deduplicate by <code>(source,id)</code>.</p>
+<h2 id="configure-update-or-remove">Configure, update, or remove</h2>
+<p>The chart generates Collector configuration from its values. Inspect the full
+settings, including the <code>complete</code> and <code>custom</code> profiles for additional components:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>helm<span class="w"> </span>show<span class="w"> </span>values<span class="w"> </span><span class="s2">"</span><span class="nv">$CHART</span><span class="s2">"</span><span class="w"> </span>--version<span class="w"> </span><span class="s2">"</span><span class="nv">$VERSION</span><span class="s2">"</span><span class="w"> </span>&gt;<span class="w"> </span>chart-defaults.yaml
 </span></code></pre></div>
-<p>For an image upgrade, change <code>image.tag</code> or <code>image.digest</code> in the values file and
-repeat <code>helm upgrade --install</code>. Keep the previous image and configuration for
-rollback. To remove the workload:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>helm<span class="w"> </span>uninstall<span class="w"> </span>openshell-exporter<span class="w"> </span>--namespace<span class="w"> </span>openshell-observability
+<p>Keep your overrides in <code>helm-values.yaml</code>. Repeat the install command after
+editing values; change <code>VERSION</code> to a reviewed chart release when upgrading.
+After rotating Secret contents, restart the exporter to reload credentials:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>openshell-observability<span class="w"> </span>rollout<span class="w"> </span>restart<span class="w"> </span>deployment/openshell-exporter
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>kubectl<span class="w"> </span>-n<span class="w"> </span>openshell-observability<span class="w"> </span>rollout<span class="w"> </span>status<span class="w"> </span>deployment/openshell-exporter
 </span></code></pre></div>
-<p>The ConfigMap, Secret, namespace, and StatefulSet PVCs remain. Preserve the PVCs
-for reinstall/recovery; removing the namespace also removes these resources.</p>
+<p>To remove the workload:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>helm<span class="w"> </span>uninstall<span class="w"> </span>openshell-exporter<span class="w"> </span>--namespace<span class="w"> </span>openshell-observability
+</span></code></pre></div>
+<p>The chart retains its PVCs; the manually created Secrets and namespace remain.
+Preserve them for reinstall/recovery. Deleting the namespace also deletes these
+resources. This profile does not install a gateway or collect cluster-wide files.</p>
 
 
 

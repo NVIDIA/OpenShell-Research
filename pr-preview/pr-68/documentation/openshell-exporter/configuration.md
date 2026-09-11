@@ -6,13 +6,31 @@ agent_markdown: true
 
 # Configure sources and delivery
 
-All deployment paths run the same image and accept standard Collector YAML.
-Choose one of these ready-to-edit configurations:
+All deployment paths run the same image. Docker and Podman accept these
+ready-to-edit Collector configurations; the [Helm chart](helm.md) generates its
+configuration from chart values:
 
 | Configuration | Input | Output |
 | --- | --- | --- |
 | [config.yaml](config.yaml) | Local OCSF JSONL files | Normalized recovery records in `/output/events.json`. |
 | [gateway.yaml](gateway.yaml) | WatchSandbox and policy snapshots from an existing gateway | HTTPS CloudEvents plus local recovery records. |
+
+## Full configuration template
+
+Download [template.config.yaml](template.config.yaml) for every exporter-specific
+setting and examples of all included component types. It includes comments for
+credentials, TLS, redaction, Relay/native OTLP, Kubernetes context, durable queues,
+and edge/central forwarding. Advanced upstream transport/parser options are
+outside its scope. Keep the quickstart small; use this reference when extending it.
+
+```sh
+curl -fL https://nvidia.github.io/OpenShell-Research/documentation/openshell-exporter/template.config.yaml -o template.config.yaml
+```
+
+Copy the sections you need into `config.yaml`, remove unused definitions, supply
+the referenced secret files, and validate with the Docker or Podman instructions
+before starting. Helm users configure these capabilities through chart values;
+this Collector template is not a Helm values file.
 
 ## Read existing files
 
@@ -60,8 +78,8 @@ For mTLS, add paired `tls.cert_file` and `tls.key_file` paths. Retain verified T
 do not disable verification to work around a missing CA.
 
 Validate and recreate the container using the [Docker](docker.md) or
-[Podman](podman.md) instructions. For Kubernetes, the [Helm guide](helm.md) mounts
-these same files from a Secret and supplies settings through values.
+[Podman](podman.md) instructions. For Kubernetes, the [Helm guide](helm.md) uses
+separate token and TLS Secrets and supplies settings through chart values.
 
 Generate authorized activity in the selected sandbox and confirm records arrive
 at your destination. Check the recovery file too when running locally. A healthy

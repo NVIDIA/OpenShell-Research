@@ -1548,6 +1548,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#full-configuration-template" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Full configuration template
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#read-existing-files" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1643,6 +1654,17 @@
       On this page
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#full-configuration-template" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Full configuration template
+      </span>
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#read-existing-files" class="md-nav__link">
@@ -1804,8 +1826,9 @@
 
 
 <h1 id="configure-sources-and-delivery">Configure sources and delivery</h1>
-<p>All deployment paths run the same image and accept standard Collector YAML.
-Choose one of these ready-to-edit configurations:</p>
+<p>All deployment paths run the same image. Docker and Podman accept these
+ready-to-edit Collector configurations; the <a href="../helm/">Helm chart</a> generates its
+configuration from chart values:</p>
 <table>
 <thead>
 <tr>
@@ -1827,6 +1850,18 @@ Choose one of these ready-to-edit configurations:</p>
 </tr>
 </tbody>
 </table>
+<h2 id="full-configuration-template">Full configuration template</h2>
+<p>Download <a href="../template.config.yaml">template.config.yaml</a> for every exporter-specific
+setting and examples of all included component types. It includes comments for
+credentials, TLS, redaction, Relay/native OTLP, Kubernetes context, durable queues,
+and edge/central forwarding. Advanced upstream transport/parser options are
+outside its scope. Keep the quickstart small; use this reference when extending it.</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>-fL<span class="w"> </span>https://nvidia.github.io/OpenShell-Research/documentation/openshell-exporter/template.config.yaml<span class="w"> </span>-o<span class="w"> </span>template.config.yaml
+</span></code></pre></div>
+<p>Copy the sections you need into <code>config.yaml</code>, remove unused definitions, supply
+the referenced secret files, and validate with the Docker or Podman instructions
+before starting. Helm users configure these capabilities through chart values;
+this Collector template is not a Helm values file.</p>
 <h2 id="read-existing-files">Read existing files</h2>
 <p>With the starter configuration, place authorized OCSF JSONL files in <code>input/</code>.
 Each file must end in <code>.jsonl</code>, with one JSON object per line. Replace the
@@ -1840,15 +1875,15 @@ forwarder.</p>
 sandbox name, and an HTTPS receiver that accepts CloudEvents JSON batches. This
 setup does not create a gateway, agent, inference route, or destination.</p>
 <p>For Docker or Podman, download the gateway profile as your active configuration:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>-fL<span class="w"> </span>https://nvidia.github.io/OpenShell-Research/documentation/openshell-exporter/gateway.yaml<span class="w"> </span>-o<span class="w"> </span>config.yaml
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>curl<span class="w"> </span>-fL<span class="w"> </span>https://nvidia.github.io/OpenShell-Research/documentation/openshell-exporter/gateway.yaml<span class="w"> </span>-o<span class="w"> </span>config.yaml
 </span></code></pre></div>
 <p>Add these non-secret settings to <code>.env</code>, replacing the examples. Keep the UID/GID
 entries already created by the Docker quickstart:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>OPENSHELL_ENDPOINT=https://gateway.example.com:8080
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>OPENSHELL_GATEWAY_ID=gateway-1
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>OPENSHELL_WORKSPACE=default
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>OPENSHELL_SANDBOX_NAME=my-sandbox
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>OPENSHELL_EXPORT_URL=https://receiver.example.com/v1/events
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>OPENSHELL_ENDPOINT=https://gateway.example.com:8080
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>OPENSHELL_GATEWAY_ID=gateway-1
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>OPENSHELL_WORKSPACE=default
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>OPENSHELL_SANDBOX_NAME=my-sandbox
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>OPENSHELL_EXPORT_URL=https://receiver.example.com/v1/events
 </span></code></pre></div>
 <p>Place the raw gateway token in <code>secrets/gateway-token</code> and the separate raw
 destination token in <code>secrets/destination-token</code>, without the <code>Bearer</code> prefix.
@@ -1860,8 +1895,8 @@ appropriate receiver/exporter, using paths such as <code>/run/secrets/gateway-ca
 For mTLS, add paired <code>tls.cert_file</code> and <code>tls.key_file</code> paths. Retain verified TLS;
 do not disable verification to work around a missing CA.</p>
 <p>Validate and recreate the container using the <a href="../docker/">Docker</a> or
-<a href="../podman/">Podman</a> instructions. For Kubernetes, the <a href="../helm/">Helm guide</a> mounts
-these same files from a Secret and supplies settings through values.</p>
+<a href="../podman/">Podman</a> instructions. For Kubernetes, the <a href="../helm/">Helm guide</a> uses
+separate token and TLS Secrets and supplies settings through chart values.</p>
 <p>Generate authorized activity in the selected sandbox and confirm records arrive
 at your destination. Check the recovery file too when running locally. A healthy
 process does not establish end-to-end delivery.</p>
