@@ -1,11 +1,13 @@
 # OpenShell Agent Runner
 
-OpenShell Agent Runner (OAR) runs an agent task in an isolated OpenShell sandbox
-and saves the result to a file. Use it to review code, review technical writing,
-or run your own tasks from a terminal or CI job.
+OpenShell Agent Runner (OAR) is based on the
+[Pi coding agent](https://github.com/earendil-works/pi/tree/main/packages/coding-agent).
+It runs Pi in an isolated OpenShell sandbox and saves the task's result to a
+file. Use it to review code, review technical writing, or run your own tasks
+from a terminal or CI job.
 
 ```text
-Profile + input → OAR → Agent in a temporary sandbox → Result file
+Profile + input → OAR → Pi in a temporary sandbox → Result file
                             sandbox removed when the run ends
 ```
 
@@ -26,6 +28,14 @@ If OpenShell is not ready, follow its
 [quickstart](https://docs.nvidia.com/openshell/latest/get-started/quickstart).
 OAR uses that setup to create sandboxes and reach your model.
 
+Pi supplies the agent loop, tools, and model client. Each OAR profile supplies
+Pi's `models.json` and `settings.json`; OpenShell supplies the inference route
+and provider credentials. The packaged profiles send OpenAI-compatible Chat
+Completions requests to `https://inference.local/v1`. Your model and endpoint
+must support that API and tool calling. See
+[model and inference configuration](https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/profiles/#configure-pis-model-and-inference)
+for the file formats, reasoning settings, and compatibility options.
+
 **1. Install OAR and check your connection.**
 
 ```bash
@@ -45,8 +55,10 @@ the inference output from `oar doctor`.
 oar init ./profiles --model YOUR_MODEL_ID
 ```
 
-This creates editable copies of both reviewers. For a model without reasoning
-support, add `--thinking off`.
+This creates editable copies of both reviewers and sets the model ID in both
+Pi configuration files. For a model without reasoning support, add
+`--thinking off`; this also sets the model's `reasoning` flag to `false`.
+`init` writes local profiles; configure the inference route through OpenShell.
 
 **3. Review a document.** Replace `./README.md` with an existing text file.
 

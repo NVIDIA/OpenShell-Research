@@ -19,8 +19,8 @@ code-reviewer/
 ├── skills/              Reusable review guidance and rubric
 ├── schemas/review.json   Required shape of the result
 ├── policy.yaml          Sandbox file and network permissions
-├── models.json          Model definition
-└── settings.json        Selected model and thinking level
+├── models.json          Pi model definition and API compatibility
+└── settings.json        Pi provider, model, and thinking level
 ```
 
 | What you want to change | Where to change it |
@@ -30,8 +30,104 @@ code-reviewer/
 | Shared judgment, conventions, or scoring | A skill's `SKILL.md` |
 | Tasks, tools, or which skills are loaded | `profile.yaml` |
 | What the sandbox can access | `policy.yaml` |
-| The model | Keep the ID in `models.json` and `settings.json` in sync with your inference route |
+| The model or inference compatibility | [Pi model and inference configuration](#configure-pis-model-and-inference) in `models.json` and `settings.json` |
 | The result's JSON fields | The schema and the instructions that explain those fields |
+
+## Configure Pi's model and inference
+
+OAR uses the Pi coding agent, so model configuration follows Pi's file formats.
+For each run, OAR copies the profile's `models.json` and `settings.json` into
+Pi's isolated configuration directory inside the sandbox. Your host Pi
+installation, login, and `~/.pi/agent` settings are not used.
+
+Configuration has two parts:
+
+| Configuration | What it controls |
+| --- | --- |
+| OpenShell provider and inference route | The upstream endpoint, credentials, and model served through the selected gateway and workspace. Manage these through OpenShell. |
+| Pi files in the OAR profile | How Pi formats requests, the model it selects, and its reasoning settings. Edit these locally or create them with `oar init`. |
+
+The packaged profiles use this request path:
+
+```text
+Pi → OpenAI-compatible Chat Completions → https://inference.local/v1
+   → OpenShell inference route → configured upstream model
+```
+
+### Model definition
+
+After `oar init ./profiles --model YOUR_MODEL_ID`, each profile's `models.json`
+contains:
+
+```json
+{
+  "providers": {
+    "openshell": {
+      "baseUrl": "https://inference.local/v1",
+      "api": "openai-completions",
+      "apiKey": "unused",
+      "authHeader": true,
+      "compat": {
+        "supportsDeveloperRole": false
+      },
+      "models": [
+        {
+          "id": "YOUR_MODEL_ID",
+          "reasoning": true
+        }
+      ]
+    }
+  }
+}
+```
+
+`openshell` is Pi's provider name within the profile; keep it even when
+OpenShell routes to a differently named upstream provider. OAR requires exactly
+one provider named `openshell` and exactly one model under it.
+
+`baseUrl` points Pi at OpenShell's sandbox inference endpoint. `apiKey: "unused"`
+is a placeholder sent with a bearer authorization header; actual upstream
+credentials belong in OpenShell's provider configuration.
+
+`api: "openai-completions"` selects Pi's OpenAI Chat Completions client. It does
+not require an OpenAI-hosted model, but the routed endpoint must accept that
+protocol and support the tool calls Pi uses. `compat.supportsDeveloperRole:
+false` makes Pi send the system prompt with the `system` role. Other endpoint
+differences may require Pi compatibility options, such as
+`compat.supportsReasoningEffort: false` for a server that rejects
+`reasoning_effort`. Model limits such as `contextWindow` and `maxTokens` also
+belong in `models.json`. See Pi's
+[custom model reference](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/models.md)
+for field definitions. Any API choice must also work with your OpenShell route.
+
+### Model selection and reasoning
+
+The corresponding `settings.json` contains only these three keys:
+
+```json
+{
+  "defaultProvider": "openshell",
+  "defaultModel": "YOUR_MODEL_ID",
+  "defaultThinkingLevel": "high"
+}
+```
+
+OAR checks that `defaultModel` matches the model's `id` in `models.json` and
+passes this provider, model, and thinking level to Pi at launch. Additional Pi
+settings keys are rejected by OAR.
+
+`oar init --thinking off` sets `defaultThinkingLevel` to `off` and the model's
+`reasoning` flag to `false`. Other levels set `reasoning` to `true`; they are
+`minimal`, `low`, `medium`, `high` (the default), `xhigh`, and `max`. Choose a
+level supported by your model and endpoint. These are Pi reasoning settings;
+`init` does not discover model capabilities or test inference.
+
+When changing models, first configure the route in OpenShell and inspect it
+with `oar doctor` using the same gateway and workspace as your run. Update both
+`models.json`'s model `id` and `settings.json`'s `defaultModel` to that model ID,
+then adjust reasoning, limits, and compatibility for the new model. Run
+`oar validate` against the profile and try a task to verify inference; local
+validation and `doctor` do not send model requests.
 
 ## How a task is defined
 
