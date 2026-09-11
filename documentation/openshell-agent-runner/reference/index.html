@@ -1746,7 +1746,10 @@
 <p><code>init</code> creates both profiles by default. Repeat <code>--profile NAME</code> to select
 which ones to create. It refuses to overwrite existing profile directories.
 <code>--thinking</code> accepts <code>off</code>, <code>minimal</code>, <code>low</code>, <code>medium</code>, <code>high</code> (default),
-<code>xhigh</code>, or <code>max</code>; choose a level your model supports.</p>
+<code>xhigh</code>, or <code>max</code>; choose a level your model supports. It sets Pi's
+<code>defaultThinkingLevel</code> and sets the model's <code>reasoning</code> flag to <code>false</code> for
+<code>off</code>, or <code>true</code> otherwise. <code>--model</code> sets the model ID in both Pi files.
+See <a href="../profiles/#configure-pis-model-and-inference">model and inference configuration</a>.</p>
 <p>Use <code>oar COMMAND --help</code> for all options. For a task's inputs, variables, and
 output format, put the profile and task before <code>--help</code>:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>oar<span class="w"> </span>run<span class="w"> </span>./profiles/code-reviewer<span class="w"> </span>--task<span class="w"> </span>review-repository<span class="w"> </span>--help
@@ -1871,7 +1874,7 @@ one result. OAR checks the request before attempting to create the sandbox.</p>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>2. RUN · new OpenShell sandbox
 </span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>   Create using the profile's policy
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>   Upload input, prompt, skills + schema*
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>   Run the agent using gateway inference
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>   Run Pi with the profile's model settings using gateway inference
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>              |
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>              v
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>3. COLLECT · your machine / CI
@@ -1954,7 +1957,7 @@ with <code>0</code>. Read the JSON verdict if your CI policy depends on the revi
 </tr>
 <tr>
 <td>No inference route or model request fails</td>
-<td>Check the route in OpenShell, then the model ID and thinking level in your profile.</td>
+<td>Check the OpenShell route, then <a href="../profiles/#configure-pis-model-and-inference">Pi's model ID, API compatibility, and reasoning settings</a>. The packaged profiles require OpenAI-compatible Chat Completions with tool calling.</td>
 </tr>
 <tr>
 <td><code>init</code> says a profile already exists</td>
