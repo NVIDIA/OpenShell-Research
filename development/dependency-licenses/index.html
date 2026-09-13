@@ -1494,7 +1494,8 @@ container or system packages, unsupported package managers, or dependencies
 that are absent from a supported dependency inventory. A passing check is
 therefore not a complete legal clearance.</p>
 <h2 id="policy-and-unresolved-results">Policy and unresolved results</h2>
-<p>The policy approves a maintained set of open-source licenses. Consult
+<p>The policy approves a maintained set of open-source licenses and records exact
+review decisions for dependencies outside that global list. Consult
 <code>.github/dependency-license-policy.toml</code> for the current policy. License metadata
 that is missing, ambiguous, malformed, or not approved fails the check. Registry
 outages are unresolved rather than being treated as successful lookups. An
@@ -1511,6 +1512,12 @@ forms require reviewed, exact-source clarification.</p>
 Use the exact identity reported by the checker and verify the authoritative
 license evidence. A clarification must still satisfy the approved policy; it
 cannot grant an exception for an unapproved license.</p>
+<p>A maintainer can approve a dependency outside the global list with an exact
+<code>[[exception]]</code>. Each exception identifies the <code>ecosystem</code>, <code>name</code>, and <code>source</code>,
+provides a review <code>reason</code> and HTTPS <code>evidence</code>, and lists the accepted
+<code>version</code>/reported-<code>license</code> pairs. The package fails closed if its source,
+version, or registry-reported license changes. An exception also fails when its
+package is no longer inventoried, so obsolete approvals cannot accumulate.</p>
 <p>PR checks use the base branch's approved list when one exists. A proposed
 allowlist expansion cannot approve its own dependencies. Workflow and checker
 changes still require maintainer review because the workflow cannot protect
@@ -1532,7 +1539,8 @@ dependency licenses.</p>
 resolved version. For Go, <code>go.mod</code> provides the version selection while <code>go.sum</code>
 provides integrity hashes; <code>go.sum</code> is not treated as a lockfile or package
 list. The reported license value comes from that version's public metadata or a
-reviewed policy clarification, not from the dependency file itself.</p>
+reviewed policy clarification, not from the dependency file itself. Exceptions
+approve that exact reported value rather than replacing it.</p>
 <p>For a failure:</p>
 <ol>
 <li>Confirm that the manifest and lockfile contain the intended dependency and
@@ -1540,14 +1548,18 @@ reviewed policy clarification, not from the dependency file itself.</p>
 <li>Check the package registry's exact-version metadata.</li>
 <li>If that metadata is incomplete, add a narrowly scoped clarification backed
    by an authoritative HTTPS source.</li>
+<li>If a maintainer approves a license outside the global list, record a narrow
+   exception for the exact package source, version, and reported license.</li>
 <li>Treat any policy change as a separate maintainer decision. Do not broaden the
-   policy merely to make a check pass.</li>
+   global list merely to make a check pass.</li>
 </ol>
 <h2 id="rollout-and-full-audits">Rollout and full audits</h2>
 <p>An ordinary pull request enforces policy only for direct dependency additions
 and changes, while still reporting all current direct-dependency licenses.
-Editing an existing policy triggers full enforcement, as does manually
-dispatching the workflow without a base revision.</p>
+Changing the global approved list triggers full enforcement. Clarification and
+exception edits recheck the dependencies they name, and stale exceptions always
+fail. Manually dispatching the workflow without a base revision also performs a
+full audit.</p>
 <h2 id="local-checks">Local checks</h2>
 <p>From the repository root, run the pinned command in the workflow's <code>Test checker</code>
 step. Keeping the executable test command in the workflow provides one source of
