@@ -189,13 +189,13 @@ func canonicalCorrelationContext(
 	return result
 }
 
-func setCloudEventAttributes(
-	config *Config,
+func (p *processorImpl) setCloudEventAttributes(
 	record plog.LogRecord,
 	kind string,
 	eventID string,
 	original any,
 ) {
+	config := p.config
 	workspace := stringAttribute(record, "openshell.workspace", config.Workspace)
 	sandboxID := stringAttribute(
 		record,
@@ -211,10 +211,10 @@ func setCloudEventAttributes(
 		"cloudevents.source",
 		fmt.Sprintf(
 			"openshell://%s/workspaces/%s/sandboxes/%s/sources/%s",
-			escape(config.GatewayID),
-			escape(workspace),
-			escape(sandboxID),
-			escape(kind),
+			p.escapeSourceComponent(config.GatewayID),
+			p.escapeSourceComponent(workspace),
+			p.escapeSourceComponent(sandboxID),
+			p.escapeSourceComponent(kind),
 		),
 	)
 	attributes.PutStr("cloudevents.type", eventType(kind, original))
@@ -669,4 +669,11 @@ func stringsToAny(values []string) []any {
 		result[index] = value
 	}
 	return result
+}
+
+// Identity has already been calculated from the pristine source. Redact before
+// escaping so encoded whitespace cannot hide credentials from the patterns.
+func (p *processorImpl) escapeSourceComponent(value string) string {
+	sanitized, _ := p.redactString(value)
+	return escape(sanitized)
 }

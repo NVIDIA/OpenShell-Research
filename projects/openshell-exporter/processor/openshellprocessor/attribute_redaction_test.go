@@ -62,3 +62,52 @@ func TestFullLogSerializationRedactsSourceAttributes(t *testing.T) {
 		t.Fatal("redaction removed non-sensitive context")
 	}
 }
+
+func TestDerivedSourceSerializationRedactsBeforeEncoding(t *testing.T) {
+	for _, field := range []string{"gateway", "workspace", "sandbox", "sandbox_body"} {
+		t.Run(field, func(t *testing.T) {
+			cfg := createDefaultConfig().(*Config)
+			logs := testLogs(t, validOCSF())
+			rec := logs.ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().At(0)
+			switch field {
+			case "gateway":
+				cfg.GatewayID = "Bearer derived-private-token"
+			case "workspace":
+				rec.Attributes().PutStr("openshell.workspace", "Bearer derived-private-token")
+			case "sandbox":
+				rec.Attributes().PutStr("openshell.sandbox.id", "Bearer derived-private-token")
+			case "sandbox_body":
+				rec.Body().Map().PutStr("sandbox_id", "Bearer derived-private-token")
+			}
+			original := plog.NewLogs()
+			logs.CopyTo(original)
+			p, err := newProcessor(cfg, zap.NewNop())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = p.processLogs(context.Background(), logs); err != nil {
+				t.Fatal(err)
+			}
+			encoded, err := (&plog.JSONMarshaler{}).MarshalLogs(logs)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(encoded), "derived-private-token") {
+				t.Error("credential survived in serialized output")
+			}
+			cfg.Redaction.Patterns = nil
+			baseline, err := newProcessor(cfg, zap.NewNop())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = baseline.processLogs(context.Background(), original); err != nil {
+				t.Fatal(err)
+			}
+			id, _ := rec.Attributes().Get("cloudevents.id")
+			prior, _ := original.ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().At(0).Attributes().Get("cloudevents.id")
+			if id.Str() == "" || id.Str() != prior.Str() {
+				t.Error("redaction changed identity")
+			}
+		})
+	}
+}

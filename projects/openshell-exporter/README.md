@@ -10,7 +10,15 @@ For other deployment methods and more advanced features, contact
 
 ## Quickstart: local process
 
-Use Go 1.26.8 and a Bash-compatible shell, from this project directory. The build
+Use [Go 1.26.8](https://go.dev/doc/install) and a Bash-compatible shell. Get the
+source and enter the project directory:
+
+```sh
+git clone https://github.com/NVIDIA/OpenShell-Research.git
+cd OpenShell-Research/projects/openshell-exporter
+```
+
+The build
 downloads public dependencies. This first run uses a synthetic OCSF record; it
 needs no OpenShell gateway, credentials, or model service.
 
@@ -18,7 +26,7 @@ needs no OpenShell gateway, credentials, or model service.
 go build -o bin/openshell-event-exporter ./cmd/openshell-event-exporter
 mkdir -p input state output
 chmod 700 state output
-printf '%s\n' '{"class_uid":4001,"category_uid":4,"activity_id":1,"type_uid":400101,"time":1789120800000,"metadata":{"uid":"quickstart-1"},"message":"OpenShell exporter quickstart"}' > input/example.jsonl
+printf '%s\n' '{"class_uid":4001,"category_uid":4,"activity_id":1,"type_uid":400101,"time":1789120800000,"metadata":{"uid":"quickstart-1","version":"1.8.0"},"message":"OpenShell exporter quickstart"}' > input/example.jsonl
 ./bin/openshell-event-exporter validate --config config.yaml
 ./bin/openshell-event-exporter --config config.yaml
 ```
@@ -46,6 +54,10 @@ docker run --rm --name openshell-exporter \
   -v "$PWD/state:/work/state" -v "$PWD/output:/work/output" \
   openshell-event-exporter:local --config /work/config.yaml
 ```
+
+The image health check probes `127.0.0.1:13133`; retain that port inside the
+container. Its optional `healthcheck --writable DIRECTORY ...` command checks
+persistence-directory permissions.
 
 Use the same health and output checks. With existing checkpoints the example is
 not replayed; append a new record to test more delivery. Stop with

@@ -201,15 +201,22 @@ func (p *processorImpl) processTraces(ctx context.Context, traces ptrace.Traces)
 				}
 				for eventIndex := 0; eventIndex < span.Events().Len(); eventIndex++ {
 					event := span.Events().At(eventIndex)
+					sanitizeCorrelationIdentifiers(event.Attributes())
 					p.metrics.recordRemoved(ctx, "event", p.filter(event.Attributes()))
 					if p.config.Privacy.Mode == privacyAllow {
 						event.SetName("relay.event")
 					}
 				}
 				for linkIndex := 0; linkIndex < span.Links().Len(); linkIndex++ {
-					p.metrics.recordRemoved(ctx, "link", p.filter(span.Links().At(linkIndex).Attributes()))
+					link := span.Links().At(linkIndex)
+					sanitizeCorrelationIdentifiers(link.Attributes())
+					p.metrics.recordRemoved(ctx, "link", p.filter(link.Attributes()))
+					if p.config.Privacy.Mode == privacyAllow {
+						link.TraceState().FromRaw("")
+					}
 				}
 			}
+			sanitizeCorrelationIdentifiers(scopeSpans.Scope().Attributes())
 			p.metrics.recordRemoved(ctx, "scope", p.filter(scopeSpans.Scope().Attributes()))
 		}
 		p.metrics.recordRemoved(ctx, "resource", p.filter(resource))

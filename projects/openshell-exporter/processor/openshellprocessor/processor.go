@@ -170,7 +170,7 @@ func (p *processorImpl) normalize(ctx context.Context, record plog.LogRecord) {
 	}
 	p.metrics.observeSource(ctx, kind)
 	p.metrics.record(ctx, kind, validation, redactionCount, p.config.Redaction.ProfileID)
-	setCloudEventAttributes(p.config, record, kind, eventID, original)
+	p.setCloudEventAttributes(record, kind, eventID, original)
 	switch validation.Status {
 	case validationInvalid:
 		record.Attributes().PutBool("openshell.ocsf.valid", false)

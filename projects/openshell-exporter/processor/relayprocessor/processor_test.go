@@ -541,3 +541,45 @@ func BenchmarkRelayAllowListProcessing(b *testing.B) {
 		}
 	}
 }
+
+func TestPrivacyCoversEveryTraceContainer(t *testing.T) {
+	for _, container := range []string{"resource", "span", "scope", "event", "link"} {
+		t.Run(container, func(t *testing.T) {
+			traces := ptrace.NewTraces()
+			rs := traces.ResourceSpans().AppendEmpty()
+			ss := rs.ScopeSpans().AppendEmpty()
+			span := ss.Spans().AppendEmpty()
+			span.SetTraceID(pcommon.TraceID{1})
+			span.SetSpanID(pcommon.SpanID{1})
+			event := span.Events().AppendEmpty()
+			link := span.Links().AppendEmpty()
+			link.TraceState().FromRaw("vendor=trace-private-token")
+			attrs := map[string]pcommon.Map{"resource": rs.Resource().Attributes(), "span": span.Attributes(), "scope": ss.Scope().Attributes(), "event": event.Attributes(), "link": link.Attributes()}[container]
+			attrs.PutStr("request_id", "Bearer trace-private-token")
+			attrs.PutStr("tool_call_id", "safe-call-1")
+			p, err := newProcessor(createDefaultConfig().(*Config), zap.NewNop(), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = p.processTraces(context.Background(), traces); err != nil {
+				t.Fatal(err)
+			}
+			encoded, err := (&ptrace.JSONMarshaler{}).MarshalTraces(traces)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if bytes.Contains(encoded, []byte("trace-private-token")) {
+				t.Error("protected metadata or trace state leaked")
+			}
+			if value, exists := attrs.Get("request_id"); exists && value.Str() == "Bearer trace-private-token" {
+				t.Error("unsafe protected identifier retained")
+			}
+			if link.TraceState().AsRaw() != "" {
+				t.Error("link trace state retained")
+			}
+			if value, ok := attrs.Get("tool_call_id"); !ok || value.Str() != "safe-call-1" {
+				t.Error("safe correlation lost")
+			}
+		})
+	}
+}

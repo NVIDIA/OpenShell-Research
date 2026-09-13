@@ -366,3 +366,32 @@ type roundTripFunc func(*http.Request) (*http.Response, error)
 func (fn roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
 	return fn(request)
 }
+
+func TestPermanentSplitRejectionDoesNotSkipLaterBatches(t *testing.T) {
+	for _, laterStatus := range []int{http.StatusAccepted, http.StatusServiceUnavailable} {
+		t.Run(fmt.Sprint(laterStatus), func(t *testing.T) {
+			calls := 0
+			implementation := testExporter(&http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				calls++
+				if calls == 1 {
+					return response(http.StatusBadRequest), nil
+				}
+				return response(laterStatus), nil
+			})})
+			implementation.config.MaxEvents = 1
+			logs := oneLog(t, map[string]any{"first": "rejected"})
+			records := logs.ResourceLogs().At(0).ScopeLogs().At(0).LogRecords()
+			records.AppendEmpty().Body().SetStr("valid later record")
+			err := implementation.pushLogs(context.Background(), logs)
+			if calls != 2 {
+				t.Fatalf("attempted %d batches, want 2", calls)
+			}
+			if err == nil {
+				t.Fatal("rejection must be reported")
+			}
+			if consumererror.IsPermanent(err) != (laterStatus == http.StatusAccepted) {
+				t.Fatalf("wrong retry classification: %v", err)
+			}
+		})
+	}
+}

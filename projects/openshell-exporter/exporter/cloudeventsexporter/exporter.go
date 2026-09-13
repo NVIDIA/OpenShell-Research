@@ -92,6 +92,17 @@ func (e *cloudEventsExporter) pushLogs(ctx context.Context, logs plog.Logs) erro
 		}
 	}
 
+	// Permanent rejection applies to one HTTP batch, not unattempted records.
+	// Transient failures still retry the queued input, including accepted batches.
+	var permanentErrors []error
+	send := func(batch [][]byte) error {
+		err := e.sendBatch(ctx, batch)
+		if consumererror.IsPermanent(err) {
+			permanentErrors = append(permanentErrors, err)
+			return nil
+		}
+		return err
+	}
 	batch := make([][]byte, 0, e.config.MaxEvents)
 	batchBytes := 2
 	for _, event := range encodedEvents {
@@ -101,7 +112,7 @@ func (e *cloudEventsExporter) pushLogs(ctx context.Context, logs plog.Logs) erro
 		}
 		if len(batch) >= e.config.MaxEvents ||
 			(len(batch) > 0 && nextBytes > e.config.MaxRequestBytes) {
-			if err := e.sendBatch(ctx, batch); err != nil {
+			if err := send(batch); err != nil {
 				return err
 			}
 			batch = batch[:0]
@@ -112,7 +123,7 @@ func (e *cloudEventsExporter) pushLogs(ctx context.Context, logs plog.Logs) erro
 		batchBytes = nextBytes
 	}
 	if len(batch) > 0 {
-		if err := e.sendBatch(ctx, batch); err != nil {
+		if err := send(batch); err != nil {
 			return err
 		}
 	}
@@ -128,10 +139,13 @@ func (e *cloudEventsExporter) pushLogs(ctx context.Context, logs plog.Logs) erro
 			zap.Int("max_event_bytes", e.config.MaxEventBytes),
 			zap.Int("max_request_bytes", e.config.MaxRequestBytes),
 		)
-		return consumererror.NewPermanent(fmt.Errorf(
+		permanentErrors = append(permanentErrors, fmt.Errorf(
 			"%d CloudEvents exceed webhook size limits",
 			oversizedCount,
 		))
+	}
+	if len(permanentErrors) > 0 {
+		return consumererror.NewPermanent(errors.Join(permanentErrors...))
 	}
 	return nil
 }

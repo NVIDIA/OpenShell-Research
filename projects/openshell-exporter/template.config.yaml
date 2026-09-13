@@ -571,7 +571,7 @@ exporters:
     protocol:
       otlp:
         auth:
-          authenticator: bearertokenauth/otlp_destination
+          authenticator: bearertokenauth/internal
         tls:
           ca_file: /run/secrets/internal-ca.pem
           cert_file: /run/secrets/edge.crt
@@ -604,6 +604,9 @@ service:
   extensions:
   - file_storage/checkpoints
   - health_check
+  # Edge-to-central: uncomment BOTH entries when using load_balancing/internal.
+  # - bearertokenauth/internal
+  # - file_storage/internal_queue
   pipelines:
     logs/files:
       receivers:

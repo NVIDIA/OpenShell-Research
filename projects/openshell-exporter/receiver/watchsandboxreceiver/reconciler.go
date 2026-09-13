@@ -196,9 +196,10 @@ func (r *watchReceiver) reconcileSandbox(parent context.Context, request reconci
 		logs, convertErr := draftSnapshotLogs(r.config, request.Sandbox, r.gatewayVersion, draft, metadata)
 		if convertErr != nil {
 			r.recordPolicyConversionFailure(ctx, request, "openshell.v1.OpenShell/GetDraftPolicy", convertErr)
-		} else if eventChanged(state.DraftHash, logs) {
-			if r.deliverPolicyLogs(ctx, logs) {
-				state.DraftHash = policyEventHash(logs)
+		} else {
+			hash := policyEventHash(logs)
+			if hash != state.DraftHash && r.deliverPolicyLogs(ctx, logs) {
+				state.DraftHash = hash
 				changed = true
 			}
 		}
@@ -232,9 +233,12 @@ func (r *watchReceiver) reconcileSandbox(parent context.Context, request reconci
 		logs, convertErr := policyStatusLogs(r.config, request.Sandbox, r.gatewayVersion, policyStatus, metadata)
 		if convertErr != nil {
 			r.recordPolicyConversionFailure(ctx, request, "openshell.v1.OpenShell/GetSandboxPolicyStatus", convertErr)
-		} else if eventChanged(state.StatusHash, logs) && r.deliverPolicyLogs(ctx, logs) {
-			state.StatusHash = policyEventHash(logs)
-			changed = true
+		} else {
+			hash := policyEventHash(logs)
+			if hash != state.StatusHash && r.deliverPolicyLogs(ctx, logs) {
+				state.StatusHash = hash
+				changed = true
+			}
 		}
 	}
 
@@ -463,10 +467,6 @@ func attributeRaw(record plog.LogRecord, key string) any {
 		return nil
 	}
 	return value.AsRaw()
-}
-
-func eventChanged(previous string, logs plog.Logs) bool {
-	return previous != policyEventHash(logs)
 }
 
 func draftConsistency(notification uint64, draft interface{ GetDraftVersion() uint64 }) string {

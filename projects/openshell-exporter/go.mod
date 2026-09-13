@@ -40,6 +40,7 @@ require (
 	go.opentelemetry.io/collector/processor v1.66.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.160.0
 	go.opentelemetry.io/collector/processor/processorhelper v0.160.0
+	go.opentelemetry.io/collector/processor/processortest v0.160.0
 	go.opentelemetry.io/collector/receiver v1.66.0
 	go.opentelemetry.io/collector/receiver/otlpreceiver v0.160.0
 	go.opentelemetry.io/collector/service v0.160.0
@@ -215,7 +216,6 @@ require (
 	go.opentelemetry.io/collector/pipeline v1.66.0 // indirect
 	go.opentelemetry.io/collector/pipeline/xpipeline v0.160.0 // indirect
 	go.opentelemetry.io/collector/processor/processorhelper/xprocessorhelper v0.160.0 // indirect
-	go.opentelemetry.io/collector/processor/processortest v0.160.0 // indirect
 	go.opentelemetry.io/collector/processor/xprocessor v0.160.0 // indirect
 	go.opentelemetry.io/collector/receiver/receiverhelper v0.160.0 // indirect
 	go.opentelemetry.io/collector/receiver/receivertest v0.160.0 // indirect

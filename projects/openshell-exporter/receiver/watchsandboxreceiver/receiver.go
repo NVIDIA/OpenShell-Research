@@ -347,7 +347,11 @@ func (r *watchReceiver) consumeWithBackpressure(
 ) error {
 	delay := time.Second
 	for {
-		if err := r.next.ConsumeLogs(ctx, logs); err == nil {
+		// Downstream processors may mutate their input even when delivery fails.
+		// Retain the receiver-owned evidence for retries and checkpoint hashes.
+		attempt := plog.NewLogs()
+		logs.CopyTo(attempt)
+		if err := r.next.ConsumeLogs(ctx, attempt); err == nil {
 			return nil
 		} else if consumererror.IsPermanent(err) {
 			return err
