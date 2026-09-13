@@ -307,6 +307,34 @@ def load_policy(content: str, approved_override: list[str] | None = None) -> dic
                 f"clarification for {key.name} must still satisfy approved licenses"
             )
         seen.add(key)
+    exception_seen = set()
+    for entry in policy.get("exception", []):
+        identity = tuple(entry[field] for field in ("ecosystem", "name", "source"))
+        if identity in exception_seen or not all(identity):
+            raise ValueError(
+                "exceptions require unique exact ecosystem/name/source identities"
+            )
+        if not entry.get("reason", "").strip():
+            raise ValueError(f"exception for {identity[1]} requires a review reason")
+        if not entry.get("evidence", "").startswith("https://"):
+            raise ValueError(f"exception for {identity[1]} requires an HTTPS evidence URL")
+        reports = entry.get("reports")
+        if not isinstance(reports, list) or not reports:
+            raise ValueError(
+                f"exception for {identity[1]} requires version/license reports"
+            )
+        report_seen = set()
+        for report in reports:
+            report_identity = (report.get("version"), report.get("license"))
+            if (
+                not all(isinstance(value, str) and value.strip() for value in report_identity)
+                or report_identity in report_seen
+            ):
+                raise ValueError(
+                    f"exception for {identity[1]} requires unique non-empty version/license reports"
+                )
+            report_seen.add(report_identity)
+        exception_seen.add(identity)
     return policy
 
 
@@ -401,12 +429,42 @@ def check_dependency(dependency: Dependency, policy: dict) -> dict:
                 break
         else:
             expression = package_license(dependency)
-        passed = allowed_expression(expression, policy["approved"])
-        reason = (
-            "approved"
-            if passed
-            else "missing, ambiguous, malformed, or unapproved license"
+        exception = next(
+            (
+                entry
+                for entry in policy.get("exception", [])
+                if all(
+                    entry[key] == getattr(dependency, key)
+                    for key in ("ecosystem", "name", "source")
+                )
+            ),
+            None,
         )
+        if exception is not None:
+            evidence = exception["evidence"]
+            approved_reports = {
+                (report["version"], report["license"])
+                for report in exception["reports"]
+            }
+            passed = (dependency.version, expression) in approved_reports
+            if passed:
+                reason = f"reviewed exception: {exception['reason']}"
+            else:
+                expected = ", ".join(
+                    f"{version} with {license_name!r}"
+                    for version, license_name in sorted(approved_reports)
+                )
+                reason = (
+                    f"exception does not approve {expression!r}; expected one of: "
+                    f"{expected}"
+                )
+        else:
+            passed = allowed_expression(expression, policy["approved"])
+            reason = (
+                "approved"
+                if passed
+                else "missing, ambiguous, malformed, or unapproved license"
+            )
     except (OSError, ValueError, KeyError, TypeError) as error:
         passed, reason = False, f"metadata unresolved: {error}"
     return {
@@ -428,6 +486,50 @@ def check_dependencies(
             lambda dependency: check_dependency(dependency, policy), ordered
         )
     return dict(zip(ordered, results, strict=True))
+
+
+def policy_scoped_dependencies(
+    dependencies: dict[Dependency, list[str]], *policies: dict | None
+) -> set[Dependency]:
+    """Return current dependencies named by a clarification or exception."""
+    exact = set()
+    exception_identities = set()
+    for policy in policies:
+        if policy is None:
+            continue
+        exact.update(
+            Dependency(
+                *(entry[field] for field in ("ecosystem", "name", "version", "source"))
+            )
+            for entry in policy.get("clarification", [])
+        )
+        exception_identities.update(
+            tuple(entry[field] for field in ("ecosystem", "name", "source"))
+            for entry in policy.get("exception", [])
+        )
+    return {
+        dependency
+        for dependency in dependencies
+        if dependency in exact
+        or (dependency.ecosystem, dependency.name, dependency.source)
+        in exception_identities
+    }
+
+
+def stale_exception_failures(
+    policy: dict, dependencies: dict[Dependency, list[str]]
+) -> list[str]:
+    """Reject exception entries whose package identity is no longer inventoried."""
+    present = {
+        (dependency.ecosystem, dependency.name, dependency.source)
+        for dependency in dependencies
+    }
+    return [
+        f"{entry['ecosystem']}:{entry['name']}: stale exception; dependency is not present"
+        for entry in policy.get("exception", [])
+        if tuple(entry[field] for field in ("ecosystem", "name", "source"))
+        not in present
+    ]
 
 
 def git_text(root: Path, *args: str) -> str:
@@ -720,7 +822,7 @@ def main() -> int:
     parser.add_argument(
         "--approved-policy",
         type=Path,
-        help="Base-branch policy providing the approved list; head clarifications cannot expand it",
+        help="Base-branch policy providing the approved list; the head cannot expand it",
     )
     parser.add_argument("--report", type=Path)
     parser.add_argument(
@@ -730,12 +832,27 @@ def main() -> int:
     )
     args = parser.parse_args()
     try:
+        policy_content = args.policy.read_text()
+        head_policy = load_policy(policy_content)
+        base_policy_exists = bool(
+            args.base
+            and git_text(
+                args.repo, "ls-tree", "--name-only", args.base, "--", POLICY_PATH
+            ).strip()
+        )
+        base_policy = (
+            load_policy(git_text(args.repo, "show", f"{args.base}:{POLICY_PATH}"))
+            if base_policy_exists
+            else None
+        )
         approved = (
             load_policy(args.approved_policy.read_text())["approved"]
             if args.approved_policy
+            else base_policy["approved"]
+            if base_policy
             else None
         )
-        policy = load_policy(args.policy.read_text(), approved_override=approved)
+        policy = load_policy(policy_content, approved_override=approved)
         before = revision_files(args.repo, args.base) if args.base else {}
         after = revision_files(args.repo, args.head)
         changed = (
@@ -745,19 +862,20 @@ def main() -> int:
             if args.base
             else []
         )
-        policy_existed = bool(
-            args.base
-            and POLICY_PATH in changed
-            and git_text(
-                args.repo, "ls-tree", "--name-only", args.base, "--", POLICY_PATH
-            ).strip()
+        approved_changed = bool(
+            base_policy and head_policy["approved"] != base_policy["approved"]
         )
-        full = not args.base or policy_existed
+        full = not args.base or approved_changed
         lock_checks = check_manifest_coverage(args.repo, args.base, args.head, changed)
         if args.lock_checks_report:
             args.lock_checks_report.write_text(json.dumps(lock_checks, indent=2) + "\n")
         selected = select_dependencies(before, after, full=full)
         repository_dependencies = select_dependencies({}, after, full=True)
+        if POLICY_PATH in changed:
+            for dependency in policy_scoped_dependencies(
+                repository_dependencies, base_policy, policy
+            ):
+                selected.setdefault(dependency, repository_dependencies[dependency])
         checked = check_dependencies(repository_dependencies, policy)
         for dependency in sorted(selected):
             result = {**checked[dependency], "lockfiles": selected[dependency]}
@@ -768,7 +886,12 @@ def main() -> int:
         report = report_summary(after, repository_dependencies, checked, selected)
         if args.report:
             args.report.write_text(json.dumps(report, indent=2) + "\n")
-        failed = sum(not checked[dependency]["passed"] for dependency in selected)
+        stale_failures = stale_exception_failures(policy, repository_dependencies)
+        for failure in stale_failures:
+            print(f"FAIL {failure}")
+        failed = sum(
+            not checked[dependency]["passed"] for dependency in selected
+        ) + len(stale_failures)
         print(
             f"Checked {len(selected)} enforced dependencies; "
             f"{failed} require resolution."

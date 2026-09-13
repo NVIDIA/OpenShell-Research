@@ -554,6 +554,7 @@ def test_unapproved_unknown_malformed_and_ambiguous():
         "BSD",
         "",
         "UNKNOWN",
+        "LGPL-2.1-or-later",
         "MIT AND",
         "MIT AND GPL-3.0-only",
         "LicenseRef-Private",
@@ -794,6 +795,89 @@ def test_policy_does_not_allow_clarifications_to_bypass_allowlist():
         )
 
 
+def test_reviewed_exception_approves_only_exact_version_source_and_license():
+    exception = {
+        "ecosystem": DEPENDENCY.ecosystem,
+        "name": DEPENDENCY.name,
+        "source": DEPENDENCY.source,
+        "reason": "Reviewed separately.",
+        "evidence": "https://example.org/v1.0/LICENSE",
+        "reports": [{"version": "1.0", "license": "LGPL-2.1-or-later"}],
+    }
+    policy = {**POLICY, "exception": [exception]}
+    with mock.patch.object(
+        checker, "package_license", return_value="LGPL-2.1-or-later"
+    ):
+        result = checker.check_dependency(DEPENDENCY, policy)
+        assert_true(result["passed"])
+        assert_equal(result["evidence"], exception["evidence"])
+        assert_equal(result["reason"], "reviewed exception: Reviewed separately.")
+
+        changed_version = checker.Dependency(
+            DEPENDENCY.ecosystem, DEPENDENCY.name, "2.0", DEPENDENCY.source
+        )
+        changed_source = checker.Dependency(
+            DEPENDENCY.ecosystem, DEPENDENCY.name, DEPENDENCY.version, "different"
+        )
+        assert_false(checker.check_dependency(changed_version, policy)["passed"])
+        assert_false(checker.check_dependency(changed_source, policy)["passed"])
+
+    with mock.patch.object(
+        checker, "package_license", return_value="GPL-3.0-only"
+    ):
+        result = checker.check_dependency(DEPENDENCY, policy)
+        assert_false(result["passed"])
+        assert "exception does not approve" in result["reason"]
+
+
+def test_policy_rejects_malformed_or_duplicate_exceptions():
+    base = 'approved = ["MIT"]\n'
+    entry = '''
+[[exception]]
+ecosystem = "pypi"
+name = "example"
+source = "exact"
+reason = "Reviewed separately."
+evidence = "https://example.org/LICENSE"
+reports = [{ version = "1", license = "LGPL-2.1-or-later" }]
+'''
+    checker.load_policy(base + entry)
+    with pytest.raises(ValueError, match="unique exact"):
+        checker.load_policy(base + entry + entry)
+    with pytest.raises(ValueError, match="HTTPS"):
+        checker.load_policy(base + entry.replace("https://", "http://"))
+    with pytest.raises(ValueError, match="review reason"):
+        checker.load_policy(base + entry.replace("Reviewed separately.", ""))
+    with pytest.raises(ValueError, match="version/license reports"):
+        checker.load_policy(
+            base + entry.replace(
+                'reports = [{ version = "1", license = "LGPL-2.1-or-later" }]',
+                "reports = []",
+            )
+        )
+
+
+def test_policy_edits_recheck_scoped_dependencies_and_reject_stale_exceptions():
+    exception = {
+        "ecosystem": DEPENDENCY.ecosystem,
+        "name": DEPENDENCY.name,
+        "source": DEPENDENCY.source,
+        "reason": "Reviewed separately.",
+        "evidence": "https://example.org/v1.0/LICENSE",
+        "reports": [{"version": "1.0", "license": "LGPL-2.1-or-later"}],
+    }
+    policy = {**POLICY, "exception": [exception], "clarification": []}
+    dependencies = {DEPENDENCY: ["uv.lock"]}
+    assert_equal(
+        checker.policy_scoped_dependencies(dependencies, policy), {DEPENDENCY}
+    )
+    assert_equal(checker.stale_exception_failures(policy, dependencies), [])
+    assert_equal(
+        checker.stale_exception_failures(policy, {}),
+        ["pypi:example: stale exception; dependency is not present"],
+    )
+
+
 def test_base_approved_list_cannot_be_expanded_by_head():
     policy = checker.load_policy(
         'approved = ["MIT", "GPL-3.0-only"]', approved_override=["MIT"]
@@ -824,6 +908,8 @@ def test_cli_uses_git_revisions_not_uncommitted_files():
         (root / "uv.lock").write_text("uncommitted invalid file")
         report = root / "report.json"
         lock_checks_report = root / "lock-checks.json"
+        policy_path = root / "policy.toml"
+        policy_path.write_text('approved = ["MIT"]\n')
         args = [
             "check",
             "--repo",
@@ -831,7 +917,7 @@ def test_cli_uses_git_revisions_not_uncommitted_files():
             "--base",
             base,
             "--policy",
-            str(ROOT / checker.POLICY_PATH),
+            str(policy_path),
             "--report",
             str(report),
             "--lock-checks-report",
@@ -864,7 +950,7 @@ def test_cli_uses_git_revisions_not_uncommitted_files():
         assert_equal(failed_report["failures"], {".": ["GPL-3.0-only"]})
 
 
-def test_first_policy_introduction_is_delta_then_policy_edits_are_full():
+def test_first_policy_introduction_is_delta_then_allowlist_edits_are_full():
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
 

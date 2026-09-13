@@ -67,7 +67,8 @@ therefore not a complete legal clearance.
 
 ## Policy and unresolved results
 
-The policy approves a maintained set of open-source licenses. Consult
+The policy approves a maintained set of open-source licenses and records exact
+review decisions for dependencies outside that global list. Consult
 `.github/dependency-license-policy.toml` for the current policy. License metadata
 that is missing, ambiguous, malformed, or not approved fails the check. Registry
 outages are unresolved rather than being treated as successful lookups. An
@@ -86,6 +87,13 @@ If metadata is incomplete, a maintainer can add a `[[clarification]]` entry with
 Use the exact identity reported by the checker and verify the authoritative
 license evidence. A clarification must still satisfy the approved policy; it
 cannot grant an exception for an unapproved license.
+
+A maintainer can approve a dependency outside the global list with an exact
+`[[exception]]`. Each exception identifies the `ecosystem`, `name`, and `source`,
+provides a review `reason` and HTTPS `evidence`, and lists the accepted
+`version`/reported-`license` pairs. The package fails closed if its source,
+version, or registry-reported license changes. An exception also fails when its
+package is no longer inventoried, so obsolete approvals cannot accumulate.
 
 PR checks use the base branch's approved list when one exists. A proposed
 allowlist expansion cannot approve its own dependencies. Workflow and checker
@@ -111,7 +119,8 @@ The dependency inventory identifies each direct dependency and its exact
 resolved version. For Go, `go.mod` provides the version selection while `go.sum`
 provides integrity hashes; `go.sum` is not treated as a lockfile or package
 list. The reported license value comes from that version's public metadata or a
-reviewed policy clarification, not from the dependency file itself.
+reviewed policy clarification, not from the dependency file itself. Exceptions
+approve that exact reported value rather than replacing it.
 
 For a failure:
 
@@ -120,15 +129,19 @@ For a failure:
 2. Check the package registry's exact-version metadata.
 3. If that metadata is incomplete, add a narrowly scoped clarification backed
    by an authoritative HTTPS source.
-4. Treat any policy change as a separate maintainer decision. Do not broaden the
-   policy merely to make a check pass.
+4. If a maintainer approves a license outside the global list, record a narrow
+   exception for the exact package source, version, and reported license.
+5. Treat any policy change as a separate maintainer decision. Do not broaden the
+   global list merely to make a check pass.
 
 ## Rollout and full audits
 
 An ordinary pull request enforces policy only for direct dependency additions
 and changes, while still reporting all current direct-dependency licenses.
-Editing an existing policy triggers full enforcement, as does manually
-dispatching the workflow without a base revision.
+Changing the global approved list triggers full enforcement. Clarification and
+exception edits recheck the dependencies they name, and stale exceptions always
+fail. Manually dispatching the workflow without a base revision also performs a
+full audit.
 
 ## Local checks
 
