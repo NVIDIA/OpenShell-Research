@@ -1,0 +1,7 @@
+/bin/
+/state/
+/output/
+/input/
+/secrets/
+.env
+*.local.yaml
