@@ -542,6 +542,74 @@ func BenchmarkRelayAllowListProcessing(b *testing.B) {
 	}
 }
 
+func TestAllowModeRejectsInputCorrelationMarkers(t *testing.T) {
+	for _, container := range []string{"resource", "scope", "event", "link"} {
+		for _, key := range []string{"openshell.correlation.status", "openshell.correlation.invalid", "openshell.correlation.missing"} {
+			for _, complete := range []bool{false, true} {
+				status := "partial"
+				if complete {
+					status = "complete"
+				}
+				t.Run(container+"/"+key+"/"+status, func(t *testing.T) {
+					const secret = "Bearer review-private-token"
+					traces := ptrace.NewTraces()
+					rs := traces.ResourceSpans().AppendEmpty()
+					rs.Resource().Attributes().PutStr("openshell.sandbox.id", "sandbox-1")
+					ss := rs.ScopeSpans().AppendEmpty()
+					span := ss.Spans().AppendEmpty()
+					span.SetTraceID(pcommon.TraceID{1})
+					span.SetSpanID(pcommon.SpanID{1})
+					// Span input markers must also be replaced by normalization.
+					for _, marker := range []string{"openshell.correlation.status", "openshell.correlation.invalid", "openshell.correlation.missing"} {
+						span.Attributes().PutStr(marker, secret)
+					}
+					if complete {
+						span.Attributes().PutStr("agent.session.id", "session-1")
+					} else {
+						span.Attributes().PutStr("agent.session.id", secret)
+					}
+					event := span.Events().AppendEmpty()
+					link := span.Links().AppendEmpty()
+					attrs := map[string]pcommon.Map{"resource": rs.Resource().Attributes(), "scope": ss.Scope().Attributes(), "event": event.Attributes(), "link": link.Attributes()}[container]
+					attrs.PutStr(key, secret)
+					attrs.PutStr("tool_call_id", "safe-call-1")
+					p, err := newProcessor(createDefaultConfig().(*Config), zap.NewNop(), nil)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if _, err = p.processTraces(context.Background(), traces); err != nil {
+						t.Fatal(err)
+					}
+					encoded, err := (&ptrace.JSONMarshaler{}).MarshalTraces(traces)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if bytes.Contains(encoded, []byte("review-private-token")) {
+						t.Error("input correlation marker leaked in serialized telemetry")
+					}
+					if _, exists := attrs.Get(key); exists {
+						t.Error("input correlation marker retained outside span")
+					}
+					assertString(t, attrs, "tool_call_id", "safe-call-1")
+					assertString(t, span.Attributes(), "openshell.sandbox.id", "sandbox-1")
+					assertString(t, span.Attributes(), "openshell.correlation.status", status)
+					if complete {
+						assertString(t, span.Attributes(), "agent.session.id", "session-1")
+						for _, marker := range []string{"openshell.correlation.invalid", "openshell.correlation.missing"} {
+							if _, exists := span.Attributes().Get(marker); exists {
+								t.Errorf("complete span retained %s", marker)
+							}
+						}
+					} else {
+						assertString(t, span.Attributes(), "openshell.correlation.invalid", "agent.session.id")
+						assertString(t, span.Attributes(), "openshell.correlation.missing", "agent.session.id")
+					}
+				})
+			}
+		}
+	}
+}
+
 func TestPrivacyCoversEveryTraceContainer(t *testing.T) {
 	for _, container := range []string{"resource", "span", "scope", "event", "link"} {
 		t.Run(container, func(t *testing.T) {

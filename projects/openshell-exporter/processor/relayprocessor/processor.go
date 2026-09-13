@@ -191,7 +191,7 @@ func (p *processorImpl) processTraces(ctx context.Context, traces ptrace.Traces)
 				span := spans.At(spanIndex)
 				status := p.normalize(resource, span.Attributes(), traceContexts[span.TraceID().String()], span.TraceID(), resourceInvalid)
 				p.metrics.recordSpan(ctx, status, p.config.Privacy.Mode)
-				p.metrics.recordRemoved(ctx, "span", p.filter(span.Attributes()))
+				p.metrics.recordRemoved(ctx, "span", p.filter(span.Attributes(), true))
 				span.Status().SetMessage("")
 				if p.config.Privacy.Mode == privacyAllow {
 					if p.config.CanonicalizeSpanNames {
@@ -202,7 +202,7 @@ func (p *processorImpl) processTraces(ctx context.Context, traces ptrace.Traces)
 				for eventIndex := 0; eventIndex < span.Events().Len(); eventIndex++ {
 					event := span.Events().At(eventIndex)
 					sanitizeCorrelationIdentifiers(event.Attributes())
-					p.metrics.recordRemoved(ctx, "event", p.filter(event.Attributes()))
+					p.metrics.recordRemoved(ctx, "event", p.filter(event.Attributes(), false))
 					if p.config.Privacy.Mode == privacyAllow {
 						event.SetName("relay.event")
 					}
@@ -210,16 +210,16 @@ func (p *processorImpl) processTraces(ctx context.Context, traces ptrace.Traces)
 				for linkIndex := 0; linkIndex < span.Links().Len(); linkIndex++ {
 					link := span.Links().At(linkIndex)
 					sanitizeCorrelationIdentifiers(link.Attributes())
-					p.metrics.recordRemoved(ctx, "link", p.filter(link.Attributes()))
+					p.metrics.recordRemoved(ctx, "link", p.filter(link.Attributes(), false))
 					if p.config.Privacy.Mode == privacyAllow {
 						link.TraceState().FromRaw("")
 					}
 				}
 			}
 			sanitizeCorrelationIdentifiers(scopeSpans.Scope().Attributes())
-			p.metrics.recordRemoved(ctx, "scope", p.filter(scopeSpans.Scope().Attributes()))
+			p.metrics.recordRemoved(ctx, "scope", p.filter(scopeSpans.Scope().Attributes(), false))
 		}
-		p.metrics.recordRemoved(ctx, "resource", p.filter(resource))
+		p.metrics.recordRemoved(ctx, "resource", p.filter(resource, false))
 		p.metrics.observeSource(ctx, source)
 	}
 	return traces, nil
@@ -467,7 +467,9 @@ func firstValue(key string, maps ...pcommon.Map) (pcommon.Value, bool) {
 	return pcommon.Value{}, false
 }
 
-func (p *processorImpl) filter(attributes pcommon.Map) int {
+// normalizedSpan is true only for span attributes after normalize has regenerated
+// the internal correlation markers. In allow mode, other containers cannot supply them.
+func (p *processorImpl) filter(attributes pcommon.Map, normalizedSpan bool) int {
 	removed := 0
 	keys := make([]string, 0, attributes.Len())
 	attributes.Range(func(key string, _ pcommon.Value) bool {
@@ -476,6 +478,14 @@ func (p *processorImpl) filter(attributes pcommon.Map) int {
 	})
 	sort.Strings(keys)
 	for _, key := range keys {
+		if p.config.Privacy.Mode == privacyAllow && !normalizedSpan {
+			switch key {
+			case "openshell.correlation.status", "openshell.correlation.invalid", "openshell.correlation.missing":
+				attributes.Remove(key)
+				removed++
+				continue
+			}
+		}
 		if _, protected := protectedAttributes[key]; protected {
 			continue
 		}
