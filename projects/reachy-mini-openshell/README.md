@@ -26,7 +26,7 @@ Start here: OpenAI Realtime + the Reachy Mini simulator.
 Requirements:
 
 - macOS
-- Python 3.10, 3.11, or 3.12. Python 3.12 is recommended.
+- Python 3.11 or 3.12. Python 3.12 is recommended.
 - `uv`
 - `OPENAI_API_KEY` exported in the shell that starts the app, with access to
   the OpenAI Realtime API
