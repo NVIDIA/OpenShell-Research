@@ -13,6 +13,8 @@ Current projects:
   horizons and repeated parallel attempts, starting with GitHub policy review.
 - `openshell-middleware-manager`: `omm` CLI that creates and updates version-matched
   Python and Rust OpenShell supervisor middleware projects.
+- `pi-admission`: Standalone Pi example that admits content before history writes
+  and verifies signed approval receipts at OpenShell network egress.
 - `python-project-template`: Minimal, production-ready Python project scaffold
   managed with uv.
 - `reachy-mini-openshell`: Reachy Mini conversation demo for OpenShell.

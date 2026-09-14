@@ -1,0 +1,106 @@
+name: Pi admission
+
+"on":
+  pull_request:
+    paths:
+      - ".github/workflows/pi-admission.yml"
+      - "projects/pi-admission/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/pi-admission.yml"
+      - "projects/pi-admission/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pi-admission-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: projects/pi-admission
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.11.31"
+          python-version: "3.11"
+
+      - name: Install locked dependencies
+        run: uv sync --frozen
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+  rust:
+    name: Rust middleware
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: projects/pi-admission/middleware
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Rust
+        run: |
+          rustup toolchain install 1.90.0 --profile minimal --no-self-update
+          rustup default 1.90.0
+          rustup component add clippy rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Lint
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+
+      - name: Test
+        run: cargo test --locked
+
+  typescript:
+    name: TypeScript harness
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: projects/pi-admission/pi-harness
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.22.2"
+          cache: npm
+          cache-dependency-path: projects/pi-admission/pi-harness/package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Type-check
+        run: npm run check
+
+      - name: Build and test
+        run: |
+          npm run build
+          npm test
