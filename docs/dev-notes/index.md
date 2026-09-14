@@ -41,8 +41,8 @@ hide:
           <time datetime="2026-09-10">September 10, 2026</time>
           <span>OpenShell</span>
         </div>
-        <h3>Learning Formal Methods by Building an Agent Policy Prover</h3>
-        <p class="dev-note-card__summary">A practical introduction to Z3, policy containment, and the questions we are exploring in OpenShell.</p>
+        <h3>What we have learned applying formal methods to control AI agents</h3>
+        <p class="dev-note-card__summary">An intro to using formal methods to reason about permission changes in long-running AI agents.</p>
         <div class="dev-note-card__tags" aria-label="Tags">
           <span>formal-methods</span>
           <span>z3</span>
