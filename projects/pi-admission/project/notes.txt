@@ -1,0 +1,2 @@
+This is a real file in the sandbox project.
+alice@example.com is synthetic data for the example email replacement rule.
