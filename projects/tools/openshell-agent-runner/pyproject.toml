@@ -59,6 +59,7 @@ packages = ["src/openshell_agent_runner"]
 
 [tool.hatch.build.targets.sdist]
 include = [
+  "/assets",
   "/src/openshell_agent_runner",
   "/LICENSE",
   "/README.md",

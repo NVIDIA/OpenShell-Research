@@ -1,0 +1,19 @@
+{
+  "activity_id": 1,
+  "category_uid": 4,
+  "class_uid": 4001,
+  "message": "CONNECT denied api.example.com:443",
+  "metadata": {
+    "product": {
+      "name": "OpenShell"
+    },
+    "version": "1.8.0"
+  },
+  "severity_id": 4,
+  "time": 1786377600000,
+	"unmapped": {
+		"request_id": "request-fixture-1",
+		"sandbox_id": "sandbox-fixture-1"
+	},
+  "type_uid": 400101
+}

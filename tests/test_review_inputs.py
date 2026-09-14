@@ -104,7 +104,7 @@ class ReviewInputTests(unittest.TestCase):
         )
         self.assertTrue((self.checkout / "file link.txt").is_symlink())
 
-    def test_diff_matches_exact_commits_and_reports_submodule(self):
+    def test_change_summary_matches_exact_commits_and_reports_submodule(self):
         (self.checkout / "README.md").write_text("Revised note.\n")
         (self.checkout / "new document.txt").write_text("New document.\n")
         self.git("add", ".")
@@ -117,12 +117,13 @@ class ReviewInputTests(unittest.TestCase):
         head = self.commit(stage=False)
         result = self.prepare(head)
         self.assertEqual(result.returncode, 0, result.stderr)
-        patch = (self.output / "review-context/changes.patch").read_text().strip()
-        self.assertEqual(
-            patch,
-            self.git("diff", "--no-ext-diff", "--no-textconv", f"{self.base}...{head}"),
-        )
-        self.assertIn("+Revised note.", patch)
+        summary = (self.output / "review-context/changes-summary.txt").read_text()
+        self.assertIn("Changed files:\n", summary)
+        self.assertIn("M\tREADME.md", summary)
+        self.assertIn("A\tnew document.txt", summary)
+        self.assertIn("Diff statistics:\n", summary)
+        self.assertIn("README.md", summary)
+        self.assertNotIn("+Revised note.", summary)
         self.assertEqual(
             (self.output / "source/new document.txt").read_text(), "New document.\n"
         )

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shlex
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -24,16 +25,19 @@ from urllib.request import Request, urlopen
 import tomllib
 
 POLICY_PATH = ".github/dependency-license-policy.toml"
-LOCK_NAMES = {"uv.lock", "package-lock.json", "Cargo.lock"}
+GO_MODULE_SOURCE = "https://proxy.golang.org"
+LOCK_NAMES = {"uv.lock", "package-lock.json", "Cargo.lock", "go.mod"}
 MANIFEST_LOCKS = {
     "pyproject.toml": "uv.lock",
     "package.json": "package-lock.json",
     "Cargo.toml": "Cargo.lock",
+    "go.mod": "go.sum",
 }
 MANIFEST_MANAGERS = {
     "pyproject.toml": "uv",
     "package.json": "npm",
     "Cargo.toml": "cargo",
+    "go.mod": "go",
 }
 
 
@@ -45,9 +49,74 @@ class Dependency:
     source: str
 
 
+def go_mod_requirements(content: str) -> list[tuple[str, str, bool]]:
+    """Return effective external Go requirements and whether each is indirect."""
+    requirements = []
+    replacements: dict[tuple[str, str], tuple[str, str] | None] = {}
+    block = ""
+    for line_number, raw_line in enumerate(content.splitlines(), 1):
+        code, _, comment = raw_line.partition("//")
+        try:
+            lexer = shlex.shlex(code, posix=True, punctuation_chars="()=>")
+            lexer.commenters = ""
+            lexer.whitespace_split = True
+            tokens = list(lexer)
+        except ValueError as error:
+            raise ValueError(f"go.mod:{line_number}: {error}") from error
+        if not tokens:
+            continue
+        if block:
+            if tokens == [")"]:
+                block = ""
+                continue
+            directive, values = block, tokens
+        else:
+            directive, values = tokens[0], tokens[1:]
+            if values == ["("]:
+                if directive not in ("require", "replace"):
+                    continue
+                block = directive
+                continue
+        if directive == "require":
+            if len(values) != 2:
+                raise ValueError(
+                    f"go.mod:{line_number}: require needs a module and version"
+                )
+            requirements.append((values[0], values[1], comment.strip() == "indirect"))
+        elif directive == "replace":
+            if "=>" not in values:
+                raise ValueError(f"go.mod:{line_number}: replace is missing =>")
+            separator = values.index("=>")
+            old, new = values[:separator], values[separator + 1 :]
+            if len(old) not in (1, 2) or len(new) not in (1, 2):
+                raise ValueError(f"go.mod:{line_number}: invalid replace directive")
+            replacements[(old[0], old[1] if len(old) == 2 else "")] = (
+                (new[0], new[1]) if len(new) == 2 else None
+            )
+    if block:
+        raise ValueError(f"go.mod: unterminated {block} block")
+
+    result = []
+    for name, version, indirect in requirements:
+        replacement = replacements.get((name, version), replacements.get((name, "")))
+        if replacement is None and (
+            (name, version) in replacements or (name, "") in replacements
+        ):
+            continue  # A local replacement is repository-controlled source.
+        if replacement:
+            name, version = replacement
+        result.append((name, version, indirect))
+    return result
+
+
 def inventory(path: str, content: str) -> set[Dependency]:
     """Include every locked external package, irrespective of groups or platform."""
     result = set()
+    if Path(path).name == "go.mod":
+        return {
+            Dependency("go", name, version, GO_MODULE_SOURCE)
+            for name, version, _ in go_mod_requirements(content)
+        }
     if Path(path).name == "package-lock.json":
         lock = json.loads(content)
         if lock.get("lockfileVersion") not in (2, 3) or "packages" not in lock:
@@ -102,6 +171,12 @@ def inventory(path: str, content: str) -> set[Dependency]:
 
 def direct_inventory(path: str, content: str) -> set[Dependency]:
     """Return locked packages declared directly by the project or script."""
+    if Path(path).name == "go.mod":
+        return {
+            Dependency("go", name, version, GO_MODULE_SOURCE)
+            for name, version, indirect in go_mod_requirements(content)
+            if not indirect
+        }
     lock = (
         json.loads(content)
         if Path(path).name == "package-lock.json"
@@ -232,6 +307,34 @@ def load_policy(content: str, approved_override: list[str] | None = None) -> dic
                 f"clarification for {key.name} must still satisfy approved licenses"
             )
         seen.add(key)
+    exception_seen = set()
+    for entry in policy.get("exception", []):
+        identity = tuple(entry[field] for field in ("ecosystem", "name", "source"))
+        if identity in exception_seen or not all(identity):
+            raise ValueError(
+                "exceptions require unique exact ecosystem/name/source identities"
+            )
+        if not entry.get("reason", "").strip():
+            raise ValueError(f"exception for {identity[1]} requires a review reason")
+        if not entry.get("evidence", "").startswith("https://"):
+            raise ValueError(f"exception for {identity[1]} requires an HTTPS evidence URL")
+        reports = entry.get("reports")
+        if not isinstance(reports, list) or not reports:
+            raise ValueError(
+                f"exception for {identity[1]} requires version/license reports"
+            )
+        report_seen = set()
+        for report in reports:
+            report_identity = (report.get("version"), report.get("license"))
+            if (
+                not all(isinstance(value, str) and value.strip() for value in report_identity)
+                or report_identity in report_seen
+            ):
+                raise ValueError(
+                    f"exception for {identity[1]} requires unique non-empty version/license reports"
+                )
+            report_seen.add(report_identity)
+        exception_seen.add(identity)
     return policy
 
 
@@ -275,6 +378,29 @@ def package_license(dependency: Dependency) -> str:
         if info.get("dist", {}).get("tarball") != dependency.source:
             raise ValueError("registry tarball does not match locked source")
         return info.get("license") or ""
+    if dependency.ecosystem == "go":
+        if dependency.source != GO_MODULE_SOURCE:
+            raise ValueError(
+                "unsupported Go source; provide an exact-source clarification"
+            )
+        info = fetch_json(
+            f"https://api.deps.dev/v3/systems/GO/packages/{name}/versions/{version}"
+        )
+        key = info.get("versionKey", {})
+        if (
+            key.get("system") != "GO"
+            or key.get("name") != dependency.name
+            or key.get("version") != dependency.version
+        ):
+            raise ValueError("deps.dev response does not match requested Go module")
+        licenses = info.get("licenses", [])
+        if not isinstance(licenses, list) or any(
+            not isinstance(value, str) or not value.strip() for value in licenses
+        ):
+            raise ValueError("invalid deps.dev license metadata")
+        if len(licenses) == 1:
+            return licenses[0]
+        return " AND ".join(f"({value})" for value in licenses)
     if dependency.source not in (
         "registry+https://github.com/rust-lang/crates.io-index",
         "sparse+https://index.crates.io/",
@@ -303,12 +429,42 @@ def check_dependency(dependency: Dependency, policy: dict) -> dict:
                 break
         else:
             expression = package_license(dependency)
-        passed = allowed_expression(expression, policy["approved"])
-        reason = (
-            "approved"
-            if passed
-            else "missing, ambiguous, malformed, or unapproved license"
+        exception = next(
+            (
+                entry
+                for entry in policy.get("exception", [])
+                if all(
+                    entry[key] == getattr(dependency, key)
+                    for key in ("ecosystem", "name", "source")
+                )
+            ),
+            None,
         )
+        if exception is not None:
+            evidence = exception["evidence"]
+            approved_reports = {
+                (report["version"], report["license"])
+                for report in exception["reports"]
+            }
+            passed = (dependency.version, expression) in approved_reports
+            if passed:
+                reason = f"reviewed exception: {exception['reason']}"
+            else:
+                expected = ", ".join(
+                    f"{version} with {license_name!r}"
+                    for version, license_name in sorted(approved_reports)
+                )
+                reason = (
+                    f"exception does not approve {expression!r}; expected one of: "
+                    f"{expected}"
+                )
+        else:
+            passed = allowed_expression(expression, policy["approved"])
+            reason = (
+                "approved"
+                if passed
+                else "missing, ambiguous, malformed, or unapproved license"
+            )
     except (OSError, ValueError, KeyError, TypeError) as error:
         passed, reason = False, f"metadata unresolved: {error}"
     return {
@@ -332,8 +488,78 @@ def check_dependencies(
     return dict(zip(ordered, results, strict=True))
 
 
+def policy_scoped_dependencies(
+    dependencies: dict[Dependency, list[str]], *policies: dict | None
+) -> set[Dependency]:
+    """Return current dependencies named by a clarification or exception."""
+    exact = set()
+    exception_identities = set()
+    for policy in policies:
+        if policy is None:
+            continue
+        exact.update(
+            Dependency(
+                *(entry[field] for field in ("ecosystem", "name", "version", "source"))
+            )
+            for entry in policy.get("clarification", [])
+        )
+        exception_identities.update(
+            tuple(entry[field] for field in ("ecosystem", "name", "source"))
+            for entry in policy.get("exception", [])
+        )
+    return {
+        dependency
+        for dependency in dependencies
+        if dependency in exact
+        or (dependency.ecosystem, dependency.name, dependency.source)
+        in exception_identities
+    }
+
+
+def stale_exception_failures(
+    policy: dict, dependencies: dict[Dependency, list[str]]
+) -> list[str]:
+    """Reject exception entries whose package identity is no longer inventoried."""
+    present = {
+        (dependency.ecosystem, dependency.name, dependency.source)
+        for dependency in dependencies
+    }
+    return [
+        f"{entry['ecosystem']}:{entry['name']}: stale exception; dependency is not present"
+        for entry in policy.get("exception", [])
+        if tuple(entry[field] for field in ("ecosystem", "name", "source"))
+        not in present
+    ]
+
+
 def git_text(root: Path, *args: str) -> str:
     return subprocess.check_output(["git", "-C", str(root), *args], text=True)
+
+
+def changed_paths(root: Path, base: str, head: str) -> tuple[list[str], dict[str, str]]:
+    """Return materially changed current paths and Git-detected rename origins."""
+    fields = git_text(
+        root, "diff", "--name-status", "--find-renames", "-z", base, head
+    ).split("\0")
+    changed = []
+    renamed = {}
+    index = 0
+    while index < len(fields) and fields[index]:
+        status = fields[index]
+        index += 1
+        if status[0] in ("R", "C"):
+            previous, current = fields[index : index + 2]
+            index += 2
+            if status[0] == "R":
+                renamed[current] = previous
+                if status != "R100":
+                    changed.append(current)
+            else:
+                changed.append(current)
+        else:
+            changed.append(fields[index])
+            index += 1
+    return changed, renamed
 
 
 def revision_files(root: Path, revision: str) -> dict[str, str]:
@@ -365,6 +591,8 @@ def manifest_dependencies(name: str, data: dict) -> list:
                 "target",
             )
         ] + [data.get("workspace")]
+    if name == "go.mod":
+        raise AssertionError("Go module dependencies are parsed from source text")
     return [
         data.get(key)
         for key in (
@@ -400,7 +628,11 @@ def script_metadata(content: str) -> dict | None:
 
 
 def check_manifest_coverage(
-    root: Path, base: str | None, head: str, changed: list[str]
+    root: Path,
+    base: str | None,
+    head: str,
+    changed: list[str],
+    renamed: dict[str, str] | None = None,
 ) -> list[dict[str, str]]:
     """Reject missing inventories and identify native lock-freshness checks.
 
@@ -409,6 +641,7 @@ def check_manifest_coverage(
     """
     from fnmatch import fnmatch
 
+    renamed = renamed or {}
     paths = set(git_text(root, "ls-tree", "-r", "--name-only", "-z", head).split("\0"))
     base_paths = (
         set(git_text(root, "ls-tree", "-r", "--name-only", "-z", base).split("\0"))
@@ -437,11 +670,13 @@ def check_manifest_coverage(
                 candidates.add((Path(path).parent / manifest_name).as_posix())
     for path in sorted(candidates & paths):
         manifest = Path(path)
+        previous_path = renamed.get(path, path)
+        had_previous = previous_path in base_paths
         if manifest.suffix == ".py":
             metadata = script_metadata(git_text(root, "show", f"{head}:{path}"))
             previous_metadata = (
-                script_metadata(git_text(root, "show", f"{base}:{path}"))
-                if path in base_paths
+                script_metadata(git_text(root, "show", f"{base}:{previous_path}"))
+                if had_previous
                 else None
             )
             lock_path = f"{path}.lock"
@@ -452,7 +687,7 @@ def check_manifest_coverage(
             if not has_dependencies:
                 continue
             if (
-                path in base_paths
+                had_previous
                 and lock_path not in changed
                 and previous_metadata == metadata
             ):
@@ -466,17 +701,25 @@ def check_manifest_coverage(
         if manifest.name not in MANIFEST_LOCKS:
             continue
         content = git_text(root, "show", f"{head}:{path}")
-        parse = json.loads if manifest.name == "package.json" else tomllib.loads
-        dependencies = manifest_dependencies(manifest.name, parse(content))
+        if manifest.name == "go.mod":
+            parse = None
+            dependencies = [go_mod_requirements(content)]
+        else:
+            parse = json.loads if manifest.name == "package.json" else tomllib.loads
+            dependencies = manifest_dependencies(manifest.name, parse(content))
         lock_name = MANIFEST_LOCKS[manifest.name]
         direct_lock = (manifest.parent / lock_name).as_posix()
-        previous_dependencies = (
-            manifest_dependencies(
-                manifest.name, parse(git_text(root, "show", f"{base}:{path}"))
+        if not had_previous:
+            previous_dependencies = []
+        elif manifest.name == "go.mod":
+            previous_dependencies = [
+                go_mod_requirements(git_text(root, "show", f"{base}:{previous_path}"))
+            ]
+        else:
+            previous_dependencies = manifest_dependencies(
+                manifest.name,
+                parse(git_text(root, "show", f"{base}:{previous_path}")),
             )
-            if path in base_paths
-            else []
-        )
         if (
             not any(dependencies)
             and not any(previous_dependencies)
@@ -484,7 +727,7 @@ def check_manifest_coverage(
         ):
             continue
         if (
-            path in base_paths
+            had_previous
             and direct_lock not in changed
             and previous_dependencies == dependencies
         ):
@@ -508,6 +751,8 @@ def check_manifest_coverage(
                 if manifest.name == "package.json"
                 else tomllib.loads(workspace_content)
             )
+            if manifest.name == "go.mod":
+                continue  # Go workspaces still keep dependency files per module.
             if manifest.name == "package.json":
                 members = workspace.get("workspaces", [])
             elif manifest.name == "pyproject.toml":
@@ -551,6 +796,17 @@ def select_dependencies(
         for dependency in direct_inventory(path, content) - previous:
             selected.setdefault(dependency, []).append(path)
     return selected
+
+
+def align_renamed_files(
+    before: dict[str, str], after: dict[str, str], renamed: dict[str, str]
+) -> dict[str, str]:
+    """Expose prior contents at their renamed paths for dependency comparison."""
+    aligned = dict(before)
+    for current, previous in renamed.items():
+        if current in after and previous in before:
+            aligned[current] = before[previous]
+    return aligned
 
 
 def report_summary(
@@ -611,7 +867,7 @@ def main() -> int:
     parser.add_argument(
         "--approved-policy",
         type=Path,
-        help="Base-branch policy providing the approved list; head clarifications cannot expand it",
+        help="Base-branch policy providing the approved list; the head cannot expand it",
     )
     parser.add_argument("--report", type=Path)
     parser.add_argument(
@@ -621,34 +877,50 @@ def main() -> int:
     )
     args = parser.parse_args()
     try:
-        approved = (
-            load_policy(args.approved_policy.read_text())["approved"]
-            if args.approved_policy
-            else None
-        )
-        policy = load_policy(args.policy.read_text(), approved_override=approved)
-        before = revision_files(args.repo, args.base) if args.base else {}
-        after = revision_files(args.repo, args.head)
-        changed = (
-            git_text(
-                args.repo, "diff", "--name-only", args.base, args.head
-            ).splitlines()
-            if args.base
-            else []
-        )
-        policy_existed = bool(
+        policy_content = args.policy.read_text()
+        head_policy = load_policy(policy_content)
+        base_policy_exists = bool(
             args.base
-            and POLICY_PATH in changed
             and git_text(
                 args.repo, "ls-tree", "--name-only", args.base, "--", POLICY_PATH
             ).strip()
         )
-        full = not args.base or policy_existed
-        lock_checks = check_manifest_coverage(args.repo, args.base, args.head, changed)
+        base_policy = (
+            load_policy(git_text(args.repo, "show", f"{args.base}:{POLICY_PATH}"))
+            if base_policy_exists
+            else None
+        )
+        approved = (
+            load_policy(args.approved_policy.read_text())["approved"]
+            if args.approved_policy
+            else base_policy["approved"]
+            if base_policy
+            else None
+        )
+        policy = load_policy(policy_content, approved_override=approved)
+        before = revision_files(args.repo, args.base) if args.base else {}
+        after = revision_files(args.repo, args.head)
+        changed, renamed = (
+            changed_paths(args.repo, args.base, args.head) if args.base else ([], {})
+        )
+        approved_changed = bool(
+            base_policy and head_policy["approved"] != base_policy["approved"]
+        )
+        full = not args.base or approved_changed
+        lock_checks = check_manifest_coverage(
+            args.repo, args.base, args.head, changed, renamed
+        )
         if args.lock_checks_report:
             args.lock_checks_report.write_text(json.dumps(lock_checks, indent=2) + "\n")
-        selected = select_dependencies(before, after, full=full)
+        selected = select_dependencies(
+            align_renamed_files(before, after, renamed), after, full=full
+        )
         repository_dependencies = select_dependencies({}, after, full=True)
+        if POLICY_PATH in changed:
+            for dependency in policy_scoped_dependencies(
+                repository_dependencies, base_policy, policy
+            ):
+                selected.setdefault(dependency, repository_dependencies[dependency])
         checked = check_dependencies(repository_dependencies, policy)
         for dependency in sorted(selected):
             result = {**checked[dependency], "lockfiles": selected[dependency]}
@@ -659,7 +931,12 @@ def main() -> int:
         report = report_summary(after, repository_dependencies, checked, selected)
         if args.report:
             args.report.write_text(json.dumps(report, indent=2) + "\n")
-        failed = sum(not checked[dependency]["passed"] for dependency in selected)
+        stale_failures = stale_exception_failures(policy, repository_dependencies)
+        for failure in stale_failures:
+            print(f"FAIL {failure}")
+        failed = sum(
+            not checked[dependency]["passed"] for dependency in selected
+        ) + len(stale_failures)
         print(
             f"Checked {len(selected)} enforced dependencies; "
             f"{failed} require resolution."

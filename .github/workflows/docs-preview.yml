@@ -57,7 +57,7 @@ jobs:
             const docsChanged = files.some(
               ({ filename }) => filename.startsWith('docs/') ||
                 filename.startsWith('overrides/') ||
-                /^projects\/[^/]+\/docs\//.test(filename) ||
+                /^projects\/[^/]+\/(docs|assets)\//.test(filename) ||
                 exactInputs.has(filename),
             );
             core.setOutput('operation', docsChanged ? 'deploy' : 'remove');

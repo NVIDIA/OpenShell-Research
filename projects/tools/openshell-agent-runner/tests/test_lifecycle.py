@@ -314,12 +314,14 @@ def test_keep_sandbox_reports_name_after_artifact_failure(
 
 
 def test_timeout_cleans_owned_sandbox(tmp_path: Path, monkeypatch) -> None:
+    from openshell_agent_runner.errors import ExecutionTimeoutError
+
     profile, executable, state, _ = prepare(tmp_path, monkeypatch)
     monkeypatch.setenv("FAKE_SLEEP_CREATE", "1")
     item = replace(
         request(profile, executable, tmp_path / "result.json"), timeout_seconds=1
     )
-    with pytest.raises(ExecutionError):
+    with pytest.raises(ExecutionTimeoutError, match="timed out after 1 seconds"):
         run_agent(item)
     assert not state.exists()
 

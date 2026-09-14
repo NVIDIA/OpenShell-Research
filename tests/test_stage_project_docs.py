@@ -81,5 +81,38 @@ class StageProjectDocsTests(unittest.TestCase):
                 STAGER.stage_project_docs(source, destination)
 
 
+def test_stage_includes_project_assets_without_changing_canonical_docs(tmp_path):
+    source = tmp_path / "project" / "docs"
+    assets = tmp_path / "project" / "assets"
+    destination = tmp_path / "published"
+    (source / "assets").mkdir(parents=True)
+    assets.mkdir()
+    (source / "index.md").write_text('<img src="assets/logo.svg">')
+    (source / "assets" / "diagram.svg").write_text("<svg/>")
+    (assets / "logo.svg").write_text('<svg id="logo"/>')
+
+    STAGER.stage_project_docs(source, destination, assets)
+
+    assert (destination / "assets" / "logo.svg").read_bytes() == (
+        assets / "logo.svg"
+    ).read_bytes()
+    assert (destination / "assets" / "diagram.svg").is_file()
+    assert not (source / "assets" / "logo.svg").exists()
+
+
+def test_stage_rejects_conflicting_project_assets(tmp_path):
+    import pytest
+
+    source = tmp_path / "docs"
+    assets = tmp_path / "assets"
+    (source / "assets").mkdir(parents=True)
+    assets.mkdir()
+    (source / "assets" / "logo.svg").write_text("<svg/>")
+    (assets / "logo.svg").write_text("<svg/>")
+
+    with pytest.raises(ValueError, match="conflicts"):
+        STAGER.stage_project_docs(source, tmp_path / "published", assets)
+
+
 if __name__ == "__main__":
     unittest.main()

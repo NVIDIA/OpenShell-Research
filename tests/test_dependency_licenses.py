@@ -51,6 +51,13 @@ def uv_script(*dependencies):
     return f"# /// script\n# dependencies = {dependency_list}\n# ///\n"
 
 
+def go_mod(*requirements):
+    lines = ["module example.com/root", "", "go 1.26.0", "", "require ("]
+    lines.extend(f"\t{requirement}" for requirement in requirements)
+    lines.append(")")
+    return "\n".join(lines) + "\n"
+
+
 def assert_equal(actual, expected):
     assert actual == expected
 
@@ -63,7 +70,7 @@ def assert_true(value):
     assert value
 
 
-def check_coverage(before, after, base="base"):
+def check_coverage(before, after, base="base", renamed=None):
     changed = sorted(
         path
         for path in before.keys() | after.keys()
@@ -78,7 +85,23 @@ def check_coverage(before, after, base="base"):
         return (before if revision == "base" else after)[path]
 
     with mock.patch.object(checker, "git_text", side_effect=git_text):
-        return checker.check_manifest_coverage(ROOT, base, "head", changed)
+        return checker.check_manifest_coverage(
+            ROOT, base, "head", changed, renamed=renamed
+        )
+
+
+def test_changed_paths_tracks_renames_without_treating_copies_as_moves():
+    output = (
+        "M\0plain file\0R100\0old/path\0new/path\0"
+        "R099\0old/edited\0new/edited\0"
+        "C100\0source/path\0copied/path\0D\0gone/path\0"
+    )
+    with mock.patch.object(checker, "git_text", return_value=output):
+        changed, renamed = checker.changed_paths(ROOT, "base", "head")
+    assert_equal(changed, ["plain file", "new/edited", "copied/path", "gone/path"])
+    assert_equal(
+        renamed, {"new/path": "old/path", "new/edited": "old/edited"}
+    )
 
 
 def test_native_check_targets_for_direct_projects():
@@ -91,6 +114,7 @@ def test_native_check_targets_for_direct_projects():
             "npm",
         ),
         ("Cargo.toml", "Cargo.lock", '[dependencies]\nexample="1"', "cargo"),
+        ("go.mod", "go.sum", go_mod("example.com/module v1.0.0"), "go"),
     ]:
         targets = check_coverage(
             {}, {f"project/{manifest}": content, f"project/{lock}": "inventory"}
@@ -107,6 +131,14 @@ def test_native_check_targets_for_changed_lock_only_and_no_changes():
     assert_equal(
         check_coverage(before, {**before, "uv.lock": uv_lock("2.0")}),
         [{"directory": ".", "manager": "uv"}],
+    )
+    go_before = {
+        "go.mod": go_mod("example.com/module v1.0.0"),
+        "go.sum": "old sums",
+    }
+    assert_equal(
+        check_coverage(go_before, {**go_before, "go.sum": "new sums"}),
+        [{"directory": ".", "manager": "go"}],
     )
 
 
@@ -169,6 +201,7 @@ def test_added_dependency_manifest_requires_lockfile():
         "new/pyproject.toml": '[project]\ndependencies=["example"]',
         "new/package.json": '{"dependencies":{"example":"1"}}',
         "new/Cargo.toml": '[dependencies]\nexample="1"',
+        "new/go.mod": go_mod("example.com/module v1.0.0"),
     }
     for path, content in manifests.items():
         with pytest.raises(ValueError, match="no .* inventory"):
@@ -211,6 +244,16 @@ def test_non_dependency_manifest_changes_do_not_require_new_inventory():
         {"pyproject.toml": '[project]\nname="new"\ndependencies=["example"]'},
     )
     check_coverage({}, {"pyproject.toml": '[project]\nname="stdlib-only"'})
+    check_coverage({}, {"go.mod": "module example.com/stdlib-only\ngo 1.26.0\n"})
+
+
+def test_renamed_dependency_template_does_not_become_a_new_manifest():
+    content = '[project]\ndependencies=["example"]'
+    check_coverage(
+        {"old/templates/pyproject.toml": content},
+        {"new/templates/pyproject.toml": content},
+        renamed={"new/templates/pyproject.toml": "old/templates/pyproject.toml"},
+    )
 
 
 def test_deleting_lockfile_with_remaining_dependencies_fails():
@@ -379,6 +422,65 @@ source = "git+https://example.org/repo#abc"
     )
 
 
+def test_go_inventory_includes_external_requirements_and_applies_replacements():
+    content = (
+        go_mod(
+            "example.com/direct v1.0.0",
+            "example.com/indirect v2.0.0 // indirect",
+            "example.com/local v3.0.0",
+        )
+        + """
+replace example.com/direct => example.com/fork v1.1.0
+replace example.com/local => ./local
+"""
+    )
+    dependencies = checker.inventory("project/go.mod", content)
+    assert_equal(
+        {(item.name, item.version, item.source) for item in dependencies},
+        {
+            ("example.com/fork", "v1.1.0", checker.GO_MODULE_SOURCE),
+            ("example.com/indirect", "v2.0.0", checker.GO_MODULE_SOURCE),
+        },
+    )
+    assert_equal(
+        {item.name for item in checker.direct_inventory("project/go.mod", content)},
+        {"example.com/fork"},
+    )
+
+
+def test_go_inventory_handles_blocks_quotes_and_version_specific_replacements():
+    content = '''module example.com/root
+require "example.com/module" v1.0.0
+replace (
+    example.com/module v0.9.0 => example.com/old-fork v0.9.1
+    example.com/module v1.0.0 => example.com/current-fork v1.0.1
+)
+'''
+    assert_equal(
+        {(item.name, item.version) for item in checker.inventory("go.mod", content)},
+        {("example.com/current-fork", "v1.0.1")},
+    )
+    assert_equal(
+        {
+            (item.name, item.version)
+            for item in checker.inventory(
+                "go.mod", "require(\nexample.com/adjacent v1.2.3\n)\n"
+            )
+        },
+        {("example.com/adjacent", "v1.2.3")},
+    )
+
+
+def test_malformed_go_inventory_fails_closed():
+    for content in (
+        "require example.com/module\n",
+        "replace example.com/module v1.0.0 example.com/fork v1.0.1\n",
+        "require (\nexample.com/module v1.0.0\n",
+    ):
+        with pytest.raises(ValueError):
+            checker.inventory("go.mod", content)
+
+
 def test_direct_inventory_excludes_transitive_dependencies():
     uv_content = (
         uv_lock()
@@ -462,6 +564,13 @@ def test_same_dependency_reports_each_affected_lockfile():
     assert_equal(list(selected.values()), [["a/uv.lock", "b/uv.lock"]])
 
 
+def test_renamed_lockfile_does_not_recheck_unchanged_dependencies():
+    before = {"old/uv.lock": uv_lock()}
+    after = {"new/uv.lock": uv_lock()}
+    aligned = checker.align_renamed_files(before, after, {"new/uv.lock": "old/uv.lock"})
+    assert_false(checker.select_dependencies(aligned, after))
+
+
 def test_approved_licenses_and_boolean_expressions():
     for expression in [
         *POLICY["approved"],
@@ -477,6 +586,7 @@ def test_unapproved_unknown_malformed_and_ambiguous():
         "BSD",
         "",
         "UNKNOWN",
+        "LGPL-2.1-or-later",
         "MIT AND",
         "MIT AND GPL-3.0-only",
         "LicenseRef-Private",
@@ -613,11 +723,62 @@ def test_cargo_reads_exact_version():
     fetch.assert_called_once_with("https://crates.io/api/v1/crates/example/1.0")
 
 
+def test_go_reads_exact_version_and_requires_every_reported_license():
+    dependency = checker.Dependency(
+        "go", "example.com/module", "v1.2.3", checker.GO_MODULE_SOURCE
+    )
+    with mock.patch.object(
+        checker,
+        "fetch_json",
+        return_value={
+            "versionKey": {
+                "system": "GO",
+                "name": dependency.name,
+                "version": dependency.version,
+            },
+            "licenses": ["Apache-2.0", "BSD-3-Clause"],
+        },
+    ) as fetch:
+        result = checker.check_dependency(dependency, POLICY)
+    assert_true(result["passed"])
+    assert_equal(result["license"], "(Apache-2.0) AND (BSD-3-Clause)")
+    fetch.assert_called_once_with(
+        "https://api.deps.dev/v3/systems/GO/packages/example.com%2Fmodule/versions/v1.2.3"
+    )
+
+
+def test_go_rejects_missing_or_mismatched_metadata():
+    dependency = checker.Dependency(
+        "go", "example.com/module", "v1.2.3", checker.GO_MODULE_SOURCE
+    )
+    for response in (
+        {
+            "versionKey": {
+                "system": "GO",
+                "name": dependency.name,
+                "version": dependency.version,
+            },
+            "licenses": [],
+        },
+        {
+            "versionKey": {
+                "system": "GO",
+                "name": dependency.name,
+                "version": "v9.9.9",
+            },
+            "licenses": ["MIT"],
+        },
+    ):
+        with mock.patch.object(checker, "fetch_json", return_value=response):
+            assert_false(checker.check_dependency(dependency, POLICY)["passed"])
+
+
 def test_unknown_sources_never_trigger_arbitrary_network_requests():
     for ecosystem, source in [
         ("pypi", '{"registry":"http://localhost/simple"}'),
         ("npm", "https://registry.npmjs.org.evil.test/pkg.tgz"),
         ("cargo", "git+https://example.org#abc"),
+        ("go", "https://proxy.example.org"),
     ]:
         with (
             mock.patch.object(checker, "fetch_json") as fetch,
@@ -666,6 +827,89 @@ def test_policy_does_not_allow_clarifications_to_bypass_allowlist():
         )
 
 
+def test_reviewed_exception_approves_only_exact_version_source_and_license():
+    exception = {
+        "ecosystem": DEPENDENCY.ecosystem,
+        "name": DEPENDENCY.name,
+        "source": DEPENDENCY.source,
+        "reason": "Reviewed separately.",
+        "evidence": "https://example.org/v1.0/LICENSE",
+        "reports": [{"version": "1.0", "license": "LGPL-2.1-or-later"}],
+    }
+    policy = {**POLICY, "exception": [exception]}
+    with mock.patch.object(
+        checker, "package_license", return_value="LGPL-2.1-or-later"
+    ):
+        result = checker.check_dependency(DEPENDENCY, policy)
+        assert_true(result["passed"])
+        assert_equal(result["evidence"], exception["evidence"])
+        assert_equal(result["reason"], "reviewed exception: Reviewed separately.")
+
+        changed_version = checker.Dependency(
+            DEPENDENCY.ecosystem, DEPENDENCY.name, "2.0", DEPENDENCY.source
+        )
+        changed_source = checker.Dependency(
+            DEPENDENCY.ecosystem, DEPENDENCY.name, DEPENDENCY.version, "different"
+        )
+        assert_false(checker.check_dependency(changed_version, policy)["passed"])
+        assert_false(checker.check_dependency(changed_source, policy)["passed"])
+
+    with mock.patch.object(
+        checker, "package_license", return_value="GPL-3.0-only"
+    ):
+        result = checker.check_dependency(DEPENDENCY, policy)
+        assert_false(result["passed"])
+        assert "exception does not approve" in result["reason"]
+
+
+def test_policy_rejects_malformed_or_duplicate_exceptions():
+    base = 'approved = ["MIT"]\n'
+    entry = '''
+[[exception]]
+ecosystem = "pypi"
+name = "example"
+source = "exact"
+reason = "Reviewed separately."
+evidence = "https://example.org/LICENSE"
+reports = [{ version = "1", license = "LGPL-2.1-or-later" }]
+'''
+    checker.load_policy(base + entry)
+    with pytest.raises(ValueError, match="unique exact"):
+        checker.load_policy(base + entry + entry)
+    with pytest.raises(ValueError, match="HTTPS"):
+        checker.load_policy(base + entry.replace("https://", "http://"))
+    with pytest.raises(ValueError, match="review reason"):
+        checker.load_policy(base + entry.replace("Reviewed separately.", ""))
+    with pytest.raises(ValueError, match="version/license reports"):
+        checker.load_policy(
+            base + entry.replace(
+                'reports = [{ version = "1", license = "LGPL-2.1-or-later" }]',
+                "reports = []",
+            )
+        )
+
+
+def test_policy_edits_recheck_scoped_dependencies_and_reject_stale_exceptions():
+    exception = {
+        "ecosystem": DEPENDENCY.ecosystem,
+        "name": DEPENDENCY.name,
+        "source": DEPENDENCY.source,
+        "reason": "Reviewed separately.",
+        "evidence": "https://example.org/v1.0/LICENSE",
+        "reports": [{"version": "1.0", "license": "LGPL-2.1-or-later"}],
+    }
+    policy = {**POLICY, "exception": [exception], "clarification": []}
+    dependencies = {DEPENDENCY: ["uv.lock"]}
+    assert_equal(
+        checker.policy_scoped_dependencies(dependencies, policy), {DEPENDENCY}
+    )
+    assert_equal(checker.stale_exception_failures(policy, dependencies), [])
+    assert_equal(
+        checker.stale_exception_failures(policy, {}),
+        ["pypi:example: stale exception; dependency is not present"],
+    )
+
+
 def test_base_approved_list_cannot_be_expanded_by_head():
     policy = checker.load_policy(
         'approved = ["MIT", "GPL-3.0-only"]', approved_override=["MIT"]
@@ -696,6 +940,8 @@ def test_cli_uses_git_revisions_not_uncommitted_files():
         (root / "uv.lock").write_text("uncommitted invalid file")
         report = root / "report.json"
         lock_checks_report = root / "lock-checks.json"
+        policy_path = root / "policy.toml"
+        policy_path.write_text('approved = ["MIT"]\n')
         args = [
             "check",
             "--repo",
@@ -703,7 +949,7 @@ def test_cli_uses_git_revisions_not_uncommitted_files():
             "--base",
             base,
             "--policy",
-            str(ROOT / checker.POLICY_PATH),
+            str(policy_path),
             "--report",
             str(report),
             "--lock-checks-report",
@@ -736,7 +982,7 @@ def test_cli_uses_git_revisions_not_uncommitted_files():
         assert_equal(failed_report["failures"], {".": ["GPL-3.0-only"]})
 
 
-def test_first_policy_introduction_is_delta_then_policy_edits_are_full():
+def test_first_policy_introduction_is_delta_then_allowlist_edits_are_full():
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
 

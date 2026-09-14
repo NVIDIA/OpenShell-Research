@@ -4,6 +4,25 @@
 approved = ["Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "MIT", "MIT-CMU"]
 
 # Bare "BSD" is ambiguous and is not an approved SPDX identifier.
-# Clarifications resolve metadata, not policy exceptions. Each must identify
-# the exact ecosystem/name/version/source, an approved license expression,
-# and an HTTPS evidence URL reviewed by a maintainer.
+# Clarifications resolve metadata to an approved license. Exceptions approve a
+# reviewed dependency outside the global allowlist and must match its ecosystem,
+# name, source, version, and exact registry-reported license. Both require HTTPS
+# evidence; exceptions also require a review reason.
+
+[[clarification]]
+ecosystem = "pypi"
+name = "reachy-mini"
+version = "1.10.0"
+source = '{"registry":"https://pypi.org/simple"}'
+license = "Apache-2.0"
+evidence = "https://github.com/pollen-robotics/reachy_mini/blob/v1.10.0/LICENSE"
+
+[[exception]]
+ecosystem = "pypi"
+name = "gstreamer-bundle"
+source = '{"registry":"https://pypi.org/simple"}'
+reason = "Existing macOS runtime dependency reviewed for a security-only version update."
+evidence = "https://pypi.org/project/gstreamer-bundle/1.28.7/"
+reports = [
+    { version = "1.28.7", license = "LGPL-2.1-or-later" },
+]

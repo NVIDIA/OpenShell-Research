@@ -16,6 +16,8 @@ including how to declare its kind for automated review.
   requests.
 - `openshell-agent-runner`: `oar` CLI for launching ephemeral agents in
   OpenShell sandboxes.
+- `openshell-exporter`: OpenShell event collector, normalizer, redactor, and
+  CloudEvents or OTLP exporter.
 
 ## Research spikes
 

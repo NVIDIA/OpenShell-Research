@@ -18,6 +18,7 @@ VERDICTS = {
     "needs_changes": "⚠️ Needs changes",
     "inconclusive": "❔ Inconclusive",
 }
+REVIEW_STATUSES = {"failed", "timed_out"}
 
 
 def validate_result(result, task=None):
@@ -75,7 +76,14 @@ def read_results(directory, tasks):
                 json.loads(path.read_text(encoding="utf-8")), task.get("task")
             )
         except FileNotFoundError:
-            review["error"] = "No result produced."
+            try:
+                status = _read_status(Path(directory) / f"{task['id']}.status.json")
+            except FileNotFoundError:
+                review["error"] = "No result or execution status was produced."
+            except (OSError, ValueError, TypeError) as error:
+                review["error"] = str(error)
+            else:
+                review.update(status=status["status"], error=status["message"])
         except (OSError, ValueError, TypeError) as error:
             review["error"] = str(error)
         reviews.append(review)
@@ -85,6 +93,12 @@ def read_results(directory, tasks):
 def render_report(*, request, reviews, run_url, run_id, outcome):
     reason = f" — {_escape_text(request['reason'])}" if request.get("reason") else ""
     source_url = f"{run_url.partition('/actions/')[0]}/blob/{request['head']}"
+    timed_out = sum(review.get("status") == "timed_out" for review in reviews)
+    execution = (
+        f"incomplete — {timed_out} reviewer timeout(s), non-blocking"
+        if timed_out and outcome == "success"
+        else outcome
+    )
     lines = [
         REVIEW_MARKER,
         f"<!-- oar-report-run:{run_id} -->",
@@ -94,9 +108,18 @@ def render_report(*, request, reviews, run_url, run_id, outcome):
         "",
         "Review findings are advisory. Required checks remain separate merge gates.",
         "",
-        f"Execution: **{_escape_text(outcome)}**{reason}",
+        f"Execution: **{_escape_text(execution)}**{reason}",
         "",
     ]
+    if timed_out:
+        noun = "review" if timed_out == 1 else "reviews"
+        lines.extend(
+            [
+                "> [!WARNING]",
+                f"> {timed_out} {noun} timed out. No verdict was produced for that scope, so it was not reviewed to completion and must not be treated as a pass. The timeout is advisory and does not block merging.",
+                "",
+            ]
+        )
     if request.get("tooling"):
         lines.extend([f"Reviewer and guidelines revision: `{request['tooling']}`", ""])
     if reviews:
@@ -114,7 +137,11 @@ def render_report(*, request, reviews, run_url, run_id, outcome):
             lines.append(
                 f"| {label} | {VERDICTS[result['verdict']]} | {VERDICTS[result['guidelines_assessment']['verdict']]} | {len(result['findings'])} |"
                 if result
-                else f"| {label} | Not completed | — | — |"
+                else (
+                    f"| {label} | ⏱️ Timed out — no verdict | — | — |"
+                    if review.get("status") == "timed_out"
+                    else f"| {label} | Not completed | — | — |"
+                )
             )
         for review in reviews:
             lines.extend(
@@ -238,12 +265,17 @@ def main(argv=None):
         errors = [
             f"{review['id']}: {review['error']}"
             for review in reviews
-            if "error" in review
+            if "error" in review and review.get("status") != "timed_out"
         ]
         if errors:
             print("\n".join(errors), file=sys.stderr)
             return 1
-        print(f"Validated {len(reviews)} review results.")
+        timed_out = sum(review.get("status") == "timed_out" for review in reviews)
+        completed = len(reviews) - timed_out
+        print(
+            f"Validated {completed} review result(s); "
+            f"{timed_out} timed out without a verdict."
+        )
         return 0
     run_id = os.environ["GITHUB_RUN_ID"]
     run_url = (
@@ -273,6 +305,19 @@ def main(argv=None):
             run_id,
         )
     return 0
+
+
+def _read_status(path):
+    status = json.loads(path.read_text(encoding="utf-8"))
+    if (
+        not isinstance(status, dict)
+        or set(status) != {"status", "message"}
+        or status.get("status") not in REVIEW_STATUSES
+        or not isinstance(status.get("message"), str)
+        or not status["message"].strip()
+    ):
+        raise ValueError("Missing or invalid review execution status.")
+    return status
 
 
 def _escape_text(value):

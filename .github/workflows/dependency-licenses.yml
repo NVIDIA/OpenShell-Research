@@ -38,6 +38,12 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.x"
+          cache: false
+
       - name: Check licenses
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -70,6 +76,10 @@ jobs:
                 uv-script) uv lock --script "$script" --check ;;
                 npm) npm ci --ignore-scripts --no-audit --no-fund ;;
                 cargo) cargo metadata --locked --format-version 1 > /dev/null ;;
+                go)
+                  GOTOOLCHAIN=local GOWORK=off go mod tidy -diff
+                  GOTOOLCHAIN=local GOWORK=off go mod verify
+                  ;;
                 *) echo "Unknown package manager: $manager" >&2; exit 1 ;;
               esac
             )
