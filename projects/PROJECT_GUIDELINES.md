@@ -1,22 +1,22 @@
 # Project guidelines
 
-Use these guidelines when adding a project under `projects/<name>/`. They are
-the shared expectations for contributors and the automated new-project reviewer.
-The goal is useful, reproducible work at the right level of engineering—not a
-production checklist for every experiment.
+Use these guidelines when adding a project under
+`projects/<project-type>/<name>/`. They are the shared expectations for
+contributors and the automated new-project reviewer. The goal is useful,
+reproducible work at the right level of engineering—not a production checklist
+for every experiment.
 
 ## Declare the project kind
 
 Add `project.yaml` in the project root with one required field, `kind`. Choose
 the primary purpose; a project does not need to satisfy all three categories.
+The declared kind must match the project's parent directory as shown below.
 
-| `kind` | Purpose |
-| --- | --- |
-| `tool` | A reusable tool or library intended for other code or people to use. |
-| `research-spike` | An investigation intended to answer a question or test an idea. |
-| `use-case-example` | An end-to-end demonstration that teaches a concrete workflow. |
-
-Existing projects do not need to be backfilled for this first CI iteration.
+| Directory | `kind` | Purpose |
+| --- | --- | --- |
+| `tools` | `tool` | A reusable tool or library intended for other code or people to use. |
+| `research-spikes` | `research-spike` | An investigation intended to answer a question or test an idea. |
+| `use-case-examples` | `use-case-example` | An end-to-end demonstration that teaches a concrete workflow. |
 
 ## Guidelines for every new project
 

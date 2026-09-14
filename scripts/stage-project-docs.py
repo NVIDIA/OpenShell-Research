@@ -13,9 +13,10 @@ import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT_DOCUMENTATION = {
-    "egress-gate": ROOT / "projects" / "egress-gate" / "docs",
+    "egress-gate": ROOT / "projects" / "tools" / "egress-gate" / "docs",
     "openshell-agent-runner": ROOT
     / "projects"
+    / "tools"
     / "openshell-agent-runner"
     / "docs",
 }
@@ -31,7 +32,9 @@ def stage_project_docs(source: Path, destination: Path) -> None:
     if not source.is_dir():
         raise ValueError(f"documentation source does not exist: {source}")
     if destination_is_symlink:
-        raise ValueError(f"documentation destination must not be a symlink: {destination}")
+        raise ValueError(
+            f"documentation destination must not be a symlink: {destination}"
+        )
     if source.is_relative_to(destination) or destination.is_relative_to(source):
         raise ValueError("documentation source and destination must not overlap")
 

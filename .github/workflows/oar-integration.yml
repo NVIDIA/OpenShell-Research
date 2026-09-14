@@ -6,19 +6,19 @@ name: OAR live integration
     paths:
       - .github/workflows/oar-integration.yml
       - .github/actions/setup-review-gateway/**
-      - projects/openshell-agent-runner/src/**
-      - projects/openshell-agent-runner/pyproject.toml
-      - projects/openshell-agent-runner/uv.lock
-      - projects/openshell-agent-runner/tests/fixtures/pipeline-integration/**
+      - projects/tools/openshell-agent-runner/src/**
+      - projects/tools/openshell-agent-runner/pyproject.toml
+      - projects/tools/openshell-agent-runner/uv.lock
+      - projects/tools/openshell-agent-runner/tests/fixtures/pipeline-integration/**
   push:
     branches: [main]
     paths:
       - .github/workflows/oar-integration.yml
       - .github/actions/setup-review-gateway/**
-      - projects/openshell-agent-runner/src/**
-      - projects/openshell-agent-runner/pyproject.toml
-      - projects/openshell-agent-runner/uv.lock
-      - projects/openshell-agent-runner/tests/fixtures/pipeline-integration/**
+      - projects/tools/openshell-agent-runner/src/**
+      - projects/tools/openshell-agent-runner/pyproject.toml
+      - projects/tools/openshell-agent-runner/uv.lock
+      - projects/tools/openshell-agent-runner/tests/fixtures/pipeline-integration/**
   workflow_dispatch:
 
 permissions: {}
@@ -55,10 +55,10 @@ jobs:
           version: "0.12.5"
           python-version: "3.12"
           enable-cache: true
-          cache-dependency-glob: projects/openshell-agent-runner/uv.lock
+          cache-dependency-glob: projects/tools/openshell-agent-runner/uv.lock
 
       - name: Install the wheel and prepare the contract input
-        working-directory: projects/openshell-agent-runner
+        working-directory: projects/tools/openshell-agent-runner
         env:
           REVIEW_MODEL: ${{ secrets.MODEL_ID_TOP }}
         run: |

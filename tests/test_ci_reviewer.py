@@ -281,7 +281,7 @@ class CIReviewerTests(unittest.TestCase):
         finding = {
             "severity": "medium",
             "title": "Documented configuration file is missing",
-            "path": "projects/example/config.json",
+            "path": "projects/tools/example/config.json",
             "evidence": "The documented command reads config.json, absent from the tree.",
             "impact": "The documented command cannot start.",
             "recommendation": "Supply the configuration used by the example.",

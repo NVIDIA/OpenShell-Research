@@ -65,7 +65,7 @@ OpenShell makes an autonomous agent safe to run at the edge by solving two probl
 
 We used the HuggingFace Reachy Mini to see what that looks like in practice. We run a small chat application connected to an OpenAI endpoint within the OpenShell runtime, all on the Reachy Mini's onboard Raspberry Pi. Running the whole stack on a Raspberry Pi is part of the point: OpenShell holds up on the small, resource-constrained hardware that real edge devices ship with, not just a workstation. We use OpenShell to restrict what actions the model can take. Our next step is to route sensitive data to approved models, but more on that in a follow-up post.
 
-If you just want to try this for yourself, check out our tutorial [here](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/ONBOARD_SETUP.md).
+If you just want to try this for yourself, check out our tutorial [here](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/use-case-examples/reachy-mini-openshell/ONBOARD_SETUP.md).
 
 ---
 
@@ -270,6 +270,6 @@ time. That is the pattern we are building with OpenShell.
 
 Key resources:
 
-1. [Onboard Reachy Mini + OpenShell setup](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/ONBOARD_SETUP.md)
-2. [Reachy Mini OpenShell project source](https://github.com/NVIDIA/OpenShell-Research/tree/kirit93/reachy-implementation/projects/reachy-mini-openshell)
-3. [Camera-enabled, motion-disabled policy](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/openshell/policy-camera-enabled-motion-disabled.yaml)
+1. [Onboard Reachy Mini + OpenShell setup](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/use-case-examples/reachy-mini-openshell/ONBOARD_SETUP.md)
+2. [Reachy Mini OpenShell project source](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/use-case-examples/reachy-mini-openshell)
+3. [Camera-enabled, motion-disabled policy](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/use-case-examples/reachy-mini-openshell/openshell/policy-camera-enabled-motion-disabled.yaml)

@@ -7,8 +7,11 @@ documentation for work that uses OpenShell as its runtime.
 
 ## Work routing
 
-- Put self-contained implementations and experiments in `projects/<name>/`.
-- Put project-specific user guides and references in `projects/<name>/docs/`.
+- Put self-contained implementations and experiments in
+  `projects/<project-type>/<name>/`, where `<project-type>` is `tools`,
+  `research-spikes`, or `use-case-examples`.
+- Put project-specific user guides and references in
+  `projects/<project-type>/<name>/docs/`.
 - Put cross-project user-facing documentation in `docs/documentation/`.
 - Put Dev Notes (human-written technical notes) `docs/dev-notes/`.
 - Put agent-facing repository maintenance workflows in `docs/development/`.

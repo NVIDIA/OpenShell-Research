@@ -9,7 +9,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / ".github/scripts"))
 
-from ci_scope import PROJECT_TASKS, new_project_paths, project_task
+from ci_scope import (
+    PROJECT_KIND_BY_DIRECTORY,
+    PROJECT_TASKS,
+    new_project_paths,
+    project_task,
+)
 
 
 class ScopeTests(unittest.TestCase):
@@ -17,74 +22,110 @@ class ScopeTests(unittest.TestCase):
         files = [
             {"filename": name, "status": "added"}
             for name in (
-                "projects/new/README.md",
-                "projects/new/src/main.py",
-                "projects/new/docs/guide.md",
-                "projects/existing/new-file.py",
+                "projects/tools/new/README.md",
+                "projects/tools/new/src/main.py",
+                "projects/tools/new/docs/guide.md",
+                "projects/tools/existing/new-file.py",
                 "docs/dev-notes/posts/note.md",
                 ".github/workflows/test.yml",
                 "projects/README.md",
             )
         ]
-        self.assertEqual(new_project_paths(files, {"existing"}), ["projects/new"])
+        self.assertEqual(
+            new_project_paths(files, {"projects/tools/existing"}),
+            ["projects/tools/new"],
+        )
 
     def test_updates_on_introducing_pr_still_select_project(self):
-        files = [{"filename": "projects/new/README.md", "status": "modified"}]
-        self.assertEqual(new_project_paths(files, set()), ["projects/new"])
-        self.assertEqual(new_project_paths(files, {"new"}), [])
+        files = [{"filename": "projects/tools/new/README.md", "status": "modified"}]
+        self.assertEqual(new_project_paths(files, set()), ["projects/tools/new"])
+        self.assertEqual(new_project_paths(files, {"projects/tools/new"}), [])
 
     def test_deleted_files_do_not_create_reviews(self):
-        files = [{"filename": "projects/deleted/run.py", "status": "removed"}]
+        files = [{"filename": "projects/tools/deleted/run.py", "status": "removed"}]
         self.assertEqual(new_project_paths(files, set()), [])
 
     def test_rename_to_new_directory_selects_destination_only(self):
         files = [
             {
-                "filename": "projects/new/README.md",
+                "filename": "projects/tools/new/README.md",
                 "status": "renamed",
-                "previous_filename": "projects/old/README.md",
+                "previous_filename": "projects/tools/old/README.md",
             }
         ]
-        self.assertEqual(new_project_paths(files, {"old"}), ["projects/new"])
-        self.assertEqual(new_project_paths(files, {"old", "new"}), [])
+        self.assertEqual(
+            new_project_paths(files, {"projects/tools/old"}),
+            ["projects/tools/new"],
+        )
+        self.assertEqual(
+            new_project_paths(files, {"projects/tools/old", "projects/tools/new"}),
+            [],
+        )
 
     def test_multiple_projects_are_sorted_and_not_prefix_matched(self):
         files = [
-            {"filename": f"projects/{name}/README.md", "status": "added"}
+            {"filename": f"projects/tools/{name}/README.md", "status": "added"}
             for name in ("zeta", "alpha", "alpha-copy")
         ]
         self.assertEqual(
-            new_project_paths(files, {"alpha"}),
-            ["projects/alpha-copy", "projects/zeta"],
+            new_project_paths(files, {"projects/tools/alpha"}),
+            ["projects/tools/alpha-copy", "projects/tools/zeta"],
         )
 
     def test_spaces_and_unicode_in_project_names(self):
-        files = [{"filename": "projects/Δ tool/README.md", "status": "added"}]
-        self.assertEqual(new_project_paths(files, set()), ["projects/Δ tool"])
+        files = [
+            {
+                "filename": "projects/use-case-examples/Δ example/README.md",
+                "status": "added",
+            }
+        ]
+        self.assertEqual(
+            new_project_paths(files, set()),
+            ["projects/use-case-examples/Δ example"],
+        )
+
+    def test_files_outside_project_type_directories_are_not_projects(self):
+        files = [
+            {"filename": "projects/README.md", "status": "modified"},
+            {"filename": "projects/other/new/README.md", "status": "added"},
+        ]
+        self.assertEqual(new_project_paths(files, set()), [])
 
     def test_escaping_and_noncanonical_paths_are_rejected(self):
         for name in (
-            "/projects/a/x",
-            "projects/../x",
-            "projects//a/x",
-            "./projects/a/x",
+            "/projects/tools/a/x",
+            "projects/tools/../x/file",
+            "projects//tools/a/x",
+            "./projects/tools/a/x",
         ):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 new_project_paths([{"filename": name, "status": "added"}], set())
 
     def test_all_three_kinds_select_their_dedicated_task(self):
+        directory_by_kind = {
+            kind: directory for directory, kind in PROJECT_KIND_BY_DIRECTORY.items()
+        }
         for index, (kind, task) in enumerate(PROJECT_TASKS.items(), 1):
             with self.subTest(kind=kind):
+                path = f"projects/{directory_by_kind[kind]}/new"
                 self.assertEqual(
-                    project_task("projects/new", {"kind": kind}, index),
+                    project_task(path, {"kind": kind}, index),
                     {
                         "id": f"review-{index}",
                         "task": task,
                         "kind": kind,
-                        "input": "projects/new",
-                        "label": "projects/new",
+                        "input": path,
+                        "label": path,
                     },
                 )
+
+    def test_kind_must_match_project_type_directory(self):
+        with self.assertRaisesRegex(ValueError, "must match"):
+            project_task(
+                "projects/research-spikes/new",
+                {"kind": "tool"},
+                1,
+            )
 
     def test_missing_unknown_and_malformed_kinds_fail(self):
         for metadata in (
@@ -100,7 +141,7 @@ class ScopeTests(unittest.TestCase):
                 self.subTest(metadata=metadata),
                 self.assertRaisesRegex(ValueError, "project.yaml"),
             ):
-                project_task("projects/new", metadata, 1)
+                project_task("projects/tools/new", metadata, 1)
 
 
 if __name__ == "__main__":

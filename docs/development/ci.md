@@ -24,24 +24,26 @@ follow our project guidelines, and use an appropriate level of engineering?**
 ## Contributor workflow
 
 1. Follow the [project guidelines](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/PROJECT_GUIDELINES.md).
-2. Add a project under `projects/<name>/`, including a root `project.yaml` with
-   the required `kind` field.
+2. Add a project under `projects/<project-type>/<name>/`, including a root
+   `project.yaml` with the required `kind` field. Use the corresponding plural
+   directory from the table below.
 3. Open a non-draft PR from a branch in this repository.
 4. Read the automated assessment in one updated PR comment. Fix useful findings;
    humans decide whether the project is ready.
 
-| `kind` | Task | Review emphasis |
-| --- | --- | --- |
-| `tool` | `review-tool` | Correctness, realistic failure handling, maintainability, verification, usability. |
-| `research-spike` | `review-research-spike` | Method, evidence, reproducibility, limitations, proportionate implementation. |
-| `use-case-example` | `review-use-case-example` | Working workflow, reproducibility, instructional clarity, safe configuration, appropriate scope. |
+| Directory | `kind` | Task | Review emphasis |
+| --- | --- | --- | --- |
+| `tools` | `tool` | `review-tool` | Correctness, realistic failure handling, maintainability, verification, usability. |
+| `research-spikes` | `research-spike` | `review-research-spike` | Method, evidence, reproducibility, limitations, proportionate implementation. |
+| `use-case-examples` | `use-case-example` | `review-use-case-example` | Working workflow, reproducibility, instructional clarity, safe configuration, appropriate scope. |
 
 A project is new when its directory does not exist in the PR's base revision.
 Later commits on its introducing PR reassess the whole project, including its
 README and documentation. Multiple new projects receive separate assessments in
 the same comment. Renaming an existing project to a new directory counts as an
-addition. Missing or invalid kinds fail selection before inference and are
-reported with the file to fix; no project in that request runs until corrected.
+addition. Missing, invalid, or directory-mismatched kinds fail selection before
+inference and are reported with the file to fix; no project in that request runs
+until corrected.
 
 Existing-project changes, Dev Notes, and unrelated repository changes do not
 start live reviews. There is no central registry or metadata backfill.
@@ -127,7 +129,7 @@ CI scripts are Python; requests use PyYAML from OAR's locked environment and
 GitHub calls use the runner's `gh api`. Run from the repository root:
 
 ```sh
-uv run --project projects/openshell-agent-runner pytest \
+uv run --project projects/tools/openshell-agent-runner pytest \
   tests/test_ci_scope.py tests/test_github_api.py tests/test_*review*.py
 ```
 

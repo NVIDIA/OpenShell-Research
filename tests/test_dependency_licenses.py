@@ -237,7 +237,7 @@ def test_compatible_cargo_constraint_edit_does_not_require_lockfile_churn():
 
 def test_uv_includes_all_locked_packages_not_just_active_platform():
     content = uv_lock() + uv_lock("2.0") + uv_lock("0.1", 'editable = "."')
-    dependencies = checker.inventory("projects/tool/uv.lock", content)
+    dependencies = checker.inventory("projects/tools/example/uv.lock", content)
     assert_equal({item.version for item in dependencies}, {"1.0", "2.0"})
 
 
