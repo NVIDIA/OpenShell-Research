@@ -6,15 +6,23 @@ agent_markdown: true
 
 # OpenShell Agent Runner
 
-OpenShell Agent Runner (OAR) runs an agent task in an isolated OpenShell sandbox
-and saves the result to a file. Use it to review a project, improve a technical
-document, or run your own tasks from a terminal or CI job.
+<img class="documentation-logo" src="assets/oar-logo.svg" alt="OAR — OpenShell Agent Runner" width="540">
+
+OpenShell Agent Runner (OAR) launches ephemeral
+[Pi coding agents](https://github.com/earendil-works/pi/tree/main/packages/coding-agent)
+in OpenShell sandboxes. Each agent works on a task using the prompts, skills,
+tools, and permissions defined by its profile. Use OAR to run the included
+reviewers or your own agent workflows from a terminal or CI job.
+
+Pi supplies the agent loop, tools, skills, and model client. OAR prepares the
+task, launches Pi, collects the result, and removes the sandbox. OpenShell
+provides isolation and routes Pi's inference requests to your model.
 
 <figure class="documentation-figure documentation-figure--wide">
   <a href="assets/diagrams/system-overview.svg" aria-label="Open the OAR architecture diagram at full size">
-    <img src="assets/diagrams/system-overview.svg" alt="Three independent OAR runs share one OpenShell gateway. Each sandbox uses a profile containing prompts and skills: code-reviewer for two runs and technical-writing-reviewer for one. Inputs and results remain separate for each run.">
+    <img src="assets/diagrams/system-overview.svg" alt="Three independent OAR runs share one OpenShell gateway. Pi runs in each sandbox with a profile containing prompts and skills: code-reviewer for two runs and technical-writing-reviewer for one. Inputs and results remain separate for each run.">
   </a>
-  <figcaption>Each profile supplies prompts and skills to its agent. Runs stay isolated, even when they share a profile. Select the diagram to view it at full size.</figcaption>
+  <figcaption>Each profile supplies prompts and skills to Pi. Runs stay isolated, even when they share a profile. Select the diagram to view it at full size.</figcaption>
 </figure>
 
 A **profile** packages task prompts, reusable skills, model settings, and sandbox
@@ -31,7 +39,9 @@ OpenShell 0.0.111 or newer. You need a running **gateway** and configured
 if you have not set these up yet.
 
 OAR uses your existing OpenShell configuration. API keys and provider setup
-belong there.
+belong there. The packaged profiles configure Pi to send OpenAI-compatible
+Chat Completions requests to `https://inference.local/v1`. Choose a model and
+endpoint that support that API and tool calling.
 
 ## 1. Install and check the connection
 
@@ -67,7 +77,11 @@ profiles/
 ```
 
 The default thinking level is `high`. For a model without reasoning support,
-add `--thinking off` to `init`.
+add `--thinking off` to `init`; it also sets `reasoning: false` in Pi's model
+definition. `init` writes the model ID into the profile's `models.json` and
+`settings.json`. It does not configure or change OpenShell's inference route.
+See [model and inference configuration](profiles.md#configure-pis-model-and-inference)
+to understand these files or adapt them to your endpoint.
 
 ## 3. Run your first review
 

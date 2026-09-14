@@ -19,7 +19,10 @@ agent_markdown: true
 `init` creates both profiles by default. Repeat `--profile NAME` to select
 which ones to create. It refuses to overwrite existing profile directories.
 `--thinking` accepts `off`, `minimal`, `low`, `medium`, `high` (default),
-`xhigh`, or `max`; choose a level your model supports.
+`xhigh`, or `max`; choose a level your model supports. It sets Pi's
+`defaultThinkingLevel` and sets the model's `reasoning` flag to `false` for
+`off`, or `true` otherwise. `--model` sets the model ID in both Pi files.
+See [model and inference configuration](profiles.md#configure-pis-model-and-inference).
 
 Use `oar COMMAND --help` for all options. For a task's inputs, variables, and
 output format, put the profile and task before `--help`:
@@ -102,7 +105,7 @@ one result. OAR checks the request before attempting to create the sandbox.
 2. RUN · new OpenShell sandbox
    Create using the profile's policy
    Upload input, prompt, skills + schema*
-   Run the agent using gateway inference
+   Run Pi with the profile's model settings using gateway inference
               |
               v
 3. COLLECT · your machine / CI
@@ -145,9 +148,10 @@ creation and execution separately, and uploads and cleanup take additional time.
 | Exit code | Meaning |
 | --- | --- |
 | `0` | The result was validated and saved, and requested cleanup succeeded. |
-| `1` | OpenShell execution, timeout, download, ownership checking, or cleanup failed. |
+| `1` | OpenShell execution, download, ownership checking, or cleanup failed. |
 | `2` | A command argument, profile, input, or prompt variable was invalid. |
 | `3` | The downloaded result was empty or failed validation. |
+| `4` | Sandbox creation, agent execution, download, or cleanup exceeded its timeout. |
 
 These are **run** outcomes. A reviewer can return `needs_changes` while OAR exits
 with `0`. Read the JSON verdict if your CI policy depends on the review.
@@ -161,7 +165,7 @@ For this repository's workflow and PR reports, see the
 | --- | --- |
 | `oar: command not found` after installation | Run `uv tool update-shell`, then open a new terminal. |
 | `doctor` cannot connect | Check OpenShell gateway status and that you selected the intended gateway. |
-| No inference route or model request fails | Check the route in OpenShell, then the model ID and thinking level in your profile. |
+| No inference route or model request fails | Check the OpenShell route, then [Pi's model ID, API compatibility, and reasoning settings](profiles.md#configure-pis-model-and-inference). The packaged profiles require OpenAI-compatible Chat Completions with tool calling. |
 | `init` says a profile already exists | Use the existing profile or choose a new destination. |
 | Unknown task or prompt variable | Run task-specific `--help` and check `profile.yaml`. |
 | Missing or invalid result | Read the run's errors; use `--keep-sandbox` on the next run to inspect it. |

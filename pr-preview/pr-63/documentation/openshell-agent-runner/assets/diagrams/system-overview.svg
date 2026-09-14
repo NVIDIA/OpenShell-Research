@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 760" role="img" aria-labelledby="title description">
   <title id="title">Independent OAR runs on one OpenShell gateway</title>
-  <desc id="description">Three separate oar run invocations share one OpenShell gateway. Runs 1 and 3 use the code-reviewer profile on different projects. Run 2 uses technical-writing-reviewer on a document. Each profile supplies the selected task's prompt and skills. Each run uploads its own input to a separate sandbox, runs an agent with those instructions, and returns its own result file. OAR removes each sandbox when its task finishes; the gateway remains available.</desc>
+  <desc id="description">Three separate oar run invocations share one OpenShell gateway. Runs 1 and 3 use the code-reviewer profile on different projects. Run 2 uses technical-writing-reviewer on a document. Each profile supplies the selected task's prompt and skills. Each run uploads its own input to a separate sandbox, runs Pi with those instructions, and returns its own result file. OAR removes each sandbox when its task finishes; the gateway remains available.</desc>
   <defs>
     <style>
       text{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;fill:#24352c}
@@ -73,7 +73,7 @@
 
   <rect x="356" y="155" width="438" height="155" rx="10" class="sandbox"/>
   <text x="376" y="180" class="label">Sandbox 1</text>
-  <text x="774" y="180" text-anchor="end" class="small">Agent + uploaded files</text>
+  <text x="774" y="180" text-anchor="end" class="small">Pi + uploaded files</text>
   <g role="group" aria-label="code-reviewer profile: task prompt and skills">
     <rect x="372" y="194" width="406" height="102" rx="7" class="profile-bundle"/>
     <text x="388" y="220" class="mono profile">code-reviewer</text>
@@ -99,7 +99,7 @@
 
   <rect x="356" y="337" width="438" height="155" rx="10" class="sandbox writing"/>
   <text x="376" y="362" class="label">Sandbox 2</text>
-  <text x="774" y="362" text-anchor="end" class="small">Agent + uploaded files</text>
+  <text x="774" y="362" text-anchor="end" class="small">Pi + uploaded files</text>
   <g role="group" aria-label="technical-writing-reviewer profile: task prompt and skills">
     <rect x="372" y="376" width="406" height="102" rx="7" class="profile-bundle profile-writing"/>
     <text x="388" y="402" class="mono profile">technical-writing-reviewer</text>
@@ -125,7 +125,7 @@
 
   <rect x="356" y="519" width="438" height="155" rx="10" class="sandbox"/>
   <text x="376" y="544" class="label">Sandbox 3</text>
-  <text x="774" y="544" text-anchor="end" class="small">Agent + uploaded files</text>
+  <text x="774" y="544" text-anchor="end" class="small">Pi + uploaded files</text>
   <g role="group" aria-label="code-reviewer profile: task prompt and skills">
     <rect x="372" y="558" width="406" height="102" rx="7" class="profile-bundle"/>
     <text x="388" y="584" class="mono profile">code-reviewer</text>

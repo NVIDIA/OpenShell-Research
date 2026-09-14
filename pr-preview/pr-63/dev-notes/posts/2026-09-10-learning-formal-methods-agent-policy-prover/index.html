@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="A practical introduction to Z3, policy containment, and the questions we are exploring in OpenShell.">
+        <meta name="description" content="An intro to using formal methods to reason about permission changes in long-running AI agents.">
       
       
         <meta name="author" content="Alex Watson">
@@ -31,7 +31,7 @@
   
     
       
-        <title>Learning Formal Methods by Building an Agent Policy Prover - OpenShell Research</title>
+        <title>What we have learned applying formal methods to control AI agents - OpenShell Research</title>
       
     
   
@@ -97,25 +97,25 @@
   
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="OpenShell Research">
-  <meta property="og:title" content="Learning Formal Methods by Building an Agent Policy Prover">
-  <meta property="og:description" content="A practical introduction to Z3, policy containment, and the questions we are exploring in OpenShell.">
+  <meta property="og:title" content="What we have learned applying formal methods to control AI agents">
+  <meta property="og:description" content="An intro to using formal methods to reason about permission changes in long-running AI agents.">
   <meta property="og:url" content="https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-09-10-learning-formal-methods-agent-policy-prover/">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Learning Formal Methods by Building an Agent Policy Prover">
-  <meta name="twitter:description" content="A practical introduction to Z3, policy containment, and the questions we are exploring in OpenShell.">
+  <meta name="twitter:title" content="What we have learned applying formal methods to control AI agents">
+  <meta name="twitter:description" content="An intro to using formal methods to reason about permission changes in long-running AI agents.">
   
     
     <meta property="og:image" content="https://nvidia.github.io/OpenShell-Research/assets/agent-policy-prover/hero-concept.png">
-    <meta property="og:image:alt" content="Learning Formal Methods by Building an Agent Policy Prover">
+    <meta property="og:image:alt" content="What we have learned applying formal methods to control AI agents">
     <meta name="twitter:image" content="https://nvidia.github.io/OpenShell-Research/assets/agent-policy-prover/hero-concept.png">
-    <meta name="twitter:image:alt" content="Learning Formal Methods by Building an Agent Policy Prover">
+    <meta name="twitter:image:alt" content="What we have learned applying formal methods to control AI agents">
   
   
     <meta property="article:published_time" content="2026-09-10">
     <meta property="article:modified_time" content="2026-09-10">
   
   
-    <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"Alex Watson"},"dateModified":"2026-09-10","datePublished":"2026-09-10","description":"A practical introduction to Z3, policy containment, and the questions we are exploring in OpenShell.","headline":"Learning Formal Methods by Building an Agent Policy Prover","image":"https://nvidia.github.io/OpenShell-Research/assets/agent-policy-prover/hero-concept.png","mainEntityOfPage":{"@id":"https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-09-10-learning-formal-methods-agent-policy-prover/","@type":"WebPage"}}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"Alex Watson"},"dateModified":"2026-09-10","datePublished":"2026-09-10","description":"An intro to using formal methods to reason about permission changes in long-running AI agents.","headline":"What we have learned applying formal methods to control AI agents","image":"https://nvidia.github.io/OpenShell-Research/assets/agent-policy-prover/hero-concept.png","mainEntityOfPage":{"@id":"https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-09-10-learning-formal-methods-agent-policy-prover/","@type":"WebPage"}}</script>
   
 
   <script>
@@ -151,7 +151,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#learning-formal-methods-by-building-an-agent-policy-prover" class="md-skip">
+        <a href="#what-we-have-learned-applying-formal-methods-to-control-ai-agents" class="md-skip">
           Skip to content
         </a>
       
@@ -190,7 +190,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Learning Formal Methods by Building an Agent Policy Prover
+              What we have learned applying formal methods to control AI agents
             
           </span>
         </div>
@@ -452,7 +452,7 @@
   <span class="md-ellipsis">
     
   
-  Learning Formal Methods by Building an Agent Policy Prover
+  What we have learned applying formal methods to control AI agents
 
     
   </span>
@@ -469,7 +469,7 @@
   <span class="md-ellipsis">
     
   
-  Learning Formal Methods by Building an Agent Policy Prover
+  What we have learned applying formal methods to control AI agents
 
     
   </span>
@@ -495,10 +495,54 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#formal-methods-at-the-scale-of-one-decision" class="md-nav__link">
+  <a href="#why-permission-review-breaks-at-agent-scale" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Formal methods, at the scale of one decision
+        Why permission review breaks at agent scale
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-demo-that-changed-our-minds" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        The demo that changed our minds
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#previous-work-proving-ec2-iam-and-s3-policies-at-aws" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Previous work - proving EC2, IAM, and S3 policies at AWS
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-same-problem-now-with-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        The same problem, now with agents
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-does-a-proof-over-your-policy-definition-buy-you" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        What does a proof over your policy definition buy you?
       </span>
     </span>
   </a>
@@ -528,10 +572,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#encoding-openshell-policy-as-formal-logic" class="md-nav__link">
+  <a href="#how-to-encode-the-full-openshell-policy-as-formal-logic" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Encoding OpenShell policy as formal logic
+        How to encode the full OpenShell policy as formal logic
       </span>
     </span>
   </a>
@@ -539,10 +583,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#a-managed-maximum" class="md-nav__link">
+  <a href="#expert-queries-are-just-more-formulas" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        A managed maximum
+        Expert queries are just more formulas!
       </span>
     </span>
   </a>
@@ -550,43 +594,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-we-learned-to-model" class="md-nav__link">
+  <a href="#conclusion" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        What we learned to model
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#can-least-privilege-have-a-budget" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Can least privilege have a budget?
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#where-models-still-belong" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Where models still belong
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#start-with-one-decision" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Start with one decision
+        Conclusion
       </span>
     </span>
   </a>
@@ -1576,10 +1587,54 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#formal-methods-at-the-scale-of-one-decision" class="md-nav__link">
+  <a href="#why-permission-review-breaks-at-agent-scale" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Formal methods, at the scale of one decision
+        Why permission review breaks at agent scale
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-demo-that-changed-our-minds" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        The demo that changed our minds
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#previous-work-proving-ec2-iam-and-s3-policies-at-aws" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Previous work - proving EC2, IAM, and S3 policies at AWS
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-same-problem-now-with-agents" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        The same problem, now with agents
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-does-a-proof-over-your-policy-definition-buy-you" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        What does a proof over your policy definition buy you?
       </span>
     </span>
   </a>
@@ -1609,10 +1664,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#encoding-openshell-policy-as-formal-logic" class="md-nav__link">
+  <a href="#how-to-encode-the-full-openshell-policy-as-formal-logic" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Encoding OpenShell policy as formal logic
+        How to encode the full OpenShell policy as formal logic
       </span>
     </span>
   </a>
@@ -1620,10 +1675,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#a-managed-maximum" class="md-nav__link">
+  <a href="#expert-queries-are-just-more-formulas" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        A managed maximum
+        Expert queries are just more formulas!
       </span>
     </span>
   </a>
@@ -1631,43 +1686,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#what-we-learned-to-model" class="md-nav__link">
+  <a href="#conclusion" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        What we learned to model
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#can-least-privilege-have-a-budget" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Can least privilege have a budget?
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#where-models-still-belong" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Where models still belong
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#start-with-one-decision" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Start with one decision
+        Conclusion
       </span>
     </span>
   </a>
@@ -1803,8 +1825,8 @@
   </a>
 
 
-<h1 id="learning-formal-methods-by-building-an-agent-policy-prover">Learning Formal Methods by Building an Agent Policy Prover</h1>
-<p class="dev-note-deck">Using Z3 to reason about permission changes in long-running AI agents.</p>
+<h1 id="what-we-have-learned-applying-formal-methods-to-control-ai-agents">What we have learned applying formal methods to control AI agents</h1>
+<p class="dev-note-deck">An intro to using formal methods to reason about permission changes in long-running AI agents.</p>
 
 <!-- dev-note:byline:start -->
 <!-- Generated by scripts/render-dev-notes.py; edit front matter and authors.json. -->
@@ -1830,91 +1852,52 @@
   <img src="../../../assets/agent-policy-prover/hero-concept.png" alt="Nested translucent policy boundaries contain several green agent-action paths while a red path is stopped at the boundary and exposes a counterexample outside it.">
 </figure>
 
-<p>We started exploring formal methods in OpenShell while working through a
-practical problem: how should a long-running agent request more authority after
-its policy blocks an action?</p>
-<p>OpenShell runs agents in policy-controlled sandboxes that can constrain network
-endpoints, credentials, filesystem access, methods, paths, and protocol-specific
-operations. In our experiments, policy denials often arrived partway through a
-task, when the agent had enough context to explain what it needed and draft a
-possible change. We could send every proposal to a human or model, but we wanted
-to understand which part of the decision could be checked mechanically.</p>
-<p>Our first prototype focused on policy containment. If an operator defines the
-maximum authority an agent may obtain, the gateway can compose the policy that
-would result from a proposed change and ask:</p>
-<div class="dev-note-equation">
-Allowed(candidate) ⊆ Allowed(maximum)?
-</div>
-
-<p>The candidate is the fully composed policy after the change. The maximum is an
-operator-controlled ceiling; it does not grant access by itself. Implementing
-this check showed us why reviewing one proposed rule at a time was not enough. A
-request for one GitHub endpoint could grant every method under a wildcard path,
-raw L4 access could bypass REST, GraphQL, or MCP inspection, and a reasonable
-rule could combine with existing rules to create broader authority.</p>
-<p>We encoded those policy semantics in <a href="https://microsoft.github.io/z3guide/">Z3</a>
-and asked it to search for an action the candidate allowed but the maximum did
-not. A counterexample showed us the specific binary, endpoint, method, or path
-outside the boundary. If Z3 could not find one, containment held for the
-semantics represented in the model. That gave us inspectable evidence rather
-than a general risk score.</p>
-<p>We also learned that proof and contextual judgment work best together. The
-agent's request and the prover's full findings go to a model or human reviewer.
-The request provides task context, while the prover shows whether the encoded
-policy invariants hold or supplies a concrete counterexample when they do not.
-That helps the reviewer catch an unexpected interaction buried in the composed
-policy that the agent or reviewer might otherwise miss.</p>
-<p>This post walks through the containment query, how we modeled OpenShell policy
-in Z3, where that model stops, and what we are learning from experiments with
-least-privilege budgets for agent-authored policy changes.</p>
-<h2 id="formal-methods-at-the-scale-of-one-decision">Formal methods, at the scale of one decision</h2>
-<p>Formal methods cover a large family of techniques for describing systems and
-properties mathematically and then reasoning about whether those properties
-hold. Model checking, theorem proving, abstract interpretation, SAT solving,
-and SMT solving all fall under that umbrella.</p>
-<p>For the problem here, we only need four pieces:</p>
+<p>In this post- we’ll dive into how permission review breaks at agent scale, and how to use the Z3 open source library to write a formal proof that a policy change proposed by an agent stays inside what you approved.</p>
+<h2 id="why-permission-review-breaks-at-agent-scale">Why permission review breaks at agent scale</h2>
+<p>AI agents are becoming smarter, and the work we ask them to do is becoming increasingly autonomous. Today, many of us use small groups of agents to iterate on code one PR at a time with Claude or Codex. Increasingly, we’re starting to hand agents long-running and open-ended research tasks that require hundreds of agents working over hundreds or thousands of hours that may unlock the next breakthrough in a sector.</p>
+<p>As these use cases expand, a few things start to happen:</p>
 <ul>
-<li><strong>A model:</strong> a precise representation of the actions a policy permits.</li>
-<li><strong>A property:</strong> for example, “the candidate grants no action outside the managed
-  maximum.”</li>
-<li><strong>A decision procedure:</strong> Z3 searches for an assignment that satisfies the
-  logical query.</li>
-<li><strong>An enforcement point:</strong> the gateway acts on the result before committing the
-  policy change.</li>
+<li>Agent needs evolve. As they go about their tasks, agents will need access to data stores, coding repos, ability to search the internet, and to execute detailed simulations and tests.</li>
+<li>Human supervision stops scaling. At the scale these need to run, human supervision over all agents itself becomes impossible.</li>
 </ul>
-<p>The guarantee is relative to those pieces.</p>
-<p>If the model omits a policy field, the proof says nothing about that field. If
-the runtime and prover interpret a glob differently, they disagree about the
-boundary. If an agent has another path to the same effect, proving one admission
-decision correct does not give you complete mediation.</p>
-<p>So “formally verified” does not mean “the system is safe.” For this use case, it
-means something narrower: under the policy semantics represented in the model,
-the solver could not find an action that violates the property we asked it to
-check.</p>
-<p>That narrow statement is useful- A model reviewing a permission request can be
-influenced by the request's wording, miss an interaction, or make different
-decisions on two similar inputs. Z3 evaluates the formula it receives. The
-parts that deserve scrutiny are explicit: the specification, its encoding, the
-handoff from proof to commit, and the runtime enforcement semantics.</p>
+<p>This raises a hard question. How can we guarantee that a group of agents working together- each with its own scoped policy- do not exceed the permissions that we granted to the overall system? For example, imagine one agent with write access to the Internet, and another with access to security tooling, or a broadly scoped charter like “do competitive research”- stay on track and within the intent of the human operator?</p>
+<p>This requires a new set of controls and mechanisms that allow us to stop squinting at a list of sandbox permissions and to start thinking in a higher level and more declarative way. In this post, we’ll dive into some of the research we have been doing in this area on the OpenShell team, specifically around the use of formal methods, to build a “proof” of the capabilities of not just a single agent, but an entire agent system.</p>
+<h2 id="the-demo-that-changed-our-minds">The demo that changed our minds</h2>
+<p>In one of our first demos of OpenShell, for Jensen actually, we demonstrated the ability to use OpenShell’s REST inspection endpoint to only allow an OpenClaw agent to write selectively to a GitHub repository, despite having access to a broadly scoped API key. The demo started off as expected- OpenShell’s sandbox saw the attempted write to the forbidden repo and blocked it. Then the next message was “file successfully written to [forbidden repo]. What had happened here? The agent realized that it was running in a sandbox, and then used the GitHub credential with another low-level Github binary called git-remote-https, bypassing OpenShell’s layer 7 HTTP/REST/MCP inspection using the available wire protocol and a binary that at the time, we had approved in our policy to clone Git repos, but that we had no idea was capable of writing to them.</p>
+<p>Clever. And it brought up a point, that between sandbox/runtime policies for network, file, tool, AI model, and credential access- there are an exponential number of possible unintended combinations that might lead to an AI agent being able to do something the human operator explicitly does not want.</p>
+<h2 id="previous-work-proving-ec2-iam-and-s3-policies-at-aws">Previous work - proving EC2, IAM, and S3 policies at AWS</h2>
+<p>Back in the 2016 timeframe, members of our team were working at AWS and faced a similar challenge. Given all of the awesome complexity of AWS IAM policies, AWS S3 storage policies, historical version support- can we definitively say whether an object in S3 is accessible to the public Internet or not?</p>
+<p>Today, this sounds kind of funny, and it did in 2016 too, until you think about the complexity and layering interactions possible between the policies that we write to control systems. Byron Cook’s team of Ph.D’s came up with a clever approach, code-named Zelkova, that now runs once per day for every S3 bucket policy- millions of SMT queries per day and definitively answers this question.</p>
+<p>The idea was to use formal methods, specifically a theorem solver- to formally model IAM, S3, and EC2 policies. Once we have these policies and their interactions modeled in formal logic, we could construct a proof that our invariants (things that we expect to be true) hold up. This ended up being quite successful, and has the added benefit that after the intensive task of modeling complex policies in formal logic, the actual queries across them could be made quite fast and scaled horizontally across compute.</p>
+<h2 id="the-same-problem-now-with-agents">The same problem, now with agents</h2>
+<p>Today, our challenges are quite similar. An agent, or a system of agents, each have filesystem, network, credential, tool, and MCP policies- each with different capabilities, and that can be combined together as agents can communicate with different agents.</p>
+<p>Frontier labs have advocated for a trusted AI agent review of agent actions from specialized models, escalating the most important events for human approval and reducing approval fatigue. However, AI models- just like humans, are probabilistic and can miss important details. Even more, reviewing every agent action with an equally intelligent reviewer model, doubles your compute costs and effectively halves your total token throughput.</p>
+<p>What we have been experimenting with and validating with OpenShell, is the use of formal methods to model and flexibly “prove” that certain invariants in a policy- such as an unintended way to bypass a rule blocking a write to a code repo, or a delete to a production database- are possible. What we found is that while modeling these policies can be complex, and must be kept up to date- there are some really powerful advantages.</p>
+<ul>
+<li>Ability to formally audit or prove invariants at any time</li>
+<li>Deterministic “proof” against our understanding of the policy</li>
+<li>These checks run in the order of milliseconds, no tokens required</li>
+</ul>
+<p>These logic checks do not understand context- for example requesting access to delete a temporary, throw-away repository vs a production repository. But, combined with a human or trusted AI reviewer, these proofs can both provide a formal auditing trail required for running in sensitive, physical (real world), or regulatory controlled environments, AND can provide incredible value to a probabilistic AI reviewer with output that can’t be fooled or misdirected.</p>
+<h2 id="what-does-a-proof-over-your-policy-definition-buy-you">What does a proof over your policy definition buy you?</h2>
+<p>We view formal methods as a very promising area of research into agent control. See more on these proofs in action in adversarial research experiments here: <a href="https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-08-27-adversarial-policy-review-long-horizon-agents/">https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-08-27-adversarial-policy-review-long-horizon-agents/</a></p>
+<p>Formal methods have not just been used for policy verification, they have a long history in critical systems- anywhere from flight control systems, core internet switching and routing, to the package managers that we use every day on our systems to ensure that complex dependencies between software on our systems are matched correctly.</p>
+<p>For many AI researchers, some of us may have taken a class on formal verification in college, but comparatively few have used formal verification in practice. For the remainder of this post, we’ll explore an introduction to algorithmic verification and build a minimal example for agent control in OpenShell from the ground up, using a popular open-source solver.</p>
 <h2 id="sat-smt-and-z3-in-five-minutes">SAT, SMT, and Z3 in five minutes</h2>
-<p>A SAT solver answers whether a Boolean formula is satisfiable.</p>
-<p>Given variables such as <code>a</code> and <code>b</code>, it can find an assignment that makes this
-formula true:</p>
+<p>In computer science and formal methods, a SAT (satisfiability) solver answers whether a Boolean formula is satisfiable. If there are possible values of variables (let’s say x and y) that are true, the SAT solver returns true. If not, it returns false.</p>
+<p>Given variables such as a and b, it can find an assignment that makes this formula true:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>a AND (NOT b)
 </span></code></pre></div>
-<p>An SMT solver extends that style of reasoning with theories: integers, real
-numbers, strings, regular languages, arrays, bit-vectors, and other useful
-domains.</p>
-<p>Z3 is an SMT solver and theorem prover developed by Microsoft Research. Its
-supported theories map conveniently to policy models:</p>
+<p>In contrast, an SMT (satisfiability modulo theories) solver extends that style of reasoning with theories: integers, real numbers, strings, regular languages, arrays, bit-vectors, and other useful domains.</p>
+<p>Z3 is an SMT solver and theorem prover that has been developed and maintained by Microsoft Research. Z3 is general, and we need to build code to map the elements of our specific agent policy to the constructs that Z3 understands.</p>
+<p>For example:</p>
 <ul>
 <li>ports are integers;</li>
 <li>hosts and paths are strings;</li>
-<li>globs can be represented as regular expressions;</li>
+<li>Globs like “<em>”, “</em><em>”, or “/.</em>/**” can be represented as regular expressions;</li>
 <li>policy composition becomes Boolean logic.</li>
 </ul>
-<p>The <a href="https://microsoft.github.io/z3guide/">Z3 Guide</a> is the best reference once
-the examples below feel familiar.</p>
+<p>The <a href="https://microsoft.github.io/z3guide/">Z3 Guide</a> is the best reference once the examples below feel familiar.</p>
 <p>A few constructs cover most of what we need:</p>
 <table>
 <thead>
@@ -1978,293 +1961,182 @@ the examples below feel familiar.</p>
 </tbody>
 </table>
 <p>The direction of the query is important.</p>
-<p>We do not ask Z3 to prove:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>candidate is safe
+<p>We do not ask Z3 to prove this:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>proposed policy addition is safe
 </span></code></pre></div>
-<p>We ask it to find a violation:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>candidate_allows(action)
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>AND NOT maximum_allows(action)
+<p>We have to model the question formally, and answer a very specific question. For example, one of the more general and useful proofs we have modeled in Z3 for this use case asks if a proposed policy can do any actions that a expert pre-defined policy (for example, Github read-only) cannot do. To go back to our earlier example with OpenClaw attempting to bypass layer 7 REST policy inspection, by combinign the access token with a binary using a layer 4 wire protocol, we would have encoded in Z3 that layer 4 capabilities exceed the capabilities of layer 7. Therefore, the combination of a credential (GitHub) plus a binary and network access over layer 4 exceeds the previously allowed combination of the same credential + the ‘gh’ binary over Layer 7 (REST). The prover would immediately catch this and flag a warning.</p>
+<p>The query in this case looks like this-</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>proposed_policy_allows(action)
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>AND NOT safe_policy_allows(action)
 </span></code></pre></div>
-<p>The same thing can be written as a set difference:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Allowed(candidate) ∖ Allowed(maximum) = ∅
+<p>Or the same property can be written as a set difference:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Allowed(candidate) ∖ Allowed(safe_policy) = ∅
 </span></code></pre></div>
-<p>If the solver returns <code>sat</code>, the difference is non-empty and its model gives us
-a concrete member.</p>
-<p>If it returns <code>unsat</code>, no modeled counterexample exists.</p>
+<p>If the solver returns sat, the difference is non-empty- meaning that there exist capabilities in the proposed policy that do not exist in the pre-approved reference policy.</p>
+<p>If it returns unsat, no modeled counterexample exists, meaning that none of our invariants (assumptions) were violated. Let’s try writing a query like this ourselves.</p>
 <h2 id="a-first-containment-query">A first containment query</h2>
-<p>Here is a small example in Z3's native SMT-LIB format. Save it as
-<code>containment.smt2</code> and run:</p>
+<p>Here is a small example in Z3's native SMT-LIB format. Save it as <code>containment.smt2</code> and run:</p>
 <div class="language-console highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="go">z3 containment.smt2</span>
 </span></code></pre></div>
 <p>The example compares two candidate policies against the same maximum.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>(declare-const binary String)
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>(declare-const host String)
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>(declare-const port Int)
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>(declare-const method String)
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>(declare-const path String)
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>(define-fun maximum-allows () Bool
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>  (and (= binary "/usr/bin/gh")
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>       (= host "api.github.com")
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>       (= port 443)
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>       (= method "GET")
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>       (str.prefixof "/repos/NVIDIA/OpenShell/issues/" path)))
-</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>
-</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>(define-fun broad-candidate-allows () Bool
-</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>  (and (= binary "/usr/bin/gh")
-</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>       (= host "api.github.com")
-</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>       (= port 443)
-</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>       (= method "POST")
-</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>       (str.prefixof "/repos/NVIDIA/" path)))
-</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>
-</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>(define-fun narrow-candidate-allows () Bool
-</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>  (and (= binary "/usr/bin/gh")
-</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>       (= host "api.github.com")
-</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>       (= port 443)
-</span><span id="__span-5-25"><a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>       (= method "GET")
-</span><span id="__span-5-26"><a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>       (= path "/repos/NVIDIA/OpenShell/issues/123")))
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>(declare-const layer String)
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>(declare-const method String)
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>(declare-const path String)
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>; The action domain: every request is either raw L4 or inspected REST.
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>(assert (or (= layer "l4") (= layer "rest")))
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>; An enforced REST rule covers only inspected REST traffic.
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>(define-fun maximum-allows () Bool
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>  (and (= binary "/usr/bin/gh")
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>       (= host "api.github.com")
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>       (= port 443)
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>       (= layer "rest")
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>       (= method "GET")
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>       (str.prefixof "/repos/NVIDIA/OpenShell/issues/" path)))
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>
+</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>(define-fun broad-candidate-allows () Bool
+</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>  (and (= binary "/usr/bin/gh")
+</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>       (= host "api.github.com")
+</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>       (= port 443)
+</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>       (= layer "rest")
+</span><span id="__span-5-25"><a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>       (= method "POST")
+</span><span id="__span-5-26"><a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>       (str.prefixof "/repos/NVIDIA/" path)))
 </span><span id="__span-5-27"><a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>
-</span><span id="__span-5-28"><a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>(push)
-</span><span id="__span-5-29"><a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a>(assert (and broad-candidate-allows (not maximum-allows)))
-</span><span id="__span-5-30"><a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a>(check-sat)
-</span><span id="__span-5-31"><a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a>(get-model)
-</span><span id="__span-5-32"><a id="__codelineno-5-32" name="__codelineno-5-32" href="#__codelineno-5-32"></a>(pop)
-</span><span id="__span-5-33"><a id="__codelineno-5-33" name="__codelineno-5-33" href="#__codelineno-5-33"></a>
-</span><span id="__span-5-34"><a id="__codelineno-5-34" name="__codelineno-5-34" href="#__codelineno-5-34"></a>(push)
-</span><span id="__span-5-35"><a id="__codelineno-5-35" name="__codelineno-5-35" href="#__codelineno-5-35"></a>(assert (and narrow-candidate-allows (not maximum-allows)))
-</span><span id="__span-5-36"><a id="__codelineno-5-36" name="__codelineno-5-36" href="#__codelineno-5-36"></a>(check-sat)
-</span><span id="__span-5-37"><a id="__codelineno-5-37" name="__codelineno-5-37" href="#__codelineno-5-37"></a>(pop)
+</span><span id="__span-5-28"><a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>(define-fun narrow-candidate-allows () Bool
+</span><span id="__span-5-29"><a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a>  (and (= binary "/usr/bin/gh")
+</span><span id="__span-5-30"><a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a>       (= host "api.github.com")
+</span><span id="__span-5-31"><a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a>       (= port 443)
+</span><span id="__span-5-32"><a id="__codelineno-5-32" name="__codelineno-5-32" href="#__codelineno-5-32"></a>       (= layer "rest")
+</span><span id="__span-5-33"><a id="__codelineno-5-33" name="__codelineno-5-33" href="#__codelineno-5-33"></a>       (= method "GET")
+</span><span id="__span-5-34"><a id="__codelineno-5-34" name="__codelineno-5-34" href="#__codelineno-5-34"></a>       (= path "/repos/NVIDIA/OpenShell/issues/123")))
+</span><span id="__span-5-35"><a id="__codelineno-5-35" name="__codelineno-5-35" href="#__codelineno-5-35"></a>
+</span><span id="__span-5-36"><a id="__codelineno-5-36" name="__codelineno-5-36" href="#__codelineno-5-36"></a>; A raw L4 rule to the same host and port has no method or path to inspect.
+</span><span id="__span-5-37"><a id="__codelineno-5-37" name="__codelineno-5-37" href="#__codelineno-5-37"></a>; It covers L4 *and* anything that could ride over it, including REST.
+</span><span id="__span-5-38"><a id="__codelineno-5-38" name="__codelineno-5-38" href="#__codelineno-5-38"></a>(define-fun l4-candidate-allows () Bool
+</span><span id="__span-5-39"><a id="__codelineno-5-39" name="__codelineno-5-39" href="#__codelineno-5-39"></a>  (and (= binary "/usr/bin/gh")
+</span><span id="__span-5-40"><a id="__codelineno-5-40" name="__codelineno-5-40" href="#__codelineno-5-40"></a>       (= host "api.github.com")
+</span><span id="__span-5-41"><a id="__codelineno-5-41" name="__codelineno-5-41" href="#__codelineno-5-41"></a>       (= port 443)
+</span><span id="__span-5-42"><a id="__codelineno-5-42" name="__codelineno-5-42" href="#__codelineno-5-42"></a>       (or (= layer "l4") (= layer "rest"))))
+</span><span id="__span-5-43"><a id="__codelineno-5-43" name="__codelineno-5-43" href="#__codelineno-5-43"></a>
+</span><span id="__span-5-44"><a id="__codelineno-5-44" name="__codelineno-5-44" href="#__codelineno-5-44"></a>; Check 1: does the broad candidate exceed the maximum?
+</span><span id="__span-5-45"><a id="__codelineno-5-45" name="__codelineno-5-45" href="#__codelineno-5-45"></a>(push)
+</span><span id="__span-5-46"><a id="__codelineno-5-46" name="__codelineno-5-46" href="#__codelineno-5-46"></a>(assert (and broad-candidate-allows (not maximum-allows)))
+</span><span id="__span-5-47"><a id="__codelineno-5-47" name="__codelineno-5-47" href="#__codelineno-5-47"></a>(check-sat)
+</span><span id="__span-5-48"><a id="__codelineno-5-48" name="__codelineno-5-48" href="#__codelineno-5-48"></a>(get-value (layer method path))
+</span><span id="__span-5-49"><a id="__codelineno-5-49" name="__codelineno-5-49" href="#__codelineno-5-49"></a>(pop)
+</span><span id="__span-5-50"><a id="__codelineno-5-50" name="__codelineno-5-50" href="#__codelineno-5-50"></a>
+</span><span id="__span-5-51"><a id="__codelineno-5-51" name="__codelineno-5-51" href="#__codelineno-5-51"></a>; Check 2: Does the narrow candidate (GET, one issue) exceed the maximum?
+</span><span id="__span-5-52"><a id="__codelineno-5-52" name="__codelineno-5-52" href="#__codelineno-5-52"></a>(push)
+</span><span id="__span-5-53"><a id="__codelineno-5-53" name="__codelineno-5-53" href="#__codelineno-5-53"></a>(assert (and narrow-candidate-allows (not maximum-allows)))
+</span><span id="__span-5-54"><a id="__codelineno-5-54" name="__codelineno-5-54" href="#__codelineno-5-54"></a>(check-sat)
+</span><span id="__span-5-55"><a id="__codelineno-5-55" name="__codelineno-5-55" href="#__codelineno-5-55"></a>(pop)
+</span><span id="__span-5-56"><a id="__codelineno-5-56" name="__codelineno-5-56" href="#__codelineno-5-56"></a>
+</span><span id="__span-5-57"><a id="__codelineno-5-57" name="__codelineno-5-57" href="#__codelineno-5-57"></a>; Check 3: Does the raw L4 rule to the same host and port exceed the maximum?
+</span><span id="__span-5-58"><a id="__codelineno-5-58" name="__codelineno-5-58" href="#__codelineno-5-58"></a>(push)
+</span><span id="__span-5-59"><a id="__codelineno-5-59" name="__codelineno-5-59" href="#__codelineno-5-59"></a>(assert (and l4-candidate-allows (not maximum-allows)))
+</span><span id="__span-5-60"><a id="__codelineno-5-60" name="__codelineno-5-60" href="#__codelineno-5-60"></a>(check-sat)
+</span><span id="__span-5-61"><a id="__codelineno-5-61" name="__codelineno-5-61" href="#__codelineno-5-61"></a>(get-value (layer method path))
+</span><span id="__span-5-62"><a id="__codelineno-5-62" name="__codelineno-5-62" href="#__codelineno-5-62"></a>(pop)
 </span></code></pre></div>
-<p>The first check returns <code>sat</code>.</p>
-<p>One possible model is:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>method = "POST"
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>path   = "/repos/NVIDIA/"
+<p>The first check returns sat, and the get-model above returns the witness below- a write to the root of the org that the safe (maximal) policy never permitted.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>sat                                                  ; check 1: broad candidate
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>((layer "rest") (method "POST") (path "/repos/NVIDIA/"))
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>unsat                                                ; check 2: narrow candidate
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>sat                                                  ; check 3: raw L4
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>((layer "l4") (method "") (path ""))
 </span></code></pre></div>
-<p>That action is permitted by the broad candidate and not by the read-only
-maximum.</p>
-<p>The narrow candidate returns <code>unsat</code>: its exact GET request is contained by the
-maximum.</p>
-<p><code>push</code> and <code>pop</code> create temporary solver scopes. They are convenient when
-several related queries share one base model. OpenShell's current containment
-function creates a fresh solver for each containment query; some earlier
-verification experiments used incremental scopes to run several risk queries
-over the same reachability model.</p>
-<p>There is also no explicit <code>exists</code> in the source.</p>
-<p>Because <code>binary</code>, <code>host</code>, <code>port</code>, <code>method</code>, and <code>path</code> are declared without fixed
-values, Z3 is free to choose them. Operationally, satisfiability is answering:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>exists action:
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    candidate_allows(action)
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    AND NOT maximum_allows(action)
+<p>The second check returns unsat. Every action the narrow candidate allows is already allowed inside the maximum. The third check is the OpenClaw story from earlier. The layer 4 candidate names the same host and port as is in our reference maximum policy, but over layer 4, which uses a wire protocol that cannot be enforced by OpenShell. The prover returns <code>sat</code> with <code>layer = l4</code> and an empty method and path. In this case, we didn’t have to explicitly write a rule saying that L4 is broader than L7 REST, it effectively falls out of the encoding.</p>
+<h2 id="how-to-encode-the-full-openshell-policy-as-formal-logic">How to encode the full OpenShell policy as formal logic</h2>
+<p>OpenShell’s runtime prover models the following attributes for any network action:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>action = {
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>  binary: String,
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>  host: String,
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>  port: Int,
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>  layer: String,
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>  method: String,
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>  path: String
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>}
 </span></code></pre></div>
-<p>Avoiding explicit quantifiers where possible keeps the SMT model simpler and
-tends to make solver behavior easier to reason about.</p>
-<h2 id="encoding-openshell-policy-as-formal-logic">Encoding OpenShell policy as formal logic</h2>
-<p>OpenShell models one symbolic network action:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>action = {
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>  binary: String,
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>  host: String,
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>  port: Int,
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>  layer: String,
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>  method: String,
-</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>  path: String
-</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>}
+<p><strong>Note:</strong> the example action above is just a subset, the OpenShell runtime also covers filesystem, process, credential, and inference containment.</p>
+<p>We use code written in Rust to encode any policy changes proposed by agents into actions that can be checked by Z3. Once encoded, we can run a variety of checks. The first, a very general check- asks if the candidate (proposed) policy can do anything that the reference (safe) policy cannot do.</p>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">candidate_allows</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">policy_allows</span><span class="p">(</span><span class="n">candidate</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">action</span><span class="p">);</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="kd">let</span><span class="w"> </span><span class="n">maximum_allows</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">policy_allows</span><span class="p">(</span><span class="n">maximum</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">action</span><span class="p">);</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">solver</span><span class="p">.</span><span class="n">assert</span><span class="p">(</span><span class="n">Bool</span><span class="p">::</span><span class="n">and</span><span class="p">(</span><span class="o">&amp;</span><span class="p">[</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="n">candidate_allows</span><span class="p">,</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">    </span><span class="o">!</span><span class="n">maximum_allows</span><span class="p">,</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="p">]));</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="k">match</span><span class="w"> </span><span class="n">solver</span><span class="p">.</span><span class="n">check</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">    </span><span class="n">SatResult</span><span class="p">::</span><span class="n">Unsat</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">MaximumPolicyCheck</span><span class="p">::</span><span class="n">WithinMax</span><span class="p">,</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">    </span><span class="n">SatResult</span><span class="p">::</span><span class="n">Sat</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="n">model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">solver</span><span class="p">.</span><span class="n">get_model</span><span class="p">().</span><span class="n">expect</span><span class="p">(</span><span class="s">"sat result has a model"</span><span class="p">);</span>
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="n">counterexample</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">counterexample_from_model</span><span class="p">(</span><span class="o">&amp;</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">action</span><span class="p">)</span>
+</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="w">            </span><span class="p">.</span><span class="n">expect</span><span class="p">(</span><span class="s">"model contains a symbolic action"</span><span class="p">);</span>
+</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="w">        </span><span class="n">MaximumPolicyCheck</span><span class="p">::</span><span class="n">ExceedsMax</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">counterexample</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-8-16"><a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-8-17"><a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a><span class="w">    </span><span class="n">SatResult</span><span class="p">::</span><span class="n">Unknown</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">MaximumPolicyCheck</span><span class="p">::</span><span class="n">Unsupported</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-8-18"><a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a><span class="w">        </span><span class="n">reason</span><span class="p">:</span><span class="w"> </span><span class="s">"Z3 returned unknown"</span><span class="p">.</span><span class="n">to_owned</span><span class="p">(),</span>
+</span><span id="__span-8-19"><a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a><span class="w">    </span><span class="p">},</span>
+</span><span id="__span-8-20"><a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a><span class="p">}</span>
 </span></code></pre></div>
-<p>Rust parses and normalizes the policy schema, then builds two Boolean predicates
-over the same symbolic action:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>candidate_allows(action)
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>maximum_allows(action)
-</span></code></pre></div>
-<p>At the center of the containment check is essentially:</p>
-<div class="language-rust highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">candidate_allows</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">policy_allows</span><span class="p">(</span><span class="n">candidate</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">action</span><span class="p">);</span>
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="kd">let</span><span class="w"> </span><span class="n">maximum_allows</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">policy_allows</span><span class="p">(</span><span class="n">maximum</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">action</span><span class="p">);</span>
-</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">solver</span><span class="p">.</span><span class="n">assert</span><span class="p">(</span><span class="n">Bool</span><span class="p">::</span><span class="n">and</span><span class="p">(</span><span class="o">&amp;</span><span class="p">[</span>
-</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">    </span><span class="n">candidate_allows</span><span class="p">,</span>
-</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">    </span><span class="o">!</span><span class="n">maximum_allows</span><span class="p">,</span>
-</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="p">]));</span>
-</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>
-</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="k">match</span><span class="w"> </span><span class="n">solver</span><span class="p">.</span><span class="n">check</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">    </span><span class="n">SatResult</span><span class="p">::</span><span class="n">Unsat</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">MaximumPolicyCheck</span><span class="p">::</span><span class="n">WithinMax</span><span class="p">,</span>
-</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">    </span><span class="n">SatResult</span><span class="p">::</span><span class="n">Sat</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="n">model</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">solver</span><span class="p">.</span><span class="n">get_model</span><span class="p">().</span><span class="n">expect</span><span class="p">(</span><span class="s">"sat result has a model"</span><span class="p">);</span>
-</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="w">        </span><span class="kd">let</span><span class="w"> </span><span class="n">counterexample</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">counterexample_from_model</span><span class="p">(</span><span class="o">&amp;</span><span class="n">model</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">action</span><span class="p">)</span>
-</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="w">            </span><span class="p">.</span><span class="n">expect</span><span class="p">(</span><span class="s">"model contains a symbolic action"</span><span class="p">);</span>
-</span><span id="__span-10-15"><a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a><span class="w">        </span><span class="n">MaximumPolicyCheck</span><span class="p">::</span><span class="n">ExceedsMax</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">counterexample</span><span class="w"> </span><span class="p">}</span>
-</span><span id="__span-10-16"><a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a><span class="w">    </span><span class="p">}</span>
-</span><span id="__span-10-17"><a id="__codelineno-10-17" name="__codelineno-10-17" href="#__codelineno-10-17"></a><span class="w">    </span><span class="n">SatResult</span><span class="p">::</span><span class="n">Unknown</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">MaximumPolicyCheck</span><span class="p">::</span><span class="n">Unsupported</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-10-18"><a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a><span class="w">        </span><span class="n">reason</span><span class="p">:</span><span class="w"> </span><span class="s">"Z3 returned unknown"</span><span class="p">.</span><span class="n">to_owned</span><span class="p">(),</span>
-</span><span id="__span-10-19"><a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a><span class="w">    </span><span class="p">},</span>
-</span><span id="__span-10-20"><a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a><span class="p">}</span>
-</span></code></pre></div>
-<p>The policy itself becomes nested conjunctions and disjunctions.</p>
 <p>Conceptually:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>policy_allows(a) = ⋁ rule_allows(rule, a)
-</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
-</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>rule_allows(rule, a) =
-</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>  binary_matches(rule, a) ∧ endpoint_matches(rule, a)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>policy_allows(a) = ⋁ rule_allows(rule, a)
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>rule_allows(rule, a) =
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>  binary_matches(rule, a) ∧ endpoint_matches(rule, a)
 </span></code></pre></div>
-<p>An endpoint constrains the host and port. When L7 inspection is active, it also
-constrains things such as methods and paths.</p>
-<p>OpenShell supports <code>*</code> and <code>**</code> glob semantics. These are compiled into Z3
-regular expressions. A single <code>*</code> cannot cross the relevant separator — <code>/</code> for
-paths or <code>.</code> for hosts — while <code>**</code> can. Z3's regular-expression theory then
-checks whether the symbolic string belongs to the resulting language.</p>
-<p>This matters because the network layer is part of the authority being proved.</p>
-<p>Raw L4 authority over a binary, host, and port is broader than inspected L7
-authority over the same connection. L4 does not preserve REST methods and
-paths, GraphQL operations and fields, or MCP tools and resources. A raw network
-grant can therefore include actions that would have been excluded by
-protocol-specific controls.</p>
-<p>That interaction is easy to miss when reviewing one rule at a time. In the
-logical model, the two grants denote different sets of actions.</p>
-<h2 id="a-managed-maximum">A managed maximum</h2>
-<p>We use the containment query as the basis for a managed maximum.</p>
-<p>The maximum is owned by the gateway and acts as a ceiling. It does not grant the
-sandbox access by itself.</p>
-<p>Before creating a sandbox or committing an authority-changing update, the
-gateway evaluates the fully composed sandbox and provider policy against that
-ceiling.</p>
-<p>For an agent-authored proposal, the result can be:</p>
-<ul>
-<li><strong>Apply:</strong> the proposed authority is inside the maximum's auto-eligible region.</li>
-<li><strong>Ask:</strong> it is inside the maximum but intersects authority marked for review,
-  or the sandbox is running in managed ask mode.</li>
-<li><strong>Reject:</strong> it exceeds the maximum or depends on a policy surface the prover
-  does not support.</li>
-</ul>
-<p>The gateway recomputes containment against live policy and provider state
-immediately before persistence.</p>
-<p>That last step matters. A proposal that passed earlier is evidence that a
-particular state was acceptable; it is not a reusable capability token.</p>
-<h2 id="what-we-learned-to-model">What we learned to model</h2>
-<p>Our first OpenShell experiments asked targeted questions: could a binary reach
-link-local metadata, did a proposal expand credential-bearing reach, could raw
-L4 access bypass L7 inspection, or did it add methods to an already reachable
-endpoint?</p>
-<p>Those checks were useful because they encoded security expertise and produced
-concrete evidence for reviewers. As we worked with them, we found two patterns
-worth separating.</p>
-<p>The first was general policy comparison. A maximum-boundary check asks whether
-a candidate remains inside an operator-defined ceiling. A narrowness check asks
-how much authority the candidate adds relative to the action that caused the
-denial. Both apply broadly to agent permission changes without requiring us to
-predict every possible misuse.</p>
-<p>The second was the value of domain-specific invariants. Subject-matter experts
-often know the properties they care most about preserving: an agent must not
-reach a metadata service, bypass required L7 inspection, or gain a credentialed
-mutation path to a protected resource. Encoding those properties in logic lets
-the prover search for a concrete counterexample as the policy changes.</p>
-<p>We saw this in our <a href=".././2026-08-27-adversarial-policy-review-long-horizon-agents/">long-horizon adversarial experiment</a>.
-An agent proposed a GitHub write permission bound to an apparently constrained
-process. The prover reported the resulting credential-reach expansion, helping
-the reviewer recognize that the proposal still enabled the protected write.</p>
-<p>One practical lesson was to make each result's role explicit. Some invariants
-should prevent a change outright. Other findings are better presented as
-context for a reviewer. The managed maximum provides the general boundary
-around both.</p>
-<p>The other lesson was to keep the scope of the proof visible. Our initial model
-covered L4, REST, and WebSocket authority, while unsupported GraphQL and MCP
-surfaces failed closed. The current containment path also covers filesystem
-paths, although that comparison is implemented directly in Rust. GraphQL, MCP,
-query matchers, and CIDR-based <code>allowed_ips</code> still require additional modeling
-before a containment result can make claims about them.</p>
-<h2 id="can-least-privilege-have-a-budget">Can least privilege have a budget?</h2>
-<p>Containment tells us whether a candidate stays below the maximum.</p>
-<p>It does not tell us whether the candidate is a good response to the denial that
-caused the agent to request more access.</p>
-<p>Suppose the maximum allows read access across an organization's GitHub
-repositories. An agent needs to read one issue and proposes:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>GET /repos/NVIDIA/**
-</span></code></pre></div>
-<p>That proposal may be fully contained by the maximum while still being much
-broader than the task required.</p>
-<p>We have started experimenting with a second comparison:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>delta(action) =
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    candidate_allows(action)
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    AND NOT current_policy_allows(action)
-</span></code></pre></div>
-<p>For each proposed grant, Z3 can determine whether it adds new authority and
-return a representative new action.</p>
-<p>The current spike then evaluates the shape of that grant in Rust.</p>
-<p>An exact addition can have a low cost. A wildcard costs more. A recursive <code>**</code>
-costs more again. Replacing inspected L7 authority with raw L4 access carries a
-much larger cost.</p>
-<p>A conservative budget could permit one exact addition while routing broader
-changes to review.</p>
-<p>This is deliberately a hybrid.</p>
-<p>Z3 is not measuring the cardinality of an often-infinite action set. It
-establishes that semantic expansion exists and can produce examples of that
-expansion. The budget is a product policy over structural features of the
-proposed grant.</p>
-<p>Whether those features and weights correspond well enough to operational risk
-is something we still need to test.</p>
-<p>Maximum containment is further along as an admission boundary. Least-privilege
-budgets are an experiment.</p>
-<p>A few questions we want to explore:</p>
-<ul>
-<li>Can denials and solver counterexamples help agents draft narrower policy
-  changes on the next attempt?</li>
-<li>Can we define useful notions of semantic breadth for GraphQL operations and
-  MCP tools without reducing them to fragile syntax scores?</li>
-<li>How should many individually small permission changes accumulate over a
-  long-running task or a tree of delegated agents?</li>
-</ul>
-<h2 id="where-models-still-belong">Where models still belong</h2>
-<p>A containment proof only answers the question encoded in the property.</p>
-<p>It does not know why an agent wants access. It does not know whether the user's
-request makes an action appropriate. It cannot weigh business context,
-reversibility, or unusual combinations that were never represented in the
-model.</p>
-<p>Those are reasons to keep model-based and human review in the system.</p>
-<p>An approval flow we are exploring looks roughly like this:</p>
-<figure class="dev-note-figure">
-  <img src="../../../assets/agent-policy-prover/approval-flow.svg" alt="A proposed policy change passes through within formal boundary and needs contextual judgment decisions before reject and counterexample, apply, model or human review, and enforce and audit outcomes. H also leads to enforce and audit.">
-</figure>
-
-<p>There is precedent for combining these kinds of mechanisms.</p>
-<p><a href="https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/#building-guardrails">OpenAI</a>
-describes combining model-based and rules-based guardrails.
-<a href="https://www.anthropic.com/research/trustworthy-agents">Anthropic's work on trustworthy agents</a>
-treats safety as a property of the model, harness, tools, and environment
-together. <a href="https://arxiv.org/abs/2510.05156">Google DeepMind's VeriGuard</a>
-similarly places verification between proposed agent behavior and execution.</p>
-<p>Our working rule is simple: use a formal check when the boundary can be stated
-precisely, and do not ask the formal model to answer questions it was not built
-to represent.</p>
-<p>Likewise, a contextual reviewer should not silently override a hard invariant
-just because the request sounds convincing.</p>
-<p>Keeping those roles explicit makes the resulting authority easier to reason
-about.</p>
-<h2 id="start-with-one-decision">Start with one decision</h2>
-<p>The core containment query is small:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>candidate_allows(x)
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>AND NOT maximum_allows(x)
-</span></code></pre></div>
-<p>You do not need to begin by formally specifying an entire agent or proving a
-neural network correct. Pick one consequential decision with inputs you can
-model, write down one property you want to preserve, and put the check somewhere
-that can actually enforce the result.</p>
-<p>For OpenShell, that decision is whether an agent may change its own sandbox
-authority.</p>
-<p>SMT solving gives us a different artifact from another review of the request:
-either a counterexample showing authority outside the maximum, or a proof that
-no such action exists under the modeled semantics.</p>
-<p>There is plenty we have not modeled yet, and least-privilege budgeting is still
-an experiment. That is part of what makes this area useful to work on in the
-open.</p>
-<p>If you are building agent policies, tool permissions, or another constrained
-action surface, try writing down the action space explicitly and asking the
-solver for the counterexample.</p>
-<p>Sometimes the useful part of formal methods is not proving a large system
-correct. It is making one boundary precise enough that the system can answer for
-itself.</p>
+<p>This is where you start to see some of the complexity of modeling an entire policy language. For example, OpenShell supports <code>*</code> and <code>**</code> glob semantics. These are compiled into Z3 regular expressions. As humans that are familiar with glob mechanics, we know that a single <code>*</code> cannot cross <code>/</code> for paths or <code>.</code> for hosts- while <code>**</code> can. So, we use our Rust code to encode this logic. Z3's regular-expression theory can then check for us whether the symbolic string belongs to the resulting language. For a deep-dive on our research around containment, check out the OpenShell spike on maximum policies and narrowness budgets here: <a href="https://github.com/NVIDIA/OpenShell/blob/spike/maximal-policy-prover-subset/crates/openshell-prover/MAXIMUM_POLICY_ENVELOPE_SPIKE.md">https://github.com/NVIDIA/OpenShell/blob/spike/maximal-policy-prover-subset/crates/openshell-prover/MAXIMUM_POLICY_ENVELOPE_SPIKE.md</a>.</p>
+<h2 id="expert-queries-are-just-more-formulas">Expert queries are just more formulas!</h2>
+<p>In the examples above, we have used a very general and extensible query, essentially asking if one proposed policy, however complex it is, is a subset of another safe policy that we have already reviewed. But, once we have the policy language modeled in Z3, we can ask about anything we want to.</p>
+<p>OpenShell’s policy advisor has four expert security checks built in, that run on any proposed policy and that are provided to the human or agent reviewer for approval. In adversarial testing, we have found that providing the results of these checks- which cannot be fooled, manipulated, or defeated directly, as context to an agent reviewer as an incredibly valuable way to increase the trustworthiness of agentic or human reviewers. Read more here: <a href="https://docs.nvidia.com/openshell/sandboxes/policy-advisor">https://docs.nvidia.com/openshell/sandboxes/policy-advisor</a>.</p>
+<p>Today, the OpenShell policy prover encodes the following expert queries which run on every proposed policy before approval. From the docs:</p>
+<table>
+<thead>
+<tr>
+<th>Category</th>
+<th>Triggered when</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>link_local_reach</code></td>
+<td>A rule reaches 169.254.0.0/16, fe80::/10, or a known metadata hostname.</td>
+</tr>
+<tr>
+<td><code>l7_bypass_credentialed</code></td>
+<td>A binary using a wire protocol the L7 proxy cannot inspect (git-remote-https, ssh, nc) gains reach to a host where a credential is in scope.</td>
+</tr>
+<tr>
+<td><code>credential_reach_expansion</code></td>
+<td>A binary gains credentialed reach to a (host, port) it could not reach before.</td>
+</tr>
+<tr>
+<td><code>capability_expansion</code></td>
+<td>On a (binary, host, port) that already had credentialed reach, the proposal adds a new HTTP method. The finding cites the specific method.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="conclusion">Conclusion</h2>
+<p>We’re incredibly excited about the promise of formal methods to help govern, audit, and build trustworthiness with agents over long horizon and continuously expanding and important tasks. If you’re working with formal methods, or interested in contributing to OpenShell- please reach out to us on the CNCF Slack, or join our weekly community meetings (sign up at <a href="https://github.com/NVIDIA/OpenShell">https://github.com/NVIDIA/OpenShell</a>).</p>
 <h2 id="resources">Resources</h2>
+<p>Definitive references for Z3, once the examples above start to feel familiar</p>
 <ul>
 <li><a href="https://microsoft.github.io/z3guide/">Z3 Guide</a></li>
 <li><a href="https://www.microsoft.com/en-us/research/?p=825739">Z3: An Efficient SMT Solver</a></li>
 <li><a href="https://microsoft.github.io/z3guide/docs/theories/Regular%20Expressions/">Z3 regular expressions</a></li>
 <li><a href="https://github.com/Z3Prover/z3">Z3 source and language bindings</a></li>
+</ul>
+<p>DeepMind’s verified code generation approach to the same problem-</p>
+<ul>
 <li><a href="https://arxiv.org/abs/2510.05156">VeriGuard: Enhancing LLM Agent Safety via Verified Code Generation</a></li>
+</ul>
+<p>Blogs on AI review of agent permissions</p>
+<ul>
 <li><a href="https://www.anthropic.com/research/trustworthy-agents">Trustworthy agents in practice</a></li>
 <li><a href="https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/">A practical guide to building AI agents</a></li>
 </ul>
