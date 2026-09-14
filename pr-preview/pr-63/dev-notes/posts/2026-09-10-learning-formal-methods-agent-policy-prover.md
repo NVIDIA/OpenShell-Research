@@ -50,7 +50,7 @@ card_tags:
   <img src="../../assets/agent-policy-prover/hero-concept.png" alt="Five colorful clusters of connected AI agent nodes sit within a green policy boundary while a red path crosses the boundary and is stopped by a proof marker.">
 </figure>
 
-In this post- we’ll dive into how permission review breaks at agent scale, and how to use the Z3 open source library to write a formal proof that a policy change proposed by an agent stays inside what you approved.
+In this post- we’ll dive into how permission review breaks at agent scale, and how to use the [Z3 open source library](https://github.com/Z3Prover/z3) to write a formal proof that a policy change proposed by an agent stays inside what you approved.
 
 ## Why permission review breaks at agent scale
 
@@ -61,7 +61,7 @@ As these use cases expand, a few things start to happen:
 - Agent needs evolve. As they go about their tasks, agents will need access to data stores, coding repos, ability to search the internet, and to execute detailed simulations and tests.
 - Human supervision stops scaling. At the scale these need to run, human supervision over all agents itself becomes impossible.
 
-This raises a hard question. How can we guarantee that a group of agents working together- each with its own scoped policy- do not exceed the permissions that we granted to the overall system? For example, imagine one agent with write access to the Internet, and another with access to security tooling, or a broadly scoped charter like “do competitive research”- stay on track and within the intent of the human operator?
+This raises a hard question: how can we guarantee that a group of agents working together—each with its own scoped policy—does not exceed the permissions granted to the overall system? Imagine one agent with write access to the internet, another with access to security tooling, or a group working under a broadly scoped charter like “do competitive research.” How do we keep the system within the intent of the human operator?
 
 This requires a new set of controls and mechanisms that allow us to stop squinting at a list of sandbox permissions and to start thinking in a higher level and more declarative way. In this post, we’ll dive into some of the research we have been doing in this area on the OpenShell team, specifically around the use of formal methods, to build a “proof” of the capabilities of not just a single agent, but an entire agent system.
 
@@ -73,9 +73,9 @@ Clever. And it brought up a point, that between sandbox/runtime policies for net
 
 ## Previous work - proving EC2, IAM, and S3 policies at AWS
 
-Back in the 2016 timeframe, members of our team were working at AWS and faced a similar challenge. Given all of the awesome complexity of AWS IAM policies, AWS S3 storage policies, historical version support- can we definitively say whether an object in S3 is accessible to the public Internet or not?
+Back in the 2016 timeframe, members of our team were working at AWS and faced a similar challenge. Given all of the awesome complexity of AWS IAM policies, AWS S3 storage policies, historical version support- can we definitively say whether an object in S3 is accessible to the public internet or not?
 
-Today, this sounds kind of funny, and it did in 2016 too, until you think about the complexity and layering interactions possible between the policies that we write to control systems. Byron Cook’s team of Ph.D’s came up with a clever approach, code-named Zelkova, that now runs once per day for every S3 bucket policy- millions of SMT queries per day and definitively answers this question.
+Today, this sounds kind of funny, and it did in 2016 too, until you think about the complexity and layering interactions possible between the policies that we write to control systems. [Byron Cook and colleagues at AWS](https://www.amazon.science/publications/semantic-based-automated-reasoning-for-aws-access-policies-using-smt) developed Zelkova, which formalizes AWS access policies as SMT formulas and was already invoked millions of times daily when they published their work in 2018. That effort has since grown across AWS; later work describes [scaling to a billion SMT queries per day](https://link.springer.com/chapter/10.1007/978-3-031-13185-1_1).
 
 The idea was to use formal methods, specifically a theorem solver- to formally model IAM, S3, and EC2 policies. Once we have these policies and their interactions modeled in formal logic, we could construct a proof that our invariants (things that we expect to be true) hold up. This ended up being quite successful, and has the added benefit that after the intensive task of modeling complex policies in formal logic, the actual queries across them could be made quite fast and scaled horizontally across compute.
 
@@ -103,7 +103,7 @@ For many AI researchers, some of us may have taken a class on formal verificatio
 
 ## SAT, SMT, and Z3 in five minutes
 
-In computer science and formal methods, a SAT (satisfiability) solver answers whether a Boolean formula is satisfiable. If there are possible values of variables (let’s say x and y) that are true, the SAT solver returns true. If not, it returns false.
+In computer science and formal methods, a [SAT (satisfiability) solver](https://en.wikipedia.org/wiki/Boolean_satisfiability_problem) answers whether a Boolean formula is satisfiable. If there are possible values of variables (let’s say x and y) that are true, the SAT solver returns true. If not, it returns false.
 
 Given variables such as a and b, it can find an assignment that makes this formula true:
 
@@ -111,7 +111,7 @@ Given variables such as a and b, it can find an assignment that makes this formu
 a AND (NOT b)
 ```
 
-In contrast, an SMT (satisfiability modulo theories) solver extends that style of reasoning with theories: integers, real numbers, strings, regular languages, arrays, bit-vectors, and other useful domains.
+In contrast, an [SMT (satisfiability modulo theories) solver](https://en.wikipedia.org/wiki/Satisfiability_modulo_theories) extends that style of reasoning with theories: integers, real numbers, strings, regular languages, arrays, bit-vectors, and other useful domains.
 
 Z3 is an SMT solver and theorem prover that has been developed and maintained by Microsoft Research. Z3 is general, and we need to build code to map the elements of our specific agent policy to the constructs that Z3 understands.
 
@@ -304,7 +304,7 @@ rule_allows(rule, a) =
   binary_matches(rule, a) ∧ endpoint_matches(rule, a)
 ```
 
-This is where you start to see some of the complexity of modeling an entire policy language. For example, OpenShell supports `*` and `**` glob semantics. These are compiled into Z3 regular expressions. As humans that are familiar with glob mechanics, we know that a single `*` cannot cross `/` for paths or `.` for hosts- while `**` can. So, we use our Rust code to encode this logic. Z3's regular-expression theory can then check for us whether the symbolic string belongs to the resulting language. For a deep-dive on our research around containment, check out the OpenShell spike on maximum policies and narrowness budgets here: <https://github.com/NVIDIA/OpenShell/blob/spike/maximal-policy-prover-subset/crates/openshell-prover/MAXIMUM_POLICY_ENVELOPE_SPIKE.md>.
+This is where you start to see some of the complexity of modeling an entire policy language. For example, OpenShell supports `*` and `**` glob semantics. These are compiled into Z3 regular expressions. As humans that are familiar with glob mechanics, we know that a single `*` cannot cross `/` for paths or `.` for hosts- while `**` can. So, we use our Rust code to encode this logic. Z3's regular-expression theory can then check for us whether the symbolic string belongs to the resulting language. That scope is deliberate: OpenShell models a regular-language fragment rather than arbitrary language-specific regular expressions with features such as backreferences, and unsupported policy surfaces fail closed. For a deep-dive on our research around containment, check out the OpenShell spike on maximum policies and narrowness budgets here: <https://github.com/NVIDIA/OpenShell/blob/spike/maximal-policy-prover-subset/crates/openshell-prover/MAXIMUM_POLICY_ENVELOPE_SPIKE.md>.
 
 ## Expert queries are just more formulas!
 
