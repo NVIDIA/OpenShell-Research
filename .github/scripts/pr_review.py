@@ -12,7 +12,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 import yaml
-from ci_scope import new_project_paths, project_task
+from ci_scope import PROJECT_KIND_BY_DIRECTORY, new_project_paths, project_task
 from github_api import GitHub, GitHubError
 from review_report import find_existing_report
 
@@ -41,11 +41,21 @@ def resolve_request(github, context):
     projects = next((entry for entry in base_tree if entry["path"] == "projects"), None)
     existing = set()
     if projects and projects["type"] == "tree":
-        existing = {
-            entry["path"]
-            for entry in github.request("GET", f"git/trees/{projects['sha']}")["tree"]
-            if entry["type"] == "tree"
-        }
+        project_types = github.request("GET", f"git/trees/{projects['sha']}")["tree"]
+        for project_type in project_types:
+            if (
+                project_type["type"] != "tree"
+                or project_type["path"] not in PROJECT_KIND_BY_DIRECTORY
+            ):
+                continue
+            projects_of_type = github.request(
+                "GET", f"git/trees/{project_type['sha']}"
+            )["tree"]
+            existing.update(
+                f"projects/{project_type['path']}/{entry['path']}"
+                for entry in projects_of_type
+                if entry["type"] == "tree"
+            )
     tasks = []
     errors = []
     for index, path in enumerate(new_project_paths(files, existing), start=1):

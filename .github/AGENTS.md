@@ -15,7 +15,7 @@
   CLI, without another Python dependency.
 - Run request and profile tests in the OAR uv environment (which supplies PyYAML).
 - Run offline routing, transport, input, and report tests, including the complete
-  PR-flow integration, with `uv run --project projects/openshell-agent-runner
+  PR-flow integration, with `uv run --project projects/tools/openshell-agent-runner
   pytest tests/test_ci_scope.py tests/test_github_api.py tests/test_*review*.py`.
 - Keep the live integration focused on execution contracts, not expected
   reviewer verdicts. It never posts a PR assessment.

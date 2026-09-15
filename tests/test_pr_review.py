@@ -46,9 +46,10 @@ class MockGitHub:
             "head": {"sha": HEAD, "repo": {"full_name": self.repository}},
             "base": {"sha": BASE, "ref": "main"},
         }
-        self.files = [{"filename": "projects/new/README.md", "status": "added"}]
+        self.files = [{"filename": "projects/tools/new/README.md", "status": "added"}]
         self.base_tree = [{"path": "projects", "type": "tree", "sha": "projects-tree"}]
-        self.projects_tree = [{"path": "existing", "type": "tree"}]
+        self.projects_tree = [{"path": "tools", "type": "tree", "sha": "tools-tree"}]
+        self.tools_tree = [{"path": "existing", "type": "tree"}]
         self.metadata = "kind: tool\n"
         self.metadata_type = "file"
         self.error = None
@@ -63,6 +64,8 @@ class MockGitHub:
             return {"tree": self.base_tree}
         if path == "git/trees/projects-tree":
             return {"tree": self.projects_tree}
+        if path == "git/trees/tools-tree":
+            return {"tree": self.tools_tree}
         if path.startswith("contents/projects/") and path.endswith(
             f"/project.yaml?ref={HEAD}"
         ):
@@ -98,7 +101,7 @@ class RequestTests(unittest.TestCase):
         self.assertEqual((request["head"], request["base"]), (HEAD, BASE))
         self.assertEqual(request["tasks"][0]["task"], "review-tool")
         self.assertIn(
-            ("GET", f"contents/projects/new/project.yaml?ref={HEAD}", None),
+            ("GET", f"contents/projects/tools/new/project.yaml?ref={HEAD}", None),
             self.github.calls,
         )
         self.assertFalse(any("actions/" in path for _, path, _ in self.github.calls))
@@ -130,12 +133,12 @@ class RequestTests(unittest.TestCase):
             self.assertIsNone(resolve_request(self.github, {"event_name": event}))
 
     def test_existing_project_needs_no_metadata(self):
-        self.github.files[0]["filename"] = "projects/existing/new-file.py"
+        self.github.files[0]["filename"] = "projects/tools/existing/new-file.py"
         self.assertIsNone(resolve_request(self.github, self.context))
         self.assertFalse(any("contents/" in path for _, path, _ in self.github.calls))
 
     def test_existing_report_is_retired_when_review_no_longer_applies(self):
-        self.github.files[0]["filename"] = "projects/existing/new-file.py"
+        self.github.files[0]["filename"] = "projects/tools/existing/new-file.py"
         self.github.comments = [
             {
                 "id": 9,
@@ -156,14 +159,14 @@ class RequestTests(unittest.TestCase):
         self.github.base_tree = []
         self.assertEqual(
             resolve_request(self.github, self.context)["tasks"][0]["input"],
-            "projects/new",
+            "projects/tools/new",
         )
 
     def test_multiple_new_projects_and_encoded_names(self):
         self.github.files.extend(
             [
-                {"filename": "projects/second/README.md", "status": "added"},
-                {"filename": "projects/a space/README.md", "status": "added"},
+                {"filename": "projects/tools/second/README.md", "status": "added"},
+                {"filename": "projects/tools/a space/README.md", "status": "added"},
             ]
         )
         self.github.pr["changed_files"] = 3
@@ -173,7 +176,11 @@ class RequestTests(unittest.TestCase):
             ["review-1", "review-2", "review-3"],
         )
         self.assertIn(
-            ("GET", f"contents/projects/a%20space/project.yaml?ref={HEAD}", None),
+            (
+                "GET",
+                f"contents/projects/tools/a%20space/project.yaml?ref={HEAD}",
+                None,
+            ),
             self.github.calls,
         )
 
@@ -189,7 +196,7 @@ class RequestTests(unittest.TestCase):
             with self.subTest(metadata=metadata):
                 self.github.metadata = metadata
                 request = resolve_request(self.github, self.context)
-                self.assertIn("projects/new/project.yaml", request["reason"])
+                self.assertIn("projects/tools/new/project.yaml", request["reason"])
                 self.assertEqual(request["tasks"], [])
         self.github.error = GitHubError("Not found", status=404)
         self.assertIn("Missing", resolve_request(self.github, self.context)["reason"])
@@ -264,7 +271,7 @@ class RequestTests(unittest.TestCase):
                 )
 
     def test_cli_marks_report_retirement_as_not_ready_for_inference(self):
-        self.github.files[0]["filename"] = "projects/existing/new-file.py"
+        self.github.files[0]["filename"] = "projects/tools/existing/new-file.py"
         self.github.comments = [
             {
                 "id": 9,

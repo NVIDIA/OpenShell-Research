@@ -13,7 +13,7 @@ for the reusable edge architecture, implementation decisions, challenges, and
 demo result.
 
 Follow the **[project-local onboard setup
-tutorial](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/ONBOARD_SETUP.md)**
+tutorial](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/use-case-examples/reachy-mini-openshell/ONBOARD_SETUP.md)**
 for the copy-and-run build, installation, policy verification, voice demo, and
 troubleshooting steps.
 
@@ -37,12 +37,12 @@ The tutorial progressively adds:
 ## Project resources
 
 - [Implementation Dev Note](../../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell.md)
-- [Onboard setup and troubleshooting tutorial](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/ONBOARD_SETUP.md)
-- [Application source and README](https://github.com/NVIDIA/OpenShell-Research/tree/kirit93/reachy-implementation/projects/reachy-mini-openshell)
-- [Motion-disabled policy](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/openshell/policy-motion-disabled.yaml)
-- [Camera-enabled, motion-disabled policy](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/openshell/policy-camera-enabled-motion-disabled.yaml)
-- [Head-motion-enabled policy](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/openshell/policy-head-motion-enabled.yaml)
-- [Sandbox Dockerfile](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/Dockerfile.openshell)
+- [Onboard setup and troubleshooting tutorial](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/use-case-examples/reachy-mini-openshell/ONBOARD_SETUP.md)
+- [Application source and README](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/use-case-examples/reachy-mini-openshell)
+- [Motion-disabled policy](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/use-case-examples/reachy-mini-openshell/openshell/policy-motion-disabled.yaml)
+- [Camera-enabled, motion-disabled policy](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/use-case-examples/reachy-mini-openshell/openshell/policy-camera-enabled-motion-disabled.yaml)
+- [Head-motion-enabled policy](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/use-case-examples/reachy-mini-openshell/openshell/policy-head-motion-enabled.yaml)
+- [Sandbox Dockerfile](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/use-case-examples/reachy-mini-openshell/Dockerfile.openshell)
 
 ## Two ways to use the project
 

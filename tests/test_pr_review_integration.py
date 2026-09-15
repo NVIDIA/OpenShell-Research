@@ -15,7 +15,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / ".github/scripts"))
-sys.path.insert(0, str(ROOT / "projects/openshell-agent-runner/tests"))
+sys.path.insert(0, str(ROOT / "projects/tools/openshell-agent-runner/tests"))
 
 import github_api
 import pr_review
@@ -60,16 +60,21 @@ class ReviewGitHub:
 @pytest.mark.parametrize("invalid_task", [None, "review-research-spike"])
 def test_new_projects_reach_one_current_report(tmp_path, monkeypatch, invalid_task):
     checkout = tmp_path / "pr-data"
-    existing = checkout / "projects/existing"
+    existing = checkout / "projects/tools/existing"
     existing.mkdir(parents=True)
     (existing / "README.md").write_text("Existing project.\n")
     _git(checkout, "init", "-q")
     _git(checkout, "add", ".")
     _git(checkout, "commit", "-qm", "Base")
     base = _git(checkout, "rev-parse", "HEAD")
-    for kind in ("tool", "research-spike", "use-case-example"):
-        project = checkout / "projects" / kind
-        project.mkdir()
+    directory_by_kind = {
+        "tool": "tools",
+        "research-spike": "research-spikes",
+        "use-case-example": "use-case-examples",
+    }
+    for kind, project_type in directory_by_kind.items():
+        project = checkout / "projects" / project_type / f"new-{kind}"
+        project.mkdir(parents=True)
         (project / "project.yaml").write_text(f"kind: {kind}\n")
         (project / "README.md").write_text(f"# New {kind}\n")
     (existing / "README.md").write_text("Changed, but not a new project.\n")
@@ -101,9 +106,12 @@ def test_new_projects_reach_one_current_report(tmp_path, monkeypatch, invalid_ta
         f"git/trees/{base}": {
             "tree": [{"path": "projects", "type": "tree", "sha": "base-projects"}]
         },
-        "git/trees/base-projects": {"tree": [{"path": "existing", "type": "tree"}]},
+        "git/trees/base-projects": {
+            "tree": [{"path": "tools", "type": "tree", "sha": "base-tools"}]
+        },
+        "git/trees/base-tools": {"tree": [{"path": "existing", "type": "tree"}]},
     }
-    for metadata in checkout.glob("projects/*/project.yaml"):
+    for metadata in checkout.glob("projects/*/*/project.yaml"):
         responses[f"contents/{metadata.relative_to(checkout)}?ref={head}"] = {
             "type": "file",
             "encoding": "base64",
@@ -238,7 +246,7 @@ def test_new_projects_reach_one_current_report(tmp_path, monkeypatch, invalid_ta
     assert body == (tmp_path / "report.md").read_text().strip()
     assert body in (tmp_path / "summary.md").read_text()
     assert head in body and "advisory" in body and "Needs changes" in body
-    assert "projects/existing" not in body
+    assert "projects/tools/existing" not in body
     assert ("Not completed" in body) is bool(invalid_task)
     for item in request["tasks"]:
         assert item["input"] in body
