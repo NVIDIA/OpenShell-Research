@@ -67,7 +67,7 @@ This requires a new set of controls and mechanisms that allow us to stop squinti
 
 ## The demo that changed our minds
 
-In one of our first demos of OpenShell, for Jensen actually, we demonstrated the ability to use OpenShell’s REST inspection endpoint to only allow an OpenClaw agent to write selectively to a GitHub repository, despite having access to a broadly scoped API key. The demo started off as expected- OpenShell’s sandbox saw the attempted write to the forbidden repo and blocked it. Then the next message was “file successfully written to \[forbidden repo\]. What had happened here? The agent realized that it was running in a sandbox, and then used the GitHub credential with another low-level Github binary called git-remote-https, bypassing OpenShell’s layer 7 HTTP/REST/MCP inspection using the available wire protocol and a binary that at the time, we had approved in our policy to clone Git repos, but that we had no idea was capable of writing to them.
+In one of our first demos of OpenShell, for Jensen actually, we demonstrated the ability to use OpenShell’s REST inspection endpoint to only allow an OpenClaw agent to write selectively to a GitHub repository, despite having access to a broadly scoped API key. The demo started off as expected- OpenShell’s sandbox saw the attempted write to the forbidden repo and blocked it. Then the next message was “file successfully written to \[forbidden repo\].” What had happened here? The agent realized that it was running in a sandbox, and then used the GitHub credential with another low-level Github binary called git-remote-https, bypassing OpenShell’s layer 7 HTTP/REST/MCP inspection using the available wire protocol and a binary that at the time, we had approved in our policy to clone Git repos, but that we had no idea was capable of writing to them.
 
 Clever. And it brought up a point, that between sandbox/runtime policies for network, file, tool, AI model, and credential access- there are an exponential number of possible unintended combinations that might lead to an AI agent being able to do something the human operator explicitly does not want.
 
@@ -119,7 +119,7 @@ For example:
 
 - ports are integers;
 - hosts and paths are strings;
-- Globs like “*”, “**”, or “/.*/**” can be represented as regular expressions;
+- Globs like `*`, `**`, or `/.*/**` can be represented as regular expressions;
 - policy composition becomes Boolean logic.
 
 The [Z3 Guide](https://microsoft.github.io/z3guide/) is the best reference once the examples below feel familiar.
