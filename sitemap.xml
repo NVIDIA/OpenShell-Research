@@ -23,42 +23,6 @@
         <loc>https://nvidia.github.io/OpenShell-Research/documentation/</loc>
       </url>
       <url>
-        <loc>https://nvidia.github.io/OpenShell-Research/documentation/egress-gate/</loc>
-      </url>
-      <url>
-        <loc>https://nvidia.github.io/OpenShell-Research/documentation/egress-gate/configuration/</loc>
-      </url>
-      <url>
-        <loc>https://nvidia.github.io/OpenShell-Research/documentation/egress-gate/request-content/</loc>
-      </url>
-      <url>
-        <loc>https://nvidia.github.io/OpenShell-Research/documentation/egress-gate/evaluation/</loc>
-      </url>
-      <url>
-        <loc>https://nvidia.github.io/OpenShell-Research/documentation/egress-gate/operations/</loc>
-      </url>
-      <url>
-        <loc>https://nvidia.github.io/OpenShell-Research/documentation/egress-gate/gates/</loc>
-      </url>
-      <url>
-        <loc>https://nvidia.github.io/OpenShell-Research/documentation/egress-gate/gates/regex/</loc>
-      </url>
-      <url>
-        <loc>https://nvidia.github.io/OpenShell-Research/documentation/egress-gate/gates/custom/</loc>
-      </url>
-      <url>
-        <loc>https://nvidia.github.io/OpenShell-Research/documentation/egress-gate/architecture/</loc>
-      </url>
-      <url>
-        <loc>https://nvidia.github.io/OpenShell-Research/documentation/egress-gate/architecture/request-lifecycle/</loc>
-      </url>
-      <url>
-        <loc>https://nvidia.github.io/OpenShell-Research/documentation/egress-gate/architecture/service-boundary/</loc>
-      </url>
-      <url>
-        <loc>https://nvidia.github.io/OpenShell-Research/documentation/egress-gate/reference/limits-and-failures/</loc>
-      </url>
-      <url>
         <loc>https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/</loc>
       </url>
       <url>
