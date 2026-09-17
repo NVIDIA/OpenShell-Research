@@ -12,7 +12,7 @@ PROJECT_TASKS = {
 }
 PROJECT_KIND_BY_DIRECTORY = {
     "tools": "tool",
-    "research-spikes": "research-spike",
+    "research": "research-spike",
     "use-case-examples": "use-case-example",
 }
 

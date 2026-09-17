@@ -69,7 +69,7 @@ def test_new_projects_reach_one_current_report(tmp_path, monkeypatch, invalid_ta
     base = _git(checkout, "rev-parse", "HEAD")
     directory_by_kind = {
         "tool": "tools",
-        "research-spike": "research-spikes",
+        "research-spike": "research",
         "use-case-example": "use-case-examples",
     }
     for kind, project_type in directory_by_kind.items():

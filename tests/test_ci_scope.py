@@ -122,7 +122,7 @@ class ScopeTests(unittest.TestCase):
     def test_kind_must_match_project_type_directory(self):
         with self.assertRaisesRegex(ValueError, "must match"):
             project_task(
-                "projects/research-spikes/new",
+                "projects/research/new",
                 {"kind": "tool"},
                 1,
             )

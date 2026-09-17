@@ -36,7 +36,7 @@ code review.
 | Directory | `kind` | Task | Review emphasis |
 | --- | --- | --- | --- |
 | `tools` | `tool` | `review-tool` | Documented behavior, project structure, representative implementation evidence, verification, and first use. |
-| `research-spikes` | `research-spike` | `review-research-spike` | Documented question and method, representative evidence, reproducibility, limitations, and proportionate structure. |
+| `research` | `research-spike` | `review-research-spike` | Documented question and method, representative evidence, reproducibility, limitations, and proportionate structure. |
 | `use-case-examples` | `use-case-example` | `review-use-case-example` | Documented workflow, representative integration evidence, reproducibility, safe configuration, and appropriate scope. |
 
 A project is new when its directory does not exist in the PR's base revision.

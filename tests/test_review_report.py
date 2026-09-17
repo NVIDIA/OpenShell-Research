@@ -57,7 +57,7 @@ def report_options():
             {
                 "id": "review-1",
                 "task": "review-research-spike",
-                "label": "projects/research-spikes/new-spike",
+                "label": "projects/research/new-spike",
                 "result": result(),
             }
         ],
@@ -269,7 +269,7 @@ class ReviewReportTests(unittest.TestCase):
             {
                 "severity": "medium",
                 "title": "Wrong command",
-                "path": "projects/research-spikes/new spike/README.md",
+                "path": "projects/research/new spike/README.md",
                 "line": 12,
                 "evidence": "The documented command is unavailable.",
                 "impact": "The first run fails.",
@@ -280,7 +280,7 @@ class ReviewReportTests(unittest.TestCase):
         body = render_report(**options)
 
         self.assertIn(
-            f"https://github.com/example/research/blob/{HEAD}/projects/research-spikes/new%20spike/README.md#L12",
+            f"https://github.com/example/research/blob/{HEAD}/projects/research/new%20spike/README.md#L12",
             body,
         )
 

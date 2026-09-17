@@ -15,8 +15,8 @@ The declared kind must match the project's parent directory as shown below.
 | Directory | `kind` | Purpose |
 | --- | --- | --- |
 | `tools` | `tool` | A reusable tool or library intended for other code or people to use. |
-| `research-spikes` | `research-spike` | An investigation intended to answer a question or test an idea. |
-| `use-case-examples` | `use-case-example` | An end-to-end demonstration that teaches a concrete workflow. |
+| `research` | `research-spike` | An investigation intended to answer a question or test an idea. |
+| `use-case-examples` | `use-case-example` | A reference implementation of a realistic, end-to-end use case. |
 
 ## Guidelines for every new project
 

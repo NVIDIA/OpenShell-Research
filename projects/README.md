@@ -1,7 +1,7 @@
 # Projects
 
 This directory contains self-contained OpenShell projects grouped by their
-semantic kind. Each project lives under `tools/`, `research-spikes/`, or
+semantic kind. Each project lives under `tools/`, `research/`, or
 `use-case-examples/` with its own dependencies, runtime notes, and source
 layout.
 
@@ -17,13 +17,17 @@ including how to declare its kind for automated review.
 - `openshell-exporter`: OpenShell event collector, normalizer, redactor, and
   CloudEvents or OTLP exporter.
 
-## Research spikes
+## Research
 
 - `long-horizon-agent-evals`: Persistent agent experiments over configurable
   time horizons and repeated parallel attempts, starting with GitHub policy
   review.
 
 ## Use case examples
+
+These projects are reference implementations for realistic OpenShell use cases.
+They demonstrate end-to-end patterns that readers can understand and adapt;
+they are not presented as production-ready applications.
 
 - `python-project-template`: Minimal, production-ready Python project scaffold
   managed with uv.
