@@ -29,28 +29,6 @@ nav = [
   ]},
   {"Documentation" = [
     "documentation/index.md",
-    {"Egress Gate" = [
-      "documentation/egress-gate/index.md",
-      {"Guides" = [
-        {"Configure policies" = "documentation/egress-gate/configuration.md"},
-        {"Parse request content" = "documentation/egress-gate/request-content.md"},
-        {"Test policies offline" = "documentation/egress-gate/evaluation.md"},
-        {"Run and operate Egress Gate" = "documentation/egress-gate/operations.md"}
-      ]},
-      {"Gates" = [
-        "documentation/egress-gate/gates/index.md",
-        {"Regex gate" = "documentation/egress-gate/gates/regex.md"},
-        {"Add a custom gate" = "documentation/egress-gate/gates/custom.md"}
-      ]},
-      {"Architecture" = [
-        "documentation/egress-gate/architecture/index.md",
-        {"Request lifecycle" = "documentation/egress-gate/architecture/request-lifecycle.md"},
-        {"Service boundary" = "documentation/egress-gate/architecture/service-boundary.md"}
-      ]},
-      {"Reference" = [
-        {"Limits and failure behavior" = "documentation/egress-gate/reference/limits-and-failures.md"}
-      ]}
-    ]},
     {"OpenShell Agent Runner" = [
       "documentation/openshell-agent-runner/index.md",
       {"Run reviews" = "documentation/openshell-agent-runner/reviews.md"},

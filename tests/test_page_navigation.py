@@ -11,12 +11,14 @@ ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "zensical.toml"
 STYLES = ROOT / "docs" / "stylesheets" / "dev-notes.css"
 DOCUMENTATION_LANDING = ROOT / "site" / "documentation" / "index.html"
-EGRESS_GATE_LANDING = ROOT / "site" / "documentation" / "egress-gate" / "index.html"
-CONFIGURATION_GUIDE = (
-    ROOT / "site" / "documentation" / "egress-gate" / "configuration" / "index.html"
+AGENT_RUNNER_LANDING = (
+    ROOT / "site" / "documentation" / "openshell-agent-runner" / "index.html"
 )
-REQUEST_CONTENT_GUIDE = (
-    ROOT / "site" / "documentation" / "egress-gate" / "request-content" / "index.html"
+REVIEWS_GUIDE = (
+    ROOT / "site" / "documentation" / "openshell-agent-runner" / "reviews" / "index.html"
+)
+PROFILES_GUIDE = (
+    ROOT / "site" / "documentation" / "openshell-agent-runner" / "profiles" / "index.html"
 )
 
 
@@ -50,19 +52,19 @@ class PageNavigationTests(unittest.TestCase):
             self.skipTest("rendered output is checked after the documentation build")
 
         documentation = DOCUMENTATION_LANDING.read_text(encoding="utf-8")
-        egress_gate = EGRESS_GATE_LANDING.read_text(encoding="utf-8")
-        configuration = CONFIGURATION_GUIDE.read_text(encoding="utf-8")
-        request_content = REQUEST_CONTENT_GUIDE.read_text(encoding="utf-8")
+        agent_runner = AGENT_RUNNER_LANDING.read_text(encoding="utf-8")
+        reviews = REVIEWS_GUIDE.read_text(encoding="utf-8")
+        profiles = PROFILES_GUIDE.read_text(encoding="utf-8")
 
         self.assertIn("Back to OpenShell Research", documentation)
-        self.assertIn("Next: Egress Gate", documentation)
+        self.assertIn("Next: OpenShell Agent Runner", documentation)
         self.assertNotIn("Previous: Bringing Privacy", documentation)
-        self.assertIn("Previous: Documentation", egress_gate)
-        self.assertIn("Next: Configure policies", egress_gate)
-        self.assertIn("Previous: Egress Gate", configuration)
-        self.assertIn("Next: Parse request content", configuration)
-        self.assertIn("Previous: Configure policies", request_content)
-        self.assertIn("Next: Test policies offline", request_content)
+        self.assertIn("Previous: Documentation", agent_runner)
+        self.assertIn("Next: Run reviews", agent_runner)
+        self.assertIn("Previous: OpenShell Agent Runner", reviews)
+        self.assertIn("Next: Customize profiles", reviews)
+        self.assertIn("Previous: Run reviews", profiles)
+        self.assertIn("Next: Command reference", profiles)
 
 
 if __name__ == "__main__":

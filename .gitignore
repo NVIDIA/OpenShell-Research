@@ -124,7 +124,6 @@ lib/
 # Static site and docs output
 public/
 site/
-docs/documentation/egress-gate/
 docs/documentation/openshell-agent-runner/
 .docusaurus/
 .vitepress/cache/
