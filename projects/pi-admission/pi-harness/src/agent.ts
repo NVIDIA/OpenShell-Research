@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import { isDeepStrictEqual } from "node:util";
 import {
   Agent,
   type AgentEvent,
   type AgentMessage,
-  type AgentContext,
   type StreamFn,
 } from "@earendil-works/pi-agent-core";
 import {
@@ -29,13 +29,9 @@ export class ContextOverflowError extends Error {}
  */
 export class AdmissionAgent extends Agent {
   private readonly live;
-  private systemPromptCandidate = "";
-  private approvedSystemPrompt = "";
   private readonly subscribers = new Set<
     (event: AgentEvent, signal: AbortSignal) => Promise<void> | void
   >();
-  private readonly steering: AgentMessage[] = [];
-  private readonly followUps: AgentMessage[] = [];
   private controller?: AbortController;
   private settled: Promise<void> = Promise.resolve();
   stopped = false;
@@ -50,32 +46,11 @@ export class AdmissionAgent extends Agent {
       initialState: { model, thinkingLevel: clampThinkingLevel(model, "medium") },
       streamFn,
     });
-    // Pi's base lifecycle fields are readonly. This engine owns its own public
-    // state and lifecycle; it never invokes the base execution/state reducer.
-    const owner = this;
+    // Pi's session persists only the approved events emitted by this loop.
     this.live = {
       ...super.state,
-      // Pi rebuilds this field synchronously. Stage those writes as candidates;
-      // public state continues to expose only the last approved system prompt.
-      get systemPrompt(): string {
-        return owner.approvedSystemPrompt;
-      },
-      set systemPrompt(value: string) {
-        owner.systemPromptCandidate = value;
-      },
       pendingToolCalls: new Set<string>(),
     };
-  }
-
-  async approveSystemPrompt(signal?: AbortSignal): Promise<string> {
-    const approved = await this.admission.text(
-      "system",
-      this.systemPromptCandidate,
-      signal,
-    );
-    signal?.throwIfAborted();
-    this.approvedSystemPrompt = approved;
-    return approved;
   }
 
   override get state() {
@@ -99,23 +74,18 @@ export class AdmissionAgent extends Agent {
     return this.settled;
   }
   override steer(message: AgentMessage) {
-    this.steering.push(message);
+    void message;
+    throw new Error("Agent is busy; wait or cancel the active turn.");
   }
   override followUp(message: AgentMessage) {
-    this.followUps.push(message);
+    void message;
+    throw new Error("Agent is busy; wait or cancel the active turn.");
   }
-  override clearSteeringQueue() {
-    this.steering.length = 0;
-  }
-  override clearFollowUpQueue() {
-    this.followUps.length = 0;
-  }
-  override clearAllQueues() {
-    this.clearSteeringQueue();
-    this.clearFollowUpQueue();
-  }
+  override clearSteeringQueue() {}
+  override clearFollowUpQueue() {}
+  override clearAllQueues() {}
   override hasQueuedMessages() {
-    return this.steering.length + this.followUps.length > 0;
+    return false;
   }
   override reset() {
     if (this.live.isStreaming)
@@ -123,7 +93,6 @@ export class AdmissionAgent extends Agent {
     this.live.messages = [];
     this.live.errorMessage = undefined;
     this.stopped = false;
-    this.clearAllQueues();
   }
   override prompt(
     input: string | AgentMessage | AgentMessage[],
@@ -140,16 +109,7 @@ export class AdmissionAgent extends Agent {
     return this.run(messages);
   }
   override continue(): Promise<void> {
-    const last = this.live.messages.at(-1);
-    if (
-      !this.hasQueuedMessages() &&
-      last?.role !== "user" &&
-      last?.role !== "toolResult"
-    )
-      return Promise.reject(
-        new Error("There is no unfinished turn to continue."),
-      );
-    return this.run([]);
+    return Promise.reject(new Error("Automatic continuation is disabled."));
   }
 
   private async run(candidates: AgentMessage[]): Promise<void> {
@@ -166,24 +126,14 @@ export class AdmissionAgent extends Agent {
     try {
       await this.emit({ type: "agent_start" });
       await this.admitBatch(candidates, published);
-      const steered = await this.drain(
-        this.steering,
-        this.steeringMode,
-        published,
-      );
-      if (!candidates.length && !steered)
-        await this.drain(this.followUps, this.followUpMode, published);
       for (;;) {
         this.signal!.throwIfAborted();
         await this.emit({ type: "turn_start" });
-        // AgentSession rebuilds system context when tools/settings change.
-        // Approve that snapshot before every provider call.
-        const systemPrompt = await this.approveSystemPrompt(this.signal);
         const response = await (
           await this.streamFunction(
             this.live.model,
             {
-              systemPrompt,
+              systemPrompt: this.live.systemPrompt,
               messages: convertToLlm(this.live.messages),
               tools: this.live.tools,
             },
@@ -196,7 +146,9 @@ export class AdmissionAgent extends Agent {
         ).result();
         this.signal!.throwIfAborted();
         if (isContextOverflow(response, this.live.model.contextWindow))
-          throw new ContextOverflowError("Context is too large.");
+          throw new ContextOverflowError(
+            "Context is too large; run /compact and retry.",
+          );
         if (
           response.stopReason === "error" ||
           response.stopReason === "aborted"
@@ -205,13 +157,11 @@ export class AdmissionAgent extends Agent {
             "Model request failed or was cancelled; no response was saved.",
           );
         const assistant = (await this.admit(response)) as AssistantMessage;
-        await this.publish(assistant, published);
         const calls = assistant.content.filter(
           (block) => block.type === "toolCall",
         );
         const toolResults: ToolResultMessage[] = [];
-        for (let index = 0; index < calls.length; index++) {
-          const call = calls[index];
+        for (const call of calls) {
           try {
             if (assistant.stopReason === "length")
               throw new Error("Incomplete tool call.");
@@ -238,9 +188,28 @@ export class AdmissionAgent extends Agent {
                 ? tool.prepareArguments(prepared.arguments)
                 : prepared.arguments) as typeof prepared.arguments;
               args = validateToolArguments(tool, prepared);
+              if (!isDeepStrictEqual(args, call.arguments)) {
+                const checked = (await this.admit({
+                  ...assistant,
+                  content: assistant.content.map((block) =>
+                    block.type === "toolCall" && block.id === call.id
+                      ? { ...block, arguments: args as typeof block.arguments }
+                      : block,
+                  ),
+                })) as AssistantMessage;
+                const checkedCall = checked.content.find(
+                  (block) => block.type === "toolCall" && block.id === call.id,
+                );
+                if (
+                  checkedCall?.type !== "toolCall" ||
+                  !isDeepStrictEqual(checkedCall.arguments, args)
+                )
+                  throw new AdmissionError("invalid");
+              }
               // No onUpdate callback: partial tool output is not approved yet.
               result = await tool.execute(call.id, args, this.signal);
             } catch (error) {
+              this.signal!.throwIfAborted();
               isError = true;
               result = {
                 content: [
@@ -263,56 +232,20 @@ export class AdmissionAgent extends Agent {
               isError: isError,
               timestamp: Date.now(),
             })) as ToolResultMessage;
-            await this.publishTool(approved, published);
             toolResults.push(approved);
           } catch (error) {
-            // Close outstanding pairs with separately admitted, content-free
-            // failures. If admission is unavailable, require a new session.
-            try {
-              for (const pending of calls.slice(index)) {
-                const approved = (await this.admit({
-                  role: "toolResult",
-                  toolCallId: pending.id,
-                  toolName: pending.name,
-                  content: [
-                    {
-                      type: "text",
-                      text: "Tool result unavailable; this turn was stopped.",
-                    },
-                  ],
-                  isError: true,
-                  timestamp: Date.now(),
-                })) as ToolResultMessage;
-                await this.publishTool(approved, published);
-              }
-            } catch {
-              this.stopped = true;
-            }
+            // Tool effects cannot be rolled back. Keep the incomplete batch out
+            // of history and stop instead of attempting replay.
+            if (!this.signal!.aborted) this.stopped = true;
             throw error;
           }
         }
+        this.signal!.throwIfAborted();
+        await this.publish(assistant, published);
+        for (const result of toolResults)
+          await this.publishTool(result, published);
         await this.emit({ type: "turn_end", message: assistant, toolResults });
-        const steered = await this.drain(
-          this.steering,
-          this.steeringMode,
-          published,
-        );
-        const followedUp =
-          !calls.length &&
-          !steered &&
-          (await this.drain(this.followUps, this.followUpMode, published));
-        if (!calls.length && !steered && !followedUp) break;
-        // Native automatic compaction between tool turns uses the same
-        // session_before_compact admission hook as manual compaction.
-        await this.prepareNextTurnWithContext?.(
-          {
-            message: assistant,
-            toolResults,
-            context: this.context(),
-            newMessages: published,
-          },
-          this.signal,
-        );
+        if (!calls.length) break;
       }
     } catch (error) {
       this.clearAllQueues();
@@ -340,13 +273,6 @@ export class AdmissionAgent extends Agent {
     }
   }
 
-  private context(): AgentContext {
-    return {
-      systemPrompt: this.live.systemPrompt,
-      messages: this.live.messages.slice(),
-      tools: this.live.tools,
-    };
-  }
   private async admit(candidate: AgentMessage): Promise<Message> {
     if (
       candidate.role !== "user" &&
@@ -365,16 +291,6 @@ export class AdmissionAgent extends Agent {
       approved.push(await this.admit(candidate));
     this.signal!.throwIfAborted();
     for (const message of approved) await this.publish(message, published);
-  }
-  private async drain(
-    queue: AgentMessage[],
-    mode: string,
-    published: AgentMessage[],
-  ): Promise<boolean> {
-    if (!queue.length) return false;
-    const candidates = queue.splice(0, mode === "all" ? queue.length : 1);
-    await this.admitBatch(candidates, published);
-    return true;
   }
   private async publish(message: Message, published: AgentMessage[]) {
     this.live.messages = [...this.live.messages, message];

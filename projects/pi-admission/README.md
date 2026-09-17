@@ -1,81 +1,72 @@
-# Standalone Pi admission
+# Minimal Pi admission spike
 
-This use-case example runs unmodified Pi in an unmodified OpenShell sandbox and
-keeps policy-denied content out of Pi's live conversation and saved JSONL. A
-small Rust service makes both decisions:
+This research spike shows why content policy must integrate at the agent
+harness—not only at network egress. It runs an unmodified Pi coding session in
+OpenShell with two boundaries:
 
-1. Pi sends each candidate to authenticated HTTPS admission before publishing
-   or saving it.
-2. Admission allows it unchanged, replaces an `example.com` email with
-   `[EMAIL]`, or denies an SSN-shaped value.
-3. After the full provider context is approved, the service signs a short-lived
-   receipt over its ordered user/tool text projection, destination, sandbox,
-   and fixed policy identity.
-4. OpenShell calls the same service as pre-credentials middleware. It verifies
-   the receipt against the intercepted request, applies the policy again, and
-   removes the private receipt header before provider credentials are attached.
+```text
+draft -> admission HTTPS -> Pi history and JSONL -> provider request
+                    receipt ^                    |
+                            +-- OpenShell middleware
+```
 
-Blocking only at step 4 would be too late: the denied text could already be in
-the local transcript. The two checks protect different boundaries.
+The launcher admits a complete user, assistant, or tool-result candidate before
+publishing it. The external Rust process also signs the user/tool projection for
+each model call; pre-credentials middleware checks that receipt against the
+actual request before OpenShell supplies the provider credential.
 
-## Demonstration policy
+The intentionally synthetic fixed policy is:
 
-The fixed policy is compiled once in
-[`middleware/src/policy.rs`](middleware/src/policy.rs):
+| Match | Result |
+| --- | --- |
+| address ending in `@example.com` | replace with `[EMAIL]` |
+| `NNN-NN-NNNN` | deny |
 
-| Entity | Decision | Synthetic example |
-| --- | --- | --- |
-| Address ending in `@example.com` | Replace with `[EMAIL]` | `alice@example.com` |
-| `NNN-NN-NNNN` digits | Deny | `123-45-6789` |
+These regexes are teaching aids, not production DLP.
 
-Denial is evaluated first. Patterns inspect decoded JSON strings, so JSON
-escaping does not bypass them. Text block boundaries are preserved. Content in
-executable tool arguments or protected reasoning metadata is denied instead of
-rewritten. Egress never rewrites the provider body: it denies any remaining
-matching entity.
+## Scope
 
-These regexes are intentionally incomplete. They do not validate real email
-addresses or SSNs and will have both false positives and misses. Use only
-synthetic data with this example.
+The launcher keeps Pi's native TUI, JSONL sessions, reasoning controls, and
+native `read`, `bash`, `edit`, and `write` tools. Tool calls run sequentially.
+The complete assistant/tool-result batch is admitted before it is published.
+Tool side effects are not transactional and may exist even when a result is
+denied.
 
-## Prerequisites
+Only explicit `/compact` is supported. Automatic compaction, retries, queued
+prompts, project instructions, skills, resume/import/branching, model switching,
+images, extensions, and direct `!` shell commands are disabled. A prompt entered
+while Pi is working is rejected rather than retained. At context exhaustion,
+run `/compact` yourself.
 
-You need:
+The sample workspace contains `counter.js` and one Node test so a model can
+inspect, edit, and test real code without extra project scaffolding.
 
-- an existing HTTPS/mTLS OpenShell gateway registered in the `openshell` CLI;
-- OpenShell `0.0.116` (the pinned middleware contract) or a compatible release;
-- Bash, Python 3.11+, uv 0.11+, Rust 1.90+, Docker, and Node 22 only for local
-  harness development;
-- a provider key with quota for an OpenAI-compatible Chat Completions model.
+## Run
 
-The sample catalog uses OpenRouter. Provider use can incur normal model costs.
-No keys are copied into the image or committed to this repository.
-
-## Run it
-
-From `projects/pi-admission/`:
+Prerequisites are an existing HTTPS/mTLS OpenShell gateway, OpenShell `0.0.116`
+or a compatible release, Bash, Python 3.11+, uv 0.11+, Rust 1.90+, Docker, Node
+22 for local development, and one OpenAI-compatible Chat Completions key.
 
 ```sh
 cp .env.example .env
 cp models.json.example models.json
-# Set OPENSHELL_GATEWAY, PI_ADMISSION_HOST, and PI_MODEL_API_KEY in .env.
+# Fill in the three values documented in .env.
 ./demo.sh prepare
 ```
 
-`PI_ADMISSION_HOST` must be a DNS name or IPv4 address reachable from both the
-gateway and sandbox. Do not use `localhost` for container callers. Preparation
-discovers the selected gateway's issuer and public Ed25519 key over verified
-mTLS, generates a 30-day local service certificate, stages one selected native
-Pi model, and builds `pi-admission:local`. Host-owned state is written to
-`.workspaces/` with mode `0700`/`0600` defaults.
+`PI_ADMISSION_HOST` must be reachable from the gateway and sandbox. Preparation
+discovers the selected gateway identity over its existing mTLS connection,
+creates a 30-day local service certificate, and writes private state under
+`.workspaces/`.
 
-Run the service in one terminal:
+Start the service:
 
 ```sh
 ./demo.sh serve
 ```
 
-In another terminal:
+Then print and install the middleware registration in the gateway's
+operator-owned configuration before creating the sandbox:
 
 ```sh
 ./demo.sh registration
@@ -83,62 +74,28 @@ In another terminal:
 ./demo.sh launch
 ```
 
-`registration` prints the middleware TOML entry. Merge it into the selected
-gateway's configuration, install the generated CA path where that gateway can
-read it, and restart the gateway before running `setup`. Gateway deployment is
-operator-owned; this example does not edit or restart it.
-
-All actions have a side-effect-free print form which does not load `.env`:
-
-```sh
-./demo.sh --print prepare
-./demo.sh --print serve
-./demo.sh --print setup
-./demo.sh --print launch
-./demo.sh --print verify
-./demo.sh --print cleanup
-```
-
-Try these inputs in Pi:
+Useful prompts are:
 
 ```text
-Hello. Briefly describe what you can do.
-Please repeat alice@example.com.
+Read the sample and run its test.
+Change the counter to add two, update the test, and run it.
+Repeat alice@example.com.
 123-45-6789
-Use the write tool to create demo.txt containing a short greeting.
 /compact
-/new
 /quit
 ```
 
-The email becomes `[EMAIL]` before it appears or is saved. The fictitious SSN
-shape is rejected and never enters live history or JSONL. The workspace starts
-empty, but Pi's project tools remain enabled: the harness admits each tool result
-before publishing, saving, or continuing the model turn. Use `/session` to
-locate the append-only JSONL under `/sandbox/sessions`.
+Every action has a side-effect-free form that neither sources `.env` nor reveals
+secrets, for example `./demo.sh --print setup`. Run the paid live check with
+`./demo.sh verify`; it checks denial, redaction, a real write tool, manual
+compaction, saved JSONL, and rejection of a provider request without a receipt.
+It requires the running gateway, sandbox, service, and model credential.
 
-Run the separate real-model acceptance workflow with:
+Finish with `./demo.sh cleanup`. It removes only the example sandbox, sessions,
+providers, and profiles. It retains host configuration, gateway registration,
+and the Docker image.
 
-```sh
-./demo.sh verify
-```
-
-It exercises replacement, denial before history mutation, a real tool result,
-manual compaction, saved JSONL, and a missing-receipt request. It requires a
-running service, gateway, sandbox, and paid provider access; local tests do not
-establish live provider compatibility.
-
-When finished:
-
-```sh
-./demo.sh cleanup
-```
-
-Cleanup deletes the demo sandbox (including its sessions), provider instances
-and profiles. It retains generated host configuration, the manual gateway
-registration, and the Docker image. Stop `serve` separately with Ctrl-C.
-
-## Development checks
+## Development
 
 ```sh
 uv run ruff format --check .
@@ -155,29 +112,16 @@ npm run check
 npm test
 ```
 
-The automated suite is intentionally limited to five core scenarios: two Pi
-harness flows plus admission transport, egress inspection, and receipt-binding
-checks in the Rust service.
+The suite is deliberately bounded: two launcher end-to-end flows and focused
+admission transport, egress parsing, and receipt-binding checks. The protobuf,
+manifest, and lockfile are generated or managed by
+`openshell-middleware-manager`; do not edit the protocol by hand.
 
-The middleware scaffold, protocol, and lockfile are managed by
-`openshell-middleware-manager`; do not edit its protocol by hand.
+## Limits
 
-## Supported scope and limitations
-
-The harness keeps Pi's native TUI, sequential tools and tool continuations,
-reasoning, manual/automatic compaction, model serialization, prompt-cache
-fields, and native session ownership. Allowed native messages remain unchanged.
-Candidate buffers and queues are not history.
-
-This POC is text-only and supports one prepared OpenAI-compatible Chat
-Completions model. Project instructions, skills, shell shortcuts, resume/import,
-branching, renaming, live model switching, resource reload, and arbitrary
-extensions are disabled. Unsupported request structures fail closed.
-It does not inspect across split content blocks or decode arbitrary encodings.
-Opaque provider metadata is preserved but is not claimed to be fully understood.
-
-Receipts bind the ordered user/tool projection, not every byte or all
-assistant/system history, and do not prove that the harness itself ran.
-Tool-result admission cannot reverse tool side effects. The history guarantee
-is for this controlled harness, not compromised same-authority code. This is a
-readable security example, not production DLP or identity validation.
+The supported request is uncompressed, streaming, text-only Chat Completions.
+Unknown shapes fail closed. Receipts cover ordered user/tool text, destination,
+sandbox, middleware, policy, and expiry—not the full transcript or every HTTP
+byte. Assistant/reasoning text is locally admitted and scanned at egress but is
+not receipt-bound. The guarantee applies to this controlled launcher, not
+compromised same-authority code, filesystem contents, or reversible tool effects.

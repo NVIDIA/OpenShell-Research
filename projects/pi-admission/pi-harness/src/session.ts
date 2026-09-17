@@ -18,14 +18,7 @@ import {
   type PromptOptions,
 } from "@earendil-works/pi-coding-agent";
 import { Admission, AdmissionError, RECEIPT_HEADER } from "./admission.js";
-import {
-  AdmissionAgent,
-  ContextOverflowError,
-  retainedUsage,
-} from "./agent.js";
-import { projectTools } from "./tools.js";
-
-export { projectTools } from "./tools.js";
+import { AdmissionAgent, retainedUsage } from "./agent.js";
 
 export interface SessionOptions {
   cwd: string;
@@ -36,7 +29,6 @@ export interface SessionOptions {
   admission: Admission;
   /** Deterministic integration tests use Pi's public stream/tool seams. */
   stream?: StreamFn;
-  compactAtTokens?: number;
 }
 
 /** Native Pi session/persistence, with explicit guards for unsupported writes. */
@@ -68,20 +60,11 @@ export class AdmissionSession extends AgentSession {
   }
 
   override async prompt(text: string, options?: PromptOptions): Promise<void> {
+    if (this.isStreaming)
+      throw new Error("Agent is busy; wait or cancel the active turn.");
     if (this.isStopped)
-      throw new Error("An unfinished tool batch requires /new.");
-    try {
-      await super.prompt(text, options);
-    } catch (error) {
-      if (!(error instanceof ContextOverflowError) || !this.autoCompactionEnabled)
-        throw error;
-      // The failed provider response was never published. Compact only approved
-      // history, then retry that unfinished turn once.
-      await this.compact();
-      await this.agent.continue();
-    } finally {
-      if (!this.isStreaming) this.clearQueue();
-    }
+      throw new Error("The session stopped after an incomplete tool batch; restart Pi.");
+    await super.prompt(text, { ...options, streamingBehavior: undefined });
   }
 
   // These native entry points write outside the agent's message event path.
@@ -145,11 +128,7 @@ function sessionFactory(options: SessionOptions) {
     packages: [],
     enableInstallTelemetry: false,
     compaction: {
-      enabled: true,
-      reserveTokens:
-        options.compactAtTokens === undefined
-          ? undefined
-          : options.model.contextWindow - options.compactAtTokens,
+      enabled: false,
     },
     retry: { enabled: false },
   });
@@ -241,7 +220,6 @@ function sessionFactory(options: SessionOptions) {
       options.model.provider,
       options.apiKey,
     );
-    const tools = projectTools(cwd);
     const agent = new AdmissionAgent(options.model, stream, options.admission);
     agent.sessionId = sessionManager.getSessionId();
     agent.steeringMode = settingsManager.getSteeringMode();
@@ -254,14 +232,7 @@ function sessionFactory(options: SessionOptions) {
       settingsManager: services.settingsManager,
       resourceLoader: services.resourceLoader,
       modelRuntime: services.modelRuntime,
-      baseToolsOverride: Object.fromEntries(
-        tools.map((tool) => [tool.name, tool]),
-      ),
-      initialActiveToolNames: tools.map((tool) => tool.name),
-      allowedToolNames: tools.map((tool) => tool.name),
     });
-    // Check project instructions and skill metadata before exposing the session.
-    await agent.approveSystemPrompt();
     return {
       session,
       services,
@@ -272,6 +243,9 @@ function sessionFactory(options: SessionOptions) {
 }
 
 class AdmissionRuntime extends AgentSessionRuntime {
+  override async newSession(): Promise<never> {
+    return unsupported("New sessions; restart the launcher");
+  }
   override async switchSession(): Promise<never> {
     return unsupported("Resume");
   }

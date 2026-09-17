@@ -153,6 +153,7 @@ timeout = "10s"
     (image / "models.json").write_text(json.dumps(catalog, indent=2) + "\n")
     (image / "model-selection.json").write_text(json.dumps(selection) + "\n")
     shutil.copyfile(example / "sandbox/Dockerfile", image / "Dockerfile")
+    shutil.copytree(example / "workspace", image / "workspace")
     shutil.copyfile(tls / "ca.crt", image / "admission-ca.crt")
     print(f"Selected model: {selection['provider']}/{selection['id']}")
 

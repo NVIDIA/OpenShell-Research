@@ -12,10 +12,9 @@ import type {
 export const RECEIPT_HEADER = "x-pi-admission-receipt";
 export const MAX_ADMISSION_BYTES = 4 * 1024 * 1024;
 
-export type TextOrigin = "user" | "system" | "compaction_summary";
+export type TextOrigin = "user" | "compaction_summary";
 export type AdmissionKind =
   | "user_message"
-  | "system_context"
   | "compaction_summary"
   | "assistant_message"
   | "tool_result"
@@ -125,7 +124,6 @@ export class Admission {
   ): Promise<string> {
     const kind = {
       user: "user_message",
-      system: "system_context",
       compaction_summary: "compaction_summary",
     } as const;
     const envelope = {

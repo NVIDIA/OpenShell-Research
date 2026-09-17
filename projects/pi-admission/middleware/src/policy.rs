@@ -47,7 +47,6 @@ pub(crate) fn evaluate_candidate(kind: &str, mut body: Value) -> CandidateDecisi
     }
     let result = match kind {
         "user_message" => edit_message(&mut body, "user"),
-        "system_context" => edit_message(&mut body, "system"),
         "compaction_summary" => edit_message(&mut body, "compaction_summary"),
         "tool_result" => edit_tool_result(&mut body),
         "assistant_message" => edit_assistant(&mut body),

@@ -17,6 +17,7 @@ COPY pi-harness/ ./
 RUN npm run build && mkdir /app/agent
 COPY models.json /app/models.json
 COPY model-selection.json /app/model-selection.json
+COPY workspace/ /sandbox/workspace/
 RUN mkdir -p /sandbox/workspace /sandbox/sessions \
     && chown -R sandbox:sandbox /sandbox \
     && chmod -R a+rX /app
