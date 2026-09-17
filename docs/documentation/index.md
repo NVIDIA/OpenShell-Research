@@ -9,7 +9,5 @@ agent_markdown: true
 Technical documentation and references for installing, using, and extending
 OpenShell Research projects.
 
-- [Egress Gate](egress-gate/index.md): extensible middleware for applying gates
-  to outgoing HTTP requests.
 - [OpenShell Agent Runner](openshell-agent-runner/index.md): launch ephemeral
   agents for single, bounded tasks in CI and automated workflows.

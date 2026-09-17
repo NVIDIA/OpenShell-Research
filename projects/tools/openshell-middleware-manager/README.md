@@ -85,7 +85,7 @@ builds. Use `--openshell-version latest` when you want the newest release.
 The starter templates still use the older `max_body_bytes` binding field, so
 `omm create` does not yet support v0.0.116. Validation stops without publishing
 that starter. `omm update` can refresh an existing service already compatible
-with the newer contract, such as Egress Gate.
+with the newer contract.
 
 Run `omm --help` for all options and `omm --version` for the installed OMM
 version. By default, `omm` derives the Python package name from the project
@@ -116,7 +116,7 @@ Python updates run `uv sync` and then `uv run pytest` by default. If a project
 needs additional build steps, supply its normal validation command:
 
 ```sh
-omm update /path/to/egress-gate \
+omm update /path/to/my-middleware \
   --openshell-version v0.0.116 --check-command 'make check'
 ```
 

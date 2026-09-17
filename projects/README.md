@@ -12,8 +12,6 @@ including how to declare its kind for automated review.
 
 - `openshell-middleware-manager`: `omm` CLI that creates and updates version-matched
   Python and Rust OpenShell supervisor middleware projects.
-- `egress-gate`: Extensible OpenShell middleware for provider-bound HTTP
-  requests.
 - `openshell-agent-runner`: `oar` CLI for launching ephemeral agents in
   OpenShell sandboxes.
 - `openshell-exporter`: OpenShell event collector, normalizer, redactor, and

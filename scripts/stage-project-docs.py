@@ -13,7 +13,6 @@ import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT_DOCUMENTATION = {
-    "egress-gate": ROOT / "projects" / "tools" / "egress-gate" / "docs",
     "openshell-agent-runner": ROOT
     / "projects"
     / "tools"
