@@ -33,7 +33,7 @@ impl GatewayAuthentication {
     pub(crate) fn verify(
         &self,
         metadata: &MetadataMap,
-        expected_kind: &str,
+        expected_kinds: &[&str],
         sandbox_id: Option<&str>,
     ) -> Result<(), Status> {
         let values: Vec<_> = metadata.get_all("authorization").iter().collect();
@@ -55,7 +55,7 @@ impl GatewayAuthentication {
         let claims = decode::<Claims>(token, &self.key, &self.validation)
             .map_err(|_| Status::unauthenticated("authentication failed"))?
             .claims;
-        if claims.caller_kind != expected_kind
+        if !expected_kinds.contains(&claims.caller_kind.as_str())
             || sandbox_id.is_some_and(|expected| claims.sandbox_id.as_deref() != Some(expected))
         {
             return Err(Status::permission_denied("caller context mismatch"));
@@ -100,10 +100,17 @@ mod tests {
         let mut metadata = MetadataMap::new();
         metadata.insert("authorization", format!("Bearer {token}").parse().unwrap());
         assert!(
-            auth.verify(&metadata, "supervisor", Some("sandbox"))
+            auth.verify(&metadata, &["supervisor"], Some("sandbox"))
                 .is_ok()
         );
-        assert!(auth.verify(&metadata, "supervisor", Some("other")).is_err());
-        assert!(auth.verify(&metadata, "gateway", None).is_err());
+        assert!(
+            auth.verify(&metadata, &["supervisor"], Some("other"))
+                .is_err()
+        );
+        assert!(auth.verify(&metadata, &["gateway"], None).is_err());
+        assert!(
+            auth.verify(&metadata, &["gateway", "supervisor"], None)
+                .is_ok()
+        );
     }
 }
