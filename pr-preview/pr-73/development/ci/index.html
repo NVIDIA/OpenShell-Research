@@ -928,9 +928,8 @@ code review.</p>
 <h2 id="contributor-workflow">Contributor workflow</h2>
 <ol>
 <li>Follow the <a href="https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/PROJECT_GUIDELINES.md">project guidelines</a>.</li>
-<li>Add a project under <code>projects/&lt;project-type&gt;/&lt;name&gt;/</code>, including a root
-   <code>project.yaml</code> with the required <code>kind</code> field. Use the corresponding plural
-   directory from the table below.</li>
+<li>Add a project under <code>projects/&lt;project-type&gt;/&lt;name&gt;/</code>. Its plural parent
+   directory from the table below determines the review kind and task.</li>
 <li>Open a non-draft PR from a branch in this repository.</li>
 <li>Read the automated assessment in one updated PR comment. Fix useful findings;
    humans decide whether the project is ready.</li>
@@ -953,7 +952,7 @@ code review.</p>
 </tr>
 <tr>
 <td><code>research</code></td>
-<td><code>research-spike</code></td>
+<td><code>research</code></td>
 <td><code>review-research-spike</code></td>
 <td>Documented question and method, representative evidence, reproducibility, limitations, and proportionate structure.</td>
 </tr>
@@ -972,15 +971,13 @@ inventories the project, and samples only the manifests, entry points,
 configuration, implementation, and tests needed to check the documented big
 picture. It does not read every source line or run an exhaustive test suite.
 Multiple new projects receive separate assessments in the same comment.
-Renaming an existing project to a new directory counts as an addition. Missing
-or invalid kinds, including kinds that do not match the containing project-type
-directory, fail selection before inference and are reported with the file to
-fix; no project in that request runs until corrected.</p>
+Renaming an existing project to a new directory counts as an addition. Paths
+outside the three recognized project-type directories do not start a review.</p>
 <p>Existing-project changes, Dev Notes, and unrelated repository changes do not
 start live reviews. There is no central registry or metadata backfill.</p>
 <h2 id="how-the-pieces-fit">How the pieces fit</h2>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>New-project PR
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  └─ Select new directories and read project.yaml
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>  └─ Select new directories and derive kind from the project path
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>       └─ One ci-reviewer profile
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>            ├─ Shared prompt + common review skill
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>            ├─ One kind-specific skill
