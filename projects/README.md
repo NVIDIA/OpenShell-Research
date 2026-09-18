@@ -6,7 +6,7 @@ semantic kind. Each project lives under `tools/`, `research/`, or
 layout.
 
 Adding a project? Start with the [project guidelines](PROJECT_GUIDELINES.md),
-including how to declare its kind for automated review.
+including how its location determines the automated review kind.
 
 ## Tools
 

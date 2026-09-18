@@ -7,12 +7,12 @@ from pathlib import PurePosixPath
 
 PROJECT_TASKS = {
     "tool": "review-tool",
-    "research-spike": "review-research-spike",
+    "research": "review-research-spike",
     "use-case-example": "review-use-case-example",
 }
 PROJECT_KIND_BY_DIRECTORY = {
     "tools": "tool",
-    "research": "research-spike",
+    "research": "research",
     "use-case-examples": "use-case-example",
 }
 
@@ -37,23 +37,19 @@ def new_project_paths(files, existing_projects):
     return sorted(candidates)
 
 
-def project_task(path, metadata, index):
+def project_task(path, index):
+    project_path = PurePosixPath(path)
+    parts = project_path.parts
     if (
-        not isinstance(metadata, dict)
-        or not isinstance(metadata.get("kind"), str)
-        or metadata["kind"] not in PROJECT_TASKS
+        project_path.is_absolute()
+        or ".." in parts
+        or str(project_path) != path
+        or len(parts) != 3
+        or parts[0] != "projects"
+        or parts[1] not in PROJECT_KIND_BY_DIRECTORY
     ):
-        raise ValueError(
-            f"{path}/project.yaml must declare kind: " + ", ".join(PROJECT_TASKS)
-        )
-    kind = metadata["kind"]
-    project_directory = PurePosixPath(path).parts[1]
-    directory_kind = PROJECT_KIND_BY_DIRECTORY[project_directory]
-    if kind != directory_kind:
-        raise ValueError(
-            f"{path}/project.yaml kind must match its {project_directory} "
-            f"directory: {directory_kind}"
-        )
+        raise ValueError(f"Invalid project path: {path!r}")
+    kind = PROJECT_KIND_BY_DIRECTORY[parts[1]]
     return {
         "id": f"review-{index}",
         "task": PROJECT_TASKS[kind],

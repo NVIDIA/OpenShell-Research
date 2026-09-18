@@ -4,16 +4,13 @@
 """Resolve a same-repository PR's new projects before allocating inference."""
 
 import argparse
-import base64
 import json
 import os
 import subprocess
 from pathlib import Path
-from urllib.parse import quote
 
-import yaml
 from ci_scope import PROJECT_KIND_BY_DIRECTORY, new_project_paths, project_task
-from github_api import GitHub, GitHubError
+from github_api import GitHub
 from review_report import find_existing_report
 
 
@@ -56,18 +53,11 @@ def resolve_request(github, context):
                 for entry in projects_of_type
                 if entry["type"] == "tree"
             )
-    tasks = []
-    errors = []
-    for index, path in enumerate(new_project_paths(files, existing), start=1):
-        try:
-            tasks.append(
-                project_task(
-                    path, _read_metadata(github, path, pr["head"]["sha"]), index
-                )
-            )
-        except ValueError as error:
-            errors.append(str(error))
-    if not tasks and not errors:
+    tasks = [
+        project_task(path, index)
+        for index, path in enumerate(new_project_paths(files, existing), start=1)
+    ]
+    if not tasks:
         return _retirement_request(github, pr)
     return {
         "number": number,
@@ -76,7 +66,7 @@ def resolve_request(github, context):
         "title": pr["title"],
         "description": pr.get("body") or "",
         "tasks": tasks,
-        "reason": "\n".join(errors),
+        "reason": "",
     }
 
 
@@ -113,28 +103,6 @@ def main():
         output.writelines(f"{key}={value}\n" for key, value in outputs.items())
     if request["reason"]:
         raise SystemExit(request["reason"])
-
-
-def _read_metadata(github, path, revision):
-    filename = f"{path}/project.yaml"
-    try:
-        data = github.request("GET", f"contents/{quote(filename)}?ref={revision}")
-    except GitHubError as error:
-        if error.status != 404:
-            raise
-        raise ValueError(
-            f"Missing {filename}; see projects/PROJECT_GUIDELINES.md."
-        ) from error
-    if (
-        not isinstance(data, dict)
-        or data.get("type") != "file"
-        or data.get("encoding") != "base64"
-    ):
-        raise ValueError(f"{filename} must be a regular YAML file.")
-    try:
-        return yaml.safe_load(base64.b64decode(data["content"]).decode("utf-8"))
-    except (yaml.YAMLError, UnicodeError, ValueError) as error:
-        raise ValueError(f"Invalid YAML in {filename}.") from error
 
 
 def _retirement_request(github, pr):

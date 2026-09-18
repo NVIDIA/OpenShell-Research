@@ -3,7 +3,6 @@
 
 """Real selection, snapshot, CLI, and report flow; GitHub/OpenShell are simulated."""
 
-import base64
 import json
 import os
 import shutil
@@ -69,13 +68,12 @@ def test_new_projects_reach_one_current_report(tmp_path, monkeypatch, invalid_ta
     base = _git(checkout, "rev-parse", "HEAD")
     directory_by_kind = {
         "tool": "tools",
-        "research-spike": "research",
+        "research": "research",
         "use-case-example": "use-case-examples",
     }
     for kind, project_type in directory_by_kind.items():
         project = checkout / "projects" / project_type / f"new-{kind}"
         project.mkdir(parents=True)
-        (project / "project.yaml").write_text(f"kind: {kind}\n")
         (project / "README.md").write_text(f"# New {kind}\n")
     (existing / "README.md").write_text("Changed, but not a new project.\n")
     (checkout / "projects/PROJECT_GUIDELINES.md").write_text(
@@ -111,12 +109,6 @@ def test_new_projects_reach_one_current_report(tmp_path, monkeypatch, invalid_ta
         },
         "git/trees/base-tools": {"tree": [{"path": "existing", "type": "tree"}]},
     }
-    for metadata in checkout.glob("projects/*/*/project.yaml"):
-        responses[f"contents/{metadata.relative_to(checkout)}?ref={head}"] = {
-            "type": "file",
-            "encoding": "base64",
-            "content": base64.b64encode(metadata.read_bytes()).decode(),
-        }
     github = ReviewGitHub(responses, changed)
     monkeypatch.setattr(pr_review, "GitHub", lambda: github)
     monkeypatch.setattr(github_api, "GitHub", lambda: github)
@@ -135,7 +127,7 @@ def test_new_projects_reach_one_current_report(tmp_path, monkeypatch, invalid_ta
     request = json.loads(request_file.read_text())
     assert {item["kind"] for item in request["tasks"]} == {
         "tool",
-        "research-spike",
+        "research",
         "use-case-example",
     }
     assert request["head"] == head and request["base"] == base

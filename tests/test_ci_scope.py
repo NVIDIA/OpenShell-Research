@@ -109,7 +109,7 @@ class ScopeTests(unittest.TestCase):
             with self.subTest(kind=kind):
                 path = f"projects/{directory_by_kind[kind]}/new"
                 self.assertEqual(
-                    project_task(path, {"kind": kind}, index),
+                    project_task(path, index),
                     {
                         "id": f"review-{index}",
                         "task": task,
@@ -119,29 +119,20 @@ class ScopeTests(unittest.TestCase):
                     },
                 )
 
-    def test_kind_must_match_project_type_directory(self):
-        with self.assertRaisesRegex(ValueError, "must match"):
-            project_task(
-                "projects/research/new",
-                {"kind": "tool"},
-                1,
-            )
-
-    def test_missing_unknown_and_malformed_kinds_fail(self):
-        for metadata in (
-            None,
-            [],
-            "tool",
-            {},
-            {"kind": "library"},
-            {"kind": ["tool"]},
-            {"kind": True},
+    def test_task_rejects_paths_outside_project_type_directories(self):
+        for path in (
+            "projects/new",
+            "projects/other/new",
+            "projects/tools/new/nested",
+            "projects/tools/../new",
+            "./projects/tools/new",
+            "tools/new",
         ):
             with (
-                self.subTest(metadata=metadata),
-                self.assertRaisesRegex(ValueError, "project.yaml"),
+                self.subTest(path=path),
+                self.assertRaisesRegex(ValueError, "Invalid project path"),
             ):
-                project_task("projects/tools/new", metadata, 1)
+                project_task(path, 1)
 
 
 if __name__ == "__main__":

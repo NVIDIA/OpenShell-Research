@@ -26,9 +26,8 @@ code review.
 ## Contributor workflow
 
 1. Follow the [project guidelines](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/PROJECT_GUIDELINES.md).
-2. Add a project under `projects/<project-type>/<name>/`, including a root
-   `project.yaml` with the required `kind` field. Use the corresponding plural
-   directory from the table below.
+2. Add a project under `projects/<project-type>/<name>/`. Its plural parent
+   directory from the table below determines the review kind and task.
 3. Open a non-draft PR from a branch in this repository.
 4. Read the automated assessment in one updated PR comment. Fix useful findings;
    humans decide whether the project is ready.
@@ -36,7 +35,7 @@ code review.
 | Directory | `kind` | Task | Review emphasis |
 | --- | --- | --- | --- |
 | `tools` | `tool` | `review-tool` | Documented behavior, project structure, representative implementation evidence, verification, and first use. |
-| `research` | `research-spike` | `review-research-spike` | Documented question and method, representative evidence, reproducibility, limitations, and proportionate structure. |
+| `research` | `research` | `review-research-spike` | Documented question and method, representative evidence, reproducibility, limitations, and proportionate structure. |
 | `use-case-examples` | `use-case-example` | `review-use-case-example` | Documented workflow, representative integration evidence, reproducibility, safe configuration, and appropriate scope. |
 
 A project is new when its directory does not exist in the PR's base revision.
@@ -46,10 +45,8 @@ inventories the project, and samples only the manifests, entry points,
 configuration, implementation, and tests needed to check the documented big
 picture. It does not read every source line or run an exhaustive test suite.
 Multiple new projects receive separate assessments in the same comment.
-Renaming an existing project to a new directory counts as an addition. Missing
-or invalid kinds, including kinds that do not match the containing project-type
-directory, fail selection before inference and are reported with the file to
-fix; no project in that request runs until corrected.
+Renaming an existing project to a new directory counts as an addition. Paths
+outside the three recognized project-type directories do not start a review.
 
 Existing-project changes, Dev Notes, and unrelated repository changes do not
 start live reviews. There is no central registry or metadata backfill.
@@ -58,7 +55,7 @@ start live reviews. There is no central registry or metadata backfill.
 
 ```text
 New-project PR
-  └─ Select new directories and read project.yaml
+  └─ Select new directories and derive kind from the project path
        └─ One ci-reviewer profile
             ├─ Shared prompt + common review skill
             ├─ One kind-specific skill
