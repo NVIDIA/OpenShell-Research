@@ -15,7 +15,7 @@ diagnostic UI, and OpenShell policy enforcement for physical robot tools.
 [Designing OpenShell for the Edge](../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell.md).
 
 **Building it on a robot?** Follow the
-[project-local onboard setup tutorial](https://github.com/NVIDIA/OpenShell-Research/blob/kirit93/reachy-implementation/projects/reachy-mini-openshell/ONBOARD_SETUP.md).
+[project-local onboard setup tutorial](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/use-case-examples/reachy-mini-openshell/ONBOARD_SETUP.md).
 
 ## Project Page Standard
 

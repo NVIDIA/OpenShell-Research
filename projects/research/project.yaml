@@ -1,0 +1,3 @@
+# Temporary: main's legacy selector needs this while the grouped-layout PR runs.
+# The new location-based selector ignores it; delete it after the migration merges.
+kind: research-spike

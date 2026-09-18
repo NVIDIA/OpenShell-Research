@@ -536,6 +536,32 @@ def git_text(root: Path, *args: str) -> str:
     return subprocess.check_output(["git", "-C", str(root), *args], text=True)
 
 
+def changed_paths(root: Path, base: str, head: str) -> tuple[list[str], dict[str, str]]:
+    """Return materially changed current paths and Git-detected rename origins."""
+    fields = git_text(
+        root, "diff", "--name-status", "--find-renames", "-z", base, head
+    ).split("\0")
+    changed = []
+    renamed = {}
+    index = 0
+    while index < len(fields) and fields[index]:
+        status = fields[index]
+        index += 1
+        if status[0] in ("R", "C"):
+            previous, current = fields[index : index + 2]
+            index += 2
+            if status[0] == "R":
+                renamed[current] = previous
+                if status != "R100":
+                    changed.append(current)
+            else:
+                changed.append(current)
+        else:
+            changed.append(fields[index])
+            index += 1
+    return changed, renamed
+
+
 def revision_files(root: Path, revision: str) -> dict[str, str]:
     paths = git_text(root, "ls-tree", "-r", "--name-only", "-z", revision).split("\0")
     return {
@@ -602,7 +628,11 @@ def script_metadata(content: str) -> dict | None:
 
 
 def check_manifest_coverage(
-    root: Path, base: str | None, head: str, changed: list[str]
+    root: Path,
+    base: str | None,
+    head: str,
+    changed: list[str],
+    renamed: dict[str, str] | None = None,
 ) -> list[dict[str, str]]:
     """Reject missing inventories and identify native lock-freshness checks.
 
@@ -611,6 +641,7 @@ def check_manifest_coverage(
     """
     from fnmatch import fnmatch
 
+    renamed = renamed or {}
     paths = set(git_text(root, "ls-tree", "-r", "--name-only", "-z", head).split("\0"))
     base_paths = (
         set(git_text(root, "ls-tree", "-r", "--name-only", "-z", base).split("\0"))
@@ -639,11 +670,13 @@ def check_manifest_coverage(
                 candidates.add((Path(path).parent / manifest_name).as_posix())
     for path in sorted(candidates & paths):
         manifest = Path(path)
+        previous_path = renamed.get(path, path)
+        had_previous = previous_path in base_paths
         if manifest.suffix == ".py":
             metadata = script_metadata(git_text(root, "show", f"{head}:{path}"))
             previous_metadata = (
-                script_metadata(git_text(root, "show", f"{base}:{path}"))
-                if path in base_paths
+                script_metadata(git_text(root, "show", f"{base}:{previous_path}"))
+                if had_previous
                 else None
             )
             lock_path = f"{path}.lock"
@@ -654,7 +687,7 @@ def check_manifest_coverage(
             if not has_dependencies:
                 continue
             if (
-                path in base_paths
+                had_previous
                 and lock_path not in changed
                 and previous_metadata == metadata
             ):
@@ -676,15 +709,16 @@ def check_manifest_coverage(
             dependencies = manifest_dependencies(manifest.name, parse(content))
         lock_name = MANIFEST_LOCKS[manifest.name]
         direct_lock = (manifest.parent / lock_name).as_posix()
-        if path not in base_paths:
+        if not had_previous:
             previous_dependencies = []
         elif manifest.name == "go.mod":
             previous_dependencies = [
-                go_mod_requirements(git_text(root, "show", f"{base}:{path}"))
+                go_mod_requirements(git_text(root, "show", f"{base}:{previous_path}"))
             ]
         else:
             previous_dependencies = manifest_dependencies(
-                manifest.name, parse(git_text(root, "show", f"{base}:{path}"))
+                manifest.name,
+                parse(git_text(root, "show", f"{base}:{previous_path}")),
             )
         if (
             not any(dependencies)
@@ -693,7 +727,7 @@ def check_manifest_coverage(
         ):
             continue
         if (
-            path in base_paths
+            had_previous
             and direct_lock not in changed
             and previous_dependencies == dependencies
         ):
@@ -762,6 +796,17 @@ def select_dependencies(
         for dependency in direct_inventory(path, content) - previous:
             selected.setdefault(dependency, []).append(path)
     return selected
+
+
+def align_renamed_files(
+    before: dict[str, str], after: dict[str, str], renamed: dict[str, str]
+) -> dict[str, str]:
+    """Expose prior contents at their renamed paths for dependency comparison."""
+    aligned = dict(before)
+    for current, previous in renamed.items():
+        if current in after and previous in before:
+            aligned[current] = before[previous]
+    return aligned
 
 
 def report_summary(
@@ -855,21 +900,21 @@ def main() -> int:
         policy = load_policy(policy_content, approved_override=approved)
         before = revision_files(args.repo, args.base) if args.base else {}
         after = revision_files(args.repo, args.head)
-        changed = (
-            git_text(
-                args.repo, "diff", "--name-only", args.base, args.head
-            ).splitlines()
-            if args.base
-            else []
+        changed, renamed = (
+            changed_paths(args.repo, args.base, args.head) if args.base else ([], {})
         )
         approved_changed = bool(
             base_policy and head_policy["approved"] != base_policy["approved"]
         )
         full = not args.base or approved_changed
-        lock_checks = check_manifest_coverage(args.repo, args.base, args.head, changed)
+        lock_checks = check_manifest_coverage(
+            args.repo, args.base, args.head, changed, renamed
+        )
         if args.lock_checks_report:
             args.lock_checks_report.write_text(json.dumps(lock_checks, indent=2) + "\n")
-        selected = select_dependencies(before, after, full=full)
+        selected = select_dependencies(
+            align_renamed_files(before, after, renamed), after, full=full
+        )
         repository_dependencies = select_dependencies({}, after, full=True)
         if POLICY_PATH in changed:
             for dependency in policy_scoped_dependencies(

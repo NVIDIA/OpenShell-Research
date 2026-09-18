@@ -372,7 +372,7 @@ agent security and physical safety as separate problems.
 
 The complete prototype, local setup, benchmark harness, machine-readable
 results, and Dev Note live together in the
-[OpenShell Research repository](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/robotics-policy-prover).
+[OpenShell Research repository](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/use-case-examples/robotics-policy-prover).
 The default fixture mode reproduces the interaction without model credentials;
 the optional agent mode can be used to explore different planners. We welcome
 new policy encodings, adversarial workloads, simulator adapters, and benchmark
@@ -380,9 +380,9 @@ results through the normal OpenShell Research contribution process.
 
 Resources:
 
-1. [Robotics policy-prover project source](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/robotics-policy-prover)
-2. [Machine-readable DGX Spark benchmark results](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/robotics-policy-prover/benchmarks/policy-latency.json)
-3. [Machine-readable Terra planning-loop sample](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/robotics-policy-prover/benchmarks/terra-planning-loop.json)
+1. [Robotics policy-prover project source](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/use-case-examples/robotics-policy-prover)
+2. [Machine-readable DGX Spark benchmark results](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/use-case-examples/robotics-policy-prover/benchmarks/policy-latency.json)
+3. [Machine-readable Terra planning-loop sample](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/use-case-examples/robotics-policy-prover/benchmarks/terra-planning-loop.json)
 4. [NVIDIA OpenShell](https://github.com/NVIDIA/OpenShell)
 5. [ENPIRE: Agentic Robot Policy Self-Improvement in the Real World](https://research.nvidia.com/labs/gear/enpire/)
 6. [Z3 theorem prover](https://github.com/Z3Prover/z3)
