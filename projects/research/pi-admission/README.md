@@ -46,37 +46,83 @@ inspect, edit, and test real code without extra project scaffolding.
 
 ## Run
 
-Prerequisites are an existing HTTPS/mTLS OpenShell gateway, OpenShell `0.0.116`
-or a compatible release, Bash, Python 3.11+, uv 0.11+, Rust 1.90+, Docker, Node
-22 for local development, and one OpenAI-compatible Chat Completions key.
+You need an existing HTTPS/mTLS OpenShell gateway registered in your CLI, access
+to its configuration and restart procedure, Bash, Python 3.11+, uv 0.11+,
+Rust 1.90+ with native build tools, and Docker. OpenShell `0.0.116` was tested;
+other releases must support the same middleware contract. Node 22 is needed
+only for local harness development; the demo image includes it.
+
+Use your own model provider: it must support HTTPS, streaming OpenAI-compatible
+Chat Completions, text input, tool calling, and API-key authentication. This
+spike does not support OAuth, custom authentication headers, or every Pi API.
+Model calls, including the verification, may incur provider charges.
+
+### 1. Configure and prepare
+
+Run these commands from `projects/research/pi-admission/`:
 
 ```sh
 cp .env.example .env
 cp models.json.example models.json
-# Fill in the three values documented in .env.
+```
+
+Edit `models.json` to describe your provider and model using Pi's native catalog
+format. Set the provider name, `baseUrl`, model `id`, limits, and compatibility
+settings for your endpoint; keep `api: "openai-completions"` and text-only input.
+The supplied OpenRouter/GLM configuration is an example, not a requirement.
+Do not put API keys in this file: it is copied into the sandbox image.
+
+Set these values in `.env`:
+
+| Variable | Your value |
+| --- | --- |
+| `OPENSHELL_GATEWAY` | The gateway name shown by `openshell gateway list` |
+| `PI_ADMISSION_HOST` | DNS hostname or IPv4 address of the machine running `serve`, without a scheme or port |
+| `PI_MODEL_API_KEY` | The API key for the selected model provider |
+| `PI_MODEL` | Only when the catalog has multiple models: `provider/model-id` |
+
+The gateway and sandbox supervisor must reach the service on TCP **50051**;
+Pi inside the sandbox uses TCP **5443**. Choose a hostname/address reachable
+from both gateway and sandbox; `localhost`
+inside a sandbox points to the sandbox, not your host. Docker-specific hostnames
+are suitable only if they also resolve from the gateway. Allow these connections
+through the host firewall.
+
+```sh
 ./demo.sh prepare
 ```
 
-`PI_ADMISSION_HOST` must be reachable from the gateway and sandbox. Preparation
-discovers the selected gateway identity over its existing mTLS connection,
-creates a 30-day local service certificate, and writes private state under
-`.workspaces/`.
+Preparation discovers the gateway identity using your CLI's existing mTLS
+credentials, creates a 30-day service certificate, and builds the local
+`pi-admission:local` image. Private generated state stays in `.workspaces/`.
 
-Start the service:
+### 2. Start and register the service
+
+In one terminal, start the service and leave it running:
 
 ```sh
 ./demo.sh serve
 ```
 
-Then print the middleware registration:
+In a second terminal, from the same project directory, print the registration:
 
 ```sh
 ./demo.sh registration
 ```
 
-Add that entry to the gateway's operator-owned configuration and restart the
-gateway while `serve` is running. Both the gateway and each sandbox connect to
-the service at startup. Then create the demo sandbox:
+This command only prints TOML; it does not register anything. Add the entry to
+the configuration loaded by your gateway. If the gateway runs on another machine
+or in a container, copy/mount the **public** `.workspaces/tls/ca.crt` there and
+adjust `tls_ca_cert_path` to a path readable by the gateway process. Do not copy
+the service's private key.
+
+Restart the gateway using the procedure for your installation, while `serve`
+is running. Both the gateway and each sandbox connect to the service at startup.
+This restart may briefly affect other gateway users.
+
+### 3. Launch and try it
+
+In the second terminal:
 
 ```sh
 ./demo.sh setup
@@ -93,6 +139,14 @@ Repeat alice@example.com.
 /compact
 /quit
 ```
+
+The email should appear as `[EMAIL]` in the admitted conversation. The synthetic
+SSN-shaped input should be denied without entering live history or JSONL. Tool
+edits should change the sample and its test. `/compact` may report insufficient
+history in a short session; continue working or use the verification below,
+which deliberately exercises compaction with a smaller retention threshold.
+
+### 4. Verify and inspect egress
 
 Every action has a side-effect-free form that neither sources `.env` nor reveals
 secrets, for example `./demo.sh --print setup`. Run the paid live check with
@@ -111,10 +165,18 @@ The verification's bypass attempt should report `receipt_missing`. User input
 denied before any model request stays inside the harness boundary; it is not a
 network request and will not appear as an egress denial.
 
-Finish with `./demo.sh cleanup`. It removes only the example sandbox, sessions,
-providers, and profiles. It retains host configuration, gateway registration,
-and the Docker image.
-Run cleanup before repeating setup after a failed or completed demo.
+### 5. Clean up
+
+After exiting Pi, run `./demo.sh cleanup`. It deletes the example sandbox and its
+sessions, providers, and profiles; save any work you want to retain first. It
+keeps host configuration, gateway registration, and the Docker image. Run cleanup
+before repeating setup after a failed or completed demo. The scripts use fixed
+`pi-admission` resource names; use a gateway where those names are available.
+
+When finished permanently, remove the `pi-admission` middleware entry from the
+gateway configuration and restart the gateway **before stopping `serve`**.
+Otherwise a later gateway startup may fail while trying to contact the stopped
+service. Finally, stop `serve` with Ctrl-C.
 
 ## Development
 
