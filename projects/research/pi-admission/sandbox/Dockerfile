@@ -4,7 +4,7 @@
 FROM node:22.22.2-bookworm-slim@sha256:9f6d5975c7dca860947d3915877f85607946403fc55349f39b4bc3688448bb6e
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates fd-find ripgrep iproute2 nftables \
+    && apt-get install -y --no-install-recommends ca-certificates fd-find ripgrep iproute2 nftables python3 \
     && ln -s /usr/bin/fdfind /usr/local/bin/fd \
     && useradd --create-home --uid 1001 sandbox \
     && rm -rf /var/lib/apt/lists/*
