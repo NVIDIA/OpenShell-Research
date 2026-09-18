@@ -98,8 +98,9 @@ impl SupervisorMiddleware for Middleware {
         &self,
         request: Request<()>,
     ) -> Result<Response<pb::MiddlewareManifest>, Status> {
+        // Both gateway registration and sandbox startup discover the manifest.
         self.authentication
-            .verify(request.metadata(), "gateway", None)?;
+            .verify(request.metadata(), &["gateway", "supervisor"], None)?;
         Ok(Response::new(self.manifest()))
     }
 
@@ -108,7 +109,7 @@ impl SupervisorMiddleware for Middleware {
         request: Request<pb::ValidateConfigRequest>,
     ) -> Result<Response<pb::ValidateConfigResponse>, Status> {
         self.authentication
-            .verify(request.metadata(), "gateway", None)?;
+            .verify(request.metadata(), &["gateway"], None)?;
         let body = request.into_inner();
         let valid = body.middleware_name == self.config.middleware_name
             && body
@@ -136,7 +137,7 @@ impl SupervisorMiddleware for Middleware {
             .map(|context| context.sandbox_id.as_str())
             .filter(|value| !value.is_empty());
         self.authentication
-            .verify(request.metadata(), "supervisor", sandbox_id)?;
+            .verify(request.metadata(), &["supervisor"], sandbox_id)?;
         let request = request.into_inner();
         if request.phase != pb::SupervisorMiddlewarePhase::PreCredentials as i32 {
             return Ok(Response::new(Self::deny("unsupported_phase")));
