@@ -8,11 +8,6 @@ layout.
 Adding a project? Start with the [project guidelines](PROJECT_GUIDELINES.md),
 including how to declare its kind for automated review.
 
-The former top-level project roots remain as symbolic-link aliases. GitHub
-project-root links lead to the new location, and local checkouts can traverse
-the old paths. GitHub file URLs below those roots cannot be redirected and must
-use the categorized paths below.
-
 ## Tools
 
 - `openshell-middleware-manager`: `omm` CLI that creates and updates version-matched
