@@ -1,8 +1,8 @@
 # Minimal Pi admission spike
 
 This research spike shows why content policy must integrate at the agent
-harness—not only at network egress. It runs an unmodified Pi coding session in
-OpenShell with two boundaries:
+harness—not only at network egress. It uses unmodified Pi libraries for a
+controlled coding session in OpenShell with two boundaries:
 
 ```text
 draft -> admission HTTPS -> Pi history and JSONL -> provider request
@@ -68,11 +68,17 @@ Start the service:
 ./demo.sh serve
 ```
 
-Then print and install the middleware registration in the gateway's
-operator-owned configuration before creating the sandbox:
+Then print the middleware registration:
 
 ```sh
 ./demo.sh registration
+```
+
+Add that entry to the gateway's operator-owned configuration and restart the
+gateway while `serve` is running. Both the gateway and each sandbox connect to
+the service at startup. Then create the demo sandbox:
+
+```sh
 ./demo.sh setup
 ./demo.sh launch
 ```
@@ -94,9 +100,21 @@ secrets, for example `./demo.sh --print setup`. Run the paid live check with
 compaction, saved JSONL, and rejection of a provider request without a receipt.
 It requires the running gateway, sandbox, service, and model credential.
 
+Inspect network decisions using OpenShell's existing logs (replace `YOUR_GATEWAY`
+with the gateway from `.env`):
+
+```sh
+openshell --gateway YOUR_GATEWAY logs pi-admission --source sandbox --since 5m
+```
+
+The verification's bypass attempt should report `receipt_missing`. User input
+denied before any model request stays inside the harness boundary; it is not a
+network request and will not appear as an egress denial.
+
 Finish with `./demo.sh cleanup`. It removes only the example sandbox, sessions,
 providers, and profiles. It retains host configuration, gateway registration,
 and the Docker image.
+Run cleanup before repeating setup after a failed or completed demo.
 
 ## Development
 
