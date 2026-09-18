@@ -172,5 +172,5 @@ For this repository's workflow and PR reports, see the
 | No output with `--dry-run` | Expected: the plan is printed, but no result file is created. |
 
 To run the current source without installing a tool, use `uv run --frozen oar`
-from `projects/openshell-agent-runner`. See [installation](index.md#1-install-and-check-the-connection)
+from `projects/tools/openshell-agent-runner`. See [installation](index.md#1-install-and-check-the-connection)
 for making this version available as `oar` from any directory.
