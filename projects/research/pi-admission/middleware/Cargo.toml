@@ -16,7 +16,7 @@ base64 = "0.22"
 bytes = "1"
 ed25519-dalek = { version = "2", features = ["pem", "pkcs8", "rand_core"] }
 futures-core = "0.3"
-jsonwebtoken = "10"
+jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 prost = "0.14"
 prost-types = "0.14"
 rand = "0.8"
