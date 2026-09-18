@@ -32,6 +32,9 @@ The complete assistant/tool-result batch is admitted before it is published.
 Tool side effects are not transactional and may exist even when a result is
 denied.
 
+Edit results show admitted text rather than Pi's file-derived diff preview,
+which would read content outside the admission boundary.
+
 Only explicit `/compact` is supported. Automatic compaction, retries, queued
 prompts, project instructions, skills, resume/import/branching, model switching,
 images, extensions, and direct `!` shell commands are disabled. A prompt entered

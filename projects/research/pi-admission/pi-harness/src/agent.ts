@@ -114,7 +114,7 @@ export class AdmissionAgent extends Agent {
 
   private async run(candidates: AgentMessage[]): Promise<void> {
     if (this.live.isStreaming || this.stopped)
-      throw new Error("Session is busy or stopped; use /new if stopped.");
+      throw new Error("Session is busy or stopped; restart Pi if stopped.");
     this.controller = new AbortController();
     this.live.isStreaming = true;
     this.live.errorMessage = undefined;

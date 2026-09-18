@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import { InMemoryCredentialStore, type Model } from "@earendil-works/pi-ai";
 import { streamSimple } from "@earendil-works/pi-ai/compat";
+import { Text } from "@earendil-works/pi-tui";
 import {
   AgentSession,
   AgentSessionRuntime,
@@ -16,6 +17,7 @@ import {
   compact,
   type CreateAgentSessionRuntimeFactory,
   type PromptOptions,
+  type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { Admission, AdmissionError, RECEIPT_HEADER } from "./admission.js";
 import { AdmissionAgent, retainedUsage } from "./agent.js";
@@ -60,11 +62,34 @@ export class AdmissionSession extends AgentSession {
   }
 
   override async prompt(text: string, options?: PromptOptions): Promise<void> {
-    if (this.isStreaming)
+    if (this.isStreaming) {
+      if (this.extensionRunner.hasUI()) {
+        this.extensionRunner.getUIContext().notify(
+          "Agent is busy; wait or cancel the active turn.", "warning",
+        );
+        return;
+      }
       throw new Error("Agent is busy; wait or cancel the active turn.");
+    }
     if (this.isStopped)
       throw new Error("The session stopped after an incomplete tool batch; restart Pi.");
     await super.prompt(text, { ...options, streamingBehavior: undefined });
+  }
+
+  override getToolDefinition(name: string): ToolDefinition | undefined {
+    const definition = super.getToolDefinition(name);
+    if (name !== "edit" || !definition) return definition;
+    // Pi's edit preview rereads the file, outside admission and after execution.
+    // Render only the admitted arguments/result; keep native tool execution.
+    return {
+      ...definition,
+      renderShell: "default",
+      renderCall: (args) =>
+        new Text(`edit ${(args as { path?: string }).path ?? ""}`, 0, 0),
+      renderResult: (result) =>
+        new Text(result.content.filter((part) => part.type === "text")
+          .map((part) => part.text).join("\n"), 0, 0),
+    };
   }
 
   // These native entry points write outside the agent's message event path.
@@ -82,7 +107,7 @@ export class AdmissionSession extends AgentSession {
     return unsupported("Session branching");
   }
   override async reload(): Promise<never> {
-    return unsupported("Resource reload; use /new");
+    return unsupported("Resource reload; restart the launcher");
   }
   override async setModel(): Promise<never> {
     return unsupported("Model switching");
@@ -95,7 +120,7 @@ export class AdmissionSession extends AgentSession {
   }
 }
 
-/** Use Pi's real TUI runtime; /new is safe, importing unchecked history is not. */
+/** Use Pi's real TUI runtime without importing unchecked history. */
 export async function createAdmissionRuntime(
   options: SessionOptions,
 ): Promise<AgentSessionRuntime> {
@@ -162,6 +187,8 @@ function sessionFactory(options: SessionOptions) {
       settingsManager,
       resourceLoaderOptions: {
         noExtensions: true,
+        noSkills: true,
+        noContextFiles: true,
         noPromptTemplates: true,
         noThemes: true,
         extensionFactories: [
@@ -243,17 +270,23 @@ function sessionFactory(options: SessionOptions) {
 }
 
 class AdmissionRuntime extends AgentSessionRuntime {
-  override async newSession(): Promise<never> {
-    return unsupported("New sessions; restart the launcher");
+  override async newSession() {
+    return this.cancelChange("New sessions; restart the launcher");
   }
-  override async switchSession(): Promise<never> {
-    return unsupported("Resume");
+  override async switchSession() {
+    return this.cancelChange("Resume");
   }
-  override async importFromJsonl(): Promise<never> {
-    return unsupported("Import");
+  override async importFromJsonl() {
+    return this.cancelChange("Import");
   }
-  override async fork(): Promise<never> {
-    return unsupported("Fork");
+  override async fork() {
+    return this.cancelChange("Fork");
+  }
+  private cancelChange(feature: string) {
+    this.session.extensionRunner.getUIContext().notify(
+      `${feature} is not supported by this admission example.`, "warning",
+    );
+    return { cancelled: true };
   }
 }
 

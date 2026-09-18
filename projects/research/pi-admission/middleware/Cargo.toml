@@ -11,7 +11,7 @@ name = "pi_admission"
 
 [dependencies]
 axum = "0.8"
-axum-server = { version = "0.8", features = ["tls-rustls"] }
+axum-server = { version = "0.8", features = ["tls-rustls-no-provider"] }
 base64 = "0.22"
 bytes = "1"
 ed25519-dalek = { version = "2", features = ["pem", "pkcs8", "rand_core"] }
