@@ -29,8 +29,6 @@ These projects are reference implementations for realistic OpenShell use cases.
 They demonstrate end-to-end patterns that readers can understand and adapt;
 they are not presented as production-ready applications.
 
-- `python-project-template`: Minimal, production-ready Python project scaffold
-  managed with uv.
 - `reachy-mini-openshell`: Reachy Mini conversation demo for OpenShell.
 - `robotics-policy-prover`: Robotics demonstration of policy-proving
   agent-generated actions before execution.
