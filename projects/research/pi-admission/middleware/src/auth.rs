@@ -63,3 +63,47 @@ impl GatewayAuthentication {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ed25519_dalek::{SigningKey, pkcs8::EncodePrivateKey};
+    use jsonwebtoken::{EncodingKey, Header, encode};
+    use rand::rngs::OsRng;
+    use serde_json::json;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn gateway_token_authenticates_and_binds_caller() {
+        let key = SigningKey::generate(&mut OsRng);
+        let mut validation = Validation::new(Algorithm::EdDSA);
+        validation.set_issuer(&["gateway"]);
+        validation.set_audience(&["pi-admission"]);
+        let auth = GatewayAuthentication {
+            key: DecodingKey::from_ed_der(key.verifying_key().as_bytes()),
+            validation,
+        };
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let claims = json!({"iss": "gateway", "aud": "pi-admission", "iat": now,
+            "exp": now + 60, "caller_kind": "supervisor", "sandbox_id": "sandbox"});
+        let mut header = Header::new(Algorithm::EdDSA);
+        header.typ = Some("openshell-ext+jwt".into());
+        let token = encode(
+            &header,
+            &claims,
+            &EncodingKey::from_ed_der(key.to_pkcs8_der().unwrap().as_bytes()),
+        )
+        .unwrap();
+        let mut metadata = MetadataMap::new();
+        metadata.insert("authorization", format!("Bearer {token}").parse().unwrap());
+        assert!(
+            auth.verify(&metadata, "supervisor", Some("sandbox"))
+                .is_ok()
+        );
+        assert!(auth.verify(&metadata, "supervisor", Some("other")).is_err());
+        assert!(auth.verify(&metadata, "gateway", None).is_err());
+    }
+}

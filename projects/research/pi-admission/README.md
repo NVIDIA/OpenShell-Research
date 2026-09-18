@@ -112,6 +112,7 @@ cargo test --locked
 cd ../pi-harness
 npm ci
 npm run check
+npm run build
 npm test
 ```
 
