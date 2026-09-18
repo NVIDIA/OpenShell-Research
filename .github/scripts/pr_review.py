@@ -4,16 +4,13 @@
 """Resolve a same-repository PR's new projects before allocating inference."""
 
 import argparse
-import base64
 import json
 import os
 import subprocess
 from pathlib import Path
-from urllib.parse import quote
 
-import yaml
-from ci_scope import new_project_paths, project_task
-from github_api import GitHub, GitHubError
+from ci_scope import PROJECT_KIND_BY_DIRECTORY, new_project_paths, project_task
+from github_api import GitHub
 from review_report import find_existing_report
 
 
@@ -41,24 +38,34 @@ def resolve_request(github, context):
     projects = next((entry for entry in base_tree if entry["path"] == "projects"), None)
     existing = set()
     if projects and projects["type"] == "tree":
-        existing = {
-            entry["path"]
-            for entry in github.request("GET", f"git/trees/{projects['sha']}")["tree"]
-            if entry["type"] == "tree"
-        }
-    tasks = []
-    errors = []
-    for index, path in enumerate(new_project_paths(files, existing), start=1):
-        try:
-            tasks.append(
-                project_task(
-                    path, _read_metadata(github, path, pr["head"]["sha"]), index
-                )
+        project_types = github.request("GET", f"git/trees/{projects['sha']}")["tree"]
+        for project_type in project_types:
+            if (
+                project_type["type"] != "tree"
+                or project_type["path"] not in PROJECT_KIND_BY_DIRECTORY
+            ):
+                continue
+            projects_of_type = github.request(
+                "GET", f"git/trees/{project_type['sha']}"
+            )["tree"]
+            existing.update(
+                f"projects/{project_type['path']}/{entry['path']}"
+                for entry in projects_of_type
+                if entry["type"] == "tree"
             )
-        except ValueError as error:
-            errors.append(str(error))
-    if not tasks and not errors:
+    tasks = [
+        project_task(path, index)
+        for index, path in enumerate(new_project_paths(files, existing), start=1)
+    ]
+    if not tasks:
         return _retirement_request(github, pr)
+    bypass = ""
+    if context.get("skip_live"):
+        bypass = "Repository variable OAR_SKIP_LIVE=true."
+    elif any(
+        label["name"].lower() == "skip-oar-live" for label in pr.get("labels", [])
+    ):
+        bypass = "PR label skip-oar-live."
     return {
         "number": number,
         "head": pr["head"]["sha"],
@@ -66,7 +73,8 @@ def resolve_request(github, context):
         "title": pr["title"],
         "description": pr.get("body") or "",
         "tasks": tasks,
-        "reason": "\n".join(errors),
+        "reason": "",
+        "bypass": bypass,
     }
 
 
@@ -80,6 +88,7 @@ def main():
             Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8")
         ),
         "event_name": os.environ["GITHUB_EVENT_NAME"],
+        "skip_live": os.environ.get("OAR_SKIP_LIVE", "").lower() == "true",
     }
     request = resolve_request(GitHub(), context)
     if request is None:
@@ -96,35 +105,17 @@ def main():
     args.output.write_text(json.dumps(request, indent=2) + "\n", encoding="utf-8")
     outputs = {key: request[key] for key in ("number", "head", "base")}
     outputs.update(
-        ready=str(bool(request["tasks"]) and not request["reason"]).lower(),
+        ready=str(
+            bool(request["tasks"])
+            and not request["reason"]
+            and not request.get("bypass")
+        ).lower(),
         tooling=tooling,
     )
     with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
         output.writelines(f"{key}={value}\n" for key, value in outputs.items())
     if request["reason"]:
         raise SystemExit(request["reason"])
-
-
-def _read_metadata(github, path, revision):
-    filename = f"{path}/project.yaml"
-    try:
-        data = github.request("GET", f"contents/{quote(filename)}?ref={revision}")
-    except GitHubError as error:
-        if error.status != 404:
-            raise
-        raise ValueError(
-            f"Missing {filename}; see projects/PROJECT_GUIDELINES.md."
-        ) from error
-    if (
-        not isinstance(data, dict)
-        or data.get("type") != "file"
-        or data.get("encoding") != "base64"
-    ):
-        raise ValueError(f"{filename} must be a regular YAML file.")
-    try:
-        return yaml.safe_load(base64.b64decode(data["content"]).decode("utf-8"))
-    except (yaml.YAMLError, UnicodeError, ValueError) as error:
-        raise ValueError(f"Invalid YAML in {filename}.") from error
 
 
 def _retirement_request(github, pr):

@@ -13,11 +13,19 @@ import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT_DOCUMENTATION = {
-    "openshell-agent-runner": ROOT / "projects" / "openshell-agent-runner" / "docs",
+    "openshell-agent-runner": ROOT
+    / "projects"
+    / "tools"
+    / "openshell-agent-runner"
+    / "docs",
 }
 DOCUMENTATION_ROOT = ROOT / "docs" / "documentation"
 PROJECT_ASSETS = {
-    "openshell-agent-runner": ROOT / "projects" / "openshell-agent-runner" / "assets",
+    "openshell-agent-runner": ROOT
+    / "projects"
+    / "tools"
+    / "openshell-agent-runner"
+    / "assets",
 }
 
 

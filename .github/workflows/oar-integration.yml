@@ -2,23 +2,23 @@ name: OAR live integration
 
 "on":
   pull_request:
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review, labeled, unlabeled]
     paths:
       - .github/workflows/oar-integration.yml
       - .github/actions/setup-review-gateway/**
-      - projects/openshell-agent-runner/src/**
-      - projects/openshell-agent-runner/pyproject.toml
-      - projects/openshell-agent-runner/uv.lock
-      - projects/openshell-agent-runner/tests/fixtures/pipeline-integration/**
+      - projects/tools/openshell-agent-runner/src/**
+      - projects/tools/openshell-agent-runner/pyproject.toml
+      - projects/tools/openshell-agent-runner/uv.lock
+      - projects/tools/openshell-agent-runner/tests/fixtures/pipeline-integration/**
   push:
     branches: [main]
     paths:
       - .github/workflows/oar-integration.yml
       - .github/actions/setup-review-gateway/**
-      - projects/openshell-agent-runner/src/**
-      - projects/openshell-agent-runner/pyproject.toml
-      - projects/openshell-agent-runner/uv.lock
-      - projects/openshell-agent-runner/tests/fixtures/pipeline-integration/**
+      - projects/tools/openshell-agent-runner/src/**
+      - projects/tools/openshell-agent-runner/pyproject.toml
+      - projects/tools/openshell-agent-runner/uv.lock
+      - projects/tools/openshell-agent-runner/tests/fixtures/pipeline-integration/**
   workflow_dispatch:
 
 permissions: {}
@@ -28,16 +28,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  bypass:
+    name: Report manual live OAR bypass
+    if: >-
+      vars.OAR_SKIP_LIVE == 'true' ||
+      contains(github.event.pull_request.labels.*.name, 'skip-oar-live')
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Explain bypass
+        env:
+          REPOSITORY_BYPASS: ${{ vars.OAR_SKIP_LIVE == 'true' }}
+        run: |
+          if [[ "$REPOSITORY_BYPASS" == 'true' ]]; then
+            reason='Repository variable OAR_SKIP_LIVE=true.'
+          else
+            reason='PR label skip-oar-live.'
+          fi
+          echo "::warning::Live OAR integration manually bypassed. $reason"
+          {
+            echo '## Live OAR integration manually bypassed'
+            echo
+            echo "$reason"
+            echo 'No live execution was verified. Offline functional, package, and runtime checks remain enabled.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   integration:
     name: Run installed OAR through OpenShell
     # Candidate OAR code runs on the host: restrict secrets to trusted branches.
     if: >-
-      (github.event_name == 'pull_request' &&
+      vars.OAR_SKIP_LIVE != 'true' &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-oar-live') &&
+      ((github.event_name == 'pull_request' &&
        !github.event.pull_request.draft &&
        github.event.pull_request.head.repo.full_name == github.repository &&
        github.actor != 'dependabot[bot]') ||
       (github.event_name != 'pull_request' &&
-       github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
+       github.ref == format('refs/heads/{0}', github.event.repository.default_branch)))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -55,10 +82,10 @@ jobs:
           version: "0.12.5"
           python-version: "3.12"
           enable-cache: true
-          cache-dependency-glob: projects/openshell-agent-runner/uv.lock
+          cache-dependency-glob: projects/tools/openshell-agent-runner/uv.lock
 
       - name: Install the wheel and prepare the contract input
-        working-directory: projects/openshell-agent-runner
+        working-directory: projects/tools/openshell-agent-runner
         env:
           REVIEW_MODEL: ${{ secrets.MODEL_ID_TOP }}
         run: |

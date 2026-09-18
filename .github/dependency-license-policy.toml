@@ -17,6 +17,14 @@ source = '{"registry":"https://pypi.org/simple"}'
 license = "Apache-2.0"
 evidence = "https://github.com/pollen-robotics/reachy_mini/blob/v1.10.0/LICENSE"
 
+[[clarification]]
+ecosystem = "pypi"
+name = "transformers"
+version = "5.17.0"
+source = '{"registry":"https://pypi.org/simple"}'
+license = "Apache-2.0"
+evidence = "https://github.com/huggingface/transformers/blob/v5.17.0/LICENSE"
+
 [[exception]]
 ecosystem = "pypi"
 name = "gstreamer-bundle"

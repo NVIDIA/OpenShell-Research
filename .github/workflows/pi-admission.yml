@@ -4,13 +4,13 @@ name: Pi admission
   pull_request:
     paths:
       - ".github/workflows/pi-admission.yml"
-      - "projects/pi-admission/**"
+      - "projects/research/pi-admission/**"
   push:
     branches:
       - main
     paths:
       - ".github/workflows/pi-admission.yml"
-      - "projects/pi-admission/**"
+      - "projects/research/pi-admission/**"
   workflow_dispatch:
 
 permissions:
@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: projects/pi-admission
+        working-directory: projects/research/pi-admission
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: projects/pi-admission/middleware
+        working-directory: projects/research/pi-admission/middleware
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -80,7 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: projects/pi-admission/pi-harness
+        working-directory: projects/research/pi-admission/pi-harness
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -92,7 +92,7 @@ jobs:
         with:
           node-version: "22.22.2"
           cache: npm
-          cache-dependency-path: projects/pi-admission/pi-harness/package-lock.json
+          cache-dependency-path: projects/research/pi-admission/pi-harness/package-lock.json
 
       - name: Install locked dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund

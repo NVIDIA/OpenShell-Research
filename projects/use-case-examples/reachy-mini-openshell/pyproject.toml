@@ -1,0 +1,110 @@
+[build-system]
+requires = [ "setuptools>=84,<85",]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reachy_mini_conversation_app"
+version = "0.3.0"
+description = "Reachy Mini conversation demo for OpenShell."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+ "aiohttp>=3.14.3,<4", # 3.14.3 fixes aiohttp security advisories pulled in by reachy-mini.
+ "aiortc>=1.13.0",
+ "fastrtc>=0.0.34",
+ "gradio==5.50.1.dev1",
+ "gstreamer-bundle>=1.28.7,<1.29; sys_platform != 'linux'", # 1.28.7 fixes GStreamer advisories and supports Python 3.11-3.12 on macOS.
+ "huggingface-hub>=1.5,<2",
+ "opencv-python>=4.12.0.88",
+ "pillow>=12.3,<13", # 12.3.0 fixes Pillow security advisories pulled in by Gradio.
+ "pip>=26.2.1,<27", # 26.2.1 fixes pip security advisories pulled in by reachy-mini.
+ "protobuf>=7.36,<8", # 7.36.0 fixes protobuf security advisories pulled in by ONNX Runtime.
+ "python-dotenv",
+ "openai>=2.1",
+ "httpx>=0.27",
+ "reachy_mini_dances_library",
+ "reachy_mini_toolbox",
+ "reachy-mini[mujoco]==1.10.0",
+ "eclipse-zenoh~=1.7.0",
+ "gradio_client>=1.13.3",
+ "setuptools>=84,<85", # 84.0.0 fixes setuptools security advisories pulled in by torch.
+ "starlette>=1.6,<2", # 1.6.0 fixes Starlette security advisories pulled in by Gradio and reachy-mini.
+ "tornado>=6.5.8,<7", # 6.5.8 fixes Tornado advisories pulled in by reachy-mini.
+]
+[[project.authors]]
+name = "Pollen Robotics"
+email = "contact@pollen-robotics.com"
+
+[dependency-groups]
+dev = [
+ "pytest",
+ "pytest-asyncio",
+ "ruff==0.12.0",
+ "pre-commit",
+ "types-requests",
+ "python-semantic-release>=10.5.3",
+ "ty>=0.0.53",
+]
+
+[tool.uv]
+environments = [
+    "sys_platform == 'darwin'",
+]
+# reachy-mini still carries obsolete upper/exact transitive pins. Keep
+# the audited versions authoritative until its published metadata catches up.
+override-dependencies = [
+    "gstreamer-bundle>=1.28.7,<1.29; sys_platform != 'linux'",
+    "huggingface-hub>=1.5,<2",
+    "pillow>=12.3,<13",
+    "pydantic>=2.12.5,<3", # Reachy Mini requires 2.12.5; Gradio's conservative cap excludes it.
+    "starlette>=1.6,<2",
+]
+
+[project.optional-dependencies]
+local_vision = [ "torch>=2.13,<3", "transformers>=5.17,<6", "num2words",] # 5.17.0 fixes Transformers security advisories.
+yolo_vision = [ "ultralytics", "supervision", "onnxruntime",]
+mediapipe_vision = [ "mediapipe>=0.10.35,<0.11",]
+all_vision = [ "torch>=2.13,<3", "transformers>=5.17,<6", "num2words", "ultralytics", "supervision", "onnxruntime", "mediapipe>=0.10.35,<0.11",] # 5.17.0 fixes Transformers security advisories.
+
+[project.scripts]
+reachy-mini-conversation-app = "reachy_mini_conversation_app.main:main"
+reachy-mini-backend-check = "reachy_mini_conversation_app.backend_check:main"
+reachy-mini-sandbox-audio = "reachy_mini_conversation_app.sandbox_audio:main"
+reachy-agent-control = "reachy_mini_conversation_app.sandbox_control:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.ruff]
+line-length = 119
+exclude = [ ".venv", "dist", "build", "**/__pycache__", "*.egg-info", ".pytest_cache",]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.package-data]
+reachy_mini_conversation_app = [ "images/*", "profiles/**/*.py", "profiles/**/*.txt",]
+
+[tool.ruff.lint]
+select = [ "E", "F", "W", "I", "C4", "D",]
+ignore = [ "E501", "D100", "D203", "D213",]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "native-controller/src"]
+
+[tool.setuptools.packages.find]
+where = [ "src",]
+
+[tool.ruff.lint.isort]
+length-sort = true
+lines-after-imports = 2
+no-lines-before = [ "standard-library", "local-folder",]
+known-local-folder = [ "reachy_mini_conversation_app",]
+known-first-party = [ "reachy_mini", "reachy_mini_dances_library", "reachy_mini_toolbox",]
+split-on-trailing-comma = true

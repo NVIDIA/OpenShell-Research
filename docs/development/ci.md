@@ -26,17 +26,17 @@ code review.
 ## Contributor workflow
 
 1. Follow the [project guidelines](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/PROJECT_GUIDELINES.md).
-2. Add a project under `projects/<name>/`, including a root `project.yaml` with
-   the required `kind` field.
+2. Add a project under `projects/<project-type>/<name>/`. Its plural parent
+   directory from the table below determines the review kind and task.
 3. Open a non-draft PR from a branch in this repository.
 4. Read the automated assessment in one updated PR comment. Fix useful findings;
    humans decide whether the project is ready.
 
-| `kind` | Task | Review emphasis |
-| --- | --- | --- |
-| `tool` | `review-tool` | Documented behavior, project structure, representative implementation evidence, verification, and first use. |
-| `research-spike` | `review-research-spike` | Documented question and method, representative evidence, reproducibility, limitations, and proportionate structure. |
-| `use-case-example` | `review-use-case-example` | Documented workflow, representative integration evidence, reproducibility, safe configuration, and appropriate scope. |
+| Directory | `kind` | Task | Review emphasis |
+| --- | --- | --- | --- |
+| `tools` | `tool` | `review-tool` | Documented behavior, project structure, representative implementation evidence, verification, and first use. |
+| `research` | `research` | `review-research-spike` | Documented question and method, representative evidence, reproducibility, limitations, and proportionate structure. |
+| `use-case-examples` | `use-case-example` | `review-use-case-example` | Documented workflow, representative integration evidence, reproducibility, safe configuration, and appropriate scope. |
 
 A project is new when its directory does not exist in the PR's base revision.
 Later commits on its introducing PR reassess the project overview. The reviewer
@@ -45,9 +45,8 @@ inventories the project, and samples only the manifests, entry points,
 configuration, implementation, and tests needed to check the documented big
 picture. It does not read every source line or run an exhaustive test suite.
 Multiple new projects receive separate assessments in the same comment.
-Renaming an existing project to a new directory counts as an addition. Missing
-or invalid kinds fail selection before inference and are reported with the file
-to fix; no project in that request runs until corrected.
+Renaming an existing project to a new directory counts as an addition. Paths
+outside the three recognized project-type directories do not start a review.
 
 Existing-project changes, Dev Notes, and unrelated repository changes do not
 start live reviews. There is no central registry or metadata backfill.
@@ -56,7 +55,7 @@ start live reviews. There is no central registry or metadata backfill.
 
 ```text
 New-project PR
-  └─ Select new directories and read project.yaml
+  └─ Select new directories and derive kind from the project path
        └─ One ci-reviewer profile
             ├─ Shared prompt + common review skill
             ├─ One kind-specific skill
@@ -83,9 +82,9 @@ findings are advisory; native checks remain separate merge gates.
 
 ## Execution and trust
 
-`New project review` runs on PR opening, reopening, new commits, readiness, and
-conversion back to draft. When a new project is removed from the PR or the PR
-returns to draft, the workflow removes its now-stale bot report.
+`New project review` runs on PR opening, reopening, new commits, readiness,
+label changes, and conversion back to draft. When a new project is removed from
+the PR or the PR returns to draft, the workflow removes its now-stale bot report.
 Draft, fork, and Dependabot PRs skip live review. There is no manual fork
 authorization or waiting for other workflows.
 
@@ -135,13 +134,46 @@ not the sandbox or comment reporter. No persistent gateway is required.
 Dependency-license checks are already part of the repository's CI. They neither
 use OAR nor coordinate with this reviewer; see [Dependency License Checks](dependency-licenses.md).
 
+## Bypass live checks during an external outage
+
+Maintainers can explicitly bypass new-project reviews and live OAR integration
+when inference or another external dependency is unavailable:
+
+- For one PR, apply the `skip-oar-live` label. Create it first if needed.
+  Adding or removing it triggers the applicable workflows; remove it to resume
+  live checks. It persists across commits until removed.
+- For a repository-wide outage, set the Actions **variable** `OAR_SKIP_LIVE` to
+  `true` in **Settings → Secrets and variables → Actions → Variables**. Delete
+  the variable or set it to `false` after recovery. Variable changes do not
+  trigger workflows: rerun **all jobs** in affected runs to apply the new value.
+
+These controls require the updated workflows on the default branch (and the
+updated live integration workflow in the tested PR). Rerunning an older workflow
+revision does not add bypass support; trigger a new run using the updated revision.
+PR label controls use GitHub's label permissions; restrict label management to
+the people allowed to waive live checks. The integration workflow uses labels
+from its event payload, so use the new label-change run rather than rerunning
+an older event to apply label changes.
+
+The PR report and integration summary explicitly state that execution was
+manually bypassed, with no passing verdict. Offline OAR functional, package, and
+runtime checks, and all other repository checks, remain enabled. Provider errors
+still fail live runs unless someone explicitly enables a bypass. These controls
+do not change branch protection or dismiss other failures.
+
+To diagnose a failure, download `pr-review-results` and inspect `review-*.log`.
+A provider HTTP 503 after sandbox setup and input uploads indicates an upstream
+inference failure, not a review finding. A successful gateway setup only confirms
+configuration; verify the configured model with an authenticated Chat Completions
+request or rerun live integration after recovery. Do not print credentials.
+
 ## Validation and evolution
 
 CI scripts are Python; requests use PyYAML from OAR's locked environment and
 GitHub calls use the runner's `gh api`. Run from the repository root:
 
 ```sh
-uv run --project projects/openshell-agent-runner pytest \
+uv run --project projects/tools/openshell-agent-runner pytest \
   tests/test_ci_scope.py tests/test_github_api.py tests/test_*review*.py
 ```
 

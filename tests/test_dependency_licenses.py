@@ -70,7 +70,7 @@ def assert_true(value):
     assert value
 
 
-def check_coverage(before, after, base="base"):
+def check_coverage(before, after, base="base", renamed=None):
     changed = sorted(
         path
         for path in before.keys() | after.keys()
@@ -85,7 +85,23 @@ def check_coverage(before, after, base="base"):
         return (before if revision == "base" else after)[path]
 
     with mock.patch.object(checker, "git_text", side_effect=git_text):
-        return checker.check_manifest_coverage(ROOT, base, "head", changed)
+        return checker.check_manifest_coverage(
+            ROOT, base, "head", changed, renamed=renamed
+        )
+
+
+def test_changed_paths_tracks_renames_without_treating_copies_as_moves():
+    output = (
+        "M\0plain file\0R100\0old/path\0new/path\0"
+        "R099\0old/edited\0new/edited\0"
+        "C100\0source/path\0copied/path\0D\0gone/path\0"
+    )
+    with mock.patch.object(checker, "git_text", return_value=output):
+        changed, renamed = checker.changed_paths(ROOT, "base", "head")
+    assert_equal(changed, ["plain file", "new/edited", "copied/path", "gone/path"])
+    assert_equal(
+        renamed, {"new/path": "old/path", "new/edited": "old/edited"}
+    )
 
 
 def test_native_check_targets_for_direct_projects():
@@ -231,6 +247,15 @@ def test_non_dependency_manifest_changes_do_not_require_new_inventory():
     check_coverage({}, {"go.mod": "module example.com/stdlib-only\ngo 1.26.0\n"})
 
 
+def test_renamed_dependency_template_does_not_become_a_new_manifest():
+    content = '[project]\ndependencies=["example"]'
+    check_coverage(
+        {"old/templates/pyproject.toml": content},
+        {"new/templates/pyproject.toml": content},
+        renamed={"new/templates/pyproject.toml": "old/templates/pyproject.toml"},
+    )
+
+
 def test_deleting_lockfile_with_remaining_dependencies_fails():
     manifest = '[project]\ndependencies=["example"]'
     with pytest.raises(ValueError):
@@ -255,7 +280,7 @@ def test_compatible_cargo_constraint_edit_does_not_require_lockfile_churn():
 
 def test_uv_includes_all_locked_packages_not_just_active_platform():
     content = uv_lock() + uv_lock("2.0") + uv_lock("0.1", 'editable = "."')
-    dependencies = checker.inventory("projects/tool/uv.lock", content)
+    dependencies = checker.inventory("projects/tools/example/uv.lock", content)
     assert_equal({item.version for item in dependencies}, {"1.0", "2.0"})
 
 
@@ -537,6 +562,13 @@ def test_same_dependency_reports_each_affected_lockfile():
         {}, {"a/uv.lock": uv_lock(), "b/uv.lock": uv_lock()}
     )
     assert_equal(list(selected.values()), [["a/uv.lock", "b/uv.lock"]])
+
+
+def test_renamed_lockfile_does_not_recheck_unchanged_dependencies():
+    before = {"old/uv.lock": uv_lock()}
+    after = {"new/uv.lock": uv_lock()}
+    aligned = checker.align_renamed_files(before, after, {"new/uv.lock": "old/uv.lock"})
+    assert_false(checker.select_dependencies(aligned, after))
 
 
 def test_approved_licenses_and_boolean_expressions():

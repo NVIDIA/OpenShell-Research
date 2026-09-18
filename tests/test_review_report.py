@@ -57,7 +57,7 @@ def report_options():
             {
                 "id": "review-1",
                 "task": "review-research-spike",
-                "label": "projects/new-spike",
+                "label": "projects/research/new-spike",
                 "result": result(),
             }
         ],
@@ -65,6 +65,23 @@ def report_options():
         "run_id": 100,
         "outcome": "completed",
     }
+
+
+def test_manual_bypass_report_never_presents_stale_results_as_passing():
+    options = report_options()
+    options["request"].update(
+        bypass="PR label skip-oar-live.",
+        tasks=[{"label": "projects/research/new-spike"}],
+    )
+    options["outcome"] = "skipped"
+    body = render_report(**options)
+    assert REVIEW_MARKER in body
+    assert "manually bypassed" in body
+    assert "No verdict was produced" in body
+    assert "PR label skip-oar-live" in body
+    assert "projects/research/new-spike" in body
+    assert "✅ Pass" not in body
+    assert "No result or execution status" not in body
 
 
 class MockGitHub:
@@ -269,7 +286,7 @@ class ReviewReportTests(unittest.TestCase):
             {
                 "severity": "medium",
                 "title": "Wrong command",
-                "path": "projects/new spike/README.md",
+                "path": "projects/research/new spike/README.md",
                 "line": 12,
                 "evidence": "The documented command is unavailable.",
                 "impact": "The first run fails.",
@@ -280,7 +297,7 @@ class ReviewReportTests(unittest.TestCase):
         body = render_report(**options)
 
         self.assertIn(
-            f"https://github.com/example/research/blob/{HEAD}/projects/new%20spike/README.md#L12",
+            f"https://github.com/example/research/blob/{HEAD}/projects/research/new%20spike/README.md#L12",
             body,
         )
 
