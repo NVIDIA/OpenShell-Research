@@ -16,8 +16,9 @@ commands from the repository root. Use Python 3.10 or newer.
 ## Content routing
 
 - Put project-specific software knowledge—installation, usage, reproducibility,
-  and known limitations—under `projects/<name>/docs/`. The clean build stages
-  configured project documentation under `docs/documentation/` for publishing.
+  and known limitations—under `projects/<project-type>/<name>/docs/`. The clean
+  build stages configured project documentation under `docs/documentation/`
+  for publishing.
 - Put cross-project software documentation directly under
   `docs/documentation/`.
 - Put dated experiments, benchmarks, releases, use cases, and engineering updates

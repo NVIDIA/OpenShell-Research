@@ -3,9 +3,7 @@
 
 """Offline request selection and exact-revision boundary tests."""
 
-import base64
 import copy
-import importlib.util
 import json
 import os
 import subprocess
@@ -17,15 +15,8 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / ".github/scripts"))
 
-from github_api import GitHubError
-from review_report import REVIEW_MARKER
-
-if importlib.util.find_spec("yaml") is None:
-    raise unittest.SkipTest(
-        "Request tests run in the OAR environment, which supplies PyYAML."
-    )
-
 from pr_review import main, resolve_request
+from review_report import REVIEW_MARKER
 
 HEAD = "a" * 40
 BASE = "b" * 40
@@ -46,12 +37,10 @@ class MockGitHub:
             "head": {"sha": HEAD, "repo": {"full_name": self.repository}},
             "base": {"sha": BASE, "ref": "main"},
         }
-        self.files = [{"filename": "projects/new/README.md", "status": "added"}]
+        self.files = [{"filename": "projects/tools/new/README.md", "status": "added"}]
         self.base_tree = [{"path": "projects", "type": "tree", "sha": "projects-tree"}]
-        self.projects_tree = [{"path": "existing", "type": "tree"}]
-        self.metadata = "kind: tool\n"
-        self.metadata_type = "file"
-        self.error = None
+        self.projects_tree = [{"path": "tools", "type": "tree", "sha": "tools-tree"}]
+        self.tools_tree = [{"path": "existing", "type": "tree"}]
         self.comments = []
         self.calls = []
 
@@ -63,16 +52,8 @@ class MockGitHub:
             return {"tree": self.base_tree}
         if path == "git/trees/projects-tree":
             return {"tree": self.projects_tree}
-        if path.startswith("contents/projects/") and path.endswith(
-            f"/project.yaml?ref={HEAD}"
-        ):
-            if self.error:
-                raise self.error
-            return {
-                "type": self.metadata_type,
-                "encoding": "base64",
-                "content": base64.b64encode(self.metadata.encode()).decode(),
-            }
+        if path == "git/trees/tools-tree":
+            return {"tree": self.tools_tree}
         raise AssertionError(f"Unexpected request: {method} {path}")
 
     def paginate(self, path, key=None):
@@ -97,10 +78,7 @@ class RequestTests(unittest.TestCase):
         self.assertEqual(request["reason"], "")
         self.assertEqual((request["head"], request["base"]), (HEAD, BASE))
         self.assertEqual(request["tasks"][0]["task"], "review-tool")
-        self.assertIn(
-            ("GET", f"contents/projects/new/project.yaml?ref={HEAD}", None),
-            self.github.calls,
-        )
+        self.assertFalse(any("contents/" in path for _, path, _ in self.github.calls))
         self.assertFalse(any("actions/" in path for _, path, _ in self.github.calls))
 
     def test_skip_drafts_forks_bots_closed_and_stale_events_before_reading_files(self):
@@ -129,13 +107,13 @@ class RequestTests(unittest.TestCase):
         for event in ("workflow_dispatch", "workflow_run", "push"):
             self.assertIsNone(resolve_request(self.github, {"event_name": event}))
 
-    def test_existing_project_needs_no_metadata(self):
-        self.github.files[0]["filename"] = "projects/existing/new-file.py"
+    def test_existing_project_is_not_selected(self):
+        self.github.files[0]["filename"] = "projects/tools/existing/new-file.py"
         self.assertIsNone(resolve_request(self.github, self.context))
         self.assertFalse(any("contents/" in path for _, path, _ in self.github.calls))
 
     def test_existing_report_is_retired_when_review_no_longer_applies(self):
-        self.github.files[0]["filename"] = "projects/existing/new-file.py"
+        self.github.files[0]["filename"] = "projects/tools/existing/new-file.py"
         self.github.comments = [
             {
                 "id": 9,
@@ -156,14 +134,14 @@ class RequestTests(unittest.TestCase):
         self.github.base_tree = []
         self.assertEqual(
             resolve_request(self.github, self.context)["tasks"][0]["input"],
-            "projects/new",
+            "projects/tools/new",
         )
 
-    def test_multiple_new_projects_and_encoded_names(self):
+    def test_multiple_new_projects_are_sorted_without_file_reads(self):
         self.github.files.extend(
             [
-                {"filename": "projects/second/README.md", "status": "added"},
-                {"filename": "projects/a space/README.md", "status": "added"},
+                {"filename": "projects/tools/second/README.md", "status": "added"},
+                {"filename": "projects/tools/a space/README.md", "status": "added"},
             ]
         )
         self.github.pr["changed_files"] = 3
@@ -172,99 +150,56 @@ class RequestTests(unittest.TestCase):
             [task["id"] for task in request["tasks"]],
             ["review-1", "review-2", "review-3"],
         )
-        self.assertIn(
-            ("GET", f"contents/projects/a%20space/project.yaml?ref={HEAD}", None),
-            self.github.calls,
-        )
-
-    def test_metadata_failures_are_reportable_before_any_inference(self):
-        for metadata in (
-            "kind: unsupported",
-            "kind: [tool]",
-            "kind: [",
-            "",
-            "- tool",
-            "!!python/object:builtins.object {}",
-        ):
-            with self.subTest(metadata=metadata):
-                self.github.metadata = metadata
-                request = resolve_request(self.github, self.context)
-                self.assertIn("projects/new/project.yaml", request["reason"])
-                self.assertEqual(request["tasks"], [])
-        self.github.error = GitHubError("Not found", status=404)
-        self.assertIn("Missing", resolve_request(self.github, self.context)["reason"])
-
-    def test_metadata_transport_errors_are_not_mislabeled_as_missing_files(self):
-        for status in (403, 500, None):
-            self.github.error = GitHubError("Unavailable", status=status)
-            with self.subTest(status=status), self.assertRaises(GitHubError):
-                resolve_request(self.github, self.context)
-
-    def test_non_file_metadata_is_rejected(self):
-        self.github.metadata_type = "symlink"
-        self.assertIn(
-            "regular YAML file", resolve_request(self.github, self.context)["reason"]
-        )
+        self.assertFalse(any("contents/" in path for _, path, _ in self.github.calls))
 
     def test_incomplete_file_inventory_fails(self):
         self.github.pr["changed_files"] = 2
         with self.assertRaisesRegex(ValueError, "complete PR file list"):
             resolve_request(self.github, self.context)
 
-    def test_cli_writes_pinned_request_and_reports_metadata_errors(self):
-        for invalid in (False, True):
+    def test_cli_writes_pinned_request(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            event = root / "event.json"
+            event.write_text(json.dumps(self.context["payload"]))
+            request_file = root / "request/request.json"
+            output = root / "outputs"
+            environment = {
+                "GITHUB_EVENT_PATH": str(event),
+                "GITHUB_EVENT_NAME": "pull_request_target",
+                "GITHUB_OUTPUT": str(output),
+            }
             with (
-                self.subTest(invalid=invalid),
-                tempfile.TemporaryDirectory() as directory,
+                patch.dict(os.environ, environment),
+                patch("pr_review.GitHub", return_value=self.github),
+                patch(
+                    "sys.argv",
+                    [
+                        "pr_review.py",
+                        "--output",
+                        str(request_file),
+                        "--tooling",
+                        "trusted tooling",
+                    ],
+                ),
+                patch(
+                    "pr_review.subprocess.run",
+                    return_value=subprocess.CompletedProcess([], 0, "c" * 40 + "\n"),
+                ) as git,
             ):
-                root = Path(directory)
-                event = root / "event.json"
-                event.write_text(json.dumps(self.context["payload"]))
-                request_file = root / "request/request.json"
-                output = root / "outputs"
-                self.github.metadata = "kind: unknown" if invalid else "kind: tool"
-                environment = {
-                    "GITHUB_EVENT_PATH": str(event),
-                    "GITHUB_EVENT_NAME": "pull_request_target",
-                    "GITHUB_OUTPUT": str(output),
-                }
-                with (
-                    patch.dict(os.environ, environment),
-                    patch("pr_review.GitHub", return_value=self.github),
-                    patch(
-                        "sys.argv",
-                        [
-                            "pr_review.py",
-                            "--output",
-                            str(request_file),
-                            "--tooling",
-                            "trusted tooling",
-                        ],
-                    ),
-                    patch(
-                        "pr_review.subprocess.run",
-                        return_value=subprocess.CompletedProcess(
-                            [], 0, "c" * 40 + "\n"
-                        ),
-                    ) as git,
-                ):
-                    if invalid:
-                        with self.assertRaisesRegex(SystemExit, "project.yaml"):
-                            main()
-                    else:
-                        main()
-                saved = json.loads(request_file.read_text())
-                self.assertEqual(saved["head"], HEAD)
-                self.assertEqual(saved["tooling"], "c" * 40)
-                self.assertIn(f"ready={str(not invalid).lower()}\n", output.read_text())
-                self.assertIn("number=7\n", output.read_text())
-                self.assertEqual(
-                    git.call_args.args[0],
-                    ["git", "-C", "trusted tooling", "rev-parse", "HEAD"],
-                )
+                main()
+            saved = json.loads(request_file.read_text())
+            self.assertEqual(saved["head"], HEAD)
+            self.assertEqual(saved["tooling"], "c" * 40)
+            self.assertIn("ready=true\n", output.read_text())
+            self.assertIn("number=7\n", output.read_text())
+            self.assertEqual(
+                git.call_args.args[0],
+                ["git", "-C", "trusted tooling", "rev-parse", "HEAD"],
+            )
 
     def test_cli_marks_report_retirement_as_not_ready_for_inference(self):
-        self.github.files[0]["filename"] = "projects/existing/new-file.py"
+        self.github.files[0]["filename"] = "projects/tools/existing/new-file.py"
         self.github.comments = [
             {
                 "id": 9,

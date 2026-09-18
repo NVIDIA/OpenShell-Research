@@ -14,7 +14,7 @@ name: OAR functional checks
       - tests/*review*
       - tests/test_ci_scope.py
       - tests/test_github_api.py
-      - projects/openshell-agent-runner/**
+      - projects/tools/openshell-agent-runner/**
   push:
     branches:
       - main
@@ -30,7 +30,7 @@ name: OAR functional checks
       - tests/*review*
       - tests/test_ci_scope.py
       - tests/test_github_api.py
-      - projects/openshell-agent-runner/**
+      - projects/tools/openshell-agent-runner/**
   workflow_dispatch:
 
 permissions:
@@ -57,20 +57,20 @@ jobs:
           version: "0.12.5"
           python-version: "3.12"
           enable-cache: true
-          cache-dependency-glob: projects/openshell-agent-runner/uv.lock
+          cache-dependency-glob: projects/tools/openshell-agent-runner/uv.lock
 
       - name: Isolate the project environment
         run: echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/oar-checks-venv" >> "$GITHUB_ENV"
 
       - name: Run project checks
-        working-directory: projects/openshell-agent-runner
+        working-directory: projects/tools/openshell-agent-runner
         run: |
-          uv run --frozen pre-commit validate-config ../../.pre-commit-config.yaml
+          uv run --frozen pre-commit validate-config ../../../.pre-commit-config.yaml
           make check
 
       - name: Test PR selection, review execution, and reporting
         run: |
-          uv run --project projects/openshell-agent-runner --frozen pytest \
+          uv run --project projects/tools/openshell-agent-runner --frozen pytest \
             tests/test_ci_scope.py tests/test_github_api.py tests/test_*review*.py
 
       - name: Validate OAR workflow syntax
@@ -103,10 +103,10 @@ jobs:
           version: "0.12.5"
           python-version: "3.12"
           enable-cache: true
-          cache-dependency-glob: projects/openshell-agent-runner/uv.lock
+          cache-dependency-glob: projects/tools/openshell-agent-runner/uv.lock
 
       - name: Build wheel and source distribution
-        working-directory: projects/openshell-agent-runner
+        working-directory: projects/tools/openshell-agent-runner
         run: |
           make build
           shopt -s nullglob
@@ -116,7 +116,7 @@ jobs:
           test "${#sdists[@]}" -eq 1
 
       - name: Install and exercise the wheel
-        working-directory: projects/openshell-agent-runner
+        working-directory: projects/tools/openshell-agent-runner
         run: |
           wheel=(dist/*.whl)
           uv venv "$RUNNER_TEMP/package-venv"
@@ -154,15 +154,15 @@ jobs:
           version: "0.12.5"
           python-version: "3.12"
           enable-cache: true
-          cache-dependency-glob: projects/openshell-agent-runner/uv.lock
+          cache-dependency-glob: projects/tools/openshell-agent-runner/uv.lock
 
       - name: Isolate the project environment
         run: echo "UV_PROJECT_ENVIRONMENT=$RUNNER_TEMP/oar-runtime-venv" >> "$GITHUB_ENV"
 
       - name: Install locked dependencies and initialize a profile
         run: |
-          uv sync --project projects/openshell-agent-runner --locked
-          uv run --project projects/openshell-agent-runner --frozen oar init \
+          uv sync --project projects/tools/openshell-agent-runner --locked
+          uv run --project projects/tools/openshell-agent-runner --frozen oar init \
             "$RUNNER_TEMP/profiles" --profile code-reviewer \
             --model provider/model --thinking off
 
@@ -170,7 +170,7 @@ jobs:
         run: |
           docker build \
             --tag openshell-agent-runner-pi:ci \
-            projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/image
+            projects/tools/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/image
           docker run --rm \
             --entrypoint bash \
             --volume "$RUNNER_TEMP/profiles/code-reviewer:/profile-source:ro" \
@@ -183,10 +183,10 @@ jobs:
         run: |
           docker run --rm --network none \
             --entrypoint bash \
-            --volume "$PWD/projects/openshell-agent-runner/tests/fixtures/format-output.schema.json:/sandbox/output.schema.json:ro" \
-            --volume "$PWD/projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/extensions/submit-result.ts:/sandbox/oar-submit-result.ts:ro" \
-            --volume "$PWD/projects/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/extensions/validate-tools.ts:/sandbox/oar-validate-tools.ts:ro" \
-            --volume "$PWD/projects/openshell-agent-runner/tests/fixtures/validate-pi-extensions.mjs:/sandbox/validate-pi-extensions.mjs:ro" \
+            --volume "$PWD/projects/tools/openshell-agent-runner/tests/fixtures/format-output.schema.json:/sandbox/output.schema.json:ro" \
+            --volume "$PWD/projects/tools/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/extensions/submit-result.ts:/sandbox/oar-submit-result.ts:ro" \
+            --volume "$PWD/projects/tools/openshell-agent-runner/src/openshell_agent_runner/harnesses/pi/runtime/extensions/validate-tools.ts:/sandbox/oar-validate-tools.ts:ro" \
+            --volume "$PWD/projects/tools/openshell-agent-runner/tests/fixtures/validate-pi-extensions.mjs:/sandbox/validate-pi-extensions.mjs:ro" \
             openshell-agent-runner-pi:ci \
             -c "ln -s /usr/local/lib/node_modules /sandbox/node_modules && \
               node \
@@ -194,7 +194,7 @@ jobs:
               /sandbox/validate-pi-extensions.mjs"
 
       - name: Exercise isolated Pi sessions
-        working-directory: projects/openshell-agent-runner
+        working-directory: projects/tools/openshell-agent-runner
         env:
           OAR_PI_IMAGE: openshell-agent-runner-pi:ci
         run: uv run --frozen pytest tests/harnesses/runtime_checks.py
