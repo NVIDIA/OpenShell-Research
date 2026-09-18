@@ -8,6 +8,9 @@ layout.
 Adding a project? Start with the [project guidelines](PROJECT_GUIDELINES.md),
 including how to declare its kind for automated review.
 
+The former top-level project paths remain as symbolic-link aliases for existing
+links and local tooling. New references should use the categorized paths below.
+
 ## Tools
 
 - `openshell-middleware-manager`: `omm` CLI that creates and updates version-matched
