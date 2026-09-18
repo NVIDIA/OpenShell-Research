@@ -19,6 +19,8 @@ including how its location determines the automated review kind.
 
 ## Research
 
+- `pi-admission`: Pi admission spike demonstrating redaction before history
+  writes and signed approval receipts enforced at OpenShell network egress.
 - `long-horizon-agent-evals`: Persistent agent experiments over configurable
   time horizons and repeated parallel attempts, starting with GitHub policy
   review.
