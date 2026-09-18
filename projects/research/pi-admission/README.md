@@ -110,15 +110,49 @@ In a second terminal, from the same project directory, print the registration:
 ./demo.sh registration
 ```
 
-This command only prints TOML; it does not register anything. Add the entry to
-the configuration loaded by your gateway. If the gateway runs on another machine
-or in a container, copy/mount the **public** `.workspaces/tls/ca.crt` there and
-adjust `tls_ca_cert_path` to a path readable by the gateway process. Do not copy
-the service's private key.
+This command reads `.workspaces/middleware.toml`, created by `prepare`, and
+prints it. It does **not** write to the gateway configuration, register the
+middleware, or restart anything.
+
+Find the TOML configuration actually loaded by your gateway process. Its path
+depends on how the gateway was installed: check its service/startup configuration
+or ask its operator. This is the **server's configuration**, not the CLI's local
+gateway credentials. Do not assume a file named `gateway.toml` in the current
+directory is the right one.
+
+Back up that file, then add the printed `[[openshell.supervisor.middleware]]`
+entry. For a gateway configuration accessible on this machine, the command is:
+
+```sh
+# Replace this placeholder with the existing, active gateway config path.
+./demo.sh registration >> /path/to/gateway.toml
+```
+
+If the file requires administrator permissions, use this **instead**:
+
+```sh
+./demo.sh registration | sudo tee -a /path/to/gateway.toml >/dev/null
+```
+
+Both commands **append**. Run only one, and only when no middleware entry named
+`pi-admission` already exists. On subsequent runs, edit the existing entry rather
+than appending a duplicate. Do not use `>`: it would overwrite the gateway's
+other settings.
+
+For a remote or containerized gateway, install the entry in that deployment's
+configuration instead of appending to an unrelated local file. Copy/mount the
+**public** `.workspaces/tls/ca.crt` there and adjust `tls_ca_cert_path` in the entry
+to a path readable by the gateway process. Do not copy the service's private key.
 
 Restart the gateway using the procedure for your installation, while `serve`
 is running. Both the gateway and each sandbox connect to the service at startup.
 This restart may briefly affect other gateway users.
+
+Before continuing, check that it is healthy (use your `.env` gateway name):
+
+```sh
+openshell --gateway YOUR_GATEWAY gateway info
+```
 
 ### 3. Launch and try it
 
@@ -177,6 +211,59 @@ When finished permanently, remove the `pi-admission` middleware entry from the
 gateway configuration and restart the gateway **before stopping `serve`**.
 Otherwise a later gateway startup may fail while trying to contact the stopped
 service. Finally, stop `serve` with Ctrl-C.
+
+## Comparison: network redaction alone
+
+**What this demonstrates:** a proxy can sanitize what the model receives without
+sanitizing the agent's live conversation or saved session. Those are different
+boundaries; successful network redaction is not evidence of clean local history.
+
+Use a separate sandbox running ordinary Pi, without `pi-harness`, for this
+comparison. Keep its normal model-provider and network configuration, but attach
+OpenShell's built-in regex middleware to the model endpoint instead of the
+`pi-admission` middleware:
+
+```yaml
+network_middlewares:
+  network_redaction:
+    middleware: openshell/regex
+    config:
+      mode: redact
+    on_error: fail_closed
+    endpoints:
+      include: ["YOUR_MODEL_PROVIDER_HOST"]
+```
+
+This is a policy fragment, not a complete sandbox policy. The built-in middleware
+needs no external service registration. In OpenShell `0.0.116`, it replaces
+`sk-[A-Za-z0-9_-]{16,}` with `[REDACTED]`; its patterns are fixed, and it does not
+recognize this spike's email/SSN patterns.
+
+In ordinary Pi, send this **fake token**, never a real credential:
+
+```text
+Repeat this demonstration token exactly: sk-DEMO_ONLY_NOT_A_REAL_KEY_123456
+```
+
+Inspect OpenShell's sandbox logs for the regex transformation, then inspect Pi's
+original user message and search its saved session JSONL for the fake token.
+The original remains in local history even though the outgoing request was
+redacted. The model's reply may show `[REDACTED]`, but do not rely on model
+obedience alone as proof of what crossed the network.
+
+Compare that with `alice@example.com` in our admission demo:
+
+| Approach | Outgoing content | Pi history and JSONL |
+| --- | --- | --- |
+| Ordinary Pi + network-only regex | Fake token redacted | Original fake token remains |
+| Admission harness | Email redacted | Only `[EMAIL]` is published |
+
+The two examples deliberately use different fixed patterns. For an identical
+input comparison, the Rust admission policy would need the same fake-token
+pattern; it does not currently contain it. Do not layer this network replacement
+onto the receipt-enforced demo: changing attested content can invalidate the
+receipt and obscure the comparison. `./demo.sh launch` always starts the admission
+harness, not the ordinary-Pi baseline.
 
 ## Development
 
