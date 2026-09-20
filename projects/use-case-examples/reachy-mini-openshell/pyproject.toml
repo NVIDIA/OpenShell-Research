@@ -61,10 +61,10 @@ override-dependencies = [
 ]
 
 [project.optional-dependencies]
-local_vision = [ "torch>=2.13,<3", "transformers>=5.15.1,<6", "num2words",]
+local_vision = [ "torch>=2.13,<3", "transformers>=5.17,<6", "num2words",] # 5.17.0 fixes Transformers security advisories.
 yolo_vision = [ "ultralytics", "supervision", "onnxruntime",]
 mediapipe_vision = [ "mediapipe>=0.10.35,<0.11",]
-all_vision = [ "torch>=2.13,<3", "transformers>=5.15.1,<6", "num2words", "ultralytics", "supervision", "onnxruntime", "mediapipe>=0.10.35,<0.11",]
+all_vision = [ "torch>=2.13,<3", "transformers>=5.17,<6", "num2words", "ultralytics", "supervision", "onnxruntime", "mediapipe>=0.10.35,<0.11",] # 5.17.0 fixes Transformers security advisories.
 
 [project.scripts]
 reachy-mini-conversation-app = "reachy_mini_conversation_app.main:main"
