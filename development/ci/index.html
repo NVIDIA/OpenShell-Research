@@ -847,6 +847,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#bypass-live-checks-during-an-external-outage" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Bypass live checks during an external outage
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#validation-and-evolution" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -1000,9 +1011,9 @@ issue needs correction), and <code>inconclusive</code> (insufficient evidence). 
 does not hide guideline violations or force a passing verdict. Scores and
 findings are advisory; native checks remain separate merge gates.</p>
 <h2 id="execution-and-trust">Execution and trust</h2>
-<p><code>New project review</code> runs on PR opening, reopening, new commits, readiness, and
-conversion back to draft. When a new project is removed from the PR or the PR
-returns to draft, the workflow removes its now-stale bot report.
+<p><code>New project review</code> runs on PR opening, reopening, new commits, readiness,
+label changes, and conversion back to draft. When a new project is removed from
+the PR or the PR returns to draft, the workflow removes its now-stale bot report.
 Draft, fork, and Dependabot PRs skip live review. There is no manual fork
 authorization or waiting for other workflows.</p>
 <ul>
@@ -1048,6 +1059,35 @@ gateway, and configures inference. Credentials stay with gateway configuration,
 not the sandbox or comment reporter. No persistent gateway is required.</p>
 <p>Dependency-license checks are already part of the repository's CI. They neither
 use OAR nor coordinate with this reviewer; see <a href="../dependency-licenses/">Dependency License Checks</a>.</p>
+<h2 id="bypass-live-checks-during-an-external-outage">Bypass live checks during an external outage</h2>
+<p>Maintainers can explicitly bypass new-project reviews and live OAR integration
+when inference or another external dependency is unavailable:</p>
+<ul>
+<li>For one PR, apply the <code>skip-oar-live</code> label. Create it first if needed.
+  Adding or removing it triggers the applicable workflows; remove it to resume
+  live checks. It persists across commits until removed.</li>
+<li>For a repository-wide outage, set the Actions <strong>variable</strong> <code>OAR_SKIP_LIVE</code> to
+  <code>true</code> in <strong>Settings → Secrets and variables → Actions → Variables</strong>. Delete
+  the variable or set it to <code>false</code> after recovery. Variable changes do not
+  trigger workflows: rerun <strong>all jobs</strong> in affected runs to apply the new value.</li>
+</ul>
+<p>These controls require the updated workflows on the default branch (and the
+updated live integration workflow in the tested PR). Rerunning an older workflow
+revision does not add bypass support; trigger a new run using the updated revision.
+PR label controls use GitHub's label permissions; restrict label management to
+the people allowed to waive live checks. The integration workflow uses labels
+from its event payload, so use the new label-change run rather than rerunning
+an older event to apply label changes.</p>
+<p>The PR report and integration summary explicitly state that execution was
+manually bypassed, with no passing verdict. Offline OAR functional, package, and
+runtime checks, and all other repository checks, remain enabled. Provider errors
+still fail live runs unless someone explicitly enables a bypass. These controls
+do not change branch protection or dismiss other failures.</p>
+<p>To diagnose a failure, download <code>pr-review-results</code> and inspect <code>review-*.log</code>.
+A provider HTTP 503 after sandbox setup and input uploads indicates an upstream
+inference failure, not a review finding. A successful gateway setup only confirms
+configuration; verify the configured model with an authenticated Chat Completions
+request or rerun live integration after recovery. Do not print credentials.</p>
 <h2 id="validation-and-evolution">Validation and evolution</h2>
 <p>CI scripts are Python; requests use PyYAML from OAR's locked environment and
 GitHub calls use the runner's <code>gh api</code>. Run from the repository root:</p>
