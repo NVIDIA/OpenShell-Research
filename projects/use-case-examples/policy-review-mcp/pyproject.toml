@@ -21,7 +21,7 @@ jev = ["typesafe-sdk==0.7.0"]
 dev = [
   "pytest>=8.4,<10",
   "pytest-asyncio>=1.2,<2",
-  "ruff>=0.12,<0.15",
+  "ruff==0.16.4",
 ]
 
 [project.scripts]
