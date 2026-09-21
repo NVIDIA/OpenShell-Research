@@ -8,8 +8,6 @@ RUN apt-get update \
     && ln -s /usr/bin/fdfind /usr/local/bin/fd \
     && useradd --create-home --uid 1001 sandbox \
     && rm -rf /var/lib/apt/lists/*
-COPY admission-ca.crt /usr/local/share/ca-certificates/admission-ca.crt
-RUN update-ca-certificates
 WORKDIR /app
 COPY pi-harness/package.json pi-harness/package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund

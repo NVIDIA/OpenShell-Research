@@ -26,26 +26,12 @@ network_policies:
       - { path: /usr/bin/node }
       - { path: /usr/local/bin/node }
 
-  admission:
-    name: Authenticated admission API
-    endpoints:
-      - host: host.docker.internal # prepare replaces this with PI_ADMISSION_HOST.
-        port: 5443
-        protocol: rest
-        enforcement: enforce
-        rules:
-          - allow:
-              method: POST
-              path: /v1/admission
-    binaries:
-      - { path: /usr/local/bin/node }
-
 network_middlewares:
-  pi_admission:
-    name: Verify admitted Pi provider context
-    middleware: pi-admission
-    order: 0
-    config: {}
+  network_redaction:
+    name: Redact fake API keys at egress only
+    middleware: openshell/regex
+    config:
+      mode: redact
     on_error: fail_closed
     endpoints:
       include:

@@ -10,13 +10,13 @@ state=$example/.workspaces
 print_only=false
 if [[ ${1:-} == --print ]]; then print_only=true; shift; fi
 action=${1:-help}
+shift || true
 # .env is trusted operator input. Print mode never executes it.
 if ! $print_only && [[ -f $example/.env ]]; then
   set -a
   source "$example/.env"
   set +a
 fi
-service_host=${PI_ADMISSION_HOST:-YOUR_SERVICE_HOST}
 gateway=${OPENSHELL_GATEWAY:-YOUR_GATEWAY}
 openshell=(openshell --gateway "$gateway")
 run() {
@@ -30,7 +30,6 @@ delete_if_present() {
     printf '%s\n' "$output"
   else
     status=$?
-    # Older OpenShell releases return gRPC NotFound for an absent resource.
     if [[ $output == *"code: 'Some requested entity was not found'"* &&
           $output == *"message: \"$resource not found\""* ]]; then
       printf '%s already absent; continuing cleanup.\n' "$resource"
@@ -40,84 +39,60 @@ delete_if_present() {
     fi
   fi
 }
+admission_mode() {
+  if [[ ${1:-} != --admission || (${2:-} != off && ${2:-} != on) || $# != 2 ]]; then
+    echo "Usage: ./demo.sh $action --admission off|on" >&2
+    exit 2
+  fi
+  printf '%s' "$2"
+}
 cd "$example"
 case "$action" in
   prepare)
-    if ! $print_only; then
-      : "${PI_ADMISSION_HOST:?Set the service hostname or IPv4 address in .env}"
-      : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}"
-      if [[ ! -f $example/models.json ]]; then
-        echo 'Create models.json from models.json.example and configure your model first.' >&2
-        exit 1
-      fi
+    if (( $# )); then echo "prepare takes no arguments" >&2; exit 2; fi
+    if ! $print_only && [[ ! -f $example/models.json ]]; then
+      echo 'Create models.json from models.json.example and configure your model first.' >&2
+      exit 1
     fi
     run uv sync --frozen
-    if $print_only; then
-      printf '%q ' "${openshell[@]}" gateway list --output json
-      printf '| '
-      run uv run --frozen python "$example/prepare.py" --state "$state" --host "$service_host" --gateway "$gateway" --model "${PI_MODEL:-}"
-    else
-      "${openshell[@]}" gateway list --output json | uv run --frozen python "$example/prepare.py" --state "$state" --host "$service_host" --gateway "$gateway" --model "${PI_MODEL:-}"
-    fi
+    run uv run --frozen python "$example/prepare.py" --state "$state" --model "${PI_MODEL:-}"
     run docker build --tag pi-admission:local "$state/image"
     ;;
-  serve)
-    run cargo run --locked --manifest-path "$example/middleware/Cargo.toml" -- --config "$state/admission.json"
-    ;;
-  registration)
-    run cat "$state/middleware.toml"
-    ;;
   setup)
+    if (( $# )); then echo "setup takes no arguments" >&2; exit 2; fi
     if ! $print_only; then
       : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}"
       : "${PI_MODEL_API_KEY:?Set PI_MODEL_API_KEY in the example .env}"
       export PI_MODEL_API_KEY
-      PI_ADMISSION_TOKEN=$(uv run --frozen python -c 'import json,sys; print(json.load(open(sys.argv[1]))["bearer_token"])' "$state/admission.json")
-      export PI_ADMISSION_TOKEN
     fi
     run "${openshell[@]}" gateway info
-    for provider in model admission; do
-      run "${openshell[@]}" provider profile import --file "$state/$provider-provider.yaml"
-      variable=PI_MODEL_API_KEY
-      [[ $provider != admission ]] || variable=PI_ADMISSION_TOKEN
-      run "${openshell[@]}" provider create --name "pi-admission-$provider" --type "pi-admission-$provider" --credential "$variable"
-    done
-    run "${openshell[@]}" sandbox create --name pi-admission --from pi-admission:local --policy "$state/policy.yaml" --provider pi-admission-model --provider pi-admission-admission --detach -- /bin/sleep infinity
-    if $print_only; then
-      printf '%q ' "${openshell[@]}" sandbox get pi-admission --output json
-      printf '| uv run --frozen python %q --state %q\n' "$example/bind-sandbox.py" "$state"
-    else
-      "${openshell[@]}" sandbox get pi-admission --output json | uv run --frozen python "$example/bind-sandbox.py" --state "$state"
-    fi
+    run "${openshell[@]}" provider profile import --file "$state/model-provider.yaml"
+    run "${openshell[@]}" provider create --name pi-admission-model --type pi-admission-model --credential PI_MODEL_API_KEY
+    run "${openshell[@]}" sandbox create --name pi-admission --from pi-admission:local --policy "$state/policy.yaml" --provider pi-admission-model --detach -- /bin/sleep infinity
     ;;
-  launch)
-    if ! $print_only; then : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}" "${PI_ADMISSION_HOST:?Set the service host in .env}"; fi
-    run "${openshell[@]}" sandbox exec --tty --name pi-admission -- /usr/local/bin/node --disable-warning=UNDICI-EHPA /app/dist/src/cli.js --admission "https://$service_host:5443/v1/admission"
-    ;;
-  verify)
-    if ! $print_only; then : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}" "${PI_ADMISSION_HOST:?Set the service host in .env}"; fi
-    run "${openshell[@]}" sandbox exec --no-tty --name pi-admission -- /usr/local/bin/node --disable-warning=UNDICI-EHPA /app/dist/src/verify.js --admission "https://$service_host:5443/v1/admission"
+  launch|verify)
+    mode=$(admission_mode "$@")
+    if ! $print_only; then : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}"; fi
+    tty=--tty
+    entry=cli
+    if [[ $action == verify ]]; then tty=--no-tty; entry=verify; fi
+    run "${openshell[@]}" sandbox exec "$tty" --name pi-admission -- /usr/local/bin/node --disable-warning=UNDICI-EHPA "/app/dist/src/$entry.js" --admission "$mode"
     ;;
   cleanup)
+    if (( $# )); then echo "cleanup takes no arguments" >&2; exit 2; fi
     if ! $print_only; then : "${OPENSHELL_GATEWAY:?Select your existing gateway in .env}"; fi
     delete_if_present sandbox "${openshell[@]}" sandbox delete pi-admission
-    for provider in model admission; do
-      delete_if_present provider "${openshell[@]}" provider delete "pi-admission-$provider"
-      delete_if_present 'provider profile' "${openshell[@]}" provider profile delete "pi-admission-$provider"
-    done
-    run uv run --frozen python -c 'import pathlib,sys; pathlib.Path(sys.argv[1]).unlink(missing_ok=True)' "$state/sandbox-id"
-    printf 'Sandbox and its sessions removed. Stop serve with Ctrl-C.\n'
-    printf 'Host configuration remains in %s; the local Docker image is retained.\n' "$state"
+    delete_if_present provider "${openshell[@]}" provider delete pi-admission-model
+    delete_if_present 'provider profile' "${openshell[@]}" provider profile delete pi-admission-model
+    printf 'Sandbox and its sessions removed. The local Docker image is retained.\n'
     ;;
   help)
-    printf 'Usage: ./demo.sh [--print] ACTION\n\n'
-    printf '  prepare  Generate service TLS/config; build the Pi image\n'
-    printf '  serve    Run Pi admission service (keep this terminal open)\n'
-    printf '  registration  Show the gateway middleware TOML entry\n'
-    printf '  setup    Create providers and sandbox; bind admission identity\n'
-    printf '  launch   Start a new interactive Pi-powered session\n'
-    printf '  verify   Run real deny/redact/history/compaction and bypass checks\n'
-    printf '  cleanup  Delete sandbox, providers, and sessions\n'
+    printf 'Usage: ./demo.sh [--print] ACTION [OPTIONS]\n\n'
+    printf '  prepare  Generate policy/model config and build the Pi image\n'
+    printf '  setup    Create the model provider and shared sandbox\n'
+    printf '  launch --admission off|on  Start a fresh interactive session\n'
+    printf '  verify --admission off|on  Run the paid live check in one mode\n'
+    printf '  cleanup  Delete the sandbox, provider, and sessions\n'
     printf '\n--print shows commands without executing .env, requiring secrets, or changing state.\n'
     ;;
   *) echo "Unknown action. Run ./demo.sh help." >&2; exit 2 ;;
