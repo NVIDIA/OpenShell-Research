@@ -1,298 +1,215 @@
-# Minimal Pi admission spike
+# Pi local-admission comparison
 
-This research spike shows why content policy must integrate at the agent
-harness—not only at network egress. It uses unmodified Pi libraries for a
-controlled coding session in OpenShell with two boundaries:
+This research example demonstrates one point: redaction at network egress is
+not enough when the original content remains in the agent's saved session.
 
 ```text
-draft -> admission HTTPS -> Pi history and JSONL -> provider request
-                    receipt ^                    |
-                            +-- OpenShell middleware
+Admission off:
+  content ------------------> history -> built-in regex -> model
+                                raw
+
+Admission on:
+  content -> local redaction -> history -> built-in regex -> model
+                               redacted
 ```
 
-The launcher admits a complete user, assistant, or tool-result candidate before
-publishing it. The external Rust process also signs the user/tool projection for
-each model call; pre-credentials middleware checks that receipt against the
-actual request before OpenShell supplies the provider credential.
+Both modes use one sandbox, the same controlled Pi launcher, model, native
+tools, and OpenShell policy. The baseline is **not** a separate stock Pi CLI;
+it is this launcher's controlled publication loop with local admission disabled.
+Every launch starts a fresh JSONL session and prints its mode and transcript
+path.
 
-The intentionally synthetic fixed policy is:
+The only synthetic policy is:
 
-| Match | Result |
-| --- | --- |
-| address ending in `@example.com` | replace with `[EMAIL]` |
-| `NNN-NN-NNNN` | deny |
+```text
+match:       sk-[A-Za-z0-9_-]{16,}
+replacement: [REDACTED]
+```
 
-These regexes are teaching aids, not production DLP.
+The local rule intentionally matches OpenShell's built-in fake API-key rule.
+This is a focused example, not a configurable policy framework or a claim of
+general DLP coverage. Use only invented values.
 
-## Scope
+| Mode | Saved history | Outgoing request |
+| --- | --- | --- |
+| Admission off | Original fake key remains | Built-in regex redacts it |
+| Admission on | `[REDACTED]` replaces it | Already redacted locally |
 
-The launcher keeps Pi's native TUI, JSONL sessions, reasoning controls, and
-native `read`, `bash`, `edit`, and `write` tools. Tool calls run sequentially.
-The complete assistant/tool-result batch is admitted before it is published.
-Tool side effects are not transactional and may exist even when a result is
-denied.
+## Preserved Pi behavior and boundaries
 
-Edit results show admitted text rather than Pi's file-derived diff preview,
-which would read content outside the admission boundary.
+The launcher retains Pi's native TUI and JSONL sessions, native `read`, `bash`,
+`edit`, and `write` tools, supported reasoning/replay metadata, thinking
+controls, usage accounting, cancellation, and explicit `/compact`.
 
-Only explicit `/compact` is supported. Automatic compaction, retries, queued
-prompts, project instructions, skills, resume/import/branching, model switching,
-images, extensions, and direct `!` shell commands are disabled. A prompt entered
-while Pi is working is rejected rather than retained. At context exhaustion,
-run `/compact` yourself.
+Its controlled loop admits complete user messages, assistant output, tool
+results, and manual compaction summaries before publication when admission is
+on. It preserves text-block boundaries and native metadata. A transformation
+that would change signed text/reasoning or tool-call semantics is rejected
+instead of corrupting replay metadata or executing a modified call. Partial
+streaming output and incomplete tool batches are not published. Native tool
+execution is unchanged, but tool side effects are nontransactional and may
+remain after a later rejection or cancellation. Unchecked tool details and edit
+previews remain excluded.
 
-The sample workspace contains `counter.js` and one Node test so a model can
-inspect, edit, and test real code without extra project scaffolding.
+Automatic compaction, retries, queued prompts, project instructions, skills,
+resume/import/branching, model switching, images, extensions, and direct `!`
+commands are disabled because those history-writing paths do not have the same
+pre-publication boundary. At context exhaustion, run `/compact` explicitly.
 
-## Run
+## Prerequisites and configuration
 
-You need an existing HTTPS/mTLS OpenShell gateway registered in your CLI, access
-to its configuration and restart procedure, Bash, Python 3.11+, uv 0.11+,
-Rust 1.90+ with native build tools, and Docker. OpenShell `0.0.116` was tested;
-other releases must support the same middleware contract. Node 22 is needed
-only for local harness development; the demo image includes it.
+You need an existing HTTPS/mTLS OpenShell gateway registered in the CLI, Bash,
+Python 3.11+, uv 0.11+, Docker, and a provider compatible with streaming,
+text-only OpenAI Chat Completions and API-key authentication. OpenShell
+`0.0.116` was tested. Node 22 is needed only for host-side harness development;
+the image includes it. Model calls can incur provider charges.
 
-Use your own model provider: it must support HTTPS, streaming OpenAI-compatible
-Chat Completions, text input, tool calling, and API-key authentication. This
-spike does not support OAuth, custom authentication headers, or every Pi API.
-Model calls, including the verification, may incur provider charges.
-
-### 1. Configure and prepare
-
-Run these commands from `projects/research/pi-admission/`:
+From `projects/research/pi-admission/`:
 
 ```sh
 cp .env.example .env
 cp models.json.example models.json
 ```
 
-Edit `models.json` to describe your provider and model using Pi's native catalog
-format. Set the provider name, `baseUrl`, model `id`, limits, and compatibility
-settings for your endpoint; keep `api: "openai-completions"` and text-only input.
-The supplied OpenRouter/GLM configuration is an example, not a requirement.
-Do not put API keys in this file: it is copied into the sandbox image.
+Edit `models.json` using Pi's native catalog format. Set the provider `baseUrl`,
+model `id`, limits, and compatibility values; retain
+`api: "openai-completions"` and text-only input. Do not put credentials there.
 
-Set these values in `.env`:
-
-| Variable | Your value |
-| --- | --- |
-| `OPENSHELL_GATEWAY` | The gateway name shown by `openshell gateway list` |
-| `PI_ADMISSION_HOST` | DNS hostname or IPv4 address of the machine running `serve`, without a scheme or port |
-| `PI_MODEL_API_KEY` | The API key for the selected model provider |
-| `PI_MODEL` | Only when the catalog has multiple models: `provider/model-id` |
-
-The gateway and sandbox supervisor must reach the service on TCP **50051**;
-Pi inside the sandbox uses TCP **5443**. Choose a hostname/address reachable
-from both gateway and sandbox; `localhost`
-inside a sandbox points to the sandbox, not your host. Docker-specific hostnames
-are suitable only if they also resolve from the gateway. Allow these connections
-through the host firewall.
+Set `OPENSHELL_GATEWAY` and `PI_MODEL_API_KEY` in `.env`. Set `PI_MODEL` only
+when the catalog contains multiple models.
 
 ```sh
 ./demo.sh prepare
-```
-
-Preparation discovers the gateway identity using your CLI's existing mTLS
-credentials, creates a 30-day service certificate, and builds the local
-`pi-admission:local` image. Private generated state stays in `.workspaces/`.
-
-### 2. Start and register the service
-
-In one terminal, start the service and leave it running:
-
-```sh
-./demo.sh serve
-```
-
-In a second terminal, from the same project directory, print the registration:
-
-```sh
-./demo.sh registration
-```
-
-This command reads `.workspaces/middleware.toml`, created by `prepare`, and
-prints it. It does **not** write to the gateway configuration, register the
-middleware, or restart anything.
-
-Find the TOML configuration actually loaded by your gateway process. Its path
-depends on how the gateway was installed: check its service/startup configuration
-or ask its operator. This is the **server's configuration**, not the CLI's local
-gateway credentials. Do not assume a file named `gateway.toml` in the current
-directory is the right one.
-
-Back up that file, then add the printed `[[openshell.supervisor.middleware]]`
-entry. For a gateway configuration accessible on this machine, the command is:
-
-```sh
-# Replace this placeholder with the existing, active gateway config path.
-./demo.sh registration >> /path/to/gateway.toml
-```
-
-If the file requires administrator permissions, use this **instead**:
-
-```sh
-./demo.sh registration | sudo tee -a /path/to/gateway.toml >/dev/null
-```
-
-Both commands **append**. Run only one, and only when no middleware entry named
-`pi-admission` already exists. On subsequent runs, edit the existing entry rather
-than appending a duplicate. Do not use `>`: it would overwrite the gateway's
-other settings.
-
-For a remote or containerized gateway, install the entry in that deployment's
-configuration instead of appending to an unrelated local file. Copy/mount the
-**public** `.workspaces/tls/ca.crt` there and adjust `tls_ca_cert_path` in the entry
-to a path readable by the gateway process. Do not copy the service's private key.
-
-Restart the gateway using the procedure for your installation, while `serve`
-is running. Both the gateway and each sandbox connect to the service at startup.
-This restart may briefly affect other gateway users.
-
-Before continuing, check that it is healthy (use your `.env` gateway name):
-
-```sh
-openshell --gateway YOUR_GATEWAY gateway info
-```
-
-### 3. Launch and try it
-
-In the second terminal:
-
-```sh
 ./demo.sh setup
-./demo.sh launch
 ```
 
-Useful prompts are:
+Preparation selects the model, renders the model provider and policy, and
+builds `pi-admission:local`. Setup creates one model provider and one sandbox.
+There is no admission service, certificate, token, identity binding, custom
+middleware registration, or gateway restart.
 
-```text
-Read the sample and run its test.
-Change the counter to add two, update the test, and run it.
-Repeat alice@example.com.
-123-45-6789
-/compact
-/quit
-```
+## Run the comparison
 
-The email should appear as `[EMAIL]` in the admitted conversation. The synthetic
-SSN-shaped input should be denied without entering live history or JSONL. Tool
-edits should change the sample and its test. `/compact` may report insufficient
-history in a short session; continue working or use the verification below,
-which deliberately exercises compaction with a smaller retention threshold.
+Use a different fresh fake key in each run. Reuse can let a later conversation
+recover a value from an earlier transcript in the shared sandbox and obscure
+what the comparison measures. Do not place either value in workspace files.
 
-### 4. Verify and inspect egress
-
-Every action has a side-effect-free form that neither sources `.env` nor reveals
-secrets, for example `./demo.sh --print setup`. Run the paid live check with
-`./demo.sh verify`; it checks denial, redaction, a real write tool, manual
-compaction, saved JSONL, and rejection of a provider request without a receipt.
-It requires the running gateway, sandbox, service, and model credential.
-
-Inspect network decisions using OpenShell's existing logs (replace `YOUR_GATEWAY`
-with the gateway from `.env`):
+### Admission off
 
 ```sh
-openshell --gateway YOUR_GATEWAY logs pi-admission --source sandbox --since 5m
+./demo.sh launch --admission off
 ```
 
-The verification's bypass attempt should report `receipt_missing`. User input
-denied before any model request stays inside the harness boundary; it is not a
-network request and will not appear as an egress denial.
+1. Note the printed transcript path.
+2. Enter a new value matching the synthetic pattern, for example in a prompt
+   asking only for acknowledgement.
+3. Inspect the stored user message in the printed JSONL file and confirm the
+   original remains.
+4. Confirm a built-in regex finding in OpenShell's sandbox logs:
 
-### 5. Clean up
+   ```sh
+   openshell --gateway YOUR_GATEWAY logs pi-admission --source sandbox --since 5m
+   ```
 
-After exiting Pi, run `./demo.sh cleanup`. It deletes the example sandbox and its
-sessions, providers, and profiles; save any work you want to retain first. It
-keeps host configuration, gateway registration, and the Docker image. Run cleanup
-before repeating setup after a failed or completed demo. The scripts use fixed
-`pi-admission` resource names; use a gateway where those names are available.
+5. Copy the exact transcript path printed by the launcher, substitute it for
+   `PASTE_ACTUAL_TRANSCRIPT_PATH` below, and send the resulting prompt to the
+   agent:
 
-When finished permanently, remove the `pi-admission` middleware entry from the
-gateway configuration and restart the gateway **before stopping `serve`**.
-Otherwise a later gateway startup may fail while trying to contact the stopped
-service. Finally, stop `serve` with Ctrl-C.
+   ```text
+   Use the bash tool exactly once to run the following Python command verbatim.
+   Do not use the read tool, do not read any other file, and do not guess.
 
-## Comparison: network redaction alone
+   python3 -c 'import json,re,sys; rows=(json.loads(line) for line in open(sys.argv[1])); texts=("\n".join(block["text"] for block in row["message"]["content"] if block["type"] == "text") for row in rows if row.get("type") == "message" and row["message"]["role"] == "user"); match=next(re.search(r"sk-[A-Za-z0-9_-]{16,}|\[REDACTED\]", text) for text in texts if re.search(r"sk-[A-Za-z0-9_-]{16,}|\[REDACTED\]", text)); print(" ".join(match.group(0)))' 'PASTE_ACTUAL_TRANSCRIPT_PATH'
+   ```
 
-**What this demonstrates:** a proxy can sanitize what the model receives without
-sanitizing the agent's live conversation or saved session. Those are different
-boundaries; successful network redaction is not evidence of clean local history.
+The Python process inserts spaces before returning tool output, so the original
+contiguous value never reaches the network layer on this recovery turn. This
+shows that network-only redaction left recoverable source content in session
+history.
 
-Use a separate sandbox running ordinary Pi, without `pi-harness`, for this
-comparison. Keep its normal model-provider and network configuration, but attach
-OpenShell's built-in regex middleware to the model endpoint instead of the
-`pi-admission` middleware:
+### Admission on
 
-```yaml
-network_middlewares:
-  network_redaction:
-    middleware: openshell/regex
-    config:
-      mode: redact
-    on_error: fail_closed
-    endpoints:
-      include: ["YOUR_MODEL_PROVIDER_HOST"]
+```sh
+./demo.sh launch --admission on
 ```
 
-This is a policy fragment, not a complete sandbox policy. The built-in middleware
-needs no external service registration. In OpenShell `0.0.116`, it replaces
-`sk-[A-Za-z0-9_-]{16,}` with `[REDACTED]`; its patterns are fixed, and it does not
-recognize this spike's email/SSN patterns.
+Repeat the steps with a different fresh fake key. The JSONL user message should
+contain `[REDACTED]`, not the original. A network regex finding is not expected
+for content already replaced locally. Asking the agent to inspect only this
+transcript should recover the marker rather than the fake key.
 
-In ordinary Pi, send this **fake token**, never a real credential:
+Saved JSONL and OpenShell middleware logs are the evidence. A model's success,
+failure, or claim that it saw a marker is not sufficient by itself. The
+built-in regex accepts bodies only up to 256 KiB; `fail_closed` blocks larger
+requests, so keep the experiment short or compact it.
 
-```text
-Repeat this demonstration token exactly: sk-DEMO_ONLY_NOT_A_REAL_KEY_123456
+## Optional live check
+
+The paid verification uses the same shared setup and one fresh session per run:
+
+```sh
+./demo.sh verify --admission off
+./demo.sh verify --admission on
 ```
 
-Inspect OpenShell's sandbox logs for the regex transformation, then inspect Pi's
-original user message and search its saved session JSONL for the fake token.
-The original remains in local history even though the outgoing request was
-redacted. The model's reply may show `[REDACTED]`, but do not rely on model
-obedience alone as proof of what crossed the network.
+It checks the mode-specific saved user value, a real native write tool call,
+and manual compaction. It does not replace inspection of the middleware logs or
+assert that a model successfully performs the recovery prompt.
 
-Compare that with `alice@example.com` in our admission demo:
+Every action has a side-effect-free print form that does not source `.env`, for
+example `./demo.sh --print launch --admission on`.
 
-| Approach | Outgoing content | Pi history and JSONL |
-| --- | --- | --- |
-| Ordinary Pi + network-only regex | Fake token redacted | Original fake token remains |
-| Admission harness | Email redacted | Only `[EMAIL]` is published |
+## Cleanup and migration
 
-The two examples deliberately use different fixed patterns. For an identical
-input comparison, the Rust admission policy would need the same fake-token
-pattern; it does not currently contain it. Do not layer this network replacement
-onto the receipt-enforced demo: changing attested content can invalidate the
-receipt and obscure the comparison. `./demo.sh launch` always starts the admission
-harness, not the ordinary-Pi baseline.
+```sh
+./demo.sh cleanup
+```
+
+Cleanup deletes the example sandbox, its sessions, and the model provider. Save
+workspace changes or transcripts first. The generated host state and local
+Docker image remain.
+
+For an installation of the former service-backed version:
+
+1. Save sandbox work and transcripts that must survive recreation.
+2. Remove the old custom middleware registration and restart the gateway before
+   stopping the old admission service.
+3. Clean up obsolete demo resources, then prepare and set up this version to
+   rebuild the image, provider, sandbox, and policy.
+
+Ordinary preparation never edits or restarts an operator's gateway. This
+version intentionally provides no network proof that local admission ran.
+Built-in egress redaction remains active but does not authenticate local policy
+decisions or verify receipts.
 
 ## Development
 
 ```sh
+uv sync --frozen
 uv run ruff format --check .
 uv run ruff check .
 
-cd middleware
-cargo fmt --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --locked
-
-cd ../pi-harness
+cd pi-harness
 npm ci
 npm run check
 npm run build
 npm test
+
+cd ..
+bash -n demo.sh
 ```
 
-The suite is deliberately bounded: two launcher end-to-end flows and focused
-admission transport, egress parsing, and receipt-binding checks. The protobuf,
-manifest, and lockfile are generated or managed by
-`openshell-middleware-manager`; do not edit the protocol by hand.
+The deterministic tests keep pre-network request capture separate from paid
+gateway/model verification. They cover both modes across live history, saved
+JSONL, assistant output, tool results, and compaction; native tool execution and
+metadata; rejection of unsafe signed transformations; cancellation; and guards
+on unsupported session replacement paths.
 
-## Limits
+## Scope and limits
 
-The supported request is uncompressed, streaming, text-only Chat Completions.
-Unknown shapes fail closed. Receipts cover ordered user/tool text, destination,
-sandbox, middleware, policy, and expiry—not the full transcript or every HTTP
-byte. Assistant/reasoning text is locally admitted and scanned at egress but is
-not receipt-bound. The guarantee applies to this controlled launcher, not
-compromised same-authority code, filesystem contents, or reversible tool effects.
+Local admission protects supported conversation history created by this
+controlled launcher when enabled. It does not erase secrets from workspace or
+other files, earlier sessions, editor recall, tool side effects, or reversible
+encodings. The request format is HTTPS, streaming, text-only Chat Completions;
+unknown content shapes fail closed. Same-authority code and filesystem contents
+are outside this example's guarantee.
