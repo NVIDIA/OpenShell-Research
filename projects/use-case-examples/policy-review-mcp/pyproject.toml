@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "policy-review-mcp"
+version = "0.1.0"
+description = "Task-aware OpenShell policy review with independent prover and JEV MCP services."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "mcp>=1.26,<2",
+  "pydantic>=2.11,<3",
+  "ruamel-yaml>=0.18.15,<0.19",
+]
+
+[project.optional-dependencies]
+jev = ["typesafe-sdk==0.7.0"]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.4,<10",
+  "pytest-asyncio>=1.2,<2",
+  "ruff>=0.12,<0.15",
+]
+
+[project.scripts]
+policy-review-prover-mcp = "policy_review_mcp.prover_server:main"
+policy-review-jev-mcp = "policy_review_mcp.jev_server:main"
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.package-data]
+policy_review_mcp = ["reference/*.yaml"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

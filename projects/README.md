@@ -32,3 +32,5 @@ they are not presented as production-ready applications.
 - `reachy-mini-openshell`: Reachy Mini conversation demo for OpenShell.
 - `robotics-policy-prover`: Robotics demonstration of policy-proving
   agent-generated actions before execution.
+- `policy-review-mcp`: Independent prover and JEV MCP services for reviewing
+  whether a delegated OpenShell policy stays within a boundary and fits its task.
