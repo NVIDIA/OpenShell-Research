@@ -13,6 +13,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / ".github/scripts"))
 
 from pr_review import main, resolve_request
@@ -240,6 +242,62 @@ class RequestTests(unittest.TestCase):
 
             self.assertTrue(json.loads(request_file.read_text())["retire"])
             self.assertIn("ready=false\n", output.read_text())
+
+
+@pytest.mark.parametrize(
+    ("variable", "labels", "ready", "bypass"),
+    [
+        ("", [], True, ""),
+        ("false", ["documentation"], True, ""),
+        ("true", [], False, "Repository variable OAR_SKIP_LIVE=true."),
+        ("TRUE", [], False, "Repository variable OAR_SKIP_LIVE=true."),
+        ("", ["skip-oar-live"], False, "PR label skip-oar-live."),
+        ("", ["Skip-OAR-Live"], False, "PR label skip-oar-live."),
+        ("false", ["skip-oar-live"], False, "PR label skip-oar-live."),
+    ],
+)
+def test_cli_live_bypass_preserves_scope_and_disables_inference(
+    tmp_path, monkeypatch, variable, labels, ready, bypass
+):
+    github = MockGitHub()
+    event = tmp_path / "event.json"
+    # The latest API labels, not a stale event's labels, control the PR review.
+    event.write_text(json.dumps({"pull_request": github.pr}))
+    github.pr["labels"] = [{"name": label} for label in labels]
+    request_file = tmp_path / "request.json"
+    output = tmp_path / "outputs"
+    for key, value in {
+        "GITHUB_EVENT_PATH": str(event),
+        "GITHUB_EVENT_NAME": "pull_request_target",
+        "GITHUB_OUTPUT": str(output),
+        "OAR_SKIP_LIVE": variable,
+    }.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setattr("pr_review.GitHub", lambda: github)
+    monkeypatch.setattr("sys.argv", ["pr_review.py", "--output", str(request_file)])
+    with patch(
+        "pr_review.subprocess.run",
+        return_value=subprocess.CompletedProcess([], 0, "c" * 40 + "\n"),
+    ):
+        main()
+
+    saved = json.loads(request_file.read_text())
+    assert saved["bypass"] == bypass
+    assert saved["head"] == HEAD
+    assert saved["tasks"][0]["input"] == "projects/tools/new"
+    assert f"ready={str(ready).lower()}\n" in output.read_text()
+
+
+def test_removing_bypass_label_resumes_review_despite_stale_payload():
+    github = MockGitHub()
+    payload = copy.deepcopy(github.pr)
+    payload["labels"] = [{"name": "skip-oar-live"}]
+    request = resolve_request(
+        github,
+        {"event_name": "pull_request_target", "payload": {"pull_request": payload}},
+    )
+    assert request["tasks"]
+    assert not request["bypass"]
 
 
 if __name__ == "__main__":
