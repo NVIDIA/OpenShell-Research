@@ -225,6 +225,33 @@ test("signed transformations are rejected before assistant publication", async (
   );
 });
 
+test("plaintext reasoning replay metadata obeys the admission mode", async () => {
+  const response = answer("Acknowledged.");
+  response.content.unshift({
+    type: "thinking",
+    thinking: "",
+    // Pi preserves OpenRouter reasoning_details in this signature slot.
+    thinkingSignature: JSON.stringify([
+      { type: "reasoning.text", text: syntheticKey, index: 0 },
+    ]),
+  });
+  for (const mode of ["off", "on"] as const) {
+    const { session } = await fixture(mode, () => result(response));
+    if (mode === "on") {
+      await assert.rejects(
+        session.prompt("safe user text"),
+        (error) => error instanceof AdmissionError && error.kind === "invalid",
+      );
+      assert.equal(session.history.some((message) => message.role === "assistant"), false);
+      assert.ok(!(await saved(session)).includes(syntheticKey));
+    } else {
+      await session.prompt("safe user text");
+      assert.ok(JSON.stringify(session.history).includes(syntheticKey));
+      assert.ok((await saved(session)).includes(syntheticKey));
+    }
+  }
+});
+
 test("tool calls that would require semantic rewriting are rejected", async () => {
   const call = writeCall();
   const toolCall = call.content.find((block) => block.type === "toolCall");

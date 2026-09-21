@@ -74,6 +74,12 @@ export class Admission {
             return text === block.text ? block : { ...block, text };
           }
           if (block.type === "thinking") {
+            // Chat Completions can retain plaintext reasoning in replay metadata.
+            if (
+              this.mode === "on" &&
+              block.thinkingSignature?.match(SYNTHETIC_KEY)
+            )
+              throw new AdmissionError("invalid");
             const thinking = this.redact(block.thinking);
             if (
               thinking !== block.thinking &&
