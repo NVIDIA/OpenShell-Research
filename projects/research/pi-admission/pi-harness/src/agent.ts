@@ -28,7 +28,7 @@ export class ContextOverflowError extends Error {}
  * AgentSession alone persists the approved message_end events.
  */
 export class AdmissionAgent extends Agent {
-  private readonly live;
+  private readonly live = { ...super.state, pendingToolCalls: new Set<string>() };
   private readonly subscribers = new Set<
     (event: AgentEvent, signal: AbortSignal) => Promise<void> | void
   >();
@@ -46,11 +46,6 @@ export class AdmissionAgent extends Agent {
       initialState: { model, thinkingLevel: clampThinkingLevel(model, "medium") },
       streamFn,
     });
-    // Pi's session persists only the approved events emitted by this loop.
-    this.live = {
-      ...super.state,
-      pendingToolCalls: new Set<string>(),
-    };
   }
 
   override get state() {
@@ -73,19 +68,11 @@ export class AdmissionAgent extends Agent {
   override waitForIdle() {
     return this.settled;
   }
-  override steer(message: AgentMessage) {
-    void message;
+  override steer() {
     throw new Error("Agent is busy; wait or cancel the active turn.");
   }
-  override followUp(message: AgentMessage) {
-    void message;
+  override followUp() {
     throw new Error("Agent is busy; wait or cancel the active turn.");
-  }
-  override clearSteeringQueue() {}
-  override clearFollowUpQueue() {}
-  override clearAllQueues() {}
-  override hasQueuedMessages() {
-    return false;
   }
   override reset() {
     if (this.live.isStreaming)
@@ -189,22 +176,15 @@ export class AdmissionAgent extends Agent {
                 : prepared.arguments) as typeof prepared.arguments;
               args = validateToolArguments(tool, prepared);
               if (!isDeepStrictEqual(args, call.arguments)) {
-                const checked = (await this.admit({
+                // Admission.message already rejects changes to tool calls.
+                await this.admit({
                   ...assistant,
                   content: assistant.content.map((block) =>
                     block.type === "toolCall" && block.id === call.id
                       ? { ...block, arguments: args as typeof block.arguments }
                       : block,
                   ),
-                })) as AssistantMessage;
-                const checkedCall = checked.content.find(
-                  (block) => block.type === "toolCall" && block.id === call.id,
-                );
-                if (
-                  checkedCall?.type !== "toolCall" ||
-                  !isDeepStrictEqual(checkedCall.arguments, args)
-                )
-                  throw new AdmissionError("invalid");
+                });
               }
               // No onUpdate callback: partial tool output is not approved yet.
               result = await tool.execute(call.id, args, this.signal);

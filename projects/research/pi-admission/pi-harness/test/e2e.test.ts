@@ -6,20 +6,17 @@ import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import type { StreamFn } from "@earendil-works/pi-agent-core";
 import {
   createAssistantMessageEventStream,
   type AssistantMessage,
   type Context,
   type Model,
 } from "@earendil-works/pi-ai";
-import type { StreamFn } from "@earendil-works/pi-agent-core";
-import {
-  Admission,
-  type AdmissionResponse,
-  type Evaluate,
-} from "../src/admission.js";
-import { AdmissionSession } from "../src/session.js";
+import { Admission, AdmissionError, type AdmissionMode } from "../src/admission.js";
+import { AdmissionSession, createAdmissionRuntime } from "../src/session.js";
 
+const syntheticKey = "sk-LOCAL_TEST_ONLY_123456789";
 const model: Model<"openai-completions"> = {
   id: "test",
   name: "Test",
@@ -31,11 +28,6 @@ const model: Model<"openai-completions"> = {
   contextWindow: 100000,
   maxTokens: 4096,
   cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-};
-const allow: AdmissionResponse = {
-  decision: "allow",
-  replacement: null,
-  receipt: null,
 };
 
 function answer(text: string): AssistantMessage {
@@ -62,7 +54,11 @@ function writeCall(): AssistantMessage {
   return {
     ...answer(""),
     content: [
-      { type: "thinking", thinking: "Use the native write tool." },
+      {
+        type: "thinking",
+        thinking: `Use the native write tool. ${syntheticKey}`,
+        thinkingSignature: "reasoning_content",
+      },
       {
         type: "toolCall",
         id: "write-1",
@@ -75,32 +71,75 @@ function writeCall(): AssistantMessage {
   };
 }
 
-async function fixture(evaluate: Evaluate) {
+function multiBlockAnswer(): AssistantMessage {
+  return {
+    ...answer(""),
+    content: [
+      { type: "text", text: "assistant output" },
+      { type: "text", text: syntheticKey },
+    ],
+  };
+}
+
+function bashCall(): AssistantMessage {
+  return {
+    ...answer(""),
+    content: [
+      {
+        type: "toolCall",
+        id: "bash-1",
+        name: "bash",
+        // The unmodified call constructs the value only at execution time. Its
+        // result then exercises the tool-result admission boundary.
+        arguments: {
+          command: "printf 'sk-%s%s\\n' 'LOCAL_TEST_' 'ONLY_123456789'",
+        },
+      },
+    ],
+    stopReason: "toolUse",
+  };
+}
+
+function result(message: AssistantMessage) {
+  const stream = createAssistantMessageEventStream();
+  stream.push({
+    type: "done",
+    reason: message.stopReason === "toolUse" ? "toolUse" : "stop",
+    message,
+  });
+  return stream;
+}
+
+async function fixture(mode: AdmissionMode, stream?: StreamFn) {
   const cwd = await mkdtemp(join(tmpdir(), "pi-admission-e2e-"));
   const requests: Context[] = [];
-  const stream: StreamFn = (_model, context, options) => {
-    assert.equal(options?.headers?.["x-pi-admission-receipt"], "receipt");
+  const defaultStream: StreamFn = (_model, context, options) => {
     assert.equal(options?.reasoning, "medium");
+    assert.equal(options?.apiKey, "placeholder");
     requests.push(structuredClone({ ...context, tools: undefined }));
-    const result = createAssistantMessageEventStream();
-    const message = requests.length === 1 ? writeCall() : answer("Done");
-    result.push({
-      type: "done",
-      reason: message.stopReason === "toolUse" ? "toolUse" : "stop",
-      message,
-    });
-    return result;
+    const message =
+      requests.length === 1
+        ? writeCall()
+        : requests.length === 2
+          ? bashCall()
+          : requests.length === 3
+            ? multiBlockAnswer()
+            : answer(`compaction summary ${syntheticKey}`);
+    return result(message);
   };
-  const session = await AdmissionSession.create({
+  const runtime = await createAdmissionRuntime({
     cwd,
     sessionDir: join(cwd, "sessions"),
     agentDir: join(cwd, "agent"),
     model,
     apiKey: "placeholder",
-    admission: new Admission(evaluate),
-    stream,
+    admission: new Admission(mode),
+    stream: stream ?? defaultStream,
   });
-  return { cwd, session, requests };
+  const session = runtime.session;
+  assert.ok(session instanceof AdmissionSession);
+  await session.bindExtensions({});
+  return { cwd, session, requests, runtime };
 }
 
 async function saved(session: AdmissionSession): Promise<string> {
@@ -112,99 +151,114 @@ async function saved(session: AdmissionSession): Promise<string> {
   }
 }
 
-test("allowed and redacted input reaches the provider and saved history with a receipt", async () => {
-  const kinds: string[] = [];
-  let releaseTool!: () => void;
-  let toolPending!: () => void;
-  const toolGate = new Promise<void>((resolve) => (releaseTool = resolve));
-  const pending = new Promise<void>((resolve) => (toolPending = resolve));
-  const { cwd, session, requests } = await fixture(async (kind, body) => {
-    kinds.push(kind);
-    if (kind === "provider_context") return { ...allow, receipt: "receipt" };
-    if (kind === "tool_result") {
-      toolPending();
-      await toolGate;
+for (const mode of ["off", "on"] as const) {
+  test(`admission ${mode} controls every supported publication boundary`, async () => {
+    const { cwd, session, requests, runtime } = await fixture(mode);
+    for (const change of [
+      () => runtime.newSession(),
+      () => runtime.switchSession("unchecked.jsonl"),
+      () => runtime.importFromJsonl("unchecked.jsonl"),
+      () => runtime.fork("unchecked-entry"),
+    ])
+      assert.deepEqual(await change(), { cancelled: true });
+
+    assert.deepEqual(session.getActiveToolNames(), ["read", "bash", "edit", "write"]);
+    await session.prompt(`user input ${syntheticKey}`);
+    assert.equal(await readFile(join(cwd, "tool-output.txt"), "utf8"), "written by Pi");
+    assert.equal(requests.length, 3);
+    const finalAssistant = session.history.at(-1);
+    assert.equal(finalAssistant?.role, "assistant");
+    assert.equal(finalAssistant?.content.length, 2);
+
+    const snapshots = [
+      JSON.stringify(requests),
+      JSON.stringify(session.history),
+      await saved(session),
+    ];
+    assert.ok(snapshots.every((snapshot) => snapshot.includes("opaque-replay-data")));
+    assert.ok(snapshots.every((snapshot) => snapshot.includes("reasoning_content")));
+    assert.ok(snapshots.every((snapshot) => snapshot.includes("Successfully wrote")));
+    if (mode === "on") {
+      assert.ok(snapshots.every((snapshot) => snapshot.includes("[REDACTED]")));
+      assert.ok(snapshots.every((snapshot) => !snapshot.includes(syntheticKey)));
+    } else {
+      assert.ok(snapshots.every((snapshot) => snapshot.includes(syntheticKey)));
     }
-    if (kind === "user_message" && body.text === "alice@example.com") {
-      return {
-        decision: "replace",
-        replacement: { ...body, text: "[EMAIL]" },
-        receipt: null,
-      };
+
+    session.settingsManager.applyOverrides({ compaction: { keepRecentTokens: 1 } });
+    assert.ok(await session.compact());
+    const compaction = session.entries.find((entry) => entry.type === "compaction");
+    assert.ok(compaction && (!('details' in compaction) || compaction.details === undefined));
+    const summary = JSON.stringify(compaction);
+    if (mode === "on") {
+      assert.ok(summary.includes("[REDACTED]"));
+      assert.ok(!summary.includes(syntheticKey));
+    } else {
+      assert.ok(summary.includes(syntheticKey));
     }
-    return allow;
   });
+}
 
-  assert.deepEqual(session.getActiveToolNames(), ["read", "bash", "edit", "write"]);
-  const firstTurn = session.prompt("plain text");
-  await pending;
+test("signed transformations are rejected before assistant publication", async () => {
+  const signed = answer(syntheticKey);
+  signed.content = [{ type: "text", text: syntheticKey, textSignature: "signed" }];
+  const { session } = await fixture("on", () => result(signed));
+
+  await assert.rejects(
+    session.prompt("safe user text"),
+    (error) => error instanceof AdmissionError && error.kind === "invalid",
+  );
   assert.equal(session.history.some((message) => message.role === "assistant"), false);
-  releaseTool();
-  await firstTurn;
-  await session.prompt("alice@example.com");
+  assert.ok(!(await saved(session)).includes(syntheticKey));
 
-  assert.equal(requests.length, 3);
-  assert.ok(kinds.includes("tool_result"));
-  assert.equal(
-    await readFile(join(cwd, "tool-output.txt"), "utf8"),
-    "written by Pi",
-  );
-  const snapshots = [
-    JSON.stringify(requests),
-    JSON.stringify(session.history),
-    await saved(session),
+  const opaqueReasoning = answer("");
+  opaqueReasoning.content = [
+    {
+      type: "thinking",
+      thinking: syntheticKey,
+      thinkingSignature: "opaque-reasoning-signature",
+    },
   ];
-  assert.ok(
-    snapshots.every((snapshot) => snapshot.includes("Successfully wrote")),
-  );
-  assert.ok(snapshots.every((snapshot) => snapshot.includes("plain text")));
-  assert.ok(snapshots.every((snapshot) => snapshot.includes("opaque-replay-data")));
-  assert.ok(snapshots.every((snapshot) => snapshot.includes("[EMAIL]")));
-  assert.ok(
-    snapshots.every((snapshot) => !snapshot.includes("alice@example.com")),
-  );
-
-  session.settingsManager.applyOverrides({ compaction: { keepRecentTokens: 1 } });
-  assert.ok(await session.compact());
-  assert.ok(kinds.includes("compaction_summary"));
-  const compaction = session.entries.find((entry) => entry.type === "compaction");
-  assert.ok(
-    compaction && (!("details" in compaction) || compaction.details === undefined),
+  await assert.rejects(
+    new Admission("on").message(opaqueReasoning),
+    (error) => error instanceof AdmissionError && error.kind === "invalid",
   );
 });
 
-test("denied input never reaches the provider, live history, or saved history", async () => {
-  const forbidden = "123-45-6789";
-  const { session, requests } = await fixture(async (kind) =>
-    kind === "user_message"
-      ? { decision: "deny", replacement: null, receipt: null }
-      : allow,
+test("tool calls that would require semantic rewriting are rejected", async () => {
+  const call = writeCall();
+  const toolCall = call.content.find((block) => block.type === "toolCall");
+  assert.ok(toolCall?.type === "toolCall");
+  toolCall.arguments = { path: "unsafe.txt", content: syntheticKey };
+  const { cwd, session } = await fixture("on", () => result(call));
+
+  await assert.rejects(
+    session.prompt("safe user text"),
+    (error) => error instanceof AdmissionError && error.kind === "invalid",
   );
+  await assert.rejects(readFile(join(cwd, "unsafe.txt")), { code: "ENOENT" });
+  assert.equal(session.history.some((message) => message.role === "assistant"), false);
+});
 
-  await assert.rejects(session.prompt(forbidden));
-
-  assert.deepEqual(requests, []);
-  assert.ok(!JSON.stringify(session.history).includes(forbidden));
-  assert.ok(!JSON.stringify(session.entries).includes(forbidden));
-  assert.ok(!(await saved(session)).includes(forbidden));
-
+test("cancellation does not publish an incomplete assistant response", async () => {
   let release!: () => void;
-  let admissionPending!: () => void;
+  let started!: () => void;
   const gate = new Promise<void>((resolve) => (release = resolve));
-  const pending = new Promise<void>((resolve) => (admissionPending = resolve));
-  const cancelled = await fixture(async (kind) => {
-    if (kind === "user_message") {
-      admissionPending();
-      await gate;
-    }
-    return kind === "provider_context" ? { ...allow, receipt: "receipt" } : allow;
-  });
-  const turn = cancelled.session.prompt("cancel me");
+  const pending = new Promise<void>((resolve) => (started = resolve));
+  const stream: StreamFn = () => {
+    const events = createAssistantMessageEventStream();
+    started();
+    void gate.then(() => events.push({ type: "done", reason: "stop", message: answer("late") }));
+    return events;
+  };
+  const { session } = await fixture("on", stream);
+  const turn = session.prompt("checked user text");
   await pending;
-  await assert.rejects(cancelled.session.prompt("busy"), /busy/);
-  const abort = cancelled.session.abort();
+  await assert.rejects(session.prompt("busy"), /busy/);
+  const abort = session.abort();
   release();
   await abort;
   await assert.rejects(turn);
-  assert.equal(JSON.stringify(cancelled.session.history).includes("cancel me"), false);
+  assert.equal(session.history.some((message) => message.role === "assistant"), false);
+  assert.ok(!(await saved(session)).includes("late"));
 });

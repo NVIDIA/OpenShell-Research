@@ -15,11 +15,10 @@ import {
   createAgentSessionServices,
   convertToLlm,
   compact,
-  type CreateAgentSessionRuntimeFactory,
   type PromptOptions,
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
-import { Admission, AdmissionError, RECEIPT_HEADER } from "./admission.js";
+import { Admission, AdmissionError } from "./admission.js";
 import { AdmissionAgent, retainedUsage } from "./agent.js";
 
 export interface SessionOptions {
@@ -36,14 +35,7 @@ export interface SessionOptions {
 /** Native Pi session/persistence, with explicit guards for unsupported writes. */
 export class AdmissionSession extends AgentSession {
   static async create(options: SessionOptions): Promise<AdmissionSession> {
-    const result = await sessionFactory(options)({
-      cwd: resolve(options.cwd),
-      agentDir: resolve(options.agentDir),
-      sessionManager: SessionManager.create(
-        resolve(options.cwd),
-        resolve(options.sessionDir),
-      ),
-    });
+    const result = await createSession(options);
     await result.session.bindExtensions({});
     return result.session;
   }
@@ -124,24 +116,16 @@ export class AdmissionSession extends AgentSession {
 export async function createAdmissionRuntime(
   options: SessionOptions,
 ): Promise<AgentSessionRuntime> {
-  const factory = sessionFactory(options);
-  const result = await factory({
-    cwd: resolve(options.cwd),
-    agentDir: resolve(options.agentDir),
-    sessionManager: SessionManager.create(
-      resolve(options.cwd),
-      resolve(options.sessionDir),
-    ),
-  });
+  const result = await createSession(options);
   return new AdmissionRuntime(
     result.session,
     result.services,
-    factory,
+    async () => unsupported("Session replacement"),
     result.diagnostics,
   );
 }
 
-function sessionFactory(options: SessionOptions) {
+async function createSession(options: SessionOptions) {
   if (
     options.model.api !== "openai-completions" ||
     options.model.input.some((type) => type !== "text") ||
@@ -157,115 +141,99 @@ function sessionFactory(options: SessionOptions) {
     },
     retry: { enabled: false },
   });
-  const stream: StreamFn = async (model, context, streamOptions) => {
-    const receipt = await options.admission.receipt(
-      context,
-      streamOptions?.signal,
-    );
-    return (options.stream ?? streamSimple)(model, context, {
+  const stream: StreamFn = (model, context, streamOptions) =>
+    (options.stream ?? streamSimple)(model, context, {
       ...streamOptions,
       apiKey: options.apiKey,
-      headers: { ...streamOptions?.headers, [RECEIPT_HEADER]: receipt },
     });
-  };
-  return async ({
+  const cwd = resolve(options.cwd);
+  const agentDir = resolve(options.agentDir);
+  const sessionManager = SessionManager.create(cwd, resolve(options.sessionDir));
+  const services = await createAgentSessionServices({
     cwd,
     agentDir,
-    sessionManager,
-    sessionStartEvent,
-  }: Parameters<CreateAgentSessionRuntimeFactory>[0]) => {
-    if (sessionManager.getEntries().length)
-      return unsupported("Restoring existing history");
-    const services = await createAgentSessionServices({
-      cwd,
-      agentDir,
-      // OpenShell supplies runtime credentials; /app remains read-only.
-      modelRuntime: await ModelRuntime.create({
-        credentials: new InMemoryCredentialStore(),
-        modelsPath: null,
-      }),
-      settingsManager,
-      resourceLoaderOptions: {
-        noExtensions: true,
-        noSkills: true,
-        noContextFiles: true,
-        noPromptTemplates: true,
-        noThemes: true,
-        extensionFactories: [
-          {
-            name: "admission",
-            factory: (pi) => {
-              pi.on("session_before_compact", async (event) => {
-                // Supplying a summary or explicitly cancelling is mandatory:
-                // throwing from an extension handler could fall back to Pi's
-                // unchecked default summarizer.
-                try {
-                  const summary = await compact(
-                    event.preparation,
-                    options.model,
-                    options.apiKey,
-                    undefined,
-                    event.customInstructions,
-                    event.signal,
-                    session.thinkingLevel,
-                    stream,
-                    undefined,
-                    { enabled: false, maxRetries: 0, baseDelayMs: 0 },
-                    undefined,
-                    sessionManager.getSessionId(),
-                  );
-                  const approved = await options.admission.text(
-                    "compaction_summary",
-                    summary.summary,
-                    event.signal,
-                  );
-                  return {
-                    compaction: {
-                      summary: approved,
-                      firstKeptEntryId: summary.firstKeptEntryId,
-                      tokensBefore: event.preparation.tokensBefore,
-                      ...(summary.usage
-                        ? { usage: retainedUsage(summary.usage) }
-                        : {}),
-                    },
-                  };
-                } catch {
-                  return { cancel: true };
-                }
-              });
-            },
+    // OpenShell supplies runtime credentials; /app remains read-only.
+    modelRuntime: await ModelRuntime.create({
+      credentials: new InMemoryCredentialStore(),
+      modelsPath: null,
+    }),
+    settingsManager,
+    resourceLoaderOptions: {
+      noExtensions: true,
+      noSkills: true,
+      noContextFiles: true,
+      noPromptTemplates: true,
+      noThemes: true,
+      extensionFactories: [
+        {
+          name: "admission",
+          factory: (pi) => {
+            pi.on("session_before_compact", async (event) => {
+              // Supplying a summary or explicitly cancelling is mandatory:
+              // throwing from an extension handler could fall back to Pi's
+              // unchecked default summarizer.
+              try {
+                const summary = await compact(
+                  event.preparation,
+                  options.model,
+                  options.apiKey,
+                  undefined,
+                  event.customInstructions,
+                  event.signal,
+                  session.thinkingLevel,
+                  stream,
+                  undefined,
+                  { enabled: false, maxRetries: 0, baseDelayMs: 0 },
+                  undefined,
+                  sessionManager.getSessionId(),
+                );
+                const approved = await options.admission.text(
+                  "compaction_summary",
+                  summary.summary,
+                  event.signal,
+                );
+                return {
+                  compaction: {
+                    summary: approved,
+                    firstKeptEntryId: summary.firstKeptEntryId,
+                    tokensBefore: event.preparation.tokensBefore,
+                    ...(summary.usage
+                      ? { usage: retainedUsage(summary.usage) }
+                      : {}),
+                  },
+                };
+              } catch {
+                return { cancel: true };
+              }
+            });
           },
-        ],
-      },
-    });
-    services.modelRuntime.registerProvider(options.model.provider, {
-      api: options.model.api,
-      baseUrl: options.model.baseUrl,
-      models: [options.model],
-    });
-    await services.modelRuntime.setRuntimeApiKey(
-      options.model.provider,
-      options.apiKey,
-    );
-    const agent = new AdmissionAgent(options.model, stream, options.admission);
-    agent.sessionId = sessionManager.getSessionId();
-    agent.steeringMode = settingsManager.getSteeringMode();
-    agent.followUpMode = settingsManager.getFollowUpMode();
-    const session = new AdmissionSession({
-      agent,
-      cwd,
-      sessionManager,
-      sessionStartEvent,
-      settingsManager: services.settingsManager,
-      resourceLoader: services.resourceLoader,
-      modelRuntime: services.modelRuntime,
-    });
-    return {
-      session,
-      services,
-      diagnostics: services.diagnostics,
-      extensionsResult: services.resourceLoader.getExtensions(),
-    };
+        },
+      ],
+    },
+  });
+  services.modelRuntime.registerProvider(options.model.provider, {
+    api: options.model.api,
+    baseUrl: options.model.baseUrl,
+    models: [options.model],
+  });
+  await services.modelRuntime.setRuntimeApiKey(
+    options.model.provider,
+    options.apiKey,
+  );
+  const agent = new AdmissionAgent(options.model, stream, options.admission);
+  agent.sessionId = sessionManager.getSessionId();
+  const session = new AdmissionSession({
+    agent,
+    cwd,
+    sessionManager,
+    settingsManager: services.settingsManager,
+    resourceLoader: services.resourceLoader,
+    modelRuntime: services.modelRuntime,
+  });
+  return {
+    session,
+    services,
+    diagnostics: services.diagnostics,
   };
 }
 
