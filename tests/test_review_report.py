@@ -67,6 +67,23 @@ def report_options():
     }
 
 
+def test_manual_bypass_report_never_presents_stale_results_as_passing():
+    options = report_options()
+    options["request"].update(
+        bypass="PR label skip-oar-live.",
+        tasks=[{"label": "projects/research/new-spike"}],
+    )
+    options["outcome"] = "skipped"
+    body = render_report(**options)
+    assert REVIEW_MARKER in body
+    assert "manually bypassed" in body
+    assert "No verdict was produced" in body
+    assert "PR label skip-oar-live" in body
+    assert "projects/research/new-spike" in body
+    assert "✅ Pass" not in body
+    assert "No result or execution status" not in body
+
+
 class MockGitHub:
     def __init__(self):
         self.pr = {"number": 7, "state": "open", "head": {"sha": HEAD}}

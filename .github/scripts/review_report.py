@@ -122,6 +122,19 @@ def render_report(*, request, reviews, run_url, run_id, outcome):
         )
     if request.get("tooling"):
         lines.extend([f"Reviewer and guidelines revision: `{request['tooling']}`", ""])
+    if request.get("bypass"):
+        lines.extend(
+            [
+                "> [!WARNING]",
+                "> Live OAR review was manually bypassed. No verdict was produced; this is not a passing review.",
+                f"> {_escape_text(request['bypass'])}",
+                "",
+                "Projects not reviewed:",
+                "",
+                *[f"- {_escape_text(task['label'])}" for task in request["tasks"]],
+            ]
+        )
+        return "\n".join(lines)
     if reviews:
         lines.extend(
             [

@@ -59,6 +59,13 @@ def resolve_request(github, context):
     ]
     if not tasks:
         return _retirement_request(github, pr)
+    bypass = ""
+    if context.get("skip_live"):
+        bypass = "Repository variable OAR_SKIP_LIVE=true."
+    elif any(
+        label["name"].lower() == "skip-oar-live" for label in pr.get("labels", [])
+    ):
+        bypass = "PR label skip-oar-live."
     return {
         "number": number,
         "head": pr["head"]["sha"],
@@ -67,6 +74,7 @@ def resolve_request(github, context):
         "description": pr.get("body") or "",
         "tasks": tasks,
         "reason": "",
+        "bypass": bypass,
     }
 
 
@@ -80,6 +88,7 @@ def main():
             Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8")
         ),
         "event_name": os.environ["GITHUB_EVENT_NAME"],
+        "skip_live": os.environ.get("OAR_SKIP_LIVE", "").lower() == "true",
     }
     request = resolve_request(GitHub(), context)
     if request is None:
@@ -96,7 +105,11 @@ def main():
     args.output.write_text(json.dumps(request, indent=2) + "\n", encoding="utf-8")
     outputs = {key: request[key] for key in ("number", "head", "base")}
     outputs.update(
-        ready=str(bool(request["tasks"]) and not request["reason"]).lower(),
+        ready=str(
+            bool(request["tasks"])
+            and not request["reason"]
+            and not request.get("bypass")
+        ).lower(),
         tooling=tooling,
     )
     with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:

@@ -3,7 +3,7 @@ name: New project review
 "on":
   # Trusted workflow/tooling only. PR contents are uploaded as data, never run here.
   pull_request_target:
-    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, labeled, unlabeled]
 
 permissions: {}
 
@@ -44,6 +44,7 @@ jobs:
         id: request
         env:
           GH_TOKEN: ${{ github.token }}
+          OAR_SKIP_LIVE: ${{ vars.OAR_SKIP_LIVE }}
         run: uv run --project tooling/projects/tools/openshell-agent-runner --locked --no-dev python tooling/.github/scripts/pr_review.py --tooling tooling --output request/request.json
       - name: Upload request
         if: always() && steps.request.outputs.number != ''

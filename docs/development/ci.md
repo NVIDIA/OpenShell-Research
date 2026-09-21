@@ -82,9 +82,9 @@ findings are advisory; native checks remain separate merge gates.
 
 ## Execution and trust
 
-`New project review` runs on PR opening, reopening, new commits, readiness, and
-conversion back to draft. When a new project is removed from the PR or the PR
-returns to draft, the workflow removes its now-stale bot report.
+`New project review` runs on PR opening, reopening, new commits, readiness,
+label changes, and conversion back to draft. When a new project is removed from
+the PR or the PR returns to draft, the workflow removes its now-stale bot report.
 Draft, fork, and Dependabot PRs skip live review. There is no manual fork
 authorization or waiting for other workflows.
 
@@ -133,6 +133,39 @@ not the sandbox or comment reporter. No persistent gateway is required.
 
 Dependency-license checks are already part of the repository's CI. They neither
 use OAR nor coordinate with this reviewer; see [Dependency License Checks](dependency-licenses.md).
+
+## Bypass live checks during an external outage
+
+Maintainers can explicitly bypass new-project reviews and live OAR integration
+when inference or another external dependency is unavailable:
+
+- For one PR, apply the `skip-oar-live` label. Create it first if needed.
+  Adding or removing it triggers the applicable workflows; remove it to resume
+  live checks. It persists across commits until removed.
+- For a repository-wide outage, set the Actions **variable** `OAR_SKIP_LIVE` to
+  `true` in **Settings → Secrets and variables → Actions → Variables**. Delete
+  the variable or set it to `false` after recovery. Variable changes do not
+  trigger workflows: rerun **all jobs** in affected runs to apply the new value.
+
+These controls require the updated workflows on the default branch (and the
+updated live integration workflow in the tested PR). Rerunning an older workflow
+revision does not add bypass support; trigger a new run using the updated revision.
+PR label controls use GitHub's label permissions; restrict label management to
+the people allowed to waive live checks. The integration workflow uses labels
+from its event payload, so use the new label-change run rather than rerunning
+an older event to apply label changes.
+
+The PR report and integration summary explicitly state that execution was
+manually bypassed, with no passing verdict. Offline OAR functional, package, and
+runtime checks, and all other repository checks, remain enabled. Provider errors
+still fail live runs unless someone explicitly enables a bypass. These controls
+do not change branch protection or dismiss other failures.
+
+To diagnose a failure, download `pr-review-results` and inspect `review-*.log`.
+A provider HTTP 503 after sandbox setup and input uploads indicates an upstream
+inference failure, not a review finding. A successful gateway setup only confirms
+configuration; verify the configured model with an authenticated Chat Completions
+request or rerun live integration after recovery. Do not print credentials.
 
 ## Validation and evolution
 
