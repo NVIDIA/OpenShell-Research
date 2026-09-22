@@ -6,9 +6,11 @@
 import argparse
 import os
 from pathlib import Path
+from typing import Annotated
 
 from mcp.server.fastmcp import FastMCP
-from pydantic import ValidationError
+from mcp.types import ToolAnnotations
+from pydantic import Field, ValidationError
 
 from policy_review_mcp.contracts import (
     ExecutionContext,
@@ -17,21 +19,75 @@ from policy_review_mcp.contracts import (
     TargetedQuestion,
 )
 from policy_review_mcp.jev import JevConfig, invalid_request_report, review_delegation
+from policy_review_mcp.mcp_guidance import JEV_DESCRIPTION, ORDERED_WORKFLOW
+from policy_review_mcp.results import JevReport
 
 
 def create_server(config: JevConfig) -> FastMCP:
-    server = FastMCP("OpenShell Delegation Review")
+    server = FastMCP(
+        "OpenShell Delegation Review", instructions=JEV_DESCRIPTION + "\n" + ORDERED_WORKFLOW
+    )
 
-    @server.tool(name="review_delegation")
+    @server.tool(
+        name="review_delegation",
+        description=JEV_DESCRIPTION + "\n" + ORDERED_WORKFLOW,
+        annotations=ToolAnnotations(
+            title="Review OpenShell task fit with JEV",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=False,
+            openWorldHint=True,
+        ),
+    )
     def review_delegation_tool(
-        task: str,
-        candidate_policy: str,
-        execution_context: ExecutionContext,
-        annotations: list[FieldAnnotation] | None = None,
-        starting_policy: str | None = None,
-        questions: list[TargetedQuestion] | None = None,
-    ) -> dict:
-        """Assess task fit for supported permissions; this is not a containment proof."""
+        task: Annotated[
+            str, Field(description="Exact delegated assignment, not a broader project objective.")
+        ],
+        candidate_policy: Annotated[
+            str,
+            Field(
+                description=(
+                    "Complete candidate OpenShell YAML text, not a path or diff. Use "
+                    "the exact bytes checked by the prover."
+                )
+            ),
+        ],
+        execution_context: Annotated[
+            ExecutionContext,
+            Field(
+                description=(
+                    "Known runtime facts; {} is allowed when unknown. Do not invent "
+                    "dependencies or write requirements."
+                )
+            ),
+        ],
+        annotations: Annotated[
+            list[FieldAnnotation] | None,
+            Field(
+                description=(
+                    "Optional caller rationale and change labels at JSON pointers; not "
+                    "evidence of need."
+                )
+            ),
+        ] = None,
+        starting_policy: Annotated[
+            str | None,
+            Field(
+                description=(
+                    "Optional complete prior policy YAML for comparison; not the operator boundary."
+                )
+            ),
+        ] = None,
+        questions: Annotated[
+            list[TargetedQuestion] | None,
+            Field(
+                description=(
+                    "Optional independent Choice questions in the same batch. "
+                    "Diagnostic mode requires one exact supported target per question."
+                )
+            ),
+        ] = None,
+    ) -> JevReport:
 
         try:
             request = ReviewRequest(
@@ -43,17 +99,19 @@ def create_server(config: JevConfig) -> FastMCP:
                 questions=questions or [],
             )
         except ValidationError as error:
-            return invalid_request_report(
-                task=task,
-                candidate_policy=candidate_policy,
-                execution_context=execution_context.model_dump(mode="json"),
-                annotations=[item.model_dump(mode="json") for item in annotations or []],
-                starting_policy=starting_policy,
-                questions=[item.model_dump(mode="json") for item in questions or []],
-                config=config,
-                reason=str(error),
+            return JevReport.model_validate(
+                invalid_request_report(
+                    task=task,
+                    candidate_policy=candidate_policy,
+                    execution_context=execution_context.model_dump(mode="json"),
+                    annotations=[item.model_dump(mode="json") for item in annotations or []],
+                    starting_policy=starting_policy,
+                    questions=[item.model_dump(mode="json") for item in questions or []],
+                    config=config,
+                    reason=str(error),
+                )
             )
-        return review_delegation(request, config)
+        return JevReport.model_validate(review_delegation(request, config))
 
     return server
 

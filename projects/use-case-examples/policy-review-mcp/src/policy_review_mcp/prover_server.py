@@ -6,20 +6,46 @@
 import argparse
 import os
 from pathlib import Path
+from typing import Annotated
 
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
+from pydantic import Field
 
+from policy_review_mcp.mcp_guidance import ORDERED_WORKFLOW, PROVER_DESCRIPTION
 from policy_review_mcp.prover import ProverConfig, check_policy_boundary
+from policy_review_mcp.results import ProverReport
 
 
 def create_server(config: ProverConfig) -> FastMCP:
-    server = FastMCP("OpenShell Policy Prover")
+    server = FastMCP(
+        "OpenShell Policy Prover", instructions=PROVER_DESCRIPTION + "\n" + ORDERED_WORKFLOW
+    )
 
-    @server.tool(name="check_policy_boundary")
-    def check_policy_boundary_tool(candidate_policy: str) -> dict:
-        """Check complete candidate YAML against the configured operator boundary."""
+    @server.tool(
+        name="check_policy_boundary",
+        description=PROVER_DESCRIPTION + "\n" + ORDERED_WORKFLOW,
+        annotations=ToolAnnotations(
+            title="Check OpenShell policy boundary",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
+    def check_policy_boundary_tool(
+        candidate_policy: Annotated[
+            str,
+            Field(
+                description=(
+                    "Complete candidate OpenShell YAML text, not a path or diff. "
+                    "Preserve exact bytes for JEV fingerprint comparison."
+                )
+            ),
+        ],
+    ) -> ProverReport:
 
-        return check_policy_boundary(candidate_policy, config)
+        return ProverReport.model_validate(check_policy_boundary(candidate_policy, config))
 
     return server
 

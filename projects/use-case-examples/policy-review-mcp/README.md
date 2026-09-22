@@ -171,7 +171,7 @@ and may incur charges.
 
 ```bash
 cd projects/use-case-examples/policy-review-mcp
-uv sync --target dev
+uv sync --locked --group dev
 cp prover.config.example.toml prover.toml
 cp jev.config.example.toml jev.toml
 export TYPESAFE_API_KEY=...
@@ -181,8 +181,9 @@ Ensure `openshell-prover` is on `PATH`, or set `executable` in `prover.toml` to
 the absolute path of your built binary. An unavailable prover causes the ordered
 demo to skip JEV and report `jev.status: not_assessed`.
 
-The TypeSafe SDK is included in the default installation. Relative paths in
-either TOML file resolve from that config file. Keep the API
+The TypeSafe SDK is included in the default installation. The boundary path
+resolves relative to its TOML file; use an absolute prover executable path or a
+command on `PATH`. Keep the API
 key out of TOML and `.env` files committed to source control.
 
 Register the two commands separately in an MCP client. A representative
@@ -193,19 +194,42 @@ configuration is:
   "mcpServers": {
     "openshell-policy-prover": {
       "command": "uv",
-      "args": ["run", "policy-review-prover-mcp", "--config", "/absolute/path/prover.toml"]
+      "args": ["run", "--directory", "/absolute/path/to/policy-review-mcp", "--locked", "policy-review-prover-mcp", "--config", "/absolute/path/to/policy-review-mcp/prover.toml"]
     },
     "openshell-delegation-review": {
       "command": "uv",
-      "args": ["run", "policy-review-jev-mcp", "--config", "/absolute/path/jev.toml"],
+      "args": ["run", "--directory", "/absolute/path/to/policy-review-mcp", "--locked", "policy-review-jev-mcp", "--config", "/absolute/path/to/policy-review-mcp/jev.toml"],
       "env": {"TYPESAFE_API_KEY": "supply-through-your-secret-manager"}
     }
   }
 }
 ```
 
-Do not put `TYPESAFE_API_KEY` in the prover process environment. Both servers
+Replace the absolute paths with your checkout's project directory and TOML files.
+`--directory` makes launch independent of the client's working directory; an
+absolute `--config` alone does not locate the installed Python package. If a GUI
+client cannot find `uv`, use its absolute executable path as `command`.
+The JSON shows a common `mcpServers` format; adapt it to your client's configuration
+format and secret injection mechanism. GUI clients need not load your `.bashrc`.
+
+Do not put `TYPESAFE_API_KEY` in the prover process environment, including through
+inherited client environment variables. Both servers
 reserve stdout for MCP and use no gateway or shared session.
+
+At initialization, both servers publish operating instructions. `tools/list`
+exposes field descriptions, nested request contracts, typed output schemas, and
+read-only tool annotations. The JEV tool explicitly advertises its external
+TypeSafe API interaction (`openWorldHint: true`); read-only means no policy
+mutation, not no network traffic or API charges. The prover uses only the local
+executable (`openWorldHint: false`). These hints are metadata, not a security boundary.
+
+For a first call, send complete YAML **text**, not a path or diff, to
+`check_policy_boundary(candidate_policy)`. If `status` is `complete` and
+`within_boundary` is true, call `review_delegation` with the same candidate bytes,
+the exact delegated `task`, and `execution_context` (`{}` if genuinely unknown).
+Annotations, starting policy, and custom questions are optional. Compare the
+returned `candidate_sha256` values before interpreting the reports together.
+Neither server enforces this cross-server ordering for the caller.
 
 ## Run the ordered demo
 
@@ -325,6 +349,18 @@ score.
 
 ## Tool results
 
+Both tools return reports in MCP `structuredContent`, validated against their
+advertised `outputSchema`, with equivalent JSON text for legacy clients. Nested
+JEV assessments, findings, coverage, and custom answers are typed; the external
+prover's original JSON and provider-owned coverage/counterexample remain opaque
+payloads. Existing report field names and schema versions are retained; absent
+optional fields may now be explicit nulls.
+
+Always inspect the report's `status`, not only MCP `isError`. A boundary rejection,
+adapter error, invalid review input, or unavailable JEV API can be a successfully
+delivered report (`isError: false`). Malformed MCP arguments can instead produce
+an MCP tool error without a report. `complete` is never an approval flag.
+
 `check_policy_boundary(candidate_policy)` returns the candidate and boundary
 SHA-256 values, original v1 prover report, coverage, categorical result,
 counterexample or reason, prover version, and elapsed time. Adapter failures are
@@ -373,9 +409,9 @@ question-count limit is checked before any API request, without silent truncatio
 Run focused checks from this directory:
 
 ```bash
-uv run --target dev pytest
-uv run --target dev ruff check .
-OPENSHELL_PROVER=/absolute/path/openshell-prover uv run --target dev pytest
+uv run --locked --group dev pytest
+uv run --locked --group dev ruff check .
+OPENSHELL_PROVER=/absolute/path/openshell-prover uv run --locked --group dev pytest
 ```
 
 The tests cover duplicate-key, alias, size, and source-location behavior;
@@ -387,6 +423,9 @@ locations; enclosing context; and rule-level question limits. The fake model and
 behavior.
 
 The project CI job runs locked dependencies, Ruff, and credential-free tests.
+Stdio tests launch both installed entrypoints from an unrelated working directory,
+initialize MCP, discover metadata/schemas, and verify structured calls using a
+fake local prover and JEV inputs that never contact TypeSafe.
 The six real-prover tests skip unless `OPENSHELL_PROVER` points to the pinned
 executable. Live JEV requests are manual, not CI prerequisites.
 
