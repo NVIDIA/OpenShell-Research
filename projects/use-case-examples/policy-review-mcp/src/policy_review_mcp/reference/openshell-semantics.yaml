@@ -1,0 +1,64 @@
+version: openshell-review-semantics-v1
+openshell_revision: 484f0768fc6a0d93e0a2be295c1679aed24e18a9
+provenance: Demo-authored summary of the pinned OpenShell sources, not an official schema or a runtime proof.
+sources:
+  schema: https://github.com/NVIDIA/OpenShell/blob/484f0768fc6a0d93e0a2be295c1679aed24e18a9/docs/reference/policy-schema.mdx
+  network: https://github.com/NVIDIA/OpenShell/blob/484f0768fc6a0d93e0a2be295c1679aed24e18a9/crates/openshell-supervisor-network/data/sandbox-policy.rego
+  filesystem: https://github.com/NVIDIA/OpenShell/blob/484f0768fc6a0d93e0a2be295c1679aed24e18a9/crates/openshell-sandbox/src/sandbox/linux/landlock.rs
+semantics:
+  filesystem_policy:
+    source: filesystem
+    explanation: >-
+      read_only entries add read access; read_write entries add read and write access.
+      These are Landlock PathBeneath grants: a directory grant is not limited to one
+      task-mentioned child file. A read_only entry is not a deny rule cancelling
+      a read_write grant. Consider overlapping entries. Actual path resolution,
+      accessible files, kernel support, and Landlock compatibility are runtime facts,
+      not established by the authored paths alone.
+  filesystem_policy.include_workdir:
+    source: schema
+    explanation: >-
+      true adds the driver-resolved working directory to read_write. An absent
+      filesystem_policy defaults include_workdir to true; an explicit empty
+      filesystem_policy defaults it to false. The resolved directory is runtime
+      context. This review does not assess this implicit grant.
+  network_policies:
+    source: network
+    explanation: >-
+      Named policies associate binaries with endpoints. Endpoint and binary matching
+      determine applicable policies. Allow rules are alternatives, not an ordered
+      sequence of operations; one matching allow rule can permit a request.
+      Matching deny rules take precedence across matching endpoints. Removing one
+      rule need not remove authority granted elsewhere in the policy.
+  network_policies.binaries:
+    source: network
+    explanation: >-
+      With binary identity enforcement enabled, binary paths match the executable
+      or its ancestors, not just the immediate caller. Wildcard binary paths use
+      glob matching. Trusted runtime configuration can disable binary identity
+      requirements; do not infer that setting from policy YAML or assume paths
+      prove the runtime executable identity.
+  network_policies.endpoints:
+    source: schema
+    explanation: >-
+      host and port constrain the destination. protocol rest enables HTTP request
+      inspection. enforcement enforce blocks disallowed requests; audit logs
+      violations but allows traffic. access presets, deny_rules, query constraints,
+      and other unsupported controls remain context only in this demo.
+  network_policies.endpoints.rules.allow:
+    source: network
+    explanation: >-
+      The method and path must both match the same request. Method '*' matches any
+      method; other methods compare case-insensitively, and GET also matches HEAD.
+      Paths are matched against canonicalized request paths using
+      glob.match(pattern, ['/'], actual); bare '**' matches every path. Do not treat
+      a wildcard pattern as an exact path or restrict it to operation examples.
+      No query matcher means this rule does not constrain query parameters.
+      The pinned schema prose and Rego differ in their description of glob
+      delimiters: do not infer fine-grained wildcard containment from this summary;
+      leave that to the prover/runtime. Neither method nor path restricts request
+      body contents by itself.
+review_limits:
+  - Assess only listed review_targets; other native fields remain visible as context, not reviewed scope.
+  - This is task-fit review of authored permissions, not a validation or proof of effective runtime access.
+  - An unnecessary rule is not a claim that deleting it removes equivalent authority elsewhere.
