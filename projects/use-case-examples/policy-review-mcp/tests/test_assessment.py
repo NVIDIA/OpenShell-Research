@@ -16,7 +16,7 @@ FIXTURES = Path(__file__).parents[1] / "demo/fixtures"
 def test_write_guidance_uses_relevant_evidence_and_blocks_conflicts(blocker) -> None:
     def model(state, questions, config):
         answers = _fake_model(state, questions, config)
-        prefix = "filesystem.read_write.0"
+        prefix = "/filesystem_policy/read_write/0"
         for suffix, value in (
             ("justification", "unjustified"),
             ("write_necessity", "not_required"),
@@ -122,7 +122,7 @@ def _fake_model(state, questions, config):
     answers = {}
     for identifier, question in questions.items():
         if question["type"] == "score":
-            value = 1.8 if identifier.startswith("network.") else 0.1
+            value = 1.8 if identifier.startswith("/network_policies/") else 0.1
             answers[identifier] = {
                 "type": "score",
                 "value": value,
@@ -134,7 +134,9 @@ def _fake_model(state, questions, config):
                 value = "none"
             elif identifier.endswith(".write_necessity"):
                 value = "required"
-            elif identifier.endswith(".justification") and identifier.startswith("network."):
+            elif identifier.endswith(".justification") and identifier.startswith(
+                "/network_policies/"
+            ):
                 value = "unjustified"
             elif identifier.startswith("custom."):
                 value = next(iter(question["criteria"]))
@@ -294,16 +296,16 @@ def test_custom_questions_include_resolved_policy_values() -> None:
 def test_broad_write_scope_does_not_imply_write_is_unnecessary() -> None:
     def model(state, questions, config):
         answers = _fake_model(state, questions, config)
-        group = "filesystem.read_write.0"
-        answers[f"{group}.justification"]["value"] = "unjustified"
-        answers[f"{group}.justification"]["probabilities"] = {
+        target = "/filesystem_policy/read_write/0"
+        answers[f"{target}.justification"]["value"] = "unjustified"
+        answers[f"{target}.justification"]["probabilities"] = {
             "justified": 0.02,
             "unjustified": 0.96,
             "insufficient_context": 0.02,
         }
-        answers[f"{group}.excess"]["value"] = 1.8
-        answers[f"{group}.write_necessity"]["value"] = "required"
-        answers[f"{group}.write_necessity"]["probabilities"] = {
+        answers[f"{target}.excess"]["value"] = 1.8
+        answers[f"{target}.write_necessity"]["value"] = "required"
+        answers[f"{target}.write_necessity"]["probabilities"] = {
             "required": 0.96,
             "not_required": 0.02,
             "insufficient_context": 0.02,
@@ -326,8 +328,8 @@ def test_broad_write_scope_does_not_imply_write_is_unnecessary() -> None:
 def test_low_confidence_choice_is_non_actionable_and_incomplete() -> None:
     def model(state, questions, config):
         answers = _fake_model(state, questions, config)
-        group = "filesystem.read_only.0"
-        answers[f"{group}.justification"] = {
+        target = "/filesystem_policy/read_only/0"
+        answers[f"{target}.justification"] = {
             "type": "choice",
             "value": "unjustified",
             "probabilities": {

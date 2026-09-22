@@ -127,3 +127,42 @@ Important disagreements remain visible:
 The examples now illustrate useful contrasts without turning uncertain model
 preferences into approval. The modeled runtime assumptions remain essential;
 these checks did not launch a real delegated workload under these policies.
+
+## Native OpenShell context and rule-level review (2026-09-22)
+
+Rubric v3 keeps the same Choice/Score dimensions and thresholds. It replaces
+flattened permission groups with the complete parsed native candidate policy,
+optional native starting policy, exact JSON-pointer targets, model-visible
+coverage, and `openshell-review-semantics-v1`. The semantics reference is a
+demo-authored summary with pinned OpenShell sources, not a substitute for runtime
+validation. Each REST allow rule now has its own assessment with the complete
+enclosing network policy available as context.
+
+All ten examples were run twice again through the ordered stdio runner. Both
+passes completed with 20 real-prover calls and 18 live JEV requests; every
+paired report had matching candidate fingerprints. The rubric, fixtures, and
+thresholds were unchanged between these two passes.
+
+| Scenario | JEV status in both passes | Observed guidance in both passes |
+| --- | --- | --- |
+| `read_issue_narrow` | complete | Both filesystem entries and both GET rules fit; no findings. |
+| `read_issue_broad` | incomplete | Specifically flags `rules/1`, the POST comment rule; wildcard GET remains uncertain. |
+| `read_issue_with_comment` | complete | Specifically flags `rules/2`, the POST comment rule; neither sibling GET rule is flagged. |
+| `publish_comment` | complete | The same three allow rules fit the publishing task; no findings. |
+| `prepared_checkout_read_only` | complete | Read-only checkout fits; no findings. |
+| `prepared_checkout_review` | incomplete | `/filesystem_policy/read_write/0` has unnecessary writes; excess-score uncertainty remains. |
+| `outside_boundary` | not_assessed | Prover rejects issue creation; JEV is skipped. |
+| `vague_assignment` | incomplete | Network intent remains unresolved; no change guidance. |
+| `misleading_rationale` | incomplete | Specifically flags the POST comment rule despite the annotation. |
+| `dynamic_write_choice` | incomplete | Core checkout-write guidance remains; uncertainty is retained. |
+
+JEV-path end-to-end latency was 1.22–1.36 seconds. The default reports took
+11–38 lines at 80 columns and 10–28 at 120 columns. Detailed reports were also
+rendered from the same returned JSON, including exact rule locations and
+enclosing-context pointers.
+
+This validates improved finding precision, not universally improved model
+accuracy: wildcard-read excess remains an unresolved assessment, and the
+checkout excess score remains uncertain. We did not lower thresholds or change
+the fixtures to force those answers. The reports assess authored task fit, not
+the effective runtime behavior of a launched workload.

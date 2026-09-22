@@ -166,7 +166,7 @@ def _report() -> dict:
             "status": "incomplete",
             "assessments": [
                 {
-                    "group_id": "fs",
+                    "target_pointer": "fs",
                     "summary": "Read [red]literal[/red]",
                     "task_justification": choice,
                     "excess_scope": {
@@ -183,7 +183,7 @@ def _report() -> dict:
             ],
             "findings": [
                 {
-                    "group_id": "fs",
+                    "target_pointer": "fs",
                     "message": "Scope may be broader than needed.",
                     "actionable_guidance": False,
                 }

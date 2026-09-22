@@ -19,16 +19,61 @@ or activates policies, invokes the other service, or spawns an agent.
 The JEV service inventories the full YAML document but initially assesses only:
 
 - each exact `filesystem_policy.read_only` and `read_write` entry; and
-- GitHub REST endpoint groups for `api.github.com` with explicit enforced
-  method/path rules and binary selectors.
+- each `network_policies.<name>.endpoints[n].rules[m]` REST allow rule for
+  `api.github.com`, with its enclosing endpoint and binary restrictions.
 
 Process, Landlock, other network families, access presets, deny rules, query
 constraints, and selectors whose interactions cannot be represented faithfully
 are returned under `coverage.unassessed`. Full YAML input does not imply full
 semantic coverage. Unknown nested fields fail closed for their affected
-filesystem or network group rather than silently producing a partial
+filesystem section or network endpoint rather than silently producing a partial
 assessment. The external prover has its own modeled coverage and reports that
 separately.
+
+## What JEV receives
+
+The model receives the complete **parsed native OpenShell candidate policy**,
+not a replacement permission schema. Field names, nested objects, arrays,
+authored values, and omitted fields are preserved; YAML comments/formatting are
+not sent. An optional starting policy is passed in the same native structure.
+It is comparison context, not the operator boundary.
+
+Each core question explicitly names a JSON pointer into `candidate_policy`.
+For example, `/network_policies/github/endpoints/0/rules/2` identifies one allow
+rule, not the entire endpoint. The full configuration remains available so JEV
+can interpret that rule with its endpoint, binaries, and sibling rules.
+Filesystem questions identify individual `read_only[n]` or `read_write[n]`
+entries. "Review target" means only the location being assessed; it is not a
+new OpenShell permission type.
+
+The application-defined request envelope also includes:
+
+| Field | Purpose |
+| --- | --- |
+| `candidate_policy`, `starting_policy` | Native parsed configuration; starting policy is null when omitted. |
+| `review_targets` | Candidate JSON pointers and pointers to their enclosing context. |
+| `delegated_task`, `execution_context` | Exact task and caller-supplied runtime facts. |
+| `field_annotations`, `custom_question_context` | Caller rationale, verified annotated changes, and resolved custom references. |
+| `coverage` | Supported target pointers, unsupported fields with reasons, and the policy inventory. |
+| `policy_semantics` | Versioned, source-linked summary of relevant OpenShell behavior. |
+| `operation_examples`, `review_rules` | Demo-authored GitHub examples and assessment instructions—not an official OpenShell schema. |
+
+The [semantics reference](src/policy_review_mcp/reference/openshell-semantics.yaml)
+is a **demo-authored summary** grounded in the same pinned OpenShell revision as
+the prover. It covers filesystem grants and workdir defaults, binary/ancestor
+matching, endpoint enforcement, allow/deny interactions, GET/HEAD matching,
+path matching, and runtime limitations. Every section identifies its source.
+It also records a schema-prose versus Rego discrepancy in path-glob delimiter
+descriptions rather than pretending this demo can prove wildcard containment.
+
+Visible context is not assessed scope: unsupported controls remain in the
+native document and coverage report but do not receive core questions. Caller
+rationales do not override the assignment. The model does not receive the
+operator boundary or prover report and does not prove effective runtime access.
+Removing a flagged rule may leave equivalent access through another rule.
+
+All core and custom questions still use one batched JEV request. Question types
+remain `Choice` and `Score`; the discussed `Noul` alternative is not implemented.
 
 ## Prerequisites
 
@@ -69,7 +114,7 @@ and may incur charges.
 
 ```bash
 cd projects/use-case-examples/policy-review-mcp
-uv sync --group dev
+uv sync --target dev
 cp prover.config.example.toml prover.toml
 cp jev.config.example.toml jev.toml
 export TYPESAFE_API_KEY=...
@@ -159,7 +204,8 @@ answers.
 ### Reading the terminal report
 
 The runner prints a Rich report by default: the exact task, separate prover and
-JEV outcomes, a next step, and one compact row per assessed permission group. It also
+JEV outcomes, a next step, and one compact row per assessed filesystem entry or
+network allow rule. It also
 lists policy fields JEV did not assess. Ordinary service logs are hidden; add
 `--verbose` to show them on stderr.
 
@@ -169,11 +215,12 @@ lists policy fields JEV did not assess. Ordinary service logs are hidden; add
 | Prover: EXCEEDS BOUNDARY | The candidate grants authority outside the boundary; the counterexample shows why. |
 | Prover: NOT VERIFIED | The check failed or could not reach a conclusion. |
 | JEV: SKIPPED | The prover did not pass, so JEV was not called. |
-| JEV: ASSESSED | Supported groups were assessed; this is not an approval. |
-| JEV: PARTIAL / UNCERTAIN | Some answers are uncertain, conflicting, or lack context. Read the per-group results; independent findings can still support guidance. |
+| JEV: ASSESSED | Supported policy entries were assessed; this is not an approval. |
+| JEV: PARTIAL / UNCERTAIN | Some answers are uncertain, conflicting, or lack context. Read the per-target results; independent findings can still support guidance. |
 | JEV: UNAVAILABLE / INVALID INPUT | The API request failed or review input needs correction. |
 
-Use `--details` for the diagnostic panels. For each group, **Task fit** asks whether the permissions are justified by the
+Use `--details` for the diagnostic panels, exact target pointers, source lines,
+and enclosing-context pointers. For each entry, **Task fit** asks whether its permissions are justified by the
 assignment. **Excess scope** is an expected score from 0 (fits) through 1 (some
 unnecessary access) to 2 (substantial unrelated access). **Context** describes
 missing information. **Write needed?** asks whether any write access is needed,
@@ -221,7 +268,7 @@ It returns:
 - candidate and deterministic review-input fingerprints;
 - `complete`, `incomplete`, `invalid_input`, or `unavailable` status;
 - supported and unassessed coverage;
-- task justification, excess scope, and context-gap answers per group;
+- task justification, excess scope, and context-gap answers per target;
 - a separate write-necessity answer for read/write permissions;
 - fixed-category located findings with probabilities and confidence; and
 - separately labeled custom-question answers and timings.
@@ -231,32 +278,41 @@ Missing context, contradictory answers, or an answer below the configured confid
 winning probability, or probability-margin thresholds produces `incomplete`.
 Each finding requires sufficient evidence for its own dimension and a confident
 no-context-gap answer. Missing context or contradictions block guidance for the
-whole affected group; an uncertain excess score alone does not veto independent,
+whole affected target; an uncertain excess score alone does not veto independent,
 confident write-necessity evidence. Findings expose `blocked_by` reasons.
-Thresholds are unchanged in rubric v2. Excess write scope is reported separately
+Thresholds are unchanged in rubric v3. Excess write scope is reported separately
 from whether any write access is needed. Custom questions receive each
 referenced policy value, source location, and supported/unassessed coverage—not
 only its JSON pointer.
 
-Task-fit findings use `permission_not_justified`: rejecting a permission group
-does not establish that every action it grants is unnecessary. Specific excess
+Task-fit findings use `permission_not_justified`: rejecting a policy entry
+does not establish that every capability it grants is unnecessary. Specific excess
 scope and unnecessary-write claims require their separate question's evidence.
+
+JEV report **schema version 2** replaces `coverage.supported_groups` with
+`coverage.supported_targets` (JSON pointers) and `group_id` with
+`target_pointer` on assessments/findings. Assessments also include
+`context_pointers`; reports identify `semantics_version` and `rubric_version`.
+The prover report stays at schema version 1. The finer rule-level assessment
+uses three questions per allow rule rather than per endpoint; the existing
+question-count limit is checked before any API request, without silent truncation.
 
 ## Verification
 
 Run focused checks from this directory:
 
 ```bash
-uv run --group dev pytest
-uv run --group dev ruff check .
-OPENSHELL_PROVER=/absolute/path/openshell-prover uv run --group dev pytest
+uv run --target dev pytest
+uv run --target dev ruff check .
+OPENSHELL_PROVER=/absolute/path/openshell-prover uv run --target dev pytest
 ```
 
 The tests cover duplicate-key, alias, size, and source-location behavior;
 annotation changes; nested coverage; discoverable MCP schemas; single-batch
 core/custom assessments; resolved custom-question values; write-scope semantics;
 uncertainty handling; adapter contract validation; candidate fingerprints; and
-caller ordering. The fake model and fake prover tests do not claim live-service
+caller ordering; native candidate/starting-policy preservation; exact rule
+locations; enclosing context; and rule-level question limits. The fake model and fake prover tests do not claim live-service
 behavior.
 
 The project CI job runs locked dependencies, Ruff, and credential-free tests.
@@ -270,7 +326,8 @@ recorded rather than replaced by fixture expectations.
 
 ## Security and limitations
 
-- Policies and task context leave the machine when sent to TypeSafe. Do not send
+- Complete parsed candidate/starting policies and task context leave the machine
+  when sent to TypeSafe, including fields outside the assessed subset. Do not send
   secrets, credentials, proprietary code, or sensitive diffs without approval.
 - SHA-256 values detect byte mismatches; they do not authenticate intent or
   authorize activation.

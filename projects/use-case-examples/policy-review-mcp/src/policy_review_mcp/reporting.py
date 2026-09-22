@@ -95,14 +95,14 @@ def print_review_report(
     assessments = review.get("assessments", [])
     if assessments:
         table = Table(expand=True, padding=(0, 1), show_lines=True)
-        table.add_column("Permission", ratio=2)
+        table.add_column("Policy entry", ratio=2)
         table.add_column("Assessment", ratio=1)
         table.add_column("Follow-up", ratio=2)
-        actionable_groups = 0
+        actionable_targets = 0
         for item in assessments:
-            related = [f for f in findings if f["group_id"] == item["group_id"]]
+            related = [f for f in findings if f["target_pointer"] == item["target_pointer"]]
             actionable = [f for f in related if matched and f.get("actionable_guidance")]
-            actionable_groups += bool(actionable)
+            actionable_targets += bool(actionable)
             uncertainty = item.get("uncertainty", {})
             if item.get("contradictions"):
                 verdict = "Conflicting answers"
@@ -142,7 +142,7 @@ def print_review_report(
         console.print(table)
         console.print(
             Text(
-                f"{len(assessments)} groups · {actionable_groups} with change guidance · "
+                f"{len(assessments)} policy entries · {actionable_targets} with change guidance · "
                 + (
                     "unresolved evidence remains"
                     if status == "incomplete"
@@ -154,7 +154,7 @@ def print_review_report(
             console.print(
                 "Next: Review change guidance and unresolved evidence. "
                 "Rerun the prover after any policy edit."
-                if actionable_groups or status == "incomplete"
+                if actionable_targets or status == "incomplete"
                 else "Next: No change indicated here; review unassessed fields separately."
             )
     unassessed = (review.get("coverage") or {}).get("unassessed", [])
@@ -260,7 +260,7 @@ def _assessment_panel(
     for conflict in assessment.get("contradictions", []):
         parts.append(Text(f"Conflicting answers: {conflict}", style="yellow"))
     for finding in findings:
-        if finding["group_id"] != assessment["group_id"]:
+        if finding["target_pointer"] != assessment["target_pointer"]:
             continue
         actionable = finding.get("actionable_guidance", False) and matched
         label = "Consider a change" if actionable else "Needs investigation"
@@ -270,6 +270,8 @@ def _assessment_panel(
         if finding.get("blocked_by"):
             parts.append(Text("Blocked by: " + ", ".join(finding["blocked_by"]), style="dim"))
     locations = assessment.get("locations", [])
+    if assessment.get("context_pointers"):
+        parts.append(Text("Context: " + ", ".join(assessment["context_pointers"]), style="dim"))
     for location in locations:
         parts.append(
             Text(
@@ -278,7 +280,7 @@ def _assessment_panel(
                 style="dim",
             )
         )
-    return Panel(Group(*parts), title=Text(assessment["group_id"]), border_style="blue")
+    return Panel(Group(*parts), title=Text(assessment["target_pointer"]), border_style="blue")
 
 
 def _percent(value: float) -> str:

@@ -1,14 +1,17 @@
 version: 1
-rubric: delegation-rubric-v2
+rubric: delegation-rubric-v3
 core_dimensions:
   - task_justification
   - excess_scope
   - context_gap
-  - write_necessity (read/write groups only)
+  - write_necessity (read/write targets only)
 notes:
+  - Question IDs identify candidate-policy JSON pointers, not synthetic permission groups.
+  - Each REST allow rule is assessed separately with its native endpoint and binary context.
+  - Candidate and optional starting documents retain the authored OpenShell structure.
   - Questions are independent and batched in one request.
   - Missing context suppresses actionable scope guidance.
   - Each finding requires confident evidence for its own dimension and for context sufficiency.
-  - Contradictory task-fit, write, or excess answers block guidance for the group.
+  - Contradictory task-fit, write, or excess answers block guidance for the target.
   - Uncertain custom choices keep the overall review incomplete.
   - Results are not combined into an approval score.

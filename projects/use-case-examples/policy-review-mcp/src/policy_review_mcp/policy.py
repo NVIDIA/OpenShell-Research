@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Bounded YAML parsing, source locations, annotations, and permission grouping."""
+"""Bounded YAML parsing, source locations, annotations, and review targets."""
 
 from dataclasses import dataclass
 from io import StringIO
@@ -38,20 +38,23 @@ class SourceLocation:
 
 
 @dataclass(frozen=True)
-class PermissionGroup:
-    id: str
+class ReviewTarget:
+    pointer: str
     kind: str
     summary: str
-    pointers: tuple[str, ...]
+    context_pointers: tuple[str, ...]
     locations: tuple[SourceLocation, ...]
-    state: dict[str, Any]
+
+    @property
+    def needs_write_question(self) -> bool:
+        return self.kind == "filesystem_policy.read_write"
 
 
 @dataclass(frozen=True)
 class ParsedPolicy:
     data: dict[str, Any]
     locations: dict[str, SourceLocation]
-    groups: tuple[PermissionGroup, ...]
+    targets: tuple[ReviewTarget, ...]
     inventory: tuple[str, ...]
     unassessed: tuple[dict[str, Any], ...]
 
@@ -85,11 +88,11 @@ def parse_policy(source: str, *, source_name: str = "candidate") -> ParsedPolicy
         node_count=[1],
     )
     inventory = tuple(pointer for pointer in locations if pointer)
-    groups, unassessed = _permission_groups(document, locations)
+    targets, unassessed = _review_targets(document, locations)
     return ParsedPolicy(
         data=document,
         locations=locations,
-        groups=tuple(groups),
+        targets=tuple(targets),
         inventory=inventory,
         unassessed=tuple(unassessed),
     )
@@ -188,6 +191,8 @@ def _collect_locations(
         seen_containers[identity] = pointer
     if isinstance(node, dict):
         for key, value in node.items():
+            if not isinstance(key, str):
+                raise PolicyInputError("policy mapping keys must be strings")
             node_count[0] += 1
             if node_count[0] > MAX_YAML_NODES:
                 raise PolicyInputError(f"policy exceeds the node limit of {MAX_YAML_NODES}")
@@ -228,12 +233,19 @@ def _collect_locations(
             )
 
 
-def _permission_groups(
+def _review_targets(
     data: dict[str, Any], locations: dict[str, SourceLocation]
-) -> tuple[list[PermissionGroup], list[dict[str, Any]]]:
-    groups: list[PermissionGroup] = []
+) -> tuple[list[ReviewTarget], list[dict[str, Any]]]:
+    targets: list[ReviewTarget] = []
     unassessed: list[dict[str, Any]] = []
     filesystem = data.get("filesystem_policy", {})
+    if "filesystem_policy" not in data:
+        unassessed.append(
+            {
+                "pointer": "/filesystem_policy/include_workdir",
+                "reason": "implicit_runtime_workdir",
+            }
+        )
     if isinstance(filesystem, dict):
         unknown_filesystem_fields = set(filesystem) - {
             "read_only",
@@ -251,7 +263,7 @@ def _permission_groups(
             unassessed.append(
                 {
                     "pointer": "/filesystem_policy",
-                    "reason": "unsupported_field_affects_filesystem_groups",
+                    "reason": "unsupported_field_affects_filesystem_entries",
                 }
             )
         else:
@@ -270,15 +282,13 @@ def _permission_groups(
                     if not isinstance(path, str):
                         unassessed.append({"pointer": pointer, "reason": "unsupported_shape"})
                         continue
-                    mode = "read" if access_key == "read_only" else "read/write"
-                    groups.append(
-                        PermissionGroup(
-                            id=f"filesystem.{access_key}.{index}",
-                            kind="filesystem",
-                            summary=f"{mode} access to {path}",
-                            pointers=(pointer,),
+                    targets.append(
+                        ReviewTarget(
+                            pointer=pointer,
+                            kind=f"filesystem_policy.{access_key}",
+                            summary=f"filesystem_policy.{access_key}[{index}]: {path}",
+                            context_pointers=("/filesystem_policy",),
                             locations=(locations[pointer],),
-                            state={"mode": access_key, "path": path},
                         )
                     )
         if "include_workdir" in filesystem:
@@ -299,7 +309,7 @@ def _permission_groups(
             unknown_rule_fields = set(rule) - {"name", "endpoints", "binaries"}
             if unknown_rule_fields:
                 unassessed.append(
-                    {"pointer": base, "reason": "unsupported_field_affects_network_group"}
+                    {"pointer": base, "reason": "unsupported_field_affects_network_policy"}
                 )
                 continue
             binaries = rule.get("binaries", [])
@@ -331,35 +341,21 @@ def _permission_groups(
                 if reason:
                     unassessed.append({"pointer": pointer, "reason": reason})
                     continue
-                selectors = [
-                    {
-                        "method": item["allow"]["method"].upper(),
-                        "path": item["allow"]["path"],
-                    }
-                    for item in endpoint["rules"]
-                ]
-                related = [pointer]
-                if binaries:
-                    related.append(f"{base}/binaries")
-                group_locations = tuple(locations[p] for p in related if p in locations)
-                rendered = ", ".join(f"{item['method']} {item['path']}" for item in selectors)
-                groups.append(
-                    PermissionGroup(
-                        id=f"network.{name}.{index}",
-                        kind="github_rest",
-                        summary=f"GitHub REST via {binary_paths}: {rendered}",
-                        pointers=tuple(related),
-                        locations=group_locations,
-                        state={
-                            "host": endpoint["host"],
-                            "port": endpoint.get("port", 443),
-                            "protocol": "rest",
-                            "enforcement": "enforce",
-                            "binaries": binary_paths,
-                            "selectors": selectors,
-                        },
+                for rule_index, item in enumerate(endpoint["rules"]):
+                    rule_pointer = f"{pointer}/rules/{rule_index}"
+                    allow = item["allow"]
+                    targets.append(
+                        ReviewTarget(
+                            pointer=rule_pointer,
+                            kind="network_policies.endpoints.rules.allow",
+                            summary=(
+                                f"{name}.endpoints[{index}].rules[{rule_index}].allow: "
+                                f"{allow['method']} {allow['path']}"
+                            ),
+                            context_pointers=(base, pointer, f"{base}/binaries"),
+                            locations=(locations[rule_pointer],),
+                        )
                     )
-                )
     elif "network_policies" in data:
         unassessed.append({"pointer": "/network_policies", "reason": "unsupported_shape"})
 
@@ -368,7 +364,7 @@ def _permission_groups(
             unassessed.append(
                 {"pointer": f"/{_escape(key)}", "reason": "unsupported_policy_family"}
             )
-    return groups, unassessed
+    return targets, unassessed
 
 
 def _unsupported_github_endpoint(endpoint: Any, binaries: list[str]) -> str | None:
@@ -387,6 +383,7 @@ def _unsupported_github_endpoint(endpoint: Any, binaries: list[str]) -> str | No
         allow = rule.get("allow") if isinstance(rule, dict) else None
         if (
             not isinstance(allow, dict)
+            or set(rule) != {"allow"}
             or not isinstance(allow.get("method"), str)
             or not isinstance(allow.get("path"), str)
             or set(allow) != {"method", "path"}
