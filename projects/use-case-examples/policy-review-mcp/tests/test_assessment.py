@@ -3,10 +3,118 @@
 
 from pathlib import Path
 
+import pytest
+from ruamel.yaml import YAML
+
 from policy_review_mcp.contracts import ExecutionContext, ReviewRequest, TargetedQuestion
 from policy_review_mcp.jev import JevConfig, review_delegation
 
 FIXTURES = Path(__file__).parents[1] / "demo/fixtures"
+
+
+@pytest.mark.parametrize("blocker", [None, "context", "contradiction"])
+def test_write_guidance_uses_relevant_evidence_and_blocks_conflicts(blocker) -> None:
+    def model(state, questions, config):
+        answers = _fake_model(state, questions, config)
+        prefix = "filesystem.read_write.0"
+        for suffix, value in (
+            ("justification", "unjustified"),
+            ("write_necessity", "not_required"),
+        ):
+            answer = answers[f"{prefix}.{suffix}"]
+            answer.update(
+                value=value,
+                probabilities={
+                    key: 0.96 if key == value else 0.02 for key in answer["probabilities"]
+                },
+            )
+        answers[f"{prefix}.excess"]["confidence"] = 0.2
+        if blocker == "context":
+            answers[f"{prefix}.context"]["confidence"] = 0.2
+        elif blocker == "contradiction":
+            answer = answers[f"{prefix}.justification"]
+            answer.update(
+                value="justified",
+                probabilities={
+                    "justified": 0.96,
+                    "unjustified": 0.02,
+                    "insufficient_context": 0.02,
+                },
+            )
+        return answers
+
+    report = review_delegation(
+        ReviewRequest(
+            task="Read the checkout; no writes.",
+            candidate_policy=(FIXTURES / "candidate-code-review.yaml").read_text(),
+            execution_context=ExecutionContext(),
+        ),
+        JevConfig(),
+        model,
+    )
+    assert report["status"] == "incomplete"
+    finding = next(f for f in report["findings"] if f["reason"] == "write_not_required")
+    assert finding["actionable_guidance"] is (blocker is None)
+    assert bool(finding["blocked_by"]) is (blocker is not None)
+
+
+def test_uncertain_custom_choice_makes_otherwise_complete_review_incomplete() -> None:
+    def model(state, questions, config):
+        answers = _fake_model(state, questions, config)
+        answers["custom.mode"].update(
+            value="read",
+            confidence=0.35,
+            probabilities={
+                "read": 0.51,
+                "write": 0.48,
+                "none_fit": 0.005,
+                "insufficient_context": 0.005,
+            },
+        )
+        return answers
+
+    report = review_delegation(
+        ReviewRequest(
+            task="Read the checkout.",
+            candidate_policy=(FIXTURES / "candidate-code-review-read.yaml").read_text(),
+            execution_context=ExecutionContext(),
+            questions=[
+                TargetedQuestion(
+                    id="mode",
+                    pointers=["/filesystem_policy/read_only/0"],
+                    instructions="Which mode fits?",
+                    criteria={"read": "Read-only checkout", "write": "Writable checkout"},
+                )
+            ],
+        ),
+        JevConfig(),
+        model,
+    )
+    assert report["status"] == "incomplete"
+    answer = report["custom_answers"][0]
+    assert answer["uncertain"] is True
+    assert answer["instructions"] == "Which mode fits?"
+    assert answer["criteria"]["read"] == "Read-only checkout"
+
+
+def test_demo_comparisons_isolate_their_intended_variable() -> None:
+    scenarios = YAML(typ="safe").load((FIXTURES / "scenarios.yaml").read_text())["scenarios"]
+    for first, second in (
+        ("read_issue_narrow", "read_issue_broad"),
+        ("prepared_checkout_read_only", "prepared_checkout_review"),
+    ):
+        assert scenarios[first]["task"] == scenarios[second]["task"]
+        assert scenarios[first]["execution_context"] == scenarios[second]["execution_context"]
+    read, publish = scenarios["read_issue_with_comment"], scenarios["publish_comment"]
+    assert read["candidate"] == publish["candidate"]
+    assert read["execution_context"] == publish["execution_context"]
+    for name in ("misleading_rationale", "vague_assignment"):
+        assert (
+            scenarios[name]["execution_context"]
+            == scenarios["read_issue_broad"]["execution_context"]
+        )
+        assert scenarios[name]["candidate"] == scenarios["read_issue_broad"]["candidate"]
+    assert scenarios["misleading_rationale"]["task"] == scenarios["read_issue_broad"]["task"]
 
 
 def _fake_model(state, questions, config):
@@ -72,7 +180,7 @@ def test_core_and_custom_questions_are_batched_once() -> None:
     assert report["model_request_attempted"] is True
     assert report["custom_answers"][0]["id"] == "posting"
     reasons = {item["reason"] for item in report["findings"]}
-    assert {"unneeded_action", "resource_scope_too_broad"}.issubset(reasons)
+    assert {"permission_not_justified", "resource_scope_too_broad"}.issubset(reasons)
     assert report["candidate_sha256"]
     assert report["review_input_sha256"]
 
@@ -211,6 +319,8 @@ def test_broad_write_scope_does_not_imply_write_is_unnecessary() -> None:
     reasons = {finding["reason"] for finding in report["findings"]}
     assert "resource_scope_too_broad" in reasons
     assert "write_not_required" not in reasons
+    assert "unneeded_action" not in reasons
+    assert "permission_not_justified" in reasons
 
 
 def test_low_confidence_choice_is_non_actionable_and_incomplete() -> None:

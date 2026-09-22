@@ -7,9 +7,9 @@ Model and SDK:
 - `jev-1.13.0`
 - `typesafe-sdk==0.7.0`
 
-The API key was loaded from the existing interactive Bash environment through
-the supported `TYPESAFEAI_API_KEY` compatibility alias. The key value was not
-printed, persisted, or passed to the prover.
+The API key was loaded from the existing interactive Bash environment. The key
+value was not printed, persisted, or passed to the prover. Current scripts use
+the SDK's standard `TYPESAFE_API_KEY` environment variable.
 
 ## Broad issue-summary case
 
@@ -55,7 +55,75 @@ called `review_delegation` through the Python MCP client. The server sent a live
 single narrow read-only group with no findings. This verifies the JEV MCP path,
 including nested request decoding and tool-schema discovery.
 
-The full ordered prover-then-JEV runner was not repeated because the external
-`openshell-prover` executable was unavailable in this environment. The runner
-still applies a 30-second read timeout and reports a concise `runner_error` for
-transport failures.
+## Full ordered demo verification (2026-09-22)
+
+An existing release build was found in the sibling OpenShell checkout, outside
+`PATH`. Setting its absolute path in the local `prover.toml` resolved the
+`prover_unavailable` error. All 28 project tests passed, including the five real
+prover fixture cases.
+
+`uv run python demo/run_demo.py read_issue_broad` then completed both MCP calls
+in 1,292 ms. The prover returned `within_boundary`; JEV returned HTTP 200 and
+assessed four groups in 359 ms. Its review status was `incomplete` because of
+context gaps and uncertainty, with eight non-actionable findings. The candidate
+fingerprints matched and the runner returned `combined: true`.
+
+The runner applies a 30-second read timeout and reports a concise `runner_error`
+for transport failures.
+
+## Controlled examples and compact reporting (2026-09-22)
+
+The earlier eight-example sweep returned `incomplete` for every case reaching
+JEV, with 52 findings and no actionable guidance. At 80 columns, the seven JEV
+reports occupied 95–109 lines. Broad, underexplained runtime grants obscured
+the intended task comparisons.
+
+The revised fixtures specify a modeled prepared runtime, remove irrelevant
+scratch writes, and introduce two adequate-policy comparisons. Rubric v2 asks
+about decision-relevant context gaps and includes documented runtime writes.
+Confidence/distribution thresholds were **not lowered**. Findings use their own
+dimension's evidence; missing context and conflicting answers still block
+guidance. A rejected group is now `permission_not_justified`, not an unsupported
+claim that its entire action is unnecessary. The default report counts groups,
+not overlapping findings, and `--details` preserves diagnostic evidence.
+
+Final validation ran all ten scenarios twice through the actual stdio runner:
+20 prover calls and 18 live JEV requests, with no transport or API failures.
+The candidate fingerprints matched in all paired reports. Inputs and the rubric
+were unchanged between passes; this is a small reproducibility check, not a
+calibrated benchmark. Earlier development runs are not included in this table.
+
+| Scenario | Pass 1 / pass 2 JEV status | Observation in both passes | Lines at 80 columns |
+| --- | --- | --- | ---: |
+| `read_issue_narrow` | complete / complete | No findings; all three groups justified. | 29 |
+| `read_issue_broad` | incomplete / complete | GitHub scope not justified; change guidance retained despite varying excess-score certainty. | 29 |
+| `read_issue_with_comment` | complete / complete | Comment-capable group not justified for a return-only task. | 32 |
+| `publish_comment` | complete / complete | Same policy now fits; no findings. | 31 |
+| `prepared_checkout_read_only` | complete / complete | Read-only baseline fits; no findings. | 18 |
+| `prepared_checkout_review` | complete / complete | Writes unnecessary; change guidance. | 21 |
+| `outside_boundary` | not_assessed / not_assessed | Prover rejected issue creation; JEV was not called. | 11 |
+| `vague_assignment` | incomplete / incomplete | Ambiguous network task fit and context; no change guidance. | 28 |
+| `misleading_rationale` | incomplete / complete | Rationale did not justify the broader GitHub group. | 29 |
+| `dynamic_write_choice` | incomplete / incomplete | Core write finding actionable; custom choice remains uncertain. | 27 |
+
+JEV-path end-to-end latency was 1.21–1.44 seconds. At 120 columns, reports took
+10–24 lines. The compact view preserves full selectors by wrapping them rather
+than truncating paths; detailed confidence, distributions, blockers, source
+locations, and coverage reasons are available with `--details` or `--json`.
+
+Important disagreements remain visible:
+
+- The broad GitHub example does not consistently yield a high enough numeric
+  excess score to emit `resource_scope_too_broad`. Its task-fit finding is the
+  reproducible signal; do not present the excess score as a stable metric.
+- The vague assignment's selected context label was `none`, but its confidence
+  was insufficient. It demonstrates uncertainty, not a reliable specific
+  `missing_runtime_context` label.
+- The custom choice selected read-only with 67% probability versus 32% writable
+  in both final passes, but confidence was only 56%, below the unchanged 60%
+  threshold. The report explicitly marks it uncertain despite stronger core
+  write-necessity evidence.
+
+The examples now illustrate useful contrasts without turning uncertain model
+preferences into approval. The modeled runtime assumptions remain essential;
+these checks did not launch a real delegated workload under these policies.

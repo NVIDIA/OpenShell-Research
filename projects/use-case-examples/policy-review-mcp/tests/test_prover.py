@@ -67,6 +67,7 @@ def test_inconsistent_exit_code_is_adapter_error(tmp_path: Path) -> None:
         ("candidate-comment.yaml", True),
         ("candidate-outside-boundary.yaml", False),
         ("candidate-code-review.yaml", True),
+        ("candidate-code-review-read.yaml", True),
     ],
 )
 def test_real_openshell_prover_fixtures_when_available(candidate: str, within: bool) -> None:

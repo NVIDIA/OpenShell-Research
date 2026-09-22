@@ -1,102 +1,187 @@
 version: 1
 scenarios:
-  read_issue_broad:
-    candidate: candidate-broad.yaml
-    task: Summarize issue acme/widget#42 and its discussion. Return the summary to me; do not publish it.
-    execution_context:
-      intended_tools: [gh]
-      prepared_inputs: []
-      installed_dependencies: [gh]
-      output_locations: []
-      scratch_locations: [/tmp]
-      runtime_requirements: [Read GitHub issue and comments over HTTPS]
-    expected_categories: [unneeded_action, resource_scope_too_broad]
   read_issue_narrow:
     candidate: candidate-read.yaml
     task: Summarize issue acme/widget#42 and its discussion. Return the summary to me; do not publish it.
+    lesson: "Baseline: exact issue and discussion reads."
+    level: core
+    compare_with: read_issue_broad
     execution_context:
       intended_tools: [gh]
       prepared_inputs: []
       installed_dependencies: [gh]
       output_locations: []
-      scratch_locations: [/tmp]
-      runtime_requirements: [Read GitHub issue and comments over HTTPS]
+      scratch_locations: []
+      runtime_requirements:
+        - This is a modeled prepared runtime, not a claim about an arbitrary gh installation.
+        - The preloaded self-contained gh executable requires read access only to /usr/bin/gh and the TLS trust file /etc/ssl/certs/ca-certificates.crt.
+        - Authentication is supplied in the environment. No config, cache, scratch, or other filesystem writes are needed. Responses are returned in memory.
+        - Network requests must be limited to the exact delegated task.
     expected_categories: []
+  read_issue_broad:
+    candidate: candidate-broad.yaml
+    task: Summarize issue acme/widget#42 and its discussion. Return the summary to me; do not publish it.
+    lesson: "Same task, broader GitHub authority."
+    level: core
+    compare_with: read_issue_narrow
+    execution_context:
+      intended_tools: [gh]
+      prepared_inputs: []
+      installed_dependencies: [gh]
+      output_locations: []
+      scratch_locations: []
+      runtime_requirements:
+        - This is a modeled prepared runtime, not a claim about an arbitrary gh installation.
+        - The preloaded self-contained gh executable requires read access only to /usr/bin/gh and the TLS trust file /etc/ssl/certs/ca-certificates.crt.
+        - Authentication is supplied in the environment. No config, cache, scratch, or other filesystem writes are needed. Responses are returned in memory.
+        - Network requests must be limited to the exact delegated task.
+    expected_categories: [permission_not_justified, resource_scope_too_broad]
+  read_issue_with_comment:
+    candidate: candidate-comment.yaml
+    task: Summarize issue acme/widget#42 and its discussion. Return the summary to me; do not publish it.
+    lesson: "Adds comment-write authority without a publishing task."
+    level: core
+    compare_with: publish_comment
+    execution_context:
+      intended_tools: [gh]
+      prepared_inputs: []
+      installed_dependencies: [gh]
+      output_locations: []
+      scratch_locations: []
+      runtime_requirements:
+        - This is a modeled prepared runtime, not a claim about an arbitrary gh installation.
+        - The preloaded self-contained gh executable requires read access only to /usr/bin/gh and the TLS trust file /etc/ssl/certs/ca-certificates.crt.
+        - Authentication is supplied in the environment. No config, cache, scratch, or other filesystem writes are needed. Responses are returned in memory.
+        - Network requests must be limited to the exact delegated task.
+    expected_categories: [permission_not_justified]
   publish_comment:
     candidate: candidate-comment.yaml
     task: Read issue acme/widget#42 and its discussion, then publish a concise summary as a comment on that issue.
+    lesson: "Same policy and runtime; publishing is now delegated."
+    level: core
+    compare_with: read_issue_with_comment
     execution_context:
       intended_tools: [gh]
       prepared_inputs: []
       installed_dependencies: [gh]
       output_locations: []
-      scratch_locations: [/tmp]
-      runtime_requirements: [Read and comment on issue 42]
+      scratch_locations: []
+      runtime_requirements:
+        - This is a modeled prepared runtime, not a claim about an arbitrary gh installation.
+        - The preloaded self-contained gh executable requires read access only to /usr/bin/gh and the TLS trust file /etc/ssl/certs/ca-certificates.crt.
+        - Authentication is supplied in the environment. No config, cache, scratch, or other filesystem writes are needed. Responses are returned in memory.
+        - Network requests must be limited to the exact delegated task.
+    expected_categories: []
+  prepared_checkout_read_only:
+    candidate: candidate-code-review-read.yaml
+    task: Review all source files in the prepared /workspace checkout and return findings. Do not run tests, create files, or modify source files.
+    lesson: "Baseline: read-only access to the entire prepared checkout."
+    level: core
+    compare_with: prepared_checkout_review
+    execution_context:
+      intended_tools: [read_file, list_files]
+      prepared_inputs: [/workspace]
+      installed_dependencies: []
+      output_locations: []
+      scratch_locations: []
+      runtime_requirements:
+        - Host-provided read_file and list_files tools require access only to the prepared source tree /workspace.
+        - Read the whole checkout; no tests, builds, caches, scratch files, or other writes are needed. Return findings in memory.
     expected_categories: []
   prepared_checkout_review:
     candidate: candidate-code-review.yaml
-    task: Review the prepared checkout and return findings. Do not modify source files.
+    task: Review all source files in the prepared /workspace checkout and return findings. Do not run tests, create files, or modify source files.
+    lesson: "Same task and runtime; checkout writes are now allowed."
+    level: core
+    compare_with: prepared_checkout_read_only
     execution_context:
-      intended_tools: [pytest]
+      intended_tools: [read_file, list_files]
       prepared_inputs: [/workspace]
-      installed_dependencies: [pytest]
+      installed_dependencies: []
       output_locations: []
-      scratch_locations: [/tmp]
-      runtime_requirements: [Tests may write caches only under /tmp]
+      scratch_locations: []
+      runtime_requirements:
+        - Host-provided read_file and list_files tools require access only to the prepared source tree /workspace.
+        - Read the whole checkout; no tests, builds, caches, scratch files, or other writes are needed. Return findings in memory.
     expected_categories: [write_not_required]
   outside_boundary:
     candidate: candidate-outside-boundary.yaml
     task: Create a new issue in acme/widget.
+    lesson: "Boundary failure stops the workflow before JEV."
+    level: core
     execution_context:
       intended_tools: [gh]
       prepared_inputs: []
       installed_dependencies: [gh]
       output_locations: []
-      scratch_locations: [/tmp]
-      runtime_requirements: [Create a GitHub issue over HTTPS]
+      scratch_locations: []
+      runtime_requirements:
+        - This is a modeled prepared runtime, not a claim about an arbitrary gh installation.
+        - The preloaded self-contained gh executable requires read access only to /usr/bin/gh and the TLS trust file /etc/ssl/certs/ca-certificates.crt.
+        - Authentication is supplied in the environment. No config, cache, scratch, or other filesystem writes are needed. Responses are returned in memory.
+        - Network requests must be limited to the exact delegated task.
     expected_categories: [not_assessed]
   vague_assignment:
     candidate: candidate-broad.yaml
     task: Handle acme/widget issue 42.
-    execution_context:
-      intended_tools: [gh]
-      prepared_inputs: []
-      installed_dependencies: []
-      output_locations: []
-      scratch_locations: []
-      runtime_requirements: []
-    expected_categories: [missing_runtime_context]
-  misleading_rationale:
-    candidate: candidate-broad.yaml
-    task: Summarize issue acme/widget#42 and return the summary without publishing it.
+    lesson: "Only the task changes: intent is now ambiguous."
+    level: advanced
+    compare_with: read_issue_broad
     execution_context:
       intended_tools: [gh]
       prepared_inputs: []
       installed_dependencies: [gh]
       output_locations: []
-      scratch_locations: [/tmp]
-      runtime_requirements: [The gh executable reads installed runtime files under /usr and /etc]
+      scratch_locations: []
+      runtime_requirements:
+        - This is a modeled prepared runtime, not a claim about an arbitrary gh installation.
+        - The preloaded self-contained gh executable requires read access only to /usr/bin/gh and the TLS trust file /etc/ssl/certs/ca-certificates.crt.
+        - Authentication is supplied in the environment. No config, cache, scratch, or other filesystem writes are needed. Responses are returned in memory.
+        - Network requests must be limited to the exact delegated task.
+    expected_categories: [missing_runtime_context]
+  misleading_rationale:
+    candidate: candidate-broad.yaml
+    task: Summarize issue acme/widget#42 and its discussion. Return the summary to me; do not publish it.
+    lesson: "Only the annotation changes; rationale does not expand the task."
+    level: advanced
+    compare_with: read_issue_broad
+    execution_context:
+      intended_tools: [gh]
+      prepared_inputs: []
+      installed_dependencies: [gh]
+      output_locations: []
+      scratch_locations: []
+      runtime_requirements:
+        - This is a modeled prepared runtime, not a claim about an arbitrary gh installation.
+        - The preloaded self-contained gh executable requires read access only to /usr/bin/gh and the TLS trust file /etc/ssl/certs/ca-certificates.crt.
+        - Authentication is supplied in the environment. No config, cache, scratch, or other filesystem writes are needed. Responses are returned in memory.
+        - Network requests must be limited to the exact delegated task.
     annotations:
       - pointer: /network_policies/github/endpoints/0
         change: new
         editable: true
         rationale: Broad read and comment access are normal for GitHub work.
-    expected_categories: [unneeded_action, resource_scope_too_broad]
+    expected_categories: [permission_not_justified]
   dynamic_write_choice:
     candidate: candidate-code-review.yaml
-    task: Review the prepared checkout and return findings. Do not modify source files.
+    task: Review all source files in the prepared /workspace checkout and return findings. Do not run tests, create files, or modify source files.
+    lesson: "Same review plus a caller-defined choice; inspect uncertainty."
+    level: advanced
+    compare_with: prepared_checkout_review
     execution_context:
-      intended_tools: [pytest]
+      intended_tools: [read_file, list_files]
       prepared_inputs: [/workspace]
-      installed_dependencies: [pytest]
+      installed_dependencies: []
       output_locations: []
-      scratch_locations: [/tmp]
-      runtime_requirements: [Tests may write caches only under /tmp]
+      scratch_locations: []
+      runtime_requirements:
+        - Host-provided read_file and list_files tools require access only to the prepared source tree /workspace.
+        - Read the whole checkout; no tests, builds, caches, scratch files, or other writes are needed. Return findings in memory.
     questions:
       - id: checkout_write
         pointers: [/filesystem_policy/read_write/0]
         instructions: Which concrete checkout permission best fits this review-only assignment?
         criteria:
-          read_only_checkout: Read-only /workspace with writable /tmp.
-          writable_checkout: Read/write /workspace and /tmp.
+          read_only_checkout: Read-only /workspace without filesystem writes.
+          writable_checkout: Read/write /workspace.
     expected_categories: [write_not_required]

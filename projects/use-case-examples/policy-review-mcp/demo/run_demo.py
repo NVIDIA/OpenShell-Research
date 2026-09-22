@@ -7,15 +7,20 @@ import argparse
 import asyncio
 import json
 import os
+import sys
+import tempfile
 import time
 from contextlib import AsyncExitStack
 from datetime import timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from rich.console import Console
 from ruamel.yaml import YAML
+
+from policy_review_mcp.reporting import print_review_report
 
 
 def _structured(result: Any) -> dict[str, Any]:
@@ -38,9 +43,10 @@ async def _session(
     command: str,
     args: list[str],
     env: dict[str, str],
+    errlog: TextIO = sys.stderr,
 ) -> ClientSession:
     streams = await stack.enter_async_context(
-        stdio_client(StdioServerParameters(command=command, args=args, env=env))
+        stdio_client(StdioServerParameters(command=command, args=args, env=env), errlog=errlog)
     )
     session = await stack.enter_async_context(
         ClientSession(*streams, read_timeout_seconds=timedelta(seconds=30))
@@ -56,19 +62,26 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     candidate = (args.scenarios.parent / scenario["candidate"]).read_text()
     prover_env = os.environ.copy()
     prover_env.pop("TYPESAFE_API_KEY", None)
-    prover_env.pop("TYPESAFEAI_API_KEY", None)
     async with AsyncExitStack() as stack:
+        errlog = (
+            sys.stderr if args.verbose else stack.enter_context(tempfile.TemporaryFile(mode="w+"))
+        )
         prover = await _session(
             stack,
             "policy-review-prover-mcp",
             ["--config", str(args.prover_config)],
             prover_env,
+            errlog,
         )
         proof = _structured(
             await prover.call_tool("check_policy_boundary", {"candidate_policy": candidate})
         )
         if proof.get("status") != "complete" or not proof.get("within_boundary"):
             return {
+                "task": scenario["task"],
+                "demo": {
+                    key: scenario[key] for key in ("lesson", "compare_with") if key in scenario
+                },
                 "prover": proof,
                 "jev": {"status": "not_assessed"},
                 "combined": False,
@@ -79,6 +92,7 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
             "policy-review-jev-mcp",
             ["--config", str(args.jev_config)],
             os.environ.copy(),
+            errlog,
         )
         review = _structured(
             await jev.call_tool(
@@ -94,6 +108,8 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
         )
         matching = proof["candidate_sha256"] == review["candidate_sha256"]
         return {
+            "task": scenario["task"],
+            "demo": {key: scenario[key] for key in ("lesson", "compare_with") if key in scenario},
             "prover": proof,
             "jev": review,
             "combined": matching,
@@ -110,8 +126,10 @@ def main() -> None:
         choices=[
             "read_issue_broad",
             "read_issue_narrow",
+            "read_issue_with_comment",
             "publish_comment",
             "prepared_checkout_review",
+            "prepared_checkout_read_only",
             "outside_boundary",
             "vague_assignment",
             "misleading_rationale",
@@ -121,13 +139,25 @@ def main() -> None:
     parser.add_argument("--scenarios", type=Path, default=root / "fixtures/scenarios.yaml")
     parser.add_argument("--prover-config", type=Path, default=root.parent / "prover.toml")
     parser.add_argument("--jev-config", type=Path, default=root.parent / "jev.toml")
+    output = parser.add_mutually_exclusive_group()
+    output.add_argument("--json", action="store_true", help="Print the complete report as JSON")
+    output.add_argument(
+        "--details", action="store_true", help="Include scores, locations, and diagnostics"
+    )
+    parser.add_argument("--verbose", action="store_true", help="Show MCP and API logs on stderr")
     args = parser.parse_args()
+    exit_code = 0
     try:
         result = asyncio.run(run(args))
     except Exception as error:
-        print(json.dumps({"status": "runner_error", "reason": _exception_message(error)}, indent=2))
-        raise SystemExit(1) from None
-    print(json.dumps(result, indent=2))
+        result = {"status": "runner_error", "reason": _exception_message(error)}
+        exit_code = 1
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print_review_report(result, console=Console(), scenario=args.scenario, details=args.details)
+    if exit_code:
+        raise SystemExit(exit_code)
 
 
 if __name__ == "__main__":

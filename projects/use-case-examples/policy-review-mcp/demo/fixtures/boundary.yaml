@@ -2,8 +2,8 @@ version: 1
 filesystem_policy:
   include_workdir: false
   read_only:
-    - /usr
-    - /etc
+    - /usr/bin/gh
+    - /etc/ssl/certs/ca-certificates.crt
   read_write:
     - /workspace
     - /tmp

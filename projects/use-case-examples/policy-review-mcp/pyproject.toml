@@ -11,11 +11,10 @@ requires-python = ">=3.11"
 dependencies = [
   "mcp>=1.26,<2",
   "pydantic>=2.11,<3",
+  "rich>=14,<15",
   "ruamel-yaml>=0.18.15,<0.19",
+  "typesafe-sdk==0.7.0",
 ]
-
-[project.optional-dependencies]
-jev = ["typesafe-sdk==0.7.0"]
 
 [dependency-groups]
 dev = [

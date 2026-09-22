@@ -1,10 +1,14 @@
 version: 1
-rubric: delegation-rubric-v1
+rubric: delegation-rubric-v2
 core_dimensions:
   - task_justification
   - excess_scope
   - context_gap
+  - write_necessity (read/write groups only)
 notes:
   - Questions are independent and batched in one request.
   - Missing context suppresses actionable scope guidance.
+  - Each finding requires confident evidence for its own dimension and for context sufficiency.
+  - Contradictory task-fit, write, or excess answers block guidance for the group.
+  - Uncertain custom choices keep the overall review incomplete.
   - Results are not combined into an approval score.

@@ -5,13 +5,14 @@
 
 import hashlib
 import json
-import os
 import time
 import tomllib
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from typesafe_sdk import Choice, Score, TypeSafeClient
 
 from policy_review_mcp.contracts import ReviewRequest
 from policy_review_mcp.policy import (
@@ -22,7 +23,7 @@ from policy_review_mcp.policy import (
 )
 
 JEV_REPORT_SCHEMA_VERSION = 1
-RUBRIC_VERSION = "delegation-rubric-v1"
+RUBRIC_VERSION = "delegation-rubric-v2"
 CATALOG_VERSION = "openshell-github-rest-v1"
 OPERATION_CATALOG = {
     "issue": "GET /repos/{owner}/{repo}/issues/{number} reads one issue.",
@@ -197,6 +198,8 @@ def review_delegation(
         "review_rules": [
             "Assess the exact delegated task, not a broader parent objective.",
             "Runtime presence does not by itself justify task access.",
+            "Include documented runtime requirements in every answer, including write necessity.",
+            "Only identify context gaps when specific missing facts could change the assessment.",
             "Treat broad selectors as broad authority, not only as operation examples.",
         ],
     }
@@ -227,11 +230,23 @@ def review_delegation(
         }
 
     assessments, findings = _render_core(candidate.groups, answers, config)
-    custom_answers = [
-        {"id": question.id, **answers[f"custom.{question.id}"]} for question in request.questions
-    ]
+    custom_answers = []
+    for question in request.questions:
+        answer = answers[f"custom.{question.id}"]
+        custom_answers.append(
+            {
+                "id": question.id,
+                "instructions": question.instructions,
+                "pointers": question.pointers,
+                "criteria": questions[f"custom.{question.id}"]["criteria"],
+                **answer,
+                "uncertain": _choice_is_uncertain(answer, config)
+                or answer["value"] in {"none_fit", "insufficient_context"},
+            }
+        )
     incomplete = any(
         any(item["uncertainty"].values())
+        or bool(item["contradictions"])
         or item["context_gap"]["value"] != "none"
         or item["task_justification"]["value"] == "insufficient_context"
         or (
@@ -239,7 +254,7 @@ def review_delegation(
             and item["write_necessity"]["value"] == "insufficient_context"
         )
         for item in assessments
-    )
+    ) or any(answer["uncertain"] for answer in custom_answers)
     return {
         **base,
         "status": "incomplete" if incomplete else "complete",
@@ -261,12 +276,7 @@ def review_delegation(
 def call_typesafe(
     state: dict[str, Any], questions: QuestionBatch, config: JevConfig
 ) -> dict[str, Any]:
-    """Translate neutral question specs to the optional TypeSafe SDK."""
-
-    try:
-        from typesafe_sdk import Choice, Score, TypeSafeClient
-    except ImportError as error:
-        raise RuntimeError("install the 'jev' extra to run the JEV service") from error
+    """Translate neutral question specs to the TypeSafe SDK."""
     sdk_questions: dict[str, Any] = {}
     for identifier, specification in questions.items():
         if specification["type"] == "choice":
@@ -277,10 +287,7 @@ def call_typesafe(
             sdk_questions[identifier] = Score(
                 instructions=specification["instructions"], criteria=specification["criteria"]
             )
-    api_key = os.environ.get("TYPESAFE_API_KEY") or os.environ.get("TYPESAFEAI_API_KEY")
-    with TypeSafeClient(
-        api_key=api_key, model=config.model, timeout=config.timeout_seconds
-    ) as client:
+    with TypeSafeClient(model=config.model, timeout=config.timeout_seconds) as client:
         response = client.system_one(state=state, questions=sdk_questions)
     output: dict[str, Any] = {}
     for identifier, answer in response.answers.items():
@@ -337,7 +344,12 @@ def _build_questions(
         }
         questions[f"{prefix}.context"] = {
             "type": "choice",
-            "instructions": f"What is the most important context gap when assessing {reference}?",
+            "instructions": (
+                f"Is a decision-relevant fact missing when assessing {reference} against "
+                "the delegated task and documented execution context? Select none when the "
+                "supplied facts suffice, even if the permission is clearly excessive. "
+                "Unnecessary authority is not itself a context gap."
+            ),
             "criteria": {
                 "none": "No material context gap.",
                 "unclear_assignment": "The delegated assignment is unclear.",
@@ -351,12 +363,14 @@ def _build_questions(
             questions[f"{prefix}.write_necessity"] = {
                 "type": "choice",
                 "instructions": (
-                    f"Does the exact delegated task require writing within {reference}, "
-                    "independent of whether the resource path is broader than necessary?"
+                    f"Does the delegated task OR its explicitly documented runtime require "
+                    f"any writing within {reference}? Count required output, cache, and scratch "
+                    "writes even when source files must remain unchanged. Assess write necessity "
+                    "independently of whether the path is broader than necessary."
                 ),
                 "criteria": {
-                    "required": "The task requires some write access within this path.",
-                    "not_required": "The task requires no write access within this path.",
+                    "required": "The task or its documented runtime needs writes within this path.",
+                    "not_required": "Neither the task nor its documented runtime needs writes.",
                     "insufficient_context": "The supplied state is not enough to decide.",
                 },
             }
@@ -397,6 +411,12 @@ def _render_core(
                 else False
             ),
         }
+        contradictions = []
+        if justification["value"] == "justified" and (
+            (write_necessity is not None and write_necessity["value"] == "not_required")
+            or float(excess["value"]) >= config.excess_score_threshold
+        ):
+            contradictions.append("Task fit conflicts with the write or excess-scope answer.")
         assessment = {
             "group_id": group.id,
             "kind": group.kind,
@@ -407,6 +427,7 @@ def _render_core(
             "context_gap": context_gap,
             "write_necessity": write_necessity,
             "uncertainty": uncertainty,
+            "contradictions": contradictions,
         }
         assessments.append(assessment)
         missing_context = (
@@ -414,66 +435,42 @@ def _render_core(
             or justification["value"] == "insufficient_context"
             or (write_necessity is not None and write_necessity["value"] == "insufficient_context")
         )
-        base_actionable = not missing_context and not any(uncertainty.values())
+        common_blockers = []
         if missing_context:
+            common_blockers.append("missing_context")
+        if uncertainty["context_gap"]:
+            common_blockers.append("uncertain_context")
+        if contradictions:
+            common_blockers.append("conflicting_answers")
+
+        if missing_context:
+            missing_answer = context_gap if context_gap["value"] != "none" else justification
+            if write_necessity and write_necessity["value"] == "insufficient_context":
+                missing_answer = write_necessity
             findings.append(
-                _finding(
-                    group,
-                    "missing_runtime_context",
-                    context_gap if context_gap["value"] != "none" else justification,
-                    actionable=False,
-                )
+                {
+                    **_finding(group, "missing_runtime_context", missing_answer, actionable=False),
+                    "blocked_by": common_blockers,
+                }
             )
-            if justification["value"] == "unjustified":
-                findings.append(
-                    _finding(
-                        group,
-                        _reason_for_group(group, excess),
-                        justification,
-                        actionable=False,
-                    )
-                )
-        justification_reason = None
+        signals = []
         if justification["value"] == "unjustified":
-            justification_reason = _reason_for_group(group, excess)
-            if not missing_context:
-                findings.append(
-                    _finding(
-                        group,
-                        justification_reason,
-                        justification,
-                        actionable=base_actionable,
-                    )
-                )
+            signals.append(("permission_not_justified", justification, "task_justification"))
         if float(excess["value"]) >= config.excess_score_threshold:
-            excess_reason = "resource_scope_too_broad"
-            if justification_reason != excess_reason:
-                findings.append(
-                    _finding(
-                        group,
-                        excess_reason,
-                        excess,
-                        actionable=base_actionable,
-                    )
-                )
+            signals.append(("resource_scope_too_broad", excess, "excess_scope"))
         if write_necessity is not None and write_necessity["value"] == "not_required":
+            signals.append(("write_not_required", write_necessity, "write_necessity"))
+        for reason, answer, dimension in signals:
+            blockers = common_blockers + (
+                [f"uncertain_{dimension}"] if uncertainty[dimension] else []
+            )
             findings.append(
-                _finding(
-                    group,
-                    "write_not_required",
-                    write_necessity,
-                    actionable=base_actionable,
-                )
+                {
+                    **_finding(group, reason, answer, actionable=not blockers),
+                    "blocked_by": blockers,
+                }
             )
     return assessments, findings
-
-
-def _reason_for_group(group: Any, excess: dict[str, Any]) -> str:
-    if group.kind == "github_rest":
-        methods = {item["method"] for item in group.state["selectors"]}
-        if methods - {"GET", "HEAD", "OPTIONS"}:
-            return "unneeded_action"
-    return "resource_scope_too_broad" if float(excess["value"]) >= 1.0 else "unneeded_action"
 
 
 def _choice_is_uncertain(answer: dict[str, Any], config: JevConfig) -> bool:
@@ -499,9 +496,11 @@ def _score_is_uncertain(answer: dict[str, Any], config: JevConfig) -> bool:
 
 def _finding(group: Any, reason: str, answer: dict[str, Any], actionable: bool) -> dict[str, Any]:
     messages = {
-        "unneeded_action": "The permission includes an action not required by the assignment.",
+        "permission_not_justified": "The permission group is not justified in its current scope.",
         "resource_scope_too_broad": "The permission covers resources beyond the stated need.",
-        "write_not_required": "The assignment does not establish a need for write access.",
+        "write_not_required": (
+            "Neither the task nor its documented runtime needs this write access."
+        ),
         "missing_runtime_context": (
             "More execution context is needed before suggesting a scope change."
         ),
