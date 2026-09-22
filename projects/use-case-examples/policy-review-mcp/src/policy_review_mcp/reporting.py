@@ -93,11 +93,18 @@ def print_review_report(
         console.print("Next: Resolve the JEV error and rerun.")
     findings = review.get("findings", [])
     assessments = review.get("assessments", [])
+    custom_answers = review.get("custom_answers", [])
+    diagnostics = {
+        answer["pointers"][0]: answer
+        for answer in custom_answers
+        if answer.get("diagnostic_outcomes")
+    }
     if assessments:
         table = Table(expand=True, padding=(0, 1), show_lines=True)
         table.add_column("Policy entry", ratio=2)
         table.add_column("Assessment", ratio=1)
-        table.add_column("Follow-up", ratio=2)
+        if diagnostics:
+            table.add_column("Diagnostic", ratio=2)
         actionable_targets = 0
         for item in assessments:
             related = [f for f in findings if f["target_pointer"] == item["target_pointer"]]
@@ -121,25 +128,27 @@ def print_review_report(
             ranked = sorted(actionable or related, key=lambda f: priority.get(f.get("reason"), 4))
             selected = ranked[0] if ranked else None
             if selected and actionable:
-                action = "Consider a change: " + selected["message"]
-            elif selected:
-                topics = {
-                    "write_not_required": "whether writes are needed",
-                    "resource_scope_too_broad": "whether scope is excessive",
-                    "permission_not_justified": "whether this scope is justified",
-                    "missing_runtime_context": "missing execution context",
-                }
-                action = (
-                    "Investigate " + topics.get(selected.get("reason"), "ambiguous evidence") + "."
-                )
-            else:
-                action = (
-                    "Review ambiguous answers."
-                    if any(uncertainty.values())
-                    else "No change indicated in assessed scope."
-                )
-            table.add_row(Text(item["summary"], overflow="fold"), Text(verdict), Text(action))
+                specific = {
+                    "write_not_required": "Writes not needed",
+                    "resource_scope_too_broad": "Excess scope",
+                }.get(selected.get("reason"))
+                if specific:
+                    verdict += "\n" + specific
+                verdict += "\nChange supported"
+            elif selected or any(uncertainty.values()) or item.get("contradictions"):
+                verdict += "\nInvestigate"
+            diagnostic = diagnostics.get(item["target_pointer"])
+            row = [Text(item["summary"], overflow="fold"), Text(verdict)]
+            if diagnostics:
+                row.append(Text(_diagnostic_text(diagnostic) if diagnostic else "—"))
+            table.add_row(*row)
         console.print(table)
+        if diagnostics:
+            console.print(
+                "Diagnostic: JEV selects among agent-supplied hypotheses, not a causal explanation "
+                "of its core assessment.",
+                style="dim",
+            )
         console.print(
             Text(
                 f"{len(assessments)} policy entries · {actionable_targets} with change guidance · "
@@ -166,7 +175,11 @@ def print_review_report(
                 style="yellow",
             )
         )
-    _print_custom_answers(review.get("custom_answers", []), console, details=details)
+    _print_custom_answers(
+        [answer for answer in custom_answers if details or not answer.get("diagnostic_outcomes")],
+        console,
+        details=details,
+    )
     if demo.get("compare_with"):
         console.print(Text(f"Compare: {demo['compare_with']}", style="dim"))
     console.print(
@@ -199,6 +212,19 @@ def print_review_report(
         )
 
 
+def _diagnostic_text(answer: dict[str, Any]) -> str:
+    status = answer.get("diagnostic_status", "uncertain")
+    description = answer["criteria"][answer["value"]]
+    prefixes = {
+        "uncertain": "UNCERTAIN preference: ",
+        "core_uncertain": "Core assessment unresolved: ",
+        "conflict": "CONFLICT with task fit: ",
+    }
+    if answer.get("uncertain") and status not in {"none_fit", "insufficient_context", "uncertain"}:
+        return "UNCERTAIN preference: " + description
+    return prefixes.get(status, "") + description
+
+
 def _print_custom_answers(
     answers: list[dict[str, Any]], console: Console, *, details: bool = False
 ) -> None:
@@ -208,6 +234,8 @@ def _print_custom_answers(
             Text(f"Custom answers — caller interpretation required · {label}", style="yellow")
         )
         console.print(Text(answer.get("instructions", answer["id"])))
+        if answer.get("diagnostic_outcomes"):
+            console.print(Text("Diagnostic: " + _diagnostic_text(answer)))
         console.print(
             Text(
                 f"Confidence {_percent(answer['confidence'])} (model certainty, not safety)",

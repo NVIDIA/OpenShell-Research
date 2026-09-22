@@ -29,3 +29,6 @@ async def test_tool_schema_exposes_nested_request_contracts() -> None:
         "runtime_requirements",
     }
     assert definitions["ExecutionContext"]["additionalProperties"] is False
+    diagnostic = definitions["TargetedQuestion"]["properties"]["diagnostic_outcomes"]
+    assert diagnostic["anyOf"][0]["additionalProperties"]["enum"] == ["justified", "unjustified"]
+    assert "none_fit" in diagnostic["description"]

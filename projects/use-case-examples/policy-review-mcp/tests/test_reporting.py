@@ -117,6 +117,8 @@ def test_compact_report_keeps_uncertainty_and_coverage_without_diagnostics() -> 
     assert "/process" in output
     assert "Confidence" not in output
     assert "candidate:4:3" not in output
+    assert "Follow-up" not in output
+    assert "Diagnostic" not in output
 
 
 def test_custom_near_tie_shows_question_descriptions_and_uncertainty() -> None:

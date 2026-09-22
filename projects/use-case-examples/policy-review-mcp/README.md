@@ -75,6 +75,63 @@ Removing a flagged rule may leave equivalent access through another rule.
 All core and custom questions still use one batched JEV request. Question types
 remain `Choice` and `Score`; the discussed `Noul` alternative is not implemented.
 
+### Agent-supplied diagnostic choices
+
+A calling agent can add a diagnostic `Choice` for an exact assessed policy entry.
+It supplies multiple plausible explanations, including a no-problem alternative;
+JEV independently selects among them in the **same API call** as the core rubric.
+For example, add this item to `questions`:
+
+```json
+{
+  "id": "comment_diagnostic",
+  "pointers": ["/network_policies/github/endpoints/0/rules/2"],
+  "instructions": "Which explanation best fits this comment POST rule?",
+  "criteria": {
+    "not_requested": "The task requests a returned summary, not a published comment.",
+    "wrong_destination": "Publishing is needed, but this rule targets the wrong issue.",
+    "justified": "Publishing to this exact issue is part of the delegated task."
+  },
+  "diagnostic_outcomes": {
+    "not_requested": "unjustified",
+    "wrong_destination": "unjustified",
+    "justified": "justified"
+  }
+}
+```
+
+`diagnostic_outcomes` opts into the diagnostic column and explicitly maps each
+caller option to its task-fit conclusion. It must cover all supplied criteria
+and include both `justified` and `unjustified` conclusions. The server always
+adds **`none_fit`** (none of the alternatives fit) and **`insufficient_context`**;
+callers cannot redefine or map these fallback options. One diagnostic per exact
+supported target is allowed; ancestor pointers and unsupported fields are
+rejected before calling JEV. Ordinary custom questions omit this mapping and
+remain separately displayed, with their existing multi-pointer support.
+
+The selected option is a **diagnostic hypothesis**, not a faithful causal
+explanation of JEV's core answer or an instruction to change the policy. Option
+text and outcome mappings are caller-authored, not independently verified facts.
+Use specific, neutral alternatives grounded in the task and runtime, not several
+paraphrases of "change the policy." The mapping is used locally to compare
+conclusions; the option descriptions themselves are sent to JEV as Choice criteria.
+
+Diagnostic answers expose `diagnostic_outcomes` and `diagnostic_status` alongside
+the selected label, descriptions, confidence, distribution, and uncertainty:
+
+| Status | Meaning |
+| --- | --- |
+| `aligned` | Confident diagnostic and core task-fit conclusions agree. |
+| `conflict` | Confident conclusions disagree; the review is incomplete and guidance for that entry is blocked by `diagnostic_conflict`. |
+| `uncertain` | The diagnostic does not meet the configured confidence/distribution thresholds. |
+| `core_uncertain` | The diagnostic is confident, but core task fit/context is unresolved or internally conflicting. |
+| `none_fit`, `insufficient_context` | JEV selected a server-owned fallback; no caller explanation is endorsed. |
+
+An uncertain or fallback diagnostic keeps the review incomplete without erasing
+independently supported core findings. A diagnostic never creates an actionable
+finding on its own. Agreement is only with core **task fit**; it does not certify
+every detail of an explanation or agreement with every other rubric dimension.
+
 ## Prerequisites
 
 - Python 3.11 or newer and `uv`.
@@ -197,7 +254,10 @@ formal boundary passes while JEV can question task fit. `read_issue_narrow` and
 `prepared_checkout_read_only` are intended adequate baselines, not guaranteed
 model outcomes. `vague_assignment` changes only the task; `misleading_rationale`
 changes only an annotation relative to `read_issue_broad`. `dynamic_write_choice`
-adds a question to the checkout-write example. Expected categories in
+adds diagnostic alternatives for unnecessary writes, overly broad writes, or
+justified writes to the checkout-write example. `read_issue_with_comment` and
+`publish_comment` share identical diagnostic choices, so their comparison still
+changes only the task. Expected categories in
 `demo/fixtures/scenarios.yaml` are evaluation labels, never substitutes for live
 answers.
 
@@ -232,13 +292,24 @@ is distinct from the SDK's confidence value. `UNCERTAIN` marks an answer that
 does not meet the configured confidence/distribution criteria. The report uses
 the assessment's existing uncertainty flags without applying new thresholds.
 
-**Consider a change** identifies a finding whose guidance is actionable.
-**Investigate** means context, certainty, or agreement is insufficient to recommend
-an edit. In the detailed view this is labeled **Needs investigation**.
+The default table has **Policy entry** and **Assessment** columns. **Change
+supported** marks actionable core evidence; **Investigate** means evidence is
+insufficient to recommend an edit. Detailed findings retain **Consider a change**
+and **Needs investigation** labels.
+
+When diagnostic questions are supplied, a **Diagnostic** column shows the selected
+option's description beside its exact entry; other rows show a dash. Uncertain
+preferences, unresolved core evidence, and conflicts are explicitly labeled.
+Fallback selections say that no alternative fits or more context is needed.
+The report does not substitute a generic "consider a change" follow-up. Use
+`dynamic_write_choice` to try it, or compare `read_issue_with_comment` with
+`publish_comment` to see the same alternatives evaluated against different tasks.
+
 Matching fingerprints only establish that both reports describe the
-same candidate; a mismatch suppresses actionable presentation. Custom answers
-are shown separately with the actual question, referenced fields, and leading
-option descriptions/probabilities. Near ties are explicitly marked uncertain.
+same candidate; a mismatch suppresses actionable presentation. Ordinary custom
+answers are shown separately with the question, references, and leading option
+descriptions/probabilities. Diagnostic choices get that full evidence view with
+`--details`, without duplicating the compact column. Near ties remain uncertain.
 
 For the full machine-readable report, including every probability and fingerprint:
 

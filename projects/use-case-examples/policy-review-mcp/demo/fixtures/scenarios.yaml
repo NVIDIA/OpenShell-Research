@@ -53,6 +53,18 @@ scenarios:
         - The preloaded self-contained gh executable requires read access only to /usr/bin/gh and the TLS trust file /etc/ssl/certs/ca-certificates.crt.
         - Authentication is supplied in the environment. No config, cache, scratch, or other filesystem writes are needed. Responses are returned in memory.
         - Network requests must be limited to the exact delegated task.
+    questions:
+      - id: comment_diagnostic
+        pointers: [/network_policies/github/endpoints/0/rules/2]
+        instructions: Which explanation best fits the comment POST rule for this assignment?
+        criteria:
+          publishing_not_requested: The task asks for a returned summary, not a published comment.
+          wrong_destination: Publishing is needed, but this rule targets the wrong repository or issue.
+          publishing_justified: Publishing to this exact issue is part of the delegated task.
+        diagnostic_outcomes:
+          publishing_not_requested: unjustified
+          wrong_destination: unjustified
+          publishing_justified: justified
     expected_categories: [permission_not_justified]
   publish_comment:
     candidate: candidate-comment.yaml
@@ -71,6 +83,18 @@ scenarios:
         - The preloaded self-contained gh executable requires read access only to /usr/bin/gh and the TLS trust file /etc/ssl/certs/ca-certificates.crt.
         - Authentication is supplied in the environment. No config, cache, scratch, or other filesystem writes are needed. Responses are returned in memory.
         - Network requests must be limited to the exact delegated task.
+    questions:
+      - id: comment_diagnostic
+        pointers: [/network_policies/github/endpoints/0/rules/2]
+        instructions: Which explanation best fits the comment POST rule for this assignment?
+        criteria:
+          publishing_not_requested: The task asks for a returned summary, not a published comment.
+          wrong_destination: Publishing is needed, but this rule targets the wrong repository or issue.
+          publishing_justified: Publishing to this exact issue is part of the delegated task.
+        diagnostic_outcomes:
+          publishing_not_requested: unjustified
+          wrong_destination: unjustified
+          publishing_justified: justified
     expected_categories: []
   prepared_checkout_read_only:
     candidate: candidate-code-review-read.yaml
@@ -165,7 +189,7 @@ scenarios:
   dynamic_write_choice:
     candidate: candidate-code-review.yaml
     task: Review all source files in the prepared /workspace checkout and return findings. Do not run tests, create files, or modify source files.
-    lesson: "Same review plus a caller-defined choice; inspect uncertainty."
+    lesson: "Same review plus agent-supplied diagnostic alternatives, including no-problem and fallbacks."
     level: advanced
     compare_with: prepared_checkout_review
     execution_context:
@@ -180,8 +204,13 @@ scenarios:
     questions:
       - id: checkout_write
         pointers: [/filesystem_policy/read_write/0]
-        instructions: Which concrete checkout permission best fits this review-only assignment?
+        instructions: Which explanation best fits the writable checkout entry for this assignment?
         criteria:
-          read_only_checkout: Read-only /workspace without filesystem writes.
-          writable_checkout: Read/write /workspace.
+          writes_unneeded: The task and documented runtime only read files; checkout writes are unnecessary.
+          writes_too_broad: Some writes are needed, but only in a narrower output or scratch directory.
+          writes_justified: The task or documented runtime requires writes throughout this checkout.
+        diagnostic_outcomes:
+          writes_unneeded: unjustified
+          writes_too_broad: unjustified
+          writes_justified: justified
     expected_categories: [write_not_required]

@@ -108,6 +108,7 @@ def test_demo_comparisons_isolate_their_intended_variable() -> None:
     read, publish = scenarios["read_issue_with_comment"], scenarios["publish_comment"]
     assert read["candidate"] == publish["candidate"]
     assert read["execution_context"] == publish["execution_context"]
+    assert read["questions"] == publish["questions"]
     for name in ("misleading_rationale", "vague_assignment"):
         assert (
             scenarios[name]["execution_context"]

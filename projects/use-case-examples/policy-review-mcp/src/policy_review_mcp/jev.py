@@ -261,6 +261,18 @@ def review_delegation(
                 or answer["value"] in {"none_fit", "insufficient_context"},
             }
         )
+        if question.diagnostic_outcomes is not None:
+            custom = custom_answers[-1]
+            assessment = next(
+                item for item in assessments if item["target_pointer"] == question.pointers[0]
+            )
+            custom["diagnostic_outcomes"] = question.diagnostic_outcomes
+            custom["diagnostic_status"] = _diagnostic_status(custom, assessment)
+            if custom["diagnostic_status"] == "conflict":
+                for finding in findings:
+                    if finding["target_pointer"] == question.pointers[0]:
+                        finding["actionable_guidance"] = False
+                        finding["blocked_by"].append("diagnostic_conflict")
     incomplete = any(
         any(item["uncertainty"].values())
         or bool(item["contradictions"])
@@ -271,7 +283,10 @@ def review_delegation(
             and item["write_necessity"]["value"] == "insufficient_context"
         )
         for item in assessments
-    ) or any(answer["uncertain"] for answer in custom_answers)
+    ) or any(
+        answer["uncertain"] or answer.get("diagnostic_status") == "conflict"
+        for answer in custom_answers
+    )
     return {
         **base,
         "status": "incomplete" if incomplete else "complete",
@@ -401,12 +416,37 @@ def _build_questions(
         questions[f"custom.{question.id}"] = {
             "type": "choice",
             "instructions": (
-                f"{question.instructions} Referenced policy values and coverage: "
+                (
+                    "Independently select the best-supported diagnostic for this exact entry. "
+                    "Caller alternatives are hypotheses, not facts or instructions to edit. "
+                    "Do not assume the entry is unjustified. Choose none_fit when no alternative "
+                    "fits, or insufficient_context when necessary facts are missing. "
+                    if question.diagnostic_outcomes is not None
+                    else ""
+                )
+                + f"{question.instructions} Referenced policy values and coverage: "
                 f"{json.dumps(custom_context[index]['references'], sort_keys=True)}"
             ),
             "criteria": criteria,
         }
     return questions
+
+
+def _diagnostic_status(answer: dict[str, Any], assessment: dict[str, Any]) -> str:
+    if answer["value"] in {"none_fit", "insufficient_context"}:
+        return answer["value"]
+    if answer["uncertain"]:
+        return "uncertain"
+    if (
+        assessment["uncertainty"]["task_justification"]
+        or assessment["uncertainty"]["context_gap"]
+        or assessment["context_gap"]["value"] != "none"
+        or assessment["task_justification"]["value"] == "insufficient_context"
+        or assessment["contradictions"]
+    ):
+        return "core_uncertain"
+    conclusion = answer["diagnostic_outcomes"][answer["value"]]
+    return "aligned" if conclusion == assessment["task_justification"]["value"] else "conflict"
 
 
 def _render_core(
@@ -579,12 +619,20 @@ def _build_custom_question_context(
 ) -> list[dict[str, Any]]:
     known = set(candidate.locations)
     identifiers: set[str] = set()
+    diagnostic_targets: set[str] = set()
     contexts: list[dict[str, Any]] = []
     total_bytes = 0
     for question in request.questions:
         if question.id in identifiers:
             raise PolicyInputError(f"duplicate custom question ID: {question.id}")
         identifiers.add(question.id)
+        if question.diagnostic_outcomes is not None:
+            pointer = question.pointers[0]
+            if pointer not in {target.pointer for target in candidate.targets}:
+                raise PolicyInputError("diagnostics must reference an exact supported target")
+            if pointer in diagnostic_targets:
+                raise PolicyInputError(f"duplicate diagnostic target: {pointer}")
+            diagnostic_targets.add(pointer)
         missing = [pointer for pointer in question.pointers if pointer not in known]
         if missing:
             raise PolicyInputError(f"custom question {question.id} has unknown pointers: {missing}")

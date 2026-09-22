@@ -5,7 +5,7 @@
 
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 MAX_POLICY_CHARACTERS = 1_048_576
 MAX_TASK_CHARACTERS = 32_768
@@ -52,6 +52,27 @@ class TargetedQuestion(BaseModel):
     pointers: list[str] = Field(min_length=1, max_length=16)
     instructions: str = Field(min_length=1, max_length=4000)
     criteria: dict[str, str] = Field(min_length=1, max_length=14)
+    diagnostic_outcomes: dict[str, Literal["justified", "unjustified"]] | None = Field(
+        default=None,
+        description=(
+            "Opt into a per-entry diagnostic: map every caller option to its task-fit conclusion. "
+            "Requires one exact supported target, multiple alternatives, and both conclusions. "
+            "The server always adds none_fit and insufficient_context; do not map those options."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def valid_diagnostic(self) -> "TargetedQuestion":
+        if self.diagnostic_outcomes is not None:
+            if len(self.pointers) != 1:
+                raise ValueError("diagnostics must reference exactly one supported target")
+            if set(self.diagnostic_outcomes) != set(self.criteria):
+                raise ValueError("diagnostic_outcomes must map every caller criterion exactly once")
+            if set(self.diagnostic_outcomes.values()) != {"justified", "unjustified"}:
+                raise ValueError(
+                    "diagnostics must offer both justified and unjustified alternatives"
+                )
+        return self
 
     @field_validator("pointers")
     @classmethod
@@ -70,8 +91,10 @@ class TargetedQuestion(BaseModel):
             raise ValueError("criteria must not use reserved choice names")
         if any(len(key) > 64 or not key for key in value):
             raise ValueError("criteria names must contain 1 to 64 characters")
-        if any(len(description) > 2000 for description in value.values()):
-            raise ValueError("criteria descriptions must not exceed 2000 characters")
+        if any(
+            not description.strip() or len(description) > 2000 for description in value.values()
+        ):
+            raise ValueError("criteria descriptions must contain 1 to 2000 nonblank characters")
         return value
 
 

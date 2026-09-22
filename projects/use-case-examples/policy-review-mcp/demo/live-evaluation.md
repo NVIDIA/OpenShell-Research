@@ -166,3 +166,37 @@ accuracy: wildcard-read excess remains an unresolved assessment, and the
 checkout excess score remains uncertain. We did not lower thresholds or change
 the fixtures to force those answers. The reports assess authored task fit, not
 the effective runtime behavior of a launched workload.
+
+## Agent-supplied diagnostic choices (2026-09-22)
+
+The compact report now has two columns unless the caller supplies diagnostic
+choices. Each diagnostic adds one independent Choice question to the existing
+batch, with caller-authored explanations and server-owned `none_fit` and
+`insufficient_context` alternatives. No second model call generates text.
+Core questions, semantics, and confidence thresholds remain unchanged.
+
+All ten scenarios were run through the real ordered stdio workflow, then the
+three diagnostic scenarios were repeated without changes: 13 prover calls and
+12 live JEV requests. Every permitted pair had matching candidate fingerprints;
+issue creation still failed the boundary check and skipped JEV.
+
+| Diagnostic scenario | Selected explanation in both runs | Core result |
+| --- | --- | --- |
+| `read_issue_with_comment` | Publishing was not requested. | POST rule not justified; change guidance. |
+| `publish_comment` | Publishing to the exact issue was delegated. | Same POST rule justified; no findings. |
+| `dynamic_write_choice` | Task and documented runtime only read; writes unnecessary. | Write guidance retained; excess-score uncertainty still makes the review incomplete. |
+
+All six diagnostic responses reported confidence and selected probability of
+1.0 and aligned with core task fit. These easy fixtures do not establish general
+calibration or prove that JEV will choose a fallback on unfamiliar input. Tests
+with controlled model responses separately verify both fallbacks, low confidence,
+near ties, unresolved core evidence, and confident conflicts that block guidance
+only for the affected entry. No live fallback or conflict was observed.
+
+Other scenarios retained their previous qualitative outcomes: adequate baselines
+fit, broad and misleading-rationale examples flagged the POST rule, and the vague
+assignment remained uncertain without actionable guidance. Live JEV-path latency
+was 1.21–1.43 seconds end to end. Reports rendered at 80 and 120 columns took
+11–40 and 10–30 lines respectively. The diagnostic column appears only when
+requested, shows descriptions rather than option IDs, and avoids a duplicate
+custom-answer block; `--details` retains all option probabilities and provenance.
