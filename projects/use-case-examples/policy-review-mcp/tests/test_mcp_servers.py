@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 from datetime import timedelta
 from pathlib import Path
@@ -23,6 +24,44 @@ from policy_review_mcp.prover_server import create_server as create_prover_serve
 
 PROJECT = Path(__file__).parents[1]
 CANDIDATE = "version: 1\nfilesystem_policy:\n  read_only: [/workspace]\n"
+
+
+@pytest.mark.parametrize("key", [None, "", " \t\n"])
+def test_jev_entrypoint_rejects_missing_or_blank_key_before_startup(tmp_path, key):
+    env = os.environ.copy()
+    env.pop("TYPESAFE_API_KEY", None)
+    if key is not None:
+        env["TYPESAFE_API_KEY"] = key
+    result = subprocess.run(
+        [sys.executable, "-m", "policy_review_mcp.jev_server", "--config", "missing.toml"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert "TYPESAFE_API_KEY is missing or blank" in result.stderr
+    assert "process that launches" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_jev_help_does_not_require_credentials(tmp_path):
+    env = os.environ.copy()
+    env.pop("TYPESAFE_API_KEY", None)
+    result = subprocess.run(
+        [sys.executable, "-m", "policy_review_mcp.jev_server", "--help"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert result.returncode == 0
+    assert "TYPESAFE_API_KEY" in result.stdout
 
 
 @pytest.mark.asyncio
@@ -164,7 +203,8 @@ async def test_readme_registrations_work_over_stdio_outside_project(tmp_path):
             args=args,
             cwd=str(tmp_path),
             env={
-                "TYPESAFE_API_KEY": "",
+                # Only invalid JEV requests follow; this placeholder is never sent to an API.
+                "TYPESAFE_API_KEY": "test-only-not-a-real-key" if suffix == "jev" else "",
                 "UV_CACHE_DIR": os.environ.get("UV_CACHE_DIR", str(tmp_path / "uv-cache")),
             },
         )

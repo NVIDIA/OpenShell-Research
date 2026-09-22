@@ -117,13 +117,21 @@ def create_server(config: JevConfig) -> FastMCP:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="JEV MCP server; requires TYPESAFE_API_KEY in the server process environment."
+    )
     parser.add_argument(
         "--config",
         default=os.environ.get("POLICY_REVIEW_JEV_CONFIG", "jev.toml"),
         type=Path,
     )
     args = parser.parse_args()
+    if not os.environ.get("TYPESAFE_API_KEY", "").strip():
+        parser.error(
+            "TYPESAFE_API_KEY is missing or blank. Supply it in the environment of the process "
+            "that launches this JEV MCP server, then restart the server. "
+            "Shell profiles and secret files are not loaded automatically."
+        )
     create_server(JevConfig.load(args.config.resolve())).run(transport="stdio")
 
 

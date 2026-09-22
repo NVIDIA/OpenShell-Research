@@ -212,6 +212,16 @@ client cannot find `uv`, use its absolute executable path as `command`.
 The JSON shows a common `mcpServers` format; adapt it to your client's configuration
 format and secret injection mechanism. GUI clients need not load your `.bashrc`.
 
+`TYPESAFE_API_KEY` must be nonblank in the **JEV server process environment**.
+The server exits immediately with a configuration error on stderr if it is
+missing, empty, or whitespace-only, before accepting MCP requests. It does not
+load `.bashrc`, `.env`, or secret files; no shell wrapper is required. Supply
+the variable through your MCP client's environment configuration or its actual
+launcher process, then restart the JEV connection. Exporting it in a separate
+terminal does not update an already-running client or background server.
+Startup checks presence only; invalid or expired keys still produce API errors
+when a review is requested. The key is never an MCP tool argument.
+
 Do not put `TYPESAFE_API_KEY` in the prover process environment, including through
 inherited client environment variables. Both servers
 reserve stdout for MCP and use no gateway or shared session.
@@ -425,7 +435,8 @@ behavior.
 The project CI job runs locked dependencies, Ruff, and credential-free tests.
 Stdio tests launch both installed entrypoints from an unrelated working directory,
 initialize MCP, discover metadata/schemas, and verify structured calls using a
-fake local prover and JEV inputs that never contact TypeSafe.
+fake local prover, a non-secret placeholder key, and JEV inputs that never contact
+TypeSafe. Separate startup tests verify that absent and blank keys are rejected.
 The six real-prover tests skip unless `OPENSHELL_PROVER` points to the pinned
 executable. Live JEV requests are manual, not CI prerequisites.
 
