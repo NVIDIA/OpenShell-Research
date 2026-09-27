@@ -19,8 +19,8 @@ including how its location determines the automated review kind.
 
 ## Research
 
-- `pi-admission`: Pi comparison showing why network-only redaction is
-  insufficient when the original content remains in saved agent history.
+- [Pi redaction experiment](research/pi-admission/README.md): specification and
+  results for redaction on model requests versus redaction before session storage.
 - `long-horizon-agent-evals`: Persistent agent experiments over configurable
   time horizons and repeated parallel attempts, starting with GitHub policy
   review.

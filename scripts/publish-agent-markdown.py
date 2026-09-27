@@ -54,6 +54,14 @@ def eligible_sources(docs_dir: Path) -> list[Path]:
             raise ValueError(f"eligible content directory does not exist: {directory}")
         sources.extend(path for path in directory.rglob("*.md") if path.is_file())
 
+    # Research supplements opt in individually; legacy research redirects do not.
+    research = docs_dir / "research"
+    _within(research, docs_dir)
+    for source in research.rglob("*.md"):
+        _within(source, docs_dir)
+        if source.is_file() and has_agent_markdown(source):
+            sources.append(source)
+
     sources.sort()
     for source in sources:
         _within(source, docs_dir)
