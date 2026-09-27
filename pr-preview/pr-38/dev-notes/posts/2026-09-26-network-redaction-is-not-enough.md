@@ -312,7 +312,7 @@ Select a model below to see the code it used to get around the filter.
 
 We had to update the harness to protect the email in our experiments – our custom Pi session manager redacted the address before it was appended to the session and saved to disk.
 
-> **If the agent's tools can't read it, then they can't leak it!**
+> **If the agent's tools can't access it, then they can't leak it!**
 
 This simple demonstration highlights that securing agents and your data requires the runtime and harness to work together to enforce policy. Our research team is working to build the needed primitives in OpenShell so any harness
 can plug its session management into the runtime. The goal is to enforce data policy before sensitive information becomes accessible to the agent, covering what the harness retains in memory and on disk.

@@ -1410,7 +1410,7 @@ form matched the regex. Its next response contained the full address.</p>
 <h2 id="runtime-harness">Runtime 🤝 Harness</h2>
 <p>We had to update the harness to protect the email in our experiments – our custom Pi session manager redacted the address before it was appended to the session and saved to disk.</p>
 <blockquote>
-<p><strong>If the agent's tools can't read it, then they can't leak it!</strong></p>
+<p><strong>If the agent's tools can't access it, then they can't leak it!</strong></p>
 </blockquote>
 <p>This simple demonstration highlights that securing agents and your data requires the runtime and harness to work together to enforce policy. Our research team is working to build the needed primitives in OpenShell so any harness
 can plug its session management into the runtime. The goal is to enforce data policy before sensitive information becomes accessible to the agent, covering what the harness retains in memory and on disk.</p>
