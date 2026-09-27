@@ -148,7 +148,7 @@ In the network redacted runs, all agents inferred that the original email was st
 
 This discrepancy motivated the agents to encode or reformat the address to bypass the filter, allowing the model to reconstruct the address from the tool output, as illustrated by the lower path in [Figure 2](#pi-redaction-bypass) above. Interestingly, GLM 5.3 Flash first got part of the address through the filter with a truncated read, exposing `csagan34@p`, a fragment the email regex didn't match.
 
-Select a model below to see the code it ran for its **redaction bypass**.
+Select a model below to see the code it used to get around the filter.
 
 === "Kimi K3"
 
