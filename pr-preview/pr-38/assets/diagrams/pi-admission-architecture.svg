@@ -42,6 +42,7 @@
     .connection-label { font-size: 14px; fill: var(--muted); text-anchor: middle; }
     .flow { fill: none; stroke: var(--muted); stroke-width: 2; marker-end: url(#arrow); }
     .middleware-result { stroke: var(--middleware-stroke); marker-end: url(#middleware-arrow); }
+    .admission-result { stroke: var(--admission-stroke); marker-end: url(#admission-arrow); }
     .admission { fill: var(--admission-fill); stroke: var(--admission-stroke); stroke-width: 2; stroke-dasharray: 6 4; }
     .middleware { fill: var(--middleware-fill); stroke: var(--middleware-stroke); stroke-width: 2; stroke-dasharray: 6 4; }
     .admission-heading { fill: var(--admission-stroke); }
@@ -53,6 +54,9 @@
     </marker>
     <marker id="middleware-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0L10 5L0 10Z" fill="var(--middleware-stroke)"/>
+    </marker>
+    <marker id="admission-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="var(--admission-stroke)"/>
     </marker>
   </defs>
   <rect class="group" x="244" y="20" width="316" height="62" rx="12"/>
@@ -89,7 +93,7 @@
   <text class="heading" x="404" y="632">Model</text>
   <text class="detail" x="404" y="656">via OpenRouter</text>
   <path class="flow" d="M404 82V216"/>
-  <path class="flow" d="M404 290V322"/>
+  <path class="flow admission-result" d="M404 290V322"/>
   <path class="flow" d="M404 388V446"/>
   <text class="small" x="420" y="432">Model request</text>
   <path class="flow" d="M404 550V603"/>
