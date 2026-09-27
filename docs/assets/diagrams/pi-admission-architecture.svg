@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved. -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="686" viewBox="0 0 640 686" role="img" aria-labelledby="title description">
+  <title id="title">Admission in the OpenShell architecture</title>
+  <desc id="description">Purple admission is an optional hook inside Pi before its agent loop, history, and tools. Orange custom network middleware is a separate optional service beside the supervisor. The supervisor sends it a request over gRPC and receives a result before forwarding to the model via OpenRouter. The gateway supplies configuration. Admission does not call the middleware.</desc>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --boundary: #f3f0e7;
+      --surface: #fffdf8;
+      --ink: #202625;
+      --muted: #536260;
+      --rule: #c4cbc6;
+      /* Match the admission and network colors in dev-notes.css. */
+      --admission-fill: color-mix(in srgb, #7d4a9c 9%, #faf8f1);
+      --admission-stroke: #7d4a9c;
+      --middleware-fill: color-mix(in srgb, #a2512f 10%, #f3f0e7);
+      --middleware-stroke: #a2512f;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --boundary: #121719;
+        --surface: #222a2c;
+        --ink: #e6e8e2;
+        --muted: #adb7b3;
+        --rule: #495655;
+        --admission-fill: color-mix(in srgb, #bf97df 9%, #181e20);
+        --admission-stroke: #bf97df;
+        --middleware-fill: color-mix(in srgb, #e0a07f 12%, #121719);
+        --middleware-stroke: #e0a07f;
+      }
+    }
+    text { fill: var(--ink); font-family: Inter, system-ui, sans-serif; }
+    .group { fill: var(--surface); stroke: var(--rule); stroke-width: 1.5; }
+    .boundary { fill: var(--boundary); stroke: var(--rule); stroke-width: 1.5; }
+    .label { font-size: 19px; font-weight: 600; }
+    .runtime-label { font-size: 17px; }
+    .heading { font-size: 22px; font-weight: 600; text-anchor: middle; }
+    .detail { font-size: 18px; fill: var(--muted); text-anchor: middle; }
+    .small { font-size: 16px; fill: var(--muted); }
+    .connection-label { font-size: 14px; fill: var(--muted); text-anchor: middle; }
+    .flow { fill: none; stroke: var(--muted); stroke-width: 2; marker-end: url(#arrow); }
+    .admission { fill: var(--admission-fill); stroke: var(--admission-stroke); stroke-width: 2; stroke-dasharray: 6 4; }
+    .middleware { fill: var(--middleware-fill); stroke: var(--middleware-stroke); stroke-width: 2; stroke-dasharray: 6 4; }
+    .admission-heading { fill: var(--admission-stroke); }
+    .middleware-heading { fill: var(--middleware-stroke); }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="var(--muted)"/>
+    </marker>
+  </defs>
+  <rect class="group" x="244" y="20" width="316" height="62" rx="12"/>
+  <text class="heading" x="402" y="59">User message</text>
+
+  <rect class="boundary" x="196" y="110" width="428" height="468" rx="16"/>
+  <text class="label runtime-label" x="214" y="140">OpenShell runtime</text>
+  <rect class="group" x="206" y="162" width="396" height="244" rx="12"/>
+  <text class="label" x="224" y="185">Sandbox</text>
+  <text class="small" x="224" y="207">Pi harness</text>
+  <rect class="admission" x="226" y="218" width="356" height="72" rx="10"/>
+  <text class="heading admission-heading" x="404" y="248">Local admission</text>
+  <text class="detail" x="404" y="274">Redact before storage</text>
+  <rect class="group" x="226" y="324" width="356" height="64" rx="10"/>
+  <text class="heading" x="404" y="351">Agent loop</text>
+  <text class="detail" x="404" y="375">Session history · tools</text>
+
+  <rect class="group" x="286" y="448" width="236" height="102" rx="12"/>
+  <text class="heading" x="404" y="478">Supervisor</text>
+  <text class="detail" x="404" y="504">Network policy · routing</text>
+  <text class="small" x="404" y="530" text-anchor="middle">Outside sandbox</text>
+
+  <rect class="middleware" x="16" y="448" width="166" height="102" rx="10"/>
+  <text class="label middleware-heading" x="99" y="476" text-anchor="middle">Network</text>
+  <text class="label middleware-heading" x="99" y="500" text-anchor="middle">middleware</text>
+  <text class="small" x="99" y="528" text-anchor="middle">Separate service</text>
+  <path class="flow" d="M286 480H184"/>
+  <text class="connection-label" x="234" y="470">Request</text>
+  <text class="connection-label" x="234" y="509">gRPC</text>
+  <path class="flow" d="M182 528H284"/>
+  <text class="connection-label" x="234" y="549">Result</text>
+
+  <rect class="group" x="244" y="605" width="320" height="62" rx="12"/>
+  <text class="heading" x="404" y="632">Model</text>
+  <text class="detail" x="404" y="656">via OpenRouter</text>
+  <path class="flow" d="M404 82V216"/>
+  <path class="flow" d="M404 290V322"/>
+  <path class="flow" d="M404 388V446"/>
+  <text class="small" x="420" y="432">Model request</text>
+  <path class="flow" d="M404 550V603"/>
+
+  <rect class="group" x="28" y="268" width="154" height="104" rx="12"/>
+  <text class="heading" x="105" y="300">Gateway</text>
+  <text class="small" x="105" y="326" text-anchor="middle">Policy · providers</text>
+  <text class="small" x="105" y="348" text-anchor="middle">Lifecycle</text>
+  <path class="flow" d="M105 372V422H318V446" stroke-dasharray="5 5"/>
+  <text class="connection-label" x="250" y="440">Configuration</text>
+</svg>

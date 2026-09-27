@@ -27,6 +27,7 @@
   --openshell-muted: #666d6b;
   --openshell-rule: rgba(32, 38, 37, 0.2);
   --openshell-rule-strong: rgba(32, 38, 37, 0.54);
+  --openshell-alert: #a2512f;
   --openshell-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
   --openshell-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --openshell-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
@@ -54,6 +55,7 @@ body[data-md-color-scheme="slate"] {
   --openshell-muted: #9fa8a5;
   --openshell-rule: rgba(230, 232, 226, 0.17);
   --openshell-rule-strong: rgba(230, 232, 226, 0.43);
+  --openshell-alert: #e0a07f;
   --md-default-bg-color: var(--openshell-paper);
   --md-default-fg-color: var(--openshell-ink);
   --md-primary-fg-color: var(--openshell-paper-raised);
@@ -1166,6 +1168,18 @@ body[data-md-color-scheme="slate"] .openshell-home-brand__dark {
 
 /* Article bylines --------------------------------------------------------- */
 
+.md-typeset #the-leak-was-coming-from-inside-the-sandbox {
+  margin-bottom: 1rem;
+  font-size: clamp(1.85rem, 4vw, 2.8rem);
+  line-height: 1.12;
+  text-wrap: balance;
+}
+
+.md-typeset #the-leak-was-coming-from-inside-the-sandbox + .dev-note-deck {
+  font-size: clamp(0.95rem, 1.6vw, 1.05rem);
+  text-wrap: balance;
+}
+
 .md-typeset .dev-note-deck {
   max-width: 46rem;
   margin: -0.35rem 0 1.8rem;
@@ -1185,6 +1199,159 @@ body[data-md-color-scheme="slate"] .openshell-home-brand__dark {
   font-family: var(--openshell-mono);
   font-size: clamp(0.88rem, 1.7vw, 1.05rem);
   line-height: 1.5;
+}
+
+/* Emphasize the observed result without turning it into a model ranking. */
+.md-typeset .admission-result {
+  --admission-result-purple: #7d4a9c;
+  margin: 1.6rem 0 2rem;
+  padding: 1.1rem 1.25rem 1.25rem;
+  border: 1px solid var(--openshell-accent-soft);
+  border-left: 4px solid var(--openshell-accent);
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, var(--openshell-accent) 5%, var(--openshell-paper-raised));
+}
+
+body[data-md-color-scheme="slate"] .admission-result {
+  --admission-result-purple: #bf97df;
+}
+
+.md-typeset .admission-result p {
+  margin: 0.65rem 0 0;
+  font-size: inherit;
+  line-height: 1.55;
+}
+
+.md-typeset .admission-result .admission-result__label {
+  margin: 0 0 0.8rem;
+  color: var(--openshell-accent);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.admission-result__recovered {
+  color: var(--openshell-alert);
+}
+
+.admission-result__protected {
+  color: var(--admission-result-purple);
+}
+
+/* Frame the explanation and code controlled by the model tabs above it. */
+.md-typeset #how-each-model-got-around-the-filter ~ .tabbed-set > .tabbed-labels {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.md-typeset #how-each-model-got-around-the-filter ~ .tabbed-set > .tabbed-content {
+  padding: 1rem;
+  border: 1px solid var(--openshell-rule-strong);
+  border-radius: 0 0 0.4rem 0.4rem;
+  background: var(--openshell-paper-raised);
+}
+
+.md-typeset #how-each-model-got-around-the-filter ~ .tabbed-set .tabbed-block > :first-child {
+  margin-top: 0;
+}
+
+.md-typeset #how-each-model-got-around-the-filter ~ .tabbed-set .tabbed-block > :last-child {
+  margin-bottom: 0;
+}
+
+/* Architecture beside the two paths from user input to stored history. */
+.md-typeset .admission-comparison {
+  width: 100%;
+  max-width: 100%;
+  margin: 1.5rem 0;
+}
+
+.admission-comparison__panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr));
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.md-typeset .admission-comparison .dev-note-figure {
+  margin: 0;
+}
+
+.md-typeset .admission-comparison figcaption {
+  width: 100%;
+  max-width: none;
+  margin: 0.8rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  text-align: left;
+  color: var(--md-default-fg-color--light);
+}
+
+.md-typeset .admission-flow {
+  --admission-flow-purple: #7d4a9c;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  margin: 0;
+  color: var(--openshell-ink);
+  font-family: var(--openshell-sans);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+body[data-md-color-scheme="slate"] .admission-flow {
+  --admission-flow-purple: #bf97df;
+}
+
+.admission-flow__case {
+  --flow-color: var(--openshell-alert);
+  min-width: 0;
+  padding-inline: 0.5rem;
+}
+
+.admission-flow__case--admission {
+  --flow-color: var(--admission-flow-purple);
+  border-left: 1px solid var(--openshell-rule);
+}
+
+.admission-flow__title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  margin-bottom: 0.4rem;
+  color: var(--flow-color);
+  font-size: 0.75rem;
+}
+
+.md-typeset .admission-flow__sequence {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.admission-flow__step {
+  align-content: center;
+  min-height: 3.5rem;
+}
+
+.admission-flow__arrow {
+  color: var(--openshell-muted);
+  line-height: 1.35rem;
+}
+
+.admission-flow__redact {
+  color: var(--flow-color);
+}
+
+.md-typeset .admission-flow code {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 0.85em;
 }
 
 .dev-note-byline {
@@ -1449,6 +1616,19 @@ body[data-md-color-scheme="slate"] .openshell-home-brand__dark {
 
 .md-typeset .dev-note-figure--native-aspect img {
   aspect-ratio: auto;
+}
+
+.md-typeset .dev-note-figure.dev-note-figure--admission img {
+  max-width: 480px;
+  color-scheme: light;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body[data-md-color-scheme="slate"] .md-typeset .dev-note-figure--admission img {
+  color-scheme: dark;
 }
 
 .md-typeset .dev-note-figure figcaption {
