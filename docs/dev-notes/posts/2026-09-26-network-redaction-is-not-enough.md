@@ -61,9 +61,9 @@ In this post, we'll demonstrate redaction bypass in action through a set of simp
 
 !!! abstract "TL;DR"
 
-    - 🛠️ **Read, encode, recover:** We ran experiments in the Pi harness with two open-source and two closed-source models. With a little nudging, all four recovered a secret despite a redaction filter on every outgoing model request.
-    - 📝 **Session history exposure:** Harnesses usually manage the session history internally. Without a data-handling policy governing what the harness keeps in memory and on disk, any sensitive information retained there is left unprotected and available to the agent's tools.
-    - 🔒 **Harness and runtime integration:** Securing agents requires deep integration between the harness and runtime to enforce policy on what agents can read, retain, and send to the outside world.
+    - 🛠️ **Read, encode, leak:** We tested two open-source and two closed-source models in the Pi harness. With a little nudging, all four leaked a secret by using tools to read and encode the unredacted value, despite the original value being redacted from every outgoing model request.
+    - 📝 **Session history exposure:** Harnesses usually manage session history internally. Data-handling policy must cover session history in memory and on disk, or sensitive data remains accessible to the agent's tools.
+    - 🔒 **Harness and runtime integration:** The harness and secure runtime must work together to enforce policy on what agents can access, retain, and send to the outside world.
 
 ## Experimental Setup
 
