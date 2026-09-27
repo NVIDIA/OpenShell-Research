@@ -147,13 +147,12 @@
 .pi-chat__code .c, .pi-chat__code .c1, .pi-chat__code .ch, .pi-chat__code .cm { color: #96a5bc; font-style: italic; }
 .pi-chat__code .nb, .pi-chat__code .nf, .pi-chat__code .nc, .pi-chat__code .nn { color: #8bd5f0; }
 .pi-chat__code .m, .pi-chat__code .mi, .pi-chat__code .mf, .pi-chat__code .mh, .pi-chat__code .nv { color: #ffc88f; }
-.pi-traces__footer { display: flex; flex-wrap: wrap; gap: .45rem; align-items: center; justify-content: space-between; padding: .65rem 1.2rem; color: var(--openshell-muted); font-size: .5rem; }
 @media (max-width: 600px) {
   .pi-traces__masthead { gap: .5rem; padding: .85rem; }
   .pi-traces__heading { align-items: flex-start; flex-direction: column; gap: .3rem; }
   .pi-traces__tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pi-traces__modes { margin-inline: .7rem; }
-  .pi-traces__legend, .pi-traces__run, .pi-traces__toolbar, .pi-traces__footer { padding-inline: .7rem; }
+  .pi-traces__legend, .pi-traces__run, .pi-traces__toolbar { padding-inline: .7rem; }
   .pi-traces__conversation { padding-inline: .55rem; height: 34rem; max-height: 75vh; }
   .pi-chat { max-width: 97%; }
   .pi-chat--user { max-width: 94%; }

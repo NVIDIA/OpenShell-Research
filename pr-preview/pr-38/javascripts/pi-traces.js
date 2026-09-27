@@ -228,9 +228,7 @@
           }
           scroll.append(messageCard(message, run));
         });
-        const footer = element("div", "pi-traces__footer");
-        footer.append(element("span", "", `${disclosure ? "Through first email disclosure" : "Complete visible trace"} · source line on every message`));
-        panel.append(header, toolbar, scroll, footer);
+        panel.append(header, toolbar, scroll);
         [["user", "user messages"], ["assistant", "assistant messages"], ["tools", "tools"]].forEach(([role, label]) => {
           const disclosures = [...scroll.querySelectorAll(`details[data-message-group="${role}"]`)];
           const allOpen = () => disclosures.every(detail => detail.open);
