@@ -43,7 +43,7 @@ hide:
           <time datetime="2026-09-26">September 26, 2026</time>
           <span>Research</span>
         </div>
-        <h3>The leak was coming from inside the sandbox</h3>
+        <h3>The leak is coming from inside the sandbox</h3>
         <p class="dev-note-card__summary">A simple experiment shows why network-layer redaction isn’t enough.</p>
         <div class="dev-note-card__tags" aria-label="Tags">
           <span>agent-security</span>

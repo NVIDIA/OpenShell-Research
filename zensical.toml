@@ -21,7 +21,7 @@ nav = [
     "dev-notes/index.md",
     {"Posts" = [
       # dev-notes:nav:start
-      {"The leak was coming from inside the sandbox" = "dev-notes/posts/2026-09-26-network-redaction-is-not-enough.md"},
+      {"The leak is coming from inside the sandbox" = "dev-notes/posts/2026-09-26-network-redaction-is-not-enough.md"},
       {"What we have learned applying formal methods to control AI agents" = "dev-notes/posts/2026-09-10-learning-formal-methods-agent-policy-prover.md"},
       {"Adversarial prototype: AI policy auto-approval for long-horizon agents in OpenShell" = "dev-notes/posts/2026-08-27-adversarial-policy-review-long-horizon-agents.md"},
       {"Can Formal Methods Govern AI-Generated Robot Actions?" = "dev-notes/posts/2026-08-07-formal-methods-ai-generated-robot-actions.md"},
@@ -49,6 +49,8 @@ generator = false
 noindex_prefixes = ["development/", "projects/", "research/"]
 
 [project.markdown_extensions.admonition]
+
+[project.markdown_extensions.footnotes]
 
 [project.markdown_extensions."pymdownx.highlight"]
 anchor_linenums = true

@@ -11,7 +11,7 @@ redaction on outgoing model requests, and whether redaction before storage
 closes that path. Build the harness and middleware described below using public
 Pi and OpenShell APIs; no internal repository is required. This specifies the
 experiment behind
-[The leak was coming from inside the sandbox](https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-09-26-network-redaction-is-not-enough/).
+[The leak is coming from inside the sandbox](https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-09-26-network-redaction-is-not-enough/).
 
 ## Setup
 
