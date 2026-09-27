@@ -5,7 +5,9 @@ description: "A simple experiment shows why network-layer redaction isn’t enou
 author: "Johnny Greco"
 agent_markdown: true
 reset_scroll_on_reload: true
-social_image: "assets/brand/openshell-research-light.png"
+social_image: "assets/pi-admission/hero-light.png"
+hero_image: "../../assets/pi-admission/hero-light.png"
+hero_image_dark: "../../assets/pi-admission/hero-dark.png"
 categories:
   - Research
 tags:
@@ -43,6 +45,11 @@ card_tags:
   </div>
 </div>
 <!-- dev-note:byline:end -->
+
+<figure class="dev-note-figure dev-note-figure--hero dev-note-figure--native-aspect" id="pi-admission-hero">
+  <img class="dev-note-image--light" src="../../assets/pi-admission/hero-light.png" alt="An envelope inside a sandbox boundary breaks into small pieces that flow through a small gap in the boundary and reassemble into an envelope outside." width="1730" height="909" fetchpriority="high">
+  <img class="dev-note-image--dark" src="../../assets/pi-admission/hero-dark.png" alt="An envelope inside a sandbox boundary breaks into small pieces that flow through a small gap in the boundary and reassemble into an envelope outside." width="1731" height="909" fetchpriority="high">
+</figure>
 
 Agents are most useful when they have access to your (company’s) data, but the context they need is often mixed with sensitive information you don’t want to share with model providers.
 

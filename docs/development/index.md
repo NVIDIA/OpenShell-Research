@@ -57,7 +57,9 @@ The renderer uses `categories[0]` as the card topic and `card_tags` as its tags,
 falling back to `tags`. An optional `card_variant` must have matching card and
 artwork CSS modifiers in `docs/stylesheets/dev-notes.css`. Set `hero_image` to
 an image path relative to the post when its card should use the post's hero
-instead of generated artwork. Hero images must live under `docs/`.
+instead of generated artwork. Set `hero_image_dark` to an optional dark-mode
+counterpart; cards switch between them with the site theme. Hero images must
+live under `docs/`.
 
 Do not edit content inside these generated marker pairs:
 
