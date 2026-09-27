@@ -46,7 +46,7 @@ card_tags:
 
 Agents are most useful when they have access to your (company’s) data, but the context they need is often mixed with sensitive information you don’t want to share with model providers.
 
-If you plan to redact or anonymize that sensitive information, when in the pipeline should you do it? It turns out that the right answer is *before* the agent's tools can come anywhere near it, but that's not always practical (though it might be required!). What if instead you simply applied a redaction filter to all outgoing model requests? After all, this would mean that the model never sees the sensitive data, right?
+If you plan to redact or anonymize that sensitive information, when in the pipeline should you do it? It turns out that the right answer is *before* the agent's tools can come anywhere near your sensitive data, but that's not always practical (though it might be required!). What if instead you simply applied a redaction filter to all outgoing model requests? After all, this would mean that the model never sees the sensitive data, right?
 
 Maybe this is one of those things that's obvious in retrospect, but the answer is definitely not. The issue is that harnesses usually manage the session history internally, outside a secure runtime’s data-handling policy. And as [recent](https://openai.com/index/hugging-face-incident-and-the-road-ahead/) [incident](https://www.anthropic.com/research/alignment-assessment-cybersecurity-incidents) [reports](https://www.aisi.gov.uk/blog/incident-report-unsanctioned-agent-behaviour-during-cyber-testing) involving "rogue" agents have shown, an agent determined to finish a task can be quite clever. If its tools can read the original, unredacted session history, the agent can encode sensitive data in a form that slips past filters on outgoing traffic.
 
@@ -304,7 +304,7 @@ To recreate the experiments in this post, point an agent at our [experiment spec
 
 ```bibtex
 @article{greco2026networkredaction,
-  author = {Johnny Greco},
+  author = {Johnny Greco and {OpenShell Research Team}},
   title = {The leak is coming from inside the sandbox},
   journal = {OpenShell Research Dev Notes},
   year = {2026},
