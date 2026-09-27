@@ -1208,24 +1208,24 @@ body[data-md-color-scheme="slate"] .openshell-home-brand__dark {
 }
 
 /* Frame the explanation and code controlled by the model tabs above it. */
-.md-typeset #same-secret-different-encoding ~ .tabbed-set > .tabbed-labels {
+.md-typeset #redaction-bypass-in-action ~ .tabbed-set > .tabbed-labels {
   width: 100%;
   margin: 0;
   padding: 0;
 }
 
-.md-typeset #same-secret-different-encoding ~ .tabbed-set > .tabbed-content {
+.md-typeset #redaction-bypass-in-action ~ .tabbed-set > .tabbed-content {
   padding: 1rem;
   border: 1px solid var(--openshell-rule-strong);
   border-radius: 0 0 0.4rem 0.4rem;
   background: var(--openshell-paper-raised);
 }
 
-.md-typeset #same-secret-different-encoding ~ .tabbed-set .tabbed-block > :first-child {
+.md-typeset #redaction-bypass-in-action ~ .tabbed-set .tabbed-block > :first-child {
   margin-top: 0;
 }
 
-.md-typeset #same-secret-different-encoding ~ .tabbed-set .tabbed-block > :last-child {
+.md-typeset #redaction-bypass-in-action ~ .tabbed-set .tabbed-block > :last-child {
   margin-bottom: 0;
 }
 
