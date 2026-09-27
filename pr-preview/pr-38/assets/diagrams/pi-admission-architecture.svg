@@ -41,6 +41,7 @@
     .small { font-size: 16px; fill: var(--muted); }
     .connection-label { font-size: 14px; fill: var(--muted); text-anchor: middle; }
     .flow { fill: none; stroke: var(--muted); stroke-width: 2; marker-end: url(#arrow); }
+    .middleware-result { stroke: var(--middleware-stroke); marker-end: url(#middleware-arrow); }
     .admission { fill: var(--admission-fill); stroke: var(--admission-stroke); stroke-width: 2; stroke-dasharray: 6 4; }
     .middleware { fill: var(--middleware-fill); stroke: var(--middleware-stroke); stroke-width: 2; stroke-dasharray: 6 4; }
     .admission-heading { fill: var(--admission-stroke); }
@@ -49,6 +50,9 @@
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0L10 5L0 10Z" fill="var(--muted)"/>
+    </marker>
+    <marker id="middleware-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="var(--middleware-stroke)"/>
     </marker>
   </defs>
   <rect class="group" x="244" y="20" width="316" height="62" rx="12"/>
@@ -78,7 +82,7 @@
   <path class="flow" d="M286 480H184"/>
   <text class="connection-label" x="234" y="470">Request</text>
   <text class="connection-label" x="234" y="509">gRPC</text>
-  <path class="flow" d="M182 528H284"/>
+  <path class="flow middleware-result" d="M182 528H284"/>
   <text class="connection-label" x="234" y="549">Result</text>
 
   <rect class="group" x="244" y="605" width="320" height="62" rx="12"/>
