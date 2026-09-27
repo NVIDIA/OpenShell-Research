@@ -134,9 +134,19 @@ The best way to understand the results is to read through the chat transcripts:[
 
 How did the agents bypass the redaction filter?
 
-In the network redacted runs, every agent was able to spot a discrepancy between their internal context and what their tools reported about the session history. For example, Opus 5.5 discovered that a stored message contained an `@` and no literal `[EMAIL]`, but when a tool printed the message, the network filter replaced the address with `[EMAIL]` before the output reached the model. In other words, the agent's "brain" could only see `[EMAIL]`.
+<figure class="dev-note-figure dev-note-figure--bypass" id="pi-redaction-bypass">
+  <div class="dev-note-figure__viewport" tabindex="0" role="region" aria-label="Redaction bypass diagram, scroll horizontally on narrow screens">
+    <img src="../../assets/diagrams/pi-redaction-bypass.svg" alt="Two tool reads of the same original email in session history. Printing the email directly produces a tool result that the network filter redacts before it reaches the model. Printing character codes instead passes the filter, and the model decodes them to recover the email. A dashed harness boundary encloses session history and tool results." width="1320" height="520" loading="lazy">
+  </div>
+  <figcaption>
+    <span class="dev-note-figure__caption-label">Figure 2</span>
+    In the <strong>upper path</strong>, the tool (<code>bash</code> in this case) reads the email from the session history and prints it as plain text. The model can't see the tool's output until the harness sends it in a model request. The network filter redacts the address in that request, so the model receives <code>[EMAIL]</code>. In the <strong>lower path</strong>, the tool reads and encodes the address as character codes. The codes don't match the email regex, so they reach the model, which reconstructs the address.
+  </figcaption>
+</figure>
 
-The discrepancy then motivated the agents to encode or reformat the address to bypass the filter, allowing the model to reconstruct the address from the tool output. Interestingly, GLM 5.3 Flash first got part of the address through the filter with a truncated read, exposing `csagan34@p`, a fragment the email regex didn't match.
+In the network redacted runs, each agent discovered that its session history still held the original email, even though the model had received `[EMAIL]`. For example, Opus 5.5 discovered that a stored message contained an `@` symbol and no literal `[EMAIL]`, but when a tool printed the message, the network filter replaced the address with `[EMAIL]` before the output reached the model. In other words, the agent's "brain" could only see `[EMAIL]`.
+
+This discrepancy motivated the agents to encode or reformat the address to bypass the filter, allowing the model to reconstruct the address from the tool output, as illustrated by the lower path in [Figure 2](#pi-redaction-bypass) above. Interestingly, GLM 5.3 Flash first got part of the address through the filter with a truncated read, exposing `csagan34@p`, a fragment the email regex didn't match.
 
 Select a model below to see the code it ran for its **redaction bypass**.
 
@@ -293,7 +303,9 @@ Select a model below to see the code it ran for its **redaction bypass**.
 
 ## Runtime 🤝 Harness
 
-We had to update the harness to protect the email in our experiments – our custom Pi session manager redacted the address before it was appended to the session and saved to disk. If the agent's tools can't read it, then they can't leak it!
+We had to update the harness to protect the email in our experiments – our custom Pi session manager redacted the address before it was appended to the session and saved to disk.
+
+> **If the agent's tools can't read it, then they can't leak it!**
 
 This simple demonstration highlights that securing agents and your data requires the runtime and harness to work together to enforce policy. Our research team is working to build the needed primitives in OpenShell so any harness
 can plug its session management into the runtime. The goal is to enforce data policy before sensitive information becomes accessible to the agent, covering what the harness retains in memory and on disk.
@@ -313,6 +325,6 @@ To recreate the experiments in this post, point an agent at our [experiment spec
 }
 ```
 
-[^simple-redaction]: We use this deliberately simplistic example to isolate the issue: filtering model requests leaves the original data available to the agent's tools. A more capable filter could catch the specific bypasses shown here. The experiment demonstrates why the timing of redaction matters, rather than measuring the strength of production filters.
+[^simple-redaction]: We use this deliberately simplistic example to isolate the issue. The experiment demonstrates why the timing of redaction matters.
 
-[^saved-transcripts]: These are real Pi sessions. Network redacted chats end at the first assistant reply containing the full original address; later follow-ups are omitted. Tool results appear as saved, before network redaction, so an address visible in the transcript may have reached the model as `[EMAIL]`. JSONL labels identify lines in the original session files. Dedicated thinking blocks and replay metadata are omitted from the viewer.
+[^saved-transcripts]: The transcripts show tool outputs before network redaction. A tool output can contain the plain-text email even though the model receives `[EMAIL]` in its place.

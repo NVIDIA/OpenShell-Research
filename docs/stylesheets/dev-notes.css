@@ -1564,3 +1564,29 @@ body[data-md-color-scheme="slate"] .md-typeset .dev-note-figure--admission img {
   line-height: 1.5;
   color: var(--md-default-fg-color--light);
 }
+
+.md-typeset .dev-note-figure--bypass .dev-note-figure__viewport {
+  overflow-x: auto;
+}
+
+.md-typeset .dev-note-figure--bypass img {
+  min-width: 900px;
+  max-width: none;
+  color-scheme: light;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body[data-md-color-scheme="slate"] .md-typeset .dev-note-figure--bypass img {
+  color-scheme: dark;
+}
+
+.md-typeset .dev-note-figure--bypass figcaption {
+  max-width: none;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--openshell-rule);
+  font-style: normal;
+  text-align: left;
+}
