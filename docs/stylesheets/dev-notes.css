@@ -1524,6 +1524,11 @@ body:not([data-md-color-scheme="slate"]) .dev-note-card__visual-image[src$="/pi-
   aspect-ratio: auto;
 }
 
+.md-typeset .admonition,
+.md-typeset details {
+  font-size: inherit;
+}
+
 .md-typeset .admonition.question,
 .md-typeset details.question {
   background-color: color-mix(in srgb, var(--openshell-question) 10%, transparent);
