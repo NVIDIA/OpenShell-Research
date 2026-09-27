@@ -4,6 +4,7 @@ date: 2026-09-26
 description: "A simple experiment shows why network-layer redaction isn’t enough."
 author: "Johnny Greco"
 agent_markdown: true
+reset_scroll_on_reload: true
 social_image: "assets/brand/openshell-research-light.png"
 categories:
   - Research
