@@ -61,6 +61,10 @@ instead of generated artwork. Set `hero_image_dark` to an optional dark-mode
 counterpart; cards switch between them with the site theme. Hero images must
 live under `docs/`.
 
+Place a post's hero figure immediately after its subtitle and before the generated
+author byline. If the post has no subtitle, place the hero directly after the
+title. Keep the introduction below the byline.
+
 Do not edit content inside these generated marker pairs:
 
 - `<!-- dev-notes:posts:start -->` / `<!-- dev-notes:posts:end -->` in
