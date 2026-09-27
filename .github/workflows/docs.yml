@@ -51,11 +51,16 @@ jobs:
       - name: Check Dev Notes renderer syntax
         run: python -m py_compile scripts/render-dev-notes.py
 
-      - name: Check navigation JavaScript syntax
-        run: node --check docs/javascripts/navigation-drawer.js
+      - name: Check documentation JavaScript syntax
+        run: |
+          node --check docs/javascripts/navigation-drawer.js
+          node --check docs/javascripts/pi-traces.js
 
       - name: Test navigation JavaScript behavior
         run: node tests/navigation-drawer.test.js
+
+      - name: Test documentation preview selection
+        run: node tests/docs-preview.test.js
 
       - name: Build documentation
         run: scripts/build-docs.sh

@@ -104,12 +104,13 @@ jobs:
                 'tests/test_docs_404.py',
                 'tests/test_render_dev_notes.py',
                 'tests/test_stage_project_docs.py',
+                'tests/docs-preview.test.js',
                 'zensical.toml',
               ]);
               const docsChanged = files.some(
                 ({ filename }) => filename.startsWith('docs/') ||
                   filename.startsWith('overrides/') ||
-                  /^projects\/[^/]+\/(docs|assets)\//.test(filename) ||
+                  /^projects\/(tools|research|use-case-examples)\/[^/]+\/(docs|assets)\//.test(filename) ||
                   exactInputs.has(filename),
               );
               operation = docsChanged ? 'deploy' : 'remove';
