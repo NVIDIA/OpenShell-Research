@@ -107,9 +107,9 @@
   <meta name="twitter:description" content="A simple experiment shows why network-layer redaction isn’t enough.">
   
     
-    <meta property="og:image" content="https://nvidia.github.io/OpenShell-Research/assets/brand/openshell-research-light.png">
+    <meta property="og:image" content="https://nvidia.github.io/OpenShell-Research/assets/pi-admission/hero-light.png">
     <meta property="og:image:alt" content="The leak is coming from inside the sandbox">
-    <meta name="twitter:image" content="https://nvidia.github.io/OpenShell-Research/assets/brand/openshell-research-light.png">
+    <meta name="twitter:image" content="https://nvidia.github.io/OpenShell-Research/assets/pi-admission/hero-light.png">
     <meta name="twitter:image:alt" content="The leak is coming from inside the sandbox">
   
   
@@ -117,7 +117,7 @@
     <meta property="article:modified_time" content="2026-09-26">
   
   
-    <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"Johnny Greco"},"dateModified":"2026-09-26","datePublished":"2026-09-26","description":"A simple experiment shows why network-layer redaction isn’t enough.","headline":"The leak is coming from inside the sandbox","image":"https://nvidia.github.io/OpenShell-Research/assets/brand/openshell-research-light.png","mainEntityOfPage":{"@id":"https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-09-26-network-redaction-is-not-enough/","@type":"WebPage"}}</script>
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"Johnny Greco"},"dateModified":"2026-09-26","datePublished":"2026-09-26","description":"A simple experiment shows why network-layer redaction isn’t enough.","headline":"The leak is coming from inside the sandbox","image":"https://nvidia.github.io/OpenShell-Research/assets/pi-admission/hero-light.png","mainEntityOfPage":{"@id":"https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-09-26-network-redaction-is-not-enough/","@type":"WebPage"}}</script>
   
 
   
@@ -1170,6 +1170,11 @@
   </div>
 </div>
 <!-- dev-note:byline:end -->
+
+<figure class="dev-note-figure dev-note-figure--hero dev-note-figure--native-aspect" id="pi-admission-hero">
+  <img class="dev-note-image--light" src="../../../assets/pi-admission/hero-light.png" alt="An envelope inside a sandbox boundary breaks into small pieces that flow through a small gap in the boundary and reassemble into an envelope outside." width="1730" height="909" fetchpriority="high">
+  <img class="dev-note-image--dark" src="../../../assets/pi-admission/hero-dark.png" alt="An envelope inside a sandbox boundary breaks into small pieces that flow through a small gap in the boundary and reassemble into an envelope outside." width="1731" height="909" fetchpriority="high">
+</figure>
 
 <p>Agents are most useful when they have access to your (company’s) data, but the context they need is often mixed with sensitive information you don’t want to share with model providers.</p>
 <p>If you plan to redact or anonymize that sensitive information, when in the pipeline should you do it? It turns out that the right answer is <em>before</em> the agent's tools can come anywhere near your sensitive data, but that's not always practical (though it might be required!). What if instead you simply applied a redaction filter to all outgoing model requests? After all, this would mean that the model never sees the sensitive data, right?</p>

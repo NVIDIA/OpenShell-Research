@@ -952,7 +952,9 @@ defined in <code>docs/dev-notes/authors.json</code>. Use a dated filename such a
 falling back to <code>tags</code>. An optional <code>card_variant</code> must have matching card and
 artwork CSS modifiers in <code>docs/stylesheets/dev-notes.css</code>. Set <code>hero_image</code> to
 an image path relative to the post when its card should use the post's hero
-instead of generated artwork. Hero images must live under <code>docs/</code>.</p>
+instead of generated artwork. Set <code>hero_image_dark</code> to an optional dark-mode
+counterpart; cards switch between them with the site theme. Hero images must
+live under <code>docs/</code>.</p>
 <p>Do not edit content inside these generated marker pairs:</p>
 <ul>
 <li><code>&lt;!-- dev-notes:posts:start --&gt;</code> / <code>&lt;!-- dev-notes:posts:end --&gt;</code> in
