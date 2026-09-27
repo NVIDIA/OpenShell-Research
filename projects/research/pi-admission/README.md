@@ -18,8 +18,11 @@ The harness, middleware, setup code, and runtime tests live in
 logs, provenance records, and evidence bundles stay in that internal project.
 The public build works without the internal checkout.
 
-The eight complete visible chats are published through
-`docs/assets/pi-admission/email-traces/viewer.json`. Edit `docs/javascripts/pi-traces.js`
+The eight recorded chats are published through
+`docs/assets/pi-admission/email-traces/viewer.json`. The viewer ends network
+redacted chats at the first assistant reply containing the full original address;
+later follow-ups remain in the generated data and internal originals. Counts and
+navigation reflect the displayed excerpt. Edit `docs/javascripts/pi-traces.js`
 and `docs/stylesheets/pi-traces.css` for presentation changes. Never hand-edit
 recorded messages, tool results, or the Dev Note's quoted code. Verify or
 regenerate the viewer with the internal project's `tools/render-public-traces.py`
