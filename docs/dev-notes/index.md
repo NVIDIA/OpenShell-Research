@@ -50,11 +50,45 @@ hide:
     <div class="journal-section__head">
       <h2 id="featured-note-title" aria-live="polite" aria-atomic="true">Featured note</h2>
     </div>
-    <article class="dev-note-card dev-note-card--featured dev-note-card--research dev-note-card--has-image" data-category="research" data-authors="[&quot;johnnygreco&quot;]">
+    <article class="dev-note-card dev-note-card--featured dev-note-card--announcements dev-note-card--has-image" data-category="announcements" data-authors="[&quot;johnnygreco&quot;]">
+      <a class="dev-note-card__link" href="posts/2026-09-28-introducing-openshell-research/">
+      <div class="dev-note-card__visual dev-note-card__visual--announcements dev-note-card__visual--image" aria-hidden="true">
+        <img class="dev-note-card__visual-image dev-note-image--light" src="../assets/openshell-research/hero.png" alt="" loading="eager" fetchpriority="high">
+        <img class="dev-note-card__visual-image dev-note-image--dark" src="../assets/openshell-research/hero-dark.png" alt="" loading="eager" fetchpriority="high">
+      </div>
+      <div class="dev-note-card__copy">
+        <div class="dev-note-card__meta">
+          <time datetime="2026-09-28">September 28, 2026</time>
+          <span>Announcements</span>
+        </div>
+        <h3>Introducing OpenShell Research</h3>
+        <p class="dev-note-card__summary">Hello, world—from the OpenShell Research team.</p>
+        <div class="dev-note-card__tags" aria-label="Tags">
+          <span>openshell</span>
+          <span>agent-security</span>
+        </div>
+        <div class="dev-note-card__footer">
+        <span class="dev-note-card__authors" aria-label="Author: Johnny Greco">
+          <img src="https://github.com/johnnygreco.png?size=64" alt="" loading="lazy">
+          <span class="dev-note-card__author-names">Johnny Greco</span>
+        </span>
+          <span class="dev-note-card__read">Read note</span>
+        </div>
+      </div>
+      </a>
+    </article>
+    <p class="dev-notes-filter-empty" hidden></p>
+  </section>
+  <section class="journal-section dev-notes-recent" aria-labelledby="recent-notes-title">
+    <div class="journal-section__head">
+      <h2 id="recent-notes-title">Recent notes</h2>
+    </div>
+    <div class="dev-notes-recent-list">
+    <article class="dev-note-card dev-note-card--recent dev-note-card--research dev-note-card--has-image" data-category="research" data-authors="[&quot;johnnygreco&quot;]">
       <a class="dev-note-card__link" href="posts/2026-09-26-network-redaction-is-not-enough/">
       <div class="dev-note-card__visual dev-note-card__visual--research dev-note-card__visual--image" aria-hidden="true">
-        <img class="dev-note-card__visual-image dev-note-image--light" src="../assets/pi-admission/hero-light.png" alt="" loading="eager" fetchpriority="high">
-        <img class="dev-note-card__visual-image dev-note-image--dark" src="../assets/pi-admission/hero-dark.png" alt="" loading="eager" fetchpriority="high">
+        <img class="dev-note-card__visual-image dev-note-image--light" src="../assets/pi-admission/hero-light.png" alt="" loading="lazy">
+        <img class="dev-note-card__visual-image dev-note-image--dark" src="../assets/pi-admission/hero-dark.png" alt="" loading="lazy">
       </div>
       <div class="dev-note-card__copy">
         <div class="dev-note-card__meta">
@@ -77,13 +111,6 @@ hide:
       </div>
       </a>
     </article>
-    <p class="dev-notes-filter-empty" hidden></p>
-  </section>
-  <section class="journal-section dev-notes-recent" aria-labelledby="recent-notes-title">
-    <div class="journal-section__head">
-      <h2 id="recent-notes-title">Recent notes</h2>
-    </div>
-    <div class="dev-notes-recent-list">
     <article class="dev-note-card dev-note-card--recent dev-note-card--research dev-note-card--has-image" data-category="research" data-authors="[&quot;zredlined&quot;]">
       <a class="dev-note-card__link" href="posts/2026-09-10-learning-formal-methods-agent-policy-prover/">
       <div class="dev-note-card__visual dev-note-card__visual--research dev-note-card__visual--image" aria-hidden="true">

@@ -1330,6 +1330,28 @@ body:has(.dev-note-header) .md-main__inner {
   line-height: 1.5;
 }
 
+.md-typeset .dev-note-greeting {
+  font-family: var(--openshell-mono);
+  font-size: clamp(1.25rem, 3vw, 1.8rem);
+  font-variant-ligatures: none;
+}
+
+.dev-note-greeting__prompt {
+  color: var(--openshell-green);
+}
+
+.dev-note-greeting > span {
+  display: inline-block;
+  white-space: pre;
+  /* Reveal the 16 characters once, keeping the full text and layout intact. */
+  animation: dev-note-type-in 1.3s steps(16, end) 0.2s backwards;
+}
+
+@keyframes dev-note-type-in {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
 .md-typeset .dev-note-equation {
   margin: 1.4rem 0 1.7rem;
   padding: 1.1rem 1.35rem;
@@ -1591,6 +1613,10 @@ body:has(.dev-note-header) .md-main__inner {
     scroll-behavior: auto;
   }
 
+  .dev-note-greeting > span {
+    animation: none;
+  }
+
   .openshell-drawer-button,
   .md-overlay,
   .md-sidebar--primary,
@@ -1600,6 +1626,12 @@ body:has(.dev-note-header) .md-main__inner {
   .dev-note-card__visual::after,
   .dev-note-card__read::after {
     transition: none !important;
+  }
+}
+
+@media print {
+  .dev-note-greeting > span {
+    animation: none;
   }
 }
 
