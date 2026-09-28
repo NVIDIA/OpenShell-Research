@@ -1333,26 +1333,6 @@ body:has(.dev-note-header) .md-main__inner {
   to { clip-path: inset(0 0 0 0); }
 }
 
-.md-typeset .dev-note-hiring {
-  margin: 2rem 0;
-  padding: 1.1rem clamp(1rem, 3vw, 1.5rem);
-  border-inline-start: 0.2rem solid var(--openshell-green);
-  background: var(--openshell-paper-deep);
-}
-
-.md-typeset .dev-note-hiring h2 {
-  margin-top: 0;
-}
-
-.md-typeset .dev-note-hiring > :last-child {
-  margin-bottom: 0;
-}
-
-.md-typeset .dev-note-hiring a {
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
-}
-
 .md-typeset .dev-note-equation {
   margin: 1.4rem 0 1.7rem;
   padding: 1.1rem 1.35rem;
