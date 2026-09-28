@@ -739,7 +739,7 @@ body:has(.openshell-home-page) .md-path {
   margin: 1.4rem 0 0;
   color: var(--openshell-muted);
   font-family: var(--openshell-serif);
-  font-size: clamp(1.02rem, 1.9vw, 1.32rem);
+  font-size: clamp(1.02rem, 1.75vw, 1.15rem);
   line-height: 1.45;
   text-wrap: balance;
 }
