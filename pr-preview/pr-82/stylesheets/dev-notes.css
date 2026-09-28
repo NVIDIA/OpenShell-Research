@@ -766,6 +766,71 @@ body:has(.openshell-home-page) .md-path {
   letter-spacing: -0.035em;
 }
 
+.dev-notes-page [hidden] {
+  display: none !important;
+}
+
+.dev-notes-toolbar,
+.dev-notes-filters,
+.dev-notes-filters label {
+  display: flex;
+  align-items: center;
+}
+
+.dev-notes-toolbar {
+  justify-content: space-between;
+  gap: 0.6rem 1.5rem;
+}
+
+.dev-notes-filters {
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin: 0;
+}
+
+.dev-notes-filters label {
+  gap: 0.5rem;
+  color: var(--openshell-muted);
+  font-family: var(--openshell-sans);
+  font-size: 0.7rem;
+}
+
+.dev-notes-filters select {
+  min-width: 7.5rem;
+  max-width: 100%;
+  height: 1.7rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--openshell-rule-strong);
+  border-radius: 0.2rem;
+  background: var(--openshell-paper);
+  color: var(--openshell-ink);
+  font: inherit;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.dev-notes-filters select:focus-visible,
+.dev-notes-filters__clear:focus-visible {
+  outline: 2px solid var(--openshell-accent);
+  outline-offset: 3px;
+}
+
+.dev-notes-filters__clear {
+  padding: 0.3rem 0;
+  color: var(--openshell-accent);
+  font-size: 0.7rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+.md-typeset .dev-notes-filter-empty {
+  margin: 1.5rem 0 3rem;
+  color: var(--openshell-muted);
+  font-family: var(--openshell-serif);
+  font-size: 1.1rem;
+}
+
 /* Generated note index ---------------------------------------------------- */
 
 .dev-note-card {
@@ -1041,6 +1106,10 @@ body:has(.openshell-home-page) .md-path {
 .dev-notes-recent {
   margin-top: 1.25rem;
   border-top: 1px solid var(--openshell-rule);
+}
+
+.dev-notes-recent .journal-section__head {
+  margin-bottom: 0;
 }
 
 .dev-note-card--recent .dev-note-card__link {
@@ -1324,6 +1393,17 @@ body:has(.dev-note-header) .md-main__inner {
   content: "/";
 }
 
+.md-typeset .dev-note-byline__label a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--openshell-rule-strong);
+  text-underline-offset: 0.2em;
+}
+
+.md-typeset .dev-note-byline__label a:hover {
+  color: var(--openshell-accent);
+}
+
 .dev-note-byline__authors {
   display: flex;
   flex-wrap: wrap;
@@ -1364,6 +1444,36 @@ body:has(.dev-note-header) .md-main__inner {
 /* Responsive -------------------------------------------------------------- */
 
 @media (max-width: 44rem) {
+  .dev-notes-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .dev-notes-filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 0.6rem;
+  }
+
+  .dev-notes-filters label {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .dev-notes-filters select {
+    width: 100%;
+    min-width: 0;
+    min-height: 2.2rem;
+    font-size: 0.8rem;
+  }
+
+  .dev-notes-filters__clear {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
   .research-masthead__copy {
     display: block;
   }
@@ -1452,6 +1562,16 @@ body:has(.dev-note-header) .md-main__inner {
 }
 
 @media (max-width: 24rem) {
+  .dev-notes-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dev-notes-filters label {
+    display: grid;
+    grid-template-columns: 3.4rem minmax(0, 1fr);
+    align-items: center;
+  }
+
   /* Leave room for a second breadcrumb row without crowding the hero. */
   .dev-note-header {
     max-height: calc(100svh - var(--openshell-header-height) - 6.5rem);

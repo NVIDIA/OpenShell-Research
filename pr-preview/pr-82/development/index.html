@@ -975,6 +975,14 @@ unknown, or multiple categories fail the build with an author-facing error.
 Categories appear consistently on index cards and article bylines. Categories
 remain available even when they have no posts; do not create placeholder notes.
 Use tags for subject areas such as robotics, formal methods, or agent security.</p>
+<p>Readers can combine category and author filters on the Dev Notes index. The
+renderer derives the author menu from every post's author IDs and always includes
+all four categories, including those without posts. The newest matching post is
+featured; the remaining matches keep their chronological order. Filters use
+<code>?category=research&amp;author=johnnygreco</code> URLs that survive refresh and browser
+Back/Forward navigation. Article byline names and categories link to these
+filtered views. Empty combinations show a message and a clear-filters action.
+Keep the full index readable when JavaScript is unavailable.</p>
 <p>The renderer uses <code>card_tags</code> as the card's tags, falling back to <code>tags</code>.
 An optional <code>card_variant</code> must have matching card and
 artwork CSS modifiers in <code>docs/stylesheets/dev-notes.css</code>. Set <code>hero_image</code> to
@@ -1196,6 +1204,8 @@ roll back to a revision before preview support, leave the Pages source set to
       <script src="../assets/javascripts/bundle.8dcc8e9c.min.js"></script>
       
         <script src="../javascripts/navigation-drawer.js"></script>
+      
+        <script src="../javascripts/dev-notes.js"></script>
       
         <script src="../javascripts/pi-traces.js"></script>
       
