@@ -9,7 +9,7 @@ hero_image_alt: "Five colorful clusters of connected AI agent nodes sit within a
 subtitle: "An intro to using formal methods to reason about permission changes in long-running AI agents."
 social_image: "assets/agent-policy-prover/hero-concept.png"
 categories:
-  - OpenShell
+  - Research
 tags:
   - openshell
   - formal-methods
@@ -55,7 +55,7 @@ card_tags:
   <p class="dev-note-byline__label">
     <span>Dev Note</span>
     <time datetime="2026-09-10">September 10, 2026</time>
-    <span>OpenShell</span>
+    <span>Research</span>
   </p>
 </div>
 <!-- dev-note:byline:end -->

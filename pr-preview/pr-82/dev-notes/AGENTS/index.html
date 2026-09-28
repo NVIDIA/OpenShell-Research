@@ -855,6 +855,9 @@
 matter and prose; <code>python3 scripts/render-dev-notes.py</code> generates the title,
 optional subtitle and hero, author byline, index cards, and navigation.</p>
 <ul>
+<li>Set <code>categories</code> to a list containing exactly one of <code>Announcements</code>,
+  <code>Research</code>, <code>Case Studies</code>, or <code>Examples</code>. Use tags for technical topics.
+  The renderer rejects missing, unknown, or multiple categories.</li>
 <li>Use <code>subtitle</code> for an optional short deck and <code>hero_image_alt</code> to describe a
   <code>hero_image</code>. <code>hero_image_dark</code> is optional. Do not copy header HTML from a post.</li>
 <li>Start new post bodies with the introduction, without a duplicate H1 or hero.</li>

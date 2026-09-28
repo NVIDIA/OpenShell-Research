@@ -962,8 +962,21 @@ consumption.</p>
 <code>title</code>, an exact <code>YYYY-MM-DD</code> date, <code>description</code>, and at least one <code>authors</code> ID
 defined in <code>docs/dev-notes/authors.json</code>. Use a dated filename such as
 <code>YYYY-MM-DD-short-title.md</code>.</p>
-<p>The renderer uses <code>categories[0]</code> as the card topic and <code>card_tags</code> as its tags,
-falling back to <code>tags</code>. An optional <code>card_variant</code> must have matching card and
+<p>Every post must list exactly one category under <code>categories</code>, using one of these
+fixed names:</p>
+<ul>
+<li><strong>Announcements</strong>: releases, launches, and team or project updates.</li>
+<li><strong>Research</strong>: experiments, benchmarks, findings, and technical investigations.</li>
+<li><strong>Case Studies</strong>: accounts of real-world adoption, deployment, and outcomes.</li>
+<li><strong>Examples</strong>: practical walkthroughs and demonstrations readers can reproduce.</li>
+</ul>
+<p>The renderer validates this list before updating any generated content. Missing,
+unknown, or multiple categories fail the build with an author-facing error.
+Categories appear consistently on index cards and article bylines. Categories
+remain available even when they have no posts; do not create placeholder notes.
+Use tags for subject areas such as robotics, formal methods, or agent security.</p>
+<p>The renderer uses <code>card_tags</code> as the card's tags, falling back to <code>tags</code>.
+An optional <code>card_variant</code> must have matching card and
 artwork CSS modifiers in <code>docs/stylesheets/dev-notes.css</code>. Set <code>hero_image</code> to
 an image path relative to the post, and describe it with <code>hero_image_alt</code>. The
 renderer uses it for both the post's opening hero and its index thumbnail. Set
