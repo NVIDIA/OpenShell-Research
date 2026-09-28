@@ -9,23 +9,23 @@
     <style>
       :root {
         color-scheme: light dark;
-        --accent: #5a8f00;
-        --background: #f6f7f8;
-        --border: #d9dde3;
+        --accent: #76b900;
+        --background: #f3f0e7;
+        --border: rgba(32, 38, 37, 0.2);
         --button-text: #111315;
-        --card: #ffffff;
-        --muted: #52606d;
-        --text: #171a1f;
+        --card: #faf8f1;
+        --muted: #666d6b;
+        --text: #202625;
       }
 
       @media (prefers-color-scheme: dark) {
         :root {
           --accent: #76b900;
-          --background: #111315;
-          --border: #343a40;
-          --card: #1b1f23;
-          --muted: #b6bec8;
-          --text: #f4f6f8;
+          --background: #121719;
+          --border: rgba(230, 232, 226, 0.17);
+          --card: #181e20;
+          --muted: #9fa8a5;
+          --text: #e6e8e2;
         }
       }
 
@@ -49,8 +49,7 @@
       main {
         background: var(--card);
         border: 1px solid var(--border);
-        border-radius: 1rem;
-        box-shadow: 0 1rem 3rem rgb(0 0 0 / 12%);
+        border-radius: 0.5rem;
         max-width: 38rem;
         padding: clamp(2rem, 7vw, 4rem);
         text-align: center;
@@ -65,7 +64,9 @@
       }
 
       h1 {
+        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
         font-size: clamp(2rem, 8vw, 3.5rem);
+        font-weight: 500;
         letter-spacing: -0.04em;
         line-height: 1;
         margin: 0 0 1rem;

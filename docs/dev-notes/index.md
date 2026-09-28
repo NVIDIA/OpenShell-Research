@@ -5,20 +5,19 @@ hide:
   - toc
 ---
 
-<div class="dev-notes-page">
+<div class="dev-notes-page" id="__skip" tabindex="-1">
   <header class="research-masthead" aria-labelledby="dev-notes-title">
     <div class="research-masthead__topline">
       <span class="research-masthead__identity">
         <img src="../assets/brand/openshell-mark.svg" alt="" aria-hidden="true">
-        OpenShell Research / Dev Notes
+        OpenShell Research
       </span>
     </div>
     <div class="research-masthead__layout">
       <div class="research-masthead__copy">
         <h1 id="dev-notes-title">Dev Notes</h1>
         <p class="research-masthead__dek">
-          Technical notes from the OpenShell team – reproducible research,
-          benchmarks, and use case examples.
+          Reproducible research, benchmarks, and use cases from the OpenShell team.
         </p>
       </div>
     </div>
@@ -29,7 +28,6 @@ hide:
   <section class="journal-section dev-notes-featured" aria-labelledby="featured-note-title">
     <div class="journal-section__head">
       <h2 id="featured-note-title">Featured note</h2>
-      <span>Latest from the team</span>
     </div>
     <article class="dev-note-card dev-note-card--featured dev-note-card--research dev-note-card--has-image">
       <a class="dev-note-card__link" href="posts/2026-09-26-network-redaction-is-not-enough/">
@@ -62,7 +60,6 @@ hide:
   <section class="journal-section dev-notes-recent" aria-labelledby="recent-notes-title">
     <div class="journal-section__head">
       <h2 id="recent-notes-title">Recent notes</h2>
-      <span>The working archive</span>
     </div>
     <div class="dev-notes-recent-list">
     <article class="dev-note-card dev-note-card--recent dev-note-card--openshell dev-note-card--has-image">

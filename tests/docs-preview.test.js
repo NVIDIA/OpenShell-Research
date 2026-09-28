@@ -29,6 +29,9 @@ for (const workflow of ["docs-preview.yml", "docs-preview-deploy.yml"]) {
       "overrides/main.html",
       "scripts/stage-project-docs.py",
       "tests/docs-preview.test.js",
+      "tests/test_dev_note_headers.py",
+      "tests/test_dev_notes_layout.py",
+      "tests/test_dev_notes_layout.py.lock",
       "zensical.toml",
     ]) {
       assert.equal(changed([filename]), true, filename);

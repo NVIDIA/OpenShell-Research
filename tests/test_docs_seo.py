@@ -87,12 +87,12 @@ class HeadParser(HTMLParser):
 def public_sources() -> list[Path]:
     sources = [DOCS / "index.md"]
     for source_root in PUBLIC_SOURCE_ROOTS:
-        sources.extend(source_root.rglob("*.md"))
+        sources.extend(path for path in source_root.rglob("*.md") if path.name != "AGENTS.md")
     return sorted(sources)
 
 
 def noindex_sources() -> list[Path]:
-    sources: list[Path] = []
+    sources: list[Path] = [DOCS / "dev-notes" / "AGENTS.md"]
     for source_root in NOINDEX_SOURCE_ROOTS:
         sources.extend(source_root.rglob("*.md"))
     return sorted(sources)

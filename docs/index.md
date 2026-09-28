@@ -5,7 +5,7 @@ hide:
   - toc
 ---
 
-<div class="openshell-home-page">
+<div class="openshell-home-page" id="__skip" tabindex="-1">
   <section class="openshell-home-hero" aria-labelledby="openshell-home-title">
     <div>
       <h1 id="openshell-home-title" class="openshell-home-brand">
