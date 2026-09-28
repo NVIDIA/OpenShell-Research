@@ -50,23 +50,19 @@ hide:
     <div class="journal-section__head">
       <h2 id="featured-note-title" aria-live="polite" aria-atomic="true">Featured note</h2>
     </div>
-    <article class="dev-note-card dev-note-card--featured dev-note-card--research dev-note-card--has-image" data-category="research" data-authors="[&quot;johnnygreco&quot;]">
-      <a class="dev-note-card__link" href="posts/2026-09-26-network-redaction-is-not-enough/">
-      <div class="dev-note-card__visual dev-note-card__visual--research dev-note-card__visual--image" aria-hidden="true">
-        <img class="dev-note-card__visual-image dev-note-image--light" src="../assets/pi-admission/hero-light.png" alt="" loading="eager" fetchpriority="high">
-        <img class="dev-note-card__visual-image dev-note-image--dark" src="../assets/pi-admission/hero-dark.png" alt="" loading="eager" fetchpriority="high">
+    <article class="dev-note-card dev-note-card--featured dev-note-card--announcements dev-note-card--has-image" data-category="announcements" data-authors="[&quot;johnnygreco&quot;]">
+      <a class="dev-note-card__link" href="posts/2026-09-28-introducing-openshell-research/">
+      <div class="dev-note-card__visual dev-note-card__visual--announcements dev-note-card__visual--image" aria-hidden="true">
+        <img class="dev-note-card__visual-image dev-note-image--light" src="../assets/openshell-research/hero.png" alt="" loading="eager" fetchpriority="high">
+        <img class="dev-note-card__visual-image dev-note-image--dark" src="../assets/openshell-research/hero-dark.png" alt="" loading="eager" fetchpriority="high">
       </div>
       <div class="dev-note-card__copy">
         <div class="dev-note-card__meta">
-          <time datetime="2026-09-26">September 26, 2026</time>
-          <span>Research</span>
+          <time datetime="2026-09-28">September 28, 2026</time>
+          <span>Announcements</span>
         </div>
-        <h3>The leak is coming from inside the sandbox</h3>
-        <p class="dev-note-card__summary">A simple experiment shows why network-layer redaction isn’t enough.</p>
-        <div class="dev-note-card__tags" aria-label="Tags">
-          <span>agent-security</span>
-          <span>runtime-and-harness</span>
-        </div>
+        <h3>Introducing OpenShell Research</h3>
+        <p class="dev-note-card__summary">Hello, world—from the OpenShell Research team.</p>
         <div class="dev-note-card__footer">
         <span class="dev-note-card__authors" aria-label="Author: Johnny Greco">
           <img src="https://github.com/johnnygreco.png?size=64" alt="" loading="lazy">
@@ -84,6 +80,29 @@ hide:
       <h2 id="recent-notes-title">Recent notes</h2>
     </div>
     <div class="dev-notes-recent-list">
+    <article class="dev-note-card dev-note-card--recent dev-note-card--research dev-note-card--has-image" data-category="research" data-authors="[&quot;johnnygreco&quot;]">
+      <a class="dev-note-card__link" href="posts/2026-09-26-network-redaction-is-not-enough/">
+      <div class="dev-note-card__visual dev-note-card__visual--research dev-note-card__visual--image" aria-hidden="true">
+        <img class="dev-note-card__visual-image dev-note-image--light" src="../assets/pi-admission/hero-light.png" alt="" loading="lazy">
+        <img class="dev-note-card__visual-image dev-note-image--dark" src="../assets/pi-admission/hero-dark.png" alt="" loading="lazy">
+      </div>
+      <div class="dev-note-card__copy">
+        <div class="dev-note-card__meta">
+          <time datetime="2026-09-26">September 26, 2026</time>
+          <span>Research</span>
+        </div>
+        <h3>The leak is coming from inside the sandbox</h3>
+        <p class="dev-note-card__summary">A simple experiment shows why network-layer redaction isn’t enough.</p>
+        <div class="dev-note-card__footer">
+        <span class="dev-note-card__authors" aria-label="Author: Johnny Greco">
+          <img src="https://github.com/johnnygreco.png?size=64" alt="" loading="lazy">
+          <span class="dev-note-card__author-names">Johnny Greco</span>
+        </span>
+          <span class="dev-note-card__read">Read note</span>
+        </div>
+      </div>
+      </a>
+    </article>
     <article class="dev-note-card dev-note-card--recent dev-note-card--research dev-note-card--has-image" data-category="research" data-authors="[&quot;zredlined&quot;]">
       <a class="dev-note-card__link" href="posts/2026-09-10-learning-formal-methods-agent-policy-prover/">
       <div class="dev-note-card__visual dev-note-card__visual--research dev-note-card__visual--image" aria-hidden="true">
@@ -96,11 +115,6 @@ hide:
         </div>
         <h3>What we have learned applying formal methods to control AI agents</h3>
         <p class="dev-note-card__summary">An intro to using formal methods to reason about permission changes in long-running AI agents.</p>
-        <div class="dev-note-card__tags" aria-label="Tags">
-          <span>formal-methods</span>
-          <span>z3</span>
-          <span>agents</span>
-        </div>
         <div class="dev-note-card__footer">
         <span class="dev-note-card__authors" aria-label="Author: Alex Watson">
           <img src="https://github.com/zredlined.png?size=64" alt="" loading="lazy">
@@ -123,11 +137,6 @@ hide:
         </div>
         <h3>Adversarial prototype: AI policy auto-approval for long-horizon agents in OpenShell</h3>
         <p class="dev-note-card__summary">Can an attacker agent convince an equally capable reviewer agent to grant a capability that is explicitly prohibited?</p>
-        <div class="dev-note-card__tags" aria-label="Tags">
-          <span>agents</span>
-          <span>policy</span>
-          <span>security</span>
-        </div>
         <div class="dev-note-card__footer">
         <span class="dev-note-card__authors" aria-label="Author: Alex Watson">
           <img src="https://github.com/zredlined.png?size=64" alt="" loading="lazy">
@@ -150,11 +159,6 @@ hide:
         </div>
         <h3>Can Formal Methods Govern AI-Generated Robot Actions?</h3>
         <p class="dev-note-card__summary">A robotics experiment asks whether an independent, SMT-backed policy boundary can efficiently govern AI-generated plans before they reach a simulated or physical robot.</p>
-        <div class="dev-note-card__tags" aria-label="Tags">
-          <span>physical-ai</span>
-          <span>formal-methods</span>
-          <span>policy</span>
-        </div>
         <div class="dev-note-card__footer">
         <span class="dev-note-card__authors" aria-label="Author: Alex Watson">
           <img src="https://github.com/zredlined.png?size=64" alt="" loading="lazy">
@@ -177,11 +181,6 @@ hide:
         </div>
         <h3>Bringing Privacy and Security to the Edge with OpenShell</h3>
         <p class="dev-note-card__summary">Edge agents handle sensitive data and make decisions with physical consequences. Reachy Mini shows why privacy and safety controls must be deterministic and local.</p>
-        <div class="dev-note-card__tags" aria-label="Tags">
-          <span>edge-ai</span>
-          <span>reachy-mini</span>
-          <span>policy</span>
-        </div>
         <div class="dev-note-card__footer">
         <span class="dev-note-card__authors" aria-label="Author: Kirit Thadaka">
           <img src="https://github.com/kirit93.png?size=64" alt="" loading="lazy">
