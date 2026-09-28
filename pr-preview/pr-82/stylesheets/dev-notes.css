@@ -736,7 +736,6 @@ body:has(.openshell-home-page) .md-path {
 }
 
 .research-masthead__dek {
-  max-width: 52rem;
   margin: 1.4rem 0 0;
   color: var(--openshell-muted);
   font-family: var(--openshell-serif);
