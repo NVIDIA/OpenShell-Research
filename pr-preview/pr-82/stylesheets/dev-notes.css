@@ -696,14 +696,14 @@ body:has(.openshell-home-page) .md-path {
 }
 
 .research-masthead {
-  padding: 1.5rem 0 1.4rem;
+  padding: 1.5rem 0 1.8rem;
 }
 
 .research-masthead__topline {
   display: flex;
   align-items: center;
   gap: 0.8rem;
-  margin-bottom: 1.4rem;
+  margin-bottom: 1.8rem;
   color: var(--openshell-muted);
   font-family: var(--openshell-mono);
   font-size: 0.63rem;
@@ -773,6 +773,7 @@ body:has(.openshell-home-page) .md-path {
 
 .dev-notes-toolbar {
   padding: 0.8rem 0 0.75rem;
+  border-top: 1px solid var(--openshell-rule);
   border-bottom: 1px solid var(--openshell-rule);
 }
 
@@ -848,7 +849,7 @@ body:has(.openshell-home-page) .md-path {
 
 .dev-note-card--featured .dev-note-card__link {
   display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   gap: 1.5rem;
 }
@@ -998,7 +999,7 @@ body:has(.openshell-home-page) .md-path {
 }
 
 .md-typeset .dev-note-card--featured h3 {
-  font-size: clamp(1.75rem, 3.4vw, 2.4rem);
+  font-size: clamp(1.85rem, 3.5vw, 2.5rem);
   line-height: 1.08;
   text-wrap: balance;
 }
@@ -1012,7 +1013,7 @@ body:has(.openshell-home-page) .md-path {
 }
 
 .md-typeset .dev-note-card--featured .dev-note-card__summary {
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 .dev-note-card__tags {
