@@ -1615,6 +1615,11 @@ body:has(.dev-note-header) .md-main__inner {
   }
 }
 
+/* Keep topic metadata searchable without displaying non-interactive badges. */
+body:has(.dev-note-header) .md-typeset .md-tags {
+  display: none;
+}
+
 /* Dev note figures and theme-specific images */
 body:not([data-md-color-scheme="slate"]) .dev-note-image--dark,
 body[data-md-color-scheme="slate"] .dev-note-image--light {

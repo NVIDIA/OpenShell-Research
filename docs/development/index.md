@@ -67,8 +67,8 @@ Categories appear consistently on index cards and article bylines. Categories
 remain available even when they have no posts; do not create placeholder notes.
 Use one `tags` list for specific topics such as `robotics`, `formal-methods`, or
 `agent-security`. Avoid generic `openshell` and `agents` tags; use
-`agent-security` consistently instead of `security`. Tags appear on articles and
-feed site search metadata; index cards omit tags.
+`agent-security` consistently instead of `security`. Tags feed site search
+metadata; articles and index cards do not display tag badges.
 
 Readers can combine category and author filters on the Dev Notes index. The
 renderer derives the author menu from every post's author IDs and always includes
