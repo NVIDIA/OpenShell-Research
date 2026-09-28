@@ -696,7 +696,25 @@ body:has(.openshell-home-page) .md-path {
 }
 
 .research-masthead {
-  padding: 0.6rem 0 0.4rem;
+  padding: 1.5rem 0 1rem;
+}
+
+.research-masthead__topline {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+  color: var(--openshell-muted);
+  font-family: var(--openshell-mono);
+  font-size: 0.63rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.research-masthead__topline img {
+  width: 1.6rem;
+  height: 1.6rem;
+  flex-shrink: 0;
 }
 
 .research-masthead__layout {
@@ -718,12 +736,13 @@ body:has(.openshell-home-page) .md-path {
 }
 
 .research-masthead__dek {
-  max-width: 50rem;
-  margin: 1.2rem 0 0;
+  max-width: 52rem;
+  margin: 1.4rem 0 0;
   color: var(--openshell-muted);
   font-family: var(--openshell-serif);
   font-size: clamp(1.02rem, 1.9vw, 1.32rem);
   line-height: 1.45;
+  text-wrap: balance;
 }
 
 .journal-section {
