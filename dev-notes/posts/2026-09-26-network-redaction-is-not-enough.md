@@ -99,7 +99,7 @@ We ran two experiments per model:
   conversation or were saved to disk. So the harness only retained the
   redacted version.
 
-In both cases, the model initially saw `[EMAIL]` in place of a full email address. The difference was what the agent could still read from its session history.
+In both cases, the full email address was redacted and replaced with `[EMAIL]` in all outgoing model requests. The difference was what the harness allowed to persist in its session history.
 
 <figure class="dev-note-figure dev-note-figure--admission" id="pi-admission-architecture">
   <img src="../../assets/diagrams/pi-admission-architecture.svg" alt="OpenShell architecture with two custom redaction components shown as dashed colored boxes: Admission redacted (purple) inside Pi, before messages enter memory or are saved to disk, and Network redacted (orange) in request middleware beside the supervisor. The middleware is a separate service called by the supervisor over gRPC before forwarding the request to the model via OpenRouter. The gateway configures the supervisor." width="640" height="686" loading="lazy">
