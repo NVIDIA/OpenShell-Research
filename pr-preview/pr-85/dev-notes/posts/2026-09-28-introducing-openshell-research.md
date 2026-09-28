@@ -64,4 +64,12 @@ We believe AI agents have enormous potential to deliver value and help people, b
 
 We also believe that open research is essential to making AI safe. This is why we are committed to working with the open-source community and building in public. [Dev Notes](../index.md) is where we’ll share our latest research, announcements, and the implementation lessons we learn along the way. When it makes sense to share (and maintain) code, we’ll put it in our [OpenShell Research repo](https://github.com/NVIDIA/OpenShell-Research). All code used in our research is always available on request.
 
-Lastly, we’re hiring! We’re looking for researchers and engineers who love asking hard questions and building useful tools. If this sounds like you, please [apply to join OpenShell Research](https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite/job/US-Remote/Software-Engineer--OpenShell_JR2020825)!
+<div class="dev-note-hiring" markdown="1">
+
+## Join OpenShell Research
+
+We’re hiring researchers and engineers who love asking hard questions and building useful tools. If this sounds like you, we’d love to hear from you.
+
+**[Apply to join us →](https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite/job/US-Remote/Software-Engineer--OpenShell_JR2020825)**
+
+</div>
