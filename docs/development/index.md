@@ -132,13 +132,15 @@ aspect ratio. Body diagrams may still use the shared wide or scrollable figure
 treatments when their labels need more room.
 
 The index separates the page introduction, filtering controls, and posts. Give
-the masthead breathing room and keep the filters in their own row, above a
-divider and the featured-note heading. Laptop screens show the featured title;
-a 900px-tall desktop viewport fits the featured note and the archive heading.
+the masthead breathing room and keep the filters in their own row between two
+dividers, above the featured-note heading. Laptop screens show the featured title;
+a 900px-tall desktop viewport fits the featured note. Keep its image and type
+larger than the archive entries; longer featured titles can move the archive
+below the first screen.
 The archive remains a normal scrolling list as it grows; do not shrink its
 entries to fit all notes on one screen or give the archive a separate scrolling
 panel. Keep one label per section. Use whitespace within the featured note and
-dividers below the filtering controls, at the archive boundary, and between
+dividers above and below the filtering controls, at the archive boundary, and between
 archive entries.
 
 Do not edit content inside these generated marker pairs:
@@ -164,7 +166,7 @@ hero assets or alt text, cropped or thumbnail-sized article heroes, overly long 
 horizontal page overflow, off-center heroes, images overflowing their figures or
 overlapping the byline, incorrect theme-image visibility, an opening that needs
 scrolling to see the full hero, and an index that obscures the featured title on
-laptops or pushes the featured note and archive heading below a 900px-tall
+laptops or pushes the featured note below a 900px-tall
 desktop viewport. They also check the separation of introduction, filters, and posts.
 They also move the featured note into the recent list to exercise its thumbnail
 layout. The workflow saves screenshots as the `dev-notes-layout` artifact for

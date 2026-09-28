@@ -136,7 +136,10 @@ def assert_index_proportions(page, viewport):
     heading = page.locator("#featured-note-title").bounding_box()
     assert masthead["y"] + masthead["height"] <= filters["y"], "Filters should follow the page introduction"
     assert filters["y"] + filters["height"] < divider["y"] + divider["height"] <= heading["y"], "The divider should separate filters from posts"
-    assert toolbar.evaluate("element => parseFloat(getComputedStyle(element).borderBottomWidth) > 0")
+    assert toolbar.evaluate("""element => {
+        const style = getComputedStyle(element);
+        return parseFloat(style.borderTopWidth) > 0 && parseFloat(style.borderBottomWidth) > 0;
+    }"""), "Dividers should frame the filters"
     cards = page.locator(".dev-note-card")
     assert cards.count() == len(POSTS)
     assert_images_loaded(cards.locator(".dev-note-card__visual-image"))
@@ -153,9 +156,6 @@ def assert_index_proportions(page, viewport):
         if viewport["height"] >= 900:
             featured = page.locator(".dev-note-card--featured").bounding_box()
             assert featured["y"] + featured["height"] < viewport["height"], "The featured note should fit on a tall desktop viewport"
-            if page.locator(".dev-note-card--recent").count():
-                recent_heading = page.locator("#recent-notes-title").bounding_box()
-                assert recent_heading["y"] + recent_heading["height"] < viewport["height"], "The archive should begin on a tall desktop viewport"
 
 
 def test_index_reading_proportions(page, site_url, viewport):
