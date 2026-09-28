@@ -18,8 +18,12 @@ PROJECT_DOCUMENTATION = {
     / "tools"
     / "openshell-agent-runner"
     / "docs",
+    "pi-admission": ROOT / "projects" / "research" / "pi-admission" / "docs",
 }
-DOCUMENTATION_ROOT = ROOT / "docs" / "documentation"
+PROJECT_DESTINATIONS = {
+    "openshell-agent-runner": ROOT / "docs" / "documentation" / "openshell-agent-runner",
+    "pi-admission": ROOT / "docs" / "research" / "pi-admission",
+}
 PROJECT_ASSETS = {
     "openshell-agent-runner": ROOT
     / "projects"
@@ -81,7 +85,7 @@ def stage_project_docs(
 def main() -> int:
     for project, source in PROJECT_DOCUMENTATION.items():
         stage_project_docs(
-            source, DOCUMENTATION_ROOT / project, PROJECT_ASSETS.get(project)
+            source, PROJECT_DESTINATIONS[project], PROJECT_ASSETS.get(project)
         )
         print(f"Staged {project} documentation from {source}.")
     return 0

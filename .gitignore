@@ -125,6 +125,7 @@ lib/
 public/
 site/
 docs/documentation/openshell-agent-runner/
+docs/research/pi-admission/
 .docusaurus/
 .vitepress/cache/
 .vitepress/dist/

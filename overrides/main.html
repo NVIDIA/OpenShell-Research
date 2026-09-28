@@ -4,6 +4,23 @@
 {% block extrahead %}
   {{ super() }}
   {% include "partials/seo.html" %}
+  {% if page.meta and page.meta.reset_scroll_on_reload %}
+    <script>
+      // Run before the theme follows fragment links or the browser restores scroll.
+      if (performance.getEntriesByType("navigation")[0]?.type === "reload") {
+        history.scrollRestoration = "manual";
+        if (location.hash) {
+          history.replaceState(history.state, "", location.pathname + location.search);
+        }
+        window.addEventListener("pageshow", () => {
+          window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+        }, { once: true });
+        window.addEventListener("pagehide", () => {
+          history.scrollRestoration = "auto";
+        }, { once: true });
+      }
+    </script>
+  {% endif %}
   <script>
     try {
       document.documentElement.dataset.navigationDrawer =

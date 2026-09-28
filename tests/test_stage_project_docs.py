@@ -23,7 +23,7 @@ class StageProjectDocsTests(unittest.TestCase):
     def test_configures_every_published_project(self) -> None:
         self.assertEqual(
             set(STAGER.PROJECT_DOCUMENTATION),
-            {"openshell-agent-runner"},
+            {"openshell-agent-runner", "pi-admission"},
         )
         for source in STAGER.PROJECT_DOCUMENTATION.values():
             self.assertTrue((source / "index.md").is_file())
@@ -79,6 +79,13 @@ class StageProjectDocsTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "must not overlap"):
                 STAGER.stage_project_docs(source, destination)
+
+
+def test_research_spec_is_staged_outside_tool_documentation():
+    assert STAGER.PROJECT_DESTINATIONS.keys() == STAGER.PROJECT_DOCUMENTATION.keys()
+    assert STAGER.PROJECT_DESTINATIONS["pi-admission"] == (
+        ROOT / "docs" / "research" / "pi-admission"
+    )
 
 
 def test_stage_includes_project_assets_without_changing_canonical_docs(tmp_path):

@@ -101,25 +101,34 @@ class AgentMarkdownUnitTests(unittest.TestCase):
             site = root / "site"
             post = docs / "dev-notes/posts/example.md"
             documentation = docs / "documentation/index.md"
+            research = docs / "research/pi-admission/index.md"
             post.parent.mkdir(parents=True)
             documentation.parent.mkdir(parents=True)
+            research.parent.mkdir(parents=True)
             site.mkdir()
             post_bytes = b"---\r\nagent_markdown: true\r\n---\r\n\r\n# Post\r\n"
             documentation_bytes = b"---\nagent_markdown: true\n---\n\n# Documentation\n"
             post.write_bytes(post_bytes)
             documentation.write_bytes(documentation_bytes)
-            for source in (post, documentation):
+            research_bytes = b"---\nagent_markdown: true\n---\n\n# Experiment spec\n"
+            research.write_bytes(research_bytes)
+            (docs / "research/index.md").write_text("# Legacy redirect\n")
+            for source in (post, documentation, research):
                 rendered = PUBLISHER.rendered_html(source, docs, site)
                 rendered.parent.mkdir(parents=True, exist_ok=True)
                 rendered.write_text("<!doctype html>", encoding="utf-8")
 
             destinations = PUBLISHER.publish(docs, site)
 
-            self.assertEqual(len(destinations), 2)
+            self.assertEqual(len(destinations), 3)
             self.assertEqual((site / "dev-notes/posts/example.md").read_bytes(), post_bytes)
             self.assertEqual(
                 (site / "documentation/index.md").read_bytes(), documentation_bytes
             )
+            self.assertEqual(
+                (site / "research/pi-admission/index.md").read_bytes(), research_bytes
+            )
+            self.assertFalse((site / "research/index.md").exists())
 
 
 @unittest.skipUnless(

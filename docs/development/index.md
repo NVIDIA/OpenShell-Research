@@ -17,10 +17,10 @@ commands from the repository root. Use Python 3.10 or newer.
 
 - Put project-specific software knowledge—installation, usage, reproducibility,
   and known limitations—under `projects/<project-type>/<name>/docs/`. The clean
-  build stages configured project documentation under `docs/documentation/`
-  for publishing.
-- Put cross-project software documentation directly under
-  `docs/documentation/`.
+  build stages tool documentation under `docs/documentation/` and linked research
+  specifications under `docs/research/` for publishing.
+- Keep the Documentation section for tools. Put cross-project tool documentation
+  directly under `docs/documentation/`.
 - Put dated experiments, benchmarks, releases, use cases, and engineering updates
   under `docs/dev-notes/`.
 - When a Dev Note introduces reusable software, add its durable guide to the
@@ -35,7 +35,9 @@ Every canonical content page under `docs/dev-notes/posts/`,
 project documentation, then copies all published Markdown sources byte-for-byte
 into `site/` at their site paths. Each rendered page links to its same-origin
 Markdown source for people and agents. Generated copies under
-`docs/documentation/` and `site/` must not be edited.
+`docs/documentation/`, staged project trees under `docs/research/`, and `site/`
+must not be edited. Research supplements opt in with the same marker; legacy
+research redirects do not.
 
 Every page in a published content tree is included, including the Documentation
 index. Keep presentation-only landing pages such as the homepage and Dev Notes
@@ -55,7 +57,13 @@ The renderer uses `categories[0]` as the card topic and `card_tags` as its tags,
 falling back to `tags`. An optional `card_variant` must have matching card and
 artwork CSS modifiers in `docs/stylesheets/dev-notes.css`. Set `hero_image` to
 an image path relative to the post when its card should use the post's hero
-instead of generated artwork. Hero images must live under `docs/`.
+instead of generated artwork. Set `hero_image_dark` to an optional dark-mode
+counterpart; cards switch between them with the site theme. Hero images must
+live under `docs/`.
+
+Place a post's hero figure immediately after its subtitle and before the generated
+author byline. If the post has no subtitle, place the hero directly after the
+title. Keep the introduction below the byline.
 
 Do not edit content inside these generated marker pairs:
 
@@ -71,6 +79,9 @@ python3 scripts/render-dev-notes.py
 ```
 
 Commit any generated changes with the source change.
+
+For Pi transcript provenance, publication boundaries, and viewer checks, see
+the [Pi project maintenance guide](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/research/pi-admission/README.md#maintenance).
 
 ## Theme and brand assets
 
@@ -100,12 +111,14 @@ Run the renderer tests and the same clean build used by CI:
 uv run --python 3.12 --with pytest==8.4.2 pytest -q \
   tests/test_agent_markdown.py tests/test_docs_404.py \
   tests/test_render_dev_notes.py tests/test_stage_project_docs.py
+node --check docs/javascripts/pi-traces.js
+node tests/docs-preview.test.js
 scripts/build-docs.sh
 ```
 
 `scripts/build-docs.sh` recreates `.venv-docs`, installs the pinned toolchain,
 stages each configured canonical project documentation tree from `projects/`
-under `docs/documentation/`, renders Dev Notes metadata, and runs `zensical
+at its configured site destination, renders Dev Notes metadata, and runs `zensical
 build --clean --strict`. Configure project trees in
 `scripts/stage-project-docs.py`. Do not report success unless the build
 completes without issues.

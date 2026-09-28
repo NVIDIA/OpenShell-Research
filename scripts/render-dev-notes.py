@@ -199,9 +199,9 @@ def card_visual_class(post: dict[str, Any]) -> str:
     return slug or "research"
 
 
-def card_hero_image_url(post: dict[str, Any]) -> str | None:
+def card_hero_image_url(post: dict[str, Any], key: str = "hero_image") -> str | None:
     """Resolve an optional post-relative hero image for the Dev Notes index."""
-    raw_path = str(post["metadata"].get("hero_image", "")).strip()
+    raw_path = str(post["metadata"].get(key, "")).strip()
     if not raw_path:
         return None
 
@@ -210,9 +210,9 @@ def card_hero_image_url(post: dict[str, Any]) -> str | None:
     try:
         docs_relative = hero_path.relative_to(docs_root)
     except ValueError as exc:
-        raise ValueError(f"{post['path']} hero_image must stay inside {docs_root}") from exc
+        raise ValueError(f"{post['path']} {key} must stay inside {docs_root}") from exc
     if not hero_path.is_file():
-        raise ValueError(f"{post['path']} hero_image does not exist: {hero_path}")
+        raise ValueError(f"{post['path']} {key} does not exist: {hero_path}")
 
     return (Path("..") / docs_relative).as_posix()
 
@@ -222,10 +222,21 @@ def render_card_visual(post: dict[str, Any], *, eager: bool = False) -> str:
     variant = html.escape(card_visual_class(post), quote=True)
     hero_image = card_hero_image_url(post)
     if hero_image:
+        dark_image = card_hero_image_url(post, "hero_image_dark")
         loading = "eager" if eager else "lazy"
         priority = ' fetchpriority="high"' if eager else ""
+        light_class = " dev-note-image--light" if dark_image else ""
+        images = (
+            f'<img class="dev-note-card__visual-image{light_class}" '
+            f'src="{html.escape(hero_image, quote=True)}" alt="" loading="{loading}"{priority}>'
+        )
+        if dark_image:
+            images += (
+                '\n        <img class="dev-note-card__visual-image dev-note-image--dark" '
+                f'src="{html.escape(dark_image, quote=True)}" alt="" loading="{loading}"{priority}>'
+            )
         return f"""      <div class="dev-note-card__visual dev-note-card__visual--{variant} dev-note-card__visual--image" aria-hidden="true">
-        <img class="dev-note-card__visual-image" src="{html.escape(hero_image, quote=True)}" alt="" loading="{loading}"{priority}>
+        {images}
       </div>"""
 
     categories = require_list(metadata, "categories", post["path"])
