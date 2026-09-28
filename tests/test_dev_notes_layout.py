@@ -14,15 +14,16 @@ Use --install-browser once to install Chromium, WebKit, and their dependencies.
 
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+import json
 import os
 from pathlib import Path
 import re
 import subprocess
 import sys
 from threading import Thread
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 import pytest
 
 
@@ -165,6 +166,95 @@ def test_featured_image_also_works_as_a_thumbnail(page, site_url, viewport):
         section.append(recent);
     }""")
     assert_index_proportions(page, viewport)
+
+
+def test_index_filters_combine_restore_and_share(page, site_url):
+    open_page(page, f"{site_url}/dev-notes/")
+    records = [
+        {
+            "title": card.locator("h3").inner_text(),
+            "category": card.get_attribute("data-category"),
+            "authors": json.loads(card.get_attribute("data-authors")),
+        }
+        for card in page.locator(".dev-note-card").all()
+    ]
+    category = page.get_by_role("combobox", name="Category", exact=True)
+    author = page.get_by_role("combobox", name="Author", exact=True)
+    titles = page.locator(".dev-note-card:visible h3")
+    clear = page.get_by_role("button", name="Clear filters", exact=True)
+    selected_author = records[0]["authors"][0]
+    author.select_option(selected_author)
+    author_matches = [record["title"] for record in records if selected_author in record["authors"]]
+    expect(titles).to_have_text(author_matches)
+    assert parse_qs(urlparse(page.url).query)["author"] == [selected_author]
+
+    for value in ["announcements", "research", "case-studies", "examples"]:
+        category.select_option(value)
+        matches = [
+            record["title"] for record in records
+            if selected_author in record["authors"] and record["category"] == value
+        ]
+        expect(titles).to_have_text(matches)
+        if matches:
+            expect(page.locator(".dev-notes-filter-empty")).to_be_hidden()
+        else:
+            expect(page.locator(".dev-notes-filter-empty")).to_be_visible()
+        assert_no_horizontal_overflow(page)
+
+    page.reload(wait_until="networkidle")
+    expect(category).to_have_value("examples")
+    expect(author).to_have_value(selected_author)
+    expect(titles).to_have_text(matches)
+    clear.click()
+    expect(titles).to_have_text([record["title"] for record in records])
+    expect(category).to_be_focused()
+    expect(page.locator(".dev-note-card--featured h3")).to_have_text(records[0]["title"])
+    page.go_back()
+    expect(category).to_have_value("examples")
+    expect(author).to_have_value(selected_author)
+    expect(titles).to_have_text(matches)
+    page.go_forward()
+    expect(titles).to_have_text([record["title"] for record in records])
+
+    # Match a different author and verify their newest note is promoted.
+    selected_author = records[-1]["authors"][0]
+    author.select_option(selected_author)
+    matches = [record["title"] for record in records if selected_author in record["authors"]]
+    expect(titles).to_have_text(matches)
+    expect(page.locator(".dev-note-card--featured h3")).to_have_text(matches[0])
+    clear.click()
+    open_page(page, f"{site_url}/dev-notes/?category=invalid&author=unknown&source=check")
+    expect(titles).to_have_text([record["title"] for record in records])
+    assert parse_qs(urlparse(page.url).query) == {"source": ["check"]}
+
+
+def test_article_bylines_open_filtered_notes(page, site_url):
+    post_url = f"{site_url}/dev-notes/posts/{POSTS[0].stem}/"
+    open_page(page, post_url)
+    title = page.locator(".dev-note-header h1").inner_text()
+    page.locator(".dev-note-byline__author").first.click()
+    expect(page.locator(".dev-notes-filters")).to_be_visible()
+    assert parse_qs(urlparse(page.url).query)["author"]
+    expect(page.locator(".dev-note-card:visible h3").filter(has_text=title)).to_have_count(1)
+    open_page(page, post_url)
+    page.locator(".dev-note-byline__label a").click()
+    expect(page.locator(".dev-notes-filters")).to_be_visible()
+    assert parse_qs(urlparse(page.url).query)["category"]
+    expect(page.locator(".dev-note-card:visible h3").filter(has_text=title)).to_have_count(1)
+
+
+def test_index_remains_readable_without_javascript(browser, site_url):
+    page = browser.new_page(java_script_enabled=False)
+    page.route("**/*", lambda route: route.continue_() if urlparse(route.request.url).hostname == "127.0.0.1" else route.abort())
+    try:
+        response = page.goto(f"{site_url}/dev-notes/?category=research")
+        assert response.ok
+        expect(page.locator(".dev-notes-filters")).to_be_hidden()
+        expect(page.locator(".dev-note-card:visible")).to_have_count(len(POSTS))
+        page.locator(".dev-note-card__link").first.click()
+        expect(page.locator(".dev-note-header h1")).to_be_visible()
+    finally:
+        page.close()
 
 
 @pytest.mark.parametrize("post", POSTS, ids=lambda post: post.stem)

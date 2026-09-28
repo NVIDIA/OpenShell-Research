@@ -105,7 +105,7 @@ def test_legacy_opening_is_not_silently_duplicated(post):
 def test_fixed_category_is_consistent_on_cards_and_articles(post, category):
     post["metadata"]["categories"] = [category]
     assert f"<span>{category}</span>" in renderer.render_card_copy(post)
-    assert f"<span>{category}</span>" in renderer.render_byline(post)
+    assert f'>{category}</a>' in renderer.render_byline(post)
     assert f"Dev Note / {category}</span>" in renderer.render_card_visual(post)
 
 
@@ -138,3 +138,23 @@ def test_category_errors_leave_generated_content_untouched(post, monkeypatch, ca
         renderer.main()
 
     assert {path: path.read_bytes() for path in originals} == originals
+
+
+def test_browse_filters_include_empty_categories_and_all_coauthors(post):
+    post["metadata"]["authors"].append("grace")
+    post["authors"].append({"name": "Grace & Co", "github": "grace"})
+    result = renderer.render_browse_filters([post, post])
+    for category in ["Announcements", "Research", "Case Studies", "Examples"]:
+        assert f'>{category}</option>' in result
+    assert result.count('value="ada"') == 1
+    assert result.count('value="grace"') == 1
+    assert "Grace &amp; Co" in result
+    assert 'data-authors="[&quot;ada&quot;, &quot;grace&quot;]"' in renderer.render_card_filter_data(post)
+
+
+def test_byline_links_use_the_index_source_and_encode_author_ids(post):
+    post["metadata"]["authors"] = ['ada&co']
+    post["metadata"]["categories"] = ["Case Studies"]
+    result = renderer.render_byline(post)
+    assert 'href="../index.md?author=ada%26co"' in result
+    assert 'href="../index.md?category=case-studies"' in result

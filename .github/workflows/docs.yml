@@ -54,6 +54,7 @@ jobs:
       - name: Check documentation JavaScript syntax
         run: |
           node --check docs/javascripts/navigation-drawer.js
+          node --check docs/javascripts/dev-notes.js
           node --check docs/javascripts/pi-traces.js
 
       - name: Test navigation JavaScript behavior

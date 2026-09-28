@@ -67,6 +67,15 @@ Categories appear consistently on index cards and article bylines. Categories
 remain available even when they have no posts; do not create placeholder notes.
 Use tags for subject areas such as robotics, formal methods, or agent security.
 
+Readers can combine category and author filters on the Dev Notes index. The
+renderer derives the author menu from every post's author IDs and always includes
+all four categories, including those without posts. The newest matching post is
+featured; the remaining matches keep their chronological order. Filters use
+`?category=research&author=johnnygreco` URLs that survive refresh and browser
+Back/Forward navigation. Article byline names and categories link to these
+filtered views. Empty combinations show a message and a clear-filters action.
+Keep the full index readable when JavaScript is unavailable.
+
 The renderer uses `card_tags` as the card's tags, falling back to `tags`.
 An optional `card_variant` must have matching card and
 artwork CSS modifiers in `docs/stylesheets/dev-notes.css`. Set `hero_image` to

@@ -12,6 +12,7 @@ import json
 import re
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -140,15 +141,6 @@ def avatar_url(author: dict[str, str], size: int) -> str:
     return f"https://github.com/{github}.png?size={size}"
 
 
-def profile_url(author: dict[str, str]) -> str:
-    if "url" in author:
-        return author["url"]
-    github = author.get("github")
-    if not github:
-        raise ValueError(f"Author {author.get('name', '<unknown>')} needs a github or url field")
-    return f"https://github.com/{github}"
-
-
 def natural_join(values: list[str]) -> str:
     if not values:
         return ""
@@ -252,7 +244,7 @@ def render_card_visual(post: dict[str, Any], *, eager: bool = False) -> str:
         {images}
       </div>"""
 
-    label = require_category(metadata, post["path"])
+    label = require_category(post["metadata"], post["path"])
     date_stamp = post["published"].strftime("%Y.%m.%d")
     return f"""      <div class="dev-note-card__visual dev-note-card__visual--{variant}" aria-hidden="true">
         <span class="dev-note-card__visual-label">Dev Note / {html.escape(label)}</span>
@@ -303,11 +295,24 @@ def render_card_copy(post: dict[str, Any]) -> str:
       </div>"""
 
 
+def category_slug(category: str) -> str:
+    return category.lower().replace(" ", "-")
+
+
+def render_card_filter_data(post: dict[str, Any]) -> str:
+    category = category_slug(require_category(post["metadata"], post["path"]))
+    authors = require_list(post["metadata"], "authors", post["path"])
+    return (
+        f'data-category="{html.escape(category, quote=True)}" '
+        f'data-authors="{html.escape(json.dumps(authors), quote=True)}"'
+    )
+
+
 def render_featured_card(post: dict[str, Any]) -> str:
     relative_url = post["path"].relative_to(DEV_NOTES_DIR).with_suffix("").as_posix() + "/"
     variant = card_visual_class(post)
     image_class = " dev-note-card--has-image" if card_hero_image_url(post) else ""
-    return f"""    <article class="dev-note-card dev-note-card--featured dev-note-card--{html.escape(variant, quote=True)}{image_class}">
+    return f"""    <article class="dev-note-card dev-note-card--featured dev-note-card--{html.escape(variant, quote=True)}{image_class}" {render_card_filter_data(post)}>
       <a class="dev-note-card__link" href="{html.escape(relative_url, quote=True)}">
 {render_card_visual(post, eager=True)}
 {render_card_copy(post)}
@@ -319,12 +324,42 @@ def render_recent_card(post: dict[str, Any]) -> str:
     relative_url = post["path"].relative_to(DEV_NOTES_DIR).with_suffix("").as_posix() + "/"
     variant = card_visual_class(post)
     image_class = " dev-note-card--has-image" if card_hero_image_url(post) else ""
-    return f"""    <article class="dev-note-card dev-note-card--recent dev-note-card--{html.escape(variant, quote=True)}{image_class}">
+    return f"""    <article class="dev-note-card dev-note-card--recent dev-note-card--{html.escape(variant, quote=True)}{image_class}" {render_card_filter_data(post)}>
       <a class="dev-note-card__link" href="{html.escape(relative_url, quote=True)}">
 {render_card_visual(post)}
 {render_card_copy(post)}
       </a>
     </article>"""
+
+
+def render_browse_filters(posts: list[dict[str, Any]]) -> str:
+    authors = {}
+    for post in posts:
+        ids = require_list(post["metadata"], "authors", post["path"])
+        authors.update(zip(ids, post["authors"], strict=True))
+    categories_html = "\n".join(
+        f'          <option value="{category_slug(category)}">{category}</option>'
+        for category in POST_CATEGORIES
+    )
+    authors_html = "\n".join(
+        f'          <option value="{html.escape(author_id, quote=True)}">{html.escape(author["name"])}</option>'
+        for author_id, author in sorted(authors.items(), key=lambda item: item[1]["name"].casefold())
+    )
+    return f"""      <form class="dev-notes-filters" aria-label="Filter Dev Notes" hidden>
+        <label for="dev-notes-category">Category
+          <select id="dev-notes-category" name="category" aria-controls="dev-notes-results">
+            <option value="">All categories</option>
+{categories_html}
+          </select>
+        </label>
+        <label for="dev-notes-author">Author
+          <select id="dev-notes-author" name="author" aria-controls="dev-notes-results">
+            <option value="">All authors</option>
+{authors_html}
+          </select>
+        </label>
+        <button type="button" class="dev-notes-filters__clear" hidden>Clear filters</button>
+      </form>"""
 
 
 def render_index_cards(posts: list[dict[str, Any]]) -> str:
@@ -345,12 +380,16 @@ def render_index_cards(posts: list[dict[str, Any]]) -> str:
 {recent}
     </div>
   </section>"""
-        body = f"""  <section class="journal-section dev-notes-featured" aria-labelledby="featured-note-title">
-    <div class="journal-section__head">
-      <h2 id="featured-note-title">Featured note</h2>
+        body = f"""<div id="dev-notes-results">
+  <section class="journal-section dev-notes-featured" aria-labelledby="featured-note-title">
+    <div class="journal-section__head dev-notes-toolbar">
+      <h2 id="featured-note-title" aria-live="polite" aria-atomic="true">Featured note</h2>
+{render_browse_filters(posts)}
     </div>
 {featured}
-  </section>{recent_section}"""
+    <p class="dev-notes-filter-empty" hidden></p>
+  </section>{recent_section}
+</div>"""
     return (
         f"{POSTS_START}\n"
         "<!-- Generated by scripts/render-dev-notes.py; edit posts and authors.json. -->\n"
@@ -409,12 +448,15 @@ def render_byline(post: dict[str, Any]) -> str:
     metadata = post["metadata"]
     published = post["published"]
     category = require_category(metadata, post["path"])
+    category_url = "../index.md?" + urlencode({"category": category_slug(category)})
     blocks = []
-    for author in authors:
+    author_ids = require_list(metadata, "authors", post["path"])
+    for author_id, author in zip(author_ids, authors, strict=True):
+        author_url = "../index.md?" + urlencode({"author": author_id})
         description = author.get("description", "")
         description_html = f"\n        <span>{html.escape(description)}</span>" if description else ""
         blocks.append(
-            f"""    <a class="dev-note-byline__author" href="{html.escape(profile_url(author), quote=True)}">
+            f"""    <a class="dev-note-byline__author" href="{html.escape(author_url, quote=True)}">
       <img src="{html.escape(avatar_url(author, 96), quote=True)}" alt="" loading="lazy">
       <span class="dev-note-byline__copy">
         <strong>{html.escape(author["name"])}</strong>{description_html}
@@ -431,7 +473,7 @@ def render_byline(post: dict[str, Any]) -> str:
   <p class="dev-note-byline__label">
     <span>Dev Note</span>
     <time datetime="{published.isoformat()}">{html.escape(format_date(published))}</time>
-    <span>{html.escape(category)}</span>
+    <a href="{html.escape(category_url, quote=True)}">{html.escape(category)}</a>
   </p>
 </div>
 {BYLINE_END}"""

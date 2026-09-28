@@ -36,6 +36,7 @@ def make_post(
         "title": title,
         "date": date,
         "description": description,
+        "authors": ["ada"],
         "categories": ["Research"] if categories is None else categories,
         "tags": tags or ["agents", "runtime"],
     }
