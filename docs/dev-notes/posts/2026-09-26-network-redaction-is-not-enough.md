@@ -323,7 +323,7 @@ To recreate the experiments in this post, point an agent at our [experiment spec
 
 ```bibtex
 @article{greco2026networkredaction,
-  author = {Johnny Greco and Kirit Thadaka and Piotr Mlocek and {OpenShell Research Team}},
+  author = {Johnny Greco and {OpenShell Research Team}},
   title = {The leak is coming from inside the sandbox},
   journal = {OpenShell Research Dev Notes},
   year = {2026},
