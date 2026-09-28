@@ -367,6 +367,8 @@
       
         
       
+        
+      
     
     
     
@@ -406,6 +408,36 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-notes/posts/2026-09-28-introducing-openshell-research/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Introducing OpenShell Research
+
+    
+      <br>
+      <small>Hello, world—from the OpenShell Research team.</small>
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -974,7 +1006,10 @@ fixed names:</p>
 unknown, or multiple categories fail the build with an author-facing error.
 Categories appear consistently on index cards and article bylines. Categories
 remain available even when they have no posts; do not create placeholder notes.
-Use tags for subject areas such as robotics, formal methods, or agent security.</p>
+Use one <code>tags</code> list for specific topics such as <code>robotics</code>, <code>formal-methods</code>, or
+<code>agent-security</code>. Avoid generic <code>openshell</code> and <code>agents</code> tags; use
+<code>agent-security</code> consistently instead of <code>security</code>. Tags feed site search
+metadata; articles and index cards do not display tag badges.</p>
 <p>Readers can combine category and author filters on the Dev Notes index. The
 renderer derives the author menu from every post's author IDs and always includes
 all four categories, including those without posts. The newest matching post is
@@ -983,8 +1018,7 @@ featured; the remaining matches keep their chronological order. Filters use
 Back/Forward navigation. Article byline names and categories link to these
 filtered views. Empty combinations show a message and a clear-filters action.
 Keep the full index readable when JavaScript is unavailable.</p>
-<p>The renderer uses <code>card_tags</code> as the card's tags, falling back to <code>tags</code>.
-An optional <code>card_variant</code> must have matching card and
+<p>An optional <code>card_variant</code> must have matching card and
 artwork CSS modifiers in <code>docs/stylesheets/dev-notes.css</code>. Set <code>hero_image</code> to
 an image path relative to the post, and describe it with <code>hero_image_alt</code>. The
 renderer uses it for both the post's opening hero and its index thumbnail. Set
@@ -1055,25 +1089,14 @@ archive entries.</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>python3<span class="w"> </span>scripts/render-dev-notes.py
 </span></code></pre></div>
 <p>Commit any generated changes with the source change.</p>
-<p>The Docs workflow runs the header tests, verifies generated content is committed,
-and checks the built site in Chromium and WebKit at desktop, tablet, and phone
-sizes in both themes. The browser checks discover every note automatically. They reject missing
-hero assets or alt text, cropped or thumbnail-sized article heroes, overly long text lines,
-horizontal page overflow, off-center heroes, images overflowing their figures or
-overlapping the byline, incorrect theme-image visibility, an opening that needs
-scrolling to see the full hero, and an index that obscures the featured title on
-laptops or pushes the featured note below a 900px-tall
-desktop viewport. They also check the separation of introduction, filters, and posts.
-They also move the featured note into the recent list to exercise its thumbnail
-layout. The workflow saves screenshots as the <code>dev-notes-layout</code> artifact for
-visual review. These are layout
-constraints rather than pixel snapshots, so ordinary prose edits need no new
-baselines. They cannot judge the readability of labels baked into an image;
-review the screenshot and full-size image for detailed charts.</p>
-<p>The same browser checks cover shared navigation: footer titles must fit inside
-their links, breadcrumbs must remain readable, and wide documentation tables
-must scroll within the article without overflowing the page.
-Embedded demos are also played in both browsers. Publish MP4 recordings with
+<p>The Docs workflow runs renderer and header tests, JavaScript checks, the clean
+site build, and verification that generated content is committed. Browser layout
+checks run on demand, outside CI. Coding agents should use the repository's
+<a href="https://github.com/NVIDIA/OpenShell-Research/blob/main/.agents/skills/docs-visual-review/SKILL.md">docs-visual-review skill</a>
+when investigating rendering problems, changing shared presentation, or reviewing
+the site's appearance. It describes focused and full Chromium/WebKit checks,
+interaction testing, and screenshot review.</p>
+<p>Publish MP4 recordings with
 H.264 video, 8-bit <code>yuv420p</code> pixels, and streaming metadata at the beginning of
 the file (<code>faststart</code>); HEVC-only recordings do not play in every browser.</p>
 <p>For Pi transcript provenance, publication boundaries, and viewer checks, see
@@ -1102,13 +1125,10 @@ project site prefix.</p>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>node<span class="w"> </span>--check<span class="w"> </span>docs/javascripts/pi-traces.js
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>node<span class="w"> </span>tests/docs-preview.test.js
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>scripts/build-docs.sh
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>uv<span class="w"> </span>run<span class="w"> </span>--locked<span class="w"> </span>--script<span class="w"> </span>tests/test_dev_notes_layout.py<span class="w"> </span>--install-browser
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>uv<span class="w"> </span>run<span class="w"> </span>--locked<span class="w"> </span>--script<span class="w"> </span>tests/test_dev_notes_layout.py<span class="w"> </span>-q
 </span></code></pre></div>
-<p>The browser installer is needed once per environment. The test script's inline
-dependencies and adjacent uv lock pin its toolchain independently of the site
-builder. Browser checks serve the built artifact on an ephemeral local port and
-write viewport screenshots to <code>.cache/dev-notes-layout/</code>.</p>
+<p>For optional browser validation, follow the <code>docs-visual-review</code> skill linked
+above. Its locked test runner serves the built artifact on an ephemeral local
+port and writes screenshots to <code>.cache/dev-notes-layout/</code> for local inspection.</p>
 <p><code>scripts/build-docs.sh</code> recreates <code>.venv-docs</code>, installs the pinned toolchain,
 stages each configured canonical project documentation tree from <code>projects/</code>
 at its configured site destination, renders Dev Notes metadata, and runs <code>zensical

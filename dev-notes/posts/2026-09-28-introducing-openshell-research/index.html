@@ -6,32 +6,32 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Install OAR, connect to OpenShell, and run your first agent review.">
+        <meta name="description" content="Hello, world—from the OpenShell Research team.">
       
       
-        <meta name="author" content="OpenShell Research Engineering">
+        <meta name="author" content="Johnny Greco">
       
       
-        <link rel="canonical" href="https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/">
+        <link rel="canonical" href="https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-09-28-introducing-openshell-research/">
       
       
-        <link rel="prev" href="../">
+        <link rel="prev" href="../../">
       
       
-        <link rel="next" href="./reviews/">
+        <link rel="next" href="../2026-09-26-network-redaction-is-not-enough/">
       
       
         
       
       
-      <link rel="icon" href="../../assets/brand/favicon.svg">
+      <link rel="icon" href="../../../assets/brand/favicon.svg">
       <meta name="generator" content="zensical-0.0.62">
     
     
   
     
       
-        <title>OpenShell Agent Runner - OpenShell Research</title>
+        <title>Introducing OpenShell Research - OpenShell Research</title>
       
     
   
@@ -40,12 +40,12 @@
       
         
       
-      <link rel="stylesheet" href="../../assets/stylesheets/modern/main.ce62732f.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/modern/main.ce62732f.min.css">
       
         
           
         
-        <link rel="stylesheet" href="../../assets/stylesheets/modern/palette.812a03bb.min.css">
+        <link rel="stylesheet" href="../../../assets/stylesheets/modern/palette.812a03bb.min.css">
       
       
 
@@ -64,13 +64,13 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/dev-notes.css">
+      <link rel="stylesheet" href="../../../stylesheets/dev-notes.css">
     
-      <link rel="stylesheet" href="../../stylesheets/documentation.css">
+      <link rel="stylesheet" href="../../../stylesheets/documentation.css">
     
-      <link rel="stylesheet" href="../../stylesheets/pi-traces.css">
+      <link rel="stylesheet" href="../../../stylesheets/pi-traces.css">
     
-    <script>__md_scope=new URL("../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    <script>__md_scope=new URL("../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
     
       
 
@@ -97,16 +97,27 @@
   
   
   
-  <meta property="og:type" content="website">
+  <meta property="og:type" content="article">
   <meta property="og:site_name" content="OpenShell Research">
-  <meta property="og:title" content="OpenShell Agent Runner">
-  <meta property="og:description" content="Install OAR, connect to OpenShell, and run your first agent review.">
-  <meta property="og:url" content="https://nvidia.github.io/OpenShell-Research/documentation/openshell-agent-runner/">
-  <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="OpenShell Agent Runner">
-  <meta name="twitter:description" content="Install OAR, connect to OpenShell, and run your first agent review.">
+  <meta property="og:title" content="Introducing OpenShell Research">
+  <meta property="og:description" content="Hello, world—from the OpenShell Research team.">
+  <meta property="og:url" content="https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-09-28-introducing-openshell-research/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Introducing OpenShell Research">
+  <meta name="twitter:description" content="Hello, world—from the OpenShell Research team.">
+  
+    
+    <meta property="og:image" content="https://nvidia.github.io/OpenShell-Research/assets/openshell-research/hero.png">
+    <meta property="og:image:alt" content="Introducing OpenShell Research">
+    <meta name="twitter:image" content="https://nvidia.github.io/OpenShell-Research/assets/openshell-research/hero.png">
+    <meta name="twitter:image:alt" content="Introducing OpenShell Research">
   
   
+    <meta property="article:published_time" content="2026-09-28">
+    <meta property="article:modified_time" content="2026-09-28">
+  
+  
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"Johnny Greco"},"dateModified":"2026-09-28","datePublished":"2026-09-28","description":"Hello, world—from the OpenShell Research team.","headline":"Introducing OpenShell Research","image":"https://nvidia.github.io/OpenShell-Research/assets/openshell-research/hero.png","mainEntityOfPage":{"@id":"https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-09-28-introducing-openshell-research/","@type":"WebPage"}}</script>
   
 
   
@@ -121,7 +132,7 @@
     }
   </script>
   
-    <link rel="alternate" type="text/markdown" href="index.md" title="Markdown source">
+    <link rel="alternate" type="text/markdown" href="../2026-09-28-introducing-openshell-research.md" title="Markdown source">
   
 
   </head>
@@ -143,7 +154,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#openshell-agent-runner" class="md-skip">
+        <a href="#introducing-openshell-research" class="md-skip">
           Skip to content
         </a>
       
@@ -159,9 +170,9 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../../.." title="OpenShell Research" class="md-header__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     <label class="md-header__button md-icon openshell-drawer-button" for="__drawer" role="button" tabindex="0" aria-label="Open navigation" aria-controls="primary-navigation" aria-expanded="false">
@@ -182,7 +193,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              OpenShell Agent Runner
+              Introducing OpenShell Research
             
           </span>
         </div>
@@ -271,9 +282,9 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <div class="md-nav__title">
-    <a href="../.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
+    <a href="../../.." title="OpenShell Research" class="md-nav__button md-logo" aria-label="OpenShell Research" data-md-component="logo">
       
-  <img src="../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
+  <img src="../../../assets/brand/openshell-mark.svg" alt="OpenShell Research">
 
     </a>
     OpenShell Research
@@ -302,6 +313,8 @@
       
   
   
+    
+  
   
   
     
@@ -322,15 +335,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../../dev-notes/" class="md-nav__link ">
+            <a href="../../" class="md-nav__link ">
               
   
   
@@ -353,7 +366,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_1_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_1">
             <span class="md-nav__icon md-icon"></span>
             
@@ -369,8 +382,10 @@
                 
   
   
+    
   
   
+  
     
     
       
@@ -392,11 +407,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_1_2" checked>
         
           
           <label class="md-nav__link" for="__nav_1_2" id="__nav_1_2_label" tabindex="0">
@@ -416,7 +431,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_1_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_1_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_1_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -430,10 +445,39 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../dev-notes/posts/2026-09-28-introducing-openshell-research/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Introducing OpenShell Research
+
+    
+      <br>
+      <small>Hello, world—from the OpenShell Research team.</small>
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
         
   
   
@@ -451,6 +495,38 @@
   
 
       </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#join-us" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Join us
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -463,7 +539,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev-notes/posts/2026-09-26-network-redaction-is-not-enough/" class="md-nav__link">
+      <a href="../2026-09-26-network-redaction-is-not-enough/" class="md-nav__link">
         
   
   
@@ -493,7 +569,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev-notes/posts/2026-09-10-learning-formal-methods-agent-policy-prover/" class="md-nav__link">
+      <a href="../2026-09-10-learning-formal-methods-agent-policy-prover/" class="md-nav__link">
         
   
   
@@ -523,7 +599,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev-notes/posts/2026-08-27-adversarial-policy-review-long-horizon-agents/" class="md-nav__link">
+      <a href="../2026-08-27-adversarial-policy-review-long-horizon-agents/" class="md-nav__link">
         
   
   
@@ -550,7 +626,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev-notes/posts/2026-08-07-formal-methods-ai-generated-robot-actions/" class="md-nav__link">
+      <a href="../2026-08-07-formal-methods-ai-generated-robot-actions/" class="md-nav__link">
         
   
   
@@ -580,7 +656,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
+      <a href="../2026-07-20-policy-controlling-reachy-mini-with-openshell/" class="md-nav__link">
         
   
   
@@ -619,8 +695,6 @@
       
   
   
-    
-  
   
   
     
@@ -641,15 +715,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../" class="md-nav__link ">
+            <a href="../../../documentation/" class="md-nav__link ">
               
   
   
@@ -672,7 +746,7 @@
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -688,8 +762,6 @@
                 
   
   
-    
-  
   
   
     
@@ -711,15 +783,15 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2_2" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="././" class="md-nav__link md-nav__link--active">
+            <a href="../../../documentation/openshell-agent-runner/" class="md-nav__link ">
               
   
   
@@ -736,13 +808,13 @@
             </a>
             
               
-              <label class="md-nav__link md-nav__link--active" for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_2_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -761,7 +833,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./reviews/" class="md-nav__link">
+      <a href="../../../documentation/openshell-agent-runner/reviews/" class="md-nav__link">
         
   
   
@@ -788,7 +860,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./profiles/" class="md-nav__link">
+      <a href="../../../documentation/openshell-agent-runner/profiles/" class="md-nav__link">
         
   
   
@@ -815,7 +887,7 @@
   
   
     <li class="md-nav__item">
-      <a href="./reference/" class="md-nav__link">
+      <a href="../../../documentation/openshell-agent-runner/reference/" class="md-nav__link">
         
   
   
@@ -891,65 +963,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#before-you-start" class="md-nav__link">
+  <a href="#join-us" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Before you start
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#1-install-and-check-the-connection" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        1. Install and check the connection
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#2-create-your-profiles" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        2. Create your profiles
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3-run-your-first-review" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        3. Run your first review
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-read-the-result" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        4. Read the result
-      </span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      <span class="md-typeset">
-        Next steps
+        Join us
       </span>
     </span>
   </a>
@@ -981,7 +998,7 @@
   
   
     <li class="md-path__item">
-      <a href="../.." class="md-path__link">
+      <a href="../../.." class="md-path__link">
         
   
   <span class="md-ellipsis">
@@ -1011,11 +1028,11 @@
     
     
       <li class="md-path__item">
-        <a href="../" class="md-path__link">
+        <a href="../../" class="md-path__link">
           
   
   <span class="md-ellipsis">
-    Documentation
+    Dev Notes
   </span>
 
         </a>
@@ -1031,7 +1048,9 @@
     
       
         
-          
+      
+        
+      
         
       
         
@@ -1049,7 +1068,7 @@
           
   
   <span class="md-ellipsis">
-    OpenShell Agent Runner
+    Posts
   </span>
 
         </a>
@@ -1071,115 +1090,66 @@
 
 
   
-  <a href="index.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
+  <a href="../2026-09-28-introducing-openshell-research.md" title="View Markdown" aria-label="View Markdown" class="md-content__button md-icon">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.56 18H3.44C2.65 18 2 17.37 2 16.59V7.41C2 6.63 2.65 6 3.44 6h17.12c.79 0 1.44.63 1.44 1.41v9.18c0 .78-.65 1.41-1.44 1.41M3.44 6.94c-.26 0-.48.21-.48.47v9.19c0 .25.22.46.48.46h17.12c.26 0 .48-.21.48-.46V7.41c0-.26-.22-.47-.48-.47zm1.45 8.25V8.81h1.92l1.92 2.35 1.92-2.35h1.93v6.38h-1.93v-3.66l-1.92 2.35-1.92-2.35v3.66zm12.01 0-2.9-3.1h1.94V8.81h1.92v3.28h1.93z"/></svg>
   </a>
 
 
-<h1 id="openshell-agent-runner">OpenShell Agent Runner</h1>
-<p><img class="documentation-logo" src="assets/oar-logo.svg" alt="OAR — OpenShell Agent Runner" width="540"></p>
-<p>OpenShell Agent Runner (OAR) launches ephemeral
-<a href="https://github.com/earendil-works/pi/tree/main/packages/coding-agent">Pi coding agents</a>
-in OpenShell sandboxes. Each agent works on a task using the prompts, skills,
-tools, and permissions defined by its profile. Use OAR to run the included
-reviewers or your own agent workflows from a terminal or CI job.</p>
-<p>Pi supplies the agent loop, tools, skills, and model client. OAR prepares the
-task, launches Pi, collects the result, and removes the sandbox. OpenShell
-provides isolation and routes Pi's inference requests to your model.</p>
-<figure class="documentation-figure documentation-figure--wide">
-  <a href="assets/diagrams/system-overview.svg" aria-label="Open the OAR architecture diagram at full size">
-    <img src="assets/diagrams/system-overview.svg" alt="Three independent OAR runs share one OpenShell gateway. Pi runs in each sandbox with a profile containing prompts and skills: code-reviewer for two runs and technical-writing-reviewer for one. Inputs and results remain separate for each run.">
-  </a>
-  <figcaption>Each profile supplies prompts and skills to Pi. Runs stay isolated, even when they share a profile. Select the diagram to view it at full size.</figcaption>
+<!-- dev-note:header:start -->
+
+<!-- Generated by scripts/render-dev-notes.py; edit front matter and authors.json. -->
+
+<div class="dev-note-header">
+<h1 id="introducing-openshell-research">Introducing OpenShell Research</h1>
+<p class="dev-note-deck">Hello, world—from the OpenShell Research team.</p>
+<figure class="dev-note-figure dev-note-figure--hero">
+  <a class="dev-note-image--light" href="../../../assets/openshell-research/hero.png" aria-label="View full-size image: The OpenShell logo and Research label surrounded by green network nodes and translucent boundaries."><img src="../../../assets/openshell-research/hero.png" alt="The OpenShell logo and Research label surrounded by green network nodes and translucent boundaries." loading="eager" fetchpriority="high"></a>
+  <a class="dev-note-image--dark" href="../../../assets/openshell-research/hero-dark.png" aria-label="View full-size image: The OpenShell logo and Research label surrounded by green network nodes and translucent boundaries."><img src="../../../assets/openshell-research/hero-dark.png" alt="The OpenShell logo and Research label surrounded by green network nodes and translucent boundaries." loading="eager" fetchpriority="high"></a>
 </figure>
+</div>
+<!-- dev-note:byline:start -->
+<!-- Generated by scripts/render-dev-notes.py; edit front matter and authors.json. -->
+<div class="dev-note-byline">
+  <div class="dev-note-byline__authors" aria-label="Author: Johnny Greco">
+    <a class="dev-note-byline__author" href="../../?author=johnnygreco">
+      <img src="https://github.com/johnnygreco.png?size=96" alt="" loading="lazy">
+      <span class="dev-note-byline__copy">
+        <strong>Johnny Greco</strong>
+        <span>OpenShell Team @ NVIDIA</span>
+      </span>
+    </a>
+  </div>
+  <p class="dev-note-byline__label">
+    <span>Dev Note</span>
+    <time datetime="2026-09-28">September 28, 2026</time>
+    <a href="../../?category=announcements">Announcements</a>
+  </p>
+</div>
+<!-- dev-note:byline:end -->
 
-<p>A <strong>profile</strong> packages task prompts, reusable skills, model settings, and sandbox
-permissions. A <strong>task</strong> is one job defined in that profile; it selects the prompt
-and skills to use. You choose a profile, select a task, and provide the input and
-output paths.</p>
-<h2 id="before-you-start">Before you start</h2>
-<p>Install <a href="https://docs.astral.sh/uv/getting-started/installation/">uv</a> and set up
-OpenShell 0.0.111 or newer. You need a running <strong>gateway</strong> and configured
-<strong>inference</strong>: the connection that lets the agent use your model. Follow the
-<a href="https://docs.nvidia.com/openshell/latest/get-started/quickstart">OpenShell quickstart</a>
-if you have not set these up yet.</p>
-<p>OAR uses your existing OpenShell configuration. API keys and provider setup
-belong there. The packaged profiles configure Pi to send OpenAI-compatible
-Chat Completions requests to <code>https://inference.local/v1</code>. Choose a model and
-endpoint that support that API and tool calling.</p>
-<h2 id="1-install-and-check-the-connection">1. Install and check the connection</h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>tool<span class="w"> </span>install<span class="w"> </span>openshell-agent-runner
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>oar<span class="w"> </span>doctor
-</span></code></pre></div>
-<p>Alternatively, use <code>uvx --from openshell-agent-runner oar</code> in place of <code>oar</code>.</p>
-<p><code>doctor</code> displays the OpenShell version, gateway status, and inference
-configuration. Check that a model is configured and note its model ID for the
-next step.</p>
-<p>The commands on this page use your selected gateway and its <code>default</code> workspace.
-To choose another target, add <code>--gateway NAME --workspace NAME</code> to <code>doctor</code> and
-<code>run</code>. See <a href="reference/#choose-a-gateway-and-workspace">connection options</a>.</p>
-<h2 id="2-create-your-profiles">2. Create your profiles</h2>
-<p>Replace <code>YOUR_MODEL_ID</code> with your configured inference model ID:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>oar<span class="w"> </span>init<span class="w"> </span>./profiles<span class="w"> </span>--model<span class="w"> </span>YOUR_MODEL_ID
-</span></code></pre></div>
-<p>You now have two editable profiles:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>profiles/
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── code-reviewer/               Review a local project directory
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>└── technical-writing-reviewer/  Review a technical document
-</span></code></pre></div>
-<p>The default thinking level is <code>high</code>. For a model without reasoning support,
-add <code>--thinking off</code> to <code>init</code>; it also sets <code>reasoning: false</code> in Pi's model
-definition. <code>init</code> writes the model ID into the profile's <code>models.json</code> and
-<code>settings.json</code>. It does not configure or change OpenShell's inference route.
-See <a href="profiles/#configure-pis-model-and-inference">model and inference configuration</a>
-to understand these files or adapt them to your endpoint.</p>
-<h2 id="3-run-your-first-review">3. Run your first review</h2>
-<p>Choose an existing text file, such as a README, design note, or draft blog post.
-Replace <code>./README.md</code> with its path:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>oar<span class="w"> </span>run<span class="w"> </span>./profiles/technical-writing-reviewer<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--task<span class="w"> </span>review-document<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>--input<span class="w"> </span>./README.md<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>--output<span class="w"> </span>./review.json
-</span></code></pre></div>
-<p>OAR uploads the file, runs the reviewer, saves the result, and removes the
-sandbox. Your original file is unchanged.</p>
-<p>To check the configuration and preview the commands first, add <code>--dry-run</code>.
-This does not contact the gateway or launch an agent.</p>
-<h2 id="4-read-the-result">4. Read the result</h2>
-<p>Open <code>review.json</code>. It contains a verdict, a summary, scores from 0 to 100,
-findings, strengths, and limitations. A higher score is better.</p>
-<table>
-<thead>
-<tr>
-<th>Verdict</th>
-<th>Meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>pass</code></td>
-<td>No material changes are needed.</td>
-</tr>
-<tr>
-<td><code>needs_changes</code></td>
-<td>The reviewer found an issue worth fixing.</td>
-</tr>
-<tr>
-<td><code>inconclusive</code></td>
-<td>The reviewer needs more context to make a sound judgment.</td>
-</tr>
-</tbody>
-</table>
-<p>A successful command means OAR delivered a valid result. The review itself can
-still say <code>needs_changes</code>. See <a href="reviews/#understand-the-result">scores and findings</a>
-for the full meaning.</p>
-<h2 id="next-steps">Next steps</h2>
-<ul>
-<li><a href="reviews/">Run reviews</a>: review code, set a focus, and supply context.</li>
-<li><a href="profiles/">Customize profiles</a>: edit instructions or define your own tasks.</li>
-<li><a href="reference/">Command reference</a>: find options, CI behavior, and fixes for common problems.</li>
-</ul>
+<!-- dev-note:header:end -->
 
+<p class="dev-note-greeting"><span><span class="dev-note-greeting__prompt">&gt;_</span> Hello, world!</span></p>
+
+<p>Today we announced the <a href="https://developer.nvidia.com/blog/nvidia-open-agent-safety-platform-a-reference-for-continuous-in-silicon-agent-monitoring">NVIDIA Open Agent Safety Platform</a>, which runs on the open-source OpenShell platform. This feels like a great opportunity to introduce our team — <strong>OpenShell Research</strong>. We’re a cross-functional team of researchers, engineers, and product managers working together to shape OpenShell’s roadmap and advance the safe and secure use of autonomous AI agents in the enterprise and beyond.</p>
+<p>We believe AI agents have enormous potential to deliver value and help people, but realizing this potential requires understanding and limiting the harm they can cause. And as agents become more capable, the risks of deploying them evolve, which is why we started this team — to ensure OpenShell keeps pace with the demands of safe agent deployment. Our initial research efforts will span harness integrations, long-running and multi-agent systems, adversarial testing, policy verification using formal methods, and applications in robotics. We’ll build prototypes, run benchmarks and large-scale experiments, and turn what we learn into dependable OpenShell capabilities — we’re just getting started!</p>
+<p>We also believe that open research is essential to making AI safe. This is why we are committed to working with the open-source community and building in public. <a href="../../">Dev Notes</a> is where we’ll share our latest research, announcements, and the implementation lessons we learn along the way. When it makes sense to share (and maintain) code, we’ll put it in our <a href="https://github.com/NVIDIA/OpenShell-Research">OpenShell Research repo</a>. All code used in our research is always available upon request.</p>
+<div class="dev-note-section-heading--compact">
+<h2 id="join-us">Join us</h2>
+</div>
+<p>We’re hiring! We are actively looking for researchers and engineers who love to build and are passionate about pushing the boundaries of what’s possible through open research. If this sounds like you, please reach out and consider <a href="https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite/job/US-Remote/Software-Engineer--OpenShell_JR2020825">applying to join our team</a>.</p>
+
+
+  <nav class="md-tags" >
+    
+      
+      
+      
+      
+        <span class="md-tag">agent-security</span>
+      
+    
+  </nav>
 
 
 
@@ -1220,23 +1190,23 @@ for the full meaning.</p>
       <nav class="md-footer__inner md-grid" aria-label="Continue reading" >
         
           
-          <a href="../" class="md-footer__link md-footer__link--prev" aria-label="Previous: Documentation">
+          <a href="../../" class="md-footer__link md-footer__link--prev" aria-label="Previous: Dev Notes">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
             </div>
             <div class="md-footer__title">
               <span class="md-footer__direction">Previous</span>
-              <div class="md-ellipsis">Documentation</div>
+              <div class="md-ellipsis">Dev Notes</div>
             </div>
           </a>
         
         
           
-          <a href="./reviews/" class="md-footer__link md-footer__link--next" aria-label="Next: Run reviews">
+          <a href="../2026-09-26-network-redaction-is-not-enough/" class="md-footer__link md-footer__link--next" aria-label="Next: The leak is coming from inside the sandbox">
             <div class="md-footer__title">
               <span class="md-footer__direction">Next</span>
-              <div class="md-ellipsis">Run reviews</div>
+              <div class="md-ellipsis">The leak is coming from inside the sandbox</div>
             </div>
             <div class="md-footer__button md-icon">
               
@@ -1276,16 +1246,16 @@ for the full meaning.</p>
       
         
         
-      <script id="__config" type="application/json">{"annotate":null,"base":"../..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"redirect":null,"search":"../../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+      <script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"redirect":null,"search":"../../../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.8dcc8e9c.min.js"></script>
+      <script src="../../../assets/javascripts/bundle.8dcc8e9c.min.js"></script>
       
-        <script src="../../javascripts/navigation-drawer.js"></script>
+        <script src="../../../javascripts/navigation-drawer.js"></script>
       
-        <script src="../../javascripts/dev-notes.js"></script>
+        <script src="../../../javascripts/dev-notes.js"></script>
       
-        <script src="../../javascripts/pi-traces.js"></script>
+        <script src="../../../javascripts/pi-traces.js"></script>
       
     
   </body>

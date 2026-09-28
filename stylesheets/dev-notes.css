@@ -760,6 +760,11 @@ body:has(.openshell-home-page) .md-path {
   letter-spacing: -0.035em;
 }
 
+.dev-notes-featured .journal-section__head {
+  padding-left: 0.6rem;
+  border-left: 3px solid var(--openshell-green);
+}
+
 .dev-notes-page [hidden] {
   display: none !important;
 }
@@ -848,9 +853,9 @@ body:has(.openshell-home-page) .md-path {
 
 .dev-note-card--featured .dev-note-card__link {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   align-items: center;
-  gap: 1.5rem;
+  gap: 2rem;
 }
 
 .dev-note-card__visual {
@@ -998,7 +1003,7 @@ body:has(.openshell-home-page) .md-path {
 }
 
 .md-typeset .dev-note-card--featured h3 {
-  font-size: clamp(1.85rem, 3.5vw, 2.5rem);
+  font-size: clamp(2.1rem, 4.1vw, 2.95rem);
   line-height: 1.08;
   text-wrap: balance;
 }
@@ -1012,25 +1017,7 @@ body:has(.openshell-home-page) .md-path {
 }
 
 .md-typeset .dev-note-card--featured .dev-note-card__summary {
-  font-size: 1rem;
-}
-
-.dev-note-card__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.28rem 0.7rem;
-  margin-top: 0.6rem;
-  color: var(--openshell-accent);
-  font-family: var(--openshell-mono);
-  font-size: 0.54rem;
-  letter-spacing: 0.045em;
-  line-height: 1.4;
-  text-transform: uppercase;
-}
-
-.dev-note-card__tags span::before {
-  margin-right: 0.12rem;
-  content: "#";
+  font-size: 1.08rem;
 }
 
 .dev-note-card__footer {
@@ -1103,7 +1090,7 @@ body:has(.openshell-home-page) .md-path {
 }
 
 .dev-notes-recent {
-  margin-top: 1rem;
+  margin-top: 1.75rem;
   padding-top: 0.5rem;
   border-top: 1px solid var(--openshell-rule);
 }
@@ -1144,7 +1131,7 @@ body:has(.openshell-home-page) .md-path {
 .dev-note-card--recent .dev-note-card__copy {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "meta" "title" "summary" "tags" "footer";
+  grid-template-areas: "meta" "title" "summary" "footer";
   gap: 0.35rem;
   min-width: 0;
 }
@@ -1163,12 +1150,6 @@ body:has(.openshell-home-page) .md-path {
 .md-typeset .dev-note-card--recent .dev-note-card__summary {
   grid-area: summary;
   font-size: 0.78rem;
-}
-
-.dev-note-card--recent .dev-note-card__tags {
-  grid-area: tags;
-  align-self: center;
-  margin-top: 0;
 }
 
 .dev-note-card--recent .dev-note-card__footer {
@@ -1330,6 +1311,32 @@ body:has(.dev-note-header) .md-main__inner {
   line-height: 1.5;
 }
 
+.md-typeset .dev-note-section-heading--compact > h2 {
+  font-size: 1.25rem;
+}
+
+.md-typeset .dev-note-greeting {
+  font-family: var(--openshell-mono);
+  font-size: clamp(1.25rem, 3vw, 1.8rem);
+  font-variant-ligatures: none;
+}
+
+.dev-note-greeting__prompt {
+  color: var(--openshell-green);
+}
+
+.dev-note-greeting > span {
+  display: inline-block;
+  white-space: pre;
+  /* Reveal the 16 characters once, keeping the full text and layout intact. */
+  animation: dev-note-type-in 1.3s steps(16, end) 0.2s backwards;
+}
+
+@keyframes dev-note-type-in {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
 .md-typeset .dev-note-equation {
   margin: 1.4rem 0 1.7rem;
   padding: 1.1rem 1.35rem;
@@ -1480,7 +1487,7 @@ body:has(.dev-note-header) .md-main__inner {
   }
 
   .dev-note-card--featured .dev-note-card__visual {
-    width: min(100%, 21rem);
+    width: min(100%, 26rem);
     justify-self: center;
   }
 
@@ -1490,7 +1497,6 @@ body:has(.dev-note-header) .md-main__inner {
       "visual meta"
       "visual title"
       "summary summary"
-      "tags tags"
       "footer footer";
     gap: 0.4rem 0.75rem;
   }
@@ -1591,6 +1597,10 @@ body:has(.dev-note-header) .md-main__inner {
     scroll-behavior: auto;
   }
 
+  .dev-note-greeting > span {
+    animation: none;
+  }
+
   .openshell-drawer-button,
   .md-overlay,
   .md-sidebar--primary,
@@ -1601,6 +1611,17 @@ body:has(.dev-note-header) .md-main__inner {
   .dev-note-card__read::after {
     transition: none !important;
   }
+}
+
+@media print {
+  .dev-note-greeting > span {
+    animation: none;
+  }
+}
+
+/* Keep topic metadata searchable without displaying non-interactive badges. */
+body:has(.dev-note-header) .md-typeset .md-tags {
+  display: none;
 }
 
 /* Dev note figures and theme-specific images */
