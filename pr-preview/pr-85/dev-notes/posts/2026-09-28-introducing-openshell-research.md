@@ -70,6 +70,4 @@ We also believe that open research is essential to making AI safe. This is why w
 
 </div>
 
-We’re hiring! We are looking for researchers and engineers who love working at the frontier and building useful tools in public. If this sounds like you, we’d love to hear from you.
-
-**[Apply to join our team](https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite/job/US-Remote/Software-Engineer--OpenShell_JR2020825)**
+We’re hiring! We are actively looking for researchers and engineers who love to build and are passionate about pushing the boundaries of what’s possible through open research. If this sounds like you, please reach out and consider [applying to join our team](https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite/job/US-Remote/Software-Engineer--OpenShell_JR2020825).
