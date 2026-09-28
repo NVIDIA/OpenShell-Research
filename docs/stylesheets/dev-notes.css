@@ -1311,6 +1311,10 @@ body:has(.dev-note-header) .md-main__inner {
   line-height: 1.5;
 }
 
+.md-typeset .dev-note-section-heading--compact > h2 {
+  font-size: 1.25rem;
+}
+
 .md-typeset .dev-note-greeting {
   font-family: var(--openshell-mono);
   font-size: clamp(1.25rem, 3vw, 1.8rem);
