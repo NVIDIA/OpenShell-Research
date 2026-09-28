@@ -159,26 +159,15 @@ python3 scripts/render-dev-notes.py
 
 Commit any generated changes with the source change.
 
-The Docs workflow runs the header tests, verifies generated content is committed,
-and checks the built site in Chromium and WebKit at desktop, tablet, and phone
-sizes in both themes. The browser checks discover every note automatically. They reject missing
-hero assets or alt text, cropped or thumbnail-sized article heroes, overly long text lines,
-horizontal page overflow, off-center heroes, images overflowing their figures or
-overlapping the byline, incorrect theme-image visibility, an opening that needs
-scrolling to see the full hero, and an index that obscures the featured title on
-laptops or pushes the featured note below a 900px-tall
-desktop viewport. They also check the separation of introduction, filters, and posts.
-They also move the featured note into the recent list to exercise its thumbnail
-layout. The workflow saves screenshots as the `dev-notes-layout` artifact for
-visual review. These are layout
-constraints rather than pixel snapshots, so ordinary prose edits need no new
-baselines. They cannot judge the readability of labels baked into an image;
-review the screenshot and full-size image for detailed charts.
+The Docs workflow runs renderer and header tests, JavaScript checks, the clean
+site build, and verification that generated content is committed. Browser layout
+checks run on demand, outside CI. Coding agents should use the repository's
+[docs-visual-review skill](https://github.com/NVIDIA/OpenShell-Research/blob/main/.agents/skills/docs-visual-review/SKILL.md)
+when investigating rendering problems, changing shared presentation, or reviewing
+the site's appearance. It describes focused and full Chromium/WebKit checks,
+interaction testing, and screenshot review.
 
-The same browser checks cover shared navigation: footer titles must fit inside
-their links, breadcrumbs must remain readable, and wide documentation tables
-must scroll within the article without overflowing the page.
-Embedded demos are also played in both browsers. Publish MP4 recordings with
+Publish MP4 recordings with
 H.264 video, 8-bit `yuv420p` pixels, and streaming metadata at the beginning of
 the file (`faststart`); HEVC-only recordings do not play in every browser.
 
@@ -216,14 +205,11 @@ uv run --python 3.12 --with pytest==8.4.2 pytest -q \
 node --check docs/javascripts/pi-traces.js
 node tests/docs-preview.test.js
 scripts/build-docs.sh
-uv run --locked --script tests/test_dev_notes_layout.py --install-browser
-uv run --locked --script tests/test_dev_notes_layout.py -q
 ```
 
-The browser installer is needed once per environment. The test script's inline
-dependencies and adjacent uv lock pin its toolchain independently of the site
-builder. Browser checks serve the built artifact on an ephemeral local port and
-write viewport screenshots to `.cache/dev-notes-layout/`.
+For optional browser validation, follow the `docs-visual-review` skill linked
+above. Its locked test runner serves the built artifact on an ephemeral local
+port and writes screenshots to `.cache/dev-notes-layout/` for local inspection.
 
 `scripts/build-docs.sh` recreates `.venv-docs`, installs the pinned toolchain,
 stages each configured canonical project documentation tree from `projects/`
