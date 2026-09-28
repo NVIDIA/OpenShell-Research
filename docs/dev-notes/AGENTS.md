@@ -23,7 +23,7 @@ optional subtitle and hero, author byline, index cards, and navigation.
 - Keep typography and hero sizing in the shared Dev Notes stylesheet. Do not add
   per-post title or hero sizing rules, inline styles, or fixed aspect ratios.
 - Keep detailed body figures readable; the hero links to its full-size image.
-- Run the documented build and locked browser layout checks. They discover all
-  notes automatically and cover both themes, desktop and phone widths, and a
-  featured note moving into the recent list. Commit regenerated files with the
-  authored metadata.
+- Run the documented renderer tests and build. Commit regenerated files with
+  the authored metadata. For rendering problems or presentation changes, use
+  `.agents/skills/docs-visual-review/SKILL.md` from the repository root for
+  on-demand browser checks and screenshot inspection; they are not CI gates.
