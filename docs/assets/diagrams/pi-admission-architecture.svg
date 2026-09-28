@@ -2,8 +2,8 @@
 <!-- SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved. -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <svg xmlns="http://www.w3.org/2000/svg" width="640" height="686" viewBox="0 0 640 686" role="img" aria-labelledby="title description">
-  <title id="title">Admission in the OpenShell architecture</title>
-  <desc id="description">Purple admission is an optional hook inside Pi before its agent loop, history, and tools. Orange custom network middleware is a separate optional service beside the supervisor. The supervisor sends it a request over gRPC and receives a result before forwarding to the model via OpenRouter. The gateway supplies configuration. Admission does not call the middleware.</desc>
+  <title id="title">Redaction in the OpenShell architecture</title>
+  <desc id="description">Admission redacted (purple): a custom Pi session manager redacts messages before they enter memory or are saved to disk. Network redacted (orange): custom network middleware redacts outgoing model requests. The middleware is a separate service called by the supervisor over gRPC before forwarding to the model via OpenRouter. The gateway supplies configuration. Admission does not call the middleware.</desc>
   <style>
     :root {
       color-scheme: light dark;
@@ -68,8 +68,8 @@
   <text class="label" x="224" y="185">Sandbox</text>
   <text class="small" x="224" y="207">Pi harness</text>
   <rect class="admission" x="226" y="218" width="356" height="72" rx="10"/>
-  <text class="heading admission-heading" x="404" y="248">Local admission</text>
-  <text class="detail" x="404" y="274">Redact before storage</text>
+  <text class="heading admission-heading" x="404" y="248">Admission redacted</text>
+  <text class="detail" x="404" y="274">Before memory &amp; disk</text>
   <rect class="group" x="226" y="324" width="356" height="64" rx="10"/>
   <text class="heading" x="404" y="351">Agent loop</text>
   <text class="detail" x="404" y="375">Session history · tools</text>
@@ -81,8 +81,8 @@
 
   <rect class="middleware" x="16" y="448" width="166" height="102" rx="10"/>
   <text class="label middleware-heading" x="99" y="476" text-anchor="middle">Network</text>
-  <text class="label middleware-heading" x="99" y="500" text-anchor="middle">middleware</text>
-  <text class="small" x="99" y="528" text-anchor="middle">Separate service</text>
+  <text class="label middleware-heading" x="99" y="500" text-anchor="middle">redacted</text>
+  <text class="small" x="99" y="528" text-anchor="middle">Middleware</text>
   <path class="flow" d="M286 480H184"/>
   <text class="connection-label" x="234" y="470">Request</text>
   <text class="connection-label" x="234" y="509">gRPC</text>

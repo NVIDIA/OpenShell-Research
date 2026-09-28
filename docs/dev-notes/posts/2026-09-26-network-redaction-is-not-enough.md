@@ -92,7 +92,7 @@ We ran two experiments per model:
 In both cases, the model initially saw `[EMAIL]` in place of a full email address. The difference was what the agent could still read from its session history.
 
 <figure class="dev-note-figure dev-note-figure--admission" id="pi-admission-architecture">
-  <img src="../../assets/diagrams/pi-admission-architecture.svg" alt="OpenShell architecture with the custom redaction components added for these experiments shown as dashed colored boxes: purple admission inside Pi, and orange network middleware beside the supervisor. Middleware remains a separate service: the supervisor calls it over gRPC, receives its result, then forwards the request to the model via OpenRouter. The gateway configures the supervisor." width="640" height="686" loading="lazy">
+  <img src="../../assets/diagrams/pi-admission-architecture.svg" alt="OpenShell architecture with two custom redaction components shown as dashed colored boxes: Admission redacted (purple) inside Pi, before messages enter memory or are saved to disk, and Network redacted (orange) in request middleware beside the supervisor. The middleware is a separate service called by the supervisor over gRPC before forwarding the request to the model via OpenRouter. The gateway configures the supervisor." width="640" height="686" loading="lazy">
   <figcaption>
     <span class="dev-note-figure__caption-label">Figure 1</span>
     <p>The <a href="https://docs.nvidia.com/openshell/about/architecture">OpenShell architecture</a> with the redaction components we added for these experiments shown as dashed colored boxes.</p>
