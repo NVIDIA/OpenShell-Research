@@ -11,6 +11,7 @@
     const overlay = document.querySelector('.md-overlay[for="__drawer"]');
     const modalDrawer = window.matchMedia(modalDrawerQuery);
     const button = document.querySelector(".openshell-drawer-button");
+    const closeButton = document.querySelector(".openshell-drawer-close");
 
     if (
       !(toggle instanceof HTMLInputElement) ||
@@ -161,6 +162,7 @@
     };
 
     button.addEventListener("click", onButtonClick);
+    closeButton?.addEventListener("click", onOverlayClick);
     toggle.addEventListener("change", onToggleChange);
     sidebar.addEventListener("click", onSidebarClick);
     overlay?.addEventListener("click", onOverlayClick);
@@ -182,6 +184,7 @@
 
     cleanup = () => {
       button.removeEventListener("click", onButtonClick);
+      closeButton?.removeEventListener("click", onOverlayClick);
       toggle.removeEventListener("change", onToggleChange);
       sidebar.removeEventListener("click", onSidebarClick);
       overlay?.removeEventListener("click", onOverlayClick);
