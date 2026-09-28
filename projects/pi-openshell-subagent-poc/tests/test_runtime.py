@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
@@ -48,7 +49,6 @@ def settings(tmp_path: Path) -> Settings:
         database_path=tmp_path / "jobs.sqlite3",
         gateway="gateway",
         workspace="workspace",
-        child_provider="poc-openai",
         child_models_file=models,
     )
 
@@ -57,7 +57,8 @@ def phases(calls: list[list[str]]) -> list[str]:
     return ["logs" if call[1] == "logs" else call[2] for call in calls]
 
 
-def test_runtime_creates_executes_captures_logs_and_deletes(tmp_path: Path) -> None:
+def test_runtime_creates_executes_captures_logs_and_deletes(tmp_path: Path, caplog) -> None:
+    caplog.set_level(logging.DEBUG, logger="openshell_tool_service.runtime")
     calls: list[list[str]] = []
     inputs: list[str | None] = []
 
@@ -67,6 +68,9 @@ def test_runtime_creates_executes_captures_logs_and_deletes(tmp_path: Path) -> N
         argv = list(command)
         calls.append(argv)
         inputs.append(input_text)
+        if "--policy" in argv:
+            policy_path = Path(argv[argv.index("--policy") + 1])
+            assert policy_path.read_text() == job().child_policy
         stdout = (
             "OPEN_SHELL_CHILD_OK\n"
             if "exec" in argv
@@ -81,8 +85,15 @@ def test_runtime_creates_executes_captures_logs_and_deletes(tmp_path: Path) -> N
     assert result.output == "OPEN_SHELL_CHILD_OK"
     assert result.sandbox_logs == "captured sandbox log\n"
     assert phases(calls) == ["create", "exec", "logs", "delete"]
+    visible = [r.getMessage() for r in caplog.records if r.levelno >= logging.INFO]
+    assert len(visible) == 1
+    assert "12345678 RUNNING" in visible[0]
+    assert "sandbox=pi-child-1234567890" in visible[0]
+    assert "policy snapshots verified" not in visible[0]
+    assert "child.exec completed" in caplog.text
+    assert "sandbox deleted" in caplog.text
     assert inputs[1] == "Return OPEN_SHELL_CHILD_OK"
-    assert "--provider" in calls[0]
+    assert "--provider" not in calls[0]
     assert "--upload" in calls[0]
     assert "PI_CODING_AGENT_DIR=/home/sandbox/.pi/agent" in calls[0]
     assert not any("COLLABORATION" in value for value in calls[0])

@@ -29,6 +29,17 @@ network-only increase:
 
 - Read `/etc/openshell/skills/policy-advisor/SKILL.md` in the parent sandbox.
 - Submit only the missing network authority as narrow `addRule` operations.
-- Wait for human approval and `policy_reloaded: true`.
+- Wait once using `/v1/proposals/<id>/wait?timeout=30`, curl `--max-time 35`,
+  and a 40-second shell-tool timeout. This overrides longer wait examples in
+  the Policy Advisor skill. Require human approval and `policy_reloaded: true`.
+- If approval and reload are not confirmed, report the proposal ID and ask the
+  user to review it in `openshell term`. Do not automatically repeat the wait
+  or submit a duplicate proposal. A wait timeout does not authorize a launch.
 - Launch a new `openshell-worker`; do not reattach to the denied job.
 - Never approve the proposal yourself.
+
+If the service returns `policy-review-unsupported`, `policy-review-inconclusive`,
+or `policy-review-unavailable`, no child sandbox was created. Report the prover
+diagnostic and stop. These outcomes are not evidence of missing parent authority
+and must not trigger a Policy Advisor proposal. Do not remove baseline policy
+fields, omit required permissions, or execute locally to bypass the prover.

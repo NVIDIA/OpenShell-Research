@@ -10,15 +10,16 @@ from fastapi import Depends, FastAPI, Header, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from openshell_tool_service.config import Settings
+from openshell_tool_service.policy_composer import OpenShellPolicyComposer
 from openshell_tool_service.policy_reviewer import (
-    LlmPolicyReviewer,
     PolicyReviewer,
+    ProverPolicyReviewer,
 )
 from openshell_tool_service.runtime import (
     OpenShellCliParentPolicySource,
     OpenShellCliRuntime,
 )
-from openshell_tool_service.service import ParentPolicySource, Runtime, ToolService
+from openshell_tool_service.service import ParentPolicySource, PolicyComposer, Runtime, ToolService
 from openshell_tool_service.store import IdempotencyConflictError, Job, JobStore
 
 
@@ -75,15 +76,12 @@ def create_app(
     runtime: Runtime | None = None,
     policy_reviewer: PolicyReviewer | None = None,
     parent_policy_source: ParentPolicySource | None = None,
+    policy_composer: PolicyComposer | None = None,
 ) -> FastAPI:
     settings = settings or Settings.from_env()
     if policy_reviewer is None:
-        if not settings.policy_review_api_key:
-            raise ValueError("policy reviewer API key is required")
-        policy_reviewer = LlmPolicyReviewer(
-            base_url=settings.policy_review_base_url,
-            api_key=settings.policy_review_api_key,
-            model=settings.policy_review_model,
+        policy_reviewer = ProverPolicyReviewer(
+            binary=settings.prover_bin,
             timeout_seconds=settings.policy_review_timeout_seconds,
         )
 
@@ -94,6 +92,8 @@ def create_app(
         policy_reviewer,
         parent_policy_source or OpenShellCliParentPolicySource(settings),
         max_workers=settings.max_workers,
+        policy_composer=(policy_composer or OpenShellPolicyComposer(settings))
+        if settings.child_provider else None,
     )
 
     @asynccontextmanager

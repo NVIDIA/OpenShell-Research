@@ -7,7 +7,7 @@ from openshell_tool_service import cli
 
 def test_cli_bounds_graceful_http_shutdown(monkeypatch) -> None:
     monkeypatch.setenv("OPENSHELL_TOOL_SERVICE_TOKEN", "test-token")
-    monkeypatch.setenv("NVIDIA_API_KEY", "test-api-key")
+    monkeypatch.delenv("NVIDIA_API_KEY", raising=False)
     monkeypatch.setenv("POC_GRACEFUL_SHUTDOWN_SECONDS", "2")
     application = object()
     captured: dict[str, Any] = {}

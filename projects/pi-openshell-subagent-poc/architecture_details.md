@@ -18,7 +18,7 @@ flowchart LR
     Parent --> Adapter[Pi Subagents\nexternal-job adapter]
     Adapter -->|HTTP job API| Tool[OpenShell Tool Service\ntrusted host process]
     Tool -->|policy get| Gateway[OpenShell gateway]
-    Tool -->|review request| Reviewer[LLM\npolicy reviewer]
+    Tool -->|local policy files| Reviewer[openshell-prover\ncontainment check]
     Tool -->|sandbox create / exec / logs / delete| Gateway
     Gateway --> Child[Child Pi\nOpenShell sandbox]
     Child -->|final stdout| Tool
@@ -34,7 +34,8 @@ flowchart LR
 | Pi Subagents | Subagent workflow and external-job lifecycle |
 | Local Pi adapter | Request translation and idempotency key |
 | Tool Service | Trusted child configuration and OpenShell CLI operations |
-| Policy reviewer | POC allow/deny recommendation |
+| Policy prover | Containment result, modeled scope, counterexample or reason for no proof |
+| Native composition helper | Reads live provider profiles and composes the effective child policy without creating a sandbox |
 | OpenShell | Sandbox lifecycle and policy enforcement |
 | Child Pi | Execution of one delegated prompt |
 
@@ -87,15 +88,25 @@ the flow is:
    request returns the same job.
 7. In a background worker, the Tool Service retrieves `pi-parent`'s live policy
    using `openshell policy get`.
-8. The LLM reviewer compares the parent policy, child policy, and task. It
-   must return a schema-valid `allow`; deny, timeout, malformed output, or
-   uncertainty fails closed.
+8. The service first checks the original child document so normalization cannot
+   conceal unsupported fields. For a provider-backed job, the native helper
+   verifies the provider is attached to the parent, reads its live profile, and
+   calls OpenShell's `compose_effective_policy`. The reviewer checks those
+   effective child and parent policies. It writes private per-call files and
+   invokes `openshell-prover check child.yaml --boundary parent.yaml --output json`.
+   The task is not passed to the prover. Actual exit code 0, `within_boundary`, and
+   the expected schema/check/coverage domains are all required. Unsupported,
+   inconclusive, timeout, missing binary, malformed output, or inconsistent
+   status fails closed. Review files are removed after every outcome.
 9. After an allow, the Tool Service writes the child policy to a temporary
    local file and runs `openshell sandbox create` for a deterministic
    `pi-child-<job-prefix>` name.
-10. It attaches the configured inference provider and uploads the child model
-    configuration.
-11. After the child is Ready, the Tool Service runs `pi -p --no-session` inside
+10. Creation attaches the configured provider and uploads the trusted model
+    configuration. It submits the original source policy, not the composed
+    `_provider_*` rules, which belong to the gateway.
+11. After the child is Ready, the service compares its actual effective policy
+    and the parent's current policy with the proved snapshots. On a mismatch it
+    deletes the child without running Pi. Otherwise it runs `pi -p --no-session` inside
     it using `openshell sandbox exec`. Only the cleaned delegated prompt is
     passed on stdin.
 12. The Tool Service captures the child's final stdout and a best-effort
@@ -124,30 +135,59 @@ they return their answer through `openshell sandbox exec` stdout.
 The parent authors the policy required for the child's task. The Tool Service
 does not infer or broaden it.
 
-Each new job fetches the parent policy and runs its own LLM-based permission
-review. Neither the parent policy nor review decisions are cached. Repeated
+Each new job fetches the parent policy and runs its own local containment check. Neither the parent policy nor review decisions are cached. Repeated
 submissions with the same idempotency key still return the existing job.
-The reviewer returns a decision, reason, and violations; it does not perform
-a separate task-alignment assessment. The task remains context for the review
-and cannot justify a permission increase.
+The adapter converts a validated proof into an allow decision and a validated
+`exceeds_boundary` counterexample into a denial. Unsupported and inconclusive results
+are separate failures, not claims of a permission increase. The task cannot
+influence the comparison and is never sent to the CLI.
 
 ```text
 Parent authors policy
         ↓
-Tool Service fetches live parent policy
+Tool Service fetches live parent policy and composes child provider rules
         ↓
-LLM reviewer returns allow or deny
+openshell-prover returns a containment result
         ↓
-allow: create child     deny: no child is created
+within_boundary + supported launch config: create child
+every other outcome: no child is created
 ```
 
 For a denied network increase, the parent may use OpenShell Policy Advisor to
 request the narrow missing rule. A human approves or rejects it. Approval
 updates the parent; the parent must then launch a new child job.
 
-The reviewer is deliberately behind a small `PolicyReviewer` interface so a
-formal OpenShell policy prover can replace it later. The current model review
-is illustrative and can be wrong.
+The `PolicyReviewer` interface is implemented by `ProverPolicyReviewer`; there
+is no model-review fallback. The integration pins schema version 1, the
+`boundary` check, and coverage of the filesystem/network L4/network REST/process/Landlock
+domains. The reported input paths and exit
+code must match the invocation. Equal policies may pass: this is a no-escalation
+check, not a proof of task-specific least privilege.
+
+The prover build script pins OpenShell PR #3533 revision
+`df10520d3828768189faa348ba9f6e6f807ab1cb`, which includes checks for explicit
+`process` and `landlock` blocks and destination `allowed_ips`. Main reports
+`coverage.domains`, not the old `scope.model_version`; the source pin records
+which implementation was reviewed. Coverage describes the comparison model,
+not an attestation of runtime enforcement. Older CLI contracts are not accepted.
+Process comparisons assume consistent identity
+resolution; Landlock comparisons check compatibility requirements, not actual
+kernel enforcement. Filesystem narrowing such as `/tmp` to `/tmp/worker` remains
+unsupported. The service passes the complete policy through unchanged and exposes
+the CLI reason; it never projects unsupported fields out of the proof.
+
+The host-side `poc-policy-compose` helper uses the existing CLI mTLS transport
+and native composition library. It reads the configured provider and profile
+through the gateway API. If the gateway has no profile, no layer is added, matching
+the gateway's behavior. Built-in OpenAI/Anthropic profiles with alternate base
+URLs also do not add their default public-vendor endpoints. The helper never
+substitutes a local profile for a missing live one or prints credential values.
+
+CLI errors map to `policy-review-unavailable`; unsupported and inconclusive
+results map to `policy-review-unsupported` and `policy-review-inconclusive`.
+Only a demonstrated expansion maps to `policy-review-denied` and includes the
+conditional Policy Advisor guidance. A missing proof cannot be repaired by
+automatically asking for more parent permissions.
 
 ## Job lifecycle
 
@@ -198,11 +238,18 @@ selected, its runner configuration routes the job to the Tool Service.
   cryptographically bind the caller's self-reported sandbox name.
 - OpenShell enforces each sandbox policy, but it does not currently record a
   native parent-child delegation relationship for this POC.
-- The model reviewer is not a policy proof.
+- A proof covers only the supported model. Unsupported policy fields are
+  rejected; the supplied Pi baseline is supported by the pinned PR build.
+- The process exit code and complete JSON contract are checked before launch;
+  no model is consulted if the prover fails.
 - Review and create are separate operations, so they are not bound to one
   atomic parent-policy revision.
-- Provider attachment is fixed by Tool Service configuration rather than
-  delegated from the parent.
+- The helper requires the child provider to be attached to the parent. A policy
+  proof alone is not permission to delegate a different credential. This local
+  helper supports mTLS and sandbox-owned policy, not global policy.
+- The snapshot check happens before Pi starts, not atomically with creation or
+  execution. It detects intervening policy drift but does not enforce future
+  parent/provider revocation. Keep these settings stable while running the POC.
 - Children are independent one-shot jobs. They cannot communicate or receive a
   follow-up prompt.
 

@@ -1,0 +1,101 @@
+# GitHub API reads and HTTPS clone/fetch; no push or API writes.
+# Verify the live effective policy after attaching providers.
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_only:
+    - /usr
+    - /lib
+    - /lib64
+    - /proc
+    - /etc
+    - /app
+    - /opt
+    - /var/log
+    - /dev/urandom
+  read_write:
+    - /sandbox
+    - /tmp
+    - /dev/null
+    - /home/sandbox
+
+landlock:
+  compatibility: best_effort
+
+process:
+  run_as_user: sandbox
+  run_as_group: sandbox
+
+network_policies:
+  openshell_tool_service:
+    name: openshell-tool-service
+    endpoints:
+      - host: host.openshell.internal
+        port: 8765
+        protocol: rest
+        enforcement: enforce
+        allowed_ips:
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+        rules:
+          - allow:
+              method: POST
+              path: /v1/jobs
+          - allow:
+              method: GET
+              path: /v1/jobs/**
+    binaries:
+      - path: /usr/bin/pi
+      - path: /usr/local/bin/pi
+      - path: /usr/bin/node
+      - path: /usr/local/bin/node
+      - path: /usr/lib/node_modules/@earendil-works/pi-coding-agent/dist/cli.js
+      - path: /usr/local/lib/node_modules/@earendil-works/pi-coding-agent/dist/cli.js
+  github_repo_read:
+    name: github-repo-read
+    endpoints:
+      - host: api.github.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow:
+              method: GET
+              path: /repos/NVIDIA/OpenShell-Research
+          - allow:
+              method: GET
+              path: /repos/NVIDIA/OpenShell-Research/**
+    binaries:
+      - path: /usr/bin/gh
+      - path: /usr/local/bin/gh
+  github_repo_clone:
+    name: github-repo-clone
+    endpoints:
+      - host: github.com
+        port: 443
+        protocol: rest
+        enforcement: enforce
+        rules:
+          - allow:
+              method: GET
+              path: /NVIDIA/OpenShell-Research.git/info/refs
+              query:
+                service: git-upload-pack
+          - allow:
+              method: POST
+              path: /NVIDIA/OpenShell-Research.git/git-upload-pack
+          - allow:
+              method: GET
+              path: /NVIDIA/OpenShell-Research/info/refs
+              query:
+                service: git-upload-pack
+          - allow:
+              method: POST
+              path: /NVIDIA/OpenShell-Research/git-upload-pack
+    binaries:
+      - path: /usr/bin/git
+      - path: /usr/local/bin/git
+      - path: /usr/lib/git-core/git-remote-http
+      - path: /usr/lib/git-core/git-remote-https

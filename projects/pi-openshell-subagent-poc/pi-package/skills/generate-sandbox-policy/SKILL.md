@@ -113,8 +113,19 @@ attenuation decision before creating the child sandbox.
 If that review returns `POLICY_ADVISOR_ACTION_REQUIRED`, use OpenShell Policy
 Advisor only for the missing network `addRule` operations. Read
 `/etc/openshell/skills/policy-advisor/SKILL.md`, submit the minimal proposal from
-the parent sandbox, wait for human approval and `policy_reloaded: true`, then
-launch a new worker request with the same child policy. Policy Advisor does not
+the parent sandbox, then wait once using `/v1/proposals/<id>/wait?timeout=30`
+with curl `--max-time 35` and a 40-second shell-tool timeout. This overrides
+longer wait examples in the Policy Advisor skill. Only launch a new worker
+after human approval and `policy_reloaded: true`. Otherwise report the proposal
+ID and ask the user to review it in `openshell term`; do not automatically repeat
+the wait or submit a duplicate proposal. A wait timeout does not authorize a launch.
+Policy Advisor does not
 cover filesystem, process, provider attachment, credential binding, or every
 advanced network-policy field; report those as requiring a manual parent-policy
 update.
+
+If the service returns `policy-review-unsupported`, `policy-review-inconclusive`,
+or `policy-review-unavailable`, no child sandbox was created. Report the prover
+diagnostic and stop. These outcomes are not evidence of missing parent authority
+and must not trigger a Policy Advisor proposal. Do not remove baseline policy
+fields, omit required permissions, or execute locally to bypass the prover.

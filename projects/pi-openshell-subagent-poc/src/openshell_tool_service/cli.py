@@ -14,7 +14,7 @@ def main() -> None:
     settings = Settings.from_env()
     logging.basicConfig(
         level=getattr(logging, settings.log_level),
-        format="%(asctime)s %(levelname)s %(message)s",
+        format="%(asctime)s %(levelname)-7s %(message)s",
         datefmt="%H:%M:%S",
     )
     if settings.log_level != "DEBUG":

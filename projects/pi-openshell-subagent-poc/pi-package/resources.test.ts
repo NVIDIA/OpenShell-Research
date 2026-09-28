@@ -68,3 +68,18 @@ test("parent instructions fail closed and retain Policy Advisor guidance", () =>
   assert.match(prompt, /Never approve your own proposal/);
   assert.match(prompt, /Do not silently execute the work locally/);
 });
+
+test("approval instructions use a single 30-second wait and require approval", () => {
+  for (const file of [
+    "./parent-system-prompt.md",
+    "./skills/openshell-workers/SKILL.md",
+    "./skills/generate-sandbox-policy/SKILL.md",
+  ]) {
+    const text = readFileSync(new URL(file, import.meta.url), "utf8");
+    assert.match(text, /\/wait\?timeout=30\b/);
+    assert.match(text, /--max-time 35/);
+    assert.match(text, /policy_reloaded/);
+    assert.match(text, /not\s+automatically repeat/);
+    assert.doesNotMatch(text, /\/wait\?timeout=300\b/);
+  }
+});

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -8,7 +9,11 @@ from fastapi.testclient import TestClient
 
 from openshell_tool_service.app import create_app
 from openshell_tool_service.config import Settings
-from openshell_tool_service.policy_reviewer import PolicyReviewRequest, PolicyReviewResult
+from openshell_tool_service.policy_reviewer import (
+    PolicyReviewError,
+    PolicyReviewRequest,
+    PolicyReviewResult,
+)
 from openshell_tool_service.runtime import ExecutionResult
 from openshell_tool_service.store import Job
 
@@ -156,6 +161,40 @@ def test_policy_denial_fails_before_child_creation(tmp_path: Path) -> None:
         assert terminal["failureCode"] == "policy-review-denied"
         result = client.get(f"/v1/jobs/{job_id}/result", headers=headers()).json()
         assert "POLICY_ADVISOR_ACTION_REQUIRED" in result["output"]
+        assert "/wait?timeout=30" in result["output"]
+        assert "Do not automatically repeat the wait" in result["output"]
+    assert runtime.jobs == []
+
+
+@pytest.mark.parametrize("code", [
+    "policy-review-unavailable", "policy-review-unsupported", "policy-review-inconclusive",
+])
+def test_unproved_policy_never_launches_or_requests_parent_permission(tmp_path: Path, code) -> None:
+    class UnavailableReviewer:
+        def review(self, _request):
+            raise PolicyReviewError("No proof obtained", code=code)
+
+    runtime = SuccessfulRuntime()
+    with TestClient(build_app(tmp_path, runtime, UnavailableReviewer())) as client:
+        created = client.post("/v1/jobs", json=payload(), headers=headers()).json()
+        job_id = created["providerJobId"]
+        terminal = wait_for_terminal(client, job_id)
+        assert terminal["failureCode"] == code
+        result = client.get(f"/v1/jobs/{job_id}/result", headers=headers()).json()
+        assert "POLICY_ADVISOR_ACTION_REQUIRED" not in result["output"]
+    assert runtime.jobs == []
+
+
+def test_default_reviewer_uses_cli_without_model_credentials(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("NVIDIA_API_KEY", raising=False)
+    runtime = SuccessfulRuntime()
+    config = replace(settings(tmp_path), prover_bin=str(tmp_path / "missing-prover"))
+    app = create_app(config, runtime, parent_policy_source=ParentPolicySource())
+    with TestClient(app) as client:
+        created = client.post("/v1/jobs", json=payload(), headers=headers()).json()
+        terminal = wait_for_terminal(client, created["providerJobId"])
+        assert terminal["failureCode"] == "policy-review-unavailable"
+        assert "could not run openshell-prover" in terminal["failureMessage"]
     assert runtime.jobs == []
 
 

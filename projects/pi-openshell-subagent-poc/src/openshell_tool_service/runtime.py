@@ -230,7 +230,8 @@ class OpenShellCliRuntime:
             policy_directory = self.settings.database_path.parent / "policies"
             policy_directory.mkdir(parents=True, exist_ok=True)
             generated_path = policy_directory / f"{job.id}.yaml"
-            generated_path.write_text(f"{job.child_policy.rstrip()}\n", encoding="utf-8")
+            # Materialize the exact bytes passed to the policy reviewer.
+            generated_path.write_text(job.child_policy, encoding="utf-8")
             generated_path.chmod(0o600)
         except OSError as error:
             raise RuntimeExecutionError(
@@ -359,7 +360,7 @@ class OpenShellCliRuntime:
                     self._delete_command(job), None, self.settings.delete_timeout_seconds
                 )
                 if deleted.returncode == 0 or self._already_absent(deleted, job.sandbox_name):
-                    logger.info(
+                    logger.debug(
                         "job %s sandbox deleted in %dms (attempt=%d)",
                         _job_ref(job),
                         _elapsed_ms(started),
@@ -396,7 +397,7 @@ class OpenShellCliRuntime:
     ) -> subprocess.CompletedProcess[str]:
         """Normalize command failures while preserving transport retry behavior."""
         started = time.monotonic()
-        logger.info("job %s %s started (timeout=%ds)", _job_ref(job), phase, timeout_seconds)
+        logger.debug("job %s %s started (timeout=%ds)", _job_ref(job), phase, timeout_seconds)
         try:
             completed = self._run_with_transport_retries(
                 job=job,
@@ -424,7 +425,7 @@ class OpenShellCliRuntime:
                 stderr=completed.stderr,
                 exit_code=completed.returncode,
             )
-        logger.info("job %s %s completed in %dms", _job_ref(job), phase, _elapsed_ms(started))
+        logger.debug("job %s %s completed in %dms", _job_ref(job), phase, _elapsed_ms(started))
         return completed
 
     def _execute(self, job: Job) -> ExecutionResult:
@@ -452,13 +453,13 @@ class OpenShellCliRuntime:
 
     def _capture_logs(self, job: Job) -> tuple[str | None, str | None]:
         """Log collection is best effort and must not prevent sandbox cleanup."""
-        logger.info("job %s capturing child sandbox logs", _job_ref(job))
+        logger.debug("job %s capturing child sandbox logs", _job_ref(job))
         try:
             captured = self.runner(
                 self._logs_command(job), None, self.settings.delete_timeout_seconds
             )
             if captured.returncode == 0:
-                logger.info(
+                logger.debug(
                     "job %s captured child sandbox logs (bytes=%d)",
                     _job_ref(job),
                     _byte_length(captured.stdout),
@@ -468,7 +469,10 @@ class OpenShellCliRuntime:
         except (OSError, subprocess.TimeoutExpired) as error:
             return None, str(error)
 
-    def run(self, job: Job) -> ExecutionResult:
+    def run(
+        self, job: Job, *, expected_policy: str | None = None,
+        expected_parent_policy: str | None = None,
+    ) -> ExecutionResult:
         """Own the entire child lifecycle, including cleanup after failed creation."""
         policy_path: Path | None = None
         create_attempted = False
@@ -479,10 +483,19 @@ class OpenShellCliRuntime:
         sandbox_log_error: str | None = None
         cleanup_errors: list[str] = []
         try:
+            if self.settings.child_provider and (
+                expected_policy is None or expected_parent_policy is None
+            ):
+                raise RuntimeExecutionError(
+                    "Provider-backed execution requires an approved effective policy",
+                    code="policy-composition-required",
+                )
             policy_path = self._materialize_policy(job)
             command = self._create_command(job, policy_path)
             create_attempted = True
-            logger.info("job %s creating sandbox %s", _job_ref(job), job.sandbox_name)
+            create_started = time.monotonic()
+            logger.debug("job %s creating child sandbox %s with provider %s",
+                        _job_ref(job), job.sandbox_name, self.settings.child_provider or "none")
             self._checked_command(
                 job,
                 phase="sandbox.create",
@@ -493,12 +506,31 @@ class OpenShellCliRuntime:
                 transient_markers=TRANSIENT_CREATE_TRANSPORT_MARKERS,
                 clean_partial_create=True,
             )
-            logger.info(
+            logger.debug("job %s child sandbox %s is ready", _job_ref(job), job.sandbox_name)
+            logger.debug(
                 "job %s sandbox ready; inspect: openshell logs %s --workspace %s",
                 _job_ref(job),
                 job.sandbox_name,
                 self.settings.workspace,
             )
+            if expected_policy is not None:
+                source = OpenShellCliParentPolicySource(self.settings, self.runner)
+                actual = source.get(job.sandbox_name)
+                current_parent = source.get(job.caller_id)
+                if (
+                    json.loads(actual) != json.loads(expected_policy)
+                    or json.loads(current_parent) != json.loads(expected_parent_policy or "null")
+                ):
+                    raise RuntimeExecutionError(
+                        "Effective policy changed after review; Pi was not started",
+                        code="policy-snapshot-changed",
+                    )
+                logger.debug("job %s actual child policy matches checked policy; "
+                            "parent policy is unchanged", _job_ref(job))
+            logger.info("%s RUNNING  sandbox=%s; provider=%s; setup=%dms%s",
+                        _job_ref(job), job.sandbox_name,
+                        self.settings.child_provider or "none", _elapsed_ms(create_started),
+                        "; policy snapshots verified" if expected_policy is not None else "")
             execution_started = True
             result = self._execute(job)
         except RuntimeExecutionError as error:

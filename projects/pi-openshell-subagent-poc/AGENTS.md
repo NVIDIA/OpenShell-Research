@@ -6,8 +6,17 @@
 - Never accept an image, provider, workspace, or command from a sandbox request.
   Those values belong to the Tool Service's trusted worker envelope.
 - The parent authors the child policy and sends it with the worker request. The
-  Tool Service runs a fail-closed LLM permission review against the live
-  parent policy before asking OpenShell to create the child.
+  Tool Service runs the standalone openshell-prover CLI against the full live
+  parent policy before asking OpenShell to create the child. Only a validated
+  within_boundary result and exit code 0 allow launch. Unsupported/inconclusive
+  results and errors fail closed; never strip policy fields or fall back to an LLM.
+- Pin the reviewed OpenShell PR #3533 revision in scripts/build-prover.sh. Validate
+  its boundary-check JSON contract and all five coverage domains; do not restore
+  compatibility with the old maximum-boundary-v2 custom build.
+- For provider-backed jobs, use the native policy composer to include the live
+  provider rules in the proof. The provider must already be attached to the parent.
+  Submit source YAML plus the provider, not reserved provider rules, during create.
+  Compare actual child and parent policies with the proved snapshots before Pi starts.
 - Keep the POC limited to external-job delegation. Do not add collaboration
   messages, mailboxes, shared memory, workflow barriers, or a browser UI.
 - A request contains only the caller name, Pi step index, delegated prompt, and

@@ -56,10 +56,9 @@ class Settings:
     max_workers: int = 8
     graceful_shutdown_seconds: int = 2
     log_level: str = "INFO"
-    policy_review_base_url: str = "https://inference-api.nvidia.com/v1"
-    policy_review_api_key: str = field(default="", repr=False)
-    policy_review_model: str = "azure/openai/gpt-5.6-sol"
-    policy_review_timeout_seconds: int = 120
+    prover_bin: str = ".state/bin/openshell-prover"
+    policy_composer_bin: str = ".state/bin/poc-policy-compose"
+    policy_review_timeout_seconds: int = 10
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -71,9 +70,6 @@ class Settings:
         gateway_endpoint = _optional("OPENSHELL_GATEWAY_ENDPOINT")
         if gateway and gateway_endpoint:
             raise ValueError("set only one of OPENSHELL_GATEWAY or OPENSHELL_GATEWAY_ENDPOINT")
-        policy_review_api_key = _optional("NVIDIA_API_KEY")
-        if not policy_review_api_key:
-            raise ValueError("NVIDIA_API_KEY is required")
 
         return cls(
             token=token,
@@ -102,14 +98,11 @@ class Settings:
             max_workers=_positive_int("POC_MAX_WORKERS", 8),
             graceful_shutdown_seconds=_positive_int("POC_GRACEFUL_SHUTDOWN_SECONDS", 2),
             log_level=_log_level("OPENSHELL_TOOL_SERVICE_LOG_LEVEL", "INFO"),
-            policy_review_base_url=os.environ.get(
-                "OPENSHELL_POLICY_REVIEW_BASE_URL", "https://inference-api.nvidia.com/v1"
-            ).rstrip("/"),
-            policy_review_api_key=policy_review_api_key,
-            policy_review_model=os.environ.get(
-                "OPENSHELL_POLICY_REVIEW_MODEL", "azure/openai/gpt-5.6-sol"
+            prover_bin=os.environ.get("OPENSHELL_PROVER_BIN", ".state/bin/openshell-prover"),
+            policy_composer_bin=os.environ.get(
+                "OPENSHELL_POLICY_COMPOSER_BIN", ".state/bin/poc-policy-compose"
             ),
             policy_review_timeout_seconds=_positive_int(
-                "OPENSHELL_POLICY_REVIEW_TIMEOUT_SECONDS", 120
+                "OPENSHELL_POLICY_REVIEW_TIMEOUT_SECONDS", 10
             ),
         )

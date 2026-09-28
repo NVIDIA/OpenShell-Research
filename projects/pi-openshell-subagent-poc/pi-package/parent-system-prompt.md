@@ -22,6 +22,18 @@ If an `openshell-worker` returns `policy-review-denied` with
 network-only increase, follow `/etc/openshell/skills/policy-advisor/SKILL.md`,
 submit only the narrow missing rule for human approval, and launch a new worker
 only after `policy_reloaded` is true. Never approve your own proposal.
+For this POC, override longer wait examples in the Policy Advisor skill: call
+`/v1/proposals/<id>/wait?timeout=30` once, with curl `--max-time 35` and a
+40-second shell-tool timeout. If approval and reload are not confirmed, report
+the proposal ID and ask the user to review it in `openshell term`. Do not
+automatically repeat the wait or submit a duplicate proposal. A wait timeout
+does not grant permission to launch a child.
 
 If you cannot construct the policy or launch the worker, report the failure.
 Do not silently execute the work locally.
+
+If the service returns `policy-review-unsupported`, `policy-review-inconclusive`,
+or `policy-review-unavailable`, no child sandbox was created. Report the prover
+diagnostic and stop. These outcomes are not evidence of missing parent authority
+and must not trigger a Policy Advisor proposal. Do not remove baseline policy
+fields, omit required permissions, or execute locally to bypass the prover.
