@@ -27,6 +27,8 @@
   --openshell-muted: #666d6b;
   --openshell-rule: rgba(32, 38, 37, 0.2);
   --openshell-rule-strong: rgba(32, 38, 37, 0.54);
+  --openshell-alert: #a2512f;
+  --openshell-question: #b58a00;
   --openshell-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
   --openshell-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --openshell-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
@@ -54,6 +56,8 @@ body[data-md-color-scheme="slate"] {
   --openshell-muted: #9fa8a5;
   --openshell-rule: rgba(230, 232, 226, 0.17);
   --openshell-rule-strong: rgba(230, 232, 226, 0.43);
+  --openshell-alert: #e0a07f;
+  --openshell-question: #f0cd59;
   --md-default-bg-color: var(--openshell-paper);
   --md-default-fg-color: var(--openshell-ink);
   --md-primary-fg-color: var(--openshell-paper-raised);
@@ -1166,6 +1170,23 @@ body[data-md-color-scheme="slate"] .openshell-home-brand__dark {
 
 /* Article bylines --------------------------------------------------------- */
 
+.md-typeset #the-leak-is-coming-from-inside-the-sandbox {
+  margin-bottom: 1rem;
+  font-size: clamp(1.85rem, 4vw, 2.8rem);
+  line-height: 1.12;
+  text-wrap: balance;
+}
+
+.md-typeset #the-leak-is-coming-from-inside-the-sandbox + .dev-note-deck {
+  margin-bottom: 0.25rem;
+  font-size: clamp(0.95rem, 1.6vw, 1.05rem);
+  text-wrap: balance;
+}
+
+.md-typeset #the-leak-is-coming-from-inside-the-sandbox ~ h2 {
+  margin-top: 1.6rem;
+}
+
 .md-typeset .dev-note-deck {
   max-width: 46rem;
   margin: -0.35rem 0 1.8rem;
@@ -1185,6 +1206,28 @@ body[data-md-color-scheme="slate"] .openshell-home-brand__dark {
   font-family: var(--openshell-mono);
   font-size: clamp(0.88rem, 1.7vw, 1.05rem);
   line-height: 1.5;
+}
+
+/* Frame the explanation and code controlled by the model tabs above it. */
+.md-typeset #redaction-bypass-in-action ~ .tabbed-set > .tabbed-labels {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.md-typeset #redaction-bypass-in-action ~ .tabbed-set > .tabbed-content {
+  padding: 1rem;
+  border: 1px solid var(--openshell-rule-strong);
+  border-radius: 0 0 0.4rem 0.4rem;
+  background: var(--openshell-paper-raised);
+}
+
+.md-typeset #redaction-bypass-in-action ~ .tabbed-set .tabbed-block > :first-child {
+  margin-top: 0;
+}
+
+.md-typeset #redaction-bypass-in-action ~ .tabbed-set .tabbed-block > :last-child {
+  margin-bottom: 0;
 }
 
 .dev-note-byline {
@@ -1418,7 +1461,12 @@ body[data-md-color-scheme="slate"] .openshell-home-brand__dark {
   }
 }
 
-/* Dev note diagrams (SVG figures) */
+/* Dev note figures and theme-specific images */
+body:not([data-md-color-scheme="slate"]) img.dev-note-image--dark,
+body[data-md-color-scheme="slate"] img.dev-note-image--light {
+  display: none;
+}
+
 .md-typeset .dev-note-figure {
   width: 100%;
   max-width: 100%;
@@ -1447,8 +1495,102 @@ body[data-md-color-scheme="slate"] .openshell-home-brand__dark {
   aspect-ratio: 1200 / 630;
 }
 
+.md-typeset #pi-admission-hero {
+  margin: 0.25rem auto 0.5rem;
+}
+
+.md-typeset #pi-admission-hero img {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  mask-image:
+    linear-gradient(to right, transparent, #000 4%, #000 96%, transparent),
+    linear-gradient(to bottom, transparent, #000 6%, #000 94%, transparent);
+  mask-composite: intersect;
+}
+
+body:not([data-md-color-scheme="slate"]) .dev-note-card__visual:has(img[src$="/pi-admission/hero-light.png"]) {
+  background: var(--openshell-paper);
+}
+
+body:not([data-md-color-scheme="slate"]) #pi-admission-hero img,
+body:not([data-md-color-scheme="slate"]) .dev-note-card__visual-image[src$="/pi-admission/hero-light.png"] {
+  filter: brightness(1.06);
+  mix-blend-mode: multiply;
+}
+
 .md-typeset .dev-note-figure--native-aspect img {
   aspect-ratio: auto;
+}
+
+.md-typeset .admonition,
+.md-typeset details {
+  font-size: inherit;
+}
+
+.md-typeset .admonition.question,
+.md-typeset details.question {
+  background-color: color-mix(in srgb, var(--openshell-question) 10%, transparent);
+}
+
+.md-typeset .question > .admonition-title::before,
+.md-typeset .question > summary::before {
+  background-color: var(--openshell-question);
+}
+
+.md-typeset .question > .admonition-title::after,
+.md-typeset .question > summary::after {
+  color: var(--openshell-question);
+}
+
+.md-typeset .dev-note-figure.dev-note-figure--admission {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  align-items: center;
+  gap: 1.5rem 2rem;
+}
+
+.md-typeset .dev-note-figure.dev-note-figure--admission img {
+  max-width: 480px;
+  color-scheme: light;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body[data-md-color-scheme="slate"] .md-typeset .dev-note-figure--admission img {
+  color-scheme: dark;
+}
+
+.md-typeset .dev-note-figure.dev-note-figure--admission figcaption {
+  margin: 0;
+  max-width: none;
+  padding-inline-start: 1rem;
+  border-inline-start: 1px solid var(--openshell-rule);
+  font-style: normal;
+  text-align: left;
+}
+
+.md-typeset .dev-note-figure__caption-label {
+  display: block;
+  margin-bottom: 0.55rem;
+  color: var(--openshell-muted);
+  font-family: var(--openshell-mono);
+  font-size: 0.55rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.md-typeset .dev-note-figure--admission figcaption p:first-of-type {
+  margin-top: 0;
+}
+
+.md-typeset .dev-note-figure--admission figcaption p:last-child {
+  margin-bottom: 0;
 }
 
 .md-typeset .dev-note-figure figcaption {
@@ -1457,4 +1599,30 @@ body[data-md-color-scheme="slate"] .openshell-home-brand__dark {
   font-size: 0.8rem;
   line-height: 1.5;
   color: var(--md-default-fg-color--light);
+}
+
+.md-typeset .dev-note-figure--bypass .dev-note-figure__viewport {
+  overflow-x: auto;
+}
+
+.md-typeset .dev-note-figure--bypass img {
+  min-width: 900px;
+  max-width: none;
+  color-scheme: light;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body[data-md-color-scheme="slate"] .md-typeset .dev-note-figure--bypass img {
+  color-scheme: dark;
+}
+
+.md-typeset .dev-note-figure--bypass figcaption {
+  max-width: none;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--openshell-rule);
+  font-style: normal;
+  text-align: left;
 }

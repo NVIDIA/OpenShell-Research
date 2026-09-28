@@ -64,6 +64,8 @@
     
       <link rel="stylesheet" href="../stylesheets/documentation.css">
     
+      <link rel="stylesheet" href="../stylesheets/pi-traces.css">
+    
     <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
     
       
@@ -92,6 +94,7 @@
   <meta name="robots" content="noindex, follow">
 
 
+  
   <script>
     try {
       document.documentElement.dataset.navigationDrawer =
@@ -357,6 +360,8 @@
       
         
       
+        
+      
     
     
     
@@ -396,6 +401,33 @@
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dev-notes/posts/2026-09-26-network-redaction-is-not-enough/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  The leak is coming from inside the sandbox
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -885,10 +917,10 @@ commands from the repository root. Use Python 3.10 or newer.</p>
 <ul>
 <li>Put project-specific software knowledge—installation, usage, reproducibility,
   and known limitations—under <code>projects/&lt;project-type&gt;/&lt;name&gt;/docs/</code>. The clean
-  build stages configured project documentation under <code>docs/documentation/</code>
-  for publishing.</li>
-<li>Put cross-project software documentation directly under
-  <code>docs/documentation/</code>.</li>
+  build stages tool documentation under <code>docs/documentation/</code> and linked research
+  specifications under <code>docs/research/</code> for publishing.</li>
+<li>Keep the Documentation section for tools. Put cross-project tool documentation
+  directly under <code>docs/documentation/</code>.</li>
 <li>Put dated experiments, benchmarks, releases, use cases, and engineering updates
   under <code>docs/dev-notes/</code>.</li>
 <li>When a Dev Note introduces reusable software, add its durable guide to the
@@ -902,7 +934,9 @@ commands from the repository root. Use Python 3.10 or newer.</p>
 project documentation, then copies all published Markdown sources byte-for-byte
 into <code>site/</code> at their site paths. Each rendered page links to its same-origin
 Markdown source for people and agents. Generated copies under
-<code>docs/documentation/</code> and <code>site/</code> must not be edited.</p>
+<code>docs/documentation/</code>, staged project trees under <code>docs/research/</code>, and <code>site/</code>
+must not be edited. Research supplements opt in with the same marker; legacy
+research redirects do not.</p>
 <p>Every page in a published content tree is included, including the Documentation
 index. Keep presentation-only landing pages such as the homepage and Dev Notes
 card index, redirect-only pages, obsolete or orphan project pages, internal
@@ -918,7 +952,12 @@ defined in <code>docs/dev-notes/authors.json</code>. Use a dated filename such a
 falling back to <code>tags</code>. An optional <code>card_variant</code> must have matching card and
 artwork CSS modifiers in <code>docs/stylesheets/dev-notes.css</code>. Set <code>hero_image</code> to
 an image path relative to the post when its card should use the post's hero
-instead of generated artwork. Hero images must live under <code>docs/</code>.</p>
+instead of generated artwork. Set <code>hero_image_dark</code> to an optional dark-mode
+counterpart; cards switch between them with the site theme. Hero images must
+live under <code>docs/</code>.</p>
+<p>Place a post's hero figure immediately after its subtitle and before the generated
+author byline. If the post has no subtitle, place the hero directly after the
+title. Keep the introduction below the byline.</p>
 <p>Do not edit content inside these generated marker pairs:</p>
 <ul>
 <li><code>&lt;!-- dev-notes:posts:start --&gt;</code> / <code>&lt;!-- dev-notes:posts:end --&gt;</code> in
@@ -930,6 +969,8 @@ instead of generated artwork. Hero images must live under <code>docs/</code>.</p
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>python3<span class="w"> </span>scripts/render-dev-notes.py
 </span></code></pre></div>
 <p>Commit any generated changes with the source change.</p>
+<p>For Pi transcript provenance, publication boundaries, and viewer checks, see
+the <a href="https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/research/pi-admission/README.md#maintenance">Pi project maintenance guide</a>.</p>
 <h2 id="theme-and-brand-assets">Theme and brand assets</h2>
 <p>Project logos shared by a README and the site belong in <code>projects/&lt;name&gt;/assets/</code>.
 Register that directory in <code>PROJECT_ASSETS</code> in <code>scripts/stage-project-docs.py</code>;
@@ -951,11 +992,13 @@ project site prefix.</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>run<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.12<span class="w"> </span>--with<span class="w"> </span><span class="nv">pytest</span><span class="o">==</span><span class="m">8</span>.4.2<span class="w"> </span>pytest<span class="w"> </span>-q<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>tests/test_agent_markdown.py<span class="w"> </span>tests/test_docs_404.py<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>tests/test_render_dev_notes.py<span class="w"> </span>tests/test_stage_project_docs.py
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>scripts/build-docs.sh
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>node<span class="w"> </span>--check<span class="w"> </span>docs/javascripts/pi-traces.js
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>node<span class="w"> </span>tests/docs-preview.test.js
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>scripts/build-docs.sh
 </span></code></pre></div>
 <p><code>scripts/build-docs.sh</code> recreates <code>.venv-docs</code>, installs the pinned toolchain,
 stages each configured canonical project documentation tree from <code>projects/</code>
-under <code>docs/documentation/</code>, renders Dev Notes metadata, and runs <code>zensical
+at its configured site destination, renders Dev Notes metadata, and runs <code>zensical
 build --clean --strict</code>. Configure project trees in
 <code>scripts/stage-project-docs.py</code>. Do not report success unless the build
 completes without issues.</p>
@@ -1055,6 +1098,8 @@ roll back to a revision before preview support, leave the Pages source set to
       <script src="../assets/javascripts/bundle.8dcc8e9c.min.js"></script>
       
         <script src="../javascripts/navigation-drawer.js"></script>
+      
+        <script src="../javascripts/pi-traces.js"></script>
       
     
   </body>
