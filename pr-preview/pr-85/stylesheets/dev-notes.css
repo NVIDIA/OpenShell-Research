@@ -760,6 +760,11 @@ body:has(.openshell-home-page) .md-path {
   letter-spacing: -0.035em;
 }
 
+.dev-notes-featured .journal-section__head {
+  padding-left: 0.6rem;
+  border-left: 3px solid var(--openshell-green);
+}
+
 .dev-notes-page [hidden] {
   display: none !important;
 }
@@ -848,9 +853,9 @@ body:has(.openshell-home-page) .md-path {
 
 .dev-note-card--featured .dev-note-card__link {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   align-items: center;
-  gap: 1.5rem;
+  gap: 2rem;
 }
 
 .dev-note-card__visual {
@@ -998,7 +1003,7 @@ body:has(.openshell-home-page) .md-path {
 }
 
 .md-typeset .dev-note-card--featured h3 {
-  font-size: clamp(1.85rem, 3.5vw, 2.5rem);
+  font-size: clamp(2.1rem, 4.1vw, 2.95rem);
   line-height: 1.08;
   text-wrap: balance;
 }
@@ -1012,7 +1017,7 @@ body:has(.openshell-home-page) .md-path {
 }
 
 .md-typeset .dev-note-card--featured .dev-note-card__summary {
-  font-size: 1rem;
+  font-size: 1.08rem;
 }
 
 .dev-note-card__tags {
@@ -1103,7 +1108,7 @@ body:has(.openshell-home-page) .md-path {
 }
 
 .dev-notes-recent {
-  margin-top: 1rem;
+  margin-top: 1.75rem;
   padding-top: 0.5rem;
   border-top: 1px solid var(--openshell-rule);
 }
@@ -1502,7 +1507,7 @@ body:has(.dev-note-header) .md-main__inner {
   }
 
   .dev-note-card--featured .dev-note-card__visual {
-    width: min(100%, 21rem);
+    width: min(100%, 26rem);
     justify-self: center;
   }
 
