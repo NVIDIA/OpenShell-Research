@@ -53,23 +53,102 @@ Dev Notes are Markdown posts under `docs/dev-notes/posts/`. Each post requires
 defined in `docs/dev-notes/authors.json`. Use a dated filename such as
 `YYYY-MM-DD-short-title.md`.
 
-The renderer uses `categories[0]` as the card topic and `card_tags` as its tags,
-falling back to `tags`. An optional `card_variant` must have matching card and
-artwork CSS modifiers in `docs/stylesheets/dev-notes.css`. Set `hero_image` to
-an image path relative to the post when its card should use the post's hero
-instead of generated artwork. Set `hero_image_dark` to an optional dark-mode
-counterpart; cards switch between them with the site theme. Hero images must
-live under `docs/`.
+Every post must list exactly one category under `categories`, using one of these
+fixed names:
 
-Place a post's hero figure immediately after its subtitle and before the generated
-author byline. If the post has no subtitle, place the hero directly after the
-title. Keep the introduction below the byline.
+- **Announcements**: releases, launches, and team or project updates.
+- **Research**: experiments, benchmarks, findings, and technical investigations.
+- **Case Studies**: accounts of real-world adoption, deployment, and outcomes.
+- **Examples**: practical walkthroughs and demonstrations readers can reproduce.
+
+The renderer validates this list before updating any generated content. Missing,
+unknown, or multiple categories fail the build with an author-facing error.
+Categories appear consistently on index cards and article bylines. Categories
+remain available even when they have no posts; do not create placeholder notes.
+Use tags for subject areas such as robotics, formal methods, or agent security.
+
+Readers can combine category and author filters on the Dev Notes index. The
+renderer derives the author menu from every post's author IDs and always includes
+all four categories, including those without posts. The newest matching post is
+featured; the remaining matches keep their chronological order. Filters use
+`?category=research&author=johnnygreco` URLs that survive refresh and browser
+Back/Forward navigation. Article byline names and categories link to these
+filtered views. Empty combinations show a message and a clear-filters action.
+Keep the full index readable when JavaScript is unavailable.
+
+The renderer uses `card_tags` as the card's tags, falling back to `tags`.
+An optional `card_variant` must have matching card and
+artwork CSS modifiers in `docs/stylesheets/dev-notes.css`. Set `hero_image` to
+an image path relative to the post, and describe it with `hero_image_alt`. The
+renderer uses it for both the post's opening hero and its index thumbnail. Set
+`hero_image_dark` to an optional dark-mode counterpart; both surfaces switch with
+the site theme. Hero images must live under `docs/`. Without `hero_image`, the
+post omits the hero and the index uses generated artwork.
+
+Authors provide content rather than header HTML. For example, a new post can be:
+
+```markdown
+---
+title: "A clear experiment title"
+date: 2026-09-28
+description: "A short summary for the index and search."
+subtitle: "An optional sentence introducing the experiment."
+agent_markdown: true
+authors:
+  - johnnygreco
+hero_image: "../../assets/my-experiment/hero.png"
+hero_image_alt: "A description of what the image communicates."
+categories:
+  - Research
+---
+
+Start the introduction here. The renderer inserts the opening layout above it.
+
+## Experiment
+
+Describe the work and evidence.
+```
+
+Use a real author ID and an existing image, or omit both hero fields. `subtitle`
+is optional and separate from the index's `description`. The renderer generates
+the title, subtitle, hero, and byline in that order. Do not add another H1 or
+manually position a hero. Existing generated headers update from front matter
+without changing the prose below them.
+
+Shared CSS sets the reading column to at most 74 character units, with 18px body
+text on desktop and at least 16px on phones. Every post uses the sandbox note's
+smaller title and subtitle styles: titles scale from 1.6rem on narrow phones
+to 2.8rem on desktop, with a 1.85rem minimum above 24rem viewport width, and
+subtitles from 0.95rem to 1.05rem. The opening reserves space for the site header
+and breadcrumbs, then fits the title, subtitle, and complete hero in the remaining
+viewport. Heroes fill that available space up to the reading-column width and
+560px height, preserving their native proportions without cropping. Longer text
+leaves less room for the hero; authors should keep titles and subtitles concise.
+The index continues to use compact thumbnails.
+Clicking a hero opens the original image, so a diagram can remain compact without
+losing access to its details. Index images use bounded frames with the full image
+visible. Do not add per-post title/hero sizing or force an image into a different
+aspect ratio. Body diagrams may still use the shared wide or scrollable figure
+treatments when their labels need more room.
+
+The index separates the page introduction, filtering controls, and posts. Give
+the masthead breathing room and keep the filters in their own row between two
+dividers, above the featured-note heading. Laptop screens show the featured title;
+a 900px-tall desktop viewport fits the featured note. Keep its image and type
+larger than the archive entries; longer featured titles can move the archive
+below the first screen.
+The archive remains a normal scrolling list as it grows; do not shrink its
+entries to fit all notes on one screen or give the archive a separate scrolling
+panel. Keep one label per section. Use whitespace within the featured note and
+dividers above and below the filtering controls, at the archive boundary, and between
+archive entries.
 
 Do not edit content inside these generated marker pairs:
 
 - `<!-- dev-notes:posts:start -->` / `<!-- dev-notes:posts:end -->` in
   `docs/dev-notes/index.md`
 - `<!-- dev-note:byline:start -->` / `<!-- dev-note:byline:end -->` in posts
+- `<!-- dev-note:header:start -->` / `<!-- dev-note:header:end -->` in posts
 - `# dev-notes:nav:start` / `# dev-notes:nav:end` in `zensical.toml`
 
 After changing posts or author metadata, run:
@@ -79,6 +158,29 @@ python3 scripts/render-dev-notes.py
 ```
 
 Commit any generated changes with the source change.
+
+The Docs workflow runs the header tests, verifies generated content is committed,
+and checks the built site in Chromium and WebKit at desktop, tablet, and phone
+sizes in both themes. The browser checks discover every note automatically. They reject missing
+hero assets or alt text, cropped or thumbnail-sized article heroes, overly long text lines,
+horizontal page overflow, off-center heroes, images overflowing their figures or
+overlapping the byline, incorrect theme-image visibility, an opening that needs
+scrolling to see the full hero, and an index that obscures the featured title on
+laptops or pushes the featured note below a 900px-tall
+desktop viewport. They also check the separation of introduction, filters, and posts.
+They also move the featured note into the recent list to exercise its thumbnail
+layout. The workflow saves screenshots as the `dev-notes-layout` artifact for
+visual review. These are layout
+constraints rather than pixel snapshots, so ordinary prose edits need no new
+baselines. They cannot judge the readability of labels baked into an image;
+review the screenshot and full-size image for detailed charts.
+
+The same browser checks cover shared navigation: footer titles must fit inside
+their links, breadcrumbs must remain readable, and wide documentation tables
+must scroll within the article without overflowing the page.
+Embedded demos are also played in both browsers. Publish MP4 recordings with
+H.264 video, 8-bit `yuv420p` pixels, and streaming metadata at the beginning of
+the file (`faststart`); HEVC-only recordings do not play in every browser.
 
 For Pi transcript provenance, publication boundaries, and viewer checks, see
 the [Pi project maintenance guide](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/research/pi-admission/README.md#maintenance).
@@ -110,11 +212,18 @@ Run the renderer tests and the same clean build used by CI:
 ```sh
 uv run --python 3.12 --with pytest==8.4.2 pytest -q \
   tests/test_agent_markdown.py tests/test_docs_404.py \
-  tests/test_render_dev_notes.py tests/test_stage_project_docs.py
+  tests/test_render_dev_notes.py tests/test_dev_note_headers.py tests/test_stage_project_docs.py
 node --check docs/javascripts/pi-traces.js
 node tests/docs-preview.test.js
 scripts/build-docs.sh
+uv run --locked --script tests/test_dev_notes_layout.py --install-browser
+uv run --locked --script tests/test_dev_notes_layout.py -q
 ```
+
+The browser installer is needed once per environment. The test script's inline
+dependencies and adjacent uv lock pin its toolchain independently of the site
+builder. Browser checks serve the built artifact on an ephemeral local port and
+write viewport screenshots to `.cache/dev-notes-layout/`.
 
 `scripts/build-docs.sh` recreates `.venv-docs`, installs the pinned toolchain,
 stages each configured canonical project documentation tree from `projects/`

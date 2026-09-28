@@ -31,7 +31,7 @@ jobs:
           uv run --python ${{ matrix.python-version }} --with pytest==8.4.2
           pytest -q tests/test_agent_markdown.py tests/test_docs_404.py
           tests/test_docs_seo.py tests/test_render_dev_notes.py
-          tests/test_stage_project_docs.py
+          tests/test_dev_note_headers.py tests/test_stage_project_docs.py
 
   validate:
     name: Validate documentation
@@ -54,6 +54,7 @@ jobs:
       - name: Check documentation JavaScript syntax
         run: |
           node --check docs/javascripts/navigation-drawer.js
+          node --check docs/javascripts/dev-notes.js
           node --check docs/javascripts/pi-traces.js
 
       - name: Test navigation JavaScript behavior
@@ -64,6 +65,25 @@ jobs:
 
       - name: Build documentation
         run: scripts/build-docs.sh
+
+      - name: Set up uv for browser checks
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+
+      - name: Install layout-check browser
+        run: uv run --locked --script tests/test_dev_notes_layout.py --install-browser
+
+      - name: Check Dev Notes reading layouts
+        run: uv run --locked --script tests/test_dev_notes_layout.py -q
+
+      - name: Upload Dev Notes layout screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dev-notes-layout
+          path: .cache/dev-notes-layout
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Verify generated documentation is committed
         run: git diff --exit-code -- docs/dev-notes zensical.toml

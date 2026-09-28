@@ -15,7 +15,7 @@ extra_css = [
   "stylesheets/documentation.css",
   "stylesheets/pi-traces.css"
 ]
-extra_javascript = ["javascripts/navigation-drawer.js", "javascripts/pi-traces.js"]
+extra_javascript = ["javascripts/navigation-drawer.js", "javascripts/dev-notes.js", "javascripts/pi-traces.js"]
 nav = [
   {"Dev Notes" = [
     "dev-notes/index.md",
@@ -51,6 +51,8 @@ noindex_prefixes = ["development/", "projects/", "research/"]
 [project.markdown_extensions.admonition]
 
 [project.markdown_extensions.footnotes]
+
+[project.markdown_extensions.md_in_html]
 
 [project.markdown_extensions."pymdownx.highlight"]
 anchor_linenums = true

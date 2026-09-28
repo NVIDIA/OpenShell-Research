@@ -36,7 +36,8 @@ def make_post(
         "title": title,
         "date": date,
         "description": description,
-        "categories": categories or ["Systems"],
+        "authors": ["ada"],
+        "categories": ["Research"] if categories is None else categories,
         "tags": tags or ["agents", "runtime"],
     }
     if card_tags is not None:
@@ -80,6 +81,8 @@ class DateValidationTests(unittest.TestCase):
                             f"title: {title}",
                             f"date: {date}",
                             "description: Test post.",
+                            "categories:",
+                            "  - Research",
                             "authors:",
                             "  - ada",
                             "---",
@@ -194,8 +197,9 @@ class MarkerReplacementTests(unittest.TestCase):
             post["path"] = path
             post["frontmatter"] = "title: A Dev Note\ndate: 2026-06-05"
             post["body"] = (
-                "# A Dev Note\n\n"
+                f"{renderer.HEADER_START}\n# A Dev Note\n\n"
                 f"{renderer.BYLINE_START}\nstale\n{renderer.BYLINE_END}\n\n"
+                f"{renderer.HEADER_END}\n\n"
                 "Body.\n"
             )
             post["authors"] = [
@@ -203,7 +207,7 @@ class MarkerReplacementTests(unittest.TestCase):
             ]
             path.write_text("placeholder", encoding="utf-8")
 
-            renderer.update_post_byline(post)
+            renderer.update_post_header(post)
 
             rendered = path.read_text(encoding="utf-8")
         self.assertIn(r"Lab C:\notes\1", rendered)
