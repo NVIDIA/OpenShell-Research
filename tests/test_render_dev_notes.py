@@ -36,7 +36,7 @@ def make_post(
         "title": title,
         "date": date,
         "description": description,
-        "categories": categories or ["Systems"],
+        "categories": ["Research"] if categories is None else categories,
         "tags": tags or ["agents", "runtime"],
     }
     if card_tags is not None:
@@ -80,6 +80,8 @@ class DateValidationTests(unittest.TestCase):
                             f"title: {title}",
                             f"date: {date}",
                             "description: Test post.",
+                            "categories:",
+                            "  - Research",
                             "authors:",
                             "  - ada",
                             "---",

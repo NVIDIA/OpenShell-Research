@@ -53,8 +53,22 @@ Dev Notes are Markdown posts under `docs/dev-notes/posts/`. Each post requires
 defined in `docs/dev-notes/authors.json`. Use a dated filename such as
 `YYYY-MM-DD-short-title.md`.
 
-The renderer uses `categories[0]` as the card topic and `card_tags` as its tags,
-falling back to `tags`. An optional `card_variant` must have matching card and
+Every post must list exactly one category under `categories`, using one of these
+fixed names:
+
+- **Announcements**: releases, launches, and team or project updates.
+- **Research**: experiments, benchmarks, findings, and technical investigations.
+- **Case Studies**: accounts of real-world adoption, deployment, and outcomes.
+- **Examples**: practical walkthroughs and demonstrations readers can reproduce.
+
+The renderer validates this list before updating any generated content. Missing,
+unknown, or multiple categories fail the build with an author-facing error.
+Categories appear consistently on index cards and article bylines. Categories
+remain available even when they have no posts; do not create placeholder notes.
+Use tags for subject areas such as robotics, formal methods, or agent security.
+
+The renderer uses `card_tags` as the card's tags, falling back to `tags`.
+An optional `card_variant` must have matching card and
 artwork CSS modifiers in `docs/stylesheets/dev-notes.css`. Set `hero_image` to
 an image path relative to the post, and describe it with `hero_image_alt`. The
 renderer uses it for both the post's opening hero and its index thumbnail. Set

@@ -9,7 +9,7 @@ hero_image: "../../assets/reachy-mini-openshell/hero.svg"
 hero_image_alt: "Bringing Privacy and Security to the Edge with OpenShell: a stylized Reachy Mini robot with two green camera eyes inside an OpenShell boundary ring."
 social_image: "assets/reachy-mini-openshell/hero.svg"
 categories:
-  - Edge AI
+  - Examples
 tags:
   - reachy-mini
   - openshell
@@ -54,7 +54,7 @@ card_tags:
   <p class="dev-note-byline__label">
     <span>Dev Note</span>
     <time datetime="2026-07-20">July 20, 2026</time>
-    <span>Edge AI</span>
+    <span>Examples</span>
   </p>
 </div>
 <!-- dev-note:byline:end -->

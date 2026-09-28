@@ -9,6 +9,9 @@ Read `docs/development/index.md` before editing a note. Authors supply front
 matter and prose; `python3 scripts/render-dev-notes.py` generates the title,
 optional subtitle and hero, author byline, index cards, and navigation.
 
+- Set `categories` to a list containing exactly one of `Announcements`,
+  `Research`, `Case Studies`, or `Examples`. Use tags for technical topics.
+  The renderer rejects missing, unknown, or multiple categories.
 - Use `subtitle` for an optional short deck and `hero_image_alt` to describe a
   `hero_image`. `hero_image_dark` is optional. Do not copy header HTML from a post.
 - Start new post bodies with the introduction, without a duplicate H1 or hero.

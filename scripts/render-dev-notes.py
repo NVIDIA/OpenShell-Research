@@ -30,6 +30,7 @@ BYLINE_END = "<!-- dev-note:byline:end -->"
 NAV_START = "      # dev-notes:nav:start"
 NAV_END = "      # dev-notes:nav:end"
 CANONICAL_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
+POST_CATEGORIES = ("Announcements", "Research", "Case Studies", "Examples")
 
 
 def parse_scalar(value: str) -> str:
@@ -108,6 +109,16 @@ def require_list(metadata: dict[str, Any], key: str, path: Path) -> list[str]:
     return [str(item) for item in value]
 
 
+def require_category(metadata: dict[str, Any], path: Path) -> str:
+    categories = require_list(metadata, "categories", path)
+    if len(categories) != 1 or categories[0] not in POST_CATEGORIES:
+        raise ValueError(
+            f"{path} front matter field 'categories' must list exactly one of: "
+            f"{', '.join(POST_CATEGORIES)}; got {categories!r}"
+        )
+    return categories[0]
+
+
 def require_authors(ids: list[str], authors: dict[str, dict[str, str]], path: Path) -> list[dict[str, str]]:
     if not ids:
         raise ValueError(f"{path} needs at least one Dev Notes author")
@@ -174,6 +185,7 @@ def discover_posts(authors: dict[str, dict[str, str]]) -> list[dict[str, Any]]:
     for path in sorted(POSTS_DIR.glob("*.md")):
         markdown = path.read_text(encoding="utf-8")
         metadata, raw_frontmatter, body = parse_frontmatter(markdown, path)
+        require_category(metadata, path)
         post_authors = require_authors(require_list(metadata, "authors", path), authors, path)
         published = parse_date(require_string(metadata, "date", path), path)
         posts.append(
@@ -195,8 +207,8 @@ def card_visual_class(post: dict[str, Any]) -> str:
     variant = str(metadata.get("card_variant", "")).strip()
     if variant and not re.fullmatch(r"[a-z0-9_-]+", variant):
         raise ValueError(f"{post['path']} has invalid card_variant {variant!r}")
-    categories = require_list(metadata, "categories", post["path"])
-    source = variant or (categories[0] if categories else "research")
+    category = require_category(metadata, post["path"])
+    source = variant or category
     slug = re.sub(r"[^a-z0-9_-]+", "-", source.lower()).strip("-")
     return slug or "research"
 
@@ -220,7 +232,6 @@ def card_hero_image_url(post: dict[str, Any], key: str = "hero_image") -> str | 
 
 
 def render_card_visual(post: dict[str, Any], *, eager: bool = False) -> str:
-    metadata = post["metadata"]
     variant = html.escape(card_visual_class(post), quote=True)
     hero_image = card_hero_image_url(post)
     if hero_image:
@@ -241,8 +252,7 @@ def render_card_visual(post: dict[str, Any], *, eager: bool = False) -> str:
         {images}
       </div>"""
 
-    categories = require_list(metadata, "categories", post["path"])
-    label = categories[0] if categories else "Research"
+    label = require_category(metadata, post["path"])
     date_stamp = post["published"].strftime("%Y.%m.%d")
     return f"""      <div class="dev-note-card__visual dev-note-card__visual--{variant}" aria-hidden="true">
         <span class="dev-note-card__visual-label">Dev Note / {html.escape(label)}</span>
@@ -269,10 +279,9 @@ def render_card_copy(post: dict[str, Any]) -> str:
     title = require_string(metadata, "title", path)
     published = post["published"]
     description = require_string(metadata, "description", path)
-    categories = require_list(metadata, "categories", path)
+    category = require_category(metadata, path)
     tags = require_list(metadata, "card_tags", path) or require_list(metadata, "tags", path)
     authors = post["authors"]
-    category = categories[0] if categories else "Research"
     tags_html = ""
     if tags:
         tag_items = "\n".join(f"          <span>{html.escape(tag)}</span>" for tag in tags)
@@ -399,8 +408,7 @@ def render_byline(post: dict[str, Any]) -> str:
     authors = post["authors"]
     metadata = post["metadata"]
     published = post["published"]
-    categories = require_list(metadata, "categories", post["path"])
-    category = categories[0] if categories else "Research"
+    category = require_category(metadata, post["path"])
     blocks = []
     for author in authors:
         description = author.get("description", "")

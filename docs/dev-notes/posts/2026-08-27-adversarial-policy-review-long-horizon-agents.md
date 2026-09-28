@@ -8,7 +8,7 @@ hero_image: "../../assets/long-horizon-agent-evals/back-and-forth-by-session.png
 hero_image_alt: "Back-and-forth by session for the 30-minute experiments."
 social_image: "assets/long-horizon-agent-evals/back-and-forth-by-session.png"
 categories:
-  - OpenShell
+  - Research
 tags:
   - openshell
   - agents
@@ -52,7 +52,7 @@ card_tags:
   <p class="dev-note-byline__label">
     <span>Dev Note</span>
     <time datetime="2026-08-27">August 27, 2026</time>
-    <span>OpenShell</span>
+    <span>Research</span>
   </p>
 </div>
 <!-- dev-note:byline:end -->

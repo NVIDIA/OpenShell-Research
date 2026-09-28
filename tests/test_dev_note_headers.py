@@ -21,7 +21,10 @@ def post(tmp_path, monkeypatch):
     path.parent.mkdir(parents=True)
     (path.parent / "hero.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
     (path.parent / "dark.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"/>')
-    frontmatter = "title: A note\ndate: 2026-09-28\ndescription: Summary\nauthors:\n  - ada"
+    frontmatter = (
+        "title: A note\ndate: 2026-09-28\ndescription: Summary\nauthors:\n  - ada"
+        "\ncategories:\n  - Research"
+    )
     body = "An introduction with **Markdown**.\n\n## Evidence\n\nKeep this prose.\n"
     path.write_text(f"---\n{frontmatter}\n---\n\n{body}")
     metadata, frontmatter, body = renderer.parse_frontmatter(path.read_text(), path)
@@ -96,3 +99,42 @@ def test_legacy_opening_is_not_silently_duplicated(post):
     post["body"] = "# Old title\n\nProse to preserve.\n"
     with pytest.raises(ValueError, match="front matter"):
         renderer.update_post_header(post)
+
+
+@pytest.mark.parametrize("category", ["Announcements", "Research", "Case Studies", "Examples"])
+def test_fixed_category_is_consistent_on_cards_and_articles(post, category):
+    post["metadata"]["categories"] = [category]
+    assert f"<span>{category}</span>" in renderer.render_card_copy(post)
+    assert f"<span>{category}</span>" in renderer.render_byline(post)
+    assert f"Dev Note / {category}</span>" in renderer.render_card_visual(post)
+
+
+@pytest.mark.parametrize("category_frontmatter", [
+    "",
+    "\ncategories:",
+    "\ncategories: Research",
+    "\ncategories:\n  - OpenShell",
+    "\ncategories:\n  - research",
+    "\ncategories:\n  - Research\n  - Examples",
+    "\ncategories:\n  - Research\n  - Research",
+    '\ncategories:\n  - ""',
+])
+def test_category_errors_leave_generated_content_untouched(post, monkeypatch, category_frontmatter):
+    posts_dir = post["path"].parent
+    invalid_path = posts_dir / "z-invalid.md"
+    frontmatter = post["frontmatter"].split("\ncategories:", 1)[0] + category_frontmatter
+    invalid_path.write_text(f"---\n{frontmatter}\n---\n\nUnchanged prose.\n")
+    index_path = posts_dir.parent / "index.md"
+    index_path.write_text(f"{renderer.POSTS_START}\nUnchanged index.\n{renderer.POSTS_END}")
+    config_path = posts_dir.parent / "zensical.toml"
+    config_path.write_text(f"{renderer.NAV_START}\nUnchanged navigation.\n{renderer.NAV_END}")
+    monkeypatch.setattr(renderer, "POSTS_DIR", posts_dir)
+    monkeypatch.setattr(renderer, "INDEX_PATH", index_path)
+    monkeypatch.setattr(renderer, "CONFIG_PATH", config_path)
+    monkeypatch.setattr(renderer, "load_authors", lambda: {"ada": {"name": "Ada", "github": "ada"}})
+    originals = {path: path.read_bytes() for path in [post["path"], invalid_path, index_path, config_path]}
+
+    with pytest.raises(ValueError, match="front matter field 'categories'"):
+        renderer.main()
+
+    assert {path: path.read_bytes() for path in originals} == originals
