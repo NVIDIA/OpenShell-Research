@@ -15,7 +15,7 @@ hide:
       <div class="research-masthead__copy">
         <h1 id="dev-notes-title">Dev Notes</h1>
         <p class="research-masthead__dek">
-          OpenShell's research journal – reproducible research, announcements, and case studies.
+          OpenShell's research journal – reproducible research, announcements, and implementation lessons.
         </p>
       </div>
     </div>

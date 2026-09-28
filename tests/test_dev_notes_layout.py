@@ -140,6 +140,10 @@ def assert_index_proportions(page, viewport):
         const style = getComputedStyle(element);
         return parseFloat(style.borderTopWidth) > 0 && parseFloat(style.borderBottomWidth) > 0;
     }"""), "Dividers should frame the filters"
+    if viewport["width"] >= 1280:
+        subtitle = page.locator(".research-masthead__dek")
+        line_height = subtitle.evaluate("element => parseFloat(getComputedStyle(element).lineHeight)")
+        assert subtitle.bounding_box()["height"] <= line_height + 1, "The index subtitle should fit on one line at desktop widths"
     cards = page.locator(".dev-note-card")
     assert cards.count() == len(POSTS)
     assert_images_loaded(cards.locator(".dev-note-card__visual-image"))
