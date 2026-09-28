@@ -129,6 +129,14 @@ def assert_footer_navigation_visible(page):
 def assert_index_proportions(page, viewport):
     assert_no_horizontal_overflow(page)
     assert_footer_navigation_visible(page)
+    masthead = page.locator(".research-masthead").bounding_box()
+    filters = page.locator(".dev-notes-filters").bounding_box()
+    toolbar = page.locator(".dev-notes-toolbar")
+    divider = toolbar.bounding_box()
+    heading = page.locator("#featured-note-title").bounding_box()
+    assert masthead["y"] + masthead["height"] <= filters["y"], "Filters should follow the page introduction"
+    assert filters["y"] + filters["height"] < divider["y"] + divider["height"] <= heading["y"], "The divider should separate filters from posts"
+    assert toolbar.evaluate("element => parseFloat(getComputedStyle(element).borderBottomWidth) > 0")
     cards = page.locator(".dev-note-card")
     assert cards.count() == len(POSTS)
     assert_images_loaded(cards.locator(".dev-note-card__visual-image"))
@@ -140,12 +148,14 @@ def assert_index_proportions(page, viewport):
     for visual in page.locator(".dev-note-card--recent .dev-note-card__visual").all():
         assert visual.bounding_box()["height"] <= 120, "Recent images should stay thumbnails"
     if viewport["width"] >= 1024:
-        featured = page.locator(".dev-note-card--featured").bounding_box()
-        assert featured["y"] + featured["height"] < viewport["height"], "Featured note pushes the list below the fold"
-        # The spacious masthead leaves the archive below the fold on short laptops.
-        if viewport["height"] >= 900 and page.locator(".dev-note-card--recent").count():
-            title = page.locator(".dev-note-card--recent h3").first.bounding_box()
-            assert title["y"] + title["height"] < viewport["height"], "First recent title should be visible on a tall desktop viewport"
+        title = page.locator(".dev-note-card--featured h3").bounding_box()
+        assert title["y"] + title["height"] < viewport["height"], "The featured title should be visible on a laptop viewport"
+        if viewport["height"] >= 900:
+            featured = page.locator(".dev-note-card--featured").bounding_box()
+            assert featured["y"] + featured["height"] < viewport["height"], "The featured note should fit on a tall desktop viewport"
+            if page.locator(".dev-note-card--recent").count():
+                recent_heading = page.locator("#recent-notes-title").bounding_box()
+                assert recent_heading["y"] + recent_heading["height"] < viewport["height"], "The archive should begin on a tall desktop viewport"
 
 
 def test_index_reading_proportions(page, site_url, viewport):

@@ -696,14 +696,14 @@ body:has(.openshell-home-page) .md-path {
 }
 
 .research-masthead {
-  padding: 1.5rem 0 1rem;
+  padding: 1.5rem 0 1.4rem;
 }
 
 .research-masthead__topline {
   display: flex;
   align-items: center;
   gap: 0.8rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.4rem;
   color: var(--openshell-muted);
   font-family: var(--openshell-mono);
   font-size: 0.63rem;
@@ -765,7 +765,6 @@ body:has(.openshell-home-page) .md-path {
   display: none !important;
 }
 
-.dev-notes-toolbar,
 .dev-notes-filters,
 .dev-notes-filters label {
   display: flex;
@@ -773,11 +772,16 @@ body:has(.openshell-home-page) .md-path {
 }
 
 .dev-notes-toolbar {
-  justify-content: space-between;
-  gap: 0.6rem 1.5rem;
+  padding: 0.8rem 0 0.75rem;
+  border-bottom: 1px solid var(--openshell-rule);
+}
+
+.dev-notes-toolbar:not(:has(.dev-notes-filters:not([hidden]))) {
+  display: none;
 }
 
 .dev-notes-filters {
+  justify-content: flex-end;
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
   margin: 0;
@@ -1441,11 +1445,6 @@ body:has(.dev-note-header) .md-main__inner {
 /* Responsive -------------------------------------------------------------- */
 
 @media (max-width: 44rem) {
-  .dev-notes-toolbar {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
   .dev-notes-filters {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

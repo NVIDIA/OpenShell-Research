@@ -131,14 +131,15 @@ visible. Do not add per-post title/hero sizing or force an image into a differen
 aspect ratio. Body diagrams may still use the shared wide or scrollable figure
 treatments when their labels need more room.
 
-The index gives the page title and featured note prominence, with a spacious
-masthead and the first recent title visible in a 900px-tall desktop viewport.
-Shorter laptop screens show the featured note, with the archive further down.
+The index separates the page introduction, filtering controls, and posts. Give
+the masthead breathing room and keep the filters in their own row, above a
+divider and the featured-note heading. Laptop screens show the featured title;
+a 900px-tall desktop viewport fits the featured note and the archive heading.
 The archive remains a normal scrolling list as it grows; do not shrink its
 entries to fit all notes on one screen or give the archive a separate scrolling
 panel. Keep one label per section. Use whitespace within the featured note and
-reserve dividers for the
-archive boundary and the entries within it.
+dividers below the filtering controls, at the archive boundary, and between
+archive entries.
 
 Do not edit content inside these generated marker pairs:
 
@@ -162,8 +163,9 @@ sizes in both themes. The browser checks discover every note automatically. They
 hero assets or alt text, cropped or thumbnail-sized article heroes, overly long text lines,
 horizontal page overflow, off-center heroes, images overflowing their figures or
 overlapping the byline, incorrect theme-image visibility, an opening that needs
-scrolling to see the full hero, and an index that pushes the featured note below
-a laptop viewport or the first recent title below a 900px-tall desktop viewport.
+scrolling to see the full hero, and an index that obscures the featured title on
+laptops or pushes the featured note and archive heading below a 900px-tall
+desktop viewport. They also check the separation of introduction, filters, and posts.
 They also move the featured note into the recent list to exercise its thumbnail
 layout. The workflow saves screenshots as the `dev-notes-layout` artifact for
 visual review. These are layout

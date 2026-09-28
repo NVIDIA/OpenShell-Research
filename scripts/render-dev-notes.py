@@ -380,11 +380,13 @@ def render_index_cards(posts: list[dict[str, Any]]) -> str:
 {recent}
     </div>
   </section>"""
-        body = f"""<div id="dev-notes-results">
-  <section class="journal-section dev-notes-featured" aria-labelledby="featured-note-title">
-    <div class="journal-section__head dev-notes-toolbar">
-      <h2 id="featured-note-title" aria-live="polite" aria-atomic="true">Featured note</h2>
+        body = f"""<div class="dev-notes-toolbar">
 {render_browse_filters(posts)}
+</div>
+<div id="dev-notes-results">
+  <section class="journal-section dev-notes-featured" aria-labelledby="featured-note-title">
+    <div class="journal-section__head">
+      <h2 id="featured-note-title" aria-live="polite" aria-atomic="true">Featured note</h2>
     </div>
 {featured}
     <p class="dev-notes-filter-empty" hidden></p>
