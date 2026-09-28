@@ -1020,24 +1020,6 @@ body:has(.openshell-home-page) .md-path {
   font-size: 1.08rem;
 }
 
-.dev-note-card__tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.28rem 0.7rem;
-  margin-top: 0.6rem;
-  color: var(--openshell-accent);
-  font-family: var(--openshell-mono);
-  font-size: 0.54rem;
-  letter-spacing: 0.045em;
-  line-height: 1.4;
-  text-transform: uppercase;
-}
-
-.dev-note-card__tags span::before {
-  margin-right: 0.12rem;
-  content: "#";
-}
-
 .dev-note-card__footer {
   display: flex;
   align-items: center;
@@ -1149,7 +1131,7 @@ body:has(.openshell-home-page) .md-path {
 .dev-note-card--recent .dev-note-card__copy {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "meta" "title" "summary" "tags" "footer";
+  grid-template-areas: "meta" "title" "summary" "footer";
   gap: 0.35rem;
   min-width: 0;
 }
@@ -1168,12 +1150,6 @@ body:has(.openshell-home-page) .md-path {
 .md-typeset .dev-note-card--recent .dev-note-card__summary {
   grid-area: summary;
   font-size: 0.78rem;
-}
-
-.dev-note-card--recent .dev-note-card__tags {
-  grid-area: tags;
-  align-self: center;
-  margin-top: 0;
 }
 
 .dev-note-card--recent .dev-note-card__footer {
@@ -1517,7 +1493,6 @@ body:has(.dev-note-header) .md-main__inner {
       "visual meta"
       "visual title"
       "summary summary"
-      "tags tags"
       "footer footer";
     gap: 0.4rem 0.75rem;
   }

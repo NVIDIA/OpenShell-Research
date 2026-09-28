@@ -12,17 +12,13 @@ categories:
   - Examples
 tags:
   - reachy-mini
-  - openshell
   - edge-ai
   - sandbox
   - robotics
   - policy
 authors:
   - kirit93
-card_tags:
-  - edge-ai
-  - reachy-mini
-  - policy
+
 ---
 
 <!-- dev-note:header:start -->

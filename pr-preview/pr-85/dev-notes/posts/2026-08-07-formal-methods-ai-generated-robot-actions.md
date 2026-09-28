@@ -12,18 +12,13 @@ social_image: "assets/robotics-policy-prover/robotics-policy-prover-hero.png"
 categories:
   - Research
 tags:
-  - openshell
   - robotics
   - physical-ai
   - formal-methods
   - policy
-  - agents
 authors:
   - zredlined
-card_tags:
-  - physical-ai
-  - formal-methods
-  - policy
+
 ---
 
 <!-- dev-note:header:start -->

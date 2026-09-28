@@ -10,17 +10,12 @@ social_image: "assets/long-horizon-agent-evals/back-and-forth-by-session.png"
 categories:
   - Research
 tags:
-  - openshell
-  - agents
   - policy
-  - security
+  - agent-security
   - long-horizon
 authors:
   - zredlined
-card_tags:
-  - agents
-  - policy
-  - security
+
 ---
 
 <!-- dev-note:header:start -->

@@ -13,15 +13,13 @@ hero_image_dark: "../../assets/pi-admission/hero-dark.png"
 categories:
   - Research
 tags:
-  - openshell
   - agent-security
+  - runtime-and-harness
   - redaction
   - pi
 authors:
   - johnnygreco
-card_tags:
-  - agent-security
-  - runtime-and-harness
+
 ---
 
 <!-- dev-note:header:start -->
