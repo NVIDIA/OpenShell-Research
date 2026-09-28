@@ -272,22 +272,14 @@ def render_card_copy(post: dict[str, Any]) -> str:
     published = post["published"]
     description = require_string(metadata, "description", path)
     category = require_category(metadata, path)
-    tags = require_list(metadata, "card_tags", path) or require_list(metadata, "tags", path)
     authors = post["authors"]
-    tags_html = ""
-    if tags:
-        tag_items = "\n".join(f"          <span>{html.escape(tag)}</span>" for tag in tags)
-        tags_html = f"""
-        <div class="dev-note-card__tags" aria-label="Tags">
-{tag_items}
-        </div>"""
     return f"""      <div class="dev-note-card__copy">
         <div class="dev-note-card__meta">
           <time datetime="{published.isoformat()}">{html.escape(format_date(published))}</time>
           <span>{html.escape(category)}</span>
         </div>
         <h3>{html.escape(title)}</h3>
-        <p class="dev-note-card__summary">{html.escape(description)}</p>{tags_html}
+        <p class="dev-note-card__summary">{html.escape(description)}</p>
         <div class="dev-note-card__footer">
 {render_card_authors(authors)}
           <span class="dev-note-card__read">Read note</span>

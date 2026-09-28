@@ -27,7 +27,6 @@ def make_post(
     description: str = "What the experiment taught us.",
     categories: list[str] | None = None,
     tags: list[str] | None = None,
-    card_tags: list[str] | None = None,
     variant: str = "",
     hero_image: str = "",
 ) -> dict[str, object]:
@@ -38,10 +37,8 @@ def make_post(
         "description": description,
         "authors": ["ada"],
         "categories": ["Research"] if categories is None else categories,
-        "tags": tags or ["agents", "runtime"],
+        "tags": tags or ["agent-security", "runtime"],
     }
-    if card_tags is not None:
-        metadata["card_tags"] = card_tags
     if variant:
         metadata["card_variant"] = variant
     if hero_image:
@@ -118,18 +115,19 @@ class CardRenderingTests(unittest.TestCase):
         self.assertIn("2026.06.05", visual)
         self.assertNotIn("OSR—", visual)
 
-    def test_card_tags_override_tags_and_variant_reaches_outer_card(self) -> None:
+    def test_cards_preserve_topic_metadata_without_rendering_tags(self) -> None:
         post = make_post(
             "2026-06-05-note.md",
-            tags=["fallback"],
-            card_tags=["preferred", "evaluation"],
+            tags=["agent-security", "evaluation"],
             variant="launch",
         )
-        card = renderer.render_featured_card(post)
-        self.assertIn("dev-note-card--launch", card)
-        self.assertIn(">preferred<", card)
-        self.assertIn(">evaluation<", card)
-        self.assertNotIn(">fallback<", card)
+        for render_card in (renderer.render_featured_card, renderer.render_recent_card):
+            card = render_card(post)
+            self.assertIn("dev-note-card--launch", card)
+            self.assertNotIn("dev-note-card__tags", card)
+            self.assertNotIn("agent-security", card)
+            self.assertNotIn("evaluation", card)
+        self.assertEqual(post["metadata"]["tags"], ["agent-security", "evaluation"])
 
     def test_hero_image_replaces_generated_visual(self) -> None:
         post = make_post(
@@ -162,13 +160,12 @@ class CardRenderingTests(unittest.TestCase):
             "2026-06-05-note.md",
             title="Runtime <script>",
             description=r"Literal \1 and <strong>markup</strong>",
-            card_tags=["<unsafe>"],
         )
         card = renderer.render_featured_card(post)
         self.assertNotIn("<script>", card)
         self.assertIn("Runtime &lt;script&gt;", card)
         self.assertIn(r"Literal \1", card)
-        self.assertIn("&lt;unsafe&gt;", card)
+        self.assertIn("&lt;strong&gt;markup&lt;/strong&gt;", card)
 
     def test_invalid_variant_is_rejected(self) -> None:
         post = make_post("2026-06-05-note.md", variant="launch mode")

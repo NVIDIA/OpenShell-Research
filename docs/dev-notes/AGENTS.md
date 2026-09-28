@@ -10,7 +10,10 @@ matter and prose; `python3 scripts/render-dev-notes.py` generates the title,
 optional subtitle and hero, author byline, index cards, and navigation.
 
 - Set `categories` to a list containing exactly one of `Announcements`,
-  `Research`, `Case Studies`, or `Examples`. Use tags for technical topics.
+  `Research`, `Case Studies`, or `Examples`. Use one `tags` list for specific
+  technical topics. Omit generic `openshell` and `agents` tags, and use
+  `agent-security` instead of `security`. Tags feed article badges and search;
+  index cards omit them.
   The renderer rejects missing, unknown, or multiple categories.
 - Use `subtitle` for an optional short deck and `hero_image_alt` to describe a
   `hero_image`. `hero_image_dark` is optional. Do not copy header HTML from a post.

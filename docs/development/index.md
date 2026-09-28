@@ -65,7 +65,10 @@ The renderer validates this list before updating any generated content. Missing,
 unknown, or multiple categories fail the build with an author-facing error.
 Categories appear consistently on index cards and article bylines. Categories
 remain available even when they have no posts; do not create placeholder notes.
-Use tags for subject areas such as robotics, formal methods, or agent security.
+Use one `tags` list for specific topics such as `robotics`, `formal-methods`, or
+`agent-security`. Avoid generic `openshell` and `agents` tags; use
+`agent-security` consistently instead of `security`. Tags appear on articles and
+feed site search metadata; index cards omit tags.
 
 Readers can combine category and author filters on the Dev Notes index. The
 renderer derives the author menu from every post's author IDs and always includes
@@ -76,7 +79,6 @@ Back/Forward navigation. Article byline names and categories link to these
 filtered views. Empty combinations show a message and a clear-filters action.
 Keep the full index readable when JavaScript is unavailable.
 
-The renderer uses `card_tags` as the card's tags, falling back to `tags`.
 An optional `card_variant` must have matching card and
 artwork CSS modifiers in `docs/stylesheets/dev-notes.css`. Set `hero_image` to
 an image path relative to the post, and describe it with `hero_image_alt`. The

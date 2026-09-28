@@ -11,17 +11,12 @@ social_image: "assets/agent-policy-prover/hero-concept.png"
 categories:
   - Research
 tags:
-  - openshell
   - formal-methods
   - z3
-  - agents
-  - security
+  - agent-security
 authors:
   - zredlined
-card_tags:
-  - formal-methods
-  - z3
-  - agents
+
 ---
 
 <!-- dev-note:header:start -->

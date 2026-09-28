@@ -14,7 +14,6 @@ authors:
 categories:
   - Announcements
 tags:
-  - openshell
   - agent-security
 ---
 
