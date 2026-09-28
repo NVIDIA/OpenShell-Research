@@ -726,7 +726,7 @@ body:has(.openshell-home-page) .md-path {
 
 .research-masthead__copy {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 1.5rem;
 }
 
@@ -735,18 +735,18 @@ body:has(.openshell-home-page) .md-path {
   max-width: 13ch;
   margin: 0;
   font-family: var(--openshell-serif);
-  font-size: clamp(2.8rem, 5.5vw, 3.6rem);
+  font-size: clamp(3.2rem, 6.5vw, 4.3rem);
   font-weight: 500;
   letter-spacing: -0.06em;
   line-height: 1.05;
 }
 
 .research-masthead__dek {
-  max-width: 40rem;
+  max-width: 42ch;
   margin: 0;
-  color: var(--openshell-muted);
+  color: var(--openshell-ink);
   font-family: var(--openshell-serif);
-  font-size: 0.9rem;
+  font-size: clamp(1rem, 1.6vw, 1.15rem);
   line-height: 1.45;
 }
 
@@ -784,7 +784,7 @@ body:has(.openshell-home-page) .md-path {
 
 .dev-note-card--featured .dev-note-card__link {
   display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
   align-items: center;
   gap: 1.5rem;
 }
@@ -934,8 +934,9 @@ body:has(.openshell-home-page) .md-path {
 }
 
 .md-typeset .dev-note-card--featured h3 {
-  font-size: clamp(1.6rem, 3vw, 2.15rem);
+  font-size: clamp(1.75rem, 3.4vw, 2.4rem);
   line-height: 1.08;
+  text-wrap: balance;
 }
 
 .md-typeset .dev-note-card__summary {
@@ -944,6 +945,10 @@ body:has(.openshell-home-page) .md-path {
   font-family: var(--openshell-serif);
   font-size: 0.85rem;
   line-height: 1.45;
+}
+
+.md-typeset .dev-note-card--featured .dev-note-card__summary {
+  font-size: 0.95rem;
 }
 
 .dev-note-card__tags {
@@ -1373,7 +1378,7 @@ body:has(.dev-note-header) .md-main__inner {
   }
 
   .dev-note-card--featured .dev-note-card__visual {
-    width: min(100%, 18rem);
+    width: min(100%, 21rem);
     justify-self: center;
   }
 
