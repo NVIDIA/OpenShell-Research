@@ -167,6 +167,83 @@ def test_index_reading_proportions(page, site_url, viewport):
     assert_index_proportions(page, viewport)
 
 
+def test_index_image_budget_and_theme_loading(page, site_url):
+    images = []
+    page.on("response", lambda response: images.append({
+        "name": response.url, "bytes": int(response.headers.get("content-length", 0)),
+    }) if response.request.resource_type == "image" and response.url.startswith(site_url) else None)
+    open_page(page, f"{site_url}/dev-notes/")
+    featured = page.locator(".dev-note-card--featured img.dev-note-card__visual-image")
+    # Do not force hidden images eager: these assertions exercise real loading.
+    for image in featured.all():
+        if image.is_visible():
+            image.evaluate("image => image.decode()")
+    resources = page.evaluate("""performance.getEntriesByType('resource').map(entry => ({
+        name: entry.name, type: entry.initiatorType, bytes: entry.encodedBodySize
+    }))""")
+    assert sum(entry["bytes"] for entry in images) < 300_000, images
+    assert not any(urlparse(entry["name"]).path.endswith(".png") for entry in images), images
+    assert not any("fonts.googleapis.com" in entry["name"] for entry in resources)
+    for image in featured.all():
+        if not image.is_visible():
+            # WebKit selects currentSrc even while the image remains unfetched.
+            assert image.evaluate("image => image.currentSrc") not in {entry["name"] for entry in images}
+            assert image.evaluate("image => image.naturalWidth") == 0
+    page.evaluate("""document.body.dataset.mdColorScheme =
+        document.body.dataset.mdColorScheme === 'slate' ? 'default' : 'slate'""")
+    for image in featured.all():
+        if image.is_visible():
+            page.wait_for_function("image => image.complete && image.naturalWidth > 0", arg=image.element_handle())
+            assert "/assets/responsive/" in image.evaluate("image => image.currentSrc")
+
+
+def test_transcripts_wait_for_viewport_and_follow_source_links(page, site_url):
+    url = f"{site_url}/dev-notes/posts/2026-09-26-network-redaction-is-not-enough/"
+    requests = []
+    page.on("request", lambda request: requests.append(request.url))
+    open_page(page, url)
+    assert not any(request.endswith("viewer.json") for request in requests)
+    viewer = page.locator(".pi-traces")
+    viewer.scroll_into_view_if_needed()
+    expect(viewer.locator(".pi-traces__app")).to_be_visible()
+    assert sum(request.endswith("viewer.json") for request in requests) == 1
+    open_page(page, f"{site_url}/dev-notes/")
+    open_page(page, url + "#trace-source-kimi-on")
+    expect(page.locator("#trace-panel-kimi-on")).to_be_visible()
+    expect(page.locator("#trace-panel-kimi-off")).to_be_hidden()
+    page.locator("#trace-tab-kimi-off").click()
+    expect(page.locator("#trace-panel-kimi-off")).to_be_visible()
+    page.locator("#trace-model-tab-kimi").focus()
+    page.keyboard.press("ArrowRight")
+    expect(page.locator("#trace-model-tab-glm")).to_be_focused()
+    expect(page.locator("#trace-panel-glm-off")).to_be_visible()
+    viewer.locator(".pi-traces__collapse").click()
+    expect(viewer.locator(".pi-traces__content")).to_be_hidden()
+    viewer.locator(".pi-traces__collapse").click()
+    expect(page.locator("#trace-panel-glm-off")).to_be_visible()
+
+
+def test_saved_theme_loads_only_its_hero_on_retina_screen(browser, site_url):
+    page = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=2, color_scheme="light")
+    page.route("**/*", lambda route: route.continue_() if route.request.url.startswith(site_url) else route.abort())
+    page.add_init_script("""localStorage.setItem('/.__palette', JSON.stringify({
+        color: {scheme: 'slate', media: '(prefers-color-scheme: dark)', primary: 'black', accent: 'green'}
+    }))""")
+    requests = []
+    page.on("request", lambda request: requests.append(request.url))
+    try:
+        page.goto(f"{site_url}/dev-notes/", wait_until="networkidle")
+        assert page.locator("body").get_attribute("data-md-color-scheme") == "slate"
+        hero = page.locator(".dev-note-card--featured .dev-note-image--dark")
+        hero.evaluate("image => image.decode()")
+        assert "/assets/responsive/" in hero.evaluate("image => image.currentSrc")
+        hidden = page.locator(".dev-note-card--featured .dev-note-image--light")
+        assert hidden.evaluate("image => image.currentSrc") not in requests
+        assert hidden.evaluate("image => image.naturalWidth") == 0
+    finally:
+        page.close()
+
+
 def test_featured_image_also_works_as_a_thumbnail(page, site_url, viewport):
     open_page(page, f"{site_url}/dev-notes/")
     if page.locator(".dev-note-card--recent").count() == 0:
@@ -368,6 +445,20 @@ def test_shared_documentation_navigation(page, site_url, viewport):
         assert page.get_by_role("button", name="Open navigation", exact=True).evaluate(
             "e => e === document.activeElement"
         ), "Closing the drawer should restore focus"
+
+
+def test_homepage_brand_and_navigation(page, site_url):
+    open_page(page, site_url + "/")
+    assert_no_horizontal_overflow(page)
+    brand = page.locator(".openshell-home-brand img:visible")
+    assert brand.count() == 1
+    brand.evaluate("image => image.decode()")
+    assert "/assets/responsive/" in brand.evaluate("image => image.currentSrc")
+    page.locator(".openshell-home-link").filter(has=page.get_by_text("Dev Notes", exact=True)).click()
+    expect(page.locator(".dev-notes-page")).to_be_visible()
+    page.go_back(wait_until="networkidle")
+    page.locator(".openshell-home-link").filter(has=page.get_by_text("Documentation", exact=True)).click()
+    expect(page.locator("h1")).to_contain_text("Documentation")
 
 
 @pytest.mark.parametrize("post", VIDEO_POSTS, ids=lambda post: post.stem)

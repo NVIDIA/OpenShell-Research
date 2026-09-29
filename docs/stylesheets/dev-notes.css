@@ -32,6 +32,8 @@
   --openshell-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
   --openshell-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --openshell-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --md-text-font: var(--openshell-sans);
+  --md-code-font: var(--openshell-mono);
   --md-default-bg-color: var(--openshell-paper);
   --md-default-fg-color: var(--openshell-ink);
   --md-primary-fg-color: var(--openshell-paper-raised);

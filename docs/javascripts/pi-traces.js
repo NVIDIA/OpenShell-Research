@@ -298,8 +298,34 @@
     }
   }
 
+  let cleanupPending = () => {};
   function enhance() {
-    document.querySelectorAll(".pi-traces").forEach(initialize);
+    cleanupPending();
+    const pending = new Set(document.querySelectorAll(".pi-traces:not([data-initialized])"));
+    if (!pending.size) return;
+    // The transcript payload and its DOM are substantial. Prepare them just
+    // before the reader reaches the viewer, or immediately for source links.
+    const observer = "IntersectionObserver" in window
+      ? new IntersectionObserver(entries => {
+        entries.filter(entry => entry.isIntersecting).forEach(entry => start(entry.target));
+      }, { rootMargin: "600px" })
+      : null;
+    const start = viewer => {
+      pending.delete(viewer);
+      observer?.unobserve(viewer);
+      initialize(viewer);
+      if (!pending.size) cleanupPending();
+    };
+    const followPendingSource = () => {
+      if (/^#trace-source-/.test(window.location.hash)) [...pending].forEach(start);
+    };
+    cleanupPending = () => {
+      observer?.disconnect();
+      window.removeEventListener("hashchange", followPendingSource);
+    };
+    window.addEventListener("hashchange", followPendingSource);
+    followPendingSource();
+    pending.forEach(viewer => observer ? observer.observe(viewer) : start(viewer));
   }
   if (window.document$?.subscribe) window.document$.subscribe(enhance);
   else if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", enhance, { once: true });

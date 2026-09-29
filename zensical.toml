@@ -68,6 +68,7 @@ pygments_lang_class = true
 alternate_style = true
 
 [project.theme]
+font = false
 custom_dir = "overrides"
 favicon = "assets/brand/favicon.svg"
 logo = "assets/brand/openshell-mark.svg"

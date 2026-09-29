@@ -62,6 +62,10 @@
       matches.forEach((card, index) => {
         card.element.classList.toggle("dev-note-card--featured", index === 0);
         card.element.classList.toggle("dev-note-card--recent", index !== 0);
+        card.element.querySelectorAll("img[data-featured-sizes]").forEach(image => {
+          image.sizes = index === 0 ? image.dataset.featuredSizes : image.dataset.recentSizes;
+          image.fetchPriority = index === 0 ? "high" : "auto";
+        });
         if (index === 0) featured.insertBefore(card.element, empty);
         else recentList.append(card.element);
       });

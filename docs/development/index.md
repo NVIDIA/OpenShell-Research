@@ -127,6 +127,18 @@ viewport. Heroes fill that available space up to the reading-column width and
 560px height, preserving their native proportions without cropping. Longer text
 leaves less room for the hero; authors should keep titles and subtitles concise.
 The index continues to use compact thumbnails.
+The clean build runs `scripts/optimize-site.py` over rendered HTML. Local PNG,
+JPEG, and static WebP images receive content-addressed WebP `srcset` variants
+from 320 to 1920 pixels wide, intrinsic dimensions, and asynchronous decoding.
+Original image URLs and full-size links stay intact, as do published Markdown
+sources. Do not commit the generated `site/assets/responsive/` files. Authored
+responsive pictures and animated images are preserved. Card `sizes` follow their
+featured or archive role, including after filtering. Hidden light/dark variants
+use native lazy loading so only the visible theme downloads. Body images load
+lazily, and video posters use compressed variants. The site uses system fonts
+without external font stylesheets.
+The transcript viewer defers its JSON download and DOM construction until it
+approaches the viewport; transcript source fragment links initialize it directly.
 Clicking a hero opens the original image, so a diagram can remain compact without
 losing access to its details. Index images use bounded frames with the full image
 visible. Do not add per-post title/hero sizing or force an image into a different
