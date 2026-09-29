@@ -783,8 +783,9 @@ body:has(.openshell-home-page) .md-path {
   border-bottom: 1px solid var(--openshell-rule);
 }
 
-.dev-notes-toolbar:not(:has(.dev-notes-filters:not([hidden]))) {
-  display: none;
+.dev-notes-filters[inert] {
+  /* Reserve the controls' responsive height before enhancement completes. */
+  visibility: hidden;
 }
 
 .dev-notes-filters {

@@ -18,6 +18,7 @@
 <link href="../stylesheets/pi-traces.css" rel="stylesheet"/>
 <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
 <meta content="noindex, follow" name="robots"/>
+<noscript><style>.dev-notes-toolbar { display: none; }</style></noscript>
 <script>
     try {
       document.documentElement.dataset.navigationDrawer =
@@ -491,7 +492,10 @@ featured; the remaining matches keep their chronological order. Filters use
 <code>?category=research&amp;author=johnnygreco</code> URLs that survive refresh and browser
 Back/Forward navigation. Article byline names and categories link to these
 filtered views. Empty combinations show a message and a clear-filters action.
-Keep the full index readable when JavaScript is unavailable.</p>
+Keep the full index readable when JavaScript is unavailable.
+Reserve the filter controls' layout space while their inert form initializes,
+so revealing the controls does not move the posts on first load or reload.
+The no-JavaScript fallback omits the toolbar entirely.</p>
 <p>An optional <code>card_variant</code> must have matching card and
 artwork CSS modifiers in <code>docs/stylesheets/dev-notes.css</code>. Set <code>hero_image</code> to
 an image path relative to the post, and describe it with <code>hero_image_alt</code>. The

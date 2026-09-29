@@ -109,7 +109,7 @@
     clear.addEventListener("click", clearFilters);
     window.addEventListener("popstate", applyFilters);
     applyFilters();
-    form.hidden = false;
+    form.inert = false;
     cleanup = () => {
       form.removeEventListener("change", updateUrl);
       form.removeEventListener("submit", updateUrl);
