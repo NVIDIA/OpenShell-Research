@@ -5,104 +5,79 @@ description: Use for docs visual audits, layout, typography, heroes, CSS, naviga
 
 # Documentation visual review
 
-Run commands from the OpenShell Research repository root. Read
-`docs/development/index.md` and applicable `AGENTS.md` instructions first.
-Browser validation is on demand, not a CI gate. Preserve the ordinary renderer,
-JavaScript, and clean-build checks; do not add browser runs back to CI.
+Run commands from the repository root. Read `docs/development/index.md` and any
+applicable `AGENTS.md` instructions before changing the site.
 
-## Choose the scope
+## Choose pages and checks
 
-Use `tests/test_dev_notes_layout.py` and its adjacent uv lock rather than writing
-another browser harness. It discovers current Dev Notes and covers Chromium and
-WebKit, light (`default`) and dark (`slate`) themes, and desktop, tablet, and phone
-viewports. Start with tests relevant to the change. Run the full suite when
-changing shared layout or when the user requests a comprehensive review.
+Review the pages affected by the change and representative pages that share their
+styles or templates. Include both `default` and `slate` themes and desktop,
+tablet, and phone widths. Check Chromium and WebKit for affected surfaces.
 
-Examples of focused selections with pytest's `-k`:
+Use the existing browser suite, `tests/test_dev_notes_layout.py`, for layout and
+interaction checks. It discovers current Dev Notes and saves screenshots. Select
+relevant tests with pytest's `-k`; run the full suite for a site-wide audit or a
+shared layout change. Useful selections include:
 
-- Index hierarchy, title, subtitle, featured card: `index_reading_proportions`.
-- Hero or card changes: `post_reading_proportions or featured_image_also_works_as_a_thumbnail`.
-- Filters, author links, history, no-JavaScript fallback: `filters or bylines or without_javascript`.
-- Breadcrumbs, footer, mobile drawer, tables: `shared_documentation_navigation`.
-- Embedded recordings: `embedded_video_playback`.
+- Index and featured cards: `index_reading_proportions or featured_image_also_works_as_a_thumbnail`.
+- Articles and heroes: `post_reading_proportions or featured_image_also_works_as_a_thumbnail`.
+- Filters and byline links: `filters or bylines or without_javascript`.
+- Shared navigation and search: `shared_documentation_navigation or search_and_saved_navigation`.
+- Images, transcripts, or video: select the corresponding test names with `--collect-only -q`.
 
-For a single note, use `--collect-only -q` to find its parametrized test IDs,
-then select the relevant filename with `-k`. Keep both browsers, themes, and
-screen sizes for final validation of affected surfaces. A quick single-browser
-run is useful during iteration but does not establish cross-browser correctness.
+For a single article, use `--collect-only -q` to find its parametrized test ID,
+then select its filename with `-k`.
 
-## Build and run
+## Build and inspect
 
-Build the current sources before testing; browser tests read `site/` and do not
-rebuild it:
+Build before running browser tests; they read the generated `site/` directory:
 
 ```sh
 scripts/build-docs.sh
 ```
 
-Install browsers once per environment, or again if the locked Playwright version
-changes. This installs Chromium, WebKit, and their system dependencies:
+Install the browsers if they are not already available:
 
 ```sh
 uv run --locked --script tests/test_dev_notes_layout.py --install-browser
 ```
 
-For example, check the index across the browser/theme/viewport matrix:
+Run focused checks during iteration, then validate the affected surfaces across
+the complete browser, theme, and viewport matrix. For example:
 
 ```sh
 uv run --locked --script tests/test_dev_notes_layout.py -q -k index_reading_proportions
 ```
 
-For a comprehensive review:
+For a site-wide audit:
 
 ```sh
 uv run --locked --script tests/test_dev_notes_layout.py -q
 ```
 
-The full suite can take about six minutes. It starts and stops its own local HTTP
-server. Screenshots from page-fixture tests are saved to
-`.cache/dev-notes-layout/`, with test and parameter names in the filenames.
-Inspect files produced by the current run; other screenshots may be stale.
-External requests are blocked for deterministic checks, so separately inspect
-external avatars or embeds when those are relevant to the task.
+The suite serves `site/` locally and writes screenshots to
+`.cache/dev-notes-layout/`. Inspect screenshots from the current run; older files
+may still be present. The suite blocks external requests, so inspect relevant
+external avatars or embeds separately.
 
-## Inspect the rendered result
-
-Open the relevant screenshots with an available image-viewing tool. Passing
-geometry assertions does not establish visual quality or diagram-label
-readability. For a visual audit, also serve the complete built site and interact
-with the affected pages in an available browser:
+Open the affected pages in a browser and interact with them. To serve the built
+site manually:
 
 ```sh
 python3 -m http.server 8000 --directory site
 ```
 
-Reuse an existing artifact preview when available. On a remote machine,
-localhost alone is not a user-accessible preview; report a verified forwarded or
-published preview URL if the user needs to view it.
+Inspect the rendered pages, not just test results. Check visual hierarchy,
+readability, spacing, image detail and proportions, theme contrast, clipping,
+overlap, and horizontal overflow. Confirm that tables and navigation work at
+narrow widths. On the Dev Notes index, confirm that the featured card is
+prominent, the archive scrolls naturally, and category and author filters work
+together, clear correctly, and survive refresh and browser history. On articles,
+check that the title, subtitle, and complete hero fit the opening viewport, images
+keep their proportions, and diagram labels remain legible at full size. Exercise
+mobile navigation, search, transcripts, and video where relevant.
 
-Judge the result against these established design decisions:
-
-- The Dev Notes masthead has a prominent serif title and readable subtitle with
-  breathing room. Divider lines separate filters from the introduction and
-  posts. The featured note is larger than archive entries; the archive scrolls
-  naturally rather than shrinking or acquiring its own scroll panel.
-- Article titles, subtitles, and complete heroes fit the opening viewport using
-  shared styles. Heroes preserve their proportions without cropping, stretching,
-  overflowing figures, or overlapping the byline. Inspect both theme variants
-  and the full-size asset for detailed diagrams. Author thumbnails stay left;
-  sidebar post links contain titles only.
-- Text columns remain readable, phones have no page-wide horizontal overflow,
-  tables scroll within the article, and navigation labels do not clip or overlap.
-- Exercise category and author combinations, empty results, clear filters,
-  refresh, Back/Forward, and byline links when filtering changes. Check mobile
-  navigation and video playback when those surfaces change.
-
-Fix shared styles, templates, or source metadata rather than hand-editing
-renderer-owned HTML or adding per-post sizing overrides. Rebuild after changes
-and rerun affected checks. Do not weaken assertions solely to silence failures;
-update a constraint only when the requested design has intentionally changed.
-
-Report the tested pages and scope, browser results, screenshots inspected, and
-any unverified surfaces or blocked checks. Do not claim a visual review based
-only on passing tests or test collection.
+If you make a fix, change the source styles, templates, or metadata, rebuild,
+and rerun the affected checks. Report the pages, themes, widths, and browsers
+reviewed, the screenshots inspected, and any surfaces or checks you could not
+verify.
