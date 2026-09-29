@@ -130,6 +130,12 @@ go test -race ./...
 go build ./cmd/...
 ```
 
+The module-level `golang.org/x/crypto` finding [GO-2026-5932](https://pkg.go.dev/vuln/GO-2026-5932)
+applies to its unmaintained `openpgp` packages and has no fixed version. This
+exporter does not compile those packages: `go list -deps ./...` contains no
+`golang.org/x/crypto/openpgp` paths. Recheck package reachability if the Go
+dependencies change.
+
 The source is extracted from exporter snapshot
 `6a440f05249ac05aa9b9ef8acada4c909ec86bc8`. This distribution retains the Go
 implementation and component tests; deployment tooling lives separately.
