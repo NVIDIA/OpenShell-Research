@@ -30,6 +30,7 @@
     if (isTool) {
       const disclosure = element("details", "pi-chat__disclosure");
       disclosure.dataset.messageGroup = "tools";
+      disclosure.open = true;
       const summary = element("summary");
       const lines = message.text.split("\n").length - Number(message.text.endsWith("\n"));
       const label = message.role === "call"
