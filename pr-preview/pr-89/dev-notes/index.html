@@ -26,8 +26,16 @@
 <meta content="summary" name="twitter:card"/>
 <meta content="Dev Notes" name="twitter:title"/>
 <meta content="Dev Notes, experiments, milestones, and lessons from building OpenShell research applications." name="twitter:description"/>
-<noscript><style>.dev-notes-toolbar { display: none; }</style></noscript>
+<noscript><style>
+    .dev-notes-toolbar, .pi-traces__loading { display: none; }
+    .pi-traces__content { height: auto; }
+  </style></noscript>
 <script>
+    // Shared filter links should never flash the unfiltered card list.
+    const noteFilters = new URLSearchParams(location.search);
+    if (noteFilters.has("category") || noteFilters.has("author")) {
+      document.documentElement.dataset.devNotesFiltered = "true";
+    }
     try {
       document.documentElement.dataset.navigationDrawer =
         window.sessionStorage.getItem("openshell.navigationDrawerOpen") === "true"
@@ -52,7 +60,7 @@
 <header class="md-header md-header--shadow" data-md-component="header">
 <nav aria-label="Header" class="md-header__inner md-grid">
 <a aria-label="OpenShell Research" class="md-header__button md-logo" data-md-component="logo" href="./.." title="OpenShell Research">
-<img alt="OpenShell Research" decoding="async" src="../assets/brand/openshell-mark.svg"/>
+<img alt="OpenShell Research" decoding="async" height="100" src="../assets/brand/openshell-mark.svg" width="100"/>
 </a>
 <label aria-controls="primary-navigation" aria-expanded="false" aria-label="Open navigation" class="md-header__button md-icon openshell-drawer-button" for="__drawer" role="button" tabindex="0">
 <svg aria-hidden="true" viewbox="0 0 24 24">
@@ -130,7 +138,7 @@
 <nav aria-label="Navigation" class="md-nav md-nav--primary" data-md-level="0">
 <div class="md-nav__title">
 <a aria-label="OpenShell Research" class="md-nav__button md-logo" data-md-component="logo" href="./.." title="OpenShell Research">
-<img alt="OpenShell Research" decoding="async" src="../assets/brand/openshell-mark.svg"/>
+<img alt="OpenShell Research" decoding="async" height="100" src="../assets/brand/openshell-mark.svg" width="100"/>
 </a>
     OpenShell Research
     <button aria-label="Close navigation" class="openshell-drawer-close md-icon" type="button">
@@ -401,7 +409,7 @@
 <div class="dev-notes-page" id="__skip" tabindex="-1">
 <header aria-labelledby="dev-notes-title" class="research-masthead">
 <div class="research-masthead__topline">
-<img alt="" aria-hidden="true" decoding="async" loading="lazy" src="../assets/brand/openshell-mark.svg"/>
+<img alt="" aria-hidden="true" decoding="async" height="100" loading="lazy" src="../assets/brand/openshell-mark.svg" width="100"/>
 <span>OpenShell / Dev Notes</span>
 </div>
 <div class="research-masthead__layout">
@@ -564,7 +572,7 @@
 <article class="dev-note-card dev-note-card--recent dev-note-card--examples dev-note-card--has-image" data-authors='["kirit93"]' data-category="examples">
 <a class="dev-note-card__link" href="posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/">
 <div aria-hidden="true" class="dev-note-card__visual dev-note-card__visual--examples dev-note-card__visual--image">
-<img alt="" class="dev-note-card__visual-image" decoding="async" loading="lazy" src="../assets/reachy-mini-openshell/hero.svg"/>
+<img alt="" class="dev-note-card__visual-image" decoding="async" height="630" loading="lazy" src="../assets/reachy-mini-openshell/hero.svg" width="1200"/>
 </div>
 <div class="dev-note-card__copy">
 <div class="dev-note-card__meta">

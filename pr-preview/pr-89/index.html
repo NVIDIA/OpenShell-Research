@@ -25,8 +25,16 @@
 <meta content="summary" name="twitter:card"/>
 <meta content="OpenShell Research" name="twitter:title"/>
 <meta content="OpenShell research, experiments, and documentation for secure AI agents, policy enforcement, automation, and robotics." name="twitter:description"/>
-<noscript><style>.dev-notes-toolbar { display: none; }</style></noscript>
+<noscript><style>
+    .dev-notes-toolbar, .pi-traces__loading { display: none; }
+    .pi-traces__content { height: auto; }
+  </style></noscript>
 <script>
+    // Shared filter links should never flash the unfiltered card list.
+    const noteFilters = new URLSearchParams(location.search);
+    if (noteFilters.has("category") || noteFilters.has("author")) {
+      document.documentElement.dataset.devNotesFiltered = "true";
+    }
     try {
       document.documentElement.dataset.navigationDrawer =
         window.sessionStorage.getItem("openshell.navigationDrawerOpen") === "true"
@@ -51,7 +59,7 @@
 <header class="md-header md-header--shadow" data-md-component="header">
 <nav aria-label="Header" class="md-header__inner md-grid">
 <a aria-label="OpenShell Research" class="md-header__button md-logo" data-md-component="logo" href="." title="OpenShell Research">
-<img alt="OpenShell Research" decoding="async" src="./assets/brand/openshell-mark.svg"/>
+<img alt="OpenShell Research" decoding="async" height="100" src="./assets/brand/openshell-mark.svg" width="100"/>
 </a>
 <label aria-controls="primary-navigation" aria-expanded="false" aria-label="Open navigation" class="md-header__button md-icon openshell-drawer-button" for="__drawer" role="button" tabindex="0">
 <svg aria-hidden="true" viewbox="0 0 24 24">
@@ -129,7 +137,7 @@
 <nav aria-label="Navigation" class="md-nav md-nav--primary" data-md-level="0">
 <div class="md-nav__title">
 <a aria-label="OpenShell Research" class="md-nav__button md-logo" data-md-component="logo" href="." title="OpenShell Research">
-<img alt="OpenShell Research" decoding="async" src="./assets/brand/openshell-mark.svg"/>
+<img alt="OpenShell Research" decoding="async" height="100" src="./assets/brand/openshell-mark.svg" width="100"/>
 </a>
     OpenShell Research
     <button aria-label="Close navigation" class="openshell-drawer-close md-icon" type="button">

@@ -34,8 +34,16 @@
 <meta content="2026-07-20" property="article:published_time"/>
 <meta content="2026-07-20" property="article:modified_time"/>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"Kirit Thadaka"},"dateModified":"2026-07-20","datePublished":"2026-07-20","description":"Edge agents handle sensitive data and make decisions with physical consequences. Reachy Mini shows why privacy and safety controls must be deterministic and local.","headline":"Bringing Privacy and Security to the Edge with OpenShell","image":"https://nvidia.github.io/OpenShell-Research/assets/reachy-mini-openshell/hero.svg","mainEntityOfPage":{"@id":"https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-07-20-policy-controlling-reachy-mini-with-openshell/","@type":"WebPage"}}</script>
-<noscript><style>.dev-notes-toolbar { display: none; }</style></noscript>
+<noscript><style>
+    .dev-notes-toolbar, .pi-traces__loading { display: none; }
+    .pi-traces__content { height: auto; }
+  </style></noscript>
 <script>
+    // Shared filter links should never flash the unfiltered card list.
+    const noteFilters = new URLSearchParams(location.search);
+    if (noteFilters.has("category") || noteFilters.has("author")) {
+      document.documentElement.dataset.devNotesFiltered = "true";
+    }
     try {
       document.documentElement.dataset.navigationDrawer =
         window.sessionStorage.getItem("openshell.navigationDrawerOpen") === "true"
@@ -61,7 +69,7 @@
 <header class="md-header md-header--shadow" data-md-component="header">
 <nav aria-label="Header" class="md-header__inner md-grid">
 <a aria-label="OpenShell Research" class="md-header__button md-logo" data-md-component="logo" href="../../.." title="OpenShell Research">
-<img alt="OpenShell Research" decoding="async" src="../../../assets/brand/openshell-mark.svg"/>
+<img alt="OpenShell Research" decoding="async" height="100" src="../../../assets/brand/openshell-mark.svg" width="100"/>
 </a>
 <label aria-controls="primary-navigation" aria-expanded="false" aria-label="Open navigation" class="md-header__button md-icon openshell-drawer-button" for="__drawer" role="button" tabindex="0">
 <svg aria-hidden="true" viewbox="0 0 24 24">
@@ -139,7 +147,7 @@
 <nav aria-label="Navigation" class="md-nav md-nav--primary" data-md-level="0">
 <div class="md-nav__title">
 <a aria-label="OpenShell Research" class="md-nav__button md-logo" data-md-component="logo" href="../../.." title="OpenShell Research">
-<img alt="OpenShell Research" decoding="async" src="../../../assets/brand/openshell-mark.svg"/>
+<img alt="OpenShell Research" decoding="async" height="100" src="../../../assets/brand/openshell-mark.svg" width="100"/>
 </a>
     OpenShell Research
     <button aria-label="Close navigation" class="openshell-drawer-close md-icon" type="button">
@@ -620,7 +628,7 @@
 <div class="dev-note-header">
 <h1 id="bringing-privacy-and-security-to-the-edge-with-openshell">Bringing Privacy and Security to the Edge with OpenShell</h1>
 <figure class="dev-note-figure dev-note-figure--hero">
-<a aria-label="View full-size image: Bringing Privacy and Security to the Edge with OpenShell: a stylized Reachy Mini robot with two green camera eyes inside an OpenShell boundary ring." href="../../../assets/reachy-mini-openshell/hero.svg"><img alt="Bringing Privacy and Security to the Edge with OpenShell: a stylized Reachy Mini robot with two green camera eyes inside an OpenShell boundary ring." decoding="async" fetchpriority="high" loading="eager" src="../../../assets/reachy-mini-openshell/hero.svg"/></a>
+<a aria-label="View full-size image: Bringing Privacy and Security to the Edge with OpenShell: a stylized Reachy Mini robot with two green camera eyes inside an OpenShell boundary ring." href="../../../assets/reachy-mini-openshell/hero.svg"><img alt="Bringing Privacy and Security to the Edge with OpenShell: a stylized Reachy Mini robot with two green camera eyes inside an OpenShell boundary ring." decoding="async" fetchpriority="high" height="630" loading="eager" src="../../../assets/reachy-mini-openshell/hero.svg" width="1200"/></a>
 </figure>
 </div>
 <!-- dev-note:byline:start -->
@@ -682,7 +690,7 @@ decisions. So we split the work into separate parts, each with one job.</p>
    reached only after every boundary above has allowed it.</li>
 </ol>
 <figure class="dev-note-figure">
-<img alt="On-device boundary stack. Five boundaries connected top to bottom: a cloud or local model, the agent in an on-device OpenShell sandbox, the local OpenShell policy decision as the control point, a narrow trusted capability adapter, and the physical device, sensor, or local data." decoding="async" loading="lazy" src="../../../assets/reachy-mini-openshell/diagrams/boundary-stack.svg"/>
+<img alt="On-device boundary stack. Five boundaries connected top to bottom: a cloud or local model, the agent in an on-device OpenShell sandbox, the local OpenShell policy decision as the control point, a narrow trusted capability adapter, and the physical device, sensor, or local data." decoding="async" height="664" loading="lazy" src="../../../assets/reachy-mini-openshell/diagrams/boundary-stack.svg" width="720"/>
 <figcaption>Reasoning, policy enforcement, hardware ownership, and device execution are separated into distinct boundaries. The local OpenShell policy decision is the control point, evaluated on the device before a request can leave the sandbox.</figcaption>
 </figure>
 <p>The sandbox starts with deny-by-default policy instead of inheriting everything
@@ -743,7 +751,7 @@ changes. The sandbox, the adapter, and the boundary stay the same.</p>
 <hr/>
 <h2 id="what-this-looks-like-on-reachy">What This Looks Like on Reachy</h2>
 <figure class="dev-note-figure dev-note-figure--wide">
-<img alt="Request flow on Reachy. The person speaks to the trusted native Reachy App, which streams PCM audio into the OpenShell sandbox, where the conversation agent exchanges policy-checked audio with the OpenAI Realtime API. Robot requests from the agent pass through the OpenShell gateway, which allows the POST /camera/capture path to the one-frame camera adapter and denies the POST /api/move/goto path to the Reachy daemon and motors." decoding="async" loading="lazy" src="../../../assets/reachy-mini-openshell/diagrams/request-flow.svg"/>
+<img alt="Request flow on Reachy. The person speaks to the trusted native Reachy App, which streams PCM audio into the OpenShell sandbox, where the conversation agent exchanges policy-checked audio with the OpenAI Realtime API. Robot requests from the agent pass through the OpenShell gateway, which allows the POST /camera/capture path to the one-frame camera adapter and denies the POST /api/move/goto path to the Reachy daemon and motors." decoding="async" height="664" loading="lazy" src="../../../assets/reachy-mini-openshell/diagrams/request-flow.svg" width="960"/>
 <figcaption>Every request to the hardware passes through OpenShell first. The OpenShell policy allows the camera capture path (green) and denies the movement path (red), so the camera works and the head does not move, enforced by policy rather than by the application choosing to refuse.</figcaption>
 </figure>
 <p>There is no laptop, browser, or Gradio page in the runtime path. The full
@@ -792,7 +800,7 @@ example, but the benefit of middleware is its flexibility. You can build in what
 want for PII redaction or replacement.</p>
 <p>Keep an eye on this repo for more details on privacy routing!</p>
 <figure class="dev-note-figure dev-note-figure--wide">
-<img alt="Privacy routing with middleware. OpenShell's policy forces the sandboxed agent's outbound traffic through an OpenShell middleware service. A router in the middleware detects the data type: image data goes to a model approved to handle sensitive images, and everything else goes to a frontier model in the cloud." decoding="async" loading="lazy" src="../../../assets/reachy-mini-openshell/diagrams/privacy-routing.svg"/>
+<img alt="Privacy routing with middleware. OpenShell's policy forces the sandboxed agent's outbound traffic through an OpenShell middleware service. A router in the middleware detects the data type: image data goes to a model approved to handle sensitive images, and everything else goes to a frontier model in the cloud." decoding="async" height="440" loading="lazy" src="../../../assets/reachy-mini-openshell/diagrams/privacy-routing.svg" width="900"/>
 </figure>
 <hr/>
 <h2 id="conclusion">Conclusion</h2>

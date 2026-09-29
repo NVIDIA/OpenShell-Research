@@ -27,8 +27,16 @@
 <meta content="summary" name="twitter:card"/>
 <meta content="Customize profiles" name="twitter:title"/>
 <meta content="Adapt OAR tasks with prompts, runtime variables, skills, tools, and result schemas." name="twitter:description"/>
-<noscript><style>.dev-notes-toolbar { display: none; }</style></noscript>
+<noscript><style>
+    .dev-notes-toolbar, .pi-traces__loading { display: none; }
+    .pi-traces__content { height: auto; }
+  </style></noscript>
 <script>
+    // Shared filter links should never flash the unfiltered card list.
+    const noteFilters = new URLSearchParams(location.search);
+    if (noteFilters.has("category") || noteFilters.has("author")) {
+      document.documentElement.dataset.devNotesFiltered = "true";
+    }
     try {
       document.documentElement.dataset.navigationDrawer =
         window.sessionStorage.getItem("openshell.navigationDrawerOpen") === "true"
@@ -54,7 +62,7 @@
 <header class="md-header md-header--shadow" data-md-component="header">
 <nav aria-label="Header" class="md-header__inner md-grid">
 <a aria-label="OpenShell Research" class="md-header__button md-logo" data-md-component="logo" href="../../.." title="OpenShell Research">
-<img alt="OpenShell Research" decoding="async" src="../../../assets/brand/openshell-mark.svg"/>
+<img alt="OpenShell Research" decoding="async" height="100" src="../../../assets/brand/openshell-mark.svg" width="100"/>
 </a>
 <label aria-controls="primary-navigation" aria-expanded="false" aria-label="Open navigation" class="md-header__button md-icon openshell-drawer-button" for="__drawer" role="button" tabindex="0">
 <svg aria-hidden="true" viewbox="0 0 24 24">
@@ -132,7 +140,7 @@
 <nav aria-label="Navigation" class="md-nav md-nav--primary" data-md-level="0">
 <div class="md-nav__title">
 <a aria-label="OpenShell Research" class="md-nav__button md-logo" data-md-component="logo" href="../../.." title="OpenShell Research">
-<img alt="OpenShell Research" decoding="async" src="../../../assets/brand/openshell-mark.svg"/>
+<img alt="OpenShell Research" decoding="async" height="100" src="../../../assets/brand/openshell-mark.svg" width="100"/>
 </a>
     OpenShell Research
     <button aria-label="Close navigation" class="openshell-drawer-close md-icon" type="button">
@@ -853,7 +861,7 @@ copies <code>schemas/review.json</code> into the profile; you can edit it to cha
 required fields, types, and bounds. OAR supplies the validation machinery.</p>
 <figure class="documentation-figure documentation-figure--wide">
 <a aria-label="Open the result validation diagram at full size" href="../assets/diagrams/result-handling.svg">
-<img alt="The selected task points to a schema file in the profile. OAR uploads a copy for submit_result to check the agent's JSON in the sandbox, then checks the downloaded JSON against the profile's schema before saving the host output. Invalid submissions return errors to the agent for correction." decoding="async" loading="lazy" src="../assets/diagrams/result-handling.svg"/>
+<img alt="The selected task points to a schema file in the profile. OAR uploads a copy for submit_result to check the agent's JSON in the sandbox, then checks the downloaded JSON against the profile's schema before saving the host output. Invalid submissions return errors to the agent for correction." decoding="async" height="840" loading="lazy" src="../assets/diagrams/result-handling.svg" width="840"/>
 </a>
 <figcaption>The profile defines the format. OAR checks it in the sandbox and again on your machine. Select the diagram to view it at full size.</figcaption>
 </figure>

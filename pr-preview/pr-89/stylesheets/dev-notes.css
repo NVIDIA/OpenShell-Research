@@ -788,6 +788,15 @@ body:has(.openshell-home-page) .md-path {
   visibility: hidden;
 }
 
+html[data-dev-notes-filtered] .dev-notes-page:has(.dev-notes-filters[inert]) :is(.dev-notes-featured, .dev-notes-recent) {
+  visibility: hidden;
+}
+
+.dev-notes-page .dev-notes-filters__clear[hidden] {
+  display: block !important;
+  visibility: hidden;
+}
+
 .dev-notes-filters {
   justify-content: flex-end;
   flex-wrap: wrap;

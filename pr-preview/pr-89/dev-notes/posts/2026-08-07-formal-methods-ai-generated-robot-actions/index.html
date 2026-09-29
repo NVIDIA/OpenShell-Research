@@ -34,8 +34,16 @@
 <meta content="2026-08-07" property="article:published_time"/>
 <meta content="2026-08-10" property="article:modified_time"/>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"Alex Watson"},"dateModified":"2026-08-10","datePublished":"2026-08-07","description":"A robotics experiment asks whether an independent, SMT-backed policy boundary can efficiently govern AI-generated plans before they reach a simulated or physical robot.","headline":"Can Formal Methods Govern AI-Generated Robot Actions?","image":"https://nvidia.github.io/OpenShell-Research/assets/robotics-policy-prover/robotics-policy-prover-hero.png","mainEntityOfPage":{"@id":"https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-08-07-formal-methods-ai-generated-robot-actions/","@type":"WebPage"}}</script>
-<noscript><style>.dev-notes-toolbar { display: none; }</style></noscript>
+<noscript><style>
+    .dev-notes-toolbar, .pi-traces__loading { display: none; }
+    .pi-traces__content { height: auto; }
+  </style></noscript>
 <script>
+    // Shared filter links should never flash the unfiltered card list.
+    const noteFilters = new URLSearchParams(location.search);
+    if (noteFilters.has("category") || noteFilters.has("author")) {
+      document.documentElement.dataset.devNotesFiltered = "true";
+    }
     try {
       document.documentElement.dataset.navigationDrawer =
         window.sessionStorage.getItem("openshell.navigationDrawerOpen") === "true"
@@ -61,7 +69,7 @@
 <header class="md-header md-header--shadow" data-md-component="header">
 <nav aria-label="Header" class="md-header__inner md-grid">
 <a aria-label="OpenShell Research" class="md-header__button md-logo" data-md-component="logo" href="../../.." title="OpenShell Research">
-<img alt="OpenShell Research" decoding="async" src="../../../assets/brand/openshell-mark.svg"/>
+<img alt="OpenShell Research" decoding="async" height="100" src="../../../assets/brand/openshell-mark.svg" width="100"/>
 </a>
 <label aria-controls="primary-navigation" aria-expanded="false" aria-label="Open navigation" class="md-header__button md-icon openshell-drawer-button" for="__drawer" role="button" tabindex="0">
 <svg aria-hidden="true" viewbox="0 0 24 24">
@@ -139,7 +147,7 @@
 <nav aria-label="Navigation" class="md-nav md-nav--primary" data-md-level="0">
 <div class="md-nav__title">
 <a aria-label="OpenShell Research" class="md-nav__button md-logo" data-md-component="logo" href="../../.." title="OpenShell Research">
-<img alt="OpenShell Research" decoding="async" src="../../../assets/brand/openshell-mark.svg"/>
+<img alt="OpenShell Research" decoding="async" height="100" src="../../../assets/brand/openshell-mark.svg" width="100"/>
 </a>
     OpenShell Research
     <button aria-label="Close navigation" class="openshell-drawer-close md-icon" type="button">
@@ -653,7 +661,7 @@ before it reaches a simulator or robot?</p>
 planner and run quickly enough to fit a robot-planning loop driven by an AI
 model.</p>
 <figure class="dev-note-figure">
-<img alt="Architecture diagram showing an AI agent inside a sandboxed agent runtime. Proposed plans pass through a Rust and Z3 action-admission prover before an admitted contract reaches a simulation or real-world robot. Changing world state feeds the admission and runtime-enforcement boundary." decoding="async" loading="lazy" src="../../../assets/robotics-policy-prover/action-governance-architecture.svg"/>
+<img alt="Architecture diagram showing an AI agent inside a sandboxed agent runtime. Proposed plans pass through a Rust and Z3 action-admission prover before an admitted contract reaches a simulation or real-world robot. Changing world state feeds the admission and runtime-enforcement boundary." decoding="async" height="720" loading="lazy" src="../../../assets/robotics-policy-prover/action-governance-architecture.svg" width="1200"/>
 </figure>
 <hr/>
 <h2 id="the-experiment">The Experiment</h2>
@@ -796,7 +804,7 @@ both plans took <strong>5.76 to 26.23 ms</strong>, with a <strong>17.30 ms media
 <strong>0.05–0.26%</strong> of the observed inference time. Model planning varied by seconds;
 policy admission remained in milliseconds.</p>
 <figure class="dev-note-figure dev-note-figure--wide">
-<img alt="Ten successful GPT-5.6 Terra runs showing that two policy checks accounted for 0.05 to 0.26 percent of AI plan-generation time, with a median of 0.16 percent." decoding="async" loading="lazy" src="../../../assets/robotics-policy-prover/terra-planning-loop-variance.svg"/>
+<img alt="Ten successful GPT-5.6 Terra runs showing that two policy checks accounted for 0.05 to 0.26 percent of AI plan-generation time, with a median of 0.16 percent." decoding="async" height="620" loading="lazy" src="../../../assets/robotics-policy-prover/terra-planning-loop-variance.svg" width="1200"/>
 <figcaption>Policy-prover time as a share of AI inference across ten sequential Terra missions. This is not a general benchmark of the model or serving endpoint.</figcaption>
 </figure>
 <p>We also isolated the policy decision in a release-mode benchmark on an <strong>NVIDIA
@@ -806,7 +814,7 @@ measured decisions after 1,000 warm-ups. Against an illustrative 100 ms model
 call, the slowest p95 would add about <strong>1.25%</strong>. Against the multi-second
 calls observed in this experiment, the share is much smaller.</p>
 <figure class="dev-note-figure">
-<img alt="Release-mode benchmark showing policy-decision p95 latency between 1.006 and 1.250 milliseconds for allow, deny, and constrained outcomes across 3 to 48 waypoints." decoding="async" loading="lazy" src="../../../assets/robotics-policy-prover/policy-latency-scaling.svg"/>
+<img alt="Release-mode benchmark showing policy-decision p95 latency between 1.006 and 1.250 milliseconds for allow, deny, and constrained outcomes across 3 to 48 waypoints." decoding="async" height="600" loading="lazy" src="../../../assets/robotics-policy-prover/policy-latency-scaling.svg" width="1200"/>
 <figcaption>Release-mode p95 policy latency on NVIDIA DGX Spark.</figcaption>
 </figure>
 <p>The Spark benchmark isolates geometry checks and Z3 setup/checking; it excludes
