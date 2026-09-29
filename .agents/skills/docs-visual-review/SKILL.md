@@ -19,8 +19,8 @@ interaction checks. It discovers current Dev Notes and saves screenshots. Select
 relevant tests with pytest's `-k`; run the full suite for a site-wide audit or a
 shared layout change. Useful selections include:
 
-- Index and featured cards: `index_reading_proportions or featured_image_also_works_as_a_thumbnail`.
-- Articles and heroes: `post_reading_proportions`.
+- Index and featured cards: `index_reading_proportions`.
+- Articles and heroes: `post_reading_proportions or featured_image_also_works_as_a_thumbnail`.
 - Filters and byline links: `filters or bylines or without_javascript`.
 - Shared navigation and search: `shared_documentation_navigation or search_and_saved_navigation`.
 - Images, transcripts, or video: select the corresponding test names with `--collect-only -q`.
