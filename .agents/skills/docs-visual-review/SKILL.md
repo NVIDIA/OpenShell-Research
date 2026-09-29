@@ -1,6 +1,6 @@
 ---
 name: docs-visual-review
-description: Review the OpenShell Research documentation site's rendering and interactions using the existing browser layout suite and screenshots. Use for visual regressions, Dev Notes typography or hero changes, shared CSS or navigation changes, or a requested visual audit; routine documentation edits do not require it.
+description: Use for docs visual audits, layout, typography, heroes, CSS, navigation, or interaction changes. Skip prose-only edits.
 ---
 
 # Documentation visual review
