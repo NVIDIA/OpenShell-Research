@@ -133,6 +133,8 @@ The index continues to use compact thumbnails.
 The clean build runs `scripts/optimize-site.py` over rendered HTML. Local PNG,
 JPEG, and static WebP images receive content-addressed WebP `srcset` variants
 from 320 to 1920 pixels wide, intrinsic dimensions, and asynchronous decoding.
+SVG images keep their vector sources and receive dimensions from their viewBox
+so heroes, logos, and diagrams reserve space before downloading.
 Original image URLs and full-size links stay intact, as do published Markdown
 sources. Do not commit the generated `site/assets/responsive/` files. Authored
 responsive pictures and animated images are preserved. Card `sizes` follow their
@@ -142,6 +144,9 @@ lazily, and video posters use compressed variants. The site uses system fonts
 without external font stylesheets.
 The transcript viewer defers its JSON download and DOM construction until it
 approaches the viewport; transcript source fragment links initialize it directly.
+Its responsive frame reserves space while loading and keeps a constant height
+when switching models. Filtered index links reveal their cards after applying
+the URL filters; the toolbar reserves room for its clear button.
 Clicking a hero opens the original image, so a diagram can remain compact without
 losing access to its details. Index images use bounded frames with the full image
 visible. Do not add per-post title/hero sizing or force an image into a different

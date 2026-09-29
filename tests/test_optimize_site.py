@@ -95,3 +95,20 @@ def test_palette_transparency_survives_compression(tmp_path):
     with Image.open(variants[0][0]) as converted:
         assert converted.getpixel((0, 0))[3] == 0
         assert converted.getpixel((10, 5))[3] == 255
+
+
+def test_svg_space_is_reserved_without_converting_vectors(tmp_path):
+    asset = tmp_path / "diagram.svg"
+    original = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="350 220 1060 420"></svg>'
+    asset.write_text(original)
+    page = tmp_path / "index.html"
+    page.write_text('''<img src="diagram.svg"><img src="diagram.svg" width="530">
+      <img src="diagram.svg" height="210"><img src="diagram.svg" width="100" height="100">''')
+    optimizer.optimize_site(tmp_path)
+    images = BeautifulSoup(page.read_text(), "html.parser").select("img")
+    assert [(image["width"], image["height"]) for image in images] == [
+        ("1060", "420"), ("530", "210"), ("530", "210"), ("100", "100"),
+    ]
+    assert all(not image.has_attr("srcset") for image in images)
+    assert asset.read_text() == original
+    assert not (tmp_path / "assets/responsive").exists()

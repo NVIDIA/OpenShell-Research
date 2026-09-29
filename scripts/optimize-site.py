@@ -10,6 +10,7 @@ import hashlib
 import os
 from pathlib import Path
 from urllib.parse import quote, unquote, urlsplit
+from xml.etree import ElementTree
 
 from bs4 import BeautifulSoup
 from PIL import Image, ImageOps
@@ -39,6 +40,13 @@ def local_asset(site: Path, page: Path, url: str) -> Path | None:
 
 def image_variants(asset: Path, site: Path) -> tuple[int, int, list[tuple[Path, int]]] | None:
     if asset.is_relative_to(site / "assets" / "responsive"):
+        return None
+    if asset.suffix.lower() == ".svg":
+        # Keep vectors intact; their viewBox supplies the ratio before download.
+        view_box = ElementTree.parse(asset).getroot().get("viewBox")
+        if view_box:
+            _, _, width, height = map(float, view_box.replace(",", " ").split())
+            return round(width), round(height), []
         return None
     if asset.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp"}:
         return None
@@ -91,9 +99,15 @@ def optimize_site(site: Path) -> int:
             if not cache[asset]:
                 continue
             width, height, variants = cache[asset]
-            # Keep authored dimensions together; otherwise reserve the native ratio.
+            # Preserve authored sizing while completing its intrinsic ratio.
             if not image.has_attr("width") and not image.has_attr("height"):
                 image["width"], image["height"] = str(width), str(height)
+            elif image.get("width", "").isdigit() and not image.has_attr("height"):
+                image["height"] = str(round(int(image["width"]) * height / width))
+            elif image.get("height", "").isdigit() and not image.has_attr("width"):
+                image["width"] = str(round(int(image["height"]) * width / height))
+            if not variants:
+                continue
             image["srcset"] = ", ".join(f"{relative_url(path, page)} {size}w" for path, size in variants)
             card = image.find_parent(class_="dev-note-card")
             image["sizes"] = (
@@ -109,7 +123,7 @@ def optimize_site(site: Path) -> int:
             if asset is not None:
                 if asset not in cache:
                     cache[asset] = image_variants(asset, site)
-                if cache[asset]:
+                if cache[asset] and cache[asset][2]:
                     variants = cache[asset][2]
                     poster = next((path for path, size in variants if size >= 960), variants[-1][0])
                     video["poster"] = relative_url(poster, page)

@@ -32,6 +32,11 @@ POSTS = sorted((ROOT / "docs/dev-notes/posts").glob("*.md"))
 VIDEO_POSTS = [post for post in POSTS if "<video" in post.read_text()]
 VIEWPORTS = [(1366, 768), (1440, 900), (768, 1024), (390, 844), (320, 740)]
 SCREENSHOTS = ROOT / ".cache/dev-notes-layout"
+SITE_PAGES = [
+    path.relative_to(ROOT / "site").as_posix()
+    for path in sorted((ROOT / "site").rglob("*.html"))
+    if 'http-equiv="refresh"' not in path.read_text()
+]
 
 
 class QuietHandler(SimpleHTTPRequestHandler):
@@ -167,17 +172,100 @@ def test_index_reading_proportions(page, site_url, viewport):
     assert_index_proportions(page, viewport)
 
 
-def test_index_reload_keeps_content_in_place(page, site_url):
+def test_site_images_reserve_layout_space(page, site_url):
+    page.emulate_media(reduced_motion="no-preference")
+    page.add_init_script("""
+        window.siteLayoutShifts = [];
+        if (PerformanceObserver.supportedEntryTypes.includes('layout-shift')) {
+            new PerformanceObserver(list => {
+                for (const entry of list.getEntries()) {
+                    if (!entry.hadRecentInput) window.siteLayoutShifts.push(entry.value);
+                }
+            }).observe({type: 'layout-shift', buffered: true});
+        }
+    """)
+    shifts = []
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.on("response", lambda response: errors.append(f"{response.status}: {response.url}")
+            if response.url.startswith(site_url) and response.status >= 400 else None)
+    held = []
+    holding = False
+
+    def route_image(route):
+        if route.request.resource_type == "image" and route.request.url.startswith(site_url):
+            if holding:
+                held.append(route)
+                return
+        route.fallback()
+
+    page.route("**/*", route_image)
+    for path in SITE_PAGES:
+        holding = True
+        page.goto(f"{site_url}/{path}", wait_until="domcontentloaded")
+        images = page.locator(".md-content img")
+        images.evaluate_all("images => images.forEach(image => image.loading = 'eager')")
+        before = images.evaluate_all("""images => images.map(image => ({
+            src: image.getAttribute('src'), width: image.getBoundingClientRect().width,
+            height: image.getBoundingClientRect().height,
+        }))""")
+        holding = False
+        while held:
+            held.pop().continue_()
+        page.wait_for_load_state("networkidle")
+        assert_no_horizontal_overflow(page)
+        layout_shifts = page.evaluate("window.siteLayoutShifts")
+        assert sum(layout_shifts) < 0.01, (path, layout_shifts)
+        after = images.evaluate_all("""images => images.map(image => ({
+            width: image.getBoundingClientRect().width,
+            height: image.getBoundingClientRect().height,
+        }))""")
+        for initial, loaded in zip(before, after, strict=True):
+            if abs(initial["height"] - loaded["height"]) > 1 or abs(initial["width"] - loaded["width"]) > 1:
+                shifts.append({"page": path, "before": initial, "after": loaded})
+    assert not shifts, json.dumps(shifts, indent=2)
+    assert not errors, errors
+
+
+def test_transcript_loading_keeps_content_in_place(page, site_url):
+    pending = []
+    page.route("**/viewer.json", lambda route: pending.append(route))
+    open_page(page, f"{site_url}/dev-notes/posts/2026-09-26-network-redaction-is-not-enough/")
+    viewer = page.locator(".pi-traces")
+    before = viewer.bounding_box()
+    viewer.scroll_into_view_if_needed()
+    expect(viewer.locator(".pi-traces__loading")).to_be_visible()
+    page.wait_for_function("document.querySelector('.pi-traces').dataset.initialized === 'true'")
+    assert pending
+    pending.pop().continue_()
+    expect(viewer.locator(".pi-traces__app")).to_be_visible()
+    after = viewer.bounding_box()
+    assert abs(before["height"] - after["height"]) <= 1, (before, after)
+    for model in viewer.locator(".pi-traces__tab").all():
+        model.click()
+        for mode in viewer.locator(".pi-traces__mode-tab:visible").all():
+            mode.click()
+            assert abs(viewer.bounding_box()["height"] - after["height"]) <= 1
+            conversation = viewer.locator(".pi-traces__conversation:visible").bounding_box()
+            frame = viewer.bounding_box()
+            assert conversation["height"] >= 200
+            assert conversation["y"] + conversation["height"] <= frame["y"] + frame["height"]
+
+
+@pytest.mark.parametrize("query", ["", "?category=research", "?category=examples"])
+def test_index_reload_keeps_content_in_place(page, site_url, query):
     before = []
 
     def capture_before_initialization(route):
         expect(page.locator(".dev-notes-filters")).to_be_hidden()
         before.append(page.locator(".dev-notes-featured").bounding_box())
+        if query:
+            expect(page.locator(".dev-note-card:visible")).to_have_count(0)
         route.continue_()
 
     # Hold the page's enhancement script to expose its first-render geometry.
     page.route("**/javascripts/dev-notes.js", capture_before_initialization)
-    open_page(page, f"{site_url}/dev-notes/")
+    open_page(page, f"{site_url}/dev-notes/{query}")
     page.reload(wait_until="networkidle")
     after = page.locator(".dev-notes-featured").bounding_box()
     assert len(before) == 2
@@ -440,6 +528,7 @@ def test_post_reading_proportions(page, site_url, viewport, post):
 
 
 def test_shared_documentation_navigation(page, site_url, viewport):
+    page.emulate_media(reduced_motion="no-preference")
     open_page(page, f"{site_url}/documentation/openshell-agent-runner/reviews/")
     assert_no_horizontal_overflow(page)
     assert_footer_navigation_visible(page)
@@ -465,6 +554,39 @@ def test_shared_documentation_navigation(page, site_url, viewport):
         assert page.get_by_role("button", name="Open navigation", exact=True).evaluate(
             "e => e === document.activeElement"
         ), "Closing the drawer should restore focus"
+
+
+def test_search_and_saved_navigation(page, site_url, viewport):
+    page.emulate_media(reduced_motion="no-preference")
+    open_page(page, f"{site_url}/documentation/")
+    if viewport["width"] < 1024:
+        page.locator('label[for="__search"]').click()
+    else:
+        page.get_by_role("button", name=re.compile(r"^Search")).click()
+    search = page.get_by_placeholder("Search", exact=True)
+    expect(search).to_be_focused()
+    search.fill("OpenShell Agent Runner")
+    results = page.locator(f'a[href^="{site_url}/documentation/openshell-agent-runner/"]:visible')
+    expect(results.first).to_be_visible()
+    results.first.click()
+    expect(page.locator("h1")).to_contain_text("OpenShell Agent Runner")
+    page.get_by_role("button", name="Open navigation", exact=True).click()
+    if viewport["width"] >= 1024:
+        before = []
+
+        def capture_navigation_startup(route):
+            before.append(page.locator(".md-content").bounding_box())
+            route.continue_()
+
+        page.route("**/javascripts/navigation-drawer.js", capture_navigation_startup)
+        page.reload(wait_until="networkidle")
+        expect(page.get_by_role("button", name="Close navigation", exact=True)).to_be_visible()
+        after = page.locator(".md-content").bounding_box()
+        assert abs(before[0]["x"] - after["x"]) <= 1, (before, after)
+        assert abs(before[0]["width"] - after["width"]) <= 1, (before, after)
+    else:
+        page.keyboard.press("Escape")
+        expect(page.get_by_role("button", name="Open navigation", exact=True)).to_be_focused()
 
 
 def test_homepage_brand_and_navigation(page, site_url):
