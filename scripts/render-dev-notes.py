@@ -337,7 +337,7 @@ def render_browse_filters(posts: list[dict[str, Any]]) -> str:
         f'          <option value="{html.escape(author_id, quote=True)}">{html.escape(author["name"])}</option>'
         for author_id, author in sorted(authors.items(), key=lambda item: item[1]["name"].casefold())
     )
-    return f"""      <form class="dev-notes-filters" aria-label="Filter Dev Notes" hidden>
+    return f"""      <form class="dev-notes-filters" aria-label="Filter Dev Notes" inert>
         <label for="dev-notes-category">Category
           <select id="dev-notes-category" name="category" aria-controls="dev-notes-results">
             <option value="">All categories</option>

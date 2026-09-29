@@ -167,6 +167,25 @@ def test_index_reading_proportions(page, site_url, viewport):
     assert_index_proportions(page, viewport)
 
 
+def test_index_reload_keeps_content_in_place(page, site_url):
+    before = []
+
+    def capture_before_initialization(route):
+        expect(page.locator(".dev-notes-filters")).to_be_hidden()
+        before.append(page.locator(".dev-notes-featured").bounding_box())
+        route.continue_()
+
+    # Hold the page's enhancement script to expose its first-render geometry.
+    page.route("**/javascripts/dev-notes.js", capture_before_initialization)
+    open_page(page, f"{site_url}/dev-notes/")
+    page.reload(wait_until="networkidle")
+    after = page.locator(".dev-notes-featured").bounding_box()
+    assert len(before) == 2
+    for initial in before:
+        assert abs(initial["y"] - after["y"]) <= 1, (initial, after)
+        assert abs(initial["width"] - after["width"]) <= 1, (initial, after)
+
+
 def test_index_image_budget_and_theme_loading(page, site_url):
     images = []
     page.on("response", lambda response: images.append({
@@ -342,6 +361,7 @@ def test_index_remains_readable_without_javascript(browser, site_url):
         response = page.goto(f"{site_url}/dev-notes/?category=research")
         assert response.ok
         expect(page.locator(".dev-notes-filters")).to_be_hidden()
+        expect(page.locator(".dev-notes-toolbar")).to_be_hidden()
         expect(page.locator(".dev-note-card:visible")).to_have_count(len(POSTS))
         page.locator(".dev-note-card__link").first.click()
         expect(page.locator(".dev-note-header h1")).to_be_visible()

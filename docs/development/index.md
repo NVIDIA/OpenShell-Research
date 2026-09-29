@@ -78,6 +78,9 @@ featured; the remaining matches keep their chronological order. Filters use
 Back/Forward navigation. Article byline names and categories link to these
 filtered views. Empty combinations show a message and a clear-filters action.
 Keep the full index readable when JavaScript is unavailable.
+Reserve the filter controls' layout space while their inert form initializes,
+so revealing the controls does not move the posts on first load or reload.
+The no-JavaScript fallback omits the toolbar entirely.
 
 An optional `card_variant` must have matching card and
 artwork CSS modifiers in `docs/stylesheets/dev-notes.css`. Set `hero_image` to

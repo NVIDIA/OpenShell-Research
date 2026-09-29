@@ -4,6 +4,7 @@
 {% block extrahead %}
   {{ super() }}
   {% include "partials/seo.html" %}
+  <noscript><style>.dev-notes-toolbar { display: none; }</style></noscript>
   {% if page.meta and page.meta.reset_scroll_on_reload %}
     <script>
       // Run before the theme follows fragment links or the browser restores scroll.
