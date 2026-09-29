@@ -1773,13 +1773,18 @@ body[data-md-color-scheme="slate"] .md-typeset .dev-note-figure--admission img {
 }
 
 .md-typeset .dev-note-figure--bypass img {
-  min-width: 900px;
   max-width: none;
   color-scheme: light;
   background: transparent;
   border: 0;
   border-radius: 0;
   box-shadow: none;
+}
+
+@media (max-width: 44rem) {
+  .md-typeset .dev-note-figure--bypass img {
+    min-width: 900px;
+  }
 }
 
 body[data-md-color-scheme="slate"] .md-typeset .dev-note-figure--bypass img {
