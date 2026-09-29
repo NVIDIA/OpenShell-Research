@@ -72,7 +72,7 @@ In this post, we'll demonstrate redaction bypass in action through a set of simp
 !!! abstract "TL;DR"
 
     - 🛠️ **Read, encode, leak:** We tested two open-source and two closed-source models in the Pi harness. With a little nudging, all four leaked a secret by using tools to read and encode the unredacted value, despite the original value being redacted from every outgoing model request.
-    - 📝 **Session history exposure:** Harnesses usually manage session history internally. Data-handling policy must cover session history in memory and on disk, or sensitive data remains accessible to the agent's tools.
+    - 📝 **Session history exposure:** Harnesses usually manage session history internally. Data-handling policy must apply to session history in memory and on disk, or sensitive data remains accessible to the agent's tools and can still leak to the model.
     - 🔒 **Harness and runtime integration:** The harness and secure runtime must work together to enforce policy on what agents can access, retain, and send to the outside world.
 
 ## Experimental Setup
@@ -322,10 +322,8 @@ Select a model below to see the code it used to get around the filter.
 
 We had to update the harness to protect the email in our experiments – our custom Pi session manager redacted the address before it was appended to the session and saved to disk.
 
-> **If the agent's tools can't access it, then they can't leak it!**
-
 This simple demonstration highlights that securing agents and your data requires the runtime and harness to work together to enforce policy. Our research team is working to build the needed primitives in OpenShell so any harness
-can plug its session management into the runtime. The goal is to enforce data policy before sensitive information becomes accessible to the agent, covering what the harness retains in memory and on disk.
+can plug its session management into the runtime. The goal is to enforce data policy before sensitive information becomes accessible to the agent, including what the harness retains in memory and on disk.
 
 To recreate the experiments in this post, point an agent at our [experiment specification](../../research/pi-admission/index.md).
 
