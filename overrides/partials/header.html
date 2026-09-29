@@ -42,6 +42,18 @@
     {% endif %}
     {% if not config.theme.palette is mapping %}
       {% include "partials/javascripts/palette.html" %}
+      <script>
+        // Apply the first-visit system theme before images enter the document.
+        // The theme bundle otherwise selects it after the initial image fetches.
+        (() => {
+          let savedPalette;
+          try { savedPalette = __md_get("__palette"); } catch {}
+          if (!savedPalette?.color) {
+            document.body.dataset.mdColorScheme =
+              matchMedia("(prefers-color-scheme: dark)").matches ? "slate" : "default";
+          }
+        })();
+      </script>
     {% endif %}
     {% if config.extra.alternate %}
       {% include "partials/alternate.html" %}

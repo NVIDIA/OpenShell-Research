@@ -28,6 +28,8 @@ for (const workflow of ["docs-preview.yml", "docs-preview-deploy.yml"]) {
       "docs/dev-notes/posts/example.md",
       "overrides/main.html",
       "scripts/stage-project-docs.py",
+      "scripts/optimize-site.py",
+      "tests/test_optimize_site.py",
       "tests/docs-preview.test.js",
       "tests/test_dev_note_headers.py",
       "tests/test_dev_notes_layout.py",

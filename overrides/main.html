@@ -4,6 +4,10 @@
 {% block extrahead %}
   {{ super() }}
   {% include "partials/seo.html" %}
+  <noscript><style>
+    .dev-notes-toolbar, .pi-traces__loading { display: none; }
+    .pi-traces__content { height: auto; }
+  </style></noscript>
   {% if page.meta and page.meta.reset_scroll_on_reload %}
     <script>
       // Run before the theme follows fragment links or the browser restores scroll.
@@ -22,6 +26,11 @@
     </script>
   {% endif %}
   <script>
+    // Shared filter links should never flash the unfiltered card list.
+    const noteFilters = new URLSearchParams(location.search);
+    if (noteFilters.has("category") || noteFilters.has("author")) {
+      document.documentElement.dataset.devNotesFiltered = "true";
+    }
     try {
       document.documentElement.dataset.navigationDrawer =
         window.sessionStorage.getItem("openshell.navigationDrawerOpen") === "true"
