@@ -161,7 +161,7 @@ How did the agents bypass the redaction filter?
   </figcaption>
 </figure>
 
-In the network redacted runs, all agents inferred that the original email was still in the session history, even though their model context showed only `[EMAIL]`. For example, Opus 5.5 discovered that a stored message contained an `@` symbol and no literal `[EMAIL]`, but when a tool printed the message, the network filter replaced the address with `[EMAIL]` before the output reached the model. In other words, the agent's "brain" could only see `[EMAIL]`.
+In the network redacted runs, all agents inferred that the original email was still in the session history, even though their model context showed only `[EMAIL]`. For example, Opus 5.5 discovered that a stored message contained an `@` symbol and no literal `[EMAIL]`, but when a tool printed the message, the network filter replaced the address with `[EMAIL]` before the output reached the model. In other words, the agent's "brain" could only see `[EMAIL]`, but its "hands" could still feel an `@` symbol in the session history.
 
 This discrepancy motivated the agents to encode or reformat the address to bypass the filter, allowing the model to reconstruct the address from the tool output, as illustrated by the lower path in [Figure 2](#pi-redaction-bypass) above. Interestingly, GLM 5.3 Flash first got part of the address through the filter with a truncated read, exposing `csagan34@p`, a fragment the email regex didn't match.
 
