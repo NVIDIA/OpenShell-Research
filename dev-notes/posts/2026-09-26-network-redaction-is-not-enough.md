@@ -5,7 +5,7 @@ description: "A simple experiment shows why network-layer redaction isn’t enou
 author: "Johnny Greco"
 agent_markdown: true
 reset_scroll_on_reload: true
-social_image: "assets/pi-admission/hero-light.png"
+social_image: "assets/pi-admission/hero-dark.png"
 hero_image: "../../assets/pi-admission/hero-light.png"
 hero_image_alt: "An envelope inside a sandbox boundary breaks into small pieces that flow through a small gap in the boundary and reassemble into an envelope outside."
 subtitle: "A simple experiment shows why network-layer redaction isn’t enough."
