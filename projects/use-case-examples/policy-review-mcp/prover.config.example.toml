@@ -1,0 +1,4 @@
+executable = "openshell-prover"
+boundary = "demo/fixtures/boundary.yaml"
+timeout_seconds = 10.0
+max_policy_bytes = 1048576
