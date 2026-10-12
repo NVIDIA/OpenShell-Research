@@ -11,6 +11,14 @@ approved = ["Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "MIT", "MIT-CMU
 
 [[clarification]]
 ecosystem = "pypi"
+name = "multidict"
+version = "6.9.1"
+source = '{"registry":"https://pypi.org/simple"}'
+license = "Apache-2.0"
+evidence = "https://github.com/aio-libs/multidict/blob/v6.9.1/LICENSE"
+
+[[clarification]]
+ecosystem = "pypi"
 name = "reachy-mini"
 version = "1.10.0"
 source = '{"registry":"https://pypi.org/simple"}'
