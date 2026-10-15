@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-#
+
 # Regenerate the Python gRPC bindings from the vendored OpenShell protos.
 # Refresh proto/ from the release named in deploy/versions.env first.
 

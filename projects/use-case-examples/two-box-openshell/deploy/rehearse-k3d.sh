@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-#
+
 # Development rehearsal only: two k3s nodes as containers on one Docker host,
 # with the same labels and taint control-node.sh and sandbox-node.sh apply, then
 # control-node.sh --existing-cluster on top. It exercises scheduling, the chart,

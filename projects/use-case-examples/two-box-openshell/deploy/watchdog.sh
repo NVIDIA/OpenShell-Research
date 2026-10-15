@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-#
+
 # Run the egress watchdog on the control node as a plain process and register it with the
 # gateway as supervisor middleware. Run after control-node.sh.
 #

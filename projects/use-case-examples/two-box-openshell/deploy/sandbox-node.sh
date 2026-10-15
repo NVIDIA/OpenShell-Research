@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-#
+
 # A sandbox node (the sandbox node, and any further boxes): a k3s agent node marked so that
 # only sandbox workloads run on it. Nothing else is installed here: no gateway,
 # no supervisor, no credentials, no CLI. Run it on each sandbox node.

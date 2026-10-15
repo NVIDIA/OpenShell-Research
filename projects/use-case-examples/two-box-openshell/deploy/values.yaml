@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # OpenShell Helm values for the two-box deployment.
 #
 # The gateway runs on the control node (control node). Supervisor pods have no node

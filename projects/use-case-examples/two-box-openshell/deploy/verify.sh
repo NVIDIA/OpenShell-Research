@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-#
-# The only definition of "it works". Run on the control node (control node) after
+
+# The only definition of "it works". Run on the control node after
 # sandbox-node.sh has joined the sandbox node.
 # Creates one sandbox from the sandboxes template, checks where each pod landed,
 # and sends one allowed and one disallowed request. Exits non-zero on failure.

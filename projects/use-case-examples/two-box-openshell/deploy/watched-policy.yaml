@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # demo-policy.yaml plus the egress watchdog on httpbin.org: every request is
 # accounted, and more than 1 MiB of request bytes in a rolling minute denies
 # the request and quarantines the sandbox at the watchdog.

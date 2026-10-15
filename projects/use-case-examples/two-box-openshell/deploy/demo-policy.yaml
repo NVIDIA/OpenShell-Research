@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # Sandbox policy for verify.sh and the scenarios: curl may read and write
 # httpbin.org, and nothing else leaves the sandbox.
 version: 1
