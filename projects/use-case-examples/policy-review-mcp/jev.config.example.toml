@@ -1,0 +1,13 @@
+model = "jev-1.13.0"
+timeout_seconds = 15.0
+max_policy_bytes = 1048576
+max_task_bytes = 32768
+max_questions = 32
+max_options_per_question = 16
+max_review_bytes = 2097152
+max_custom_context_bytes = 65536
+min_actionable_confidence = 0.6
+min_winner_probability = 0.6
+min_choice_margin = 0.15
+excess_score_threshold = 1.35
+min_excess_probability = 0.6
