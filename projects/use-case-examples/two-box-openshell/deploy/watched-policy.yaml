@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# demo-policy.yaml plus the egress watchdog on httpbin.org: every request is
+# accounted, and more than 1 MiB of request bytes in a rolling minute denies
+# the request and quarantines the sandbox at the watchdog.
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_only: [/usr, /lib, /proc, /dev/urandom, /app, /etc, /var/log]
+  read_write: [/sandbox, /tmp, /dev/null]
+
+landlock:
+  compatibility: best_effort
+
+process:
+  run_as_user: sandbox
+  run_as_group: sandbox
+
+network_middlewares:
+  egress-watchdog:
+    middleware: twobox-watchdog
+    # Bodies over the watchdog's 4 MiB payload limit skip middleware; fail
+    # closed so they are refused instead of passing unaccounted.
+    on_error: fail_closed
+    config:
+      budget:
+        bytes_per_minute: 1048576
+    endpoints:
+      include: ["httpbin.org"]
+
+network_policies:
+  httpbin:
+    name: httpbin
+    endpoints:
+      - host: httpbin.org
+        port: 443
+        protocol: rest
+        access: read-write
+    binaries:
+      - path: /usr/bin/curl

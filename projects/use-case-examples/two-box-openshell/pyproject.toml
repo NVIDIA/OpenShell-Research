@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+[project]
+name = "twobox-watchdog"
+version = "0.1.0"
+description = "Egress watchdog middleware for the two-box OpenShell example"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "grpcio>=1.81.1,<2",
+    "protobuf>=6.33.5,<7",
+    "pyjwt[crypto]>=2.10,<3",
+]
+
+[project.scripts]
+twobox-watchdog = "twobox_watchdog.server:main"
+
+[dependency-groups]
+dev = [
+    "grpcio-tools>=1.81.1,<2",
+    "pytest>=8,<10",
+    "ruff>=0.12,<1",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.8,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["src/twobox_watchdog/bindings"]
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "RUF", "SIM", "UP"]
