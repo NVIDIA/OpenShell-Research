@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img"
+     aria-label="Hero image for Bringing Privacy and Security to the Edge with OpenShell. A stylized Reachy Mini robot with two green camera eyes sits inside a thin green boundary ring, next to the blog title.">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.6" stop-color="#f7faf3"/>
+      <stop offset="1" stop-color="#eaf5dc"/>
+    </linearGradient>
+  </defs>
+
+  <!-- background -->
+  <rect x="0" y="0" width="1200" height="630" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1200" height="630" fill="none" stroke="#e6ebde" stroke-width="2"/>
+
+  <!-- subtle dot grid, right side -->
+  <g fill="#76b900" opacity="0.07">
+    <g>
+      <circle cx="700" cy="90" r="3"/><circle cx="760" cy="90" r="3"/><circle cx="820" cy="90" r="3"/><circle cx="880" cy="90" r="3"/><circle cx="940" cy="90" r="3"/><circle cx="1000" cy="90" r="3"/><circle cx="1060" cy="90" r="3"/><circle cx="1120" cy="90" r="3"/>
+      <circle cx="700" cy="150" r="3"/><circle cx="760" cy="150" r="3"/><circle cx="820" cy="150" r="3"/><circle cx="880" cy="150" r="3"/><circle cx="940" cy="150" r="3"/><circle cx="1000" cy="150" r="3"/><circle cx="1060" cy="150" r="3"/><circle cx="1120" cy="150" r="3"/>
+      <circle cx="700" cy="540" r="3"/><circle cx="760" cy="540" r="3"/><circle cx="820" cy="540" r="3"/><circle cx="880" cy="540" r="3"/><circle cx="940" cy="540" r="3"/><circle cx="1000" cy="540" r="3"/><circle cx="1060" cy="540" r="3"/><circle cx="1120" cy="540" r="3"/>
+    </g>
+  </g>
+
+  <!-- ===== text block ===== -->
+  <text x="74" y="206" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="15" font-weight="600" letter-spacing="3" fill="#4f7d00">OPENSHELL · EDGE AI</text>
+  <text x="72" y="266" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="47" font-weight="700" fill="#1b1c1e">Bringing Privacy and</text>
+  <text x="72" y="322" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="47" font-weight="700" fill="#1b1c1e">Security to the Edge</text>
+  <text x="72" y="378" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="47" font-weight="700" fill="#1b1c1e">with OpenShell</text>
+  <rect x="74" y="402" width="66" height="6" rx="3" fill="#76b900"/>
+  <text x="74" y="446" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="19" font-weight="400" fill="#5a6152">Deterministic policy and privacy, enforced on the device.</text>
+
+  <!-- ===== robot ===== -->
+  <!-- boundary ring + glow -->
+  <circle cx="905" cy="312" r="212" fill="#e6f2d4"/>
+  <circle cx="905" cy="312" r="236" fill="none" stroke="#a9cf6a" stroke-width="2"/>
+  <!-- ground shadow -->
+  <ellipse cx="905" cy="524" rx="122" ry="16" fill="#d0d6c6"/>
+
+  <!-- antennas -->
+  <line x1="868" y1="198" x2="852" y2="152" stroke="#b9c0ad" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="851" cy="147" r="8" fill="#76b900"/>
+  <line x1="942" y1="198" x2="958" y2="152" stroke="#b9c0ad" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="959" cy="147" r="8" fill="#2b2c31"/>
+
+  <!-- neck -->
+  <polygon points="868,372 942,372 957,420 853,420" fill="#cfd4c8"/>
+
+  <!-- base -->
+  <ellipse cx="905" cy="420" rx="96" ry="24" fill="#e7ebe0"/>
+  <rect x="809" y="420" width="192" height="80" fill="#e7ebe0"/>
+  <ellipse cx="905" cy="500" rx="96" ry="24" fill="#dfe4d8"/>
+  <line x1="828" y1="444" x2="982" y2="444" stroke="#cbd1c2" stroke-width="4"/>
+  <line x1="824" y1="464" x2="986" y2="464" stroke="#cbd1c2" stroke-width="4"/>
+  <line x1="828" y1="484" x2="982" y2="484" stroke="#cbd1c2" stroke-width="4"/>
+
+  <!-- head -->
+  <rect x="788" y="190" width="234" height="188" rx="50" fill="#fdfdfb" stroke="#dfe4d8" stroke-width="2"/>
+  <!-- face panel -->
+  <rect x="810" y="248" width="190" height="108" rx="36" fill="#1b1c1e"/>
+  <!-- left eye -->
+  <circle cx="858" cy="302" r="34" fill="#f4f6ef"/>
+  <circle cx="858" cy="302" r="25" fill="none" stroke="#76b900" stroke-width="6"/>
+  <circle cx="858" cy="302" r="12" fill="#1b1c1e"/>
+  <circle cx="851" cy="295" r="4" fill="#ffffff" opacity="0.85"/>
+  <!-- right eye -->
+  <circle cx="952" cy="302" r="34" fill="#f4f6ef"/>
+  <circle cx="952" cy="302" r="25" fill="none" stroke="#76b900" stroke-width="6"/>
+  <circle cx="952" cy="302" r="12" fill="#1b1c1e"/>
+  <circle cx="945" cy="295" r="4" fill="#ffffff" opacity="0.85"/>
+</svg>
