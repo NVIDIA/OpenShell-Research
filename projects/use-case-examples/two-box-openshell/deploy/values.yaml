@@ -1,0 +1,20 @@
+# OpenShell Helm values for the two-box deployment.
+#
+# The gateway runs on the control node (control node). Supervisor pods have no node
+# selector in OpenShell 0.1.4; they stay on the control node because sandbox
+# boxes are tainted and supervisors carry no toleration. Sandbox workload pods
+# reach sandbox nodes through the `sandboxes` template, which sets a node
+# selector and toleration with driver config.
+# control-node.sh sets the NodePort and the gateway certificate IP from versions.env.
+
+nodeSelector:
+  openshell.io/box: control
+
+service:
+  type: NodePort
+
+server:
+  drivers:
+    kubernetes:
+      # Lets the `sandboxes` template carry pod.node_selector and pod.tolerations.
+      allowDriverConfig: true
