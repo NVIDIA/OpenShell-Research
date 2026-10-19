@@ -25,12 +25,12 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from google.protobuf import json_format
 
-from twobox_watchdog.bindings import extension_pb2 as ext_pb2
-from twobox_watchdog.bindings import supervisor_middleware_pb2 as pb2
-from twobox_watchdog.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
-from twobox_watchdog.ledger import Budget, Ledger
+from egress_watchdog.bindings import extension_pb2 as ext_pb2
+from egress_watchdog.bindings import supervisor_middleware_pb2 as pb2
+from egress_watchdog.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
+from egress_watchdog.ledger import Budget, Ledger
 
-SERVICE_NAME = "twobox-watchdog"
+SERVICE_NAME = "egress-watchdog"
 SERVICE_VERSION = "0.1.0"
 AUDIENCE = f"urn:openshell:extension:middleware:{SERVICE_NAME}"
 # The supervisor skips middleware for larger bodies and applies on_error, so

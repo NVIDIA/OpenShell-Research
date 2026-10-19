@@ -3,7 +3,7 @@
 
 import pytest
 
-from twobox_watchdog.ledger import Budget, Ledger
+from egress_watchdog.ledger import Budget, Ledger
 
 
 class FakeClock:

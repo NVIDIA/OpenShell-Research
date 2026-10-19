@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 [project]
-name = "twobox-watchdog"
+name = "egress-watchdog"
 version = "0.1.0"
-description = "Egress watchdog middleware for the two-box OpenShell example"
+description = "Egress watchdog middleware for the agent containment example"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-twobox-watchdog = "twobox_watchdog.server:main"
+egress-watchdog = "egress_watchdog.server:main"
 
 [dependency-groups]
 dev = [
@@ -33,7 +33,7 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-extend-exclude = ["src/twobox_watchdog/bindings"]
+extend-exclude = ["src/egress_watchdog/bindings"]
 
 [tool.ruff.lint]
 select = ["B", "E", "F", "I", "RUF", "SIM", "UP"]

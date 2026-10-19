@@ -8,7 +8,7 @@
 set -euo pipefail
 
 project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-out="${project_dir}/src/twobox_watchdog/bindings"
+out="${project_dir}/src/egress_watchdog/bindings"
 
 cd "${project_dir}"
 uv run --group dev python -m grpc_tools.protoc -Iproto \
@@ -16,6 +16,6 @@ uv run --group dev python -m grpc_tools.protoc -Iproto \
   proto/extension.proto proto/supervisor_middleware.proto
 
 # protoc emits top-level imports; make them absolute package imports.
-sed -i.bak -E 's/^import (extension_pb2|supervisor_middleware_pb2) as/from twobox_watchdog.bindings import \1 as/' \
+sed -i.bak -E 's/^import (extension_pb2|supervisor_middleware_pb2) as/from egress_watchdog.bindings import \1 as/' \
   "${out}"/*_pb2.py "${out}"/*_pb2_grpc.py
 rm -f "${out}"/*.bak

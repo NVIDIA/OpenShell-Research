@@ -167,7 +167,7 @@ EOF
 
 print_next_steps() {
   echo
-  echo "the control node is ready. Operator environment: source ${TWOBOX_HOME}/env"
+  echo "Control node is ready. Operator environment: source ${TWOBOX_HOME}/env"
   if [[ "$1" == "--existing-cluster" ]]; then return; fi
   echo "On each sandbox node, run:"
   echo "  deploy/sandbox-node.sh $(sudo cat /var/lib/rancher/k3s/server/agent-token) ${CONTROL_IP}"

@@ -20,7 +20,7 @@ process:
 
 network_middlewares:
   egress-watchdog:
-    middleware: twobox-watchdog
+    middleware: egress-watchdog
     # Bodies over the watchdog's 4 MiB payload limit skip middleware; fail
     # closed so they are refused instead of passing unaccounted.
     on_error: fail_closed

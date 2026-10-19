@@ -1,4 +1,6 @@
-# Two-box OpenShell
+# Agent containment
+
+Machine-isolated agents with egress usage monitoring.
 
 Capable agents probe their own runtime first, then abuse whatever access their
 policy allows. This example puts everything that governs an agent on a machine
@@ -10,9 +12,12 @@ the agent cannot reach, and watches the traffic its policy already allows.
 - **A sandbox node** runs sandbox workloads and nothing else. Add more
   sandbox nodes the same way.
 
+This deployment pattern is often called *two-box*. The egress usage
+monitoring builds on Hugging Face's proof of concept and
+[RFC](https://github.com/Hugoch/OpenShell/blob/poc/egress-usage-monitoring/rfc/NNNN-egress-usage-monitoring/poc.md).
 It uses released OpenShell (0.1.4) with no changes to OpenShell.
 
-![Two-box OpenShell architecture: the control node runs the gateway, supervisors, and egress watchdog; the sandbox node runs network-isolated sandbox workloads whose only path is a mediated channel to their supervisor on the control node.](docs/two-box-architecture.svg)
+![Agent containment architecture: the control node runs the gateway, supervisors, and egress watchdog; the sandbox node runs network-isolated sandbox workloads whose only path is a mediated channel to their supervisor on the control node.](docs/architecture.svg)
 
 > **Status: proof of life on two machines.** Placement, per-request
 > accounting, and a byte budget with quarantine work on a DGX Station (control node)
@@ -50,8 +55,8 @@ It uses released OpenShell (0.1.4) with no changes to OpenShell.
 | `deploy/verify.sh` | The definition of "it works". Exits non-zero on failure. |
 | `deploy/rehearse-k3d.sh` | Development only: both nodes as containers on one Docker host. |
 | `deploy/demo-policy.yaml`, `deploy/watched-policy.yaml` | Sandbox policies: curl may reach httpbin.org; the second attaches the watchdog. |
-| `docs/two-box-architecture.svg` | The architecture diagram above. |
-| `src/twobox_watchdog/` | The watchdog: `server.py` (gRPC, TLS, JWT), `ledger.py` (accounting, budget, quarantine). |
+| `docs/architecture.svg` | The architecture diagram above. |
+| `src/egress_watchdog/` | The watchdog: `server.py` (gRPC, TLS, JWT), `ledger.py` (accounting, budget, quarantine). |
 | `proto/` | `supervisor_middleware.proto` and `extension.proto` from OpenShell v0.1.4. |
 
 ## Run on two machines
@@ -156,7 +161,7 @@ contract for HTTP requests in the pre-credentials phase.
   ```yaml
   network_middlewares:
     egress-watchdog:
-      middleware: twobox-watchdog
+      middleware: egress-watchdog
       on_error: fail_closed
       config:
         budget:

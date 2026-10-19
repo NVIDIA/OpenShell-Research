@@ -44,9 +44,9 @@ fi
 
 if [[ ! -f "${state}/ca.crt" ]]; then
   echo "==> Minting watchdog CA and server certificate for ${WATCHDOG_HOST}"
-  openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 365 -subj "/CN=twobox-watchdog-ca" \
+  openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 365 -subj "/CN=egress-watchdog-ca" \
     -keyout "${state}/ca.key" -out "${state}/ca.crt" 2>/dev/null
-  openssl req -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -subj "/CN=twobox-watchdog" \
+  openssl req -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -subj "/CN=egress-watchdog" \
     -keyout "${state}/server.key" -out "${state}/server.csr" 2>/dev/null
   openssl x509 -req -in "${state}/server.csr" -CA "${state}/ca.crt" -CAkey "${state}/ca.key" \
     -CAcreateserial -days 365 -out "${state}/server.crt" \
@@ -61,7 +61,7 @@ kubectl -n openshell get secret openshell-jwt-keys -o jsonpath='{.data.public\.p
 echo "==> Starting the watchdog on ${WATCHDOG_HOST}:${WATCHDOG_PORT}"
 stop_watchdog
 uv sync --project "${project_dir}" --locked --quiet
-nohup uv run --project "${project_dir}" --locked twobox-watchdog \
+nohup uv run --project "${project_dir}" --locked egress-watchdog \
   --listen "${WATCHDOG_HOST}:${WATCHDOG_PORT}" \
   --tls-cert "${state}/server.crt" --tls-key "${state}/server.key" \
   --jwt-public-key "${state}/jwt-public.pem" \
@@ -73,24 +73,24 @@ for _ in $(seq 1 30); do
 done
 
 echo "==> Registering the watchdog with the gateway"
-kubectl -n openshell create secret generic twobox-watchdog-ca \
+kubectl -n openshell create secret generic egress-watchdog-ca \
   --from-file=ca.crt="${state}/ca.crt" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 cat >"${state}/values.yaml" <<EOF
 gatewayConfig:
   openshell.supervisor.middleware:
-    - name: twobox-watchdog
+    - name: egress-watchdog
       grpc_endpoint: https://${WATCHDOG_HOST}:${WATCHDOG_PORT}
-      tls_ca_cert_path: /etc/twobox-watchdog/ca.crt
+      tls_ca_cert_path: /etc/egress-watchdog/ca.crt
       max_payload_bytes: 4194304
       timeout: 500ms
 server:
   extraVolumes:
-    - name: twobox-watchdog-ca
+    - name: egress-watchdog-ca
       secret:
-        secretName: twobox-watchdog-ca
+        secretName: egress-watchdog-ca
   extraVolumeMounts:
-    - name: twobox-watchdog-ca
-      mountPath: /etc/twobox-watchdog
+    - name: egress-watchdog-ca
+      mountPath: /etc/egress-watchdog
       readOnly: true
 EOF
 helm upgrade openshell oci://ghcr.io/nvidia/openshell/helm-chart \
@@ -103,5 +103,5 @@ for _ in $(seq 1 30); do
   openshell status 2>/dev/null | grep -q "Status: Connected" && break
   sleep 2
 done
-openshell gateway info | grep -A1 "twobox-watchdog"
+openshell gateway info | grep -A1 "egress-watchdog"
 echo "Watchdog log: ${state}/watchdog.jsonl"

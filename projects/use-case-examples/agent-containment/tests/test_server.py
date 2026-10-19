@@ -13,10 +13,10 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from google.protobuf import struct_pb2
 
-from twobox_watchdog.bindings import supervisor_middleware_pb2 as pb2
-from twobox_watchdog.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
-from twobox_watchdog.ledger import Ledger
-from twobox_watchdog.server import AUDIENCE, Authenticator, Watchdog, build_manifest, create_server
+from egress_watchdog.bindings import supervisor_middleware_pb2 as pb2
+from egress_watchdog.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
+from egress_watchdog.ledger import Ledger
+from egress_watchdog.server import AUDIENCE, Authenticator, Watchdog, build_manifest, create_server
 
 SIGNING_KEY = Ed25519PrivateKey.generate()
 PUBLIC_PEM = SIGNING_KEY.public_key().public_bytes(

@@ -21,7 +21,7 @@ SANDBOX=twobox-verify
 failures=0
 watchdog_log="${TWOBOX_HOME}/watchdog/watchdog.jsonl"
 policy="${deploy_dir}/demo-policy.yaml"
-if kubectl -n openshell get secret twobox-watchdog-ca >/dev/null 2>&1; then
+if kubectl -n openshell get secret egress-watchdog-ca >/dev/null 2>&1; then
   policy="${deploy_dir}/watched-policy.yaml"
 fi
 
@@ -36,12 +36,12 @@ check() {
   fi
 }
 
-box_of_node() {
-  kubectl get node "$1" -o jsonpath='{.metadata.labels.openshell\.io/box}'
+role_of_node() {
+  kubectl get node "$1" -o jsonpath='{.metadata.labels.openshell\.io/role}'
 }
 
-box_of_pod() {
-  box_of_node "$(kubectl -n openshell get pod "$1" -o jsonpath='{.spec.nodeName}')"
+role_of_pod() {
+  role_of_node "$(kubectl -n openshell get pod "$1" -o jsonpath='{.spec.nodeName}')"
 }
 
 node_ready_with_label() {
@@ -50,7 +50,7 @@ node_ready_with_label() {
     grep -qx True
 }
 
-sandbox_box_reserved() {
+sandbox_node_reserved() {
   kubectl get nodes -l "${SANDBOX_LABEL}" -o jsonpath='{.items[*].spec.taints[*].key}' |
     grep -qw "${SANDBOX_TAINT%%=*}"
 }
@@ -62,7 +62,7 @@ sandbox_curl() {
 
 check "Control node is Ready" node_ready_with_label "${CONTROL_LABEL}"
 check "Sandbox node is Ready" node_ready_with_label "${SANDBOX_LABEL}"
-check "Sandbox node accepts only sandbox workloads" sandbox_box_reserved
+check "Sandbox node accepts only sandbox workloads" sandbox_node_reserved
 
 if ! openshell sandbox get "${SANDBOX}" >/dev/null 2>&1; then
   openshell sandbox create --template sandboxes --name "${SANDBOX}" \
@@ -76,9 +76,9 @@ supervisor_pod="$(kubectl -n openshell get pod \
   -l "openshell.ai/boundary-pair=${pair},openshell.ai/boundary-role=supervisor" -o name)"
 supervisor_pod="${supervisor_pod#pod/}"
 
-check "Gateway runs on the control node" test "$(box_of_pod openshell-0)" = control
-check "Sandbox workload runs on the sandbox node" test "$(box_of_pod "${workload_pod}")" = sandboxes
-check "Its supervisor runs on the control node" test "$(box_of_pod "${supervisor_pod}")" = control
+check "Gateway runs on the control node" test "$(role_of_pod openshell-0)" = control
+check "Sandbox workload runs on the sandbox node" test "$(role_of_pod "${workload_pod}")" = sandboxes
+check "Its supervisor runs on the control node" test "$(role_of_pod "${supervisor_pod}")" = control
 check "Allowed request (curl to httpbin.org) succeeds" test "$(sandbox_curl https://httpbin.org/get)" = 200
 check "Unlisted host (example.com) is refused" test "$(sandbox_curl https://example.com/)" = 000
 if [[ "${policy}" == *watched-policy.yaml ]]; then

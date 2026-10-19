@@ -3,7 +3,7 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <!-- Visual style follows docs/images/openshell-system-architecture.svg in NVIDIA/OpenShell. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800" role="img" aria-labelledby="title desc">
-  <title id="title">Two-box OpenShell architecture</title>
+  <title id="title">Agent containment architecture</title>
   <desc id="desc">One k3s cluster across two machines. The control node runs the OpenShell gateway, every sandbox's supervisor, and the egress watchdog. A sandbox node accepts only network-isolated sandbox workloads; more sandbox nodes join the same way. Each workload's only network path is a mediated channel to its supervisor on the control node. The supervisor sends every request to the watchdog, then makes policy-approved connections to external services. The sandbox node holds no policy, credentials, signing keys, or watchdog.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">

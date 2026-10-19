@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from twobox_watchdog.bindings import supervisor_middleware_pb2 as supervisor__middleware__pb2
+from egress_watchdog.bindings import supervisor_middleware_pb2 as supervisor__middleware__pb2
 
 GRPC_GENERATED_VERSION = '1.81.1'
 GRPC_VERSION = grpc.__version__
