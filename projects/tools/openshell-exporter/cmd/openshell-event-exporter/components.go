@@ -63,9 +63,9 @@ func components() (otelcol.Factories, error) {
 		return otelcol.Factories{}, err
 	}
 	factories.ExtensionModules = makeModulesMap(factories.Extensions, map[component.Type]string{
-		bearertokenauthextension.NewFactory().Type(): "github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.160.0",
-		healthcheckextension.NewFactory().Type():     "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.160.0",
-		filestorage.NewFactory().Type():              "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.160.0",
+		bearertokenauthextension.NewFactory().Type(): "github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.162.0",
+		healthcheckextension.NewFactory().Type():     "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension v0.162.0",
+		filestorage.NewFactory().Type():              "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.162.0",
 		storagehealthextension.NewFactory().Type():   "github.com/NVIDIA/OpenShell-Research/projects/tools/openshell-exporter v0.0.5-rc.1",
 	})
 
@@ -79,9 +79,9 @@ func components() (otelcol.Factories, error) {
 		return otelcol.Factories{}, err
 	}
 	factories.ReceiverModules = makeModulesMap(factories.Receivers, map[component.Type]string{
-		otlpreceiver.NewFactory().Type():         "go.opentelemetry.io/collector/receiver/otlpreceiver v0.160.0",
-		filelogreceiver.NewFactory().Type():      "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.160.0",
-		k8sobjectsreceiver.NewFactory().Type():   "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.160.0",
+		otlpreceiver.NewFactory().Type():         "go.opentelemetry.io/collector/receiver/otlpreceiver v0.162.0",
+		filelogreceiver.NewFactory().Type():      "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.162.0",
+		k8sobjectsreceiver.NewFactory().Type():   "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver v0.162.0",
 		watchsandboxreceiver.NewFactory().Type(): "github.com/NVIDIA/OpenShell-Research/projects/tools/openshell-exporter v0.0.5-rc.1",
 	})
 
@@ -96,10 +96,10 @@ func components() (otelcol.Factories, error) {
 		return otelcol.Factories{}, err
 	}
 	factories.ExporterModules = makeModulesMap(factories.Exporters, map[component.Type]string{
-		otlpexporter.NewFactory().Type():          "go.opentelemetry.io/collector/exporter/otlpexporter v0.160.0",
-		otlphttpexporter.NewFactory().Type():      "go.opentelemetry.io/collector/exporter/otlphttpexporter v0.160.0",
-		fileexporter.NewFactory().Type():          "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.160.0",
-		loadbalancingexporter.NewFactory().Type(): "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.160.0",
+		otlpexporter.NewFactory().Type():          "go.opentelemetry.io/collector/exporter/otlpexporter v0.162.0",
+		otlphttpexporter.NewFactory().Type():      "go.opentelemetry.io/collector/exporter/otlphttpexporter v0.162.0",
+		fileexporter.NewFactory().Type():          "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.162.0",
+		loadbalancingexporter.NewFactory().Type(): "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.162.0",
 		cloudeventsexporter.NewFactory().Type():   "github.com/NVIDIA/OpenShell-Research/projects/tools/openshell-exporter v0.0.5-rc.1",
 	})
 
@@ -115,9 +115,9 @@ func components() (otelcol.Factories, error) {
 		return otelcol.Factories{}, err
 	}
 	factories.ProcessorModules = makeModulesMap(factories.Processors, map[component.Type]string{
-		attributesprocessor.NewFactory().Type():       "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.160.0",
-		memorylimiterprocessor.NewFactory().Type():    "go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.160.0",
-		resourceprocessor.NewFactory().Type():         "github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.160.0",
+		attributesprocessor.NewFactory().Type():       "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.162.0",
+		memorylimiterprocessor.NewFactory().Type():    "go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.162.0",
+		resourceprocessor.NewFactory().Type():         "github.com/open-telemetry/opentelemetry-collector-contrib/processor/resourceprocessor v0.162.0",
 		evidencecontractprocessor.NewFactory().Type(): "github.com/NVIDIA/OpenShell-Research/projects/tools/openshell-exporter v0.0.5-rc.1",
 		openshellprocessor.NewFactory().Type():        "github.com/NVIDIA/OpenShell-Research/projects/tools/openshell-exporter v0.0.5-rc.1",
 		relayprocessor.NewFactory().Type():            "github.com/NVIDIA/OpenShell-Research/projects/tools/openshell-exporter v0.0.5-rc.1",

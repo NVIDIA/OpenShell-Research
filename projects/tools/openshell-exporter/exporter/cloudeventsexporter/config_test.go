@@ -34,8 +34,8 @@ func TestConfigUnmarshalPreservesExporterAndHTTPSettings(t *testing.T) {
 	if !cfg.AllowInsecureHTTP || cfg.MaxEvents != 7 || cfg.DefaultSource != "openshell://configured-source" || cfg.QueueConfig.HasValue() {
 		t.Fatalf("exporter settings were lost: %#v", cfg)
 	}
-	// confighttp normalizes the new section into the effective legacy fields.
-	if cfg.IdleConnTimeout != 12*time.Second { //nolint:staticcheck // Verify the upstream decoder's documented normalization.
+	// Collector 0.162 keeps decoded settings in the keepalive section.
+	if !cfg.Keepalive.HasValue() || cfg.Keepalive.Get().IdleConnTimeout != 12*time.Second {
 		t.Fatal("HTTP keepalive settings were lost")
 	}
 	if err := cfg.Validate(); err != nil {

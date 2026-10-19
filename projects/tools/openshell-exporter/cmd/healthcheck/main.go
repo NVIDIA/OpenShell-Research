@@ -14,8 +14,19 @@ import (
 
 func main() {
 	if len(os.Args) > 1 {
+		if os.Args[1] == "--status" && len(os.Args) <= 3 {
+			endpoint := "http://127.0.0.1:8888/metrics"
+			if len(os.Args) == 3 {
+				endpoint = os.Args[2]
+			}
+			if err := deliveryStatus(context.Background(), os.Stdout, endpoint); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			return
+		}
 		if os.Args[1] != "--writable" || len(os.Args) < 3 {
-			fmt.Fprintln(os.Stderr, "usage: healthcheck [--writable DIRECTORY ...]")
+			fmt.Fprintln(os.Stderr, "usage: healthcheck [--writable DIRECTORY ... | --status [METRICS_URL]]")
 			os.Exit(2)
 		}
 		for _, directory := range os.Args[2:] {

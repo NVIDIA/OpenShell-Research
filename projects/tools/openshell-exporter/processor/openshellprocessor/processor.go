@@ -77,7 +77,6 @@ func (p *processorImpl) start(ctx context.Context, _ component.Host) error {
 }
 
 var unavailableSourceCapabilities = []string{
-	"gateway_structured_ocsf_export",
 	"watch_events",
 }
 
@@ -148,6 +147,11 @@ func (p *processorImpl) normalize(ctx context.Context, record plog.LogRecord) {
 	redactedSourceAttributes, attributeRedactionCount := p.redactRaw(sourceAttributes)
 	redactionCount := bodyRedactionCount + attributeRedactionCount
 	correlation := correlations(original, p.config.CorrelationFields)
+	if isOCSFEvidence(kind) {
+		if value, ok := lookupPath(original, "metadata.uid"); ok {
+			correlation["ocsf_event_uid"] = value
+		}
+	}
 	mergeMissingCorrelations(correlation, correlations(sourceAttributes, p.config.CorrelationFields))
 	envelope := buildEnvelope(
 		p.config,

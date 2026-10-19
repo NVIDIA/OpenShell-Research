@@ -38,6 +38,16 @@ type sourceCapabilityDefinition struct {
 
 var sourceCapabilityDefinitions = []sourceCapabilityDefinition{
 	{
+		source: "gateway_ocsf", profiles: []string{"ocsf.gateway"},
+		durability:     "checkpointed_file",
+		limitationCode: "upstream_best_effort_monitor_gateway_drops", available: true,
+	},
+	{
+		source: "supervisor_ocsf", profiles: []string{"ocsf.supervisor"},
+		durability:     "checkpointed_file",
+		limitationCode: "upstream_best_effort_runtime_retention", available: true,
+	},
+	{
 		source: "ocsf_files", profiles: []string{"ocsf.file", "ocsf.forwarded"},
 		durability:     "checkpointed_file",
 		limitationCode: "persistent_upstream_file_and_checkpoint_required", available: true,
@@ -121,6 +131,10 @@ func sourceCapabilitySummaries(enabledProfiles []string) []sourceCapabilitySumma
 
 func sourceCapabilityLane(kind string) string {
 	switch sourceProfile(kind) {
+	case "ocsf.gateway":
+		return "gateway_ocsf"
+	case "ocsf.supervisor":
+		return "supervisor_ocsf"
 	case "ocsf.file", "ocsf.forwarded":
 		return "ocsf_files"
 	case "openshell.log", "openshell.log.forwarded":
@@ -143,7 +157,7 @@ func sourceCapabilityLane(kind string) string {
 // source records remain exportable, but their metric label fails closed.
 func boundedMetricSource(kind string) string {
 	switch kind {
-	case "ocsf.file",
+	case "ocsf.gateway", "ocsf.supervisor", "ocsf.file",
 		"ocsf.forwarded",
 		"sandbox.lifecycle",
 		"gateway.log",

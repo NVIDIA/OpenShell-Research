@@ -36,7 +36,7 @@ func TestAcknowledgementFailuresAreRetryableAndNotCountedDelivered(t *testing.T)
 				}, nil
 			})}
 			implementation := testExporter(client)
-			implementation.metrics = newExporterMetrics(provider)
+			implementation.metrics = newExporterMetrics(provider, "cloudevents")
 			err := implementation.pushLogs(context.Background(), oneLog(t, "evidence"))
 			if err == nil || consumererror.IsPermanent(err) {
 				t.Fatalf("acknowledgement error=%v, want retryable", err)
@@ -98,4 +98,50 @@ func (body *faultyAcknowledgement) Read([]byte) (int, error) {
 
 func (body *faultyAcknowledgement) Close() error {
 	return body.closeErr
+}
+
+func TestDeliveryMetricsKeepDestinationsSeparate(t *testing.T) {
+	reader := sdkmetric.NewManualReader()
+	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	t.Cleanup(func() { _ = provider.Shutdown(context.Background()) })
+	newExporterMetrics(provider, "cloudevents/accepting").recordResponse(t.Context(), 202, 3, 0)
+	newExporterMetrics(provider, "cloudevents/rejecting").recordResponse(t.Context(), 400, 2, 0)
+	var result metricdata.ResourceMetrics
+	if err := reader.Collect(t.Context(), &result); err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]bool{}
+	for _, scope := range result.ScopeMetrics {
+		for _, m := range scope.Metrics {
+			switch m.Name {
+			case "openshell.exporter.delivery.events", "openshell.exporter.delivery.permanent_rejections":
+				points := m.Data.(metricdata.Sum[int64]).DataPoints
+				if len(points) != 1 {
+					t.Fatalf("unexpected points for %s: %#v", m.Name, points)
+				}
+				id, _ := points[0].Attributes.Value("exporter")
+				wantID, wantValue := "cloudevents/accepting", int64(3)
+				if m.Name == "openshell.exporter.delivery.permanent_rejections" {
+					wantID, wantValue = "cloudevents/rejecting", 1
+				}
+				if id.AsString() != wantID || points[0].Value != wantValue {
+					t.Fatalf("destination metrics merged: %#v", points)
+				}
+				seen[m.Name] = true
+			case "openshell.exporter.destination.last_success_unixtime":
+				points := m.Data.(metricdata.Gauge[int64]).DataPoints
+				if len(points) != 1 {
+					t.Fatal("rejected destination reported success")
+				}
+				id, _ := points[0].Attributes.Value("exporter")
+				if id.AsString() != "cloudevents/accepting" || points[0].Value <= 0 {
+					t.Fatal("incorrect acknowledgement time or destination")
+				}
+				seen[m.Name] = true
+			}
+		}
+	}
+	if len(seen) != 3 {
+		t.Fatalf("missing delivery metrics: %v", seen)
+	}
 }

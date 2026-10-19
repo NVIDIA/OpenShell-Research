@@ -7,9 +7,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	pb "github.com/NVIDIA/OpenShell/sdk/go/proto/openshellv1"
 	"go.opentelemetry.io/collector/consumer"
@@ -33,7 +35,7 @@ type reconciliationGateway struct {
 func (g *reconciliationGateway) List(context.Context) ([]sandboxRef, error)         { return nil, nil }
 func (g *reconciliationGateway) Watch(context.Context, string) (eventStream, error) { return nil, nil }
 func (g *reconciliationGateway) GatewayVersion(context.Context) (string, error) {
-	return "0.0.113", nil
+	return "0.1.2", nil
 }
 func (g *reconciliationGateway) GetDraft(context.Context, string) (*pb.GetDraftPolicyResponse, error) {
 	g.mu.Lock()
@@ -47,7 +49,7 @@ func (g *reconciliationGateway) GetDraftHistory(context.Context, string) (*pb.Ge
 	if g.history != nil {
 		return g.history, nil
 	}
-	return &pb.GetDraftHistoryResponse{Entries: []*pb.DraftHistoryEntry{{TimestampMs: 1700000000000, EventType: "analysis_cycle", ChunkId: "chunk-1"}}}, nil
+	return &pb.GetDraftHistoryResponse{Entries: []*pb.DraftHistoryEntry{{EventTime: timestamppb.New(time.UnixMilli(1700000000000)), EventType: "analysis_cycle", ChunkId: "chunk-1"}}}, nil
 }
 func (g *reconciliationGateway) GetPolicyStatus(context.Context, string) (*pb.GetSandboxPolicyStatusResponse, error) {
 	g.mu.Lock()

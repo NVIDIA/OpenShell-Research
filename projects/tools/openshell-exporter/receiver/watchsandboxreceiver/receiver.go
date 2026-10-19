@@ -10,6 +10,7 @@ import (
 	"io"
 	"math/rand/v2"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -22,6 +23,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/receiver"
 	"go.uber.org/zap"
+	"golang.org/x/mod/semver"
 )
 
 type watchReceiver struct {
@@ -72,10 +74,27 @@ func newWatchReceiver(
 }
 
 func (r *watchReceiver) Start(ctx context.Context, host component.Host) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	client, err := r.newClient(r.config)
 	if err != nil {
 		return err
 	}
+	// Verify the API contract before opening persistent state or starting workers.
+	infoContext, cancelInfo := context.WithTimeout(ctx, 5*time.Second)
+	gatewayVersion, err := client.GatewayVersion(infoContext)
+	cancelInfo()
+	if err != nil {
+		return errors.Join(fmt.Errorf("verify OpenShell version: %w", err), client.Close())
+	}
+	if err := ctx.Err(); err != nil {
+		return errors.Join(err, client.Close())
+	}
+	if err := validateGatewayVersion(gatewayVersion); err != nil {
+		return errors.Join(err, client.Close())
+	}
+	r.gatewayVersion = gatewayVersion
 	r.client = client
 	runContext, cancel := context.WithCancel(context.Background())
 	r.cancel = cancel
@@ -95,16 +114,6 @@ func (r *watchReceiver) Start(ctx context.Context, host component.Host) error {
 		zap.Bool("watch_events_rpc", false),
 	)
 
-	infoContext, cancelInfo := context.WithTimeout(context.Background(), 5*time.Second)
-	r.gatewayVersion, err = client.GatewayVersion(infoContext)
-	cancelInfo()
-	if err != nil {
-		r.settings.Logger.Warn(
-			"gateway version enrichment unavailable",
-			zap.Error(err),
-		)
-	}
-
 	r.discoveryWG.Add(1)
 	go r.discoveryLoop(runContext)
 	return nil
@@ -115,7 +124,7 @@ func (r *watchReceiver) Shutdown(ctx context.Context) error {
 		if r.cancel != nil {
 			r.cancel()
 		}
-		go r.finishShutdown()
+		go r.finishShutdown(ctx)
 	})
 	select {
 	case <-r.shutdownDone:
@@ -125,16 +134,18 @@ func (r *watchReceiver) Shutdown(ctx context.Context) error {
 	}
 }
 
-func (r *watchReceiver) finishShutdown() {
+func (r *watchReceiver) finishShutdown(ctx context.Context) {
 	r.discoveryWG.Wait()
 	r.watchWG.Wait()
 	r.reconcileWG.Wait()
 	var shutdownErrors []error
-	if r.policyStorage != nil {
-		shutdownErrors = append(shutdownErrors, r.policyStorage.Close(context.Background()))
-	}
+	// Release the transport even if storage cleanup blocks. All workers have
+	// stopped using both resources; give storage the caller's shutdown deadline.
 	if r.client != nil {
 		shutdownErrors = append(shutdownErrors, r.client.Close())
+	}
+	if r.policyStorage != nil {
+		shutdownErrors = append(shutdownErrors, r.policyStorage.Close(ctx))
 	}
 	r.shutdownErr = errors.Join(shutdownErrors...)
 	close(r.shutdownDone)
@@ -219,8 +230,11 @@ func (r *watchReceiver) watch(ctx context.Context, sandbox sandboxRef) {
 		if ctx.Err() != nil {
 			return
 		}
-		stream, err := r.client.Watch(ctx, sandbox.ID)
+		stream, err := r.client.Watch(ctx, sandbox.Name)
 		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
 			r.metrics.reconnect(ctx, "stream_open_failed")
 			r.emitWarning(
 				ctx,
@@ -231,7 +245,7 @@ func (r *watchReceiver) watch(ctx context.Context, sandbox sandboxRef) {
 			if !r.waitReconnect(ctx, backoff) {
 				return
 			}
-			backoff = min(backoff*2, r.config.ReconnectMax)
+			backoff += min(backoff, r.config.ReconnectMax-backoff)
 			continue
 		}
 
@@ -275,9 +289,12 @@ func (r *watchReceiver) watch(ctx context.Context, sandbox sandboxRef) {
 			r.metrics.succeeded(ctx)
 			deliveryErr := r.consumeWithBackpressure(ctx, logs)
 			if deliveryErr != nil {
-				if errors.Is(deliveryErr, context.Canceled) {
+				if ctx.Err() != nil {
+					r.metrics.unacknowledged(ctx, "canceled", logs.LogRecordCount())
 					return
 				}
+				r.metrics.unacknowledged(ctx, "permanent_rejection", logs.LogRecordCount())
+				r.metrics.gap(ctx, "downstream_permanent_rejection")
 				r.settings.Logger.Warn(
 					"sandbox event delivery failed",
 					zap.Error(deliveryErr),
@@ -295,7 +312,7 @@ func (r *watchReceiver) watch(ctx context.Context, sandbox sandboxRef) {
 		if !r.waitReconnect(ctx, backoff) {
 			return
 		}
-		backoff = min(backoff*2, r.config.ReconnectMax)
+		backoff += min(backoff, r.config.ReconnectMax-backoff)
 	}
 }
 
@@ -330,8 +347,7 @@ func (r *watchReceiver) emitWarning(
 }
 
 func (r *watchReceiver) waitReconnect(ctx context.Context, delay time.Duration) bool {
-	jitter := time.Duration(rand.Int64N(int64(delay/2) + 1))
-	timer := time.NewTimer(min(delay+jitter, r.config.ReconnectMax))
+	timer := time.NewTimer(reconnectDelay(delay, r.config.ReconnectMax))
 	defer timer.Stop()
 	select {
 	case <-ctx.Done():
@@ -341,12 +357,29 @@ func (r *watchReceiver) waitReconnect(ctx context.Context, delay time.Duration) 
 	}
 }
 
+// Equal jitter retains spread even at the maximum delay. It bounds each wait
+// between half the capped backoff and the cap; tails are still non-resumable.
+func reconnectDelay(delay, maximum time.Duration) time.Duration {
+	capDelay := min(delay, maximum)
+	floor := capDelay / 2
+	return floor + time.Duration(rand.Int64N(int64(capDelay-floor)+1))
+}
+
 func (r *watchReceiver) consumeWithBackpressure(
 	ctx context.Context,
 	logs plog.Logs,
 ) error {
 	delay := time.Second
+	stalled := false
+	defer func() {
+		if stalled {
+			r.metrics.backpressureActive.Add(ctx, -1)
+		}
+	}()
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		// Downstream processors may mutate their input even when delivery fails.
 		// Retain the receiver-owned evidence for retries and checkpoint hashes.
 		attempt := plog.NewLogs()
@@ -356,16 +389,32 @@ func (r *watchReceiver) consumeWithBackpressure(
 		} else if consumererror.IsPermanent(err) {
 			return err
 		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if !stalled {
+			stalled = true
+			r.metrics.backpressureActive.Add(ctx, 1)
+			r.metrics.gap(ctx, "downstream_backpressure")
+		}
 		r.metrics.backpressured(ctx)
 		timer := time.NewTimer(delay)
 		select {
 		case <-ctx.Done():
-			if !timer.Stop() {
-				<-timer.C
-			}
+			timer.Stop()
 			return ctx.Err()
 		case <-timer.C:
 		}
 		delay = min(delay*2, 30*time.Second)
 	}
+}
+
+// The 0.1 API changed workspace selectors, resource names, and pagination.
+// Older gateways must be rejected before starting any source watches.
+func validateGatewayVersion(raw string) error {
+	version := "v" + strings.TrimPrefix(raw, "v")
+	if !semver.IsValid(version) || semver.Compare(version, "v0.1.0") < 0 {
+		return fmt.Errorf("OpenShell %q is unsupported: version 0.1.0 or newer is required", raw)
+	}
+	return nil
 }

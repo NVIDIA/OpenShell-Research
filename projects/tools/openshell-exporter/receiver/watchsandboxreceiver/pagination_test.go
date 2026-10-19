@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	dm "github.com/NVIDIA/OpenShell/sdk/go/proto/datamodelv1"
 	pb "github.com/NVIDIA/OpenShell/sdk/go/proto/openshellv1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -44,13 +45,13 @@ func TestPolicyRevisionPaginationUsesOneRecordBoundaryProbe(t *testing.T) {
 	t.Parallel()
 	api := &policyRevisionAPI{}
 	api.respond = func(request *pb.ListSandboxPoliciesRequest) (*pb.ListSandboxPoliciesResponse, error) {
-		switch request.GetOffset() {
-		case 0:
-			return revisionResponse(3, 2, 1), nil
-		case 3:
+		switch request.GetPageToken() {
+		case "":
+			return revisionPage("next", 3, 2, 1), nil
+		case "next":
 			return revisionResponse(), nil
 		default:
-			return nil, fmt.Errorf("unexpected offset %d", request.GetOffset())
+			return nil, fmt.Errorf("unexpected page token %q", request.GetPageToken())
 		}
 	}
 	client := testPolicyRevisionClient(api, 3)
@@ -61,8 +62,8 @@ func TestPolicyRevisionPaginationUsesOneRecordBoundaryProbe(t *testing.T) {
 	}
 	assertRevisionVersions(t, revisions, 3, 2, 1)
 	requests := api.snapshotRequests()
-	if len(requests) != 2 || requests[0].GetLimit() != 3 || requests[0].GetOffset() != 0 ||
-		requests[1].GetLimit() != 1 || requests[1].GetOffset() != 3 {
+	if len(requests) != 2 || requests[0].GetPageSize() != 3 || requests[0].GetPageToken() != "" ||
+		requests[1].GetPageSize() != 1 || requests[1].GetPageToken() != "next" {
 		t.Fatalf("pagination requests=%#v, want bounded page and one-record probe", requests)
 	}
 }
@@ -71,8 +72,8 @@ func TestPolicyRevisionPaginationReportsOverflowAndRetainsBoundedNewestSet(t *te
 	t.Parallel()
 	api := &policyRevisionAPI{}
 	api.respond = func(request *pb.ListSandboxPoliciesRequest) (*pb.ListSandboxPoliciesResponse, error) {
-		if request.GetOffset() == 0 {
-			return revisionResponse(5, 4, 3), nil
+		if request.GetPageToken() == "" {
+			return revisionPage("next", 5, 4, 3), nil
 		}
 		return revisionResponse(2), nil
 	}
@@ -103,8 +104,8 @@ func TestPolicyRevisionPaginationReturnsPartialEvidenceAfterLaterPageFailure(t *
 	}
 	api := &policyRevisionAPI{}
 	api.respond = func(request *pb.ListSandboxPoliciesRequest) (*pb.ListSandboxPoliciesResponse, error) {
-		if request.GetOffset() == 0 {
-			return revisionResponse(firstPage...), nil
+		if request.GetPageToken() == "" {
+			return revisionPage("next", firstPage...), nil
 		}
 		return nil, status.Error(codes.Unavailable, "injected later-page failure")
 	}
@@ -223,5 +224,117 @@ func assertPaginationError(t *testing.T, err error, reason string, retained int)
 	var paginationErr *policyRevisionPaginationError
 	if !errors.As(err, &paginationErr) || paginationErr.Reason != reason || paginationErr.Retained != retained {
 		t.Fatalf("pagination error=%#v, want reason=%q retained=%d", err, reason, retained)
+	}
+}
+
+func revisionPage(token string, versions ...uint32) *pb.ListSandboxPoliciesResponse {
+	response := revisionResponse(versions...)
+	response.NextPageToken = token
+	return response
+}
+
+func TestPolicyRevisionPaginationFollowsShortPagesAndRejectsCycles(t *testing.T) {
+	for _, cycle := range []bool{false, true} {
+		t.Run(fmt.Sprint(cycle), func(t *testing.T) {
+			api := &policyRevisionAPI{}
+			api.respond = func(request *pb.ListSandboxPoliciesRequest) (*pb.ListSandboxPoliciesResponse, error) {
+				if request.GetSandbox() != "agent" || request.GetWorkspaceScope().GetWorkspace() != "default" {
+					t.Fatalf("scope lost: %v", request)
+				}
+				if request.GetPageToken() == "" {
+					return revisionPage("opaque-next", 3), nil
+				}
+				if request.GetPageToken() != "opaque-next" {
+					t.Fatalf("token changed: %v", request)
+				}
+				if cycle {
+					return revisionPage("opaque-next", 2), nil
+				}
+				return revisionResponse(2), nil
+			}
+			revisions, err := testPolicyRevisionClient(api, 10).ListPolicyRevisions(context.Background(), "agent")
+			if cycle {
+				assertPaginationError(t, err, policyRevisionPaginationDrift, 2)
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			assertRevisionVersions(t, revisions, 3, 2)
+			if len(api.snapshotRequests()) != 2 {
+				t.Fatal("pagination did not stop")
+			}
+		})
+	}
+}
+
+type sandboxPaginationAPI struct {
+	pb.OpenShellClient
+	requests []*pb.ListSandboxesRequest
+	cycle    bool
+	watch    *pb.WatchSandboxRequest
+}
+
+func (a *sandboxPaginationAPI) ListSandboxes(_ context.Context, request *pb.ListSandboxesRequest, _ ...grpc.CallOption) (*pb.ListSandboxesResponse, error) {
+	a.requests = append(a.requests, request)
+	token := ""
+	if request.GetPageToken() == "" || a.cycle {
+		token = "opaque-next"
+	}
+	return &pb.ListSandboxesResponse{Sandboxes: []*pb.Sandbox{{Metadata: &dm.ObjectMeta{Id: fmt.Sprint(len(a.requests)), Name: "agent"}}}, NextPageToken: token}, nil
+}
+func (a *sandboxPaginationAPI) WatchSandbox(_ context.Context, request *pb.WatchSandboxRequest, _ ...grpc.CallOption) (grpc.ServerStreamingClient[pb.SandboxStreamEvent], error) {
+	a.watch = request
+	return nil, nil
+}
+func TestSandboxRequestsUseNamedWorkspaceAndOpaquePagination(t *testing.T) {
+	for _, cycle := range []bool{false, true} {
+		api := &sandboxPaginationAPI{cycle: cycle}
+		config := createDefaultConfig().(*Config)
+		config.Workspace = "team"
+		config.LabelSelector = "owner=demo"
+		client := &grpcGatewayClient{api: api, config: config}
+		refs, err := client.List(context.Background())
+		if (err != nil) != cycle {
+			t.Fatalf("cycle=%t: %v", cycle, err)
+		}
+		if !cycle && len(refs) != 2 {
+			t.Fatalf("short page lost: %v", refs)
+		}
+		if len(api.requests) != 2 || api.requests[1].GetPageToken() != "opaque-next" {
+			t.Fatal("opaque pagination failed")
+		}
+		for _, request := range api.requests {
+			if request.GetWorkspaceScope().GetWorkspace() != "team" || request.GetLabelSelector() != "owner=demo" {
+				t.Fatalf("scope lost: %v", request)
+			}
+		}
+		if _, err = client.Watch(context.Background(), "agent"); err != nil {
+			t.Fatal(err)
+		}
+		if api.watch.GetSandbox() != "agent" || api.watch.GetWorkspaceScope().GetWorkspace() != "team" || api.watch.GetResumeAfterCursor() != "" {
+			t.Fatalf("watch request=%v", api.watch)
+		}
+	}
+}
+
+func TestPolicyRevisionBoundaryProbeFollowsEmptyPageToken(t *testing.T) {
+	api := &policyRevisionAPI{}
+	api.respond = func(request *pb.ListSandboxPoliciesRequest) (*pb.ListSandboxPoliciesResponse, error) {
+		switch request.GetPageToken() {
+		case "":
+			return revisionPage("empty-page", 3, 2), nil
+		case "empty-page":
+			return revisionPage("last-page"), nil
+		case "last-page":
+			return revisionResponse(1), nil
+		default:
+			t.Fatalf("unexpected token %q", request.GetPageToken())
+			return nil, nil
+		}
+	}
+	revisions, err := testPolicyRevisionClient(api, 2).ListPolicyRevisions(context.Background(), "sandbox")
+	assertPaginationError(t, err, policyRevisionLimitExceeded, 2)
+	assertRevisionVersions(t, revisions, 3, 2)
+	if len(api.snapshotRequests()) != 3 {
+		t.Fatal("empty page suppressed later revision")
 	}
 }

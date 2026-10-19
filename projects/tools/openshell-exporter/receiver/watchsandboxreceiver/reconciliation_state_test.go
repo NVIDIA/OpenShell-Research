@@ -8,9 +8,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"math"
 	"strings"
 	"testing"
+	"time"
 
 	pb "github.com/NVIDIA/OpenShell/sdk/go/proto/openshellv1"
 )
@@ -77,7 +79,7 @@ func TestPolicySequenceMutationAndTruncationReplayWithDiagnostics(t *testing.T) 
 	}
 
 	history[1] = &pb.DraftHistoryEntry{
-		TimestampMs: history[1].GetTimestampMs(),
+		EventTime:   history[1].GetEventTime(),
 		EventType:   history[1].GetEventType(),
 		Description: "corrected source description",
 		ChunkId:     history[1].GetChunkId(),
@@ -85,7 +87,7 @@ func TestPolicySequenceMutationAndTruncationReplayWithDiagnostics(t *testing.T) 
 	revisions[1] = &pb.SandboxPolicyRevision{
 		Version:     revisions[1].GetVersion(),
 		PolicyHash:  "sha256:corrected",
-		CreatedAtMs: revisions[1].GetCreatedAtMs(),
+		CreatedTime: revisions[1].GetCreatedTime(),
 	}
 	gateway.setPolicySnapshots(history, revisions)
 	r.reconcileSandbox(context.Background(), request)
@@ -327,7 +329,7 @@ func testPolicyHistory(count int) []*pb.DraftHistoryEntry {
 	entries := make([]*pb.DraftHistoryEntry, 0, count)
 	for index := 1; index <= count; index++ {
 		entries = append(entries, &pb.DraftHistoryEntry{
-			TimestampMs: int64(1700000000000 + index),
+			EventTime:   timestamppb.New(time.UnixMilli(int64(1700000000000 + index))),
 			EventType:   "analysis_cycle",
 			Description: fmt.Sprintf("history entry %d", index),
 			ChunkId:     fmt.Sprintf("chunk-%d", index),
@@ -342,7 +344,7 @@ func testPolicyRevisions(count int) []*pb.SandboxPolicyRevision {
 		revisions = append(revisions, &pb.SandboxPolicyRevision{
 			Version:     uint32(version),
 			PolicyHash:  fmt.Sprintf("sha256:policy-%d", version),
-			CreatedAtMs: int64(1700000000000 + version),
+			CreatedTime: timestamppb.New(time.UnixMilli(int64(1700000000000 + version))),
 		})
 	}
 	return revisions

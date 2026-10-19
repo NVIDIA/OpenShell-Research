@@ -6,6 +6,7 @@ package watchsandboxreceiver
 import (
 	"context"
 	"errors"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"strings"
 	"testing"
 	"time"
@@ -46,10 +47,10 @@ func TestEveryPublicWatchSandboxVariantConverts(t *testing.T) {
 			event: &pb.SandboxStreamEvent{
 				Payload: &pb.SandboxStreamEvent_Log{
 					Log: &pb.SandboxLogLine{
-						SandboxId:   "sandbox-id",
-						TimestampMs: 1_700_000_000_000,
-						Source:      "gateway",
-						Message:     "allowed",
+						SandboxId: "sandbox-id",
+						EventTime: timestamppb.New(time.UnixMilli(1_700_000_000_000)),
+						Source:    "gateway",
+						Message:   "allowed",
 					},
 				},
 			},
@@ -71,10 +72,10 @@ func TestEveryPublicWatchSandboxVariantConverts(t *testing.T) {
 			event: &pb.SandboxStreamEvent{
 				Payload: &pb.SandboxStreamEvent_Event{
 					Event: &pb.PlatformEvent{
-						TimestampMs: 1_700_000_000_001,
-						Source:      "kubernetes",
-						Type:        "Warning",
-						Reason:      "BackOff",
+						EventTime: timestamppb.New(time.UnixMilli(1_700_000_000_001)),
+						Source:    "kubernetes",
+						Type:      "Warning",
+						Reason:    "BackOff",
 					},
 				},
 			},
@@ -164,14 +165,14 @@ func TestLifecyclePreservesCompletePublicPayload(t *testing.T) {
 	config := createDefaultConfig().(*Config)
 	logs, err := lifecycleLogs(config, "v0.0.113", &pb.Sandbox{
 		Metadata: &datamodelv1.ObjectMeta{
-			Id:                  "sandbox-id",
-			Name:                "sandbox-name",
-			CreatedAtMs:         1_700_000_000_000,
-			Labels:              map[string]string{"team": "security"},
-			ResourceVersion:     19,
-			Annotations:         map[string]string{"trace.id": "trace-from-annotation"},
-			Workspace:           "default",
-			DeletionTimestampMs: 1_700_000_100_000,
+			Id:              "sandbox-id",
+			Name:            "sandbox-name",
+			CreatedTime:     timestamppb.New(time.UnixMilli(1_700_000_000_000)),
+			Labels:          map[string]string{"team": "security"},
+			ResourceVersion: 19,
+			Annotations:     map[string]string{"trace.id": "trace-from-annotation"},
+			Workspace:       "default",
+			DeletionTime:    timestamppb.New(time.UnixMilli(1_700_000_100_000)),
 		},
 		Spec: &pb.SandboxSpec{
 			LogLevel:    "debug",
@@ -184,16 +185,15 @@ func TestLifecyclePreservesCompletePublicPayload(t *testing.T) {
 			Providers: []string{"nvidia"},
 		},
 		Status: &pb.SandboxStatus{
-			SandboxName: "driver-sandbox-id",
-			AgentPod:    "agent-pod-1",
-			AgentFd:     "agent.sock",
-			SandboxFd:   "sandbox.sock",
+			AgentPod:  "agent-pod-1",
+			AgentFd:   "agent.sock",
+			SandboxFd: "sandbox.sock",
 			Conditions: []*pb.SandboxCondition{{
-				Type:               "Ready",
-				Status:             "True",
-				Reason:             "Provisioned",
-				Message:            "sandbox is ready",
-				LastTransitionTime: "2026-08-21T00:00:00Z",
+				Type:           "Ready",
+				Status:         "True",
+				Reason:         "Provisioned",
+				Message:        "sandbox is ready",
+				TransitionTime: timestamppb.New(time.Date(2026, 8, 21, 0, 0, 0, 0, time.UTC)),
 			}},
 			Phase:                pb.SandboxPhase_SANDBOX_PHASE_READY,
 			CurrentPolicyVersion: 7,
@@ -330,5 +330,29 @@ func TestConsumeWithBackpressureDoesNotRetryPermanentError(t *testing.T) {
 	err = watch.consumeWithBackpressure(ctx, plog.NewLogs())
 	if !consumererror.IsPermanent(err) {
 		t.Fatalf("permanent error was retried or lost: %v", err)
+	}
+}
+
+func TestOpenShell013LifecycleFieldsArePreserved(t *testing.T) {
+	sandbox := &pb.Sandbox{
+		Metadata:           &datamodelv1.ObjectMeta{Id: "sb-1", Name: "demo", Workspace: "default"},
+		HostKeyFingerprint: "SHA256:public-fingerprint",
+		Spec:               &pb.SandboxSpec{RestartPolicy: pb.SandboxRestartPolicy_SANDBOX_RESTART_POLICY_ON_FAILURE},
+		Status:             &pb.SandboxStatus{RestartCount: 2, NextRestartTime: timestamppb.New(time.Unix(1791540000, 0))},
+	}
+	logs, err := lifecycleLogs(createDefaultConfig().(*Config), "0.1.3", sandbox)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := logs.ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().At(0).Body().AsRaw().(map[string]any)
+	payload := body["source_payload"].(map[string]any)
+	if payload["host_key_fingerprint"] != "SHA256:public-fingerprint" {
+		t.Fatalf("fingerprint lost: %v", payload)
+	}
+	if payload["spec"].(map[string]any)["restart_policy"] != "SANDBOX_RESTART_POLICY_ON_FAILURE" {
+		t.Fatal("restart policy lost")
+	}
+	if payload["status"].(map[string]any)["restart_count"] != float64(2) {
+		t.Fatalf("restart count lost: %v", payload)
 	}
 }

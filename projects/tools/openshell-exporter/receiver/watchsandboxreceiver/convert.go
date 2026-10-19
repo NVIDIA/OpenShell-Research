@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"time"
 
 	pb "github.com/NVIDIA/OpenShell/sdk/go/proto/openshellv1"
@@ -81,7 +82,7 @@ func lifecycleLogs(
 		return plog.Logs{}, errors.New("sandbox payload has no stable ID")
 	}
 	eventType := "MODIFIED"
-	if metadata.GetDeletionTimestampMs() > 0 {
+	if timestampMillis(metadata.GetDeletionTime()) > 0 {
 		eventType = "DELETED"
 	}
 	status := sandbox.GetStatus()
@@ -145,7 +146,7 @@ func logLineLogs(
 	}
 	body := map[string]any{
 		"sandbox_id":   line.GetSandboxId(),
-		"timestamp_ms": line.GetTimestampMs(),
+		"timestamp_ms": timestampMillis(line.GetEventTime()),
 		"level":        line.GetLevel(),
 		"target":       line.GetTarget(),
 		"message":      line.GetMessage(),
@@ -167,8 +168,8 @@ func logLineLogs(
 	if err != nil {
 		return plog.Logs{}, err
 	}
-	if line.GetTimestampMs() > 0 {
-		record.Attributes().PutInt("openshell.event.time_unix_ms", line.GetTimestampMs())
+	if timestampMillis(line.GetEventTime()) > 0 {
+		record.Attributes().PutInt("openshell.event.time_unix_ms", timestampMillis(line.GetEventTime()))
 	}
 	return logs, nil
 }
@@ -181,7 +182,7 @@ func platformEventLogs(
 ) (plog.Logs, error) {
 	body := map[string]any{
 		"sandbox_id":   sandbox.ID,
-		"timestamp_ms": event.GetTimestampMs(),
+		"timestamp_ms": timestampMillis(event.GetEventTime()),
 		"source":       event.GetSource(),
 		"type":         event.GetType(),
 		"reason":       event.GetReason(),
@@ -203,10 +204,10 @@ func platformEventLogs(
 	if err != nil {
 		return plog.Logs{}, err
 	}
-	if event.GetTimestampMs() > 0 {
+	if timestampMillis(event.GetEventTime()) > 0 {
 		record.Attributes().PutInt(
 			"openshell.event.time_unix_ms",
-			event.GetTimestampMs(),
+			timestampMillis(event.GetEventTime()),
 		)
 	}
 	return logs, nil
@@ -369,4 +370,11 @@ func stringMapToAny(values map[string]string) map[string]any {
 		result[key] = value
 	}
 	return result
+}
+
+func timestampMillis(value *timestamppb.Timestamp) int64 {
+	if value == nil {
+		return 0
+	}
+	return value.AsTime().UnixMilli()
 }
