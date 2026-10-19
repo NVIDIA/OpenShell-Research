@@ -25,6 +25,8 @@ type ValidationConfig struct {
 
 var supportedSourceProfiles = []string{
 	"ocsf.file",
+	"ocsf.gateway",
+	"ocsf.supervisor",
 	"ocsf.forwarded",
 	"openshell.log",
 	"openshell.log.forwarded",

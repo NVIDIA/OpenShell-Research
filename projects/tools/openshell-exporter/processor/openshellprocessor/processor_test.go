@@ -5,11 +5,17 @@ package openshellprocessor
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
+	"go.opentelemetry.io/collector/consumer"
+	"go.opentelemetry.io/collector/consumer/consumererror"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/plog"
+	"go.opentelemetry.io/collector/processor/processortest"
 	"go.uber.org/zap"
 )
 
@@ -28,7 +34,7 @@ func TestConfigRejectsUnknownOrEmptySourceProfiles(t *testing.T) {
 func TestSourceCapabilitySetsDistinguishDisabledAndUnobserved(t *testing.T) {
 	disabled, declaredUnobserved := sourceCapabilitySets([]string{"openshell.log"})
 	if strings.Join(disabled, ",") !=
-		"ocsf.file,ocsf.forwarded,openshell.log.forwarded,watchsandbox,policy.reconciliation,kubernetes.context,nemo_relay.log,nemo_relay.trace,openshell.trace" {
+		"ocsf.file,ocsf.gateway,ocsf.supervisor,ocsf.forwarded,openshell.log.forwarded,watchsandbox,policy.reconciliation,kubernetes.context,nemo_relay.log,nemo_relay.trace,openshell.trace" {
 		t.Fatalf("disabled profiles=%v", disabled)
 	}
 	if len(declaredUnobserved) != 0 {
@@ -45,9 +51,9 @@ func TestSourceCapabilitySetsDistinguishDisabledAndUnobserved(t *testing.T) {
 	}
 }
 
-func TestUnavailableCapabilitiesIncludeUpstreamGatewayOCSFGate(t *testing.T) {
+func TestUnavailableCapabilitiesExcludeAvailableGatewayOCSF(t *testing.T) {
 	if strings.Join(unavailableSourceCapabilities, ",") !=
-		"gateway_structured_ocsf_export,watch_events" {
+		"watch_events" {
 		t.Fatalf("unavailable capabilities=%v", unavailableSourceCapabilities)
 	}
 }
@@ -613,7 +619,12 @@ func FuzzMalformedEvidenceIsRetained(f *testing.F) {
 }
 
 func BenchmarkOCSFNormalization(b *testing.B) {
-	processor, err := newProcessor(createDefaultConfig().(*Config), zap.NewNop())
+	sink, err := consumer.NewLogs(func(context.Context, plog.Logs) error { return nil })
+	if err != nil {
+		b.Fatal(err)
+	}
+	factory := NewFactory()
+	processor, err := factory.CreateLogs(context.Background(), processortest.NewNopSettings(factory.Type()), factory.CreateDefaultConfig(), sink)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -627,7 +638,7 @@ func BenchmarkOCSFNormalization(b *testing.B) {
 		record.Attributes().PutStr("openshell.acquisition.kind", "ocsf.file")
 		record.Attributes().PutStr("log.file.path", "/var/log/openshell-ocsf.jsonl")
 		record.Attributes().PutInt("log.file.record_offset", 128)
-		if _, err := processor.processLogs(context.Background(), logs); err != nil {
+		if err := processor.ConsumeLogs(context.Background(), logs); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -712,5 +723,172 @@ func TestCanonicalCorrelationContextAddsTrustedIdentity(t *testing.T) {
 	}
 	if got["agent_session_id"] != "session-1" {
 		t.Fatal("source-compatible agent_session_id was removed")
+	}
+}
+
+func TestBaseEventValidationAndRouting(t *testing.T) {
+	for _, kind := range []string{"ocsf.file", "ocsf.forwarded", "ocsf.gateway", "ocsf.supervisor"} {
+		event := validOCSF()
+		event["class_uid"], event["category_uid"], event["activity_id"], event["type_uid"] = 0, 0, 99, 99
+		if result := validateSource(kind, event); result.Status != validationValid {
+			t.Fatalf("%s: %v", kind, result)
+		}
+		if got := eventType(kind, event); got != "com.nvidia.openshell.ocsf.0.v1" {
+			t.Fatal(got)
+		}
+		for _, invalid := range []any{-1, 0.5, "0", nil} {
+			event["class_uid"] = invalid
+			if result := validateSource(kind, event); result.Status != validationInvalid {
+				t.Fatalf("accepted class %v", invalid)
+			}
+		}
+		event["class_uid"], event["category_uid"] = 4001, 0
+		if result := validateSource(kind, event); result.Status != validationInvalid {
+			t.Fatal("accepted zero category for non-base event")
+		}
+		event["class_uid"], event["category_uid"] = 0, 4
+		if result := validateSource(kind, event); result.Status != validationInvalid {
+			t.Fatal("accepted base class with non-base category")
+		}
+	}
+}
+
+func TestOCSFNativeIdentityKeepsGatewayAndSandboxSeparate(t *testing.T) {
+	event := validOCSF()
+	event["metadata"].(map[string]any)["uid"] = "native-event-123"
+	delete(event, "unmapped")
+	delete(event, "sandbox_id")
+	delete(event, "unmapped")
+	delete(event, "sandbox_id")
+	event["device"] = map[string]any{"uid": "gateway-prod", "hostname": "replica-2"}
+	if got := sandboxIDFrom(event, "unknown"); got != "unknown" {
+		t.Fatalf("gateway used as sandbox: %s", got)
+	}
+	event["container"] = map[string]any{"uid": "sandbox-123"}
+	if got := sandboxIDFrom(event, "unknown"); got != "sandbox-123" {
+		t.Fatalf("sandbox=%s", got)
+	}
+	config := createDefaultConfig().(*Config)
+	processor, err := newProcessor(config, zap.NewNop())
+	if err != nil {
+		t.Fatal(err)
+	}
+	logs := plog.NewLogs()
+	recordBody := logs.ResourceLogs().AppendEmpty().ScopeLogs().AppendEmpty().LogRecords().AppendEmpty()
+	if err := recordBody.Body().FromRaw(event); err != nil {
+		t.Fatal(err)
+	}
+	record := logs.ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().At(0)
+	record.Attributes().PutStr("openshell.acquisition.kind", "ocsf.gateway")
+	before := stableID(config, record, "ocsf.gateway", record.Body().AsRaw())
+	if _, err := processor.processLogs(context.Background(), logs); err != nil {
+		t.Fatal(err)
+	}
+	id, _ := record.Attributes().Get("event.id")
+	if id.Str() != before {
+		t.Fatal("native uid changed the identity contract")
+	}
+	body := record.Body().AsRaw().(map[string]any)
+	if got := body["correlation"].(map[string]any)["ocsf_event_uid"]; got != "native-event-123" {
+		t.Fatalf("native uid=%v", got)
+	}
+	if got := body["openshell"].(map[string]any)["sandbox_id"]; got != "sandbox-123" {
+		t.Fatalf("envelope sandbox=%v", got)
+	}
+}
+
+func TestNonOCSFMetadataUIDIsNotAnOCSFEventID(t *testing.T) {
+	config := createDefaultConfig().(*Config)
+	p, err := newProcessor(config, zap.NewNop())
+	if err != nil {
+		t.Fatal(err)
+	}
+	logs := plog.NewLogs()
+	record := logs.ResourceLogs().AppendEmpty().ScopeLogs().AppendEmpty().LogRecords().AppendEmpty()
+	record.Attributes().PutStr("openshell.acquisition.kind", "kubernetes.context")
+	if err := record.Body().FromRaw(map[string]any{"metadata": map[string]any{"uid": "pod-uid"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.processLogs(context.Background(), logs); err != nil {
+		t.Fatal(err)
+	}
+	body := record.Body().AsRaw().(map[string]any)
+	if _, ok := body["correlation"].(map[string]any)["ocsf_event_uid"]; ok {
+		t.Fatal("Kubernetes object UID mislabeled as OCSF event identity")
+	}
+}
+
+func TestReceiverRetryPreservesSourceAndNormalizedIdentity(t *testing.T) {
+	for _, partial := range []bool{false, true} {
+		t.Run(fmt.Sprintf("partial=%t", partial), func(t *testing.T) {
+			var attempts []plog.Logs
+			sink, err := consumer.NewLogs(func(_ context.Context, logs plog.Logs) error {
+				retained := plog.NewLogs()
+				logs.CopyTo(retained)
+				attempts = append(attempts, retained)
+				if len(attempts) == 1 {
+					if partial {
+						return consumererror.NewLogs(errors.New("queue storage full"), logs)
+					}
+					return errors.New("queue storage full")
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			factory := NewFactory()
+			p, err := factory.CreateLogs(t.Context(), processortest.NewNopSettings(factory.Type()), factory.CreateDefaultConfig(), sink)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = p.Shutdown(context.Background()) })
+			if p.Capabilities().MutatesData {
+				t.Fatal("retry-safe processor declares source mutation")
+			}
+			input := validOCSF()
+			input["authorization"] = "Bearer test-only-secret"
+			input["container"] = map[string]any{"uid": "sandbox-1"}
+			input["actor"] = map[string]any{"process": map[string]any{"name": "agent", "pid": int64(42)}}
+			input["action"] = "Denied"
+			input["nemo_relay.session_id"] = "session-1"
+			logs := testLogs(t, input)
+			onlyRecord(logs).SetObservedTimestamp(pcommon.Timestamp(123456789))
+			onlyRecord(logs).Attributes().PutInt("log.file.record_offset", 128)
+			original := plog.NewLogs()
+			logs.CopyTo(original)
+			// Also exercise the Collector's fanout contract for non-mutating consumers.
+			logs.MarkReadOnly()
+			err = p.ConsumeLogs(t.Context(), logs)
+			if err == nil {
+				t.Fatal("downstream failure was swallowed")
+			}
+			var failed consumererror.Logs
+			if errors.As(err, &failed) {
+				logs = failed.Data()
+			}
+			if !reflect.DeepEqual(onlyRecord(original).Body().AsRaw(), onlyRecord(logs).Body().AsRaw()) ||
+				!reflect.DeepEqual(onlyRecord(original).Attributes().AsRaw(), onlyRecord(logs).Attributes().AsRaw()) {
+				t.Fatal("receiver retry source changed")
+			}
+			if err := p.ConsumeLogs(t.Context(), logs); err != nil {
+				t.Fatal(err)
+			}
+			if len(attempts) != 2 {
+				t.Fatalf("attempts=%d, want 2", len(attempts))
+			}
+			if !reflect.DeepEqual(onlyRecord(attempts[0]).Body().AsRaw(), onlyRecord(attempts[1]).Body().AsRaw()) ||
+				!reflect.DeepEqual(onlyRecord(attempts[0]).Attributes().AsRaw(), onlyRecord(attempts[1]).Attributes().AsRaw()) {
+				t.Fatal("retry changed normalized evidence or identity")
+			}
+			id, _ := onlyRecord(attempts[1]).Attributes().Get("cloudevents.id")
+			if id.Str() == "" {
+				t.Fatal("retry lost identity")
+			}
+			encoded, err := (&plog.JSONMarshaler{}).MarshalLogs(attempts[1])
+			if err != nil || strings.Contains(string(encoded), "test-only-secret") {
+				t.Fatalf("retry failed privacy filtering: %v", err)
+			}
+		})
 	}
 }

@@ -13,6 +13,7 @@ import (
 	"os"
 	"strings"
 
+	dm "github.com/NVIDIA/OpenShell/sdk/go/proto/datamodelv1"
 	pb "github.com/NVIDIA/OpenShell/sdk/go/proto/openshellv1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -229,12 +230,14 @@ func loadTLSConfig(config *Config, serverName string) (*tls.Config, error) {
 func (c *grpcGatewayClient) List(ctx context.Context) ([]sandboxRef, error) {
 	const pageSize = uint32(1000)
 	result := make([]sandboxRef, 0)
-	for offset := uint32(0); ; offset += pageSize {
+	pageToken := ""
+	seen := map[string]bool{}
+	for {
 		response, err := c.api.ListSandboxes(ctx, &pb.ListSandboxesRequest{
-			Limit:         pageSize,
-			Offset:        offset,
-			LabelSelector: c.config.LabelSelector,
-			Workspace:     c.config.Workspace,
+			PageSize:       int32(pageSize),
+			PageToken:      pageToken,
+			LabelSelector:  c.config.LabelSelector,
+			WorkspaceScope: namedWorkspace(c.config.Workspace),
 		})
 		if err != nil {
 			return nil, err
@@ -249,18 +252,24 @@ func (c *grpcGatewayClient) List(ctx context.Context) ([]sandboxRef, error) {
 				Name: metadata.GetName(),
 			})
 		}
-		if len(response.GetSandboxes()) < int(pageSize) {
+		pageToken = response.GetNextPageToken()
+		if pageToken == "" {
 			return result, nil
 		}
+		if seen[pageToken] {
+			return nil, errors.New("sandbox pagination repeated a page token")
+		}
+		seen[pageToken] = true
 	}
 }
 
 func (c *grpcGatewayClient) Watch(
 	ctx context.Context,
-	sandboxID string,
+	sandboxName string,
 ) (eventStream, error) {
 	return c.api.WatchSandbox(ctx, &pb.WatchSandboxRequest{
-		Id:             sandboxID,
+		Sandbox:        sandboxName,
+		WorkspaceScope: namedWorkspace(c.config.Workspace),
 		FollowStatus:   true,
 		FollowLogs:     true,
 		FollowEvents:   true,
@@ -281,34 +290,36 @@ func (c *grpcGatewayClient) GatewayVersion(ctx context.Context) (string, error) 
 
 func (c *grpcGatewayClient) GetDraft(ctx context.Context, sandboxName string) (*pb.GetDraftPolicyResponse, error) {
 	return c.api.GetDraftPolicy(ctx, &pb.GetDraftPolicyRequest{
-		Name:      sandboxName,
-		Workspace: c.config.Workspace,
+		Sandbox:        sandboxName,
+		WorkspaceScope: namedWorkspace(c.config.Workspace),
 	})
 }
 
 func (c *grpcGatewayClient) GetDraftHistory(ctx context.Context, sandboxName string) (*pb.GetDraftHistoryResponse, error) {
 	return c.api.GetDraftHistory(ctx, &pb.GetDraftHistoryRequest{
-		Name:      sandboxName,
-		Workspace: c.config.Workspace,
+		Sandbox:        sandboxName,
+		WorkspaceScope: namedWorkspace(c.config.Workspace),
 	})
 }
 
 func (c *grpcGatewayClient) GetPolicyStatus(ctx context.Context, sandboxName string) (*pb.GetSandboxPolicyStatusResponse, error) {
 	return c.api.GetSandboxPolicyStatus(ctx, &pb.GetSandboxPolicyStatusRequest{
-		Name:      sandboxName,
-		Workspace: c.config.Workspace,
+		Sandbox:        sandboxName,
+		WorkspaceScope: namedWorkspace(c.config.Workspace),
 	})
 }
 
 func (c *grpcGatewayClient) ListPolicyRevisions(ctx context.Context, sandboxName string) ([]*pb.SandboxPolicyRevision, error) {
 	accumulator := newPolicyRevisionAccumulator(c.config.PolicyReconciliation.MaxRevisions)
+	pageToken := ""
+	seen := map[string]bool{}
 	for {
 		if uint32(len(accumulator.revisions)) == accumulator.limit {
 			response, err := c.api.ListSandboxPolicies(ctx, &pb.ListSandboxPoliciesRequest{
-				Name:      sandboxName,
-				Workspace: c.config.Workspace,
-				Limit:     1,
-				Offset:    uint32(len(accumulator.revisions)),
+				Sandbox:        sandboxName,
+				WorkspaceScope: namedWorkspace(c.config.Workspace),
+				PageSize:       1,
+				PageToken:      pageToken,
 			})
 			if err != nil {
 				return accumulator.revisions, &policyRevisionPaginationError{
@@ -318,18 +329,26 @@ func (c *grpcGatewayClient) ListPolicyRevisions(ctx context.Context, sandboxName
 					Cause:    err,
 				}
 			}
-			if len(response.GetRevisions()) == 0 {
+			if len(response.GetRevisions()) > 0 {
+				return accumulator.revisions, accumulator.limitError(len(accumulator.revisions) + len(response.GetRevisions()))
+			}
+			pageToken = response.GetNextPageToken()
+			if pageToken == "" {
 				return accumulator.revisions, nil
 			}
-			return accumulator.revisions, accumulator.limitError(len(accumulator.revisions) + len(response.GetRevisions()))
+			if seen[pageToken] {
+				return accumulator.revisions, &policyRevisionPaginationError{Reason: policyRevisionPaginationDrift, Retained: len(accumulator.revisions), Limit: accumulator.limit}
+			}
+			seen[pageToken] = true
+			continue
 		}
 		remaining := accumulator.limit - uint32(len(accumulator.revisions))
 		requestLimit := min(policyRevisionPageSize, remaining)
 		response, err := c.api.ListSandboxPolicies(ctx, &pb.ListSandboxPoliciesRequest{
-			Name:      sandboxName,
-			Workspace: c.config.Workspace,
-			Limit:     requestLimit,
-			Offset:    uint32(len(accumulator.revisions)),
+			Sandbox:        sandboxName,
+			WorkspaceScope: namedWorkspace(c.config.Workspace),
+			PageSize:       int32(requestLimit),
+			PageToken:      pageToken,
 		})
 		if err != nil {
 			if len(accumulator.revisions) == 0 {
@@ -346,9 +365,14 @@ func (c *grpcGatewayClient) ListPolicyRevisions(ctx context.Context, sandboxName
 		if err := accumulator.add(page, requestLimit); err != nil {
 			return accumulator.revisions, err
 		}
-		if len(page) < int(requestLimit) {
+		pageToken = response.GetNextPageToken()
+		if pageToken == "" {
 			return accumulator.revisions, nil
 		}
+		if seen[pageToken] {
+			return accumulator.revisions, &policyRevisionPaginationError{Reason: policyRevisionPaginationDrift, Retained: len(accumulator.revisions), Limit: accumulator.limit}
+		}
+		seen[pageToken] = true
 	}
 }
 
@@ -369,4 +393,8 @@ func (c bearerCredentials) GetRequestMetadata(
 
 func (c bearerCredentials) RequireTransportSecurity() bool {
 	return true
+}
+
+func namedWorkspace(name string) *dm.WorkspaceSelector {
+	return &dm.WorkspaceSelector{Selection: &dm.WorkspaceSelector_Workspace{Workspace: name}}
 }

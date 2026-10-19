@@ -12,6 +12,64 @@ extensions:
     endpoint: ${env:EXPORTER_HEALTH_ENDPOINT:-127.0.0.1:13133}
 
 receivers:
+  file_log/gateway_ocsf:
+    include: [./input/gateways/*/gateway-ocsf.jsonl*]
+    start_at: beginning
+    storage: file_storage/checkpoints
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+    include_file_path: true
+    include_file_path_resolved: true
+    include_file_record_offset: true
+    include_file_record_number: true
+    on_truncate: read_whole_file
+    max_log_size: 8MiB
+    max_log_size_behavior: split
+    attributes:
+      openshell.acquisition.kind: ocsf.gateway
+      openshell.acquisition.source_instance: gateway-ocsf-jsonl
+    operators:
+      - type: json_parser
+        parse_from: body
+        parse_to: body
+        on_error: send
+  file_log/supervisor_ocsf:
+    include: [./input/supervisors/*/stderr.log*]
+    start_at: beginning
+    storage: file_storage/checkpoints
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+    include_file_path: true
+    include_file_path_resolved: true
+    include_file_record_offset: true
+    include_file_record_number: true
+    on_truncate: read_whole_file
+    max_log_size: 8MiB
+    max_log_size_behavior: split
+    attributes:
+      openshell.acquisition.kind: ocsf.supervisor
+      openshell.acquisition.source_instance: supervisor-stderr
+    operators:
+      # Input is the unwrapped platform log stream (docker/podman/kubectl logs).
+      # Select only the structured copy; retain malformed marked payloads.
+      - type: filter
+        expr: 'body not matches "^\\S+ OCSF-JSON(?: |$)"'
+      - type: regex_parser
+        regex: '^\S+ OCSF-JSON ?(?P<record>.*)$'
+        on_error: send
+      - type: move
+        from: attributes.record
+        to: body
+      - type: json_parser
+        parse_from: body
+        parse_to: body
+        on_error: send
   file_log/ocsf:
     include: [./input/*.jsonl, ./input/sandboxes/*/openshell-ocsf.*.log]
     start_at: beginning
@@ -41,7 +99,7 @@ processors:
     limit_mib: 256
     spike_limit_mib: 64
   openshell:
-    source_profiles: [ocsf.file]
+    source_profiles: [ocsf.gateway, ocsf.supervisor, ocsf.file]
     gateway_id: local-gateway
     workspace: default
     source_instance: gateway-ocsf-jsonl
@@ -63,6 +121,6 @@ service:
   extensions: [file_storage/checkpoints, storagehealth, health_check]
   pipelines:
     logs:
-      receivers: [file_log/ocsf]
+      receivers: [file_log/gateway_ocsf, file_log/supervisor_ocsf, file_log/ocsf]
       processors: [memory_limiter, openshell]
       exporters: [file/recovery]

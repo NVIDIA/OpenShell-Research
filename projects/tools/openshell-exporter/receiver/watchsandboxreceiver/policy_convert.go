@@ -35,7 +35,7 @@ func draftSnapshotLogs(
 		"sandbox_id":                  sandbox.ID,
 		"draft_version":               sanitized.GetDraftVersion(),
 		"rolling_summary":             sanitized.GetRollingSummary(),
-		"last_analyzed_at_ms":         sanitized.GetLastAnalyzedAtMs(),
+		"last_analyzed_at_ms":         timestampMillis(sanitized.GetLastAnalyzedTime()),
 		"chunk_count":                 len(sanitized.GetChunks()),
 		"review_tokens_removed":       removed,
 		"effective_policies_included": config.PolicyReconciliation.IncludeEffectivePolicies,
@@ -49,8 +49,8 @@ func draftSnapshotLogs(
 		return plog.Logs{}, err
 	}
 	record.Attributes().PutInt("openshell.policy.revision", int64(sanitized.GetDraftVersion()))
-	if sanitized.GetLastAnalyzedAtMs() > 0 {
-		record.Attributes().PutInt("openshell.event.time_unix_ms", sanitized.GetLastAnalyzedAtMs())
+	if timestampMillis(sanitized.GetLastAnalyzedTime()) > 0 {
+		record.Attributes().PutInt("openshell.event.time_unix_ms", timestampMillis(sanitized.GetLastAnalyzedTime()))
 	}
 	return logs, nil
 }
@@ -88,8 +88,8 @@ func draftChunkLogs(
 	if sanitized.GetId() != "" {
 		record.Attributes().PutStr("openshell.policy.chunk.id", sanitized.GetId())
 	}
-	if sanitized.GetCreatedAtMs() > 0 {
-		record.Attributes().PutInt("openshell.event.time_unix_ms", sanitized.GetCreatedAtMs())
+	if timestampMillis(sanitized.GetCreatedTime()) > 0 {
+		record.Attributes().PutInt("openshell.event.time_unix_ms", timestampMillis(sanitized.GetCreatedTime()))
 	}
 	return logs, nil
 }
@@ -125,8 +125,8 @@ func policyStatusLogs(
 	}
 	if revision := sanitized.GetRevision(); revision != nil {
 		record.Attributes().PutInt("openshell.policy.revision", int64(revision.GetVersion()))
-		if revision.GetCreatedAtMs() > 0 {
-			record.Attributes().PutInt("openshell.event.time_unix_ms", revision.GetCreatedAtMs())
+		if timestampMillis(revision.GetCreatedTime()) > 0 {
+			record.Attributes().PutInt("openshell.event.time_unix_ms", timestampMillis(revision.GetCreatedTime()))
 		}
 	}
 	return logs, nil
@@ -162,8 +162,8 @@ func policyRevisionLogs(
 	}
 	record.Attributes().PutInt("openshell.policy.version", int64(sanitized.GetVersion()))
 	record.Attributes().PutInt("openshell.policy.revision", int64(sanitized.GetVersion()))
-	if sanitized.GetCreatedAtMs() > 0 {
-		record.Attributes().PutInt("openshell.event.time_unix_ms", sanitized.GetCreatedAtMs())
+	if timestampMillis(sanitized.GetCreatedTime()) > 0 {
+		record.Attributes().PutInt("openshell.event.time_unix_ms", timestampMillis(sanitized.GetCreatedTime()))
 	}
 	return logs, nil
 }
@@ -182,7 +182,7 @@ func draftHistoryLogs(
 		"sandbox_id":      sandbox.ID,
 		"event_type":      entry.GetEventType(),
 		"policy_chunk_id": entry.GetChunkId(),
-		"timestamp_ms":    entry.GetTimestampMs(),
+		"timestamp_ms":    timestampMillis(entry.GetEventTime()),
 	}
 	body, payloadType, err := withPublicPayload(body, entry)
 	if err != nil {
@@ -195,8 +195,8 @@ func draftHistoryLogs(
 	if entry.GetChunkId() != "" {
 		record.Attributes().PutStr("openshell.policy.chunk.id", entry.GetChunkId())
 	}
-	if entry.GetTimestampMs() > 0 {
-		record.Attributes().PutInt("openshell.event.time_unix_ms", entry.GetTimestampMs())
+	if timestampMillis(entry.GetEventTime()) > 0 {
+		record.Attributes().PutInt("openshell.event.time_unix_ms", timestampMillis(entry.GetEventTime()))
 	}
 	return logs, nil
 }

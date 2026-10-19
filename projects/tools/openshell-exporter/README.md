@@ -8,9 +8,12 @@ provided as-is; use at your own risk.
 For other deployment methods and more advanced features, contact
 [delgadof@nvidia.com](mailto:delgadof@nvidia.com).
 
+Gateway API collection requires OpenShell >=0.1.0; the current target is v0.1.3.
+The first run below uses a sample file and needs no gateway.
+
 ## Quickstart: local process
 
-Use [Go 1.26.8](https://go.dev/doc/install) and a Bash-compatible shell. Get the
+Use [Go 1.27.2](https://go.dev/doc/install) and a Bash-compatible shell. Get the
 source and enter the project directory:
 
 ```sh
@@ -18,9 +21,8 @@ git clone https://github.com/NVIDIA/OpenShell-Research.git
 cd OpenShell-Research/projects/tools/openshell-exporter
 ```
 
-The build
-downloads public dependencies. This first run uses a synthetic OCSF record; it
-needs no OpenShell gateway, credentials, or model service.
+The build downloads public dependencies. The synthetic sample needs no
+credentials or model service.
 
 ```sh
 go build -o bin/openshell-event-exporter ./cmd/openshell-event-exporter
@@ -59,15 +61,15 @@ The image health check probes `127.0.0.1:13133`; retain that port inside the
 container. Its optional `healthcheck --writable DIRECTORY ...` command checks
 persistence-directory permissions.
 
-Use the same health and output checks. With existing checkpoints the example is
-not replayed; append a new record to test more delivery. Stop with
+Use the same health and output checks as the local process. Saved checkpoints
+prevent replay of the example; append a new record to test more delivery. Stop with
 `docker stop openshell-exporter`. Build locally; no published image is required.
 Linux AMD64/ARM64 and native macOS ARM64 are build targets; Docker on Apple Silicon
 runs the Linux ARM64 image through Docker Desktop.
 
-## Connect real inputs and destinations
+## Choose real inputs
 
-For actual OCSF logs, set `receivers.file_log/ocsf.include` in [config.yaml](config.yaml)
+For existing OCSF JSONL, set `receivers.file_log/ocsf.include` in [config.yaml](config.yaml)
 to the readable source file glob. In Docker, mount the source directory read-only
 and use its container path in the glob. Mount the directory, so rotated files remain
 visible. Logs inside an OpenShell sandbox must first be made accessible to the
@@ -79,11 +81,62 @@ filtering, and delivery. Select the needed pipelines and mount their credentials
 and persistent storage. The template is a reference, not a ready-to-run deployment.
 `openshell-event-exporter components` lists the full component set.
 
-For an HTTPS receiver that expects **bare OCSF inside CloudEvents `data`**, use
-[http.config.yaml](http.config.yaml). It reads the same input files and sends
-CloudEvents batches with a persistent retry queue. This configuration bypasses
-normalization and redaction; source content is forwarded as supplied. Provision
-`secrets/destination-token` (raw bearer token) and `secrets/destination-ca.pem`
+### Gateway and supervisor logs (v0.1.3)
+
+The default config includes two additional inputs:
+
+| Source | Path on the host |
+|---|---|
+| Gateway JSONL | `input/gateways/*/gateway-ocsf.jsonl*` |
+| Captured supervisor stream | `input/supervisors/*/stderr.log*` |
+
+Docker mounts these below `/work/input`. Keep replicas in separate directories,
+and retain rotation segments and checkpoints.
+
+Enable gateway JSONL in its `gateway.toml`, using a writable persistent path:
+
+```toml
+[openshell.gateway.ocsf_log]
+path = "/path/to/input/gateways/replica-1/gateway-ocsf.jsonl"
+rotation = "daily"
+max_files = 7
+```
+
+Restart the gateway after changing its configuration. Gateway-wide records may
+have no sandbox association. This output does not include supervisor OCSF.
+
+For supervisor records, enable `ocsf_json_enabled` with an authorized OpenShell
+administrator, then capture the raw platform log stream:
+
+```sh
+openshell settings set --global --key ocsf_json_enabled --value true
+mkdir -p input/supervisors/sandbox-1
+docker logs --follow SUPERVISOR_CONTAINER > input/supervisors/sandbox-1/stderr.log 2>&1
+```
+
+Use `podman logs` in place of `docker logs` when appropriate. This command stays
+attached; run the exporter separately. The parser selects `OCSF-JSON` lines,
+decodes the payload, and ignores shorthand copies. It expects the unwrapped
+platform stream, not Docker JSON/CRI storage wrappers or an extra timestamp
+prefix. Collect one structured path per producer; do not also ship that supervisor's JSONL files.
+A replayed platform-log capture can duplicate events; `correlation.ocsf_event_uid`
+retains the native ID for downstream correlation without changing exporter IDs.
+
+Keep `ocsf_schema_version` unset: this exporter validates native 1.8.0 and replay
+1.7.0, not the lossy 1.1/1.3 downgrade. Both upstream sinks are best-effort; source
+queue loss or deleted runtime logs cannot be recovered by exporter checkpoints.
+
+## Send to an HTTPS receiver
+
+[http.config.yaml](http.config.yaml) reads the original JSONL inputs and sends
+**bare OCSF inside CloudEvents `data`**, using a persistent retry queue.
+It bypasses normalization and redaction: source content is forwarded as supplied.
+For normalized, redacted delivery, copy `processors.openshell` from `config.yaml`
+into `http.config.yaml`, then set `service.pipelines.logs.processors` to
+`[memory_limiter, openshell]`. Your receiver must read the OCSF record from
+`data.original`.
+
+Provision `secrets/destination-token` (raw bearer token) and `secrets/destination-ca.pem`
 (the trusted issuing CA), restrict their access, then run:
 
 ```sh
@@ -100,11 +153,8 @@ Docker Desktop can reach a host receiver using `host.docker.internal`; Linux
 Docker Engine can add `--add-host host.docker.internal:host-gateway`. The receiver
 must listen on a reachable interface. Bearer authentication requires HTTPS.
 
-For normalized, redacted HTTP delivery, add `openshell` from `config.yaml` to that
-pipeline after `memory_limiter`. The receiver must then read the redacted OCSF
-record from `data.original`. A 2xx acknowledges a batch; retryable failures retry
-and may produce duplicates. Consumers should deduplicate by `(source,id)`.
-Raw mode hashes the body for identity, so identical source bodies share an ID.
+A 2xx acknowledges a batch; retryable failures may produce duplicates. Consumers should deduplicate by `(source,id)`.
+In raw mode, identical source bodies share an ID.
 Append a new input record when switching configurations; saved checkpoints do not
 replay records already read.
 Health and local recovery output alone do not establish successful remote delivery.
@@ -119,9 +169,8 @@ and exporter logs. The exporter observes evidence; it does not approve policy ch
 `go install ./cmd/openshell-event-exporter` installs from this checkout. The module
 path is `github.com/NVIDIA/OpenShell-Research/projects/tools/openshell-exporter`; a remote
 `go install ...@version` needs a public release tagged
-`projects/tools/openshell-exporter/v<version>`. No such release is published by
-this change.
-Custom Collectors can import the component packages and register their `NewFactory`.
+`projects/tools/openshell-exporter/v<version>`. No such release is published by this change.
+Custom Collectors can import component packages and register their `NewFactory`.
 
 ```sh
 go mod verify
@@ -137,7 +186,7 @@ exporter does not compile those packages: `go list -deps ./...` contains no
 dependencies change.
 
 The source is extracted from exporter snapshot
-`6a440f05249ac05aa9b9ef8acada4c909ec86bc8`. This distribution retains the Go
+`75a41db6be6cc6ad160e3619ad09270d1cdb5b1d`. This distribution retains the Go
 implementation and component tests; deployment tooling lives separately.
 Preserve LICENSE and NOTICE when redistributing. Synthetic local and container
 checks do not qualify live gateway or external application behavior.

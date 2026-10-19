@@ -1,4 +1,4 @@
-# OpenShell Event Exporter v0.0.5-rc.1 / Collector v0.160.0
+# OpenShell Event Exporter v0.0.5-rc.1 / Collector v0.162.0
 # Configuration reference: every exporter-owned setting and examples for all
 # component types included in the exporter image. Advanced upstream transport
 # and parser settings are outside this reference. Values are examples, not a
@@ -55,6 +55,64 @@ extensions:
   bearertokenauth/internal:
     filename: /run/secrets/internal-token
 receivers:
+  file_log/gateway_ocsf:
+    include: [/input/gateways/*/gateway-ocsf.jsonl*]
+    start_at: beginning
+    storage: file_storage/checkpoints
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+    include_file_path: true
+    include_file_path_resolved: true
+    include_file_record_offset: true
+    include_file_record_number: true
+    on_truncate: read_whole_file
+    max_log_size: 8MiB
+    max_log_size_behavior: split
+    attributes:
+      openshell.acquisition.kind: ocsf.gateway
+      openshell.acquisition.source_instance: gateway-ocsf-jsonl
+    operators:
+      - type: json_parser
+        parse_from: body
+        parse_to: body
+        on_error: send
+  file_log/supervisor_ocsf:
+    include: [/input/supervisors/*/stderr.log*]
+    start_at: beginning
+    storage: file_storage/checkpoints
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+    include_file_path: true
+    include_file_path_resolved: true
+    include_file_record_offset: true
+    include_file_record_number: true
+    on_truncate: read_whole_file
+    max_log_size: 8MiB
+    max_log_size_behavior: split
+    attributes:
+      openshell.acquisition.kind: ocsf.supervisor
+      openshell.acquisition.source_instance: supervisor-stderr
+    operators:
+      # Input is the unwrapped platform log stream (docker/podman/kubectl logs).
+      # Select only the structured copy; retain malformed marked payloads.
+      - type: filter
+        expr: 'body not matches "^\\S+ OCSF-JSON(?: |$)"'
+      - type: regex_parser
+        regex: '^\S+ OCSF-JSON ?(?P<record>.*)$'
+        on_error: send
+      - type: move
+        from: attributes.record
+        to: body
+      - type: json_parser
+        parse_from: body
+        parse_to: body
+        on_error: send
   otlp/nemo_relay:
     protocols:
       grpc:
@@ -236,6 +294,8 @@ processors:
   # adding patterns. Identity is calculated before redaction.
   openshell:
     source_profiles:
+    - ocsf.gateway
+    - ocsf.supervisor
     - ocsf.file
     - ocsf.forwarded
     - openshell.log
@@ -611,6 +671,8 @@ service:
     logs/files:
       receivers:
       - file_log/openshell_ocsf
+      - file_log/gateway_ocsf
+      - file_log/supervisor_ocsf
       processors:
       - memory_limiter
       - openshell

@@ -38,9 +38,13 @@ func validateSource(kind string, original any) validationResult {
 		}
 	}
 	errs := make([]string, 0)
+	classUID, classOK := exactInteger(event["class_uid"])
+	categoryUID, categoryOK := exactInteger(event["category_uid"])
+	baseEvent := classOK && categoryOK && classUID == 0 && categoryUID == 0
 	for _, field := range []string{"class_uid", "category_uid", "activity_id", "type_uid"} {
 		value, ok := exactInteger(event[field])
-		if !ok || value < 0 || (field != "activity_id" && value == 0) {
+		allowZero := field == "activity_id" || (baseEvent && (field == "class_uid" || field == "category_uid" || field == "type_uid"))
+		if !ok || value < 0 || (!allowZero && value == 0) {
 			errs = append(errs, fmt.Sprintf("%s must be a positive integer", field))
 		}
 	}

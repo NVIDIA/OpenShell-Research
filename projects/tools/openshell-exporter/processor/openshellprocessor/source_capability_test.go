@@ -20,6 +20,8 @@ func TestSourceCapabilitySummariesCoverEveryProfile(t *testing.T) {
 		profile string
 		sources []string
 	}{
+		{profile: "ocsf.gateway", sources: []string{"gateway_ocsf"}},
+		{profile: "ocsf.supervisor", sources: []string{"supervisor_ocsf"}},
 		{profile: "ocsf.file", sources: []string{"ocsf_files"}},
 		{profile: "ocsf.forwarded", sources: []string{"ocsf_files"}},
 		{profile: "openshell.log", sources: []string{"operational_files"}},
@@ -81,6 +83,8 @@ func TestSourceCapabilityKindMappingAndGapHealthAreBounded(t *testing.T) {
 		source string
 		gap    bool
 	}{
+		{kind: "ocsf.gateway", source: "gateway_ocsf"},
+		{kind: "ocsf.supervisor", source: "supervisor_ocsf"},
 		{kind: "ocsf.file", source: "ocsf_files"},
 		{kind: "ocsf.forwarded", source: "ocsf_files"},
 		{kind: "sandbox.file_log", source: "operational_files"},
@@ -114,7 +118,7 @@ func TestSourceCapabilityKindMappingAndGapHealthAreBounded(t *testing.T) {
 func TestMetricSourceVocabularyIsBounded(t *testing.T) {
 	t.Parallel()
 	for _, kind := range []string{
-		"ocsf.file", "ocsf.forwarded", "sandbox.lifecycle", "gateway.log", "sandbox.log",
+		"ocsf.gateway", "ocsf.supervisor", "ocsf.file", "ocsf.forwarded", "sandbox.lifecycle", "gateway.log", "sandbox.log",
 		"nemo_relay.log", "sandbox.file_log", "openshell.log.forwarded", "platform.event",
 		"policy.draft_updated", "policy.draft.snapshot", "policy.draft.chunk",
 		"policy.draft.history", "policy.status", "policy.revision",

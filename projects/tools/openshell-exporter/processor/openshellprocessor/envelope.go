@@ -145,6 +145,9 @@ func buildEnvelope(
 		"correlation":    correlation,
 		"original":       original,
 	}
+	if isOCSFEvidence(kind) {
+		addOCSFContext(envelope, original)
+	}
 	if attributes, ok := sourceAttributes.(map[string]any); ok && len(attributes) > 0 {
 		envelope["source_attributes"] = attributes
 	}
@@ -232,7 +235,7 @@ func (p *processorImpl) setCloudEventAttributes(
 func eventType(kind string, original any) string {
 	if isOCSFEvidence(kind) {
 		if object, ok := original.(map[string]any); ok {
-			if classUID, ok := exactInteger(object["class_uid"]); ok && classUID > 0 {
+			if classUID, ok := exactInteger(object["class_uid"]); ok && classUID >= 0 {
 				return "com.nvidia.openshell.ocsf." +
 					strconv.FormatInt(classUID, 10) +
 					".v1"
@@ -317,10 +320,10 @@ func correlations(original any, configured []string) map[string]any {
 		{name: "span_id", aliases: []string{"span_id", "span.id"}},
 		{name: "parent_span_id", aliases: []string{"parent_span_id", "parent.span.id"}},
 		{name: "transaction_id", aliases: []string{"transaction_id", "transaction.id"}},
-		{name: "request_id", aliases: []string{"request_id", "request.id", "gen_ai.request.id"}},
+		{name: "request_id", aliases: []string{"request_id", "request.id", "gen_ai.request.id", "nemo_relay.request_id"}},
 		{name: "session_id", aliases: []string{"session_id", "session.id", "gen_ai.conversation.id"}},
-		{name: "agent_session_id", aliases: []string{"agent_session_id", "agent.session.id"}},
-		{name: "tool_call_id", aliases: []string{"tool_call_id", "tool.call.id", "gen_ai.tool.call.id"}},
+		{name: "agent_session_id", aliases: []string{"agent_session_id", "agent.session.id", "session.id", "nemo_relay.session.instance_id", "nemo_relay.session_id"}},
+		{name: "tool_call_id", aliases: []string{"tool_call_id", "tool.call.id", "gen_ai.tool.call.id", "nemo_relay.tool_call_id"}},
 		{name: "correlation_id", aliases: []string{"correlation_id", "correlation.id"}},
 		{name: "policy_chunk_id", aliases: []string{"policy_chunk_id", "policy.chunk.id"}},
 		{name: "operation_id", aliases: []string{"operation_id", "operation.id"}},
@@ -457,7 +460,7 @@ func lookupPath(root any, path string) (any, bool) {
 }
 
 func sandboxIDFrom(original any, fallback string) string {
-	for _, path := range []string{"sandbox.id", "sandbox_id", "unmapped.sandbox_id"} {
+	for _, path := range []string{"container.uid", "sandbox.id", "sandbox_id", "unmapped.sandbox_id"} {
 		if value, ok := lookupPath(original, path); ok && fmt.Sprint(value) != "" {
 			return fmt.Sprint(value)
 		}
@@ -469,7 +472,7 @@ func sandboxIDFrom(original any, fallback string) string {
 }
 
 func isCheckpointedFile(kind string) bool {
-	return kind == "ocsf.file" ||
+	return kind == "ocsf.gateway" || kind == "ocsf.supervisor" || kind == "ocsf.file" ||
 		kind == "sandbox.file_log" ||
 		kind == "nemo_relay.log"
 }
@@ -483,7 +486,7 @@ func isForwardedFile(kind string) bool {
 }
 
 func isOCSFEvidence(kind string) bool {
-	return kind == "ocsf.file" || kind == "ocsf.forwarded"
+	return kind == "ocsf.gateway" || kind == "ocsf.supervisor" || kind == "ocsf.file" || kind == "ocsf.forwarded"
 }
 
 func isKubernetesContext(kind string) bool {
@@ -533,6 +536,9 @@ func acquisitionCoverage(kind string, attributes pcommon.Map) map[string]any {
 		coverage["known_limitations"] = []any{
 			"durability_requires_persistent_upstream_file_and_checkpoint_storage",
 		}
+		if kind == "ocsf.gateway" || kind == "ocsf.supervisor" {
+			coverage["known_limitations"] = append(coverage["known_limitations"].([]any), "upstream_best_effort_queue_and_retention")
+		}
 		if isForwardedFile(kind) {
 			coverage["known_limitations"] = []any{
 				"forwarder_owns_file_checkpoint_and_retry_state",
@@ -581,8 +587,8 @@ func acquisitionCoverage(kind string, attributes pcommon.Map) map[string]any {
 
 func sourceProfile(kind string) string {
 	switch {
-	case kind == "ocsf.file":
-		return "ocsf.file"
+	case kind == "ocsf.file" || kind == "ocsf.gateway" || kind == "ocsf.supervisor":
+		return kind
 	case kind == "ocsf.forwarded":
 		return "ocsf.forwarded"
 	case kind == "openshell.log.forwarded":

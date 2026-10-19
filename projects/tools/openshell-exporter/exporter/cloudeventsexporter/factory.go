@@ -55,7 +55,7 @@ func createLogsExporter(
 	implementation := &cloudEventsExporter{
 		config:   exporterConfig,
 		settings: settings,
-		metrics:  newExporterMetrics(settings.MeterProvider),
+		metrics:  newExporterMetrics(settings.MeterProvider, settings.ID.String()),
 	}
 	return exporterhelper.NewLogs(
 		ctx,

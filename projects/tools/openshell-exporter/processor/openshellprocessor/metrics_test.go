@@ -28,6 +28,7 @@ func TestSourceCapabilityMetricsDescribeEveryBoundedLane(t *testing.T) {
 	collected := collectInt64Metrics(t, reader)
 	wantSources := []string{
 		"driver_otlp",
+		"gateway_ocsf",
 		"gateway_otlp",
 		"kubernetes_context",
 		"ocsf_files",
@@ -35,6 +36,7 @@ func TestSourceCapabilityMetricsDescribeEveryBoundedLane(t *testing.T) {
 		"policy_reconciliation",
 		"relay_files",
 		"relay_otlp",
+		"supervisor_ocsf",
 		"watch_events",
 		"watchsandbox",
 	}
@@ -193,4 +195,19 @@ func equalStrings(got, want []string) bool {
 		}
 	}
 	return true
+}
+
+func TestNewOCSFSourcesBecomeObservedIndependently(t *testing.T) {
+	reader := sdkmetric.NewManualReader()
+	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	metrics, err := newProcessorMetrics(provider)
+	if err != nil {
+		t.Fatal(err)
+	}
+	metrics.capabilitiesConfigured(context.Background(), []string{"ocsf.gateway", "ocsf.supervisor"}, sourceCapabilitySummaries([]string{"ocsf.gateway", "ocsf.supervisor"}))
+	metrics.observeSource(context.Background(), "ocsf.gateway")
+	values := collectInt64Metrics(t, reader)
+	assertMetricPointValue(t, values["openshell.exporter.source.observed"], "gateway_ocsf", 1)
+	assertMetricPointValue(t, values["openshell.exporter.source.observed"], "supervisor_ocsf", 0)
+	assertMetricPointValue(t, values["openshell.exporter.source.health_class"], "gateway_ocsf", sourceHealthClassHealthy)
 }

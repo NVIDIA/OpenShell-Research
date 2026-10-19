@@ -5,9 +5,12 @@ package openshellprocessor
 
 import (
 	"context"
+	"errors"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
+	"go.opentelemetry.io/collector/consumer/consumererror"
+	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/processor"
 	"go.opentelemetry.io/collector/processor/processorhelper"
 )
@@ -72,7 +75,7 @@ func createLogsProcessor(
 	if err != nil {
 		return nil, err
 	}
-	return processorhelper.NewLogs(
+	inner, err := processorhelper.NewLogs(
 		ctx,
 		settings,
 		cfg,
@@ -81,4 +84,32 @@ func createLogsProcessor(
 		processorhelper.WithStart(implementation.start),
 		processorhelper.WithCapabilities(consumer.Capabilities{MutatesData: true}),
 	)
+	if err != nil {
+		return nil, err
+	}
+	return &retrySafeProcessor{Logs: inner}, nil
+}
+
+// File receivers can retry the same input after a downstream enqueue failure.
+// Keep their source intact: re-normalizing an already redacted envelope changes
+// both validation and identity. The inner pipeline owns each attempt's copy.
+type retrySafeProcessor struct {
+	processor.Logs
+}
+
+func (*retrySafeProcessor) Capabilities() consumer.Capabilities {
+	return consumer.Capabilities{MutatesData: false}
+}
+
+func (p *retrySafeProcessor) ConsumeLogs(ctx context.Context, logs plog.Logs) error {
+	attempt := plog.NewLogs()
+	logs.CopyTo(attempt)
+	err := p.Logs.ConsumeLogs(ctx, attempt)
+	var partial consumererror.Logs
+	if errors.As(err, &partial) {
+		// Partial failures carry normalized data. Retry the original source batch
+		// instead; accepted records may repeat with the same source/ID.
+		return consumererror.NewLogs(err, logs)
+	}
+	return err
 }

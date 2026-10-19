@@ -131,7 +131,7 @@ func lifecycleExporter(cfg *Config) *cloudEventsExporter {
 		settings: exporter.Settings{TelemetrySettings: component.TelemetrySettings{
 			Logger: zap.NewNop(),
 		}},
-		metrics: newExporterMetrics(nil),
+		metrics: newExporterMetrics(nil, "cloudevents"),
 	}
 }
 

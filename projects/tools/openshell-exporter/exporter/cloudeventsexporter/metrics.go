@@ -16,6 +16,7 @@ import (
 const exporterMeterName = "github.com/NVIDIA-dev/OpenShell-exporter/cloudevents"
 
 type exporterMetrics struct {
+	exporter           attribute.KeyValue
 	oversized          metric.Int64Counter
 	permanentResponses metric.Int64Counter
 	retryableResponses metric.Int64Counter
@@ -25,7 +26,7 @@ type exporterMetrics struct {
 	lastSuccess        metric.Int64Gauge
 }
 
-func newExporterMetrics(provider metric.MeterProvider) *exporterMetrics {
+func newExporterMetrics(provider metric.MeterProvider, id string) *exporterMetrics {
 	if provider == nil {
 		provider = noop.NewMeterProvider()
 	}
@@ -38,6 +39,7 @@ func newExporterMetrics(provider metric.MeterProvider) *exporterMetrics {
 	latency, _ := meter.Float64Histogram("openshell.exporter.destination.latency", metric.WithUnit("ms"))
 	lastSuccess, _ := meter.Int64Gauge("openshell.exporter.destination.last_success_unixtime", metric.WithUnit("s"))
 	return &exporterMetrics{
+		exporter:           attribute.String("exporter", id),
 		oversized:          oversized,
 		permanentResponses: permanent,
 		retryableResponses: retryable,
@@ -51,7 +53,7 @@ func newExporterMetrics(provider metric.MeterProvider) *exporterMetrics {
 func (m *exporterMetrics) recordOversized(ctx context.Context, count int) {
 	if m.oversized != nil {
 		m.oversized.Add(ctx, int64(count), metric.WithAttributes(
-			attribute.String("destination", "cloudevents"),
+			attribute.String("destination", "cloudevents"), m.exporter,
 		))
 	}
 }
@@ -62,12 +64,12 @@ func (m *exporterMetrics) recordResponse(
 	eventCount int,
 	elapsed time.Duration,
 ) {
-	attrs := metric.WithAttributes(attribute.String("status_code", strconv.Itoa(status)))
+	attrs := metric.WithAttributes(m.exporter, attribute.String("status_code", strconv.Itoa(status)))
 	if status >= 200 && status < 300 {
 		if m.deliveredBatches != nil {
 			m.deliveredBatches.Add(ctx, 1, attrs)
 			m.deliveredEvents.Add(ctx, int64(eventCount), attrs)
-			m.lastSuccess.Record(ctx, time.Now().Unix())
+			m.lastSuccess.Record(ctx, time.Now().Unix(), metric.WithAttributes(m.exporter))
 		}
 	} else if retryableStatus(status) {
 		if m.retryableResponses != nil {
@@ -77,17 +79,17 @@ func (m *exporterMetrics) recordResponse(
 		m.permanentResponses.Add(ctx, 1, attrs)
 	}
 	if m.destinationLatency != nil {
-		m.destinationLatency.Record(ctx, float64(elapsed.Microseconds())/1000)
+		m.destinationLatency.Record(ctx, float64(elapsed.Microseconds())/1000, metric.WithAttributes(m.exporter))
 	}
 }
 
 func (m *exporterMetrics) recordNetworkFailure(ctx context.Context, elapsed time.Duration) {
 	if m.retryableResponses != nil {
 		m.retryableResponses.Add(ctx, 1, metric.WithAttributes(
-			attribute.String("status_code", "network"),
+			attribute.String("status_code", "network"), m.exporter,
 		))
 	}
 	if m.destinationLatency != nil {
-		m.destinationLatency.Record(ctx, float64(elapsed.Microseconds())/1000)
+		m.destinationLatency.Record(ctx, float64(elapsed.Microseconds())/1000, metric.WithAttributes(m.exporter))
 	}
 }

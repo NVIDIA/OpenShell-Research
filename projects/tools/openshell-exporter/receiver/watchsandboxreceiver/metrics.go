@@ -30,6 +30,8 @@ type watchMetrics struct {
 	reconnects             metric.Int64Counter
 	gapWarnings            metric.Int64Counter
 	backpressure           metric.Int64Counter
+	backpressureActive     metric.Int64UpDownCounter
+	unacknowledgedRecords  metric.Int64Counter
 	sourceEnabled          metric.Int64Gauge
 	lastSuccess            metric.Int64Gauge
 	policyConfigured       metric.Int64Gauge
@@ -54,6 +56,8 @@ func newWatchMetrics(provider metric.MeterProvider) *watchMetrics {
 	reconnects, _ := meter.Int64Counter("openshell.exporter.stream.reconnects", metric.WithUnit("{reconnect}"))
 	gapWarnings, _ := meter.Int64Counter("openshell.exporter.stream.gap_warnings", metric.WithUnit("{warning}"))
 	backpressure, _ := meter.Int64Counter("openshell.exporter.stream.backpressure_retries", metric.WithUnit("{retry}"))
+	backpressureActive, _ := meter.Int64UpDownCounter("openshell.exporter.stream.backpressure_active", metric.WithDescription("Receiver deliveries waiting to retry downstream; includes policy and warning evidence."), metric.WithUnit("{delivery}"))
+	unacknowledgedRecords, _ := meter.Int64Counter("openshell.exporter.stream.unacknowledged_records", metric.WithDescription("WatchSandbox records without downstream acknowledgement on cancellation or permanent rejection; partial delivery is possible."), metric.WithUnit("{record}"))
 	sourceEnabled, _ := meter.Int64Gauge("openshell.exporter.source.enabled", metric.WithDescription("Configured source profile capability; one means enabled."), metric.WithUnit("1"))
 	lastSuccess, _ := meter.Int64Gauge("openshell.exporter.source.last_success_unixtime", metric.WithDescription("Unix time of the last normalized record by bounded source kind."), metric.WithUnit("s"))
 	policyConfigured, _ := meter.Int64Gauge(policyConfiguredMetricName, metric.WithDescription("One when read-only policy reconciliation is configured."), metric.WithUnit("1"))
@@ -69,6 +73,8 @@ func newWatchMetrics(provider metric.MeterProvider) *watchMetrics {
 		reconnects:             reconnects,
 		gapWarnings:            gapWarnings,
 		backpressure:           backpressure,
+		backpressureActive:     backpressureActive,
+		unacknowledgedRecords:  unacknowledgedRecords,
 		sourceEnabled:          sourceEnabled,
 		lastSuccess:            lastSuccess,
 		policyConfigured:       policyConfigured,
@@ -234,4 +240,8 @@ func boundedPolicyConsistencyState(state string) string {
 	default:
 		return "other"
 	}
+}
+
+func (m *watchMetrics) unacknowledged(ctx context.Context, reason string, count int) {
+	m.unacknowledgedRecords.Add(ctx, int64(count), metric.WithAttributes(attribute.String("reason", reason)))
 }

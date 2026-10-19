@@ -284,7 +284,7 @@ func (r *watchReceiver) reconcileSandbox(parent context.Context, request reconci
 					historyComplete = false
 					continue
 				}
-				event, eventErr := newPolicySequenceEvent(logs, entry.GetTimestampMs(), entry.GetChunkId()+"\x00"+entry.GetEventType())
+				event, eventErr := newPolicySequenceEvent(logs, timestampMillis(entry.GetEventTime()), entry.GetChunkId()+"\x00"+entry.GetEventType())
 				if eventErr != nil {
 					r.recordPolicyConversionFailure(ctx, request, "openshell.v1.OpenShell/GetDraftHistory", eventErr)
 					historyComplete = false

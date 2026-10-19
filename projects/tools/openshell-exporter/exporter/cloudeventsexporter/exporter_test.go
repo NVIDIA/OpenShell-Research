@@ -327,7 +327,7 @@ func testExporter(client *http.Client) *cloudEventsExporter {
 		config:   config,
 		settings: settings,
 		client:   client,
-		metrics:  newExporterMetrics(nil),
+		metrics:  newExporterMetrics(nil, "cloudevents"),
 	}
 }
 
