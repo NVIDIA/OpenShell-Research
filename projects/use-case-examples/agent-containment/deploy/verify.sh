@@ -19,9 +19,8 @@ source "${TWOBOX_HOME:-${HOME}/.twobox}/env"
 
 SANDBOX=twobox-verify
 failures=0
-watchdog_log="${TWOBOX_HOME}/watchdog/watchdog.jsonl"
 policy="${deploy_dir}/demo-policy.yaml"
-if kubectl -n openshell get secret egress-watchdog-ca >/dev/null 2>&1; then
+if kubectl -n openshell get deployment egress-watchdog >/dev/null 2>&1; then
   policy="${deploy_dir}/watched-policy.yaml"
 fi
 
@@ -55,6 +54,11 @@ sandbox_node_reserved() {
     grep -qw "${SANDBOX_TAINT%%=*}"
 }
 
+watchdog_logged() {
+  kubectl -n openshell logs deployment/egress-watchdog --tail=200 |
+    grep -q "\"sandbox\": \"$1\", .*\"host\": \"httpbin.org\""
+}
+
 sandbox_curl() {
   openshell sandbox exec -n "${SANDBOX}" --no-tty -- \
     curl -sS -m 10 -o /dev/null -w '%{http_code}' "$1" 2>/dev/null || true
@@ -82,8 +86,7 @@ check "Its supervisor runs on the control node" test "$(role_of_pod "${superviso
 check "Allowed request (curl to httpbin.org) succeeds" test "$(sandbox_curl https://httpbin.org/get)" = 200
 check "Unlisted host (example.com) is refused" test "$(sandbox_curl https://example.com/)" = 000
 if [[ "${policy}" == *watched-policy.yaml ]]; then
-  check "Watchdog accounted for the request" \
-    grep -q "\"sandbox\": \"${SANDBOX}\", .*\"host\": \"httpbin.org\"" "${watchdog_log}"
+  check "Watchdog accounted for the request" watchdog_logged "${SANDBOX}"
 fi
 
 if [[ "${1:-}" != "--keep" ]]; then

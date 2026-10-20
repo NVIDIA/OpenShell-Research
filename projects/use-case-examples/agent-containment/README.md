@@ -51,7 +51,8 @@ It uses released OpenShell (0.1.4) with no changes to OpenShell.
 | `deploy/versions.env` | The only place versions live. Every script sources it. |
 | `deploy/control-node.sh` | The control node: k3s server, Agent Sandbox, OpenShell chart, CLI, `sandboxes` template. Prints the command for each sandbox node. |
 | `deploy/sandbox-node.sh TOKEN CONTROL_IP` | Each sandbox node: joins the cluster, accepting only sandbox workloads. Nothing else. |
-| `deploy/watchdog.sh` | Mints watchdog TLS, starts the watchdog on the control node, registers it with the gateway. |
+| `deploy/watchdog.sh` | Mints watchdog TLS, runs the watchdog as a pod on the control node, registers it with the gateway. `--remove` undoes it. |
+| `deploy/watchdog.yaml` | The watchdog pod, its in-cluster service, and a network policy that admits only the gateway and supervisors. |
 | `deploy/verify.sh` | The definition of "it works". Exits non-zero on failure. |
 | `deploy/rehearse-k3d.sh` | Development only: both nodes as containers on one Docker host. |
 | `deploy/demo-policy.yaml`, `deploy/watched-policy.yaml` | Sandbox policies: curl may reach httpbin.org; the second attaches the watchdog. |
@@ -62,7 +63,7 @@ It uses released OpenShell (0.1.4) with no changes to OpenShell.
 ## Run on two machines
 
 Two Ubuntu 24.04 machines (VMs, cloud instances, workstations, Sparks, or Pis)
-with `curl` and `sudo`; the control node also needs `uv` for the watchdog. No GPU or
+with `curl` and `sudo`. No GPU or
 Docker is needed. The boxes must reach each other on TCP 6443 and 10250 and
 UDP 8472 at the addresses you choose. A Tailscale or other WireGuard overlay
 works and avoids opening a host firewall: pick each node's overlay address.
@@ -145,7 +146,13 @@ All checks passed
 ## The watchdog
 
 A Python gRPC service that implements OpenShell's supervisor middleware
-contract for HTTP requests in the pre-credentials phase.
+contract for HTTP requests in the pre-credentials phase. It runs as a pod on
+the control node: a pinned, stock `uv` Python image runs this checkout, so
+there is no image to build. Its first start installs dependencies from PyPI.
+Read its log with `kubectl -n openshell logs deployment/egress-watchdog`.
+
+- **Reachable only by the gateway and supervisors.** A network policy drops
+  everything else, including traffic from sandbox nodes and their hosts.
 
 - **Authenticated from the first run.** TLS with a private CA that the gateway
   trusts through `tls_ca_cert_path`, and a gateway-signed Ed25519 JWT on every
@@ -217,7 +224,8 @@ overlay that takes the direct LAN path. OpenShell 0.1.4.
   | Gateway API without a client certificate, through the NodePort on the sandbox node or the control node | Refused: `missing authorization header` |
   | k3s API on the control node, no credentials | 401 |
   | Kubelet on the control node: no credentials / the sandbox node's node certificate | 401 / 403 |
-  | Watchdog gRPC from the sandbox node, no token / forged token | TLS connects; `UNAUTHENTICATED` |
+  | Watchdog from the sandbox node host: pod IP, service IP | No connection (network policy) |
+  | Watchdog with no token / a forged token (earlier host-process watchdog) | TLS connects; `UNAUTHENTICATED` |
   | Supervisor pod ports 5500 and 5501 on the control node | Closed |
 
 - **From inside the workload pod** (uid 10001; same probes on the stand-in):
@@ -250,9 +258,11 @@ Not verified yet:
   already runs OpenShell, it silently replaced this cluster's bundle with the
   other gateway's, and the CLI failed with `BadSignature`. `control-node.sh` now sets
   `OPENSHELL_LOCAL_TLS_DIR` to this cluster's bundle.
-- **The gateway NodePort listens on the sandbox node too.** Kubernetes NodePorts open on
-  every node. The gateway still requires a client certificate, but a ClusterIP
-  service reached only from the control node would remove the surface.
+- **The gateway is reachable from the sandbox node's host.** Its NodePort opens
+  on every node, and any node can reach in-cluster service and pod addresses,
+  so switching to a ClusterIP service would not help. The gateway's client
+  certificate requirement is what refuses those calls. A network policy on the
+  gateway, like the watchdog's, would close the path.
 - **Ed25519 TLS certificates break some gRPC clients.** Python gRPC could not
   complete a handshake with an Ed25519 watchdog certificate; the watchdog now
   uses ECDSA P-256. Gateway JWTs stay Ed25519.
@@ -285,10 +295,8 @@ Not verified yet:
 
 - The watchdog keeps state in memory; restarting it forgets counts and
   quarantines.
-- The watchdog runs as a host process on the control node, reachable on `CONTROL_IP`.
-  Every call needs a gateway-signed token, but the port is still reachable
-  from the sandbox node's host network. Containerizing it behind a ClusterIP and a
-  NetworkPolicy is planned.
+- The watchdog pod mounts the checkout on the control node and runs as its
+  owner. Run `deploy/watchdog.sh` from the checkout you want it to serve.
 - The template's workload image is pulled by tag and should be pinned by digest
   before publishing.
 - Request bytes come from `Content-Length` or the received body, so chunked

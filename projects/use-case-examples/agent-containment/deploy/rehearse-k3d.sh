@@ -18,6 +18,8 @@
 set -euo pipefail
 
 deploy_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The watchdog pod mounts this checkout, so the control node container needs it.
+project_dir="$(dirname "${deploy_dir}")"
 # shellcheck source=versions.env
 source "${deploy_dir}/versions.env"
 
@@ -37,6 +39,7 @@ if ! k3d cluster list "${CLUSTER}" >/dev/null 2>&1; then
     --api-port 127.0.0.1:6550 \
     --port "127.0.0.1:${GATEWAY_NODE_PORT}:${GATEWAY_NODE_PORT}@server:0:direct" \
     --k3s-arg "--disable=traefik@server:0" \
+    --volume "${project_dir}:${project_dir}@server:0" \
     --k3s-node-label "${CONTROL_LABEL}@server:0" \
     --k3s-node-label "${SANDBOX_LABEL}@agent:0" \
     --k3s-arg "--node-taint=${SANDBOX_TAINT}@agent:0" \
@@ -48,7 +51,3 @@ k3d kubeconfig get "${CLUSTER}" >"${TWOBOX_HOME}/kubeconfig"
 chmod 600 "${TWOBOX_HOME}/kubeconfig"
 export KUBECONFIG="${TWOBOX_HOME}/kubeconfig"
 CONTROL_IP=127.0.0.1 "${deploy_dir}/control-node.sh" --existing-cluster
-
-# Pods reach processes on this Docker host through the cluster network's gateway.
-watchdog_host="$(docker network inspect "k3d-${CLUSTER}" -f '{{(index .IPAM.Config 0).Gateway}}')"
-echo "export WATCHDOG_HOST=${watchdog_host}" >>"${TWOBOX_HOME}/env"
