@@ -123,6 +123,8 @@ install_gateway() {
     --set "service.nodePort=${GATEWAY_NODE_PORT}" \
     --set "pkiInitJob.serverIpAddresses={${CONTROL_IP}}" \
     --wait --timeout 10m
+  # Only supervisors and the control node itself may reach the gateway.
+  kubectl apply -f "${deploy_dir}/gateway-policy.yaml" >/dev/null
 }
 
 register_gateway() {
