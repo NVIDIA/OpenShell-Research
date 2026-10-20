@@ -32,6 +32,7 @@ if [[ "${1:-}" == "--reset" ]]; then
   exit 0
 fi
 
+# k3d reads '@' as a node filter, so a literal '@' in the path is escaped.
 if ! k3d cluster list "${CLUSTER}" >/dev/null 2>&1; then
   k3d cluster create "${CLUSTER}" \
     --image "rancher/k3s:${K3S_VERSION/+/-}" \
@@ -39,10 +40,11 @@ if ! k3d cluster list "${CLUSTER}" >/dev/null 2>&1; then
     --api-port 127.0.0.1:6550 \
     --port "127.0.0.1:${GATEWAY_NODE_PORT}:${GATEWAY_NODE_PORT}@server:0:direct" \
     --k3s-arg "--disable=traefik@server:0" \
-    --volume "${project_dir}:${project_dir}@server:0" \
+    --volume "${project_dir//@/\\@}:${project_dir//@/\\@}@server:0" \
     --k3s-node-label "${CONTROL_LABEL}@server:0" \
     --k3s-node-label "${SANDBOX_LABEL}@agent:0" \
     --k3s-arg "--node-taint=${SANDBOX_TAINT}@agent:0" \
+    --kubeconfig-update-default=false --kubeconfig-switch-context=false \
     --wait --timeout 180s
 fi
 
@@ -50,4 +52,7 @@ mkdir -p "${TWOBOX_HOME}"
 k3d kubeconfig get "${CLUSTER}" >"${TWOBOX_HOME}/kubeconfig"
 chmod 600 "${TWOBOX_HOME}/kubeconfig"
 export KUBECONFIG="${TWOBOX_HOME}/kubeconfig"
-CONTROL_IP=127.0.0.1 "${deploy_dir}/control-node.sh" --existing-cluster
+# The operator CLI on this host reaches the gateway through Docker's network
+# gateway, not as the control node itself, so the gateway policy admits it.
+operator_ip="$(docker network inspect "k3d-${CLUSTER}" -f '{{(index .IPAM.Config 0).Gateway}}')"
+CONTROL_IP=127.0.0.1 OPERATOR_CIDR="${operator_ip}/32" "${deploy_dir}/control-node.sh" --existing-cluster

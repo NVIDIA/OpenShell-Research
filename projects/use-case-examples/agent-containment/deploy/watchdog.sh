@@ -28,8 +28,15 @@ mkdir -p "${state}"
 
 render_manifest() {
   sed -e "s|__WATCHDOG_IMAGE__|${WATCHDOG_IMAGE}|" -e "s|__PROJECT_DIR__|${project_dir}|" \
-    -e "s|__RUN_AS_UID__|$(stat -c %u "${project_dir}")|" \
-    -e "s|__RUN_AS_GID__|$(stat -c %g "${project_dir}")|" "${deploy_dir}/watchdog.yaml"
+    -e "s|__RUN_AS_UID__|$(owner_id -u)|" -e "s|__RUN_AS_GID__|$(owner_id -g)|" \
+    "${deploy_dir}/watchdog.yaml"
+}
+
+# The checkout's owner uid (-u) or gid (-g). GNU stat on Linux, BSD stat on macOS.
+owner_id() {
+  local gnu=%u bsd=%u
+  if [[ "$1" == -g ]]; then gnu=%g bsd=%g; fi
+  stat -c "${gnu}" "${project_dir}" 2>/dev/null || stat -f "${bsd}" "${project_dir}"
 }
 
 main() {

@@ -125,8 +125,15 @@ Remove it with `docker rm -f twobox-standin-sandbox-node` and
 
 Without sudo or a second machine, `deploy/rehearse-k3d.sh` creates both nodes
 as containers, then runs `control-node.sh --existing-cluster` on them. It needs
-Docker and [k3d](https://k3d.io) v5. It shares one kernel, so it proves
-scheduling and the watchdog, not the physical boundary.
+Docker and [k3d](https://k3d.io) v5, on Linux or on an Apple silicon Mac with
+Docker Desktop. It shares one kernel, so it proves scheduling and the
+watchdog, not the physical boundary. It leaves your default kubeconfig alone;
+`deploy/rehearse-k3d.sh --reset` deletes the cluster and its state.
+
+The operator CLI here runs beside the cluster rather than on the control node,
+so the script sets `OPERATOR_CIDR` to let it through the gateway's network
+policy. Set the same variable for `control-node.sh` if you operate a real
+cluster from another machine.
 
 ```bash
 deploy/rehearse-k3d.sh

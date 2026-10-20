@@ -14,6 +14,8 @@
 # Environment:
 #   CONTROL_IP   address sandbox nodes use to reach this node (default: first host IP)
 #   TWOBOX_HOME  operator state: CLI, kubeconfig, gateway config (default: ~/.twobox)
+#   OPERATOR_CIDR  extra source allowed to reach the gateway, when the operator
+#                  CLI does not run on the control node itself (default: none)
 
 set -euo pipefail
 
@@ -86,11 +88,11 @@ install_helm() {
   export PATH="${TWOBOX_HOME}/bin:${PATH}"
   if helm version --short 2>/dev/null | grep -q "^${HELM_VERSION}"; then return; fi
   echo "==> helm ${HELM_VERSION}"
-  local arch tmp
-  arch="$(go_arch)"
+  local platform tmp
+  platform="$(uname -s | tr '[:upper:]' '[:lower:]')-$(go_arch)"
   tmp="$(mktemp -d)"
-  curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-linux-${arch}.tar.gz" | tar -xz -C "${tmp}"
-  install -m 0755 "${tmp}/linux-${arch}/helm" "${TWOBOX_HOME}/bin/helm"
+  curl -fsSL "https://get.helm.sh/helm-${HELM_VERSION}-${platform}.tar.gz" | tar -xz -C "${tmp}"
+  install -m 0755 "${tmp}/${platform}/helm" "${TWOBOX_HOME}/bin/helm"
   rm -rf "${tmp}"
 }
 
@@ -98,12 +100,18 @@ install_openshell_cli() {
   if openshell --version 2>/dev/null | grep -qx "openshell ${OPENSHELL_VERSION}"; then return; fi
   echo "==> openshell CLI ${OPENSHELL_VERSION}"
   local asset tmp base
-  asset="openshell-$(uname -m)-unknown-linux-musl.tar.gz"
+  case "$(uname -s)-$(go_arch)" in
+    Linux-amd64) asset=openshell-x86_64-unknown-linux-musl.tar.gz ;;
+    Linux-arm64) asset=openshell-aarch64-unknown-linux-musl.tar.gz ;;
+    # macOS runs only the single-host rehearsal (rehearse-k3d.sh).
+    Darwin-arm64) asset=openshell-aarch64-apple-darwin.tar.gz ;;
+    *) echo "no OpenShell CLI build for $(uname -s) $(uname -m)" >&2; exit 1 ;;
+  esac
   base="https://github.com/NVIDIA/OpenShell/releases/download/v${OPENSHELL_VERSION}"
   tmp="$(mktemp -d)"
   curl -fsSL -o "${tmp}/${asset}" "${base}/${asset}"
   curl -fsSL -o "${tmp}/checksums.txt" "${base}/openshell-checksums-sha256.txt"
-  (cd "${tmp}" && grep " ${asset}\$" checksums.txt | sha256sum -c --quiet)
+  (cd "${tmp}" && grep " ${asset}\$" checksums.txt | shasum -a 256 -c --quiet)
   tar -xzf "${tmp}/${asset}" -C "${TWOBOX_HOME}/bin" openshell
   rm -rf "${tmp}"
 }
@@ -125,6 +133,10 @@ install_gateway() {
     --wait --timeout 10m
   # Only supervisors and the control node itself may reach the gateway.
   kubectl apply -f "${deploy_dir}/gateway-policy.yaml" >/dev/null
+  if [[ -n "${OPERATOR_CIDR:-}" ]]; then
+    kubectl -n openshell patch networkpolicy openshell-gateway --type=json -p \
+      "[{\"op\":\"add\",\"path\":\"/spec/ingress/0/from/-\",\"value\":{\"ipBlock\":{\"cidr\":\"${OPERATOR_CIDR}\"}}}]" >/dev/null
+  fi
 }
 
 register_gateway() {
