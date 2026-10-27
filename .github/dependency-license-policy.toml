@@ -35,6 +35,16 @@ evidence = "https://github.com/huggingface/transformers/blob/v5.17.0/LICENSE"
 
 [[exception]]
 ecosystem = "pypi"
+name = "certifi"
+source = '{"registry":"https://pypi.org/simple"}'
+reason = "Existing transitive CA bundle dependency pinned directly for a security-only version update."
+evidence = "https://pypi.org/project/certifi/2026.10.23/"
+reports = [
+    { version = "2026.10.23", license = "MPL-2.0" },
+]
+
+[[exception]]
+ecosystem = "pypi"
 name = "gstreamer-bundle"
 source = '{"registry":"https://pypi.org/simple"}'
 reason = "Existing macOS runtime dependency reviewed for a security-only version update."

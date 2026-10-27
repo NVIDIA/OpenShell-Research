@@ -461,3 +461,10 @@ uv run reachy-mini-app-assistant check .
 
 The checked-in uv resolution targets macOS/Darwin. For Linux deployment,
 update `[tool.uv].environments` and regenerate `uv.lock`.
+
+GStreamer 1.28.8 fixes [GStreamer-SA-2026-0078 and SA-2026-0083 through
+SA-2026-0092](https://gstreamer.freedesktop.org/security/), but PyPI's
+`gstreamer-plugins` 1.28.8 has no macOS wheels, so `gstreamer-bundle` 1.28.8
+does not resolve for this lock. The lock keeps 1.28.7; the 1.29.2a0 prerelease
+predates those fixes. Raise both `gstreamer-bundle` floors in `pyproject.toml`
+to 1.28.8 once its macOS plugin wheels are published.
