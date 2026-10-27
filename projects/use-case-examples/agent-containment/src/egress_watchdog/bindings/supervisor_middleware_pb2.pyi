@@ -1,0 +1,574 @@
+import datetime
+
+from google.protobuf import struct_pb2 as _struct_pb2
+from google.protobuf import duration_pb2 as _duration_pb2
+import extension_pb2 as _extension_pb2
+from google.protobuf.internal import containers as _containers
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
+from google.protobuf import descriptor as _descriptor
+from google.protobuf import message as _message
+from collections.abc import Iterable as _Iterable, Mapping as _Mapping
+from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
+
+DESCRIPTOR: _descriptor.FileDescriptor
+
+class HttpResponseBodyMode(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    HTTP_RESPONSE_BODY_MODE_UNSPECIFIED: _ClassVar[HttpResponseBodyMode]
+    HTTP_RESPONSE_BODY_MODE_HEADERS_ONLY: _ClassVar[HttpResponseBodyMode]
+    HTTP_RESPONSE_BODY_MODE_WHOLE_BODY_BYTES: _ClassVar[HttpResponseBodyMode]
+    HTTP_RESPONSE_BODY_MODE_STREAM_BYTES: _ClassVar[HttpResponseBodyMode]
+
+class MiddlewareSessionEndReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    MIDDLEWARE_SESSION_END_REASON_UNSPECIFIED: _ClassVar[MiddlewareSessionEndReason]
+    MIDDLEWARE_SESSION_END_REASON_NORMAL: _ClassVar[MiddlewareSessionEndReason]
+    MIDDLEWARE_SESSION_END_REASON_DOWNSTREAM_DISCONNECT: _ClassVar[MiddlewareSessionEndReason]
+    MIDDLEWARE_SESSION_END_REASON_POLICY_RELOAD: _ClassVar[MiddlewareSessionEndReason]
+    MIDDLEWARE_SESSION_END_REASON_MIDDLEWARE_DENIAL: _ClassVar[MiddlewareSessionEndReason]
+    MIDDLEWARE_SESSION_END_REASON_MIDDLEWARE_FAILURE: _ClassVar[MiddlewareSessionEndReason]
+    MIDDLEWARE_SESSION_END_REASON_PROTOCOL_ERROR: _ClassVar[MiddlewareSessionEndReason]
+    MIDDLEWARE_SESSION_END_REASON_CANCELLATION: _ClassVar[MiddlewareSessionEndReason]
+    MIDDLEWARE_SESSION_END_REASON_UPSTREAM_FAILURE: _ClassVar[MiddlewareSessionEndReason]
+    MIDDLEWARE_SESSION_END_REASON_POLICY_DENIAL: _ClassVar[MiddlewareSessionEndReason]
+    MIDDLEWARE_SESSION_END_REASON_STAGE_SKIPPED: _ClassVar[MiddlewareSessionEndReason]
+    MIDDLEWARE_SESSION_END_REASON_UPSTREAM_DISCONNECT: _ClassVar[MiddlewareSessionEndReason]
+
+class SupervisorMiddlewareOperation(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    SUPERVISOR_MIDDLEWARE_OPERATION_UNSPECIFIED: _ClassVar[SupervisorMiddlewareOperation]
+    SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_REQUEST: _ClassVar[SupervisorMiddlewareOperation]
+    SUPERVISOR_MIDDLEWARE_OPERATION_WEBSOCKET_MESSAGE: _ClassVar[SupervisorMiddlewareOperation]
+    SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_RESPONSE: _ClassVar[SupervisorMiddlewareOperation]
+
+class SupervisorMiddlewarePhase(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    SUPERVISOR_MIDDLEWARE_PHASE_UNSPECIFIED: _ClassVar[SupervisorMiddlewarePhase]
+    SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS: _ClassVar[SupervisorMiddlewarePhase]
+    SUPERVISOR_MIDDLEWARE_PHASE_PRE_RETURN: _ClassVar[SupervisorMiddlewarePhase]
+
+class WebSocketPreflightAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    WEB_SOCKET_PREFLIGHT_ACTION_UNSPECIFIED: _ClassVar[WebSocketPreflightAction]
+    WEB_SOCKET_PREFLIGHT_ACTION_INSPECT: _ClassVar[WebSocketPreflightAction]
+    WEB_SOCKET_PREFLIGHT_ACTION_SKIP: _ClassVar[WebSocketPreflightAction]
+    WEB_SOCKET_PREFLIGHT_ACTION_DENY: _ClassVar[WebSocketPreflightAction]
+
+class Decision(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    DECISION_UNSPECIFIED: _ClassVar[Decision]
+    DECISION_ALLOW: _ClassVar[Decision]
+    DECISION_DENY: _ClassVar[Decision]
+
+class ExistingHeaderAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    EXISTING_HEADER_ACTION_UNSPECIFIED: _ClassVar[ExistingHeaderAction]
+    EXISTING_HEADER_ACTION_APPEND: _ClassVar[ExistingHeaderAction]
+    EXISTING_HEADER_ACTION_OVERWRITE: _ClassVar[ExistingHeaderAction]
+    EXISTING_HEADER_ACTION_SKIP: _ClassVar[ExistingHeaderAction]
+HTTP_RESPONSE_BODY_MODE_UNSPECIFIED: HttpResponseBodyMode
+HTTP_RESPONSE_BODY_MODE_HEADERS_ONLY: HttpResponseBodyMode
+HTTP_RESPONSE_BODY_MODE_WHOLE_BODY_BYTES: HttpResponseBodyMode
+HTTP_RESPONSE_BODY_MODE_STREAM_BYTES: HttpResponseBodyMode
+MIDDLEWARE_SESSION_END_REASON_UNSPECIFIED: MiddlewareSessionEndReason
+MIDDLEWARE_SESSION_END_REASON_NORMAL: MiddlewareSessionEndReason
+MIDDLEWARE_SESSION_END_REASON_DOWNSTREAM_DISCONNECT: MiddlewareSessionEndReason
+MIDDLEWARE_SESSION_END_REASON_POLICY_RELOAD: MiddlewareSessionEndReason
+MIDDLEWARE_SESSION_END_REASON_MIDDLEWARE_DENIAL: MiddlewareSessionEndReason
+MIDDLEWARE_SESSION_END_REASON_MIDDLEWARE_FAILURE: MiddlewareSessionEndReason
+MIDDLEWARE_SESSION_END_REASON_PROTOCOL_ERROR: MiddlewareSessionEndReason
+MIDDLEWARE_SESSION_END_REASON_CANCELLATION: MiddlewareSessionEndReason
+MIDDLEWARE_SESSION_END_REASON_UPSTREAM_FAILURE: MiddlewareSessionEndReason
+MIDDLEWARE_SESSION_END_REASON_POLICY_DENIAL: MiddlewareSessionEndReason
+MIDDLEWARE_SESSION_END_REASON_STAGE_SKIPPED: MiddlewareSessionEndReason
+MIDDLEWARE_SESSION_END_REASON_UPSTREAM_DISCONNECT: MiddlewareSessionEndReason
+SUPERVISOR_MIDDLEWARE_OPERATION_UNSPECIFIED: SupervisorMiddlewareOperation
+SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_REQUEST: SupervisorMiddlewareOperation
+SUPERVISOR_MIDDLEWARE_OPERATION_WEBSOCKET_MESSAGE: SupervisorMiddlewareOperation
+SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_RESPONSE: SupervisorMiddlewareOperation
+SUPERVISOR_MIDDLEWARE_PHASE_UNSPECIFIED: SupervisorMiddlewarePhase
+SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS: SupervisorMiddlewarePhase
+SUPERVISOR_MIDDLEWARE_PHASE_PRE_RETURN: SupervisorMiddlewarePhase
+WEB_SOCKET_PREFLIGHT_ACTION_UNSPECIFIED: WebSocketPreflightAction
+WEB_SOCKET_PREFLIGHT_ACTION_INSPECT: WebSocketPreflightAction
+WEB_SOCKET_PREFLIGHT_ACTION_SKIP: WebSocketPreflightAction
+WEB_SOCKET_PREFLIGHT_ACTION_DENY: WebSocketPreflightAction
+DECISION_UNSPECIFIED: Decision
+DECISION_ALLOW: Decision
+DECISION_DENY: Decision
+EXISTING_HEADER_ACTION_UNSPECIFIED: ExistingHeaderAction
+EXISTING_HEADER_ACTION_APPEND: ExistingHeaderAction
+EXISTING_HEADER_ACTION_OVERWRITE: ExistingHeaderAction
+EXISTING_HEADER_ACTION_SKIP: ExistingHeaderAction
+
+class MiddlewareDescribeRequest(_message.Message):
+    __slots__ = ("gateway",)
+    GATEWAY_FIELD_NUMBER: _ClassVar[int]
+    gateway: _extension_pb2.PeerMetadata
+    def __init__(self, gateway: _Optional[_Union[_extension_pb2.PeerMetadata, _Mapping]] = ...) -> None: ...
+
+class MiddlewareManifest(_message.Message):
+    __slots__ = ("name", "service_version", "bindings", "expected_audience", "extension")
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    SERVICE_VERSION_FIELD_NUMBER: _ClassVar[int]
+    BINDINGS_FIELD_NUMBER: _ClassVar[int]
+    EXPECTED_AUDIENCE_FIELD_NUMBER: _ClassVar[int]
+    EXTENSION_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    service_version: str
+    bindings: _containers.RepeatedCompositeFieldContainer[MiddlewareBinding]
+    expected_audience: str
+    extension: _extension_pb2.PeerMetadata
+    def __init__(self, name: _Optional[str] = ..., service_version: _Optional[str] = ..., bindings: _Optional[_Iterable[_Union[MiddlewareBinding, _Mapping]]] = ..., expected_audience: _Optional[str] = ..., extension: _Optional[_Union[_extension_pb2.PeerMetadata, _Mapping]] = ...) -> None: ...
+
+class MiddlewareBinding(_message.Message):
+    __slots__ = ("operation", "phase", "max_payload_bytes", "request_timeout")
+    OPERATION_FIELD_NUMBER: _ClassVar[int]
+    PHASE_FIELD_NUMBER: _ClassVar[int]
+    MAX_PAYLOAD_BYTES_FIELD_NUMBER: _ClassVar[int]
+    REQUEST_TIMEOUT_FIELD_NUMBER: _ClassVar[int]
+    operation: SupervisorMiddlewareOperation
+    phase: SupervisorMiddlewarePhase
+    max_payload_bytes: int
+    request_timeout: _duration_pb2.Duration
+    def __init__(self, operation: _Optional[_Union[SupervisorMiddlewareOperation, str]] = ..., phase: _Optional[_Union[SupervisorMiddlewarePhase, str]] = ..., max_payload_bytes: _Optional[int] = ..., request_timeout: _Optional[_Union[datetime.timedelta, _duration_pb2.Duration, _Mapping]] = ...) -> None: ...
+
+class ValidateConfigRequest(_message.Message):
+    __slots__ = ("config", "middleware_name")
+    CONFIG_FIELD_NUMBER: _ClassVar[int]
+    MIDDLEWARE_NAME_FIELD_NUMBER: _ClassVar[int]
+    config: _struct_pb2.Struct
+    middleware_name: str
+    def __init__(self, config: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., middleware_name: _Optional[str] = ...) -> None: ...
+
+class ValidateConfigResponse(_message.Message):
+    __slots__ = ("valid", "reason")
+    VALID_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    valid: bool
+    reason: str
+    def __init__(self, valid: _Optional[bool] = ..., reason: _Optional[str] = ...) -> None: ...
+
+class HttpRequestEvaluation(_message.Message):
+    __slots__ = ("phase", "context", "config", "target", "headers", "body", "middleware_name")
+    PHASE_FIELD_NUMBER: _ClassVar[int]
+    CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    CONFIG_FIELD_NUMBER: _ClassVar[int]
+    TARGET_FIELD_NUMBER: _ClassVar[int]
+    HEADERS_FIELD_NUMBER: _ClassVar[int]
+    BODY_FIELD_NUMBER: _ClassVar[int]
+    MIDDLEWARE_NAME_FIELD_NUMBER: _ClassVar[int]
+    phase: SupervisorMiddlewarePhase
+    context: RequestContext
+    config: _struct_pb2.Struct
+    target: HttpRequestTarget
+    headers: _containers.RepeatedCompositeFieldContainer[HttpHeader]
+    body: bytes
+    middleware_name: str
+    def __init__(self, phase: _Optional[_Union[SupervisorMiddlewarePhase, str]] = ..., context: _Optional[_Union[RequestContext, _Mapping]] = ..., config: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., target: _Optional[_Union[HttpRequestTarget, _Mapping]] = ..., headers: _Optional[_Iterable[_Union[HttpHeader, _Mapping]]] = ..., body: _Optional[bytes] = ..., middleware_name: _Optional[str] = ...) -> None: ...
+
+class HttpHeader(_message.Message):
+    __slots__ = ("name", "value")
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    VALUE_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    value: str
+    def __init__(self, name: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+
+class HttpResponseEvent(_message.Message):
+    __slots__ = ("preflight", "body", "trailers", "session_end")
+    PREFLIGHT_FIELD_NUMBER: _ClassVar[int]
+    BODY_FIELD_NUMBER: _ClassVar[int]
+    TRAILERS_FIELD_NUMBER: _ClassVar[int]
+    SESSION_END_FIELD_NUMBER: _ClassVar[int]
+    preflight: HttpResponsePreflight
+    body: HttpResponseBodyUnit
+    trailers: HttpResponseTrailers
+    session_end: MiddlewareSessionEnd
+    def __init__(self, preflight: _Optional[_Union[HttpResponsePreflight, _Mapping]] = ..., body: _Optional[_Union[HttpResponseBodyUnit, _Mapping]] = ..., trailers: _Optional[_Union[HttpResponseTrailers, _Mapping]] = ..., session_end: _Optional[_Union[MiddlewareSessionEnd, _Mapping]] = ...) -> None: ...
+
+class HttpResponseEventResult(_message.Message):
+    __slots__ = ("preflight_result", "body_result", "trailers_result")
+    PREFLIGHT_RESULT_FIELD_NUMBER: _ClassVar[int]
+    BODY_RESULT_FIELD_NUMBER: _ClassVar[int]
+    TRAILERS_RESULT_FIELD_NUMBER: _ClassVar[int]
+    preflight_result: HttpResponsePreflightResult
+    body_result: HttpResponseBodyResult
+    trailers_result: HttpResponseTrailersResult
+    def __init__(self, preflight_result: _Optional[_Union[HttpResponsePreflightResult, _Mapping]] = ..., body_result: _Optional[_Union[HttpResponseBodyResult, _Mapping]] = ..., trailers_result: _Optional[_Union[HttpResponseTrailersResult, _Mapping]] = ...) -> None: ...
+
+class HttpResponsePreflight(_message.Message):
+    __slots__ = ("context", "target", "status_code", "headers", "middleware_name", "config", "max_payload_bytes", "permitted_body_modes")
+    CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    TARGET_FIELD_NUMBER: _ClassVar[int]
+    STATUS_CODE_FIELD_NUMBER: _ClassVar[int]
+    HEADERS_FIELD_NUMBER: _ClassVar[int]
+    MIDDLEWARE_NAME_FIELD_NUMBER: _ClassVar[int]
+    CONFIG_FIELD_NUMBER: _ClassVar[int]
+    MAX_PAYLOAD_BYTES_FIELD_NUMBER: _ClassVar[int]
+    PERMITTED_BODY_MODES_FIELD_NUMBER: _ClassVar[int]
+    context: RequestContext
+    target: HttpRequestTarget
+    status_code: int
+    headers: _containers.RepeatedCompositeFieldContainer[HttpHeader]
+    middleware_name: str
+    config: _struct_pb2.Struct
+    max_payload_bytes: int
+    permitted_body_modes: _containers.RepeatedScalarFieldContainer[HttpResponseBodyMode]
+    def __init__(self, context: _Optional[_Union[RequestContext, _Mapping]] = ..., target: _Optional[_Union[HttpRequestTarget, _Mapping]] = ..., status_code: _Optional[int] = ..., headers: _Optional[_Iterable[_Union[HttpHeader, _Mapping]]] = ..., middleware_name: _Optional[str] = ..., config: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., max_payload_bytes: _Optional[int] = ..., permitted_body_modes: _Optional[_Iterable[_Union[HttpResponseBodyMode, str]]] = ...) -> None: ...
+
+class HttpResponsePreflightResult(_message.Message):
+    __slots__ = ("skip", "inspect", "block_delivery", "reason", "reason_code", "findings", "metadata")
+    class MetadataEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    SKIP_FIELD_NUMBER: _ClassVar[int]
+    INSPECT_FIELD_NUMBER: _ClassVar[int]
+    BLOCK_DELIVERY_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    REASON_CODE_FIELD_NUMBER: _ClassVar[int]
+    FINDINGS_FIELD_NUMBER: _ClassVar[int]
+    METADATA_FIELD_NUMBER: _ClassVar[int]
+    skip: HttpResponsePreflightSkip
+    inspect: HttpResponsePreflightInspect
+    block_delivery: HttpResponseBlockDelivery
+    reason: str
+    reason_code: str
+    findings: _containers.RepeatedCompositeFieldContainer[Finding]
+    metadata: _containers.ScalarMap[str, str]
+    def __init__(self, skip: _Optional[_Union[HttpResponsePreflightSkip, _Mapping]] = ..., inspect: _Optional[_Union[HttpResponsePreflightInspect, _Mapping]] = ..., block_delivery: _Optional[_Union[HttpResponseBlockDelivery, _Mapping]] = ..., reason: _Optional[str] = ..., reason_code: _Optional[str] = ..., findings: _Optional[_Iterable[_Union[Finding, _Mapping]]] = ..., metadata: _Optional[_Mapping[str, str]] = ...) -> None: ...
+
+class HttpResponsePreflightSkip(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class HttpResponseBlockDelivery(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class HttpResponsePreflightInspect(_message.Message):
+    __slots__ = ("body_mode", "header_mutations")
+    BODY_MODE_FIELD_NUMBER: _ClassVar[int]
+    HEADER_MUTATIONS_FIELD_NUMBER: _ClassVar[int]
+    body_mode: HttpResponseBodyMode
+    header_mutations: _containers.RepeatedCompositeFieldContainer[HeaderMutation]
+    def __init__(self, body_mode: _Optional[_Union[HttpResponseBodyMode, str]] = ..., header_mutations: _Optional[_Iterable[_Union[HeaderMutation, _Mapping]]] = ...) -> None: ...
+
+class HttpResponseBodyUnit(_message.Message):
+    __slots__ = ("sequence", "data", "end_of_stream")
+    SEQUENCE_FIELD_NUMBER: _ClassVar[int]
+    DATA_FIELD_NUMBER: _ClassVar[int]
+    END_OF_STREAM_FIELD_NUMBER: _ClassVar[int]
+    sequence: int
+    data: bytes
+    end_of_stream: bool
+    def __init__(self, sequence: _Optional[int] = ..., data: _Optional[bytes] = ..., end_of_stream: _Optional[bool] = ...) -> None: ...
+
+class HttpResponseBodyResult(_message.Message):
+    __slots__ = ("sequence", "pass_through", "transform", "block_delivery", "skip_remaining", "reason", "reason_code", "findings", "metadata")
+    class MetadataEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    SEQUENCE_FIELD_NUMBER: _ClassVar[int]
+    PASS_THROUGH_FIELD_NUMBER: _ClassVar[int]
+    TRANSFORM_FIELD_NUMBER: _ClassVar[int]
+    BLOCK_DELIVERY_FIELD_NUMBER: _ClassVar[int]
+    SKIP_REMAINING_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    REASON_CODE_FIELD_NUMBER: _ClassVar[int]
+    FINDINGS_FIELD_NUMBER: _ClassVar[int]
+    METADATA_FIELD_NUMBER: _ClassVar[int]
+    sequence: int
+    pass_through: HttpResponseBodyPassThrough
+    transform: HttpResponseBodyTransform
+    block_delivery: HttpResponseBlockDelivery
+    skip_remaining: HttpResponseBodySkipRemaining
+    reason: str
+    reason_code: str
+    findings: _containers.RepeatedCompositeFieldContainer[Finding]
+    metadata: _containers.ScalarMap[str, str]
+    def __init__(self, sequence: _Optional[int] = ..., pass_through: _Optional[_Union[HttpResponseBodyPassThrough, _Mapping]] = ..., transform: _Optional[_Union[HttpResponseBodyTransform, _Mapping]] = ..., block_delivery: _Optional[_Union[HttpResponseBlockDelivery, _Mapping]] = ..., skip_remaining: _Optional[_Union[HttpResponseBodySkipRemaining, _Mapping]] = ..., reason: _Optional[str] = ..., reason_code: _Optional[str] = ..., findings: _Optional[_Iterable[_Union[Finding, _Mapping]]] = ..., metadata: _Optional[_Mapping[str, str]] = ...) -> None: ...
+
+class HttpResponseBodyPassThrough(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class HttpResponseBodySkipRemaining(_message.Message):
+    __slots__ = ("pass_through", "transform")
+    PASS_THROUGH_FIELD_NUMBER: _ClassVar[int]
+    TRANSFORM_FIELD_NUMBER: _ClassVar[int]
+    pass_through: HttpResponseBodyPassThrough
+    transform: HttpResponseBodyTransform
+    def __init__(self, pass_through: _Optional[_Union[HttpResponseBodyPassThrough, _Mapping]] = ..., transform: _Optional[_Union[HttpResponseBodyTransform, _Mapping]] = ...) -> None: ...
+
+class HttpResponseBodyTransform(_message.Message):
+    __slots__ = ("data",)
+    DATA_FIELD_NUMBER: _ClassVar[int]
+    data: bytes
+    def __init__(self, data: _Optional[bytes] = ...) -> None: ...
+
+class HttpResponseTrailers(_message.Message):
+    __slots__ = ("headers",)
+    HEADERS_FIELD_NUMBER: _ClassVar[int]
+    headers: _containers.RepeatedCompositeFieldContainer[HttpHeader]
+    def __init__(self, headers: _Optional[_Iterable[_Union[HttpHeader, _Mapping]]] = ...) -> None: ...
+
+class HttpResponseTrailersResult(_message.Message):
+    __slots__ = ("trailer_mutations", "reason", "reason_code", "findings", "metadata")
+    class MetadataEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    TRAILER_MUTATIONS_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    REASON_CODE_FIELD_NUMBER: _ClassVar[int]
+    FINDINGS_FIELD_NUMBER: _ClassVar[int]
+    METADATA_FIELD_NUMBER: _ClassVar[int]
+    trailer_mutations: _containers.RepeatedCompositeFieldContainer[HeaderMutation]
+    reason: str
+    reason_code: str
+    findings: _containers.RepeatedCompositeFieldContainer[Finding]
+    metadata: _containers.ScalarMap[str, str]
+    def __init__(self, trailer_mutations: _Optional[_Iterable[_Union[HeaderMutation, _Mapping]]] = ..., reason: _Optional[str] = ..., reason_code: _Optional[str] = ..., findings: _Optional[_Iterable[_Union[Finding, _Mapping]]] = ..., metadata: _Optional[_Mapping[str, str]] = ...) -> None: ...
+
+class MiddlewareSessionEnd(_message.Message):
+    __slots__ = ("reason", "protocol_error")
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    PROTOCOL_ERROR_FIELD_NUMBER: _ClassVar[int]
+    reason: MiddlewareSessionEndReason
+    protocol_error: MiddlewareSessionProtocolError
+    def __init__(self, reason: _Optional[_Union[MiddlewareSessionEndReason, str]] = ..., protocol_error: _Optional[_Union[MiddlewareSessionProtocolError, _Mapping]] = ...) -> None: ...
+
+class MiddlewareSessionProtocolError(_message.Message):
+    __slots__ = ("web_socket", "middleware_exchange")
+    WEB_SOCKET_FIELD_NUMBER: _ClassVar[int]
+    MIDDLEWARE_EXCHANGE_FIELD_NUMBER: _ClassVar[int]
+    web_socket: WebSocketProtocolError
+    middleware_exchange: MiddlewareExchangeProtocolError
+    def __init__(self, web_socket: _Optional[_Union[WebSocketProtocolError, _Mapping]] = ..., middleware_exchange: _Optional[_Union[MiddlewareExchangeProtocolError, _Mapping]] = ...) -> None: ...
+
+class WebSocketProtocolError(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class MiddlewareExchangeProtocolError(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class WebSocketSessionEvent(_message.Message):
+    __slots__ = ("preflight", "session_start", "message", "session_end")
+    PREFLIGHT_FIELD_NUMBER: _ClassVar[int]
+    SESSION_START_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    SESSION_END_FIELD_NUMBER: _ClassVar[int]
+    preflight: WebSocketPreflight
+    session_start: WebSocketSessionStart
+    message: WebSocketMessage
+    session_end: MiddlewareSessionEnd
+    def __init__(self, preflight: _Optional[_Union[WebSocketPreflight, _Mapping]] = ..., session_start: _Optional[_Union[WebSocketSessionStart, _Mapping]] = ..., message: _Optional[_Union[WebSocketMessage, _Mapping]] = ..., session_end: _Optional[_Union[MiddlewareSessionEnd, _Mapping]] = ...) -> None: ...
+
+class WebSocketPreflight(_message.Message):
+    __slots__ = ("session_id", "phase", "context", "target", "requested_subprotocols", "middleware_name", "config")
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    PHASE_FIELD_NUMBER: _ClassVar[int]
+    CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    TARGET_FIELD_NUMBER: _ClassVar[int]
+    REQUESTED_SUBPROTOCOLS_FIELD_NUMBER: _ClassVar[int]
+    MIDDLEWARE_NAME_FIELD_NUMBER: _ClassVar[int]
+    CONFIG_FIELD_NUMBER: _ClassVar[int]
+    session_id: str
+    phase: SupervisorMiddlewarePhase
+    context: RequestContext
+    target: HttpRequestTarget
+    requested_subprotocols: _containers.RepeatedScalarFieldContainer[str]
+    middleware_name: str
+    config: _struct_pb2.Struct
+    def __init__(self, session_id: _Optional[str] = ..., phase: _Optional[_Union[SupervisorMiddlewarePhase, str]] = ..., context: _Optional[_Union[RequestContext, _Mapping]] = ..., target: _Optional[_Union[HttpRequestTarget, _Mapping]] = ..., requested_subprotocols: _Optional[_Iterable[str]] = ..., middleware_name: _Optional[str] = ..., config: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ...) -> None: ...
+
+class WebSocketSessionStart(_message.Message):
+    __slots__ = ("selected_subprotocol",)
+    SELECTED_SUBPROTOCOL_FIELD_NUMBER: _ClassVar[int]
+    selected_subprotocol: str
+    def __init__(self, selected_subprotocol: _Optional[str] = ...) -> None: ...
+
+class WebSocketMessage(_message.Message):
+    __slots__ = ("sequence", "text", "binary")
+    SEQUENCE_FIELD_NUMBER: _ClassVar[int]
+    TEXT_FIELD_NUMBER: _ClassVar[int]
+    BINARY_FIELD_NUMBER: _ClassVar[int]
+    sequence: int
+    text: str
+    binary: bytes
+    def __init__(self, sequence: _Optional[int] = ..., text: _Optional[str] = ..., binary: _Optional[bytes] = ...) -> None: ...
+
+class WebSocketPreflightDecision(_message.Message):
+    __slots__ = ("action", "reason", "reason_code", "findings", "metadata")
+    class MetadataEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    ACTION_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    REASON_CODE_FIELD_NUMBER: _ClassVar[int]
+    FINDINGS_FIELD_NUMBER: _ClassVar[int]
+    METADATA_FIELD_NUMBER: _ClassVar[int]
+    action: WebSocketPreflightAction
+    reason: str
+    reason_code: str
+    findings: _containers.RepeatedCompositeFieldContainer[Finding]
+    metadata: _containers.ScalarMap[str, str]
+    def __init__(self, action: _Optional[_Union[WebSocketPreflightAction, str]] = ..., reason: _Optional[str] = ..., reason_code: _Optional[str] = ..., findings: _Optional[_Iterable[_Union[Finding, _Mapping]]] = ..., metadata: _Optional[_Mapping[str, str]] = ...) -> None: ...
+
+class WebSocketMessageResult(_message.Message):
+    __slots__ = ("sequence", "decision", "text", "binary", "reason", "reason_code", "findings", "metadata")
+    class MetadataEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    SEQUENCE_FIELD_NUMBER: _ClassVar[int]
+    DECISION_FIELD_NUMBER: _ClassVar[int]
+    TEXT_FIELD_NUMBER: _ClassVar[int]
+    BINARY_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    REASON_CODE_FIELD_NUMBER: _ClassVar[int]
+    FINDINGS_FIELD_NUMBER: _ClassVar[int]
+    METADATA_FIELD_NUMBER: _ClassVar[int]
+    sequence: int
+    decision: Decision
+    text: str
+    binary: bytes
+    reason: str
+    reason_code: str
+    findings: _containers.RepeatedCompositeFieldContainer[Finding]
+    metadata: _containers.ScalarMap[str, str]
+    def __init__(self, sequence: _Optional[int] = ..., decision: _Optional[_Union[Decision, str]] = ..., text: _Optional[str] = ..., binary: _Optional[bytes] = ..., reason: _Optional[str] = ..., reason_code: _Optional[str] = ..., findings: _Optional[_Iterable[_Union[Finding, _Mapping]]] = ..., metadata: _Optional[_Mapping[str, str]] = ...) -> None: ...
+
+class WebSocketSessionEventResult(_message.Message):
+    __slots__ = ("preflight_decision", "message_result")
+    PREFLIGHT_DECISION_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_RESULT_FIELD_NUMBER: _ClassVar[int]
+    preflight_decision: WebSocketPreflightDecision
+    message_result: WebSocketMessageResult
+    def __init__(self, preflight_decision: _Optional[_Union[WebSocketPreflightDecision, _Mapping]] = ..., message_result: _Optional[_Union[WebSocketMessageResult, _Mapping]] = ...) -> None: ...
+
+class RequestContext(_message.Message):
+    __slots__ = ("request_id", "sandbox_id", "originating_process", "sandbox", "workspace")
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    SANDBOX_ID_FIELD_NUMBER: _ClassVar[int]
+    ORIGINATING_PROCESS_FIELD_NUMBER: _ClassVar[int]
+    SANDBOX_FIELD_NUMBER: _ClassVar[int]
+    WORKSPACE_FIELD_NUMBER: _ClassVar[int]
+    request_id: str
+    sandbox_id: str
+    originating_process: Process
+    sandbox: str
+    workspace: str
+    def __init__(self, request_id: _Optional[str] = ..., sandbox_id: _Optional[str] = ..., originating_process: _Optional[_Union[Process, _Mapping]] = ..., sandbox: _Optional[str] = ..., workspace: _Optional[str] = ...) -> None: ...
+
+class HttpRequestTarget(_message.Message):
+    __slots__ = ("scheme", "host", "port", "method", "path", "query")
+    SCHEME_FIELD_NUMBER: _ClassVar[int]
+    HOST_FIELD_NUMBER: _ClassVar[int]
+    PORT_FIELD_NUMBER: _ClassVar[int]
+    METHOD_FIELD_NUMBER: _ClassVar[int]
+    PATH_FIELD_NUMBER: _ClassVar[int]
+    QUERY_FIELD_NUMBER: _ClassVar[int]
+    scheme: str
+    host: str
+    port: int
+    method: str
+    path: str
+    query: str
+    def __init__(self, scheme: _Optional[str] = ..., host: _Optional[str] = ..., port: _Optional[int] = ..., method: _Optional[str] = ..., path: _Optional[str] = ..., query: _Optional[str] = ...) -> None: ...
+
+class Process(_message.Message):
+    __slots__ = ("binary", "pid", "ancestors")
+    BINARY_FIELD_NUMBER: _ClassVar[int]
+    PID_FIELD_NUMBER: _ClassVar[int]
+    ANCESTORS_FIELD_NUMBER: _ClassVar[int]
+    binary: str
+    pid: int
+    ancestors: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, binary: _Optional[str] = ..., pid: _Optional[int] = ..., ancestors: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class Finding(_message.Message):
+    __slots__ = ("type", "label", "count", "confidence", "severity")
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    LABEL_FIELD_NUMBER: _ClassVar[int]
+    COUNT_FIELD_NUMBER: _ClassVar[int]
+    CONFIDENCE_FIELD_NUMBER: _ClassVar[int]
+    SEVERITY_FIELD_NUMBER: _ClassVar[int]
+    type: str
+    label: str
+    count: int
+    confidence: str
+    severity: str
+    def __init__(self, type: _Optional[str] = ..., label: _Optional[str] = ..., count: _Optional[int] = ..., confidence: _Optional[str] = ..., severity: _Optional[str] = ...) -> None: ...
+
+class WriteHeader(_message.Message):
+    __slots__ = ("name", "value", "on_existing")
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    VALUE_FIELD_NUMBER: _ClassVar[int]
+    ON_EXISTING_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    value: str
+    on_existing: ExistingHeaderAction
+    def __init__(self, name: _Optional[str] = ..., value: _Optional[str] = ..., on_existing: _Optional[_Union[ExistingHeaderAction, str]] = ...) -> None: ...
+
+class RemoveHeader(_message.Message):
+    __slots__ = ("name",)
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    def __init__(self, name: _Optional[str] = ...) -> None: ...
+
+class HeaderMutation(_message.Message):
+    __slots__ = ("write", "remove")
+    WRITE_FIELD_NUMBER: _ClassVar[int]
+    REMOVE_FIELD_NUMBER: _ClassVar[int]
+    write: WriteHeader
+    remove: RemoveHeader
+    def __init__(self, write: _Optional[_Union[WriteHeader, _Mapping]] = ..., remove: _Optional[_Union[RemoveHeader, _Mapping]] = ...) -> None: ...
+
+class HttpRequestResult(_message.Message):
+    __slots__ = ("decision", "reason", "body", "has_body", "header_mutations", "findings", "metadata", "reason_code")
+    class MetadataEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    DECISION_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    BODY_FIELD_NUMBER: _ClassVar[int]
+    HAS_BODY_FIELD_NUMBER: _ClassVar[int]
+    HEADER_MUTATIONS_FIELD_NUMBER: _ClassVar[int]
+    FINDINGS_FIELD_NUMBER: _ClassVar[int]
+    METADATA_FIELD_NUMBER: _ClassVar[int]
+    REASON_CODE_FIELD_NUMBER: _ClassVar[int]
+    decision: Decision
+    reason: str
+    body: bytes
+    has_body: bool
+    header_mutations: _containers.RepeatedCompositeFieldContainer[HeaderMutation]
+    findings: _containers.RepeatedCompositeFieldContainer[Finding]
+    metadata: _containers.ScalarMap[str, str]
+    reason_code: str
+    def __init__(self, decision: _Optional[_Union[Decision, str]] = ..., reason: _Optional[str] = ..., body: _Optional[bytes] = ..., has_body: _Optional[bool] = ..., header_mutations: _Optional[_Iterable[_Union[HeaderMutation, _Mapping]]] = ..., findings: _Optional[_Iterable[_Union[Finding, _Mapping]]] = ..., metadata: _Optional[_Mapping[str, str]] = ..., reason_code: _Optional[str] = ...) -> None: ...
