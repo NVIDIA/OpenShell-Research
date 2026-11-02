@@ -1,0 +1,134 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# The egress watchdog as a pod on the control node. It runs a stock uv Python
+# image against this project's checkout on the control node, so there is no
+# image to build. watchdog.sh fills in the placeholders. The pod runs as the
+# checkout's owner, because home directories are not readable by other users.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: egress-watchdog
+  namespace: openshell
+  labels:
+    app.kubernetes.io/name: egress-watchdog
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: egress-watchdog
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: egress-watchdog
+    spec:
+      nodeSelector:
+        openshell.io/role: control
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: __RUN_AS_UID__
+        runAsGroup: __RUN_AS_GID__
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: watchdog
+          image: __WATCHDOG_IMAGE__
+          command:
+            - uv
+            - run
+            - --project=/app
+            - --locked
+            - --no-dev
+            - egress-watchdog
+            - --listen=0.0.0.0:50051
+            - --tls-cert=/etc/egress-watchdog/tls/tls.crt
+            - --tls-key=/etc/egress-watchdog/tls/tls.key
+            - --jwt-public-key=/etc/egress-watchdog/jwt/public.pem
+          env:
+            # The checkout is read-only; uv keeps its environment and cache in /tmp.
+            - name: UV_PROJECT_ENVIRONMENT
+              value: /tmp/venv
+            - name: UV_CACHE_DIR
+              value: /tmp/uv-cache
+            - name: HOME
+              value: /tmp
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          ports:
+            - name: grpc
+              containerPort: 50051
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: project
+              mountPath: /app
+              readOnly: true
+            - name: tls
+              mountPath: /etc/egress-watchdog/tls
+              readOnly: true
+            - name: jwt
+              mountPath: /etc/egress-watchdog/jwt
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: project
+          hostPath:
+            path: __PROJECT_DIR__
+            type: Directory
+        - name: tls
+          secret:
+            secretName: egress-watchdog-tls
+        # Only the gateway's public key; the signing key is never mounted.
+        - name: jwt
+          secret:
+            secretName: openshell-jwt-keys
+            items:
+              - key: public.pem
+                path: public.pem
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: egress-watchdog
+  namespace: openshell
+spec:
+  selector:
+    app.kubernetes.io/name: egress-watchdog
+  ports:
+    - name: grpc
+      port: 50051
+      targetPort: grpc
+---
+# Only the gateway and sandbox supervisors may call the watchdog. Traffic from a
+# sandbox node, including its host, does not match and is dropped.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: egress-watchdog
+  namespace: openshell
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: egress-watchdog
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: openshell
+        - podSelector:
+            matchLabels:
+              openshell.ai/boundary-role: supervisor
+      ports:
+        - port: grpc
