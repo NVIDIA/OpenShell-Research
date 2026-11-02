@@ -1,5 +1,5 @@
 [build-system]
-requires = [ "setuptools>=84,<85",]
+requires = [ "setuptools>=84.2.1,<85",]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -12,13 +12,16 @@ dependencies = [
  "aiohttp>=3.14.5,<4", # 3.14.5 includes the 3.14.4 aiohttp security fixes pulled in by reachy-mini.
  "aiortc>=1.13.0",
  "anyio>=4.15.1,<5", # 4.15.1 fixes AnyIO security advisories pulled in by Gradio.
+ "brotli>=1.2.1,<2", # 1.2.1 fixes the Brotli decoder out-of-bounds write pulled in by Gradio.
  "certifi>=2026.10.23", # 2026.10.23 includes the 2026.10.19 emSign CA fix pulled in by requests and httpx.
  "cryptography>=50.0.1,<51", # 50.0.1 fixes cryptography security advisories pulled in by aiortc.
+ "dnspython>=2.9.1,<3", # 2.9.1 includes the 2.9.0 name-parsing CPU fix pulled in by aioice.
  "fastrtc>=0.0.34",
  "filelock>=4.2.4,<5", # 4.2.4 includes the 4.2.1 filelock security fixes pulled in by torch and huggingface-hub.
  "gradio==5.50.1.dev1",
  "gstreamer-bundle>=1.28.7,<1.29; sys_platform != 'linux'", # 1.28.7 fixes GStreamer advisories and supports Python 3.11-3.12 on macOS.
  "huggingface-hub>=1.5,<2",
+ "msgpack>=1.2.4,<2", # 1.2.4 includes the 1.2.3 strict_map_key memory-leak fix pulled in by librosa.
  "multidict>=6.9.1,<7", # 6.9.1 fixes the items-view reference leak pulled in by aiohttp.
  "opencv-python>=4.12.0.88",
  "pillow>=13,<14", # 13.0.0 fixes Pillow security advisories pulled in by Gradio.
@@ -32,9 +35,9 @@ dependencies = [
  "reachy-mini[mujoco]==1.10.0",
  "eclipse-zenoh~=1.7.0",
  "gradio_client>=1.13.3",
- "setuptools>=84,<85", # 84.0.0 fixes setuptools security advisories pulled in by torch.
+ "setuptools>=84.2.1,<85", # 84.2.1 includes the 84.1.0 namespace_packages.txt path-escape fix pulled in by torch.
  "starlette>=1.6,<2", # 1.6.0 fixes Starlette security advisories pulled in by Gradio and reachy-mini.
- "tornado>=6.5.10,<7", # 6.5.10 includes the 6.5.9 security fixes and Jupyter compatibility fix.
+ "tornado>=6.6,<7", # 6.6 fixes header-folding, redirect, and chunked-body advisories pulled in by reachy-mini.
  "urllib3>=2.8,<3", # 2.8.0 fixes proxy TLS and streaming decompression advisories.
 ]
 [[project.authors]]
