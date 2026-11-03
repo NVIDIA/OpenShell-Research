@@ -1,0 +1,13 @@
+version: 1
+catalog: openshell-github-rest-v1
+operations:
+  issue:
+    method: GET
+    path: /repos/{owner}/{repo}/issues/{number}
+  issue_comments:
+    method: GET
+    path: /repos/{owner}/{repo}/issues/{number}/comments
+  create_issue_comment:
+    method: POST
+    path: /repos/{owner}/{repo}/issues/{number}/comments
+warning: Operation examples describe capabilities; they do not justify task access.
