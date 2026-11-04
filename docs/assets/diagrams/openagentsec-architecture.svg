@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved. -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-labelledby="title description">
+  <title id="title">OpenAgentSec architecture around an OpenShell sandbox</title>
+  <desc id="description">On each host, an unchanged agent harness runs in an OpenShell sandbox, and the OpenShell supervisor handles every request and reply. The supervisor asks two middleware checks about each one: APF, a signed policy that answers allow, deny or ask, and the IPS, which inspects for secrets, personal data, prompt injection and changed MCP tools, and whose block beats any allow. A Suricata packet sensor with ET Open rules checks every packet inline before allowed model calls and tool calls leave the host. The OpenAgentSec Agent gives the IPS the quarantine state, reports inventory and health to the OpenAgentSec Server and receives actions such as quarantine. Falco runtime events and middleware audit records go to the OpenShell exporter, which delivers evidence to the Server. A read-only verifier reads back every response. The Server is never on the request path and feeds the console the security team uses.</desc>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --boundary-fill: #fbfaf6;
+      --boundary-stroke: #c4cbc6;
+      --ink: #202625;
+      --muted: #536260;
+      --badge-ink: #ffffff;
+      --openshell-fill: #eef5e6;
+      --openshell-stroke: #5f8f34;
+      --oas-fill: #e4f2f4;
+      --oas-stroke: #1f6f7a;
+      --companion-fill: #f2ecf7;
+      --companion-stroke: #7d4a9c;
+      --outside-fill: #f5f4f0;
+      --outside-stroke: #9aa19b;
+      --allowed: #4f8a2b;
+      --evidence: #7d4a9c;
+      --control: #1f6f7a;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --boundary-fill: #121719;
+        --boundary-stroke: #495655;
+        --ink: #e6e8e2;
+        --muted: #adb7b3;
+        --badge-ink: #121719;
+        --openshell-fill: color-mix(in srgb, #9ccc65 12%, #181e20);
+        --openshell-stroke: #9ccc65;
+        --oas-fill: color-mix(in srgb, #6fc7d3 12%, #181e20);
+        --oas-stroke: #6fc7d3;
+        --companion-fill: color-mix(in srgb, #bf97df 12%, #181e20);
+        --companion-stroke: #bf97df;
+        --outside-fill: #1b2123;
+        --outside-stroke: #6b7775;
+        --allowed: #9ccc65;
+        --evidence: #bf97df;
+        --control: #6fc7d3;
+      }
+    }
+    text { fill: var(--ink); font-family: Inter, system-ui, sans-serif; }
+    .host { fill: var(--boundary-fill); stroke: var(--boundary-stroke); stroke-width: 1.5; stroke-dasharray: 8 6; }
+    .sandbox { fill: var(--openshell-fill); stroke: var(--openshell-stroke); stroke-width: 2; }
+    .openshell { fill: #ffffff; fill-opacity: 0.7; stroke: var(--openshell-stroke); stroke-width: 1.5; }
+    .oas { fill: var(--oas-fill); stroke: var(--oas-stroke); stroke-width: 2; }
+    .middleware { fill: none; stroke: var(--oas-stroke); stroke-width: 1.5; stroke-dasharray: 6 4; }
+    .companion { fill: var(--companion-fill); stroke: var(--companion-stroke); stroke-width: 1.5; }
+    .outside { fill: var(--outside-fill); stroke: var(--outside-stroke); stroke-width: 1.5; }
+    .group-label { font-size: 17px; font-weight: 600; }
+    .group-detail { font-size: 15px; fill: var(--muted); }
+    .heading { font-size: 17px; font-weight: 600; text-anchor: middle; }
+    .detail { font-size: 14px; fill: var(--muted); text-anchor: middle; }
+    .flow-label { font-size: 13px; fill: var(--muted); }
+    .flow { fill: none; stroke: var(--muted); stroke-width: 2; marker-end: url(#arrow); }
+    .allowed { stroke: var(--allowed); marker-end: url(#arrow-allowed); }
+    .evidence { stroke: var(--evidence); stroke-dasharray: 6 5; marker-end: url(#arrow-evidence); }
+    .control { stroke: var(--control); marker-end: url(#arrow-control); }
+    .badge { stroke: none; }
+    .badge-text { font-size: 13px; font-weight: 700; text-anchor: middle; fill: var(--badge-ink); }
+    .legend { font-size: 14px; fill: var(--muted); }
+    @media (prefers-color-scheme: dark) {
+      .openshell { fill: #222a2c; fill-opacity: 1; }
+    }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="var(--muted)"/>
+    </marker>
+    <marker id="arrow-allowed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="var(--allowed)"/>
+    </marker>
+    <marker id="arrow-evidence" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="var(--evidence)"/>
+    </marker>
+    <marker id="arrow-control" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="var(--control)"/>
+    </marker>
+  </defs>
+
+  <!-- Host boundary -->
+  <rect class="host" x="20" y="20" width="816" height="680" rx="16"/>
+  <text class="group-label" x="36" y="46">On each host</text>
+  <text class="group-detail" x="152" y="46">Docker or Kubernetes</text>
+
+  <!-- OpenShell sandbox -->
+  <rect class="sandbox" x="40" y="64" width="520" height="232" rx="14"/>
+  <text class="group-label" x="60" y="92">OpenShell sandbox</text>
+  <text class="group-detail" x="60" y="112">Default deny: only the policy's endpoints are reachable</text>
+
+  <rect class="openshell" x="64" y="128" width="200" height="148" rx="10"/>
+  <text class="heading" x="164" y="170">AI agent</text>
+  <text class="detail" x="164" y="196">Unchanged harness</text>
+  <text class="detail" x="164" y="218">No security code</text>
+  <text class="detail" x="164" y="240">inside</text>
+
+  <rect class="openshell" x="340" y="128" width="200" height="148" rx="10"/>
+  <text class="heading" x="440" y="170">OpenShell supervisor</text>
+  <text class="detail" x="440" y="196">Every request and reply</text>
+  <text class="detail" x="440" y="218">passes through here</text>
+  <text class="detail" x="440" y="240">Enforces network policy</text>
+  <circle class="badge" cx="526" cy="141" r="11" fill="var(--openshell-stroke)"/>
+  <text class="badge-text" x="526" y="146">1</text>
+
+  <!-- Packet sensor -->
+  <rect class="companion" x="596" y="128" width="120" height="148" rx="10"/>
+  <text class="heading" x="656" y="166">Suricata</text>
+  <text class="detail" x="656" y="192">Packet sensor</text>
+  <text class="detail" x="656" y="214">ET Open rules</text>
+  <text class="detail" x="656" y="236">Inline, no bypass</text>
+  <circle class="badge" cx="702" cy="141" r="11" fill="var(--companion-stroke)"/>
+  <text class="badge-text" x="702" y="146">4</text>
+
+  <!-- Middleware -->
+  <rect class="middleware" x="250" y="340" width="370" height="166" rx="12"/>
+  <text class="group-label" x="604" y="364" text-anchor="end" style="font-size: 15px">Supervisor middleware</text>
+
+  <rect class="companion" x="266" y="378" width="130" height="116" rx="10"/>
+  <text class="heading" x="331" y="408">APF</text>
+  <text class="detail" x="331" y="432">Signed policy</text>
+  <text class="detail" x="331" y="454">allow, deny</text>
+  <text class="detail" x="331" y="474">or ask a person</text>
+  <circle class="badge" cx="382" cy="391" r="11" fill="var(--companion-stroke)"/>
+  <text class="badge-text" x="382" y="396">2</text>
+
+  <rect class="oas" x="412" y="378" width="192" height="116" rx="10"/>
+  <text class="heading" x="508" y="408">IPS</text>
+  <text class="detail" x="508" y="432">Secrets · personal data</text>
+  <text class="detail" x="508" y="452">Injection · MCP tools</text>
+  <text class="detail" x="508" y="474" style="font-weight: 600; fill: var(--oas-stroke)">Its block beats any allow</text>
+  <circle class="badge" cx="590" cy="391" r="11" fill="var(--oas-stroke)"/>
+  <text class="badge-text" x="590" y="396">3</text>
+
+  <!-- Evidence column -->
+  <rect class="companion" x="40" y="378" width="180" height="116" rx="10"/>
+  <text class="heading" x="130" y="412">Falco</text>
+  <text class="detail" x="130" y="436">Runtime sensor</text>
+  <text class="detail" x="130" y="458">Processes · files</text>
+
+  <rect class="companion" x="40" y="560" width="180" height="90" rx="10"/>
+  <text class="heading" x="130" y="594">OpenShell exporter</text>
+  <text class="detail" x="130" y="618">Read-only evidence</text>
+
+  <!-- OpenAgentSec Agent and verifier -->
+  <rect class="oas" x="250" y="560" width="370" height="90" rx="10"/>
+  <text class="heading" x="435" y="592">OpenAgentSec Agent</text>
+  <text class="detail" x="435" y="616">Finds sandboxes, keeps the quarantine,</text>
+  <text class="detail" x="435" y="636">runs scoped actions</text>
+
+  <rect class="oas" x="636" y="378" width="120" height="116" rx="10"/>
+  <text class="heading" x="696" y="412">Verifier</text>
+  <text class="detail" x="696" y="436">Read-only</text>
+  <text class="detail" x="696" y="458">checks every</text>
+  <text class="detail" x="696" y="478">response</text>
+
+  <!-- Outside the host -->
+  <rect class="outside" x="860" y="64" width="300" height="100" rx="12"/>
+  <text class="heading" x="1010" y="104">LLM API</text>
+  <text class="detail" x="1010" y="130">Model providers</text>
+
+  <rect class="outside" x="860" y="196" width="300" height="100" rx="12"/>
+  <text class="heading" x="1010" y="236">MCP tools and the web</text>
+  <text class="detail" x="1010" y="262">Tool servers and APIs</text>
+
+  <rect class="oas" x="860" y="360" width="300" height="112" rx="12"/>
+  <text class="heading" x="1010" y="398">Console</text>
+  <text class="detail" x="1010" y="424">The security team previews,</text>
+  <text class="detail" x="1010" y="446">approves and follows responses</text>
+
+  <rect class="oas" x="860" y="520" width="300" height="160" rx="12"/>
+  <text class="heading" x="1010" y="562">OpenAgentSec Server</text>
+  <text class="detail" x="1010" y="588">Incidents · approvals · audit</text>
+  <text class="detail" x="1010" y="610">Many hosts, one place</text>
+  <text class="detail" x="1010" y="644" style="font-weight: 600; fill: var(--oas-stroke)">Never on the request path</text>
+
+  <!-- Request path -->
+  <path class="flow" d="M264 186H338"/>
+  <text class="flow-label" x="301" y="178" text-anchor="middle">requests</text>
+  <path class="flow" d="M340 226H266"/>
+  <text class="flow-label" x="301" y="246" text-anchor="middle">replies</text>
+
+  <path class="flow" d="M370 276V376"/>
+  <text class="flow-label" x="360" y="322" text-anchor="end">each request and reply</text>
+  <path class="flow" d="M396 436H410"/>
+  <path class="flow control" d="M418 378V278"/>
+  <text class="flow-label" x="428" y="322">allow or block</text>
+
+  <path class="flow allowed" d="M540 200H594"/>
+  <path class="flow allowed" d="M716 140L858 120"/>
+  <text class="flow-label" x="776" y="114" text-anchor="middle">model calls</text>
+  <path class="flow allowed" d="M716 250L858 246"/>
+  <text class="flow-label" x="776" y="236" text-anchor="middle">tool calls</text>
+
+  <!-- Agent control -->
+  <path class="flow control" d="M508 560V496"/>
+  <text class="flow-label" x="518" y="534">quarantine state</text>
+  <path class="flow control" d="M620 590H858"/>
+  <text class="flow-label" x="739" y="582" text-anchor="middle">inventory · health</text>
+  <path class="flow control" d="M860 630H622"/>
+  <text class="flow-label" x="739" y="650" text-anchor="middle">quarantine · restart</text>
+  <path class="flow control" d="M1010 520V474"/>
+  <text class="flow-label" x="1020" y="502">incidents</text>
+
+  <!-- Evidence -->
+  <path class="flow evidence" d="M90 494V558"/>
+  <text class="flow-label" x="100" y="524">runtime events</text>
+  <path class="flow evidence" d="M331 494V540H200V558"/>
+  <text class="flow-label" x="266" y="532" text-anchor="middle">audit records</text>
+  <path class="flow evidence" d="M696 494V560H858"/>
+  <text class="flow-label" x="777" y="552" text-anchor="middle">readback</text>
+  <path class="flow evidence" d="M100 650V735H1010V682"/>
+  <text class="flow-label" x="540" y="727" text-anchor="middle">evidence, delivered from every host</text>
+
+  <!-- Legend -->
+  <rect class="sandbox" x="40" y="764" width="22" height="14" rx="3"/>
+  <text class="legend" x="70" y="776">OpenShell</text>
+  <rect class="oas" x="170" y="764" width="22" height="14" rx="3"/>
+  <text class="legend" x="200" y="776">OpenAgentSec</text>
+  <rect class="companion" x="326" y="764" width="22" height="14" rx="3"/>
+  <text class="legend" x="356" y="776">Companion or open-source tool</text>
+  <rect class="outside" x="600" y="764" width="22" height="14" rx="3"/>
+  <text class="legend" x="630" y="776">Outside</text>
+  <path class="flow allowed" d="M720 771H760"/>
+  <text class="legend" x="770" y="776">Allowed</text>
+  <path class="flow control" d="M850 771H890"/>
+  <text class="legend" x="900" y="776">Control</text>
+  <path class="flow evidence" d="M980 771H1020"/>
+  <text class="legend" x="1030" y="776">Evidence</text>
+  <circle class="badge" cx="1112" cy="771" r="9" fill="var(--muted)"/>
+  <text class="badge-text" x="1112" y="775" style="font-size: 11px">1</text>
+  <text class="legend" x="1128" y="776">Order</text>
+</svg>
