@@ -48,7 +48,7 @@ tags:
 
 <!-- dev-note:header:end -->
 
-When we started looking at Cedar as a policy language for Cedar, we had a few things in mind,
+When we started looking at Cedar as a policy language for OpenShell, we had a few things in mind,
 
 1. We always need the ability to decidable check if the permissions granted by policy A are less than those granted by policy B
 2. The language should be open-source, an industry standard, and be widely used by enterprises
@@ -56,7 +56,7 @@ When we started looking at Cedar as a policy language for Cedar, we had a few th
 
 One of the applications of the policy framework in OpenShell is to always maintain a least privilege floor to agent fleets. An agent A that handles a job B should only have privilege grants that are 1/ what A needs to do B and 2/ have been vetted by a security/compliance team. These grants expressed in a policy file then form the privilege ceiling for this agent. A ceiling for an agent may be less than the ceiling for a team of agents, or for that business unit.
 
-The ceiling policy for an agent is included in the ceiling policy of the team of agents which is included in the ceiling of the business unit, etc. Similarly, a sub-agent spawned for a job cannot need all of the permissions of its instantiating parent. The question then becomes "Does Policy A give more permissions than Policy B". Mathematically, is it the case that $Policy A \implies Policy B$. If it does, taking *grants* to be a function that takes a policy and returns the set of all grants in that policy, then $*grants*(A) \subset *grants*(B)$.
+The ceiling policy for an agent is included in the ceiling policy of the team of agents which is included in the ceiling of the business unit, etc. Similarly, a sub-agent spawned for a job cannot need all of the permissions of its instantiating parent. The question then becomes "Does Policy A give more permissions than Policy B". Mathematically, is it the case that *Policy A* ⇒ *Policy B*. If it does, taking *grants* to be a function that takes a policy and returns the set of all grants in that policy, then *grants*(A) ⊂ *grants*(B).
 
 This piece of machinery is what makes us maintain a least privilege floor. Treating some grants as single use grants is another less expensive mechanism to maintain that floor.
 
