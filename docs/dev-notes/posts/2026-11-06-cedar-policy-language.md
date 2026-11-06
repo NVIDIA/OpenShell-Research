@@ -48,19 +48,19 @@ tags:
 
 <!-- dev-note:header:end -->
 
-When we started looking at Cedar as a policy language for OpenShell, we had a few things in mind,
+When we started looking at Cedar as a policy language for OpenShell, we had a few things in mind:
 
 1. We need a language that lets us check if the permissions granted by policy A are no more than those granted by policy B for all policies A and B
 2. The language should be open-source, an industry standard, and widely used
-3. The language should be future-proof as we move from point in time policies to temporal policies. From "Allow X" to "Allow X only after doing Y".
+3. The language should be future-proof as we move from point-in-time policies to temporal policies. From "Allow X" to "Allow X only after doing Y".
 
-One of the applications of the policy framework in OpenShell is to always maintain a least privilege ceiling to agent fleets. An agent A that handles a job B should only have privilege grants that are 1/ what A needs to do B and 2/ have been vetted by a security/compliance team. These grants expressed in a policy file then form the privilege ceiling for this agent. A ceiling for an agent may be less than the ceiling for a team of agents, or for that business unit.
+One of the applications of the policy framework in OpenShell is to always maintain a least-privilege ceiling for agent fleets. An agent A that handles a job B should only have privilege grants that are 1/ what A needs to do B and 2/ have been vetted by a security/compliance team. These grants expressed in a policy file then form the privilege ceiling for this agent. A ceiling for an agent may be less than the ceiling for a team of agents, or for that business unit.
 
-The ceiling policy for an agent is included in the ceiling policy of the team of agents which is included in the ceiling of the business unit, etc. Similarly, a sub-agent spawned for a job cannot need all of the permissions of its instantiating parent. The question then becomes "Does Policy A give no more permissions than Policy B". Mathematically, is it the case that *Policy A* ⇒ *Policy B*. If it does, taking *grants* to be a function that takes a policy and returns the set of all grants in that policy, then *grants*(A) ⊆ *grants*(B).
+The ceiling policy for an agent is included in the ceiling policy of the team of agents which is included in the ceiling of the business unit, etc. Similarly, a sub-agent spawned for a job should not need all of the permissions of its instantiating parent. The question then becomes "Does Policy A give no more permissions than Policy B?" Mathematically, is it the case that *Policy A* ⇒ *Policy B*? If it does, taking *grants* to be a function that takes a policy and returns the set of all grants in that policy, then *grants*(A) ⊆ *grants*(B).
 
-This piece of machinery is what makes us maintain a least privilege ceiling. Treating some grants as single use grants is another less expensive mechanism to maintain that ceiling.
+This piece of machinery is what lets us maintain a least-privilege ceiling. Treating some grants as single-use grants is another less expensive mechanism to maintain that ceiling.
 
-The language being open-source and an industry standard is a given. Being popular and widely used by enterprises let's us meet enterprises where they are, writing policies in a single language for both cloud-native applications and cloud-native AI agents alike.
+The language being open-source and an industry standard is a given. Being popular and widely used by enterprises lets us meet enterprises where they are, writing policies in a single language for both cloud-native applications and cloud-native AI agents.
 
 The final desideratum from the above will be clearer as you read through this note.
 
@@ -114,20 +114,20 @@ when {
     && context.path like("/repos/NVIDIA/OpenShell/issues/*/labels", "/")
 };
 ```
-The differences worth noting are,
+The differences worth noting are:
 
-1. **Two decisions instead of one block.** YAML puts the endpoint, the rules and the binaries in one entry whereas Cedar splits it into a NetworkConnect decision and an HttpRequest decision. The former when gh opens the connection and the latter for every request the proxy inspects. The HttpRequest names the endpoint, either exactly or using wildcards.
-2. **What YAML implies, Cedar says.** A YAML binary also matches its symlinks implicitly, and a YAML GET also allows HEAD. In Cedar, you write what you mean. If you need matching through aliases then you explicitly request it using `binary_aliases.contains("/usr/bin/gh")` as an example.
+1. **Two decisions instead of one block.** YAML puts the endpoint, the rules and the binaries in one entry whereas Cedar splits it into a `NetworkConnect` decision and an `HttpRequest` decision. The former is made when `gh` opens the connection and the latter for every request the proxy inspects. Each `HttpRequest` policy names the endpoint, either exactly or using wildcards.
+2. **What YAML implies, Cedar says.** A YAML binary also matches its symlinks and the processes it launches implicitly, and a YAML GET also allows HEAD. In Cedar, you write what you mean, so the Cedar policy above is narrower than the YAML: it matches `gh` itself and nothing it launches. If you need matching through aliases or child processes then you explicitly request it, using `binary_aliases.contains("/usr/bin/gh")` or `ancestors.contains("/usr/bin/gh")` as examples.
 3. **Credentials don't grant access.** Attaching a GitHub provider to a Cedar sandbox supplies the token, not the permission. The Cedar policy is the complete statement of what that token can be used for.
-4. **Checked when submitted, and analyzable.** A typo is rejected when the policy is set, not silently ignored. Because the Cedar policy is the policy that's enforced, we can check that this agent's ceiling is contained in the triage team's ceiling.
+4. **Checked when submitted, and analyzable.** A misspelled attribute or a type error is rejected when the policy is set, not silently ignored. Because the Cedar policy is the policy that's enforced, we can check that this agent's ceiling is contained in the triage team's ceiling.
 
 ### What is Cedar
 
-Cedar was invented by AWS for authorization decisions, is a CNCF project, and is actively used for agent policies in Amazon Bedrock AgentCore and Strands Agents. It is the bulwark of authorization policies and decisions across AWS services.
+Cedar was invented by AWS for authorization decisions, is a CNCF project, and is actively used for agent policies in Amazon Bedrock AgentCore and Strands Agents. It is used at scale for authorization in AWS products and services.
 
-Cedar was designed to be fully decidable[^cedar-oopsla]. Cedar has a LEAN specification with the backend Rust implementation of Cedar primitives checked against the specification using differential random testing[^cedar-fse].
+Cedar was designed to be fully decidable[^cedar-oopsla]. Cedar has a Lean specification with the backend Rust implementation of Cedar primitives checked against the specification using differential random testing[^cedar-fse].
 
-A Cedar policy is a condition over a principal, an action, a resource, and a request context, validated against a schema, so authors can express conditions difficult to express in structural YAML. For example one cannot assert a binary can reach an endpoint only when launched by a specific parent, or conversely a binary can reach an endpoint only when not launched by a specific parent, in structural YAML. 
+A Cedar policy is a condition over a principal, an action, a resource, and a request context, validated against a schema, so authors can express conditions difficult to express in structural YAML. For example one cannot assert a binary can reach an endpoint only when launched by a specific parent, or conversely a binary can reach an endpoint only when not launched by a specific parent, in structural YAML.
 
 The language is decidable by construction. It does not support loops, recursion, or user-defined functions that lead to unboundedness and loss of decidability. Every evaluation terminates. Its symbolic compiler reduces any policy set to SMT[^symcert] with an encoding proved sound and complete in Lean. Analysis therefore applies to whatever an author writes, not only to the shapes a hand-built model covers, and it applies to the policy that is enforced, because the compiler and the evaluator share one specified semantics. That is also why a Cedar sandbox enforces the Cedar text itself. A policy derived from YAML by translation would move the question to the translator.
 
@@ -135,13 +135,13 @@ Cedar is also the base for temporal policies. Dogwood[^dogwood] extends Cedar wi
 
 ## Status
 
-We have implemented Cedar as an alternate policy language in OpenShell, with the RFC and integration under review ([OpenShell RFC 0020](https://github.com/NVIDIA/OpenShell/pull/4564), [OpenShell integration](https://github.com/NVIDIA/OpenShell/pull/4565)).
+We have implemented Cedar as an alternate policy language in OpenShell, with the RFC and integration under review ([OpenShell RFC 0020](https://github.com/NVIDIA/OpenShell/pull/4564), [OpenShell integration](https://github.com/NVIDIA/OpenShell/pull/4565)). Cedar support is available in development builds today; stable builds reject Cedar policies.
 
 ## What's coming
 
 ### Temporal policies: A teaser
 
-```
+```cedar
 // state:accepted only after a maintainer approved that same issue
 // within the last 24 hours.
 @id("triage/accept-after-approval")
@@ -165,9 +165,9 @@ when temporal {
 
 The triage agent from our example can label issues at any time, but one label is special: `state:accepted`. This Dogwood policy lets the agent apply it only if a maintainer approved that same issue in the last 24 hours. The `when` block is ordinary Cedar and checks the request in front of us. The `when temporal` block looks back over the history of events: was there an approval for this repository and issue, with `approved: true`, within the window? If there was no approval, if it was a rejection, or if it was for a different issue or is more than a day old, the request is denied. Dogwood lowers the temporal condition to a single context value, so the decision is still made by the Cedar engine. This is a sketch in Dogwood, not something OpenShell enforces today: `AddIssueLabel` and `ApproveIssue` are illustrative actions, not part of the OpenShell policy schema.
 
-This opens an interesting question and research direction. Since the `approved` state is updated outside of the policy, it is critical that all these state holding elements that the policy depends on are correct as the correctness of the policy evaluation is predicated on correctness of these predicates. In gist, there is a transfer of trust here that falls under the shared responsibility model. The entities producing the events that policies depend on need to ensure those events are correct and recorded with integrity, and the entities writing policies need to choose event sources they can trust.
+This opens an interesting question and research direction. Since the `approved` state is updated outside of the policy, it is critical that all these state holding elements that the policy depends on are correct as the correctness of the policy evaluation is predicated on correctness of these predicates. In short, there is a transfer of trust here that falls under the shared responsibility model. The entities producing the events that policies depend on need to ensure those events are correct and recorded with integrity, and the entities writing policies need to choose event sources they can trust.
 
-The correctness of predicates is vertical agnostic. A community driven initiative to assure correctness of predicates, perhaps deploying either formal or other testing based approaches is a need.
+The correctness of predicates is vertical-agnostic. A community-driven initiative to assure correctness of predicates, perhaps deploying either formal or testing-based approaches, is a need.
 
 ## References
 
