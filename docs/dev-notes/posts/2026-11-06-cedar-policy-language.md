@@ -50,9 +50,9 @@ tags:
 
 When we started looking at Cedar as a policy language for OpenShell, we had a few things in mind,
 
-1. We always need the ability to decidable check if the permissions granted by policy A are less than those granted by policy B
-2. The language should be open-source, an industry standard, and be widely used by enterprises
-3. It should be future-proof as we move from point in time policies to temporal policies such as "A diagnosis release can only happen after review by a doctor", "Payment can only happen after the bidding is closed", etc.
+1. We need a language that lets us check if the permissions granted by policy A are less than those granted by policy B for all policies A and B
+2. The language should be open-source, an industry standard, and widely used
+3. The language should be future-proof as we move from point in time policies to temporal policies. From "Allow X" to "Allow X only after doing Y".
 
 One of the applications of the policy framework in OpenShell is to always maintain a least privilege floor to agent fleets. An agent A that handles a job B should only have privilege grants that are 1/ what A needs to do B and 2/ have been vetted by a security/compliance team. These grants expressed in a policy file then form the privilege ceiling for this agent. A ceiling for an agent may be less than the ceiling for a team of agents, or for that business unit.
 
@@ -66,93 +66,68 @@ The final desideratum from the above will be clearer as you read through this no
 
 ## Introducing Cedar
 
-The best introduction will be through examples, given you are already familiar with YAML policies in the OpenShell of today.
+The best introduction will be through examples, given you are already familiar with YAML policies in OpenShell.
 
-*A filesystem and network YAML policy*
+*A network YAML policy*
+
+In this example, a triage agent may label issues in one repository and nothing else on GitHub. It can add labels to issues in `NVIDIA/OpenShell` but it cannot comment, close issues, edit code, or touch any other repository.
 
 ```yaml
 version: 1
 
-filesystem_policy:
-  include_workdir: true
-  read_only: [/bin, /usr, /lib, /proc, /dev/urandom, /app, /etc, /var/log]
-  read_write: [/sandbox, /tmp, /dev/null]
-landlock:
-  compatibility: best_effort
-
 network_policies:
-  github_api:
-    name: github-api-readonly
+  github_triage:
+    name: github-issue-labeling
     endpoints:
       - host: api.github.com
         port: 443
         protocol: rest
         enforcement: enforce
-        access: read-only
+        rules:
+          - allow:
+              method: POST
+              path: "/repos/NVIDIA/OpenShell/issues/*/labels"
     binaries:
-      - { path: /usr/bin/curl }
+      - { path: /usr/bin/gh }
 ```
 
-*The same filesystem and network policy in Cedar*
+*The same network policy in Cedar*
 
 ```cedar
-// Filesystem: read-write paths
-@id("filesystem/read_write")
-permit (
-    principal is Sandbox::Process,
-    action in [Sandbox::Action::"ReadFile", Sandbox::Action::"WriteFile"],
-    resource is Sandbox::FilesystemPath
-)
-when {
-    resource in Sandbox::FilesystemPath::"/sandbox"
-    || resource in Sandbox::FilesystemPath::"/tmp"
-    || resource in Sandbox::FilesystemPath::"/dev/null"
-};
-
-// Filesystem: read-only paths
-@id("filesystem/read_only")
-permit (
-    principal is Sandbox::Process,
-    action == Sandbox::Action::"ReadFile",
-    resource is Sandbox::FilesystemPath
-)
-when {
-    resource in Sandbox::FilesystemPath::"/bin"
-    || resource in Sandbox::FilesystemPath::"/usr"
-    || resource in Sandbox::FilesystemPath::"/lib"
-    || resource in Sandbox::FilesystemPath::"/proc"
-    || resource in Sandbox::FilesystemPath::"/dev/urandom"
-    || resource in Sandbox::FilesystemPath::"/app"
-    || resource in Sandbox::FilesystemPath::"/etc"
-    || resource in Sandbox::FilesystemPath::"/var/log"
-};
-
-// Network: curl may open a connection to api.github.com:443
-@id("github_api/connect")
+@id("github_triage/connect")
 permit (
     principal is Sandbox::Process,
     action == Sandbox::Action::"NetworkConnect",
     resource == Sandbox::NetworkEndpoint::"api.github.com:443"
 )
-when {
-    context.binary_path == "/usr/bin/curl"
-    || context.ancestors.contains("/usr/bin/curl")
-    || context.binary_aliases.contains("/usr/bin/curl")
-};
+when { context.binary_path == "/usr/bin/gh" };
 
-// Network: each request is inspected; read-only = GET, HEAD, OPTIONS
-@id("github_api/read-only")
+@id("github_triage/add-labels")
 permit (
     principal is Sandbox::Process,
     action == Sandbox::Action::"HttpRequest",
     resource == Sandbox::NetworkEndpoint::"api.github.com:443"
 )
 when {
-    (context.binary_path == "/usr/bin/curl"
-     || context.ancestors.contains("/usr/bin/curl")
-     || context.binary_aliases.contains("/usr/bin/curl"))
-    && ["GET", "HEAD", "OPTIONS"].contains(context.method)
+    context.binary_path == "/usr/bin/gh"
+    && context.method == "POST"
+    && context.path like("/repos/NVIDIA/OpenShell/issues/*/labels", "/")
 };
 ```
+The differences worth noting are,
 
+1. **Two decisions instead of one block.** YAML puts the endpoint, the rules and the binaries in one entry whereas Cedar splits it into a NetworkConnect decision and an HttpRequest decision. The former when gh opens the connection and the latter for every request the proxy inspects. The HttpRequest names the endpoint, either exactly or using wildcards.
+2. **What YAML implies, Cedar says.** A YAML binary also matches its symlinks implicitly, and a YAML GET also allows HEAD. In Cedar, you write what you mean. If you need matching through aliases then you explicitly request it using `binary_aliases.contains("/usr/bin/gh") as an example.
+3. **Credentials don't grant access.** Attaching a GitHub provider to a Cedar sandbox supplies the token, not the permission. The Cedar policy is the complete statement of what that token can be used for.
+4. **Checked when submitted, and analyzable.** A typo is rejected when the policy is set, not silently ignored. Because the Cedar policy is the policy that's enforced, we can check that this agent's ceiling is contained in the triage team's ceiling.
+
+### What is Cedar
+
+Cedar was invented by AWS for authorization decisions, is a CNCF project, and is actively used for agent policies in Amazon Bedrock AgentCore and Strands Agents. It is the bulwark of authorization policies and decisions across AWS services.
+
+Cedar was designed to be fully decidable \cite{}. Cedar has a LEAN specification with the backend Rust implementation of Cedar primitives verified as equivalent to the specification using differential testing \cite{}.
+
+A Cedar policy is a condition over a principal, an action, a resource, and a request context, validated against a schema, so authors can express conditions difficult to express in structural YAML. For example one cannot assert a binary can reach an endpoint only when launched by a specific parent, or conversely a binary can reach an endpoint only when not launched by a specific parent, in structural YAML. The language is decidable by construction. It does not support loops, recursion, or user-defined functions that lead to unboundedness and loss of decidability. Every evaluation terminates. Its symbolic compiler reduces any policy set to SMT \cite{} with an encoding proved sound and complete in Lean. Analysis therefore applies to whatever an author writes, not only to the shapes a hand-built model covers, and it applies to the policy that is enforced, because the compiler and the evaluator share one specified semantics. That is also why a Cedar sandbox enforces the Cedar text itself. A policy derived from YAML by translation would move the question to the translator.
+
+Cedar is also the base for temporal policies. Dogwood extends Cedar with `when temporal { ... }` conditions over the history of events the authorizer has seen ("permit this call only if the same principal was approved within the last hour", "deny after a logout until the next login") and with information providers, values computed on demand that a condition may consult. It lowers to Cedar and evaluates with the Cedar engine. Adopting Cedar as a sandbox policy language is the step that makes those policies reachable later without another change of language.
 
