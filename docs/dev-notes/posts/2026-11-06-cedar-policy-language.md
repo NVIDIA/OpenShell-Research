@@ -169,6 +169,25 @@ This opens an interesting question and research direction. Since the `approved` 
 
 The correctness of predicates is vertical-agnostic. A community-driven initiative to assure correctness of predicates, perhaps deploying either formal or testing-based approaches, is a need.
 
+### Prover
+
+We are building an MCP server for OpenShell. As part of this we will make available a set of APIs that can be used to exercise the prover capabilities. The Prover will continue to support YAML but with the additional support to handle Cedar policies. Cedar supports set operations that we will include as additional Prover capabilities.
+
+1. **Union:** each `permit` contributes the requests it matches, and a policy set *P* allows their union, *allowed*(P).
+2. **Set difference:** this is what `forbid` adds. A matching `forbid` always overrides any `permit`, so *allowed*(P) = (∪ permits) \ (∪ forbids). That's the formal reason "forbid always wins" and why policy order doesn't matter.
+3. **Intersection**, within a single policy: a policy's scope and all of its `when` clauses are conjoined, and `unless` clauses are conjoined after negation. A single policy's match set is therefore the intersection of its constraints. There's no operator that intersects two policy sets, though. To require two sets to both allow a request, you evaluate them separately and combine the results outside Cedar.
+4. **Complement:** you never write it directly. It's implicit, because anything no `permit` matches is denied by default.
+
+Over these, Cedar's analyzer decides the following relations between two policy sets *P₁* and *P₂*, returning a counterexample request when the answer is no:
+
+- **Inclusion:** *allowed*(P₁) ⊆ *allowed*(P₂). This is the ceiling check.
+- **Equivalence:** *allowed*(P₁) = *allowed*(P₂), for example to confirm that a refactored policy allows exactly what the original did.
+- **Disjointness:** *allowed*(P₁) ∩ *allowed*(P₂) = ∅, for example to confirm that two agents share no grants.
+
+### Policy Advisor
+
+We are scoping an interesting research direction and that is to automatically synthesize policies. Stay tuned for these.
+
 ## References
 
 [^cedar-oopsla]: J. W. Cutler, C. Disselkoen, A. Eline, S. He, K. Headley, M. Hicks, K. Hietala, E. Ioannidis, J. Kastner, A. Mamat, D. McAdams, M. McCutchen, N. Rungta, E. Torlak, and A. M. Wells. "Cedar: A New Language for Expressive, Fast, Safe, and Analyzable Authorization." *Proc. ACM Program. Lang.* 8, OOPSLA1, Article 118 (2024). [doi:10.1145/3649835](https://doi.org/10.1145/3649835)
