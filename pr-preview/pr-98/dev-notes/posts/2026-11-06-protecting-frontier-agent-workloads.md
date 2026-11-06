@@ -188,3 +188,16 @@ The two-machine deployment runs on OpenShell with no changes to OpenShell itself
 - [Saltzer and Schroeder: The Protection of Information in Computer Systems (1975)](https://www.cs.virginia.edu/~evans/cs551/saltzer/)
 
 - [Zelkova: Semantic-based automated reasoning for AWS access policies using SMT](https://www.amazon.science/publications/semantic-based-automated-reasoning-for-aws-access-policies-using-smt)
+
+## BibTeX
+
+```bibtex
+@article{watson2026protectingfrontieragents,
+  author = {Alex Watson and Ali Golshan and John Myers and Piotr Mlocek and Drew Newberry and Vishwanath Raman},
+  title = {Protecting frontier agent workloads with OpenShell},
+  journal = {OpenShell Research Dev Notes},
+  year = {2026},
+  month = {November},
+  url = {https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-11-06-protecting-frontier-agent-workloads/}
+}
+```
