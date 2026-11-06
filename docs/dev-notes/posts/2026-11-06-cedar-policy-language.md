@@ -3,10 +3,7 @@ title: "Cedar as the policy language in OpenShell"
 date: 2026-11-06
 description: "Why OpenShell is adopting Cedar for sandbox policy: decidable policy comparison, an open industry standard, and a path to temporal policies."
 author: "Vishwanath Raman"
-social_image: "assets/cedar-policy/hero.svg"
-hero_image: "../../assets/cedar-policy/hero.svg"
-hero_image_dark: "../../assets/cedar-policy/hero-dark.svg"
-hero_image_alt: "Four nested boxes labeled business unit, team, agent, and sub-agent, with grants(A) ⊆ grants(B) beneath the innermost box."
+social_image: "assets/brand/openshell-research-light.png"
 agent_markdown: true
 authors:
   - vishwa-raman
@@ -26,11 +23,6 @@ tags:
 <div class="dev-note-header" markdown="1">
 
 # Cedar as the policy language in OpenShell
-
-<figure class="dev-note-figure dev-note-figure--hero">
-  <a class="dev-note-image--light" href="../../assets/cedar-policy/hero.svg" aria-label="View full-size image: Four nested boxes labeled business unit, team, agent, and sub-agent, with grants(A) ⊆ grants(B) beneath the innermost box."><img src="../../assets/cedar-policy/hero.svg" alt="Four nested boxes labeled business unit, team, agent, and sub-agent, with grants(A) ⊆ grants(B) beneath the innermost box." loading="eager" fetchpriority="high"></a>
-  <a class="dev-note-image--dark" href="../../assets/cedar-policy/hero-dark.svg" aria-label="View full-size image: Four nested boxes labeled business unit, team, agent, and sub-agent, with grants(A) ⊆ grants(B) beneath the innermost box."><img src="../../assets/cedar-policy/hero-dark.svg" alt="Four nested boxes labeled business unit, team, agent, and sub-agent, with grants(A) ⊆ grants(B) beneath the innermost box." loading="eager" fetchpriority="high"></a>
-</figure>
 
 </div>
 
