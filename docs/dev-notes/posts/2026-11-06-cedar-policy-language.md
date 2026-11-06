@@ -125,11 +125,11 @@ The differences worth noting are:
 
 Cedar was invented by AWS for authorization decisions, is a CNCF project, and is actively used for agent policies in Amazon Bedrock AgentCore and Strands Agents. It is used at scale for authorization in AWS products and services.
 
-Cedar was designed to be fully decidable[^cedar-oopsla]. Cedar has a Lean specification with the backend Rust implementation of Cedar primitives checked against the specification using differential random testing[^cedar-fse].
+Cedar was designed to be fully decidable[^cedar-oopsla]. Cedar has a Lean[^lean] specification with the backend Rust implementation of Cedar primitives checked against the specification using differential random testing[^cedar-fse].
 
 A Cedar policy is a condition over a principal, an action, a resource, and a request context, validated against a schema, so authors can express conditions difficult to express in structural YAML. For example one cannot assert a binary can reach an endpoint only when launched by a specific parent, or conversely a binary can reach an endpoint only when not launched by a specific parent, in structural YAML.
 
-The language is decidable by construction. It does not support loops, recursion, or user-defined functions that lead to unboundedness and loss of decidability. Every evaluation terminates. Its symbolic compiler reduces any policy set to SMT[^symcert] with an encoding proved sound and complete in Lean. Analysis therefore applies to whatever an author writes, not only to the shapes a hand-built model covers, and it applies to the policy that is enforced, because the compiler and the evaluator share one specified semantics. That is also why a Cedar sandbox enforces the Cedar text itself. A policy derived from YAML by translation would move the question to the translator.
+The language is decidable by construction. It does not support loops, recursion, or user-defined functions that lead to unboundedness and loss of decidability. Every evaluation terminates. Its symbolic compiler reduces any policy set to SMT[^smt] with an encoding proved sound and complete in Lean[^symcert], and the resulting queries are solved with the cvc5 SMT solver[^cvc5]. Analysis therefore applies to whatever an author writes, not only to the shapes a hand-built model covers, and it applies to the policy that is enforced, because the compiler and the evaluator share one specified semantics. That is also why a Cedar sandbox enforces the Cedar text itself. A policy derived from YAML by translation would move the question to the translator.
 
 Cedar is also the base for temporal policies. Dogwood[^dogwood] extends Cedar with `when temporal { ... }` conditions over the history of events the authorizer has seen ("permit this call only if the same principal was approved within the last hour", "deny after a logout until the next login") and with information providers, values computed on demand that a condition may consult. It lowers to Cedar and evaluates with the Cedar engine. Adopting Cedar as a sandbox policy language is the step that makes those policies reachable later without another change of language.
 
@@ -173,9 +173,15 @@ The correctness of predicates is vertical-agnostic. A community-driven initiativ
 
 [^cedar-oopsla]: J. W. Cutler, C. Disselkoen, A. Eline, S. He, K. Headley, M. Hicks, K. Hietala, E. Ioannidis, J. Kastner, A. Mamat, D. McAdams, M. McCutchen, N. Rungta, E. Torlak, and A. M. Wells. "Cedar: A New Language for Expressive, Fast, Safe, and Analyzable Authorization." *Proc. ACM Program. Lang.* 8, OOPSLA1, Article 118 (2024). [doi:10.1145/3649835](https://doi.org/10.1145/3649835)
 
+[^lean]: L. de Moura and S. Ullrich. "The Lean 4 Theorem Prover and Programming Language." *CADE-28* (2021), LNAI 12699, pp. 625–635. [doi:10.1007/978-3-030-79876-5_37](https://doi.org/10.1007/978-3-030-79876-5_37)
+
 [^cedar-fse]: C. Disselkoen, A. Eline, S. He, K. Headley, M. Hicks, K. Hietala, J. Kastner, A. Mamat, M. McCutchen, N. Rungta, B. Shah, E. Torlak, and A. Wells. "How We Built Cedar: A Verification-Guided Approach." *FSE 2024 Companion*. [doi:10.1145/3663529.3663854](https://doi.org/10.1145/3663529.3663854)
 
+[^smt]: C. Barrett, R. Sebastiani, S. A. Seshia, and C. Tinelli. "Satisfiability Modulo Theories." In *Handbook of Satisfiability*, 2nd ed., Frontiers in Artificial Intelligence and Applications, vol. 336, IOS Press (2021). [doi:10.3233/FAIA201017](https://doi.org/10.3233/FAIA201017)
+
 [^symcert]: E. Torlak. "SymCert: Verifying SMT-Based Policy Analyses." *FMCAD 2026*. [Paper](https://www.amazon.science/publications/symcert-verifying-smt-based-policy-analyses)
+
+[^cvc5]: H. Barbosa, C. Barrett, M. Brain, G. Kremer, H. Lachnitt, M. Mann, A. Mohamed, M. Mohamed, A. Niemetz, A. Nötzli, A. Ozdemir, M. Preiner, A. Reynolds, Y. Sheng, C. Tinelli, and Y. Zohar. "cvc5: A Versatile and Industrial-Strength SMT Solver." *TACAS 2022*, LNCS 13243, pp. 415–442. [doi:10.1007/978-3-030-99524-9_24](https://doi.org/10.1007/978-3-030-99524-9_24)
 
 [^dogwood]: Dogwood: a governance language for AI agents that extends Cedar with temporal conditions and information providers. [github.com/dogwood-policy/dogwood](https://github.com/dogwood-policy/dogwood); documentation at [dogwood-policy.github.io/dogwood](https://dogwood-policy.github.io/dogwood/index.html)
 
