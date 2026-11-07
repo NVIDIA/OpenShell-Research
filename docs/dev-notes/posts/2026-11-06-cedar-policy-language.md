@@ -48,11 +48,13 @@ tags:
 
 <!-- dev-note:header:end -->
 
-OpenShell is a runtime for AI safety and governance that uses a policy driven enablement of least-privilege access to AI agents. OpenShell policies are written today in structural YAML and evaluated by the OPA engine using Rego as the policy language. Rego is a general-purpose language with no decidable procedure that always answers inclusion questions, such as "Does policy A grant no more than policy B?" Today OpenShell gets that analysis by maintaining a prover model for the YAML structure and using an SMT[^smt] solver. But every new policy enhancement needs extensions to the YAML schema, the backend Rego program, and to the prover model that analyzes it. Thus began our quest for a new policy language. We had the following in mind when it came to picking a policy language.
+OpenShell is a runtime for AI safety and governance that uses a policy driven enablement of least-privilege access to AI agents. OpenShell policies are written today in structural YAML and evaluated using Rego as the policy language, with `regorus`, a Rust implementation of Rego, as the engine. Rego is a general-purpose language with no decidable procedure that always answers inclusion questions, such as "Does policy A grant no more than policy B?" Today OpenShell gets that analysis by maintaining a prover model for the YAML structure and using an SMT[^smt] solver. But every new policy enhancement needs extensions to the YAML schema, the backend Rego program, and to the prover model that analyzes it. 
+
+We anticipate the need to enhance the policy language to move beyond point-in-time policies to temporal policies, such as "Allow X only after doing Y", which would be inexpressible in YAML. Given these considerations, with the design to future-proof our policy framework, 
+we began our quest for a new policy language. We had the following in mind when it came to picking one.
 
 1. We need a language that lets us check if the permissions granted by policy A are no more than those granted by policy B for all policies A and B
 2. The language should be open-source, an industry standard, and widely used
-3. The language should be future-proof as we move from point-in-time policies to temporal policies. From "Allow X" to "Allow X only after doing Y".
 
 One of the applications of the policy framework in OpenShell is to always maintain a least-privilege ceiling for agent fleets. An agent A that handles a job B should only have privilege grants that are 1/ what A needs to do B and 2/ have been vetted by a security/compliance team. These grants expressed in a policy file then form the privilege ceiling for this agent. A ceiling for an agent may be less than the ceiling for a team of agents, or for that business unit.
 
@@ -62,7 +64,7 @@ This piece of machinery is what lets us maintain a least-privilege ceiling. Trea
 
 The language being open-source and an industry standard is a given. Being popular and widely used by enterprises lets us meet enterprises where they are, writing policies in a single language for both cloud-native applications and cloud-native AI agents.
 
-The final desideratum from the above will be clearer as you read through this note.
+The need for temporal policies will be clearer as you read through this note.
 
 ## Introducing Cedar
 
@@ -165,20 +167,20 @@ when temporal {
 
 The triage agent from our example can label issues at any time, but one label is special: `state:accepted`. This Dogwood policy lets the agent apply it only if a maintainer approved that same issue in the last 24 hours. The `when` block is ordinary Cedar and checks the request in front of us. The `when temporal` block looks back over the history of events: was there an approval for this repository and issue, with `approved: true`, within the window? If there was no approval, if it was a rejection, or if it was for a different issue or is more than a day old, the request is denied. Dogwood lowers the temporal condition to a single context value, so the decision is still made by the Cedar engine. This is a sketch in Dogwood, not something OpenShell enforces today: `AddIssueLabel` and `ApproveIssue` are illustrative actions, not part of the OpenShell policy schema.
 
-This opens an interesting question and research direction. Since the `approved` state is updated outside of the policy, it is critical that all these state holding elements that the policy depends on are correct as the correctness of the policy evaluation is predicated on correctness of these predicates. In short, there is a transfer of trust here that falls under the shared responsibility model. The entities producing the events that policies depend on need to ensure those events are correct and recorded with integrity, and the entities writing policies need to choose event sources they can trust.
+This opens an interesting question and research direction. Since the `approved` state is updated outside of the policy, it is critical that the events the policy depends on, such as the recorded approval, are correct, because the correctness of the policy decision rests on them. In short, there is a transfer of trust here that falls under the shared responsibility model. The entities producing the events that policies depend on need to ensure those events are correct and recorded with integrity, and the entities writing policies need to choose event sources they can trust.
 
-The correctness of predicates is vertical-agnostic. A community-driven initiative to assure correctness of predicates, perhaps deploying either formal or testing-based approaches, is a need.
+The correctness of these events is a vertical-agnostic concern. A community-driven initiative to assure the correctness of such events, perhaps deploying either formal or testing-based approaches, is a need.
 
 ### Prover
 
-We are building an MCP server for OpenShell. As part of this we will make available a set of APIs that can be used to exercise the prover capabilities. The Prover will continue to support YAML but with the additional support to handle Cedar policies. Cedar supports set operations that we will include as additional Prover capabilities.
+We are building an MCP server for OpenShell. As part of this we will make available a set of APIs that can be used to exercise the prover capabilities. The Prover will continue to support YAML but with the additional support to handle Cedar policies. A Cedar policy set has a precise set-based meaning, and Cedar's analysis decides set relations between policy sets that we will expose as additional Prover capabilities.
 
 1. **Union:** each `permit` contributes the requests it matches, and a policy set *P* allows their union, *allowed*(P).
 2. **Set difference:** this is what `forbid` adds. A matching `forbid` always overrides any `permit`, so *allowed*(P) = (∪ permits) \ (∪ forbids). That's the formal reason "forbid always wins" and why policy order doesn't matter.
 3. **Intersection**, within a single policy: a policy's scope and all of its `when` clauses are conjoined, and `unless` clauses are conjoined after negation. A single policy's match set is therefore the intersection of its constraints. There's no operator that intersects two policy sets, though. To require two sets to both allow a request, you evaluate them separately and combine the results outside Cedar.
 4. **Complement:** you never write it directly. It's implicit, because anything no `permit` matches is denied by default.
 
-Over these, Cedar's analyzer decides the following relations between two policy sets *P₁* and *P₂*, returning a counterexample request when the answer is no:
+Over these, Cedar's analyzer decides the following relations between two policy sets *P₁* and *P₂*, over all requests the schema allows, returning a counterexample request when the answer is no:
 
 - **Inclusion:** *allowed*(P₁) ⊆ *allowed*(P₂). This is the ceiling check.
 - **Equivalence:** *allowed*(P₁) = *allowed*(P₂), for example to confirm that a refactored policy allows exactly what the original did.
