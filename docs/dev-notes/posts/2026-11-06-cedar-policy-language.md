@@ -50,25 +50,23 @@ tags:
 
 OpenShell is a runtime for AI safety and governance that uses a policy driven enablement of least-privilege access to AI agents. OpenShell policies are written today in structural YAML and evaluated using Rego as the policy language, with `regorus`, a Rust implementation of Rego, as the engine. Rego is a general-purpose language with no decidable procedure that always answers inclusion questions, such as "Does policy A grant no more than policy B?" Today OpenShell gets that analysis by maintaining a prover model for the YAML structure and using an SMT[^smt] solver. But every new policy enhancement needs extensions to the YAML schema, the backend Rego program, and to the prover model that analyzes it. 
 
-We anticipate the need to enhance the policy language to move beyond point-in-time policies to temporal policies, such as "Allow X only after doing Y", which would be inexpressible in YAML. Given these considerations, with the design to future-proof our policy framework, 
+We anticipate the need to enhance the policy language to move beyond point-in-time policies to temporal policies, such as "Allow X only after doing Y", which would be inexpressible in YAML. Given these considerations, with the desire to future-proof our policy framework, 
 we began our quest for a new policy language. We had the following in mind when it came to picking one.
 
 1. We need a language that lets us check if the permissions granted by policy A are no more than those granted by policy B for all policies A and B
 2. The language should be open-source, an industry standard, and widely used
 
-One of the applications of the policy framework in OpenShell is to always maintain a least-privilege ceiling for agent fleets. An agent A that handles a job B should only have privilege grants that are 1/ what A needs to do B and 2/ have been vetted by a security/compliance team. These grants expressed in a policy file then form the privilege ceiling for this agent. A ceiling for an agent may be less than the ceiling for a team of agents, or for that business unit.
+One of the applications of the policy framework in OpenShell is to always maintain a least-privilege ceiling for agent fleets. An agent A that handles a job B should only have privilege grants that are 1/ what A needs to do B and 2/ have been vetted by security and compliance teams. These grants expressed in a policy file then form the privilege ceiling for this agent. A ceiling for an agent may be less than the ceiling for a team of agents, or for that business unit.
 
-The ceiling policy for an agent is included in the ceiling policy of the team of agents which is included in the ceiling of the business unit, etc. Similarly, a sub-agent spawned for a job should not need all of the permissions of its instantiating parent. The question then becomes "Does Policy A give no more permissions than Policy B?" Mathematically, is it the case that *Policy A* ⇒ *Policy B*? If it does, taking *grants* to be a function that takes a policy and returns the set of all grants in that policy, then *grants*(A) ⊆ *grants*(B).
+The ceiling policy for an agent is included in the ceiling policy of the team of agents which is included in that of the business unit, etc. Similarly, a sub-agent spawned for a job should not need all of the permissions of its instantiating parent. The question then becomes can we always check "Does Policy A give no more permissions than Policy B?" Mathematically, is it the case that *Policy A* ⇒ *Policy B*? If it does, taking *grants* to be a function that takes a policy and returns the set of all grants in that policy, *grants*(A) ⊆ *grants*(B).
 
 This piece of machinery is what lets us maintain a least-privilege ceiling. Treating some grants as single-use grants is another less expensive mechanism to maintain that ceiling.
 
-The language being open-source and an industry standard is a given. Being popular and widely used by enterprises lets us meet enterprises where they are, writing policies in a single language for both cloud-native applications and cloud-native AI agents.
-
-The need for temporal policies will be clearer as you read through this note.
+The need for a language is open-source and an industry standard is a given. Being popular and widely used by enterprises lets us meet enterprises where they are, writing policies in a single language for both cloud-native applications and cloud-native AI agents.
 
 ## Introducing Cedar
 
-The best introduction will be through examples, given you are already familiar with YAML policies in OpenShell.
+The best introduction to Cedar will be through an example. For those of you familiar with our YAML policy framework, please read on. For others, if you would like to learn more about our current support for policies, please visit our [Sandbox Policies documentation](https://docs.nvidia.com/openshell/how-it-works/policies/overview).
 
 ### A network YAML policy
 
