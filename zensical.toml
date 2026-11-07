@@ -21,7 +21,7 @@ nav = [
     "dev-notes/index.md",
     {"Posts" = [
       # dev-notes:nav:start
-      {"OpenShell is now a CNCF sandbox project" = "dev-notes/posts/2026-11-06-donating-openshell-to-cncf.md"},
+      {"OpenShell is now a CNCF sandbox project" = "dev-notes/posts/2026-11-06-donated-openshell-to-cncf.md"},
       {"Introducing OpenShell Research" = "dev-notes/posts/2026-09-28-introducing-openshell-research.md"},
       {"The leak is coming from inside the sandbox" = "dev-notes/posts/2026-09-26-network-redaction-is-not-enough.md"},
       {"What we have learned applying formal methods to control AI agents" = "dev-notes/posts/2026-09-10-learning-formal-methods-agent-policy-prover.md"},

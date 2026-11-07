@@ -52,7 +52,7 @@ hide:
       <h2 id="featured-note-title" aria-live="polite" aria-atomic="true">Featured note</h2>
     </div>
     <article class="dev-note-card dev-note-card--featured dev-note-card--announcements dev-note-card--has-image" data-category="announcements" data-authors="[&quot;vishwa-raman&quot;]">
-      <a class="dev-note-card__link" href="posts/2026-11-06-donating-openshell-to-cncf/">
+      <a class="dev-note-card__link" href="posts/2026-11-06-donated-openshell-to-cncf/">
       <div class="dev-note-card__visual dev-note-card__visual--announcements dev-note-card__visual--image" aria-hidden="true">
         <img class="dev-note-card__visual-image dev-note-image--light" src="../assets/cncf-donation/hero.png" alt="" loading="eager" fetchpriority="high">
         <img class="dev-note-card__visual-image dev-note-image--dark" src="../assets/cncf-donation/hero-dark.png" alt="" loading="eager" fetchpriority="high">
