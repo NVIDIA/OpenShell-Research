@@ -196,6 +196,10 @@ Over these, Cedar's analyzer decides the following relations between two policy 
 
 We are scoping an interesting research direction and that is to automatically synthesize policies. Stay tuned for these.
 
+## Conclusion
+
+We’re incredibly excited to bring Cedar and eventually Dogwood to OpenShell. This is a big step towards correctness as we work towards AI Safety and governance on our journey to build trustworthy agentic systems. If you are interested in OpenShell, formal methods, AI safety and governance, join the community mailing list for notes and call invitations. Find the project in the CNCF Slack channel #openshell-dev. And look out for working groups and SIGs forming around security, policy, observability, and other areas.
+
 ## References
 
 [^smt]: C. Barrett, R. Sebastiani, S. A. Seshia, and C. Tinelli. "Satisfiability Modulo Theories." In *Handbook of Satisfiability*, 2nd ed., Frontiers in Artificial Intelligence and Applications, vol. 336, IOS Press (2021). [doi:10.3233/FAIA201017](https://doi.org/10.3233/FAIA201017)
