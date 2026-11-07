@@ -198,7 +198,7 @@ We are scoping an interesting research direction and that is to automatically sy
 
 ## Conclusion
 
-We're incredibly excited to bring Cedar and eventually Dogwood to OpenShell. This is a big step toward correctness as we work toward AI safety and governance on our journey to build trustworthy agentic systems. If you are interested in OpenShell, formal methods, AI safety and governance, or any other related topic, join the OpenShell community. Find the project in the CNCF Slack channel #openshell-dev.
+We're incredibly excited to bring Cedar and eventually Dogwood to OpenShell. We would like to give a special callout to our friends in AWS Automated Reasoning, Liana Hadarean and Lucas Käldström, for helping us with experimental features to get us here. This is a big step toward correctness as we work toward AI safety and governance on our journey to build trustworthy agentic systems. If you are interested in OpenShell, formal methods, AI safety and governance, or any other related topic, join the OpenShell community. Find the project in the CNCF Slack channel #openshell-dev.
 
 ## References
 
