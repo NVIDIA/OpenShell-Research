@@ -189,6 +189,11 @@ when investigating rendering problems, changing shared presentation, or reviewin
 the site's appearance. It describes focused and full Chromium/WebKit checks,
 interaction testing, and screenshot review.
 
+Write math with Arithmatex delimiters: `\(...\)` or `$...$` inline, and
+`\[...\]` or `$$...$$` on their own lines for display math. MathJax renders it
+in the browser, configured as in Zensical's
+[Math guide](https://zensical.org/docs/authoring/math/).
+
 Publish MP4 recordings with
 H.264 video, 8-bit `yuv420p` pixels, and streaming metadata at the beginning of
 the file (`faststart`); HEVC-only recordings do not play in every browser.
