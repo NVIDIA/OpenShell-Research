@@ -92,33 +92,33 @@ Several of these are already in motion. We invite the community to be stewards o
 
 If your organization already uses OpenShell, contributing is the fastest way to shape where it goes. Here are concrete ways to start.
 
-1. Build or harden an extension implementation.
+1. **Build or harden an extension implementation.**
 
     Pick the extension point closest to your stack and contribute a reference implementation, or improve an existing one. Examples include compute drivers for your scheduler or preferred cloud, credential drivers for secrets management, providers for inference, and logging exporters for your preferred observability pipelines.
 
     Each interface should ship with documentation and a conformance test suite so third-party implementations behave consistently. Contributing to those suites is a high-leverage way into the OpenShell ecosystem.
 
-2. Write policy and enforcement logic.
+2. **Write policy and enforcement logic.**
 
     Build middleware or gateway interceptors that encode real governance requirements, such as egress allowlists, tool-call approval flows, and per-tenant policy. Share them as examples or as a policy library. Gaps you find in the interface while doing this are valuable feedback, so file them as issues or design proposals.
 
     We would welcome your feedback on the Cedar policy framework and proposals for extensions that make authoring policies easier. Cedar also provides the foundation for temporal policy extensions on our roadmap.
 
-3. Extend isolation backends and platform coverage.
+3. **Extend isolation backends and platform coverage.**
 
     Help with Linux, macOS, and Kubernetes parity, including new isolation primitives, hardened defaults, and the security review that comes with them. Threat modeling and adversarial testing of sandbox escapes are especially welcome.
 
     OpenShell is extending deeper into infrastructure components including confidential computing capabilities that are vendor agnostic. Building or extending existing drivers to take advantage of confidential computing for agent workloads will be a great starting point. We are concurrently working on enabling running of OpenShell services within confidential computing environments to assure integrity of the OpenShell Gateway and Supervisor. We welcome your contributions to these hardening capabilities.
 
-4. Improve observability.
+4. **Improve observability.**
 
     Help define consistent metrics, traces, and structured audit events across the gateway, drivers, and sandboxes, aligned with OpenTelemetry. Real-time security monitoring depends on a schema everyone can rely on.
 
-5. Own packaging and release engineering.
+5. **Own packaging and release engineering.**
 
     Maintain packages for common package managers, reproducible builds, SBOMs, signing, and CI. This directly supports the release and security discipline Incubation requires.
 
-6. Take on enterprise requirements.
+6. **Take on enterprise requirements.**
 
     Contribute to multi-tenancy, authN/authZ integration (OIDC, RBAC), and policy-management workflows, using the use cases you see in your own deployments.
 
