@@ -271,7 +271,7 @@
 <a class="md-nav__link" href="#what-is-cedar">
 <span class="md-ellipsis">
 <span class="md-typeset">
-        What is Cedar
+        What is Cedar?
       </span>
 </span>
 </a>
@@ -568,7 +568,7 @@
 <a class="md-nav__link" href="#what-is-cedar">
 <span class="md-ellipsis">
 <span class="md-typeset">
-        What is Cedar
+        What is Cedar?
       </span>
 </span>
 </a>
@@ -767,7 +767,7 @@ The differences worth noting are:</p>
 <li><strong>Credentials don't grant access.</strong> Attaching a GitHub provider to a Cedar sandbox supplies the token, not the permission. The Cedar policy is the complete statement of what that token can be used for.</li>
 <li><strong>Checked when submitted, and analyzable.</strong> A misspelled attribute or a type error is rejected when the policy is set, not silently ignored. Because the Cedar policy is the policy that's enforced, we can check that this agent's ceiling is contained in the triage team's ceiling.</li>
 </ol>
-<h3 id="what-is-cedar">What is Cedar</h3>
+<h3 id="what-is-cedar">What is Cedar?</h3>
 <p>Cedar was invented by AWS for authorization decisions, is a CNCF project, and is actively used for agent policies in Amazon Bedrock AgentCore and Strands Agents. It is used at scale for authorization in AWS products and services. It is also fast: on the benchmarks in the Cedar paper, the Cedar authorizer is 42.8–80.8× faster than Rego<sup id="fnref:cedar-oopsla"><a class="footnote-ref" href="#fn:cedar-oopsla">2</a></sup>.</p>
 <p>Cedar was designed to be fully decidable<sup id="fnref2:cedar-oopsla"><a class="footnote-ref" href="#fn:cedar-oopsla">2</a></sup>. Cedar has a Lean<sup id="fnref:lean"><a class="footnote-ref" href="#fn:lean">3</a></sup> specification with the backend Rust implementation of Cedar primitives checked against the specification using differential random testing<sup id="fnref:cedar-fse"><a class="footnote-ref" href="#fn:cedar-fse">4</a></sup>.</p>
 <p>A Cedar policy is a condition over a principal, an action, a resource, and a request context, validated against a schema, so authors can express conditions difficult to express in structural YAML. For example one cannot assert a binary can reach an endpoint only when launched by a specific parent, or conversely a binary can reach an endpoint only when not launched by a specific parent, in structural YAML.</p>

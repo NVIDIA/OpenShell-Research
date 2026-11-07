@@ -129,7 +129,7 @@ The differences worth noting are:
 3. **Credentials don't grant access.** Attaching a GitHub provider to a Cedar sandbox supplies the token, not the permission. The Cedar policy is the complete statement of what that token can be used for.
 4. **Checked when submitted, and analyzable.** A misspelled attribute or a type error is rejected when the policy is set, not silently ignored. Because the Cedar policy is the policy that's enforced, we can check that this agent's ceiling is contained in the triage team's ceiling.
 
-### What is Cedar
+### What is Cedar?
 
 Cedar was invented by AWS for authorization decisions, is a CNCF project, and is actively used for agent policies in Amazon Bedrock AgentCore and Strands Agents. It is used at scale for authorization in AWS products and services. It is also fast: on the benchmarks in the Cedar paper, the Cedar authorizer is 42.8–80.8× faster than Rego[^cedar-oopsla].
 
