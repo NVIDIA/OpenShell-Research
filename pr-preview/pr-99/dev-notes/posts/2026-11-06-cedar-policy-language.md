@@ -131,9 +131,7 @@ The differences worth noting are:
 
 ### What is Cedar?
 
-Cedar was invented by AWS for authorization decisions, is a CNCF project, and is actively used for agent policies in Amazon Bedrock AgentCore and Strands Agents. It is used at scale for authorization in AWS products and services. It is also fast: the Cedar authors report that, on the benchmarks in their paper, the Cedar authorizer is 42.8–80.8× faster than Rego[^cedar-oopsla].
-
-Cedar was designed to be fully decidable[^cedar-oopsla]. Cedar has a Lean[^lean] specification with the backend Rust implementation of Cedar primitives checked against the specification using differential random testing[^cedar-fse].
+Cedar was invented by AWS for authorization decisions, is a CNCF project, and is actively used for agent policies in Amazon Bedrock AgentCore and Strands Agents. It is used at scale for authorization in AWS products and services. It is also fast: the Cedar authors report that, on the benchmarks in their paper, the Cedar authorizer is 42.8–80.8× faster than Rego[^cedar-oopsla]. Cedar was designed to be fully decidable[^cedar-oopsla]. Cedar has a Lean[^lean] specification with the backend Rust implementation of Cedar primitives checked against the specification using differential random testing[^cedar-fse].
 
 A Cedar policy is a condition over a principal, an action, a resource, and a request context, validated against a schema, so authors can express conditions difficult to express in structural YAML. For example one cannot assert a binary can reach an endpoint only when launched by a specific parent, or conversely a binary can reach an endpoint only when not launched by a specific parent, in structural YAML.
 
@@ -192,9 +190,11 @@ Over these, Cedar's analyzer decides the following relations between two policy 
 - **Equivalence:** *allowed*(P₁) = *allowed*(P₂), for example to confirm that a refactored policy allows exactly what the original did.
 - **Disjointness:** *allowed*(P₁) ∩ *allowed*(P₂) = ∅, for example to confirm that two agents share no grants.
 
-### Policy Advisor
+The next iteration of the prover will include these additional capabilities when Cedar policies are the input.
 
-We are scoping an interesting research direction and that is to automatically synthesize policies. Stay tuned for these.
+### Scaling the policy authoring challenge
+
+A common concern from enterprises is the authoring and management challenge of thousands of policies that will be required for large-scale agent deployments. We are exploring policy synthesis as an initiative that will use agent traces from pre-production testing and kernel-level observability to automatically synthesize policies that permit what was observed in testing, generalized as little as possible. The synthesized policy then becomes the seed ceiling policy that organizations can refine. Synthesizing from traces sets us up well for natural-language, intent-driven synthesis of OpenShell policies. All of these objectives need a well designed and purpose built policy framework with decidable analysis. The analyzer's checks of inclusion, equivalence, and disjointness can serve as a verifiable signal inside a reinforcement learning loop that trains an LLM-based synthesis system, rewarding generated policies that stay within their ceiling.
 
 ## Conclusion
 
