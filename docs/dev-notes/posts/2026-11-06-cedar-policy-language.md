@@ -3,7 +3,10 @@ title: "Cedar as the policy language in OpenShell"
 date: 2026-11-06
 description: "Why OpenShell is adopting Cedar for sandbox policy: decidable policy comparison, an open industry standard, and a path to temporal policies."
 author: "Vishwanath Raman"
-social_image: "assets/brand/openshell-research-light.png"
+social_image: "assets/cedar-policy/hero.png"
+hero_image: "../../assets/cedar-policy/hero.png"
+hero_image_dark: "../../assets/cedar-policy/hero-dark.png"
+hero_image_alt: "A watercolor cedar tree whose canopy is drawn as three nested layers, from light to dark green, with a small branching graph of nodes in the innermost layer."
 agent_markdown: true
 authors:
   - vishwa-raman
@@ -23,6 +26,11 @@ tags:
 <div class="dev-note-header" markdown="1">
 
 # Cedar as the policy language in OpenShell
+
+<figure class="dev-note-figure dev-note-figure--hero">
+  <a class="dev-note-image--light" href="../../assets/cedar-policy/hero.png" aria-label="View full-size image: A watercolor cedar tree whose canopy is drawn as three nested layers, from light to dark green, with a small branching graph of nodes in the innermost layer."><img src="../../assets/cedar-policy/hero.png" alt="A watercolor cedar tree whose canopy is drawn as three nested layers, from light to dark green, with a small branching graph of nodes in the innermost layer." loading="eager" fetchpriority="high"></a>
+  <a class="dev-note-image--dark" href="../../assets/cedar-policy/hero-dark.png" aria-label="View full-size image: A watercolor cedar tree whose canopy is drawn as three nested layers, from light to dark green, with a small branching graph of nodes in the innermost layer."><img src="../../assets/cedar-policy/hero-dark.png" alt="A watercolor cedar tree whose canopy is drawn as three nested layers, from light to dark green, with a small branching graph of nodes in the innermost layer." loading="eager" fetchpriority="high"></a>
+</figure>
 
 </div>
 
