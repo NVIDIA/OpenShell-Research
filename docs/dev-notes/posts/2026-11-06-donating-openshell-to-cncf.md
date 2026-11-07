@@ -1,9 +1,13 @@
 ---
-title: "Donating OpenShell to the CNCF: A New Home for Open Source Agent Governance"
+title: "OpenShell is now a CNCF sandbox project"
 date: 2026-11-06
 description: "OpenShell is joining the CNCF as a sandbox project: what moves, what stays the same, and how to contribute."
 author: "Vishwanath Raman"
 agent_markdown: true
+social_image: "assets/cncf-donation/hero.png"
+hero_image: "../../assets/cncf-donation/hero.png"
+hero_image_dark: "../../assets/cncf-donation/hero-dark.png"
+hero_image_alt: "A large green terminal prompt symbol above a long row of diverse people silhouetted along a baseline, including a person in a wheelchair."
 authors:
   - vishwa-raman
 categories:
@@ -19,7 +23,12 @@ tags:
 
 <div class="dev-note-header" markdown="1">
 
-# Donating OpenShell to the CNCF: A New Home for Open Source Agent Governance
+# OpenShell is now a CNCF sandbox project
+
+<figure class="dev-note-figure dev-note-figure--hero">
+  <a class="dev-note-image--light" href="../../assets/cncf-donation/hero.png" aria-label="View full-size image: A large green terminal prompt symbol above a long row of diverse people silhouetted along a baseline, including a person in a wheelchair."><img src="../../assets/cncf-donation/hero.png" alt="A large green terminal prompt symbol above a long row of diverse people silhouetted along a baseline, including a person in a wheelchair." loading="eager" fetchpriority="high"></a>
+  <a class="dev-note-image--dark" href="../../assets/cncf-donation/hero-dark.png" aria-label="View full-size image: A large green terminal prompt symbol above a long row of diverse people silhouetted along a baseline, including a person in a wheelchair."><img src="../../assets/cncf-donation/hero-dark.png" alt="A large green terminal prompt symbol above a long row of diverse people silhouetted along a baseline, including a person in a wheelchair." loading="eager" fetchpriority="high"></a>
+</figure>
 
 </div>
 

@@ -51,19 +51,18 @@ hide:
     <div class="journal-section__head">
       <h2 id="featured-note-title" aria-live="polite" aria-atomic="true">Featured note</h2>
     </div>
-    <article class="dev-note-card dev-note-card--featured dev-note-card--announcements" data-category="announcements" data-authors="[&quot;vishwa-raman&quot;]">
+    <article class="dev-note-card dev-note-card--featured dev-note-card--announcements dev-note-card--has-image" data-category="announcements" data-authors="[&quot;vishwa-raman&quot;]">
       <a class="dev-note-card__link" href="posts/2026-11-06-donating-openshell-to-cncf/">
-      <div class="dev-note-card__visual dev-note-card__visual--announcements" aria-hidden="true">
-        <span class="dev-note-card__visual-label">Dev Note / Announcements</span>
-        <span class="dev-note-card__visual-index">2026.11.06</span>
-        <span class="dev-note-card__visual-mark">&gt;_</span>
+      <div class="dev-note-card__visual dev-note-card__visual--announcements dev-note-card__visual--image" aria-hidden="true">
+        <img class="dev-note-card__visual-image dev-note-image--light" src="../assets/cncf-donation/hero.png" alt="" loading="eager" fetchpriority="high">
+        <img class="dev-note-card__visual-image dev-note-image--dark" src="../assets/cncf-donation/hero-dark.png" alt="" loading="eager" fetchpriority="high">
       </div>
       <div class="dev-note-card__copy">
         <div class="dev-note-card__meta">
           <time datetime="2026-11-06">November 6, 2026</time>
           <span>Announcements</span>
         </div>
-        <h3>Donating OpenShell to the CNCF: A New Home for Open Source Agent Governance</h3>
+        <h3>OpenShell is now a CNCF sandbox project</h3>
         <p class="dev-note-card__summary">OpenShell is joining the CNCF as a sandbox project: what moves, what stays the same, and how to contribute.</p>
         <div class="dev-note-card__footer">
         <span class="dev-note-card__authors" aria-label="Author: Vishwanath Raman">
