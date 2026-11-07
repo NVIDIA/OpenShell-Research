@@ -610,6 +610,10 @@ checks run on demand, outside CI. Coding agents should use the repository's
 when investigating rendering problems, changing shared presentation, or reviewing
 the site's appearance. It describes focused and full Chromium/WebKit checks,
 interaction testing, and screenshot review.</p>
+<p>Write math with Arithmatex delimiters: <code>\(...\)</code> or <code>$...$</code> inline, and
+<code>\[...\]</code> or <code>$$...$$</code> on their own lines for display math. MathJax renders it
+in the browser, configured as in Zensical's
+<a href="https://zensical.org/docs/authoring/math/">Math guide</a>.</p>
 <p>Publish MP4 recordings with
 H.264 video, 8-bit <code>yuv420p</code> pixels, and streaming metadata at the beginning of
 the file (<code>faststart</code>); HEVC-only recordings do not play in every browser.</p>
@@ -701,5 +705,7 @@ roll back to a revision before preview support, leave the Pages source set to
 <script src="../javascripts/navigation-drawer.js"></script>
 <script src="../javascripts/dev-notes.js"></script>
 <script src="../javascripts/pi-traces.js"></script>
+<script src="../javascripts/mathjax.js"></script>
+<script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
 </body>
 </html>
