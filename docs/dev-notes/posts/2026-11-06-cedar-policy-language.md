@@ -70,7 +70,7 @@ The ceiling policy for an agent is included in the ceiling policy of the team of
 
 This piece of machinery is what lets us maintain a least-privilege ceiling. Treating some grants as single-use grants is another less expensive mechanism to maintain that ceiling.
 
-The need for a language is open-source and an industry standard is a given. Being popular and widely used by enterprises lets us meet enterprises where they are, writing policies in a single language for both cloud-native applications and cloud-native AI agents.
+We wanted a language that is open-source and an industry standard. Being popular and widely used by enterprises lets us meet enterprises where they are, writing policies in a single language for both cloud-native applications and cloud-native AI agents.
 
 ## Introducing Cedar
 
@@ -125,19 +125,19 @@ when {
 The differences worth noting are:
 
 1. **Two decisions instead of one block.** YAML puts the endpoint, the rules and the binaries in one entry whereas Cedar splits it into a `NetworkConnect` decision and an `HttpRequest` decision. The former is made when `gh` opens the connection and the latter for every request the proxy inspects. Each `HttpRequest` policy names the endpoint, either exactly or using wildcards.
-2. **What YAML implies, Cedar says.** A YAML binary also matches its symlinks and the processes it launches implicitly, and a YAML GET also allows HEAD. In Cedar, you write what you mean, so the Cedar policy above is narrower than the YAML: it matches `gh` itself and nothing it launches. If you need matching through aliases or child processes then you explicitly request it, using `binary_aliases.contains("/usr/bin/gh")` or `ancestors.contains("/usr/bin/gh")` as examples.
+2. **What YAML implies, Cedar says.** A YAML binary also matches its symlinks and the processes it launches implicitly, and a YAML GET also allows HEAD. In Cedar, these behaviors are explicit, so the Cedar policy above is narrower than the YAML: it matches `gh` itself and nothing it launches. If you need matching through aliases or child processes then you explicitly request it, using `binary_aliases.contains("/usr/bin/gh")` or `ancestors.contains("/usr/bin/gh")` as examples.
 3. **Credentials don't grant access.** Attaching a GitHub provider to a Cedar sandbox supplies the token, not the permission. The Cedar policy is the complete statement of what that token can be used for.
-4. **Checked when submitted, and analyzable.** A misspelled attribute or a type error is rejected when the policy is set, not silently ignored. Because the Cedar policy is the policy that's enforced, we can check that this agent's ceiling is contained in the triage team's ceiling.
+4. **Checked when submitted, and analyzable.** Both formats reject malformed policies when they are set, and Cedar's schema also checks the conditions themselves, so a misspelled attribute or a type error inside a `when` clause is rejected too. Because the Cedar policy is the policy that's enforced, we can check that this agent's ceiling is contained in the triage team's ceiling.
 
 ### What is Cedar?
 
-Cedar was invented by AWS for authorization decisions, is a CNCF project, and is actively used for agent policies in Amazon Bedrock AgentCore and Strands Agents. It is used at scale for authorization in AWS products and services. It is also fast: on the benchmarks in the Cedar paper, the Cedar authorizer is 42.8–80.8× faster than Rego[^cedar-oopsla].
+Cedar was invented by AWS for authorization decisions, is a CNCF project, and is actively used for agent policies in Amazon Bedrock AgentCore and Strands Agents. It is used at scale for authorization in AWS products and services. It is also fast: the Cedar authors report that, on the benchmarks in their paper, the Cedar authorizer is 42.8–80.8× faster than Rego[^cedar-oopsla].
 
 Cedar was designed to be fully decidable[^cedar-oopsla]. Cedar has a Lean[^lean] specification with the backend Rust implementation of Cedar primitives checked against the specification using differential random testing[^cedar-fse].
 
 A Cedar policy is a condition over a principal, an action, a resource, and a request context, validated against a schema, so authors can express conditions difficult to express in structural YAML. For example one cannot assert a binary can reach an endpoint only when launched by a specific parent, or conversely a binary can reach an endpoint only when not launched by a specific parent, in structural YAML.
 
-The language is decidable by construction. It does not support loops, recursion, or user-defined functions that lead to unboundedness and loss of decidability. Every evaluation terminates. Its symbolic compiler reduces any policy set to SMT with an encoding proved sound and complete in Lean[^symcert], and the resulting queries are solved with the cvc5 SMT solver[^cvc5]. Analysis therefore applies to whatever an author writes, not only to the shapes a hand-built model covers, and it applies to the policy that is enforced, because the compiler and the evaluator share one specified semantics. That is also why a Cedar sandbox enforces the Cedar text itself. A policy derived from YAML by translation would move the question to the translator.
+The language is decidable by construction. It does not support loops, recursion, or user-defined functions that lead to unboundedness and loss of decidability. Every evaluation terminates. Its symbolic compiler reduces any policy set to SMT with an encoding proved sound and complete in Lean[^symcert], and the resulting queries are solved with the cvc5 SMT solver[^cvc5]. Analysis therefore extends to whatever an author writes, and it applies to the policy that is enforced, because the compiler and the evaluator share one specified semantics. That is also why a Cedar sandbox enforces the Cedar text itself rather than a translation from YAML, so analysis and enforcement always see the same policy.
 
 Cedar is also the base for temporal policies. Dogwood[^dogwood] extends Cedar with `when temporal { ... }` conditions over the history of events the authorizer has seen ("permit this call only if the same principal was approved within the last hour", "deny after a logout until the next login") and with information providers, values computed on demand that a condition may consult. It lowers to Cedar and evaluates with the Cedar engine. Adopting Cedar as a sandbox policy language is the step that makes those policies reachable later without another change of language.
 
