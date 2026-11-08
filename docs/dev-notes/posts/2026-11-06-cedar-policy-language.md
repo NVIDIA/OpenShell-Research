@@ -167,7 +167,7 @@ The OpenShell prover is a standalone tool at the moment that encodes YAML polici
 3. **Intersection**, within a single policy: a policy's scope and all of its `when` clauses are conjoined, and `unless` clauses are conjoined after negation. A single policy's match set is therefore the intersection of its constraints. There's no operator that intersects two policy sets, though. To require two sets to both allow a request, you evaluate them separately and combine the results outside Cedar.
 4. **Complement:** you never write it directly. It's implicit, because anything no `permit` matches is denied by default.
 
-Over these, Cedar's analyzer decides the following relations between two policy sets \(P_1\) and \(P_2\), over all requests the schema allows, returning a counterexample request when the answer is no:
+Over these, Cedar's analyzer decides the following relations between two policy sets \(P_1\) and \(P_2\), over all requests the schema allows, returning a counterexample when the answer is no:
 
 - **Inclusion:** \(\mathit{allowed}(P_1) \subseteq \mathit{allowed}(P_2)\). This is the ceiling check.
 - **Equivalence:** \(\mathit{allowed}(P_1) = \mathit{allowed}(P_2)\), for example to confirm that a refactored policy allows exactly what the original did.
