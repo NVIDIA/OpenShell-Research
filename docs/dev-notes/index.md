@@ -40,7 +40,7 @@ hide:
           <option value="zredlined">Alex Watson</option>
           <option value="johnnygreco">Johnny Greco</option>
           <option value="kirit93">Kirit Thadaka</option>
-          <option value="vishwa-raman">Vishwanath Raman</option>
+          <option value="openshell-team">OpenShell Team</option>
           </select>
         </label>
         <button type="button" class="dev-notes-filters__clear" hidden>Clear filters</button>
@@ -51,7 +51,7 @@ hide:
     <div class="journal-section__head">
       <h2 id="featured-note-title" aria-live="polite" aria-atomic="true">Featured note</h2>
     </div>
-    <article class="dev-note-card dev-note-card--featured dev-note-card--announcements dev-note-card--has-image" data-category="announcements" data-authors="[&quot;vishwa-raman&quot;]">
+    <article class="dev-note-card dev-note-card--featured dev-note-card--announcements dev-note-card--has-image" data-category="announcements" data-authors="[&quot;openshell-team&quot;]">
       <a class="dev-note-card__link" href="posts/2026-11-06-donated-openshell-to-cncf/">
       <div class="dev-note-card__visual dev-note-card__visual--announcements dev-note-card__visual--image" aria-hidden="true">
         <img class="dev-note-card__visual-image dev-note-image--light" src="../assets/cncf-donation/hero.png" alt="" loading="eager" fetchpriority="high">
@@ -65,9 +65,9 @@ hide:
         <h3>OpenShell is now a CNCF sandbox project</h3>
         <p class="dev-note-card__summary">OpenShell is joining the CNCF as a sandbox project: what moves, what stays the same, and how to contribute.</p>
         <div class="dev-note-card__footer">
-        <span class="dev-note-card__authors" aria-label="Author: Vishwanath Raman">
-          <img src="https://github.com/vishwa-raman.png?size=64" alt="" loading="lazy">
-          <span class="dev-note-card__author-names">Vishwanath Raman</span>
+        <span class="dev-note-card__authors" aria-label="Author: OpenShell Team">
+          <img src="https://github.com/ai-openshell.png?size=64" alt="" loading="lazy">
+          <span class="dev-note-card__author-names">OpenShell Team</span>
         </span>
           <span class="dev-note-card__read">Read note</span>
         </div>
