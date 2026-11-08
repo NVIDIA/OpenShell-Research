@@ -29,6 +29,8 @@ fi
 
 python -m pip install --upgrade pip
 python -m pip install -r requirements-docs.txt
+python -m pytest -q projects/tools/cedar-lexer/tests
+python -m pytest -q tests/test_cedar_code_blocks.py
 
 python scripts/stage-project-docs.py
 python scripts/render-dev-notes.py
