@@ -638,8 +638,8 @@ names and covers Cedar plus the Dogwood temporal extension (<code>when temporal<
 <code>formerly within 24h</code>, and related keywords). The docs build runs the
 project's tests and <code>tests/test_cedar_code_blocks.py</code>, which fails if any
 <code>cedar</code> or <code>dogwood</code> block under <code>docs/</code> produces a lexing error. When a post
-uses Cedar or Dogwood syntax the lexer does not know, extend the project and
-run its documented checks.</p>
+uses Cedar or Dogwood syntax the lexer does not know, extend the project, run
+its documented checks, and rerun <code>scripts/build-docs.sh</code>.</p>
 <h2 id="validate-and-preview">Validate and preview</h2>
 <p>Run the renderer tests and the same clean build used by CI:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a>uv<span class="w"> </span>run<span class="w"> </span>--python<span class="w"> </span><span class="m">3</span>.12<span class="w"> </span>--with<span class="w"> </span><span class="nv">pytest</span><span class="o">==</span><span class="m">8</span>.4.2<span class="w"> </span>pytest<span class="w"> </span>-q<span class="w"> </span><span class="se">\</span>
