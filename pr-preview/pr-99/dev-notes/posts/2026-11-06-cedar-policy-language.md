@@ -56,23 +56,25 @@ tags:
 
 <!-- dev-note:header:end -->
 
-OpenShell is a runtime for AI safety and governance that uses a policy driven enablement of least-privilege access to AI agents. OpenShell policies are written today in structural YAML and evaluated using Rego as the policy language, with `regorus`, a Rust implementation of Rego, as the engine. Rego is a general-purpose language with no decidable procedure that always answers inclusion questions, such as "Does policy A grant no more than policy B?" Today OpenShell gets that analysis by maintaining a prover model for the YAML structure and using an SMT[^smt] solver. But every new policy enhancement needs extensions to the YAML schema, the backend Rego program, and to the prover model that analyzes it. 
+OpenShell is a runtime for AI safety and governance that uses a policy driven enablement of least-privilege access to AI agents. OpenShell policies are written today in structural YAML and evaluated using Rego as the policy language, with [`regorus`](https://github.com/microsoft/regorus), a Rust implementation of Rego, as the engine. Rego is a general-purpose language with no decidable procedure that always answers inclusion questions, such as "Does policy \(P_1\) grant no more than policy \(P_2\)?" Today OpenShell gets that analysis by maintaining a prover model for the YAML structure and using an SMT[^smt] solver. But every new policy enhancement needs extensions to the YAML schema, the backend Rego program, and to the prover model that analyzes it.
 
-We anticipate the need to enhance the policy language to move beyond point-in-time policies to temporal policies, such as "Allow X only after doing Y", which would be inexpressible in YAML. Given these considerations, with the desire to future-proof our policy framework, 
-we began our quest for a new policy language. We had the following in mind when it came to picking one.
+We anticipate the need to enhance the policy language to move beyond point-in-time policies to temporal policies, such as "Allow X only after doing Y", which would be inexpressible in YAML. Given these considerations, with the desire to future-proof our policy framework, we began our quest for a new policy language. We had the following in mind when it came to picking one.
 
-1. We need a language that lets us check if the permissions granted by policy A are no more than those granted by policy B for all policies A and B
-2. The language should be open-source, an industry standard, and widely used
+1. **Decidable policy inclusion:** We need a language that lets us check if the permissions granted by policy \(P_1\) are no more than those granted by policy \(P_2\), for all policies \(P_1\) and \(P_2\).
+2. **Built for formal verification:** The language should be designed for formal verification from the ground up, so that what we prove about a policy holds for the policy that runs.
+3. **Open and widely adopted:** The language should be open-source, an industry standard, and widely used.
 
-One of the applications of the policy framework in OpenShell is to always maintain a least-privilege ceiling for agent fleets. An agent A that handles a job B should only have privilege grants that are 1/ what A needs to do B and 2/ have been vetted by security and compliance teams. These grants expressed in a policy file then form the privilege ceiling for this agent. A ceiling for an agent may be less than the ceiling for a team of agents, or for that business unit.
+One of the applications of the policy framework in OpenShell is to always maintain a least-privilege ceiling for agent fleets. An agent that handles a job should only have privilege grants that are 1/ what the agent needs to do that job and 2/ have been vetted by security and compliance teams. These grants expressed in a policy file then form the privilege ceiling for this agent. A ceiling for an agent may be less than the ceiling for a team of agents, or for that business unit.
 
-The ceiling policy for an agent is included in the ceiling policy of the team of agents which is included in that of the business unit, etc. Similarly, a sub-agent spawned for a job should not need all of the permissions of its instantiating parent. The question then becomes can we always check "Does Policy A give no more permissions than Policy B?" Mathematically, is it the case that *Policy A* ⇒ *Policy B*? If it does, taking *grants* to be a function that takes a policy and returns the set of all grants in that policy, *grants*(A) ⊆ *grants*(B).
+The ceiling policy for an agent is included in the ceiling policy of the team of agents which is included in that of the business unit, etc. Similarly, a sub-agent spawned for a job should not need all of the permissions of its instantiating parent. The question then becomes can we always check "Does \(P_1\) give no more permissions than \(P_2\)?" Mathematically, is it the case that \(P_1 \Rightarrow P_2\)? If so, taking \(\mathit{grants}\) to be a function that takes a policy and returns the set of all grants in that policy, \(\mathit{grants}(P_1) \subseteq \mathit{grants}(P_2)\).
 
 This piece of machinery is what lets us maintain a least-privilege ceiling. Treating some grants as single-use grants is another less expensive mechanism to maintain that ceiling.
 
 We wanted a language that is open-source and an industry standard. Being popular and widely used by enterprises lets us meet enterprises where they are, writing policies in a single language for both cloud-native applications and cloud-native AI agents.
 
 ## Introducing Cedar
+
+Cedar was invented by AWS for authorization decisions, is a CNCF project, and is actively used for agent policies in Amazon Bedrock AgentCore and Strands Agents. It is used at scale for authorization in AWS products and services. It is also fast. The Cedar authors report that, on the benchmarks in their paper, the Cedar authorizer is 42.8–80.8× faster than Rego[^cedar-oopsla]. A Cedar policy follows the Principal, Action, Resource, Context or PARC model. It is a short `permit` or `forbid` statement about what action over what resource a principal is proposing under a given context with optional conditions over attributes of the request. Everything is denied by default, and a matching `forbid` always wins.
 
 The best introduction to Cedar will be through an example. For those of you familiar with our YAML policy framework, please read on. For others, if you would like to learn more about our current support for policies, please visit our [Sandbox Policies documentation](https://docs.nvidia.com/openshell/how-it-works/policies/overview).
 
@@ -122,6 +124,7 @@ when {
     && context.path like("/repos/NVIDIA/OpenShell/issues/*/labels", "/")
 };
 ```
+
 The differences worth noting are:
 
 1. **Two decisions instead of one block.** YAML puts the endpoint, the rules and the binaries in one entry whereas Cedar splits it into a `NetworkConnect` decision and an `HttpRequest` decision. The former is made when `gh` opens the connection and the latter for every request the proxy inspects. Each `HttpRequest` policy names the endpoint, either exactly or using wildcards.
@@ -129,21 +132,50 @@ The differences worth noting are:
 3. **Credentials don't grant access.** Attaching a GitHub provider to a Cedar sandbox supplies the token, not the permission. The Cedar policy is the complete statement of what that token can be used for.
 4. **Checked when submitted, and analyzable.** Both formats reject malformed policies when they are set, and Cedar's schema also checks the conditions themselves, so a misspelled attribute or a type error inside a `when` clause is rejected too. Because the Cedar policy is the policy that's enforced, we can check that this agent's ceiling is contained in the triage team's ceiling.
 
-### What is Cedar?
+### Why Cedar?
 
-Cedar was invented by AWS for authorization decisions, is a CNCF project, and is actively used for agent policies in Amazon Bedrock AgentCore and Strands Agents. It is used at scale for authorization in AWS products and services. It is also fast: the Cedar authors report that, on the benchmarks in their paper, the Cedar authorizer is 42.8–80.8× faster than Rego[^cedar-oopsla]. Cedar was designed to be fully decidable[^cedar-oopsla]. Cedar has a Lean[^lean] specification with the backend Rust implementation of Cedar primitives checked against the specification using differential random testing[^cedar-fse].
+What makes Cedar compelling is the balance it strikes between expressivity, readability, and decidability. Cedar was designed to be fully decidable[^cedar-oopsla]. Every question we ask about a Cedar policy, such as "can this agent ever reach this endpoint?" or "does a sub-agent's policy grant anything its parent does not?", gets a definite yes or no answer. This is not true for general-purpose policy languages, where some questions cannot be answered by any SMT solver in all cases.
 
-A Cedar policy is a condition over a principal, an action, a resource, and a request context, validated against a schema, so authors can express conditions difficult to express in structural YAML. For example one cannot assert a binary can reach an endpoint only when launched by a specific parent, or conversely a binary can reach an endpoint only when not launched by a specific parent, in structural YAML.
+Cedar does not support loops, recursion, or user-defined functions that lead to unboundedness and loss of decidability. Every evaluation terminates. Its symbolic compiler reduces any policy set to SMT with an encoding proved sound and complete in Lean[^symcert], and the resulting queries are solved with the cvc5 SMT solver[^cvc5]. Analysis therefore extends to whatever an author writes, and it applies to the policy that is enforced, because the compiler and the evaluator share one specified semantics. That is also why a Cedar sandbox enforces the Cedar text itself, so analysis and enforcement always see the same policy.
 
-The language is decidable by construction. It does not support loops, recursion, or user-defined functions that lead to unboundedness and loss of decidability. Every evaluation terminates. Its symbolic compiler reduces any policy set to SMT with an encoding proved sound and complete in Lean[^symcert], and the resulting queries are solved with the cvc5 SMT solver[^cvc5]. Analysis therefore extends to whatever an author writes, and it applies to the policy that is enforced, because the compiler and the evaluator share one specified semantics. That is also why a Cedar sandbox enforces the Cedar text itself rather than a translation from YAML, so analysis and enforcement always see the same policy.
+Cedar has a Lean[^lean] specification with the backend Rust implementation of Cedar primitives checked against the specification using differential random testing[^cedar-fse]. A Cedar policy is a condition over a principal, an action, a resource, and a request context, validated against a schema, so authors can state precisely what they mean. For example, a policy can let a binary reach an endpoint only when a specific parent launched it, or conversely only when a specific parent did not launch it.
 
-Cedar is also the base for temporal policies. Dogwood[^dogwood] extends Cedar with `when temporal { ... }` conditions over the history of events the authorizer has seen ("permit this call only if the same principal was approved within the last hour", "deny after a logout until the next login") and with information providers, values computed on demand that a condition may consult. It lowers to Cedar and evaluates with the Cedar engine. Adopting Cedar as a sandbox policy language is the step that makes those policies reachable later without another change of language.
+For agents, using Cedar changes the assurance we can offer. Instead of testing that a sub-agent always stays within its parent's permissions, we can prove that it cannot exceed them on any run with the proof over the policy that is actually enforced. This proof extends over all expressible policies, which makes the choice compelling.
+
+Cedar is also the base for temporal policies. Dogwood[^dogwood] extends Cedar with `when temporal { ... }` conditions over the history of events the authorizer has seen, such as:
+
+- "permit this call only if the same principal was approved within the last hour"
+- "deny after a logout until the next login"
+
+Dogwood also adds information providers, values computed on demand that a condition may consult. It lowers to Cedar and evaluates with the Cedar engine. Adopting Cedar as a sandbox policy language is the step that makes those policies reachable later without another change of language.
 
 ## Status
 
 We have implemented Cedar as an alternate policy language in OpenShell, with the RFC and integration under review ([OpenShell RFC 0020](https://github.com/NVIDIA/OpenShell/pull/4564), [OpenShell integration](https://github.com/NVIDIA/OpenShell/pull/4565)). Cedar support is available in development builds today; stable builds reject Cedar policies.
 
 ## What's coming
+
+### Prover
+
+We will expose the Cedar prover as a standalone tool. A Cedar policy set has a precise set-based meaning, and Cedar's analysis decides set relations between policy sets, which become the tool's capabilities.
+
+1. **Union:** each `permit` contributes the requests it matches, and a policy set \(P\) allows their union, \(\mathit{allowed}(P)\).
+2. **Set difference:** this is what `forbid` adds. A matching `forbid` always overrides any `permit`, so
+
+    \[
+    \mathit{allowed}(P) = \Big(\bigcup \mathit{permits}\Big) \setminus \Big(\bigcup \mathit{forbids}\Big)
+    \]
+
+    That's the formal reason "forbid always wins" and why policy order doesn't matter.
+
+3. **Intersection**, within a single policy: a policy's scope and all of its `when` clauses are conjoined, and `unless` clauses are conjoined after negation. A single policy's match set is therefore the intersection of its constraints. There's no operator that intersects two policy sets, though. To require two sets to both allow a request, you evaluate them separately and combine the results outside Cedar.
+4. **Complement:** you never write it directly. It's implicit, because anything no `permit` matches is denied by default.
+
+Over these, Cedar's analyzer decides the following relations between two policy sets \(P_1\) and \(P_2\), over all requests the schema allows, returning a counterexample request when the answer is no:
+
+- **Inclusion:** \(\mathit{allowed}(P_1) \subseteq \mathit{allowed}(P_2)\). This is the ceiling check.
+- **Equivalence:** \(\mathit{allowed}(P_1) = \mathit{allowed}(P_2)\), for example to confirm that a refactored policy allows exactly what the original did.
+- **Disjointness:** \(\mathit{allowed}(P_1) \cap \mathit{allowed}(P_2) = \emptyset\), for example to confirm that two agents share no grants.
 
 ### Temporal policies: A teaser
 
@@ -175,30 +207,11 @@ This opens an interesting question and research direction. Since the `approved` 
 
 The correctness of these events is a vertical-agnostic concern. A community-driven initiative to assure the correctness of such events, perhaps deploying either formal or testing-based approaches, is a need.
 
-### Prover
-
-We are building an MCP server for OpenShell. As part of this we will make available a set of APIs that can be used to exercise the prover capabilities. The Prover will continue to support YAML but with the additional support to handle Cedar policies. A Cedar policy set has a precise set-based meaning, and Cedar's analysis decides set relations between policy sets that we will expose as additional Prover capabilities.
-
-1. **Union:** each `permit` contributes the requests it matches, and a policy set *P* allows their union, *allowed*(P).
-2. **Set difference:** this is what `forbid` adds. A matching `forbid` always overrides any `permit`, so *allowed*(P) = (∪ permits) \ (∪ forbids). That's the formal reason "forbid always wins" and why policy order doesn't matter.
-3. **Intersection**, within a single policy: a policy's scope and all of its `when` clauses are conjoined, and `unless` clauses are conjoined after negation. A single policy's match set is therefore the intersection of its constraints. There's no operator that intersects two policy sets, though. To require two sets to both allow a request, you evaluate them separately and combine the results outside Cedar.
-4. **Complement:** you never write it directly. It's implicit, because anything no `permit` matches is denied by default.
-
-Over these, Cedar's analyzer decides the following relations between two policy sets *P₁* and *P₂*, over all requests the schema allows, returning a counterexample request when the answer is no:
-
-- **Inclusion:** *allowed*(P₁) ⊆ *allowed*(P₂). This is the ceiling check.
-- **Equivalence:** *allowed*(P₁) = *allowed*(P₂), for example to confirm that a refactored policy allows exactly what the original did.
-- **Disjointness:** *allowed*(P₁) ∩ *allowed*(P₂) = ∅, for example to confirm that two agents share no grants.
-
-The next iteration of the prover will include these additional capabilities when Cedar policies are the input.
-
-### Scaling the policy authoring challenge
-
-A common concern from enterprises is the authoring and management challenge of thousands of policies that will be required for large-scale agent deployments. We are exploring policy synthesis as an initiative that will use agent traces from pre-production testing and kernel-level observability to automatically synthesize policies that permit what was observed in testing, generalized as little as possible. The synthesized policy then becomes the seed ceiling policy that organizations can refine. Synthesizing from traces sets us up well for natural-language, intent-driven synthesis of OpenShell policies. All of these objectives need a well designed and purpose built policy framework with decidable analysis. The analyzer's checks of inclusion, equivalence, and disjointness can serve as a verifiable signal inside a reinforcement learning loop that trains an LLM-based synthesis system, rewarding generated policies that stay within their ceiling.
+Looking further out, a common concern from enterprises is authoring and managing the thousands of policies that large-scale agent deployments will need. We are exploring how to synthesize policies from agent traces and intent. Going back to our desire to assure least-privilege access for all agents, decidability across all expressible policies is what makes every synthesized policy checkable against a given policy ceiling before it is ever used. We will share more as that work matures.
 
 ## Conclusion
 
-We're incredibly excited to bring Cedar and eventually Dogwood to OpenShell. We would like to give a special callout to our friends in AWS Automated Reasoning, Liana Hadarean and Lucas Käldström, for helping us with experimental features to get us here. This is a big step toward correctness as we work toward AI safety and governance on our journey to build trustworthy agentic systems. If you are interested in OpenShell, formal methods, AI safety and governance, or any other related topic, join the OpenShell community. Find the project in the CNCF Slack channel #openshell-dev.
+We're incredibly excited to bring Cedar and eventually Dogwood to OpenShell. We would like to give a special callout to our friends in AWS Automated Reasoning, Liana Hadarean and Lucas Käldström, for helping us with experimental features to get us here. This is a big step toward correctness as we work toward AI safety and governance on our journey to build trustworthy agentic systems. If you are interested in OpenShell, formal methods, AI safety and governance, or any other related topic, join the OpenShell community. Find the project in the CNCF Slack channel #openshell-dev ([join the CNCF Slack](https://slack.cncf.io/)).
 
 ## References
 
