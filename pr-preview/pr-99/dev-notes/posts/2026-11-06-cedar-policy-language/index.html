@@ -778,7 +778,7 @@
 </li>
 <li><strong>Complement:</strong> you never write it directly. It's implicit, because anything no <code>permit</code> matches is denied by default.</li>
 </ol>
-<p>Over these, Cedar's analyzer decides the following relations between two policy sets <span class="arithmatex">\(P_1\)</span> and <span class="arithmatex">\(P_2\)</span>, over all requests the schema allows, returning a counterexample request when the answer is no:</p>
+<p>Over these, Cedar's analyzer decides the following relations between two policy sets <span class="arithmatex">\(P_1\)</span> and <span class="arithmatex">\(P_2\)</span>, over all requests the schema allows, returning a counterexample when the answer is no:</p>
 <ul>
 <li><strong>Inclusion:</strong> <span class="arithmatex">\(\mathit{allowed}(P_1) \subseteq \mathit{allowed}(P_2)\)</span>. This is the ceiling check.</li>
 <li><strong>Equivalence:</strong> <span class="arithmatex">\(\mathit{allowed}(P_1) = \mathit{allowed}(P_2)\)</span>, for example to confirm that a refactored policy allows exactly what the original did.</li>
