@@ -16,6 +16,8 @@ including how its location determines the automated review kind.
   OpenShell sandboxes.
 - `openshell-exporter`: OpenShell event collector, normalizer, redactor, and
   CloudEvents or OTLP exporter.
+- `cedar-lexer`: Pygments syntax highlighting for Cedar policies and the Dogwood
+  temporal extension, used by the documentation site.
 
 ## Research
 

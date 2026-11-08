@@ -50,6 +50,7 @@ jobs:
               'scripts/render-dev-notes.py',
               'scripts/stage-project-docs.py',
               'tests/test_agent_markdown.py',
+              'tests/test_cedar_code_blocks.py',
               'tests/test_docs_404.py',
               'tests/test_optimize_site.py',
               'tests/test_render_dev_notes.py',
@@ -63,6 +64,7 @@ jobs:
             const docsChanged = files.some(
               ({ filename }) => filename.startsWith('docs/') ||
                 filename.startsWith('overrides/') ||
+                filename.startsWith('projects/tools/cedar-lexer/') ||
                 /^projects\/(tools|research|use-case-examples)\/[^/]+\/(docs|assets)\//.test(filename) ||
                 exactInputs.has(filename),
             );

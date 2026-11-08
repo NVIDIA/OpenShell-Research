@@ -29,6 +29,8 @@ for (const workflow of ["docs-preview.yml", "docs-preview-deploy.yml"]) {
       "overrides/main.html",
       "scripts/stage-project-docs.py",
       "scripts/optimize-site.py",
+      "projects/tools/cedar-lexer/src/openshell_research_cedar_lexer/lexer.py",
+      "tests/test_cedar_code_blocks.py",
       "tests/test_optimize_site.py",
       "tests/docs-preview.test.js",
       "tests/test_dev_note_headers.py",
