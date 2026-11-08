@@ -3,7 +3,7 @@
 
 """Pygments lexer for Cedar policies, including Dogwood's temporal extension."""
 
-from pygments.lexer import RegexLexer, bygroups, words
+from pygments.lexer import RegexLexer, bygroups, default, words
 from pygments.token import (
     Comment,
     Keyword,
@@ -32,6 +32,7 @@ class CedarLexer(RegexLexer):
             (r"\s+", Whitespace),
             (r"//.*?$", Comment.Single),
             (rf"@{IDENTIFIER}", Name.Decorator),
+            (r"@", Name.Decorator, "annotation"),
             (r'"', String.Double, "string"),
             (
                 rf"(def)(\s+)(cedar|temporal)(\s+)({IDENTIFIER})",
@@ -84,8 +85,14 @@ class CedarLexer(RegexLexer):
             (r"==|!=|<=|>=|&&|\|\||[<>!=+\-*/%]", Operator),
             (r"::|[(){}\[\],;:.]", Punctuation),
         ],
+        "annotation": [
+            (r"\s+", Whitespace),
+            (r"//.*?$", Comment.Single),
+            (IDENTIFIER, Name.Decorator, "#pop"),
+            default("#pop"),
+        ],
         "string": [
-            (r"\\(u\{[0-9A-Fa-f]{1,6}\}|.)", String.Escape),
+            (r"\\(u\{[0-9A-Fa-f]{1,6}\}|[\s\S])", String.Escape),
             (r'[^"\\]+', String.Double),
             (r'"', String.Double, "#pop"),
         ],

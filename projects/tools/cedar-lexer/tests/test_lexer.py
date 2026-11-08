@@ -44,6 +44,19 @@ def test_string_escapes():
     assert (String.Escape, r"\u{2603}") in tokens
 
 
+def test_annotation_name_may_follow_whitespace_or_comment():
+    tokens = _tokens('@ // note\nid("p1") permit (principal, action, resource);')
+    assert not [value for token, value in tokens if token in Error]
+    assert (Name.Decorator, "id") in tokens
+
+
+def test_string_line_continuation_is_an_escape():
+    for newline in ("\n", "\r\n"):
+        tokens = _tokens(f'when temporal {{ "a\\{newline}b" == "ab" }};')
+        assert not [value for token, value in tokens if token in Error]
+        assert (String.Escape, "\\\n") in tokens
+
+
 def test_dogwood_temporal_tokens():
     tokens = _tokens(
         """

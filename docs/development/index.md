@@ -226,8 +226,8 @@ names and covers Cedar plus the Dogwood temporal extension (`when temporal`,
 `formerly within 24h`, and related keywords). The docs build runs the
 project's tests and `tests/test_cedar_code_blocks.py`, which fails if any
 `cedar` or `dogwood` block under `docs/` produces a lexing error. When a post
-uses Cedar or Dogwood syntax the lexer does not know, extend the project and
-run its documented checks.
+uses Cedar or Dogwood syntax the lexer does not know, extend the project, run
+its documented checks, and rerun `scripts/build-docs.sh`.
 
 ## Validate and preview
 
