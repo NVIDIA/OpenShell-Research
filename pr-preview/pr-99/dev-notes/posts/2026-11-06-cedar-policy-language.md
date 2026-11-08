@@ -211,20 +211,20 @@ We're incredibly excited to bring Cedar and eventually Dogwood to OpenShell. We 
 
 ## References
 
+[^rego]: Open Policy Agent. "Policy Language (Rego)." *OPA Documentation*. [openpolicyagent.org/docs/policy-language](https://www.openpolicyagent.org/docs/policy-language)
+
 [^smt]: C. Barrett, R. Sebastiani, S. A. Seshia, and C. Tinelli. "Satisfiability Modulo Theories." In *Handbook of Satisfiability*, 2nd ed., Frontiers in Artificial Intelligence and Applications, vol. 336, IOS Press (2021). [doi:10.3233/FAIA201017](https://doi.org/10.3233/FAIA201017)
 
 [^cedar-oopsla]: J. W. Cutler, C. Disselkoen, A. Eline, S. He, K. Headley, M. Hicks, K. Hietala, E. Ioannidis, J. Kastner, A. Mamat, D. McAdams, M. McCutchen, N. Rungta, E. Torlak, and A. M. Wells. "Cedar: A New Language for Expressive, Fast, Safe, and Analyzable Authorization." *Proc. ACM Program. Lang.* 8, OOPSLA1, Article 118 (2024). [doi:10.1145/3649835](https://doi.org/10.1145/3649835)
 
-[^lean]: L. de Moura and S. Ullrich. "The Lean 4 Theorem Prover and Programming Language." *CADE-28* (2021), LNAI 12699, pp. 625–635. [doi:10.1007/978-3-030-79876-5_37](https://doi.org/10.1007/978-3-030-79876-5_37)
-
-[^cedar-fse]: C. Disselkoen, A. Eline, S. He, K. Headley, M. Hicks, K. Hietala, J. Kastner, A. Mamat, M. McCutchen, N. Rungta, B. Shah, E. Torlak, and A. Wells. "How We Built Cedar: A Verification-Guided Approach." *FSE 2024 Companion*. [doi:10.1145/3663529.3663854](https://doi.org/10.1145/3663529.3663854)
-
 [^symcert]: E. Torlak. "SymCert: Verifying SMT-Based Policy Analyses." *FMCAD 2026*. [Paper](https://www.amazon.science/publications/symcert-verifying-smt-based-policy-analyses)
 
+[^lean]: L. de Moura and S. Ullrich. "The Lean 4 Theorem Prover and Programming Language." *CADE-28* (2021), LNAI 12699, pp. 625–635. [doi:10.1007/978-3-030-79876-5_37](https://doi.org/10.1007/978-3-030-79876-5_37)
+
 [^cvc5]: H. Barbosa, C. Barrett, M. Brain, G. Kremer, H. Lachnitt, M. Mann, A. Mohamed, M. Mohamed, A. Niemetz, A. Nötzli, A. Ozdemir, M. Preiner, A. Reynolds, Y. Sheng, C. Tinelli, and Y. Zohar. "cvc5: A Versatile and Industrial-Strength SMT Solver." *TACAS 2022*, LNCS 13243, pp. 415–442. [doi:10.1007/978-3-030-99524-9_24](https://doi.org/10.1007/978-3-030-99524-9_24)
+
+[^cedar-fse]: C. Disselkoen, A. Eline, S. He, K. Headley, M. Hicks, K. Hietala, J. Kastner, A. Mamat, M. McCutchen, N. Rungta, B. Shah, E. Torlak, and A. Wells. "How We Built Cedar: A Verification-Guided Approach." *FSE 2024 Companion*. [doi:10.1145/3663529.3663854](https://doi.org/10.1145/3663529.3663854)
 
 [^dogwood]: Dogwood: a governance language for AI agents that extends Cedar with temporal conditions and information providers. [github.com/dogwood-policy/dogwood](https://github.com/dogwood-policy/dogwood); documentation at [dogwood-policy.github.io/dogwood](https://dogwood-policy.github.io/dogwood/index.html)
 
 [^z3]: L. de Moura and N. Bjørner. "Z3: An Efficient SMT Solver." *TACAS 2008*, LNCS 4963, pp. 337–340. [doi:10.1007/978-3-540-78800-3_24](https://doi.org/10.1007/978-3-540-78800-3_24)
-
-[^rego]: Open Policy Agent. "Policy Language (Rego)." *OPA Documentation*. [openpolicyagent.org/docs/policy-language](https://www.openpolicyagent.org/docs/policy-language)
