@@ -33,6 +33,14 @@ source = '{"registry":"https://pypi.org/simple"}'
 license = "Apache-2.0"
 evidence = "https://github.com/huggingface/transformers/blob/v5.17.0/LICENSE"
 
+[[clarification]]
+ecosystem = "pypi"
+name = "ty"
+version = "0.0.99"
+source = '{"registry":"https://pypi.org/simple"}'
+license = "MIT"
+evidence = "https://github.com/astral-sh/ty/blob/0.0.99/LICENSE"
+
 [[exception]]
 ecosystem = "pypi"
 name = "certifi"
