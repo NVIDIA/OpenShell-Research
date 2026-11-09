@@ -1,6 +1,6 @@
 ---
 title: "OpenShell is now a CNCF Sandbox project"
-date: 2026-11-06
+date: 2026-11-09
 description: "OpenShell is joining the CNCF as a Sandbox project: what moves, what stays the same, and how to contribute."
 author: "OpenShell Team"
 agent_markdown: true
@@ -45,7 +45,7 @@ tags:
   </div>
   <p class="dev-note-byline__label">
     <span>Dev Note</span>
-    <time datetime="2026-11-06">November 6, 2026</time>
+    <time datetime="2026-11-09">November 9, 2026</time>
     <a href="../index.md?category=announcements">Announcements</a>
   </p>
 </div>
