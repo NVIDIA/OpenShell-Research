@@ -1,6 +1,6 @@
 ---
 title: "Cedar as the policy language in OpenShell"
-date: 2026-11-06
+date: 2026-11-09
 description: "Why OpenShell is adopting Cedar for sandbox policy: decidable policy comparison, an open industry standard, and a path to temporal policies."
 author: "Vishwanath Raman"
 social_image: "assets/cedar-policy/hero.png"
@@ -48,7 +48,7 @@ tags:
   </div>
   <p class="dev-note-byline__label">
     <span>Dev Note</span>
-    <time datetime="2026-11-06">November 6, 2026</time>
+    <time datetime="2026-11-09">November 9, 2026</time>
     <a href="../index.md?category=research">Research</a>
   </p>
 </div>
