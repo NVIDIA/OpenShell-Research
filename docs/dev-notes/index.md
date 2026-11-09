@@ -62,8 +62,8 @@ hide:
           <time datetime="2026-11-06">November 6, 2026</time>
           <span>Announcements</span>
         </div>
-        <h3>OpenShell is now a CNCF sandbox project</h3>
-        <p class="dev-note-card__summary">OpenShell is joining the CNCF as a sandbox project: what moves, what stays the same, and how to contribute.</p>
+        <h3>OpenShell is now a CNCF Sandbox project</h3>
+        <p class="dev-note-card__summary">OpenShell is joining the CNCF as a Sandbox project: what moves, what stays the same, and how to contribute.</p>
         <div class="dev-note-card__footer">
         <span class="dev-note-card__authors" aria-label="Author: OpenShell Team">
           <img src="../assets/brand/openshell-mark.svg" alt="" loading="lazy">
