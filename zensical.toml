@@ -15,7 +15,13 @@ extra_css = [
   "stylesheets/documentation.css",
   "stylesheets/pi-traces.css"
 ]
-extra_javascript = ["javascripts/navigation-drawer.js", "javascripts/dev-notes.js", "javascripts/pi-traces.js"]
+extra_javascript = [
+  "javascripts/navigation-drawer.js",
+  "javascripts/dev-notes.js",
+  "javascripts/pi-traces.js",
+  "javascripts/mathjax.js",
+  "https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"
+]
 nav = [
   {"Dev Notes" = [
     "dev-notes/index.md",
@@ -52,6 +58,9 @@ generator = false
 noindex_prefixes = ["development/", "projects/", "research/"]
 
 [project.markdown_extensions.admonition]
+
+[project.markdown_extensions."pymdownx.arithmatex"]
+generic = true
 
 [project.markdown_extensions.footnotes]
 
