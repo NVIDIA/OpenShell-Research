@@ -21,6 +21,7 @@ nav = [
     "dev-notes/index.md",
     {"Posts" = [
       # dev-notes:nav:start
+      {"OpenShell is now a CNCF Sandbox project" = "dev-notes/posts/2026-11-09-donated-openshell-to-cncf.md"},
       {"Cedar as the policy language in OpenShell" = "dev-notes/posts/2026-11-09-cedar-policy-language.md"},
       {"Protecting frontier agent workloads with OpenShell" = "dev-notes/posts/2026-11-06-protecting-frontier-agent-workloads.md"},
       {"Introducing OpenShell Research" = "dev-notes/posts/2026-09-28-introducing-openshell-research.md"},

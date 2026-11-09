@@ -18,5 +18,10 @@
     "name": "Kirit Thadaka",
     "github": "kirit93",
     "description": "OpenShell Team @ NVIDIA"
+  },
+  "openshell-team": {
+    "name": "OpenShell Team",
+    "github": "ai-openshell",
+    "avatar": "assets/brand/openshell-mark.svg"
   }
 }

@@ -40,6 +40,7 @@ hide:
           <option value="zredlined">Alex Watson</option>
           <option value="johnnygreco">Johnny Greco</option>
           <option value="kirit93">Kirit Thadaka</option>
+          <option value="openshell-team">OpenShell Team</option>
           <option value="vishwa-raman">Vishwanath Raman</option>
           </select>
         </label>
@@ -51,11 +52,41 @@ hide:
     <div class="journal-section__head">
       <h2 id="featured-note-title" aria-live="polite" aria-atomic="true">Featured note</h2>
     </div>
-    <article class="dev-note-card dev-note-card--featured dev-note-card--research dev-note-card--has-image" data-category="research" data-authors="[&quot;vishwa-raman&quot;]">
+    <article class="dev-note-card dev-note-card--featured dev-note-card--announcements dev-note-card--has-image" data-category="announcements" data-authors="[&quot;openshell-team&quot;]">
+      <a class="dev-note-card__link" href="posts/2026-11-09-donated-openshell-to-cncf/">
+      <div class="dev-note-card__visual dev-note-card__visual--announcements dev-note-card__visual--image" aria-hidden="true">
+        <img class="dev-note-card__visual-image dev-note-image--light" src="../assets/cncf-donation/hero.png" alt="" loading="eager" fetchpriority="high">
+        <img class="dev-note-card__visual-image dev-note-image--dark" src="../assets/cncf-donation/hero-dark.png" alt="" loading="eager" fetchpriority="high">
+      </div>
+      <div class="dev-note-card__copy">
+        <div class="dev-note-card__meta">
+          <time datetime="2026-11-09">November 9, 2026</time>
+          <span>Announcements</span>
+        </div>
+        <h3>OpenShell is now a CNCF Sandbox project</h3>
+        <p class="dev-note-card__summary">OpenShell is joining the CNCF as a Sandbox project: what moves, what stays the same, and how to contribute.</p>
+        <div class="dev-note-card__footer">
+        <span class="dev-note-card__authors" aria-label="Author: OpenShell Team">
+          <img src="../assets/brand/openshell-mark.svg" alt="" loading="lazy">
+          <span class="dev-note-card__author-names">OpenShell Team</span>
+        </span>
+          <span class="dev-note-card__read">Read note</span>
+        </div>
+      </div>
+      </a>
+    </article>
+    <p class="dev-notes-filter-empty" hidden></p>
+  </section>
+  <section class="journal-section dev-notes-recent" aria-labelledby="recent-notes-title">
+    <div class="journal-section__head">
+      <h2 id="recent-notes-title">Recent notes</h2>
+    </div>
+    <div class="dev-notes-recent-list">
+    <article class="dev-note-card dev-note-card--recent dev-note-card--research dev-note-card--has-image" data-category="research" data-authors="[&quot;vishwa-raman&quot;]">
       <a class="dev-note-card__link" href="posts/2026-11-09-cedar-policy-language/">
       <div class="dev-note-card__visual dev-note-card__visual--research dev-note-card__visual--image" aria-hidden="true">
-        <img class="dev-note-card__visual-image dev-note-image--light" src="../assets/cedar-policy/hero.png" alt="" loading="eager" fetchpriority="high">
-        <img class="dev-note-card__visual-image dev-note-image--dark" src="../assets/cedar-policy/hero-dark.png" alt="" loading="eager" fetchpriority="high">
+        <img class="dev-note-card__visual-image dev-note-image--light" src="../assets/cedar-policy/hero.png" alt="" loading="lazy">
+        <img class="dev-note-card__visual-image dev-note-image--dark" src="../assets/cedar-policy/hero-dark.png" alt="" loading="lazy">
       </div>
       <div class="dev-note-card__copy">
         <div class="dev-note-card__meta">
@@ -74,13 +105,6 @@ hide:
       </div>
       </a>
     </article>
-    <p class="dev-notes-filter-empty" hidden></p>
-  </section>
-  <section class="journal-section dev-notes-recent" aria-labelledby="recent-notes-title">
-    <div class="journal-section__head">
-      <h2 id="recent-notes-title">Recent notes</h2>
-    </div>
-    <div class="dev-notes-recent-list">
     <article class="dev-note-card dev-note-card--recent dev-note-card--research dev-note-card--has-image" data-category="research" data-authors="[&quot;zredlined&quot;]">
       <a class="dev-note-card__link" href="posts/2026-11-06-protecting-frontier-agent-workloads/">
       <div class="dev-note-card__visual dev-note-card__visual--research dev-note-card__visual--image" aria-hidden="true">
