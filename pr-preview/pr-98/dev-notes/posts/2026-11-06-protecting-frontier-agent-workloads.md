@@ -193,7 +193,7 @@ The two-machine deployment runs on OpenShell with no changes to OpenShell itself
 
 ```bibtex
 @article{watson2026protectingfrontieragents,
-  author = {Alex Watson and Johnny Greco and Ali Golshan and John Myers and Piotr Mlocek and Drew Newberry and Vishwanath Raman},
+  author = {Alex Watson and Ali Golshan and John Myers and Piotr Mlocek and Drew Newberry and Vishwanath Raman and Johnny Greco},
   title = {Protecting frontier agent workloads with OpenShell},
   journal = {OpenShell Research Dev Notes},
   year = {2026},
