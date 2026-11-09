@@ -1,0 +1,55 @@
+[project]
+name = "openshell-research-cedar-lexer"
+version = "0.1.0"
+description = "Pygments lexer for Cedar policies and the Dogwood temporal extension."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+    { name = "NVIDIA CORPORATION & AFFILIATES" },
+]
+dependencies = [
+    "pygments>=2.13",
+]
+
+[project.entry-points."pygments.lexers"]
+cedar = "openshell_research_cedar_lexer.lexer:CedarLexer"
+
+[dependency-groups]
+dev = [
+    "pytest>=8,<10",
+    "ruff>=0.12,<1",
+    "ty>=0.0.53",
+]
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/openshell_research_cedar_lexer"]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--strict-config",
+    "--strict-markers",
+]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "RUF", "SIM", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# Pygments declares lexer metadata and token tables as plain class attributes.
+"src/openshell_research_cedar_lexer/lexer.py" = ["RUF012"]
+
+[tool.ty.src]
+include = ["src", "tests"]
+
+[tool.uv]
+required-version = ">=0.11.0"

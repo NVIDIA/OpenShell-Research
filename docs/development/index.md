@@ -216,6 +216,19 @@ pull request previews. Keep that fallback self-contained: GitHub Pages serves it
 for arbitrary paths where root-relative theme assets do not resolve beneath the
 project site prefix.
 
+## Code highlighting
+
+Fenced code blocks are highlighted by Pygments. Pygments has no Cedar lexer, so
+`requirements-docs.txt` installs the
+[Cedar Lexer](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/tools/cedar-lexer/README.md)
+project into the docs environment. It registers the `cedar` and `dogwood` fence
+names and covers Cedar plus the Dogwood temporal extension (`when temporal`,
+`formerly within 24h`, and related keywords). The docs build runs the
+project's tests and `tests/test_cedar_code_blocks.py`, which fails if any
+`cedar` or `dogwood` block under `docs/` produces a lexing error. When a post
+uses Cedar or Dogwood syntax the lexer does not know, extend the project, run
+its documented checks, and rerun `scripts/build-docs.sh`.
+
 ## Validate and preview
 
 Run the renderer tests and the same clean build used by CI:

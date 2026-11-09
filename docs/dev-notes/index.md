@@ -81,6 +81,28 @@ hide:
       <h2 id="recent-notes-title">Recent notes</h2>
     </div>
     <div class="dev-notes-recent-list">
+    <article class="dev-note-card dev-note-card--recent dev-note-card--research dev-note-card--has-image" data-category="research" data-authors="[&quot;zredlined&quot;]">
+      <a class="dev-note-card__link" href="posts/2026-11-06-protecting-frontier-agent-workloads/">
+      <div class="dev-note-card__visual dev-note-card__visual--research dev-note-card__visual--image" aria-hidden="true">
+        <img class="dev-note-card__visual-image" src="../assets/frontier-agent-workloads/hero.png" alt="" loading="lazy">
+      </div>
+      <div class="dev-note-card__copy">
+        <div class="dev-note-card__meta">
+          <time datetime="2026-11-06">November 6, 2026</time>
+          <span>Research</span>
+        </div>
+        <h3>Protecting frontier agent workloads with OpenShell</h3>
+        <p class="dev-note-card__summary">A reference architecture for how to run long-running, frontier-level agents on live systems, and the thirty-year-old security foundation it is built on.</p>
+        <div class="dev-note-card__footer">
+        <span class="dev-note-card__authors" aria-label="Author: Alex Watson">
+          <img src="https://github.com/zredlined.png?size=64" alt="" loading="lazy">
+          <span class="dev-note-card__author-names">Alex Watson</span>
+        </span>
+          <span class="dev-note-card__read">Read note</span>
+        </div>
+      </div>
+      </a>
+    </article>
     <article class="dev-note-card dev-note-card--recent dev-note-card--announcements dev-note-card--has-image" data-category="announcements" data-authors="[&quot;johnnygreco&quot;]">
       <a class="dev-note-card__link" href="posts/2026-09-28-introducing-openshell-research/">
       <div class="dev-note-card__visual dev-note-card__visual--announcements dev-note-card__visual--image" aria-hidden="true">
