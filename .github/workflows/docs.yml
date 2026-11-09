@@ -56,6 +56,7 @@ jobs:
           node --check docs/javascripts/navigation-drawer.js
           node --check docs/javascripts/dev-notes.js
           node --check docs/javascripts/pi-traces.js
+          node --check docs/javascripts/mathjax.js
 
       - name: Test navigation JavaScript behavior
         run: node tests/navigation-drawer.test.js

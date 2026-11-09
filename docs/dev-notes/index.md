@@ -41,6 +41,7 @@ hide:
           <option value="johnnygreco">Johnny Greco</option>
           <option value="kirit93">Kirit Thadaka</option>
           <option value="openshell-team">OpenShell Team</option>
+          <option value="vishwa-raman">Vishwanath Raman</option>
           </select>
         </label>
         <button type="button" class="dev-notes-filters__clear" hidden>Clear filters</button>
@@ -81,6 +82,29 @@ hide:
       <h2 id="recent-notes-title">Recent notes</h2>
     </div>
     <div class="dev-notes-recent-list">
+    <article class="dev-note-card dev-note-card--recent dev-note-card--research dev-note-card--has-image" data-category="research" data-authors="[&quot;vishwa-raman&quot;]">
+      <a class="dev-note-card__link" href="posts/2026-11-09-cedar-policy-language/">
+      <div class="dev-note-card__visual dev-note-card__visual--research dev-note-card__visual--image" aria-hidden="true">
+        <img class="dev-note-card__visual-image dev-note-image--light" src="../assets/cedar-policy/hero.png" alt="" loading="lazy">
+        <img class="dev-note-card__visual-image dev-note-image--dark" src="../assets/cedar-policy/hero-dark.png" alt="" loading="lazy">
+      </div>
+      <div class="dev-note-card__copy">
+        <div class="dev-note-card__meta">
+          <time datetime="2026-11-09">November 9, 2026</time>
+          <span>Research</span>
+        </div>
+        <h3>Cedar as the policy language in OpenShell</h3>
+        <p class="dev-note-card__summary">Why OpenShell is adopting Cedar for sandbox policy: decidable policy comparison, an open industry standard, and a path to temporal policies.</p>
+        <div class="dev-note-card__footer">
+        <span class="dev-note-card__authors" aria-label="Author: Vishwanath Raman">
+          <img src="https://github.com/vishwa-raman.png?size=64" alt="" loading="lazy">
+          <span class="dev-note-card__author-names">Vishwanath Raman</span>
+        </span>
+          <span class="dev-note-card__read">Read note</span>
+        </div>
+      </div>
+      </a>
+    </article>
     <article class="dev-note-card dev-note-card--recent dev-note-card--research dev-note-card--has-image" data-category="research" data-authors="[&quot;zredlined&quot;]">
       <a class="dev-note-card__link" href="posts/2026-11-06-protecting-frontier-agent-workloads/">
       <div class="dev-note-card__visual dev-note-card__visual--research dev-note-card__visual--image" aria-hidden="true">
