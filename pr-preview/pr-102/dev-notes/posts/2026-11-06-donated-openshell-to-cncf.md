@@ -1,7 +1,7 @@
 ---
-title: "OpenShell is now a CNCF sandbox project"
+title: "OpenShell is now a CNCF Sandbox project"
 date: 2026-11-06
-description: "OpenShell is joining the CNCF as a sandbox project: what moves, what stays the same, and how to contribute."
+description: "OpenShell is joining the CNCF as a Sandbox project: what moves, what stays the same, and how to contribute."
 author: "OpenShell Team"
 agent_markdown: true
 social_image: "assets/cncf-donation/hero.png"
@@ -23,7 +23,7 @@ tags:
 
 <div class="dev-note-header" markdown="1">
 
-# OpenShell is now a CNCF sandbox project
+# OpenShell is now a CNCF Sandbox project
 
 <figure class="dev-note-figure dev-note-figure--hero">
   <a class="dev-note-image--light" href="../../assets/cncf-donation/hero.png" aria-label="View full-size image: A large green terminal prompt symbol above a long row of diverse people silhouetted along a baseline, including a person in a wheelchair."><img src="../../assets/cncf-donation/hero.png" alt="A large green terminal prompt symbol above a long row of diverse people silhouetted along a baseline, including a person in a wheelchair." loading="eager" fetchpriority="high"></a>
@@ -53,11 +53,11 @@ tags:
 
 <!-- dev-note:header:end -->
 
-Today, NVIDIA is contributing OpenShell, the open source runtime to secure and govern autonomous AI agents, to the Cloud Native Computing Foundation (CNCF) as a sandbox project. OpenShell gives agents real capability in problem solving, without giving agents unrestricted access to data, secrets, or networks.
+Today, NVIDIA is contributing OpenShell, the open source runtime to secure and govern autonomous AI agents, to the Cloud Native Computing Foundation (CNCF) as a Sandbox project. OpenShell gives agents real capability in problem solving, without giving them unrestricted access to data, secrets, or networks.
 
 NVIDIA built OpenShell with the understanding that policies and enforcement cannot meaningfully occur in agent prompts and harnesses as those are probabilistic and do not provide a secure deterministic safety perimeter. OpenShell provides that deterministic enforcement layer to secure and govern fleets of autonomous agents. It provides a Gateway to manage agent lifecycles, a Supervisor to enforce policies and secure communication to sandboxes that isolate agent workloads, credential brokering to ensure agents never see credentials, and OCSF event streams to observe and audit agent behaviors. OpenShell is adopting Cedar, a CNCF project, as its policy language, giving teams a proven, auditable framework with a formal verification model rather than natural language instructions that agents can misinterpret or circumvent.
 
-Engineers from Red Hat, Docker, and Canonical joined as maintainers from early on, as an affirmation of the OpenShell thesis, and a demonstration of the value of deterministic controls for agent safety and governance. Moving OpenShell to CNCF puts that capability under neutral, community-led governance, similar to other industry changing CNCF projects such as Kubernetes, Envoy, Prometheus, OpenTelemetry, gRPC, Helm and others.
+Engineers from Red Hat, Docker, and Canonical joined as maintainers from early on, as an affirmation of the OpenShell thesis, and a demonstration of the value of deterministic controls for agent safety and governance. Moving OpenShell to CNCF puts that capability under neutral, community-led governance, similar to other industry-changing CNCF projects such as Kubernetes, Envoy, Prometheus, OpenTelemetry, gRPC, Helm, and others.
 
 ## Extensibility by design
 
@@ -66,7 +66,7 @@ OpenShell is built on the principle that no two agent deployments are alike. Com
 - **Providers** to connect your APIs and inference endpoints
 - **Drivers** to bring your compute, from VMs to Kubernetes
 - **Gateway interceptors** to plug in your governance and approval flows
-- **Middleware** to extend policy enforcement at the supervisor layer
+- **Middleware** to extend policy enforcement at the Supervisor layer
 - **Isolation backends** to bring your preferred sandbox or workload isolation primitive
 - **Credential drivers** to integrate your secret storage and management
 
@@ -76,7 +76,7 @@ Each interface is designed to be independently extensible, so you can adopt Open
 
 The OpenShell maintainers are the community that includes engineers from NVIDIA, Red Hat, Docker, and Canonical, who have worked on OpenShell across the runtime, SDKs, and documentation. The project adopted the CNCF Code of Conduct, has a public RFC process, and a governance model with explicit vendor-neutrality commitments.
 
-Agents are becoming cloud native infrastructure and belong in the cloud native ecosystem. The infrastructure that secures and governs these agents should therefore be part of CNCF and remain a community driven asset without affinity to any specific vendor. Hosting OpenShell within the aegis of CNCF guarantees that no single organization controls the project’s direction or release decisions.
+Agents are becoming cloud native infrastructure and belong in the cloud native ecosystem. The infrastructure that secures and governs these agents should therefore be part of CNCF and remain a community-driven asset without affinity to any specific vendor. Hosting OpenShell under the aegis of CNCF guarantees that no single organization controls the project’s direction or release decisions.
 
 ## What changes, what doesn’t
 
@@ -108,7 +108,7 @@ If your organization already uses OpenShell, contributing is the fastest way to 
 
 2. **Write policy and enforcement logic.**
 
-    Build middleware or gateway interceptors that encode real governance requirements, such as egress allowlists, tool-call approval flows, and per-tenant policy. Share them as examples or as a policy library. Gaps you find in the interface while doing this are valuable feedback, so file them as issues or design proposals.
+    Build middleware or Gateway interceptors that encode real governance requirements, such as egress allowlists, tool-call approval flows, and per-tenant policy. Share them as examples or as a policy library. Gaps you find in the interface while doing this are valuable feedback, so file them as issues or design proposals.
 
     We would welcome your feedback on the Cedar policy framework and proposals for extensions that make authoring policies easier. Cedar also provides the foundation for temporal policy extensions on our roadmap.
 
@@ -116,11 +116,11 @@ If your organization already uses OpenShell, contributing is the fastest way to 
 
     Help with Linux, macOS, and Kubernetes parity, including new isolation primitives, hardened defaults, and the security review that comes with them. Threat modeling and adversarial testing of sandbox escapes are especially welcome.
 
-    OpenShell is extending deeper into infrastructure components including confidential computing capabilities that are vendor agnostic. Building or extending existing drivers to take advantage of confidential computing for agent workloads will be a great starting point. We are concurrently working on enabling running of OpenShell services within confidential computing environments to assure integrity of the OpenShell Gateway and Supervisor. We welcome your contributions to these hardening capabilities.
+    OpenShell is extending deeper into infrastructure components, including confidential computing capabilities that are vendor-agnostic. Building or extending existing drivers to take advantage of confidential computing for agent workloads will be a great starting point. We are concurrently working on enabling running of OpenShell services within confidential computing environments to assure integrity of the OpenShell Gateway and Supervisor. We welcome your contributions to these hardening capabilities.
 
 4. **Improve observability.**
 
-    Help define consistent metrics, traces, and structured audit events across the gateway, drivers, and sandboxes, aligned with OpenTelemetry. Real-time security monitoring depends on a schema everyone can rely on.
+    Help define consistent metrics, traces, and structured audit events across the Gateway, drivers, and sandboxes, aligned with OpenTelemetry. Real-time security monitoring depends on a schema everyone can rely on.
 
 5. **Own packaging and release engineering.**
 
