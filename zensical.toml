@@ -27,7 +27,7 @@ nav = [
     "dev-notes/index.md",
     {"Posts" = [
       # dev-notes:nav:start
-      {"Cedar as the policy language in OpenShell" = "dev-notes/posts/2026-11-06-cedar-policy-language.md"},
+      {"Cedar as the policy language in OpenShell" = "dev-notes/posts/2026-11-09-cedar-policy-language.md"},
       {"Introducing OpenShell Research" = "dev-notes/posts/2026-09-28-introducing-openshell-research.md"},
       {"The leak is coming from inside the sandbox" = "dev-notes/posts/2026-09-26-network-redaction-is-not-enough.md"},
       {"What we have learned applying formal methods to control AI agents" = "dev-notes/posts/2026-09-10-learning-formal-methods-agent-policy-prover.md"},

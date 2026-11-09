@@ -52,14 +52,14 @@ hide:
       <h2 id="featured-note-title" aria-live="polite" aria-atomic="true">Featured note</h2>
     </div>
     <article class="dev-note-card dev-note-card--featured dev-note-card--research dev-note-card--has-image" data-category="research" data-authors="[&quot;vishwa-raman&quot;]">
-      <a class="dev-note-card__link" href="posts/2026-11-06-cedar-policy-language/">
+      <a class="dev-note-card__link" href="posts/2026-11-09-cedar-policy-language/">
       <div class="dev-note-card__visual dev-note-card__visual--research dev-note-card__visual--image" aria-hidden="true">
         <img class="dev-note-card__visual-image dev-note-image--light" src="../assets/cedar-policy/hero.png" alt="" loading="eager" fetchpriority="high">
         <img class="dev-note-card__visual-image dev-note-image--dark" src="../assets/cedar-policy/hero-dark.png" alt="" loading="eager" fetchpriority="high">
       </div>
       <div class="dev-note-card__copy">
         <div class="dev-note-card__meta">
-          <time datetime="2026-11-06">November 6, 2026</time>
+          <time datetime="2026-11-09">November 9, 2026</time>
           <span>Research</span>
         </div>
         <h3>Cedar as the policy language in OpenShell</h3>
