@@ -1,0 +1,27 @@
+{
+  "johnnygreco": {
+    "name": "Johnny Greco",
+    "github": "johnnygreco",
+    "description": "OpenShell Team @ NVIDIA"
+  },
+  "zredlined": {
+    "name": "Alex Watson",
+    "github": "zredlined",
+    "description": "OpenShell Team @ NVIDIA"
+  },
+  "vishwa-raman": {
+    "name": "Vishwanath Raman",
+    "github": "vishwa-raman",
+    "description": "OpenShell Team @ NVIDIA"
+  },
+  "kirit93": {
+    "name": "Kirit Thadaka",
+    "github": "kirit93",
+    "description": "OpenShell Team @ NVIDIA"
+  },
+  "openshell-team": {
+    "name": "OpenShell Team",
+    "github": "ai-openshell",
+    "avatar": "assets/brand/openshell-mark.svg"
+  }
+}
