@@ -9,6 +9,7 @@ from __future__ import annotations
 import datetime as dt
 import html
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -132,9 +133,19 @@ def require_authors(ids: list[str], authors: dict[str, dict[str, str]], path: Pa
     return resolved
 
 
-def avatar_url(author: dict[str, str], size: int) -> str:
-    if "avatar" in author:
-        return author["avatar"]
+def avatar_url(author: dict[str, str], size: int, page_dir: Path) -> str:
+    """Resolve an author avatar URL, or a docs-relative avatar path for page_dir."""
+    avatar = author.get("avatar", "").strip()
+    if avatar.startswith(("https://", "http://")):
+        return avatar
+    if avatar:
+        docs_root = (ROOT / "docs").resolve()
+        avatar_path = (docs_root / avatar).resolve()
+        if not avatar_path.is_relative_to(docs_root):
+            raise ValueError(f"Author {author.get('name', '<unknown>')} avatar must stay inside {docs_root}")
+        if not avatar_path.is_file():
+            raise ValueError(f"Author {author.get('name', '<unknown>')} avatar does not exist: {avatar_path}")
+        return Path(os.path.relpath(avatar_path, page_dir.resolve())).as_posix()
     github = author.get("github")
     if not github:
         raise ValueError(f"Author {author.get('name', '<unknown>')} needs a github or avatar field")
@@ -255,7 +266,7 @@ def render_card_visual(post: dict[str, Any], *, eager: bool = False) -> str:
 
 def render_card_authors(authors: list[dict[str, str]]) -> str:
     author_images = "\n".join(
-        f'          <img src="{html.escape(avatar_url(author, 64), quote=True)}" alt="" loading="lazy">'
+        f'          <img src="{html.escape(avatar_url(author, 64, DEV_NOTES_DIR), quote=True)}" alt="" loading="lazy">'
         for author in authors
     )
     names = natural_join([author["name"] for author in authors])
@@ -451,7 +462,7 @@ def render_byline(post: dict[str, Any]) -> str:
         description_html = f"\n        <span>{html.escape(description)}</span>" if description else ""
         blocks.append(
             f"""    <a class="dev-note-byline__author" href="{html.escape(author_url, quote=True)}">
-      <img src="{html.escape(avatar_url(author, 96), quote=True)}" alt="" loading="lazy">
+      <img src="{html.escape(avatar_url(author, 96, post["path"].parent), quote=True)}" alt="" loading="lazy">
       <span class="dev-note-byline__copy">
         <strong>{html.escape(author["name"])}</strong>{description_html}
       </span>

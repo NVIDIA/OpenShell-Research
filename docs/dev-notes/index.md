@@ -66,7 +66,7 @@ hide:
         <p class="dev-note-card__summary">OpenShell is joining the CNCF as a sandbox project: what moves, what stays the same, and how to contribute.</p>
         <div class="dev-note-card__footer">
         <span class="dev-note-card__authors" aria-label="Author: OpenShell Team">
-          <img src="https://github.com/ai-openshell.png?size=64" alt="" loading="lazy">
+          <img src="../assets/brand/openshell-mark.svg" alt="" loading="lazy">
           <span class="dev-note-card__author-names">OpenShell Team</span>
         </span>
           <span class="dev-note-card__read">Read note</span>

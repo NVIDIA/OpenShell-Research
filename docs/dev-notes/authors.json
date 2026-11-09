@@ -16,6 +16,7 @@
   },
   "openshell-team": {
     "name": "OpenShell Team",
-    "github": "ai-openshell"
+    "github": "ai-openshell",
+    "avatar": "assets/brand/openshell-mark.svg"
   }
 }

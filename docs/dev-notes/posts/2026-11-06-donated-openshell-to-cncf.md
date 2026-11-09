@@ -37,7 +37,7 @@ tags:
 <div class="dev-note-byline">
   <div class="dev-note-byline__authors" aria-label="Author: OpenShell Team">
     <a class="dev-note-byline__author" href="../index.md?author=openshell-team">
-      <img src="https://github.com/ai-openshell.png?size=96" alt="" loading="lazy">
+      <img src="../../assets/brand/openshell-mark.svg" alt="" loading="lazy">
       <span class="dev-note-byline__copy">
         <strong>OpenShell Team</strong>
       </span>
