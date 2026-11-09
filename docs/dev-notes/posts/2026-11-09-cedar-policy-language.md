@@ -66,7 +66,7 @@ As policy semantics expand, we anticipate the need to enhance the policy languag
 
 One of the applications of the policy framework in OpenShell is to always maintain a least-privilege ceiling for agent fleets. An agent that handles a job should only have privilege grants that are 1/ what the agent needs to do that job and 2/ have been vetted by security and compliance teams. These grants expressed in a policy file then form the privilege ceiling for this agent. In agentic systems with one or more agents, a ceiling policy for an agent is included in the ceiling policy of the team of agents which in turn is included in the ceiling policy of the business unit. In the other direction, a sub-agent spawned for a job should not need all of the permissions of its instantiating parent.
 
-The question then becomes can we always check "Does \(P_1\) give no more permissions than \(P_2\)?" Mathematically, is it the case that \(P_1 \Rightarrow P_2\)? If so, taking \(\mathit{grants}\) to be a function that takes a policy and returns the set of all grants in that policy, \(\mathit{grants}(P_1) \subseteq \mathit{grants}(P_2)\). This piece of machinery is what lets us maintain a least-privilege ceiling together with permission revocation after use when possible.
+The question then becomes can we always check "Does \(P_1\) give no more permissions than \(P_2\)?" Mathematically, is it the case that \(P_1 \Rightarrow P_2\)? If so, taking \(\mathit{allowed}\) to be a function that takes a policy and returns the set of all requests that policy allows, \(\mathit{allowed}(P_1) \subseteq \mathit{allowed}(P_2)\). This piece of machinery is what lets us maintain a least-privilege ceiling together with permission revocation after use when possible.
 
 ## Introducing Cedar
 
