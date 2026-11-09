@@ -130,10 +130,6 @@ If your organization already uses OpenShell, contributing is the fastest way to 
 
     Contribute to multi-tenancy, authN/authZ integration (OIDC, RBAC), and policy-management workflows, using the use cases you see in your own deployments.
 
-## Attribution
-
-Thanks to Alex Sandu, Principal Product Marketing Manager, Agentic AI at NVIDIA, and the entire OpenShell team for their contributions to this dev note.
-
 ## Get involved
 
 - Join the [mailing list](https://groups.google.com/a/ai-openshell.org/g/openshell-community/about) for community notes and call invites.
@@ -142,3 +138,7 @@ Thanks to Alex Sandu, Principal Product Marketing Manager, Agentic AI at NVIDIA,
 - Watch for working groups and SIGs, which will form around drivers, security, observability, and other areas. Join the one that matches your use case.
 
 We welcome contributors, end users, and people who are both.
+
+## Attribution
+
+Thanks to Alex Sandu, Principal Product Marketing Manager, Agentic AI at NVIDIA, and the entire OpenShell team for their contributions to this dev note.
