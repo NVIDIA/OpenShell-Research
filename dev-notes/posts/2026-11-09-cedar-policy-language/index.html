@@ -1,0 +1,920 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<meta content="Why OpenShell is adopting Cedar for sandbox policy: decidable policy comparison, an open industry standard, and a path to temporal policies." name="description"/>
+<meta content="Vishwanath Raman" name="author"/>
+<link href="https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-11-09-cedar-policy-language/" rel="canonical"/>
+<link href="../../" rel="prev"/>
+<link href="../2026-11-06-protecting-frontier-agent-workloads/" rel="next"/>
+<link href="../../../assets/brand/favicon.svg" rel="icon"/>
+<meta content="zensical-0.0.62" name="generator"/>
+<title>Cedar as the policy language in OpenShell - OpenShell Research</title>
+<link href="../../../assets/stylesheets/modern/main.ce62732f.min.css" rel="stylesheet"/>
+<link href="../../../assets/stylesheets/modern/palette.812a03bb.min.css" rel="stylesheet"/>
+<link href="../../../stylesheets/dev-notes.css" rel="stylesheet"/>
+<link href="../../../stylesheets/documentation.css" rel="stylesheet"/>
+<link href="../../../stylesheets/pi-traces.css" rel="stylesheet"/>
+<script>__md_scope=new URL("../../..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+<meta content="article" property="og:type"/>
+<meta content="OpenShell Research" property="og:site_name"/>
+<meta content="Cedar as the policy language in OpenShell" property="og:title"/>
+<meta content="Why OpenShell is adopting Cedar for sandbox policy: decidable policy comparison, an open industry standard, and a path to temporal policies." property="og:description"/>
+<meta content="https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-11-09-cedar-policy-language/" property="og:url"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="Cedar as the policy language in OpenShell" name="twitter:title"/>
+<meta content="Why OpenShell is adopting Cedar for sandbox policy: decidable policy comparison, an open industry standard, and a path to temporal policies." name="twitter:description"/>
+<meta content="https://nvidia.github.io/OpenShell-Research/assets/cedar-policy/hero.png" property="og:image"/>
+<meta content="Cedar as the policy language in OpenShell" property="og:image:alt"/>
+<meta content="https://nvidia.github.io/OpenShell-Research/assets/cedar-policy/hero.png" name="twitter:image"/>
+<meta content="Cedar as the policy language in OpenShell" name="twitter:image:alt"/>
+<meta content="2026-11-09" property="article:published_time"/>
+<meta content="2026-11-09" property="article:modified_time"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","author":{"@type":"Person","name":"Vishwanath Raman"},"dateModified":"2026-11-09","datePublished":"2026-11-09","description":"Why OpenShell is adopting Cedar for sandbox policy: decidable policy comparison, an open industry standard, and a path to temporal policies.","headline":"Cedar as the policy language in OpenShell","image":"https://nvidia.github.io/OpenShell-Research/assets/cedar-policy/hero.png","mainEntityOfPage":{"@id":"https://nvidia.github.io/OpenShell-Research/dev-notes/posts/2026-11-09-cedar-policy-language/","@type":"WebPage"}}</script>
+<noscript><style>
+    .dev-notes-toolbar, .pi-traces__loading { display: none; }
+    .pi-traces__content { height: auto; }
+  </style></noscript>
+<script>
+    // Shared filter links should never flash the unfiltered card list.
+    const noteFilters = new URLSearchParams(location.search);
+    if (noteFilters.has("category") || noteFilters.has("author")) {
+      document.documentElement.dataset.devNotesFiltered = "true";
+    }
+    try {
+      document.documentElement.dataset.navigationDrawer =
+        window.sessionStorage.getItem("openshell.navigationDrawerOpen") === "true"
+          ? "open"
+          : "closed";
+    } catch {
+      document.documentElement.dataset.navigationDrawer = "closed";
+    }
+  </script>
+<link href="../2026-11-09-cedar-policy-language.md" rel="alternate" title="Markdown source" type="text/markdown"/>
+</head>
+<body data-md-color-accent="green" data-md-color-primary="black" data-md-color-scheme="default" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label aria-label="Navigation" class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#cedar-as-the-policy-language-in-openshell">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<header class="md-header md-header--shadow" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="OpenShell Research" class="md-header__button md-logo" data-md-component="logo" href="../../.." title="OpenShell Research">
+<img alt="OpenShell Research" decoding="async" height="100" src="../../../assets/brand/openshell-mark.svg" width="100"/>
+</a>
+<label aria-controls="primary-navigation" aria-expanded="false" aria-label="Open navigation" class="md-header__button md-icon openshell-drawer-button" for="__drawer" role="button" tabindex="0">
+<svg aria-hidden="true" viewbox="0 0 24 24">
+<rect height="16" rx="2" width="17.5" x="3.25" y="4"></rect>
+<path d="M8.25 4v16"></path>
+<path class="openshell-drawer-icon-expand" d="m12 9 3 3-3 3"></path>
+<path class="openshell-drawer-icon-collapse" d="m15 9-3 3 3 3"></path>
+</svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            OpenShell Research
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              Cedar as the policy language in OpenShell
+            
+          </span>
+</div>
+</div>
+</div>
+<form class="md-header__option" data-md-component="palette">
+<input aria-label="Switch to dark mode" class="md-option" data-md-color-accent="green" data-md-color-media="(prefers-color-scheme: light)" data-md-color-primary="black" data-md-color-scheme="default" id="__palette_0" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_1" hidden="" title="Switch to dark mode">
+<svg class="lucide lucide-moon" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"></path></svg>
+</label>
+<input aria-label="Switch to light mode" class="md-option" data-md-color-accent="green" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-primary="black" data-md-color-scheme="slate" id="__palette_1" name="__palette" type="radio"/>
+<label class="md-header__button md-icon" for="__palette_0" hidden="" title="Switch to light mode">
+<svg class="lucide lucide-sun" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path></svg>
+</label>
+</form>
+<script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+<script>
+        // Apply the first-visit system theme before images enter the document.
+        // The theme bundle otherwise selects it after the initial image fetches.
+        (() => {
+          let savedPalette;
+          try { savedPalette = __md_get("__palette"); } catch {}
+          if (!savedPalette?.color) {
+            document.body.dataset.mdColorScheme =
+              matchMedia("(prefers-color-scheme: dark)").matches ? "slate" : "default";
+          }
+        })();
+      </script>
+<label aria-label="Search" class="md-header__button md-icon" for="__search">
+<svg class="lucide lucide-search" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m21 21-4.34-4.34"></path><circle cx="11" cy="11" r="8"></circle></svg>
+</label>
+<div aria-label="Search" class="md-search" data-md-component="search" role="dialog">
+<button class="md-search__button" type="button">
+    Search
+  </button>
+</div>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/NVIDIA/OpenShell-Research" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path d="M216.5 362.5c-66-8-112.5-55.5-112.5-117 0-25 9-52 24-70-6.5-16.5-5.5-51.5 2-66 20-2.5 47 8 63 22.5 19-6 39-9 63.5-9s44.5 3 62.5 8.5c15.5-14 43-24.5 63-22 7 13.5 8 48.5 1.5 65.5 16 19 24.5 44.5 24.5 70.5 0 61.5-46.5 108-113.5 116.5 17 11 28.5 35 28.5 62.5v52c0 15 12.5 23.5 27.5 17.5C441 459.5 512 369 512 257 512 115.5 397 0 255.5 0S0 115.5 0 257c0 111 70.5 203 165.5 237.5 13.5 5 26.5-4 26.5-17.5v-40c-7 3-16 5-24 5-33 0-52.5-18-66.5-51.5-5.5-13.5-11.5-21.5-23-23-6-.5-8-3-8-6 0-6 10-10.5 20-10.5 14.5 0 27 9 40 27.5 10 14.5 20.5 21 33 21s20.5-4.5 32-16c8.5-8.5 15-16 21-21" fill="currentColor"></path></svg>
+</div>
+<div class="md-source__repository">
+    OpenShell Research on GitHub
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary" data-md-level="0">
+<div class="md-nav__title">
+<a aria-label="OpenShell Research" class="md-nav__button md-logo" data-md-component="logo" href="../../.." title="OpenShell Research">
+<img alt="OpenShell Research" decoding="async" height="100" src="../../../assets/brand/openshell-mark.svg" width="100"/>
+</a>
+    OpenShell Research
+    <button aria-label="Close navigation" class="openshell-drawer-close md-icon" type="button">
+<svg aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.7" viewbox="0 0 24 24">
+<path d="m6 6 12 12M6 18 18 6"></path>
+</svg>
+</button>
+</div>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/NVIDIA/OpenShell-Research" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 7.3.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path d="M216.5 362.5c-66-8-112.5-55.5-112.5-117 0-25 9-52 24-70-6.5-16.5-5.5-51.5 2-66 20-2.5 47 8 63 22.5 19-6 39-9 63.5-9s44.5 3 62.5 8.5c15.5-14 43-24.5 63-22 7 13.5 8 48.5 1.5 65.5 16 19 24.5 44.5 24.5 70.5 0 61.5-46.5 108-113.5 116.5 17 11 28.5 35 28.5 62.5v52c0 15 12.5 23.5 27.5 17.5C441 459.5 512 369 512 257 512 115.5 397 0 255.5 0S0 115.5 0 257c0 111 70.5 203 165.5 237.5 13.5 5 26.5-4 26.5-17.5v-40c-7 3-16 5-24 5-33 0-52.5-18-66.5-51.5-5.5-13.5-11.5-21.5-23-23-6-.5-8-3-8-6 0-6 10-10.5 20-10.5 14.5 0 27 9 40 27.5 10 14.5 20.5 21 33 21s20.5-4.5 32-16c8.5-8.5 15-16 21-21" fill="currentColor"></path></svg>
+</div>
+<div class="md-source__repository">
+    OpenShell Research on GitHub
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_1" type="checkbox"/>
+<div class="md-nav__link md-nav__container">
+<a class="md-nav__link" href="../../">
+<span class="md-ellipsis">
+    
+  
+  Dev Notes
+
+    
+  </span>
+</a>
+<label class="md-nav__link" for="__nav_1" id="__nav_1_label" tabindex="">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="true" aria-labelledby="__nav_1_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_1">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+  Dev Notes
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_1_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_1_2" id="__nav_1_2_label" tabindex="0">
+<span class="md-ellipsis">
+    
+  
+  Posts
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_1_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_1_2">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+  Posts
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--active">
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    
+  
+  Cedar as the policy language in OpenShell
+
+    
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="././">
+<span class="md-ellipsis">
+    
+  
+  Cedar as the policy language in OpenShell
+
+    
+  </span>
+</a>
+<nav aria-label="On this page" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#introducing-cedar">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        Introducing Cedar
+      </span>
+</span>
+</a>
+<nav aria-label="Introducing Cedar" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#a-network-yaml-policy">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        A network YAML policy
+      </span>
+</span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-same-network-policy-in-cedar">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        The same network policy in Cedar
+      </span>
+</span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#why-we-picked-cedar">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        Why we picked Cedar
+      </span>
+</span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#status">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        Status
+      </span>
+</span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#whats-coming">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        What's coming
+      </span>
+</span>
+</a>
+<nav aria-label="What's coming" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#prover">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        Prover
+      </span>
+</span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#temporal-policies-a-teaser">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        Temporal policies: A teaser
+      </span>
+</span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#conclusion">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        Conclusion
+      </span>
+</span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#references">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        References
+      </span>
+</span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../2026-11-06-protecting-frontier-agent-workloads/">
+<span class="md-ellipsis">
+    
+  
+  Protecting frontier agent workloads with OpenShell
+
+    
+      <br/>
+<small>A reference architecture for how to run long-running, frontier-level agents on live systems, and the thirty-year-old security foundation it is built on.</small>
+</span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../2026-09-28-introducing-openshell-research/">
+<span class="md-ellipsis">
+    
+  
+  Introducing OpenShell Research
+
+    
+      <br/>
+<small>Hello, world—from the OpenShell Research team.</small>
+</span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../2026-09-26-network-redaction-is-not-enough/">
+<span class="md-ellipsis">
+    
+  
+  The leak is coming from inside the sandbox
+
+    
+      <br/>
+<small>A simple experiment shows why network-layer redaction isn’t enough.</small>
+</span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../2026-09-10-learning-formal-methods-agent-policy-prover/">
+<span class="md-ellipsis">
+    
+  
+  What we have learned applying formal methods to control AI agents
+
+    
+      <br/>
+<small>An intro to using formal methods to reason about permission changes in long-running AI agents.</small>
+</span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../2026-08-27-adversarial-policy-review-long-horizon-agents/">
+<span class="md-ellipsis">
+    
+  
+  Adversarial prototype: AI policy auto-approval for long-horizon agents in OpenShell
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../2026-08-07-formal-methods-ai-generated-robot-actions/">
+<span class="md-ellipsis">
+    
+  
+  Can Formal Methods Govern AI-Generated Robot Actions?
+
+    
+      <br/>
+<small>We built a small robotics experiment to test whether OpenShell's formal methods-based policy enforcement can govern robot plans generated by local and frontier AI models.</small>
+</span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../2026-07-20-policy-controlling-reachy-mini-with-openshell/">
+<span class="md-ellipsis">
+    
+  
+  Bringing Privacy and Security to the Edge with OpenShell
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--section md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_2" type="checkbox"/>
+<div class="md-nav__link md-nav__container">
+<a class="md-nav__link" href="../../../documentation/">
+<span class="md-ellipsis">
+    
+  
+  Documentation
+
+    
+  </span>
+</a>
+<label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_2_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_2">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+  Documentation
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle" id="__nav_2_2" type="checkbox"/>
+<div class="md-nav__link md-nav__container">
+<a class="md-nav__link" href="../../../documentation/openshell-agent-runner/">
+<span class="md-ellipsis">
+    
+  
+  OpenShell Agent Runner
+
+    
+  </span>
+</a>
+<label class="md-nav__link" for="__nav_2_2" id="__nav_2_2_label" tabindex="0">
+<span class="md-nav__icon md-icon"></span>
+</label>
+</div>
+<nav aria-expanded="false" aria-labelledby="__nav_2_2_label" class="md-nav" data-md-level="2">
+<label class="md-nav__title" for="__nav_2_2">
+<span class="md-nav__icon md-icon"></span>
+            
+  
+  OpenShell Agent Runner
+
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../documentation/openshell-agent-runner/reviews/">
+<span class="md-ellipsis">
+    
+  
+  Run reviews
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../documentation/openshell-agent-runner/profiles/">
+<span class="md-ellipsis">
+    
+  
+  Customize profiles
+
+    
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../../documentation/openshell-agent-runner/reference/">
+<span class="md-ellipsis">
+    
+  
+  Command reference
+
+    
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<div class="md-sidebar-button__wrapper">
+<label class="md-sidebar-button" for="__toc"></label>
+</div>
+<div class="md-sidebar__inner">
+<nav aria-label="On this page" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#introducing-cedar">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        Introducing Cedar
+      </span>
+</span>
+</a>
+<nav aria-label="Introducing Cedar" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#a-network-yaml-policy">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        A network YAML policy
+      </span>
+</span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-same-network-policy-in-cedar">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        The same network policy in Cedar
+      </span>
+</span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#why-we-picked-cedar">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        Why we picked Cedar
+      </span>
+</span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#status">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        Status
+      </span>
+</span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#whats-coming">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        What's coming
+      </span>
+</span>
+</a>
+<nav aria-label="What's coming" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#prover">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        Prover
+      </span>
+</span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#temporal-policies-a-teaser">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        Temporal policies: A teaser
+      </span>
+</span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#conclusion">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        Conclusion
+      </span>
+</span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#references">
+<span class="md-ellipsis">
+<span class="md-typeset">
+        References
+      </span>
+</span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<nav aria-label="Navigation" class="md-path">
+<ol class="md-path__list">
+<li class="md-path__item">
+<a class="md-path__link" href="../../..">
+<span class="md-ellipsis">
+    OpenShell Research
+  </span>
+</a>
+</li>
+<li class="md-path__item">
+<a class="md-path__link" href="../../">
+<span class="md-ellipsis">
+    Dev Notes
+  </span>
+</a>
+</li>
+<li class="md-path__item">
+<a class="md-path__link" href="././">
+<span class="md-ellipsis">
+    Posts
+  </span>
+</a>
+</li>
+</ol>
+</nav>
+<article class="md-content__inner md-typeset">
+<a aria-label="View Markdown" class="md-content__button md-icon" href="../2026-11-09-cedar-policy-language.md" title="View Markdown">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20.56 18H3.44C2.65 18 2 17.37 2 16.59V7.41C2 6.63 2.65 6 3.44 6h17.12c.79 0 1.44.63 1.44 1.41v9.18c0 .78-.65 1.41-1.44 1.41M3.44 6.94c-.26 0-.48.21-.48.47v9.19c0 .25.22.46.48.46h17.12c.26 0 .48-.21.48-.46V7.41c0-.26-.22-.47-.48-.47zm1.45 8.25V8.81h1.92l1.92 2.35 1.92-2.35h1.93v6.38h-1.93v-3.66l-1.92 2.35-1.92-2.35v3.66zm12.01 0-2.9-3.1h1.94V8.81h1.92v3.28h1.93z"></path></svg>
+</a>
+<!-- dev-note:header:start -->
+<!-- Generated by scripts/render-dev-notes.py; edit front matter and authors.json. -->
+<div class="dev-note-header">
+<h1 id="cedar-as-the-policy-language-in-openshell">Cedar as the policy language in OpenShell</h1>
+<figure class="dev-note-figure dev-note-figure--hero">
+<a aria-label="View full-size image: A watercolor cedar tree whose canopy is drawn as three nested layers, from light to dark green, with a small branching graph of nodes in the innermost layer." class="dev-note-image--light" href="../../../assets/cedar-policy/hero.png"><img alt="A watercolor cedar tree whose canopy is drawn as three nested layers, from light to dark green, with a small branching graph of nodes in the innermost layer." decoding="async" fetchpriority="high" height="887" loading="lazy" sizes="(max-width: 800px) calc(100vw - 32px), 900px" src="../../../assets/cedar-policy/hero.png" srcset="../../../assets/responsive/57e61caff0e47e0b-320.webp 320w, ../../../assets/responsive/57e61caff0e47e0b-640.webp 640w, ../../../assets/responsive/57e61caff0e47e0b-960.webp 960w, ../../../assets/responsive/57e61caff0e47e0b-1440.webp 1440w, ../../../assets/responsive/57e61caff0e47e0b-1774.webp 1774w" width="1774"/></a>
+<a aria-label="View full-size image: A watercolor cedar tree whose canopy is drawn as three nested layers, from light to dark green, with a small branching graph of nodes in the innermost layer." class="dev-note-image--dark" href="../../../assets/cedar-policy/hero-dark.png"><img alt="A watercolor cedar tree whose canopy is drawn as three nested layers, from light to dark green, with a small branching graph of nodes in the innermost layer." decoding="async" fetchpriority="high" height="887" loading="lazy" sizes="(max-width: 800px) calc(100vw - 32px), 900px" src="../../../assets/cedar-policy/hero-dark.png" srcset="../../../assets/responsive/1843f8e3c19bf253-320.webp 320w, ../../../assets/responsive/1843f8e3c19bf253-640.webp 640w, ../../../assets/responsive/1843f8e3c19bf253-960.webp 960w, ../../../assets/responsive/1843f8e3c19bf253-1440.webp 1440w, ../../../assets/responsive/1843f8e3c19bf253-1774.webp 1774w" width="1774"/></a>
+</figure>
+</div>
+<!-- dev-note:byline:start -->
+<!-- Generated by scripts/render-dev-notes.py; edit front matter and authors.json. -->
+<div class="dev-note-byline">
+<div aria-label="Author: Vishwanath Raman" class="dev-note-byline__authors">
+<a class="dev-note-byline__author" href="../../?author=vishwa-raman">
+<img alt="" decoding="async" loading="lazy" src="https://github.com/vishwa-raman.png?size=96"/>
+<span class="dev-note-byline__copy">
+<strong>Vishwanath Raman</strong>
+<span>OpenShell Team @ NVIDIA</span>
+</span>
+</a>
+</div>
+<p class="dev-note-byline__label">
+<span>Dev Note</span>
+<time datetime="2026-11-09">November 9, 2026</time>
+<a href="../../?category=research">Research</a>
+</p>
+</div>
+<!-- dev-note:byline:end -->
+<!-- dev-note:header:end -->
+<p>OpenShell is a runtime for AI safety and governance that uses a policy driven enablement of least-privilege access to AI agents. OpenShell policies are written in structural YAML and evaluated using Rego<sup id="fnref:rego"><a class="footnote-ref" href="#fn:rego">1</a></sup> as the policy language, with <a href="https://github.com/microsoft/regorus"><code>regorus</code></a>, a Rust implementation of Rego, as the engine. Rego is a general-purpose language with no decidable procedure that can <em>always</em> answer inclusion questions, such as "Does policy (P_1) grant no more than policy (P_2)?", for all possible policies (P_1) and (P_2). Today OpenShell gets that analysis by maintaining a prover model for the supported YAML structure and using an SMT<sup id="fnref:smt"><a class="footnote-ref" href="#fn:smt">2</a></sup> solver as the decision procedure to answer these questions. But every new policy enhancement needs extensions to the YAML schema, the backend Rego program, and to the prover model that analyzes it.</p>
+<p>As policy semantics expand, we anticipate the need to enhance the policy language to move beyond point-in-time policies to temporal policies, such as "Allow X only after Y", which would be inexpressible in YAML. Given these considerations, with the desire to future-proof our policy framework, we began our quest for a new policy language. We had the following in mind when it came to picking one.</p>
+<ol>
+<li><strong>Decidable policy inclusion:</strong> We need a language that lets us check if the permissions granted by policy (P_1) are no more than those granted by policy (P_2), for all policies (P_1) and (P_2).</li>
+<li><strong>Built for formal verification:</strong> We need a language that is purpose-built for formal analyzability from the ground up, so that what we prove about a policy holds for the policy that runs.</li>
+<li><strong>Open and widely adopted:</strong> The language should be open-source, an industry standard, widely used, and it should extend policies used for cloud-native applications to cover cloud-native AI agents.</li>
+</ol>
+<p>One of the applications of the policy framework in OpenShell is to always maintain a least-privilege ceiling for agent fleets. An agent that handles a job should only have privilege grants that are 1/ what the agent needs to do that job and 2/ have been vetted by security and compliance teams. These grants expressed in a policy file then form the privilege ceiling for this agent. In agentic systems with one or more agents, a ceiling policy for an agent is included in the ceiling policy of the team of agents which in turn is included in the ceiling policy of the business unit. In the other direction, a sub-agent spawned for a job might not need all of the permissions of its instantiating parent.</p>
+<p>The question then becomes can we always check "Does (P_1) give no more permissions than (P_2)?" Mathematically, is it the case that (P_1 \Rightarrow P_2)? If so, taking (\mathit{allowed}) to be a function that takes a policy and returns the set of all requests that policy allows, (\mathit{allowed}(P_1) \subseteq \mathit{allowed}(P_2)). This piece of machinery is what lets us maintain a least-privilege ceiling together with permission revocation after use when possible.</p>
+<h2 id="introducing-cedar">Introducing Cedar</h2>
+<p>Cedar is an open-source CNCF project, originally created at AWS for authorization decisions, and is actively used for agent policies in Amazon Bedrock AgentCore and Strands Agents. It is used at scale for authorization in AWS products and services. It is also fast. The Cedar authors report that, on the benchmarks in their paper, the Cedar authorizer is 42.8–80.8× faster than Rego<sup id="fnref:cedar-oopsla"><a class="footnote-ref" href="#fn:cedar-oopsla">3</a></sup>.</p>
+<p>A Cedar policy follows the Principal, Action, Resource, Context or PARC model for short. It is a concise <code>permit</code> or <code>forbid</code> statement about what action over what resource a principal is proposing under a given context with optional conditions over attributes of the request. Everything is denied by default, and a matching <code>forbid</code> always wins. In Cedar you write a schema that defines the authorization primitives of your system. Validating policies against the schema rules out whole classes of runtime errors during policy evaluation.</p>
+<p>Introducing Cedar is best served by an example. For those of you familiar with our YAML policy framework, please read on. For others, if you would like to learn more about our current support for policies, please visit our <a href="https://docs.nvidia.com/openshell/how-it-works/policies/overview">Sandbox Policies documentation</a>.</p>
+<h3 id="a-network-yaml-policy">A network YAML policy</h3>
+<p>In this example, a triage agent may label issues in one repository and nothing else on GitHub. It can add labels to issues in <code>NVIDIA/OpenShell</code> but it cannot comment, close issues, edit code, or touch any other repository.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+</span><span id="__span-0-2"><a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a><span class="nt">network_policies</span><span class="p">:</span>
+</span><span id="__span-0-4"><a href="#__codelineno-0-4" id="__codelineno-0-4" name="__codelineno-0-4"></a><span class="w">  </span><span class="nt">github_triage</span><span class="p">:</span>
+</span><span id="__span-0-5"><a href="#__codelineno-0-5" id="__codelineno-0-5" name="__codelineno-0-5"></a><span class="w">    </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">github-issue-labeling</span>
+</span><span id="__span-0-6"><a href="#__codelineno-0-6" id="__codelineno-0-6" name="__codelineno-0-6"></a><span class="w">    </span><span class="nt">endpoints</span><span class="p">:</span>
+</span><span id="__span-0-7"><a href="#__codelineno-0-7" id="__codelineno-0-7" name="__codelineno-0-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api.github.com</span>
+</span><span id="__span-0-8"><a href="#__codelineno-0-8" id="__codelineno-0-8" name="__codelineno-0-8"></a><span class="w">        </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+</span><span id="__span-0-9"><a href="#__codelineno-0-9" id="__codelineno-0-9" name="__codelineno-0-9"></a><span class="w">        </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rest</span>
+</span><span id="__span-0-10"><a href="#__codelineno-0-10" id="__codelineno-0-10" name="__codelineno-0-10"></a><span class="w">        </span><span class="nt">enforcement</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">enforce</span>
+</span><span id="__span-0-11"><a href="#__codelineno-0-11" id="__codelineno-0-11" name="__codelineno-0-11"></a><span class="w">        </span><span class="nt">rules</span><span class="p">:</span>
+</span><span id="__span-0-12"><a href="#__codelineno-0-12" id="__codelineno-0-12" name="__codelineno-0-12"></a><span class="w">          </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">allow</span><span class="p">:</span>
+</span><span id="__span-0-13"><a href="#__codelineno-0-13" id="__codelineno-0-13" name="__codelineno-0-13"></a><span class="w">              </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POST</span>
+</span><span id="__span-0-14"><a href="#__codelineno-0-14" id="__codelineno-0-14" name="__codelineno-0-14"></a><span class="w">              </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">"/repos/NVIDIA/OpenShell/issues/*/labels"</span>
+</span><span id="__span-0-15"><a href="#__codelineno-0-15" id="__codelineno-0-15" name="__codelineno-0-15"></a><span class="w">    </span><span class="nt">binaries</span><span class="p">:</span>
+</span><span id="__span-0-16"><a href="#__codelineno-0-16" id="__codelineno-0-16" name="__codelineno-0-16"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> path</span><span class="p">:</span><span class="w"> </span><span class="nv">/usr/bin/gh</span><span class="w"> </span><span class="p p-Indicator">}</span>
+</span></code></pre></div>
+<h3 id="the-same-network-policy-in-cedar">The same network policy in Cedar</h3>
+<div class="language-cedar highlight"><pre><span></span><code><span id="__span-1-1"><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a><span class="nd">@id</span><span class="p">(</span><span class="s2">"github_triage/connect"</span><span class="p">)</span>
+</span><span id="__span-1-2"><a href="#__codelineno-1-2" id="__codelineno-1-2" name="__codelineno-1-2"></a><span class="k">permit</span><span class="w"> </span><span class="p">(</span>
+</span><span id="__span-1-3"><a href="#__codelineno-1-3" id="__codelineno-1-3" name="__codelineno-1-3"></a><span class="w">    </span><span class="bp">principal</span><span class="w"> </span><span class="ow">is</span><span class="w"> </span><span class="nn">Sandbox</span><span class="p">::</span><span class="n">Process</span><span class="p">,</span>
+</span><span id="__span-1-4"><a href="#__codelineno-1-4" id="__codelineno-1-4" name="__codelineno-1-4"></a><span class="w">    </span><span class="bp">action</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nn">Sandbox</span><span class="p">::</span><span class="nn">Action</span><span class="p">::</span><span class="s2">"NetworkConnect"</span><span class="p">,</span>
+</span><span id="__span-1-5"><a href="#__codelineno-1-5" id="__codelineno-1-5" name="__codelineno-1-5"></a><span class="w">    </span><span class="bp">resource</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nn">Sandbox</span><span class="p">::</span><span class="nn">NetworkEndpoint</span><span class="p">::</span><span class="s2">"api.github.com:443"</span>
+</span><span id="__span-1-6"><a href="#__codelineno-1-6" id="__codelineno-1-6" name="__codelineno-1-6"></a><span class="p">)</span>
+</span><span id="__span-1-7"><a href="#__codelineno-1-7" id="__codelineno-1-7" name="__codelineno-1-7"></a><span class="k">when</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="bp">context</span><span class="p">.</span><span class="na">binary_path</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">"/usr/bin/gh"</span><span class="w"> </span><span class="p">};</span>
+</span><span id="__span-1-8"><a href="#__codelineno-1-8" id="__codelineno-1-8" name="__codelineno-1-8"></a>
+</span><span id="__span-1-9"><a href="#__codelineno-1-9" id="__codelineno-1-9" name="__codelineno-1-9"></a><span class="nd">@id</span><span class="p">(</span><span class="s2">"github_triage/add-labels"</span><span class="p">)</span>
+</span><span id="__span-1-10"><a href="#__codelineno-1-10" id="__codelineno-1-10" name="__codelineno-1-10"></a><span class="k">permit</span><span class="w"> </span><span class="p">(</span>
+</span><span id="__span-1-11"><a href="#__codelineno-1-11" id="__codelineno-1-11" name="__codelineno-1-11"></a><span class="w">    </span><span class="bp">principal</span><span class="w"> </span><span class="ow">is</span><span class="w"> </span><span class="nn">Sandbox</span><span class="p">::</span><span class="n">Process</span><span class="p">,</span>
+</span><span id="__span-1-12"><a href="#__codelineno-1-12" id="__codelineno-1-12" name="__codelineno-1-12"></a><span class="w">    </span><span class="bp">action</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nn">Sandbox</span><span class="p">::</span><span class="nn">Action</span><span class="p">::</span><span class="s2">"HttpRequest"</span><span class="p">,</span>
+</span><span id="__span-1-13"><a href="#__codelineno-1-13" id="__codelineno-1-13" name="__codelineno-1-13"></a><span class="w">    </span><span class="bp">resource</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nn">Sandbox</span><span class="p">::</span><span class="nn">NetworkEndpoint</span><span class="p">::</span><span class="s2">"api.github.com:443"</span>
+</span><span id="__span-1-14"><a href="#__codelineno-1-14" id="__codelineno-1-14" name="__codelineno-1-14"></a><span class="p">)</span>
+</span><span id="__span-1-15"><a href="#__codelineno-1-15" id="__codelineno-1-15" name="__codelineno-1-15"></a><span class="k">when</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-1-16"><a href="#__codelineno-1-16" id="__codelineno-1-16" name="__codelineno-1-16"></a><span class="w">    </span><span class="bp">context</span><span class="p">.</span><span class="na">binary_path</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">"/usr/bin/gh"</span>
+</span><span id="__span-1-17"><a href="#__codelineno-1-17" id="__codelineno-1-17" name="__codelineno-1-17"></a><span class="w">    </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="bp">context</span><span class="p">.</span><span class="na">method</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">"POST"</span>
+</span><span id="__span-1-18"><a href="#__codelineno-1-18" id="__codelineno-1-18" name="__codelineno-1-18"></a><span class="w">    </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="bp">context</span><span class="p">.</span><span class="na">path</span><span class="w"> </span><span class="ow">like</span><span class="p">(</span><span class="s2">"/repos/NVIDIA/OpenShell/issues/*/labels"</span><span class="p">,</span><span class="w"> </span><span class="s2">"/"</span><span class="p">)</span>
+</span><span id="__span-1-19"><a href="#__codelineno-1-19" id="__codelineno-1-19" name="__codelineno-1-19"></a><span class="p">};</span>
+</span></code></pre></div>
+<p>The differences worth noting are:</p>
+<ol>
+<li><strong>Two decisions instead of one block.</strong> The YAML policy specification language combines rules with binaries in a single entry, whereas Cedar splits this into a <code>NetworkConnect</code> decision and an <code>HttpRequest</code> decision. This separates concerns into a decision for opening the connection using <code>gh</code> and another for the actual request that the proxy inspects. Each <code>HttpRequest</code> policy names the endpoint with either exact matching or with wildcards<sup id="fnref:cedar-like"><a class="footnote-ref" href="#fn:cedar-like">4</a></sup>. Because each decision matches the point of enforcement, being allowed to open a connection never implies being allowed any particular request on it, so each grant stays as narrow as the job needs.</li>
+<li><strong>What YAML implies, Cedar says.</strong> A YAML binary automatically matches its symlinks and the processes launched implicitly. A YAML GET also allows HEAD. Cedar makes these explicit and in that sense the Cedar policy above is narrower than its YAML counterpart. It matches <code>gh</code> and nothing it launches. When you need matching through aliases or child processes, you request them explicitly, using <code>binary_aliases.contains("/usr/bin/gh")</code> or <code>ancestors.contains("/usr/bin/gh")</code>.</li>
+<li><strong>Credentials don't grant access.</strong> When you attach a provider, such as GitHub in this case, you are supplying a token and not the permissions that use that token. The Cedar policy is what defines the set of all accesses the token can be used for.</li>
+<li><strong>Checked when submitted, and analyzable.</strong> Cedar rejects malformed policies when they are set, just like YAML, and in addition Cedar's schema checks the conditions themselves, leading to rejections of policies with misspelled attributes or type errors inside a <code>when</code> clause. Since the Cedar policy is the policy that is enforced, we can formally check that this agent's ceiling is subsumed by the triage team's ceiling.</li>
+</ol>
+<h3 id="why-we-picked-cedar">Why we picked Cedar</h3>
+<p>Cedar balances expressivity, readability, and decidability. Cedar was designed to be fully decidable<sup id="fnref2:cedar-oopsla"><a class="footnote-ref" href="#fn:cedar-oopsla">3</a></sup>. In a nutshell, what makes a policy language decidable is that every question we can ask about a policy, such as "can a given agent ever reach a specific endpoint?" or "does a spawned sub-agent's policy grant anything that its parent does not?", can be answered with a definitive yes or no. This is not true for general-purpose policy languages, where some questions do not yield a definitive yes or no answer using any theory and an SMT solver.</p>
+<p>Cedar does not support loops, recursion, or user-defined functions that lead to unboundedness and loss of decidability. In exchange, every evaluation terminates and generally runs in linear time, or quadratic time in the worst case because of set containment operations<sup id="fnref3:cedar-oopsla"><a class="footnote-ref" href="#fn:cedar-oopsla">3</a></sup>. Its symbolic compiler reduces any policy set to SMT with an encoding proved sound and complete<sup id="fnref:symcert"><a class="footnote-ref" href="#fn:symcert">5</a></sup> in Lean<sup id="fnref:lean"><a class="footnote-ref" href="#fn:lean">6</a></sup>, and the resulting queries are solved with the cvc5 SMT solver<sup id="fnref:cvc5"><a class="footnote-ref" href="#fn:cvc5">7</a></sup>. Analysis therefore extends to whatever an author writes, and it applies to the policy that is enforced, because the compiler and the evaluator share one specified semantics. That is also why a Cedar sandbox enforces the Cedar text itself, so analysis and enforcement always see the same policy.</p>
+<p>Cedar has a Lean specification and a Rust implementation checked against it using differential random testing<sup id="fnref:cedar-fse"><a class="footnote-ref" href="#fn:cedar-fse">8</a></sup>. A Cedar policy is a condition over a principal, an action, a resource, and a request context, validated against a schema, so authors can state precisely what they mean. For example, a policy can let a binary reach an endpoint only when a specific parent launched it, or conversely only when a specific parent did not launch it.</p>
+<p>For agents, using Cedar changes the assurance we can offer. Instead of testing that a sub-agent always stays within its parent's permissions, we can prove that it cannot exceed them on any run with the proof over the policy that is actually enforced. This proof holds over all possible requests, which makes the choice compelling.</p>
+<p>We anticipate the need for temporal policies and our integration with Cedar provides a clean and natural path to temporal policies with Dogwood<sup id="fnref:dogwood"><a class="footnote-ref" href="#fn:dogwood">9</a></sup>, another open-source initiative from AWS. Dogwood extends Cedar with <code>when temporal { ... }</code> conditions over the history of events the authorizer has seen, such as:</p>
+<ul>
+<li>"permit this call only if the same principal was approved within the last hour"</li>
+<li>"deny after a logout until the next login"</li>
+</ul>
+<h2 id="status">Status</h2>
+<p>We have implemented Cedar as an alternate policy language in OpenShell, with the RFC and integration under review (<a href="https://github.com/NVIDIA/OpenShell/pull/4564">OpenShell RFC 0020</a>, <a href="https://github.com/NVIDIA/OpenShell/pull/4565">OpenShell integration</a>). Cedar support is available in development builds today; stable builds reject Cedar policies.</p>
+<h2 id="whats-coming">What's coming</h2>
+<h3 id="prover">Prover</h3>
+<p>The OpenShell prover is a standalone tool at the moment that encodes YAML policies into an SMT encoding with Z3<sup id="fnref:z3"><a class="footnote-ref" href="#fn:z3">10</a></sup> as the decision procedure to check inclusion between pairs of policies. That encoding is built by hand, so every new policy feature needs a matching extension to the prover. The prover is what we use to continuously check policies against their ceilings and to whittle permissions down. We will extend the prover to cover Cedar, using Cedar's symbolic compiler, whose encoding is proved sound and complete<sup id="fnref2:symcert"><a class="footnote-ref" href="#fn:symcert">5</a></sup>.</p>
+<p>A Cedar policy set has a precise set-theoretic meaning, and Cedar's analysis decides relations between policy sets, which gives us the following capabilities that we will expose in the prover.</p>
+<ol>
+<li><strong>Union:</strong> each <code>permit</code> contributes the requests it matches, and a policy set (P) allows their union, (\mathit{allowed}(P)).</li>
+<li>
+<p><strong>Set difference:</strong> this is what <code>forbid</code> adds. A matching <code>forbid</code> always overrides any <code>permit</code>, so</p>
+<p>[
+\mathit{allowed}(P) = \Big(\bigcup \mathit{permits}\Big) \setminus \Big(\bigcup \mathit{forbids}\Big)
+]</p>
+<p>That's the formal reason "forbid always wins" and why policy order doesn't matter.</p>
+</li>
+<li>
+<p><strong>Intersection</strong>, within a single policy: a policy's scope and all of its <code>when</code> clauses are conjoined, and <code>unless</code> clauses are conjoined after negation. A single policy's match set is therefore the intersection of its constraints. There's no operator that intersects two policy sets, though. To require two sets to both allow a request, you evaluate them separately and combine the results outside Cedar.</p>
+</li>
+<li><strong>Complement:</strong> you never write it directly. It's implicit, because anything no <code>permit</code> matches is denied by default.</li>
+</ol>
+<p>Over these, Cedar's analyzer decides the following relations between two policy sets (P_1) and (P_2), over all requests the schema allows, returning a counterexample when the answer is no. Each relation has a logical reading and a set-theoretic one. Read a policy set as a predicate that is true of exactly the requests it allows. Then implication between policies is inclusion between their allowed sets.</p>
+<ul>
+<li><strong>Inclusion:</strong> (\mathit{allowed}(P_1) \subseteq \mathit{allowed}(P_2)), or equivalently (P_1 \Rightarrow P_2). This is the ceiling check. It answers the question we started with. When the answer is no, the counterexample is a request in (\mathit{allowed}(P_1) \setminus \mathit{allowed}(P_2)), naming a grant that exceeds the ceiling. That is the grant to remove when whittling permissions down.</li>
+<li><strong>Equivalence:</strong> (\mathit{allowed}(P_1) = \mathit{allowed}(P_2)), or (P_1 \Leftrightarrow P_2), for example to confirm that a refactored policy allows exactly what the original did. It is inclusion in both directions, so it also confirms that narrowing a policy removed only what we meant to remove.</li>
+<li><strong>Disjointness:</strong> (\mathit{allowed}(P_1) \cap \mathit{allowed}(P_2) = \emptyset), or (\neg(P_1 \wedge P_2)) for every request, for example to confirm that two agents share no grants.</li>
+</ul>
+<h3 id="temporal-policies-a-teaser">Temporal policies: A teaser</h3>
+<div class="language-cedar highlight"><pre><span></span><code><span id="__span-2-1"><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="c1">// state:accepted only after a maintainer approved that same issue</span>
+</span><span id="__span-2-2"><a href="#__codelineno-2-2" id="__codelineno-2-2" name="__codelineno-2-2"></a><span class="c1">// within the last 24 hours.</span>
+</span><span id="__span-2-3"><a href="#__codelineno-2-3" id="__codelineno-2-3" name="__codelineno-2-3"></a><span class="nd">@id</span><span class="p">(</span><span class="s2">"triage/accept-after-approval"</span><span class="p">)</span>
+</span><span id="__span-2-4"><a href="#__codelineno-2-4" id="__codelineno-2-4" name="__codelineno-2-4"></a><span class="k">permit</span><span class="w"> </span><span class="p">(</span>
+</span><span id="__span-2-5"><a href="#__codelineno-2-5" id="__codelineno-2-5" name="__codelineno-2-5"></a><span class="w">    </span><span class="bp">principal</span><span class="w"> </span><span class="ow">is</span><span class="w"> </span><span class="nn">Sandbox</span><span class="p">::</span><span class="n">Process</span><span class="p">,</span>
+</span><span id="__span-2-6"><a href="#__codelineno-2-6" id="__codelineno-2-6" name="__codelineno-2-6"></a><span class="w">    </span><span class="bp">action</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nn">Sandbox</span><span class="p">::</span><span class="nn">Action</span><span class="p">::</span><span class="s2">"AddIssueLabel"</span><span class="p">,</span>
+</span><span id="__span-2-7"><a href="#__codelineno-2-7" id="__codelineno-2-7" name="__codelineno-2-7"></a><span class="w">    </span><span class="bp">resource</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nn">Sandbox</span><span class="p">::</span><span class="nn">NetworkEndpoint</span><span class="p">::</span><span class="s2">"api.github.com:443"</span>
+</span><span id="__span-2-8"><a href="#__codelineno-2-8" id="__codelineno-2-8" name="__codelineno-2-8"></a><span class="p">)</span>
+</span><span id="__span-2-9"><a href="#__codelineno-2-9" id="__codelineno-2-9" name="__codelineno-2-9"></a><span class="k">when</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-2-10"><a href="#__codelineno-2-10" id="__codelineno-2-10" name="__codelineno-2-10"></a><span class="w">    </span><span class="bp">context</span><span class="p">.</span><span class="na">input</span><span class="p">.</span><span class="na">repo</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">"NVIDIA/OpenShell"</span>
+</span><span id="__span-2-11"><a href="#__codelineno-2-11" id="__codelineno-2-11" name="__codelineno-2-11"></a><span class="w">    </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="bp">context</span><span class="p">.</span><span class="na">input</span><span class="p">.</span><span class="na">label</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">"state:accepted"</span>
+</span><span id="__span-2-12"><a href="#__codelineno-2-12" id="__codelineno-2-12" name="__codelineno-2-12"></a><span class="p">}</span>
+</span><span id="__span-2-13"><a href="#__codelineno-2-13" id="__codelineno-2-13" name="__codelineno-2-13"></a><span class="k">when</span><span class="w"> </span><span class="k">temporal</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-2-14"><a href="#__codelineno-2-14" id="__codelineno-2-14" name="__codelineno-2-14"></a><span class="w">    </span><span class="k">formerly</span><span class="w"> </span><span class="k">within</span><span class="w"> </span><span class="mi">24h</span><span class="w"> </span><span class="nn">Sandbox</span><span class="p">::</span><span class="nn">Action</span><span class="p">::</span><span class="s2">"ApproveIssue"</span><span class="p">::</span><span class="n">response</span><span class="p">{</span>
+</span><span id="__span-2-15"><a href="#__codelineno-2-15" id="__codelineno-2-15" name="__codelineno-2-15"></a><span class="w">        </span><span class="n">input</span><span class="p">.</span><span class="na">repo</span><span class="p">:</span><span class="w"> </span><span class="bp">context</span><span class="p">.</span><span class="na">input</span><span class="p">.</span><span class="na">repo</span><span class="p">,</span>
+</span><span id="__span-2-16"><a href="#__codelineno-2-16" id="__codelineno-2-16" name="__codelineno-2-16"></a><span class="w">        </span><span class="n">input</span><span class="p">.</span><span class="na">issue</span><span class="p">:</span><span class="w"> </span><span class="bp">context</span><span class="p">.</span><span class="na">input</span><span class="p">.</span><span class="na">issue</span><span class="p">,</span>
+</span><span id="__span-2-17"><a href="#__codelineno-2-17" id="__codelineno-2-17" name="__codelineno-2-17"></a><span class="w">        </span><span class="n">output</span><span class="p">.</span><span class="na">approved</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+</span><span id="__span-2-18"><a href="#__codelineno-2-18" id="__codelineno-2-18" name="__codelineno-2-18"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-2-19"><a href="#__codelineno-2-19" id="__codelineno-2-19" name="__codelineno-2-19"></a><span class="p">};</span>
+</span></code></pre></div>
+<p>The triage agent from our example can label issues at any time, but one label is special: <code>state:accepted</code>. This Dogwood policy lets the agent apply it only if a maintainer approved that same issue in the last 24 hours. The <code>when</code> block is ordinary Cedar and checks the request in front of us. The <code>when temporal</code> block looks back over the history of events: was there an approval for this repository and issue, with <code>approved: true</code>, within the window? If there was no approval, if it was a rejection, or if it was for a different issue or is more than a day old, the request is denied. Dogwood lowers the temporal condition to a single context value, so the decision is still made by the Cedar engine. Dogwood also adds information providers, values computed on demand that a condition may consult. This is not something OpenShell enforces today but is meant as a teaser of what's coming with Dogwood. <code>AddIssueLabel</code> and <code>ApproveIssue</code> are illustrative actions, not part of the OpenShell policy schema today.</p>
+<p>This opens an interesting question and research direction. Since the <code>approved</code> state is updated outside of the policy, it is critical that the events the policy depends on, such as the recorded approval, are correct, because the correctness of the policy decision rests on them. In short, there is a transfer of trust here that falls under the shared responsibility model. The entities producing the events that policies depend on need to ensure those events are correct and recorded with integrity, and the entities writing policies need to choose event sources they can trust.</p>
+<p>The correctness of these events is a vertical-agnostic concern. A community-driven initiative to assure the correctness of such events, perhaps deploying either formal or testing-based approaches, is a need.</p>
+<p>Looking further out, a common concern from enterprises is authoring and managing the thousands of policies that large-scale agent deployments will need. We are exploring how to synthesize policies from agent traces and intent. Going back to our desire to assure least-privilege access for all agents, decidability across all expressible policies is what makes every synthesized policy checkable against a given policy ceiling before it is ever used. We will share more as that work matures.</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>We're incredibly excited to bring Cedar and eventually Dogwood to OpenShell. We would like to give a special callout to our friends in AWS Automated Reasoning, Liana Hadarean and Lucas Käldström, for helping us with experimental features to get us here. Thanks to Johnny Greco, from the OpenShell team, for valuable feedback that shaped this note. This is a big step toward correctness as we work toward AI safety and governance on our journey to build trustworthy agentic systems. If you are interested in OpenShell, formal methods, AI safety and governance, or any other related topic, join the OpenShell community. Find the project in the CNCF Slack channel #openshell-dev (<a href="https://slack.cncf.io/">join the CNCF Slack</a>).</p>
+<h2 id="references">References</h2>
+<div class="footnote">
+<hr/>
+<ol>
+<li id="fn:rego">
+<p>Open Policy Agent. "Policy Language (Rego)." <em>OPA Documentation</em>. <a href="https://www.openpolicyagent.org/docs/policy-language">openpolicyagent.org/docs/policy-language</a> <a class="footnote-backref" href="#fnref:rego" title="Jump back to footnote 1 in the text">↩</a></p>
+</li>
+<li id="fn:smt">
+<p>C. Barrett, R. Sebastiani, S. A. Seshia, and C. Tinelli. "Satisfiability Modulo Theories." In <em>Handbook of Satisfiability</em>, 2nd ed., Frontiers in Artificial Intelligence and Applications, vol. 336, IOS Press (2021). <a href="https://doi.org/10.3233/FAIA201017">doi:10.3233/FAIA201017</a> <a class="footnote-backref" href="#fnref:smt" title="Jump back to footnote 2 in the text">↩</a></p>
+</li>
+<li id="fn:cedar-oopsla">
+<p>J. W. Cutler, C. Disselkoen, A. Eline, S. He, K. Headley, M. Hicks, K. Hietala, E. Ioannidis, J. Kastner, A. Mamat, D. McAdams, M. McCutchen, N. Rungta, E. Torlak, and A. M. Wells. "Cedar: A New Language for Expressive, Fast, Safe, and Analyzable Authorization." <em>Proc. ACM Program. Lang.</em> 8, OOPSLA1, Article 118 (2024). <a href="https://doi.org/10.1145/3649835">doi:10.1145/3649835</a> <a class="footnote-backref" href="#fnref:cedar-oopsla" title="Jump back to footnote 3 in the text">↩</a><a class="footnote-backref" href="#fnref2:cedar-oopsla" title="Jump back to footnote 3 in the text">↩</a><a class="footnote-backref" href="#fnref3:cedar-oopsla" title="Jump back to footnote 3 in the text">↩</a></p>
+</li>
+<li id="fn:cedar-like">
+<p>The three-argument <code>like</code> form used in the example is experimental and is not yet standard Cedar syntax. <a class="footnote-backref" href="#fnref:cedar-like" title="Jump back to footnote 4 in the text">↩</a></p>
+</li>
+<li id="fn:symcert">
+<p>E. Torlak. "SymCert: Verifying SMT-Based Policy Analyses." <em>FMCAD 2026</em>. <a href="https://www.amazon.science/publications/symcert-verifying-smt-based-policy-analyses">Paper</a> <a class="footnote-backref" href="#fnref:symcert" title="Jump back to footnote 5 in the text">↩</a><a class="footnote-backref" href="#fnref2:symcert" title="Jump back to footnote 5 in the text">↩</a></p>
+</li>
+<li id="fn:lean">
+<p>L. de Moura and S. Ullrich. "The Lean 4 Theorem Prover and Programming Language." <em>CADE-28</em> (2021), LNAI 12699, pp. 625–635. <a href="https://doi.org/10.1007/978-3-030-79876-5_37">doi:10.1007/978-3-030-79876-5_37</a> <a class="footnote-backref" href="#fnref:lean" title="Jump back to footnote 6 in the text">↩</a></p>
+</li>
+<li id="fn:cvc5">
+<p>H. Barbosa, C. Barrett, M. Brain, G. Kremer, H. Lachnitt, M. Mann, A. Mohamed, M. Mohamed, A. Niemetz, A. Nötzli, A. Ozdemir, M. Preiner, A. Reynolds, Y. Sheng, C. Tinelli, and Y. Zohar. "cvc5: A Versatile and Industrial-Strength SMT Solver." <em>TACAS 2022</em>, LNCS 13243, pp. 415–442. <a href="https://doi.org/10.1007/978-3-030-99524-9_24">doi:10.1007/978-3-030-99524-9_24</a> <a class="footnote-backref" href="#fnref:cvc5" title="Jump back to footnote 7 in the text">↩</a></p>
+</li>
+<li id="fn:cedar-fse">
+<p>C. Disselkoen, A. Eline, S. He, K. Headley, M. Hicks, K. Hietala, J. Kastner, A. Mamat, M. McCutchen, N. Rungta, B. Shah, E. Torlak, and A. Wells. "How We Built Cedar: A Verification-Guided Approach." <em>FSE 2024 Companion</em>. <a href="https://doi.org/10.1145/3663529.3663854">doi:10.1145/3663529.3663854</a> <a class="footnote-backref" href="#fnref:cedar-fse" title="Jump back to footnote 8 in the text">↩</a></p>
+</li>
+<li id="fn:dogwood">
+<p>Dogwood: a governance language for AI agents that extends Cedar with temporal conditions and information providers. <a href="https://github.com/dogwood-policy/dogwood">github.com/dogwood-policy/dogwood</a>; documentation at <a href="https://dogwood-policy.github.io/dogwood/index.html">dogwood-policy.github.io/dogwood</a> <a class="footnote-backref" href="#fnref:dogwood" title="Jump back to footnote 9 in the text">↩</a></p>
+</li>
+<li id="fn:z3">
+<p>L. de Moura and N. Bjørner. "Z3: An Efficient SMT Solver." <em>TACAS 2008</em>, LNCS 4963, pp. 337–340. <a href="https://doi.org/10.1007/978-3-540-78800-3_24">doi:10.1007/978-3-540-78800-3_24</a> <a class="footnote-backref" href="#fnref:z3" title="Jump back to footnote 10 in the text">↩</a></p>
+</li>
+</ol>
+</div>
+<nav class="md-tags">
+<span class="md-tag">cedar</span>
+<span class="md-tag">policy-language</span>
+<span class="md-tag">formal-methods</span>
+<span class="md-tag">agent-security</span>
+</nav>
+</article>
+</div>
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+</div>
+<button class="md-top md-icon" data-md-component="top" hidden="" type="button">
+<svg class="lucide lucide-circle-arrow-up" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10"></circle><path d="m16 12-4-4-4 4M12 16V8"></path></svg>
+  Back to top
+</button>
+</main>
+<footer class="md-footer">
+<nav aria-label="Continue reading" class="md-footer__inner md-grid">
+<a aria-label="Previous: Dev Notes" class="md-footer__link md-footer__link--prev" href="../../">
+<div class="md-footer__button md-icon">
+<svg class="lucide lucide-arrow-left" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="m12 19-7-7 7-7M19 12H5"></path></svg>
+</div>
+<div class="md-footer__title">
+<span class="md-footer__direction">Previous</span>
+<div class="md-ellipsis">Dev Notes</div>
+</div>
+</a>
+<a aria-label="Next: Protecting frontier agent workloads with OpenShell" class="md-footer__link md-footer__link--next" href="../2026-11-06-protecting-frontier-agent-workloads/">
+<div class="md-footer__title">
+<span class="md-footer__direction">Next</span>
+<div class="md-ellipsis">Protecting frontier agent workloads with OpenShell</div>
+</div>
+<div class="md-footer__button md-icon">
+<svg class="lucide lucide-arrow-right" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
+</div>
+</a>
+</nav>
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+<div class="md-copyright__highlight">
+<a href="https://github.com/NVIDIA/OpenShell">OpenShell on GitHub <span aria-hidden="true">↗</span></a>
+</div>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"annotate":null,"base":"../../..","features":["content.code.copy","navigation.sections","navigation.indexes","navigation.path","navigation.footer","navigation.top","search.highlight","toc.follow"],"redirect":null,"search":"../../../assets/javascripts/workers/search.7d14d953.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":null}</script>
+<script src="../../../assets/javascripts/bundle.8dcc8e9c.min.js"></script>
+<script src="../../../javascripts/navigation-drawer.js"></script>
+<script src="../../../javascripts/dev-notes.js"></script>
+<script src="../../../javascripts/pi-traces.js"></script>
+</body>
+</html>
