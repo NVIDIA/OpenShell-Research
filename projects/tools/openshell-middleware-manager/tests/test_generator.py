@@ -610,6 +610,8 @@ def test_python_package_name_can_be_overridden(tmp_path: Path) -> None:
     )
 
     assert (destination / "src/custom_package/server.py").is_file()
+    pyproject = (destination / "pyproject.toml").read_text()
+    assert '[tool.uv.build-backend]\nmodule-name = "custom_package"' in pyproject
 
 
 def test_numeric_project_name_gets_importable_python_package(tmp_path: Path) -> None:
@@ -625,6 +627,54 @@ def test_numeric_project_name_gets_importable_python_package(tmp_path: Path) -> 
     )
 
     assert (destination / "src/middleware_123/server.py").is_file()
+    pyproject = (destination / "pyproject.toml").read_text()
+    assert '[tool.uv.build-backend]\nmodule-name = "middleware_123"' in pyproject
+
+
+@pytest.mark.parametrize("name", ["assert", "logging", "secrets", "http", "grpc", "google"])
+def test_reserved_project_names_get_importable_python_package(tmp_path: Path, name: str) -> None:
+    destination = tmp_path / name
+
+    create_project(
+        name=name,
+        language="python",
+        requested_version="v0.0.86",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+
+    assert (destination / f"src/middleware_{name}/server.py").is_file()
+    assert not (destination / f"src/{name}").exists()
+    pyproject = (destination / "pyproject.toml").read_text()
+    assert f'module-name = "middleware_{name}"' in pyproject
+
+
+@pytest.mark.parametrize(
+    ("package_name", "message"),
+    [
+        ("class", "Python keyword"),
+        ("logging", "standard-library module"),
+        ("grpc", "generated project depends on"),
+    ],
+)
+def test_rejects_unimportable_python_package_override(
+    tmp_path: Path, package_name: str, message: str
+) -> None:
+    destination = tmp_path / "project"
+
+    with pytest.raises(ProjectError, match=message):
+        create_project(
+            name="project",
+            language="python",
+            requested_version="v0.0.86",
+            destination=destination,
+            package_name=package_name,
+            download_proto=local_proto,
+            command_runner=no_op_runner,
+        )
+
+    assert not destination.exists()
 
 
 @pytest.mark.parametrize(
