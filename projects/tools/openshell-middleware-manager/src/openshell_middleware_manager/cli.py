@@ -72,7 +72,7 @@ def create(
         typer.Option(
             "--openshell-version",
             "--version",
-            help="OpenShell release tag (for example v0.0.86), or latest.",
+            help="OpenShell release tag (for example v0.1.9), or latest.",
         ),
     ],
     output: Annotated[
@@ -122,7 +122,7 @@ def update(
         typer.Option(
             "--openshell-version",
             "--version",
-            help="OpenShell release tag (for example v0.0.86), or latest.",
+            help="OpenShell release tag (for example v0.1.9), or latest.",
         ),
     ] = "latest",
     check_command: Annotated[

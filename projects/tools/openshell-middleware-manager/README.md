@@ -2,7 +2,7 @@
 
 `openshell-middleware-manager` creates and updates Python or Rust services for OpenShell
 supervisor middleware. Each new project starts as a working pass-through gRPC
-service. It includes the protocol file for one OpenShell release, tests,
+service. It includes the protocol files for one OpenShell release, tests,
 dependency locks, and instructions for registering the service.
 
 The CLI does not install or change OpenShell.
@@ -58,7 +58,7 @@ Generate and run a Python starter with the installed command:
 ```sh
 omm create audit-headers \
   --language python \
-  --openshell-version v0.0.86 \
+  --openshell-version v0.1.9 \
   --output /tmp/audit-headers
 
 cd /tmp/audit-headers
@@ -71,7 +71,7 @@ Or generate and run a Rust starter:
 ```sh
 omm create audit-headers \
   --language rust \
-  --openshell-version v0.0.86 \
+  --openshell-version v0.1.9 \
   --output /tmp/audit-headers-rust
 
 cd /tmp/audit-headers-rust
@@ -82,10 +82,11 @@ cargo run --locked -- 127.0.0.1:50051
 The output path must not exist. Pin an OpenShell tag when you need repeatable
 builds. Use `--openshell-version latest` when you want the newest release.
 
-The starter templates still use the older `max_body_bytes` binding field, so
-`omm create` does not yet support v0.0.116. Validation stops without publishing
-that starter. `omm update` can refresh an existing service already compatible
-with the newer contract.
+New projects implement OpenShell's HTTP hooks, so `omm create` needs OpenShell
+v0.1.9 or newer. For an older release, it reports an error without creating a
+project. Version 0.0.1 of this package creates starters for the earlier v0.0.86
+contract. `omm update` can refresh an existing project to any middleware-capable
+release that the project's own code is compatible with.
 
 Run `omm --help` for all options and `omm --version` for the installed OMM
 version. By default, `omm` derives the Python package name from the project
@@ -103,13 +104,14 @@ To choose a release or update a project in another directory:
 
 ```sh
 omm update /path/to/audit-headers \
-  --openshell-version v0.0.90
+  --openshell-version v0.1.9
 ```
 
 `omm update` reads `.openshell-middleware-manifest.json` to find the project language
-and Python package. It downloads the selected `supervisor_middleware.proto`,
-regenerates Python protobuf and gRPC bindings when needed, updates `uv.lock` or
-`Cargo.lock`, and writes the version and protocol checksum to the manifest.
+and Python package. It downloads the selected `supervisor_middleware.proto` and
+the OpenShell protocol files it imports, regenerates Python protobuf and gRPC
+bindings when needed, updates `uv.lock` or `Cargo.lock`, and writes the version
+and protocol checksums to the manifest.
 The manifest must name `openshell-middleware-manager` as its generator.
 
 Python updates run `uv sync` and then `uv run pytest` by default. If a project
@@ -117,7 +119,7 @@ needs additional build steps, supply its normal validation command:
 
 ```sh
 omm update /path/to/my-middleware \
-  --openshell-version v0.0.116 --check-command 'make check'
+  --openshell-version v0.1.9 --check-command 'make check'
 ```
 
 The command runs in the staged project with its isolated Python environment,
@@ -130,18 +132,20 @@ in a separate environment from the project's runtime dependencies.
 
 Each project contains:
 
-- a pass-through implementation of `Describe`, `ValidateConfig`, and
-  `EvaluateHttpRequest`;
-- the exact `supervisor_middleware.proto` from the selected OpenShell release;
+- a pass-through implementation of `Describe`, `ValidateConfig`, and the
+  `HttpHooks.EvaluateHttpRequestHook` request hook;
+- the exact `supervisor_middleware.proto` from the selected OpenShell release,
+  with the OpenShell protocol files it imports;
 - generated Python gRPC bindings or Rust Tonic build configuration;
 - tests and lint/type-check configuration;
 - `uv.lock` or `Cargo.lock`; and
-- `.openshell-middleware-manifest.json` with the release, source URL, and protocol
-  checksum.
+- `.openshell-middleware-manifest.json` with the release, source URLs, and protocol
+  checksums.
 
-Start by implementing policy behavior in the generated `validate_config` and
-`evaluate_http_request` functions. The generated README explains how to run the
-service and register it with OpenShell.
+Start by implementing policy behavior in the generated `validate_config`,
+`evaluate_http_request_preflight`, and `evaluate_http_request_body` functions.
+The generated README explains how to run the service and register it with
+OpenShell.
 
 ## How `omm` protects your files
 
@@ -151,10 +155,12 @@ check passes. If the output path already exists, including as a symlink, the
 command stops without changing it.
 
 `omm update` works on a temporary copy of the project. It changes only the
-protocol, generated bindings or Rust build files, lockfile, and manifest. It
+protocol files, generated bindings or Rust build files, lockfile, and manifest. It
 runs the project checks before replacing those files. Your implementation files
-stay unchanged. If a file replacement fails, `omm` restores the files it
-already replaced.
+stay unchanged, including your own files in `proto/`. If a release imports a
+protocol file whose name a different file in `proto/` already uses, `omm update`
+stops so that you can move your file. If a file replacement fails, `omm`
+restores the files it already replaced.
 
 A lock prevents two `omm` processes from changing the same path at once.
 Normal failures remove the lock and temporary files. If an update and its
@@ -191,6 +197,34 @@ uv build
 
 Unit tests use local protocol fixtures. They do not contact GitHub or run `uv`
 or Cargo inside generated projects.
+
+## Check a real OpenShell release
+
+To check that generated services work with an OpenShell release, run:
+
+```sh
+scripts/verify-openshell-release.sh --openshell-version v0.1.9
+```
+
+The script needs Linux, Docker, `curl`, `openssl`, and `uv`. Rust starters also
+need Cargo with `rustfmt` and `clippy`. It downloads that release's gateway and
+CLI into a temporary directory, verifies their checksums, and runs them from
+there. It does not install OpenShell or change an existing installation. The
+script then:
+
+1. creates a Python and a Rust starter with `omm create`, refreshes each with
+   `omm update`, and runs each starter's documented checks;
+2. starts the starters and a gateway that registers them, which succeeds only
+   when the gateway accepts each starter's `Describe` response;
+3. creates a sandbox whose policy attaches each starter, sends a request
+   through it, and confirms that OpenShell logged the middleware invocation;
+   and
+4. stops the starter and confirms that OpenShell blocks the same request.
+
+Use `--language python` or `--language rust` to check one language. Omit
+`--openshell-version` to check the latest release. The script prints `ALL PASS`
+and removes its temporary directory when every check passes. Run it with
+`--help` for the remaining options.
 
 See [RELEASING.md](https://github.com/NVIDIA/OpenShell-Research/blob/main/projects/tools/openshell-middleware-manager/RELEASING.md)
 for the local PyPI release process.

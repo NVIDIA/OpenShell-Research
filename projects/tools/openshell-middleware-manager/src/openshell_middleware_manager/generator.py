@@ -29,13 +29,26 @@ from datetime import datetime, timezone
 from functools import partial
 from importlib.resources import files
 from pathlib import Path
+from typing import Any
 
 from openshell_middleware_manager import __version__
 
 _REPOSITORY_URL = "https://github.com/NVIDIA/OpenShell"
 _RAW_URL = "https://raw.githubusercontent.com/NVIDIA/OpenShell"
-_PROTO_PATH = "proto/supervisor_middleware.proto"
+_PROTO_DIRECTORY = "proto"
+_PROTO_NAME = "supervisor_middleware.proto"
+_PROTO_IMPORT_PATTERN = re.compile(
+    r'^[ \t]*import[ \t]+(?:public[ \t]+)?"([^"]+)"[ \t]*;', re.MULTILINE
+)
+_PROTO_BLOCK_COMMENT_PATTERN = re.compile(r"/\*.*?\*/", re.DOTALL)
+_PROTO_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_]+\.proto$")
+_BUNDLED_PROTO_PREFIX = "google/protobuf/"
+_HTTP_HOOKS_SERVICE = b"service HttpHooks"
+_FIRST_HTTP_HOOKS_RELEASE = "v0.1.9"
 _GRPCIO_TOOLS_VERSION = "1.81.1"
+_GENERATED_SIBLING_IMPORT_PATTERN = re.compile(
+    r"^(?:import (\w+_pb2) as |from (\w+_pb2) import )", re.MULTILINE
+)
 _VERSION_PATTERN = re.compile(r"^v\d+\.\d+\.\d+(?:[+-][0-9A-Za-z._-]+)?$")
 _PYTHON_PACKAGE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 _PROJECT_NAME_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$")
@@ -147,6 +160,25 @@ class ProjectMetadata:
 
     language: str
     python_package: str | None
+    proto_imports: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ProtoFile:
+    """One file of the middleware contract downloaded from an OpenShell release."""
+
+    name: str
+    content: bytes
+    source: str
+
+
+@dataclass(frozen=True)
+class ProtoPublication:
+    """How an update publishes each generator-owned file in a project's proto directory."""
+
+    replaced: tuple[str, ...]
+    added: tuple[str, ...]
+    removed: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -187,7 +219,8 @@ class TemplateContext:
         }
 
 
-DownloadProto = Callable[[str], tuple[bytes, str]]
+# (OpenShell version, file name in the release's proto directory) -> (content, source URL)
+DownloadProto = Callable[[str, str], tuple[bytes, str]]
 CommandRunner = Callable[[str, Path, str], None]
 
 
@@ -222,17 +255,17 @@ def create_project(
         reservation.staging_path.mkdir(mode=0o700)
         staging_path = reservation.staging_path
         staging_path.chmod(0o755)
-        proto, proto_url = downloader(version)
-        _validate_proto(proto, version)
+        contract = _download_contract(version, downloader)
+        _require_http_hooks(contract[0].content, version)
         _render_project(staging_path, language, context)
-        proto_path = staging_path / "proto" / "supervisor_middleware.proto"
-        proto_path.parent.mkdir(parents=True, exist_ok=True)
-        proto_path.write_bytes(proto)
+        proto_directory = staging_path / _PROTO_DIRECTORY
+        proto_directory.mkdir()
+        for proto_file in contract:
+            (proto_directory / proto_file.name).write_bytes(proto_file.content)
         _write_manifest(
             staging_path,
             version=version,
-            proto_url=proto_url,
-            proto=proto,
+            contract=contract,
             language=language,
             python_package=context.package_name if language == "python" else None,
         )
@@ -300,14 +333,12 @@ def update_project(
         _validate_existing_project(project_dir)
         _copy_project_to_staging(project_dir, reservation.staging_path)
         staging_path = reservation.staging_path
-        proto, proto_url = downloader(version)
-        _validate_proto(proto, version)
-        _refresh_generated_artifacts(
+        contract = _download_contract(version, downloader)
+        proto_publication = _refresh_generated_artifacts(
             staging_path,
             metadata=metadata,
             version=version,
-            proto_url=proto_url,
-            proto=proto,
+            contract=contract,
         )
         runner(metadata.language, staging_path, metadata.python_package or "unused")
         _verify_lock(legacy_reservation)
@@ -323,7 +354,7 @@ def update_project(
             metadata.language,
             metadata.python_package,
         )
-        _publish_generated_artifacts(staging_path, project_dir, metadata)
+        _publish_generated_artifacts(staging_path, project_dir, metadata, proto_publication)
         published = True
     except PublicationRollbackError:
         preserve_recovery = True
@@ -407,7 +438,7 @@ def _normalize_version(requested: str) -> str:
         value = f"v{value}"
     if not _VERSION_PATTERN.fullmatch(value):
         raise ProjectError(
-            f"invalid OpenShell version '{requested}'; expected a tag such as v0.0.86"
+            f"invalid OpenShell version '{requested}'; expected a tag such as v0.1.9"
         )
     return value
 
@@ -430,8 +461,41 @@ def _resolve_latest_version() -> str:
     return version
 
 
-def _download_proto(version: str) -> tuple[bytes, str]:
-    url = f"{_RAW_URL}/{version}/{_PROTO_PATH}"
+def _download_contract(version: str, downloader: DownloadProto) -> tuple[ProtoFile, ...]:
+    """Download the middleware proto, then every OpenShell proto it imports."""
+    contract: dict[str, ProtoFile] = {}
+    pending = [_PROTO_NAME]
+    while pending:
+        name = pending.pop()
+        if name in contract:
+            continue
+        content, source = downloader(version, name)
+        if name == _PROTO_NAME:
+            _validate_proto(content, version)
+        contract[name] = ProtoFile(name=name, content=content, source=source)
+        pending.extend(_openshell_imports(content, version))
+    middleware_proto = contract.pop(_PROTO_NAME)
+    return (middleware_proto, *sorted(contract.values(), key=lambda proto_file: proto_file.name))
+
+
+def _openshell_imports(proto: bytes, version: str) -> list[str]:
+    """Name the OpenShell proto files that a proto imports from its own directory."""
+    names = []
+    source = _PROTO_BLOCK_COMMENT_PATTERN.sub("", proto.decode(errors="replace"))
+    for imported in _PROTO_IMPORT_PATTERN.findall(source):
+        if imported.startswith(_BUNDLED_PROTO_PREFIX):
+            continue
+        if not _PROTO_NAME_PATTERN.fullmatch(imported):
+            raise ProjectError(
+                f"contract for {version} imports an unsupported proto path: {imported}"
+            )
+        names.append(imported)
+    return names
+
+
+def _download_proto(version: str, name: str) -> tuple[bytes, str]:
+    proto_path = f"{_PROTO_DIRECTORY}/{name}"
+    url = f"{_RAW_URL}/{version}/{proto_path}"
     request = urllib.request.Request(
         url,
         headers={"User-Agent": f"{_TOOL_NAME}/{__version__}"},
@@ -442,14 +506,14 @@ def _download_proto(version: str) -> tuple[bytes, str]:
     except urllib.error.HTTPError as error:
         if error.code == 404:
             raise ProjectError(
-                f"{version} does not expose {_PROTO_PATH}; choose a middleware-capable release"
+                f"{version} does not expose {proto_path}; choose a middleware-capable release"
             ) from error
         raise ProjectError(
-            f"could not download {_PROTO_PATH} for {version}: HTTP {error.code}"
+            f"could not download {proto_path} for {version}: HTTP {error.code}"
         ) from error
     except (OSError, urllib.error.URLError, http.client.IncompleteRead) as error:
         raise ProjectError(
-            f"could not download {_PROTO_PATH} for {version}: {_network_error_reason(error)}"
+            f"could not download {proto_path} for {version}: {_network_error_reason(error)}"
         ) from error
 
 
@@ -490,6 +554,14 @@ def _validate_proto(proto: bytes, version: str) -> None:
         )
 
 
+def _require_http_hooks(proto: bytes, version: str) -> None:
+    if _HTTP_HOOKS_SERVICE not in proto:
+        raise ProjectError(
+            f"{version} predates the HTTP hooks that new middleware projects implement; "
+            f"choose OpenShell {_FIRST_HTTP_HOOKS_RELEASE} or newer"
+        )
+
+
 def _validate_destination(destination: Path) -> None:
     if os.path.lexists(destination):
         raise ProjectError(f"output path must not already exist: {destination}")
@@ -513,7 +585,7 @@ def _verify_project_identity(project_dir: Path, device: int, inode: int) -> None
         raise ProjectError("project path changed during update; refusing to publish")
 
 
-def _read_project_metadata(project_dir: Path) -> ProjectMetadata:
+def _read_manifest(project_dir: Path) -> dict[str, Any]:
     manifest_path = project_dir / _MANIFEST_FILENAME
     if manifest_path.is_symlink() or not manifest_path.is_file():
         raise ProjectError(
@@ -525,6 +597,29 @@ def _read_project_metadata(project_dir: Path) -> ProjectMetadata:
         raise ProjectError(f"could not read project manifest: {error}") from error
     if not isinstance(manifest, dict):
         raise ProjectError("project manifest must contain a JSON object")
+    return manifest
+
+
+def _manifest_proto_imports(manifest: Mapping[str, Any]) -> tuple[str, ...]:
+    """Name the imported proto files that a manifest records as generator-owned."""
+    entries = manifest.get("proto_imports", [])
+    if not isinstance(entries, list):
+        raise ProjectError("project manifest proto_imports must be a list")
+    names = []
+    for entry in entries:
+        name = entry.get("name") if isinstance(entry, dict) else None
+        if (
+            not isinstance(name, str)
+            or not _PROTO_NAME_PATTERN.fullmatch(name)
+            or name == _PROTO_NAME
+        ):
+            raise ProjectError("project manifest has an invalid proto_imports entry")
+        names.append(name)
+    return tuple(names)
+
+
+def _read_project_metadata(project_dir: Path) -> ProjectMetadata:
+    manifest = _read_manifest(project_dir)
 
     generator = manifest.get("generator")
     generator_name = generator.get("name") if isinstance(generator, dict) else None
@@ -533,7 +628,7 @@ def _read_project_metadata(project_dir: Path) -> ProjectMetadata:
     languages = manifest.get("languages")
     if languages not in (["python"], ["rust"]):
         raise ProjectError("project manifest must identify exactly one supported language")
-    language = languages[0]
+    language: str = manifest["languages"][0]
     python_package = manifest.get("python_package")
     if language == "python":
         if not isinstance(python_package, str) or not _PYTHON_PACKAGE_PATTERN.fullmatch(
@@ -543,8 +638,14 @@ def _read_project_metadata(project_dir: Path) -> ProjectMetadata:
     elif python_package is not None:
         raise ProjectError("Rust project manifest must set python_package to null")
 
+    proto_imports = _manifest_proto_imports(manifest)
+
     _validate_refresh_targets(project_dir, language, python_package)
-    return ProjectMetadata(language=language, python_package=python_package)
+    return ProjectMetadata(
+        language=language,
+        python_package=python_package,
+        proto_imports=proto_imports,
+    )
 
 
 def _validate_refresh_targets(project_dir: Path, language: str, python_package: str | None) -> None:
@@ -601,16 +702,41 @@ def _refresh_generated_artifacts(
     *,
     metadata: ProjectMetadata,
     version: str,
-    proto_url: str,
-    proto: bytes,
-) -> None:
+    contract: Sequence[ProtoFile],
+) -> ProtoPublication:
     _validate_refresh_targets(
         project_dir,
         metadata.language,
         metadata.python_package,
     )
-    proto_path = project_dir / "proto" / "supervisor_middleware.proto"
-    proto_path.write_bytes(proto)
+    proto_directory = project_dir / _PROTO_DIRECTORY
+    middleware_proto, *imported_protos = contract
+    (proto_directory / middleware_proto.name).write_bytes(middleware_proto.content)
+    replaced = [middleware_proto.name]
+    added = []
+    for proto_file in imported_protos:
+        proto_path = proto_directory / proto_file.name
+        _reject_irregular_file(proto_path)
+        if not proto_path.exists():
+            added.append(proto_file.name)
+        elif (
+            proto_file.name in metadata.proto_imports
+            or proto_path.read_bytes() == proto_file.content
+        ):
+            replaced.append(proto_file.name)
+        else:
+            raise ProjectError(
+                f"{proto_path.relative_to(project_dir)} already exists and differs from the "
+                f"file that OpenShell {version} imports; move it before updating"
+            )
+        proto_path.write_bytes(proto_file.content)
+    removed = []
+    for stale_name in sorted(set(metadata.proto_imports) - {file.name for file in contract}):
+        stale_path = proto_directory / stale_name
+        _reject_irregular_file(stale_path)
+        if stale_path.exists():
+            stale_path.unlink()
+            removed.append(stale_name)
     if metadata.language == "python":
         if metadata.python_package is None:  # pragma: no cover - checked during discovery
             raise AssertionError("Python package is required")
@@ -623,11 +749,21 @@ def _refresh_generated_artifacts(
     _write_manifest(
         project_dir,
         version=version,
-        proto_url=proto_url,
-        proto=proto,
+        contract=contract,
         language=metadata.language,
         python_package=metadata.python_package,
     )
+    return ProtoPublication(
+        replaced=tuple(replaced),
+        added=tuple(added),
+        removed=tuple(removed),
+    )
+
+
+def _reject_irregular_file(path: Path) -> None:
+    """Refuse to write through a symlink or over a directory in a generated-file slot."""
+    if os.path.lexists(path) and (path.is_symlink() or not path.is_file()):
+        raise ProjectError(f"generated artifact must be a regular file: {path}")
 
 
 def _acquire_lock(
@@ -845,11 +981,12 @@ def _publish_exchange(source: Path, destination: Path) -> None:
         )
         source_name = os.fsencode(source.name)
         destination_name = os.fsencode(destination.name)
-        result = _exchange_at(
+        result = _rename_at(
             source_parent_fd,
             source_name,
             destination_parent_fd,
             destination_name,
+            exchange=True,
         )
         if result != 0:
             _raise_exchange_error(destination)
@@ -861,11 +998,12 @@ def _publish_exchange(source: Path, destination: Path) -> None:
         if source_attached and destination_attached:
             return
 
-        reverse_result = _exchange_at(
+        reverse_result = _rename_at(
             source_parent_fd,
             source_name,
             destination_parent_fd,
             destination_name,
+            exchange=True,
         )
         if reverse_result != 0:
             error_number = ctypes.get_errno()
@@ -881,12 +1019,67 @@ def _publish_exchange(source: Path, destination: Path) -> None:
         os.close(destination_parent_fd)
 
 
-def _exchange_at(
+def _publish_move(source: Path, destination: Path) -> None:
+    """Atomically move a validated regular file to a path that must not exist yet."""
+    source_parent_fd = _open_parent_directory_no_follow(source)
+    destination_parent_fd = _open_parent_directory_no_follow(destination)
+    try:
+        source_stat = os.stat(source.name, dir_fd=source_parent_fd, follow_symlinks=False)
+        if not stat.S_ISREG(source_stat.st_mode):
+            raise ProjectError(
+                "generated artifacts changed type during update; refusing to publish"
+            )
+        source_name = os.fsencode(source.name)
+        destination_name = os.fsencode(destination.name)
+        result = _rename_at(
+            source_parent_fd,
+            source_name,
+            destination_parent_fd,
+            destination_name,
+            exchange=False,
+        )
+        if result != 0:
+            if ctypes.get_errno() == errno.EEXIST:
+                raise ProjectError(
+                    f"a file appeared during update; refusing to overwrite it: {destination}"
+                )
+            _raise_exchange_error(destination)
+        source_attached = _directory_fd_matches_path(source.parent, source_parent_fd)
+        destination_attached = _directory_fd_matches_path(
+            destination.parent,
+            destination_parent_fd,
+        )
+        if source_attached and destination_attached:
+            return
+
+        reverse_result = _rename_at(
+            destination_parent_fd,
+            destination_name,
+            source_parent_fd,
+            source_name,
+            exchange=False,
+        )
+        if reverse_result != 0:
+            error_number = ctypes.get_errno()
+            raise PublicationRollbackError(
+                "an artifact parent changed during publication and the anchored move "
+                f"could not be reversed: {os.strerror(error_number)}"
+            )
+        raise ProjectError("an artifact parent changed during publication; the move was reversed")
+    finally:
+        os.close(source_parent_fd)
+        os.close(destination_parent_fd)
+
+
+def _rename_at(
     source_parent_fd: int,
     source_name: bytes,
     destination_parent_fd: int,
     destination_name: bytes,
+    *,
+    exchange: bool,
 ) -> int:
+    """Exchange two entries, or move one entry without replacing an existing destination."""
     if sys.platform.startswith("linux"):
         library = ctypes.CDLL(None, use_errno=True)
         try:
@@ -895,11 +1088,11 @@ def _exchange_at(
             raise ProjectError(
                 "this Linux runtime cannot atomically publish a project update"
             ) from error
-        exchange_flag = 2
+        rename_flag = 2 if exchange else 1
     elif sys.platform == "darwin":  # pragma: no cover - platform-specific
         library = ctypes.CDLL(None, use_errno=True)
         rename = library.renameatx_np
-        exchange_flag = 0x00000002
+        rename_flag = 0x00000002 if exchange else 0x00000004
     else:  # pragma: no cover - unsupported platform
         raise ProjectError("this platform cannot atomically publish a project update")
     rename.argtypes = (
@@ -915,7 +1108,7 @@ def _exchange_at(
         source_name,
         destination_parent_fd,
         destination_name,
-        exchange_flag,
+        rename_flag,
     )
 
 
@@ -986,34 +1179,52 @@ def _validate_exchange_entries(
 
 
 def _publish_generated_artifacts(
-    staged_project: Path, project_dir: Path, metadata: ProjectMetadata
+    staged_project: Path,
+    project_dir: Path,
+    metadata: ProjectMetadata,
+    proto_publication: ProtoPublication,
 ) -> None:
-    """Exchange refreshed artifacts in place, rolling back a normal publication failure."""
-    relative_paths = [
-        Path("proto/supervisor_middleware.proto"),
-        Path("uv.lock" if metadata.language == "python" else "Cargo.lock"),
-    ]
+    """Publish refreshed artifacts in place, rolling back a normal publication failure."""
+    proto_directory = Path(_PROTO_DIRECTORY)
+    exchanged_paths = [proto_directory / name for name in proto_publication.replaced]
+    exchanged_paths.append(Path("uv.lock" if metadata.language == "python" else "Cargo.lock"))
     if metadata.language == "python":
         if metadata.python_package is None:  # pragma: no cover - checked during discovery
             raise AssertionError("Python package is required")
-        relative_paths.append(Path("src") / metadata.python_package / "bindings")
-    relative_paths.append(Path(_MANIFEST_FILENAME))
+        exchanged_paths.append(Path("src") / metadata.python_package / "bindings")
+    exchanged_paths.append(Path(_MANIFEST_FILENAME))
 
-    exchanged: list[Path] = []
+    # Each step is (source, destination, exchange). A move's reverse swaps its two paths.
+    steps = [
+        *(
+            (staged_project / proto_directory / name, project_dir / proto_directory / name, False)
+            for name in proto_publication.added
+        ),
+        *(
+            (project_dir / proto_directory / name, staged_project / proto_directory / name, False)
+            for name in proto_publication.removed
+        ),
+        *(
+            (staged_project / relative_path, project_dir / relative_path, True)
+            for relative_path in exchanged_paths
+        ),
+    ]
+
+    completed: list[tuple[Path, Path, bool]] = []
     try:
-        for relative_path in relative_paths:
-            _publish_exchange(
-                staged_project / relative_path,
-                project_dir / relative_path,
-            )
-            exchanged.append(relative_path)
+        for source, destination, exchange in steps:
+            if exchange:
+                _publish_exchange(source, destination)
+            else:
+                _publish_move(source, destination)
+            completed.append((source, destination, exchange))
     except (ProjectError, OSError) as publish_error:
         try:
-            for relative_path in reversed(exchanged):
-                _publish_exchange(
-                    staged_project / relative_path,
-                    project_dir / relative_path,
-                )
+            for source, destination, exchange in reversed(completed):
+                if exchange:
+                    _publish_exchange(source, destination)
+                else:
+                    _publish_move(destination, source)
         except (ProjectError, OSError) as rollback_error:
             raise PublicationRollbackError(
                 "artifact publication and rollback both failed; inspect the project and "
@@ -1057,15 +1268,23 @@ def _write_manifest(
     project_dir: Path,
     *,
     version: str,
-    proto_url: str,
-    proto: bytes,
+    contract: Sequence[ProtoFile],
     language: str,
     python_package: str | None,
 ) -> None:
+    middleware_proto, *imported_protos = contract
     manifest = {
         "openshell_version": version,
-        "proto_source": proto_url,
-        "proto_sha256": hashlib.sha256(proto).hexdigest(),
+        "proto_source": middleware_proto.source,
+        "proto_sha256": hashlib.sha256(middleware_proto.content).hexdigest(),
+        "proto_imports": [
+            {
+                "name": proto_file.name,
+                "source": proto_file.source,
+                "sha256": hashlib.sha256(proto_file.content).hexdigest(),
+            }
+            for proto_file in imported_protos
+        ],
         "languages": [language],
         "python_package": python_package,
         "generator": {
@@ -1124,7 +1343,8 @@ def _prepare_python_project(
 ) -> None:
     uv = _require_command("uv")
     bindings_dir = project_dir / "src" / package_name / "bindings"
-    proto_path = project_dir / "proto" / "supervisor_middleware.proto"
+    proto_directory = project_dir / _PROTO_DIRECTORY
+    proto_names = (_PROTO_NAME, *_manifest_proto_imports(_read_manifest(project_dir)))
     _run(
         (
             uv,
@@ -1136,23 +1356,27 @@ def _prepare_python_project(
             "python",
             "-m",
             "grpc_tools.protoc",
-            f"-I{proto_path.parent}",
+            f"-I{proto_directory}",
             f"--python_out={bindings_dir}",
             f"--pyi_out={bindings_dir}",
             f"--grpc_python_out={bindings_dir}",
-            str(proto_path),
+            *(str(proto_directory / name) for name in proto_names),
         ),
         cwd=project_dir,
     )
     grpc_module = bindings_dir / "supervisor_middleware_pb2_grpc.py"
-    generated = grpc_module.read_text()
     absolute_import = "import supervisor_middleware_pb2 as supervisor__middleware__pb2"
-    relative_import = "from . import supervisor_middleware_pb2 as supervisor__middleware__pb2"
-    if absolute_import not in generated:
+    if absolute_import not in grpc_module.read_text():
         raise ProjectError(
             "generated gRPC module has an unexpected import layout; no project was published"
         )
-    grpc_module.write_text(generated.replace(absolute_import, relative_import, 1))
+    # protoc imports sibling modules by bare name, which fails inside a package.
+    for generated_module in bindings_dir.glob("*_pb2*.py*"):
+        generated_module.write_text(
+            _GENERATED_SIBLING_IMPORT_PATTERN.sub(
+                _relative_sibling_import, generated_module.read_text()
+            )
+        )
 
     with tempfile.TemporaryDirectory(prefix=f"{_TOOL_NAME}-python-") as environment:
         process_environment = os.environ.copy()
@@ -1174,6 +1398,13 @@ def _prepare_python_project(
             cwd=project_dir,
             environment=process_environment,
         )
+
+
+def _relative_sibling_import(match: re.Match[str]) -> str:
+    plain_import, public_import = match.groups()
+    if plain_import is not None:
+        return f"from . import {plain_import} as "
+    return f"from .{public_import} import "
 
 
 def _prepare_rust_project(project_dir: Path) -> None:
