@@ -104,9 +104,11 @@ documentation for the policy syntax supported by your pinned OpenShell release.
 
 ## Version-matched generated files
 
-- `proto/supervisor_middleware.proto` is the exact downloaded contract.
+- `proto/supervisor_middleware.proto` and the OpenShell protocol files it imports are
+  the exact downloaded contract.
 - `build.rs` generates Rust modules into Cargo's `OUT_DIR` from that contract.
-- `.openshell-middleware-manifest.json` records the release, source URL, and SHA-256.
+- `.openshell-middleware-manifest.json` records the release and each protocol file's
+  source URL and SHA-256.
 - `Cargo.lock` records the Rust dependency solution.
 
 Commit these files. Refresh all version-matched artifacts together with:

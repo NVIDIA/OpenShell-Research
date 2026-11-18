@@ -10,6 +10,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     tonic_prost_build::configure()
         .build_client(true)
         .build_server(true)
+        .generate_default_stubs(true)
         .compile_protos(&["proto/supervisor_middleware.proto"], &["proto"])?;
 
     Ok(())

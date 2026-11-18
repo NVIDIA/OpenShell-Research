@@ -184,8 +184,6 @@ pub fn evaluate_http_request_event(
 
 #[tonic::async_trait]
 impl SupervisorMiddleware for Middleware {
-    type EvaluateWebSocketSessionStream = ResultStream<pb::WebSocketSessionEventResult>;
-
     async fn describe(
         &self,
         request: Request<pb::MiddlewareDescribeRequest>,
@@ -202,49 +200,19 @@ impl SupervisorMiddleware for Middleware {
     ) -> Result<Response<pb::ValidateConfigResponse>, Status> {
         Ok(Response::new(validate_config(request.into_inner())))
     }
-
-    // Legacy HTTP hook that OpenShell deprecates for removal in 0.2.0. Delete this
-    // method when a contract update drops the RPC.
-    async fn evaluate_http_request(
-        &self,
-        _request: Request<pb::HttpRequestEvaluation>,
-    ) -> Result<Response<pb::HttpRequestResult>, Status> {
-        Err(Status::unimplemented("this service implements HTTP hooks"))
-    }
-
-    async fn evaluate_web_socket_session(
-        &self,
-        _request: Request<Streaming<pb::WebSocketSessionEvent>>,
-    ) -> Result<Response<Self::EvaluateWebSocketSessionStream>, Status> {
-        Err(Status::unimplemented(
-            "this service declares no WebSocket binding",
-        ))
-    }
 }
 
 #[tonic::async_trait]
 impl HttpHooks for Middleware {
-    type EvaluateHttpRequestHookStream = ResultStream<pb::HttpRequestHookResult>;
-    type EvaluateHttpResponseHookStream = ResultStream<pb::HttpResponseHookResult>;
-
     async fn evaluate_http_request_hook(
         &self,
         request: Request<Streaming<pb::HttpRequestHookEvent>>,
-    ) -> Result<Response<Self::EvaluateHttpRequestHookStream>, Status> {
+    ) -> Result<Response<ResultStream<pb::HttpRequestHookResult>>, Status> {
         let results = request.into_inner().filter_map(|event| match event {
             Ok(event) => evaluate_http_request_event(event).map(Ok),
             Err(status) => Some(Err(status)),
         });
         Ok(Response::new(Box::pin(results)))
-    }
-
-    async fn evaluate_http_response_hook(
-        &self,
-        _request: Request<Streaming<pb::HttpResponseHookEvent>>,
-    ) -> Result<Response<Self::EvaluateHttpResponseHookStream>, Status> {
-        Err(Status::unimplemented(
-            "this service declares no HTTP response binding",
-        ))
     }
 }
 

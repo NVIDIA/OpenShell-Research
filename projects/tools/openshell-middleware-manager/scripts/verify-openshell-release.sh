@@ -144,6 +144,7 @@ stop_process() {
 
 cleanup() {
     local status=$?
+    set +e
     trap - EXIT
     local sandbox language
     for sandbox in "${SANDBOXES[@]}"; do
