@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Sandbox policy for verify.sh and the scenarios: curl may read and write
+# httpbin.org, and nothing else leaves the sandbox.
+version: 1
+
+filesystem_policy:
+  include_workdir: true
+  read_only: [/usr, /lib, /proc, /dev/urandom, /app, /etc, /var/log]
+  read_write: [/sandbox, /tmp, /dev/null]
+
+landlock:
+  compatibility: best_effort
+
+process:
+  run_as_user: sandbox
+  run_as_group: sandbox
+
+network_policies:
+  httpbin:
+    name: httpbin
+    endpoints:
+      - host: httpbin.org
+        port: 443
+        protocol: rest
+        access: read-write
+    binaries:
+      - path: /usr/bin/curl
