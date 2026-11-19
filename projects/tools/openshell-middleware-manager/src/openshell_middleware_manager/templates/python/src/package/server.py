@@ -7,32 +7,64 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 
 import grpc
 
+from __PACKAGE_NAME__.bindings import extension_pb2
 from __PACKAGE_NAME__.bindings import supervisor_middleware_pb2 as pb2
 from __PACKAGE_NAME__.bindings import supervisor_middleware_pb2_grpc as pb2_grpc
 
 SERVICE_NAME = "__SERVICE_NAME__"
 SERVICE_VERSION = "0.1.0"
-MAX_BODY_BYTES = 4 * 1024 * 1024
-MAX_MESSAGE_BYTES = MAX_BODY_BYTES + 1024 * 1024
+PROTOCOL_MAJOR = 1
+PROTOCOL_MINOR = 0
+CONTRACT_CAPABILITY = "openshell.supervisor-middleware.contract"
+HTTP_HOOKS_CAPABILITY = "openshell.supervisor-middleware.http-hooks"
+CAPABILITIES = (CONTRACT_CAPABILITY, HTTP_HOOKS_CAPABILITY)
+MAX_PAYLOAD_BYTES = 4 * 1024 * 1024
+MAX_MESSAGE_BYTES = MAX_PAYLOAD_BYTES + 1024 * 1024
 
 
 def build_manifest() -> pb2.MiddlewareManifest:
-    """Describe the operation and phase supported by this service."""
+    """Describe the operation, phase, and protocol contract supported by this service."""
     return pb2.MiddlewareManifest(
         name=SERVICE_NAME,
-        service_version=SERVICE_VERSION,
         bindings=[
             pb2.MiddlewareBinding(
                 operation=pb2.SUPERVISOR_MIDDLEWARE_OPERATION_HTTP_REQUEST,
                 phase=pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS,
-                max_body_bytes=MAX_BODY_BYTES,
+                max_payload_bytes=MAX_PAYLOAD_BYTES,
             )
         ],
+        # Requiring the HTTP hooks capability selects HttpHooks for the HTTP binding.
+        extension=extension_pb2.PeerMetadata(
+            protocol_version=extension_pb2.ProtocolVersion(
+                major=PROTOCOL_MAJOR,
+                minor=PROTOCOL_MINOR,
+            ),
+            implementation_name=SERVICE_NAME,
+            implementation_version=SERVICE_VERSION,
+            supported_capabilities=CAPABILITIES,
+            required_capabilities=CAPABILITIES,
+        ),
     )
+
+
+def find_protocol_mismatch(request: pb2.MiddlewareDescribeRequest) -> str | None:
+    """Explain why the calling gateway or supervisor cannot use this service."""
+    if not request.HasField("gateway"):
+        return "the caller did not provide protocol metadata"
+    caller = request.gateway
+    if caller.protocol_version.major != PROTOCOL_MAJOR:
+        return f"the caller uses unsupported protocol major {caller.protocol_version.major}"
+    missing = sorted(set(CAPABILITIES) - set(caller.supported_capabilities))
+    if missing:
+        return f"the caller does not support required capabilities: {', '.join(missing)}"
+    unsupported = sorted(set(caller.required_capabilities) - set(CAPABILITIES))
+    if unsupported:
+        return f"the caller requires unsupported capabilities: {', '.join(unsupported)}"
+    return None
 
 
 def validate_config(request: pb2.ValidateConfigRequest) -> pb2.ValidateConfigResponse:
@@ -40,25 +72,53 @@ def validate_config(request: pb2.ValidateConfigRequest) -> pb2.ValidateConfigRes
     return pb2.ValidateConfigResponse(valid=True)
 
 
-def evaluate_http_request(request: pb2.HttpRequestEvaluation) -> pb2.HttpRequestResult:
-    """Allow a valid pre-credentials request without mutation."""
-    if request.phase != pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS:
-        return pb2.HttpRequestResult(
-            decision=pb2.DECISION_DENY,
-            reason="unsupported middleware phase",
-            reason_code="unsupported_phase",
+def evaluate_http_request_preflight(
+    preflight: pb2.HttpRequestHookPreflight,
+) -> pb2.HttpRequestHookResult:
+    """Decide from the request head whether to continue, deny, or inspect the body."""
+    if preflight.phase != pb2.SUPERVISOR_MIDDLEWARE_PHASE_PRE_CREDENTIALS:
+        return pb2.HttpRequestHookResult(
+            deny=pb2.HttpDenial(
+                diagnostics=pb2.MiddlewareDiagnostics(
+                    reason="unsupported middleware phase",
+                    reason_code="unsupported_phase",
+                )
+            )
         )
-    return pb2.HttpRequestResult(decision=pb2.DECISION_ALLOW)
+    return pb2.HttpRequestHookResult(
+        preflight_result=pb2.HttpPreflightResult(continue_without_body=pb2.HttpContinue())
+    )
 
 
-class Middleware(pb2_grpc.SupervisorMiddlewareServicer):
+def evaluate_http_request_body(body: pb2.HttpWholeBody) -> pb2.HttpRequestHookResult:
+    """Keep, replace, or deny a complete body after preflight selected whole-body inspection."""
+    return pb2.HttpRequestHookResult(
+        whole_body_result=pb2.HttpWholeBodyResult(unchanged=pb2.HttpUnchanged())
+    )
+
+
+def evaluate_http_request_event(
+    event: pb2.HttpRequestHookEvent,
+) -> pb2.HttpRequestHookResult | None:
+    """Answer one hook stream event, or return None for an event that takes no result."""
+    if event.HasField("preflight"):
+        return evaluate_http_request_preflight(event.preflight)
+    if event.HasField("whole_body"):
+        return evaluate_http_request_body(event.whole_body)
+    return None
+
+
+class Middleware(pb2_grpc.SupervisorMiddlewareServicer, pb2_grpc.HttpHooksServicer):
     """Adapt gRPC calls to the middleware's application functions."""
 
     async def Describe(
         self,
-        request: object,
+        request: pb2.MiddlewareDescribeRequest,
         context: grpc.aio.ServicerContext,
     ) -> pb2.MiddlewareManifest:
+        mismatch = find_protocol_mismatch(request)
+        if mismatch is not None:
+            await context.abort(grpc.StatusCode.FAILED_PRECONDITION, mismatch)
         return build_manifest()
 
     async def ValidateConfig(
@@ -68,12 +128,15 @@ class Middleware(pb2_grpc.SupervisorMiddlewareServicer):
     ) -> pb2.ValidateConfigResponse:
         return validate_config(request)
 
-    async def EvaluateHttpRequest(
+    async def EvaluateHttpRequestHook(
         self,
-        request: pb2.HttpRequestEvaluation,
+        request_iterator: AsyncIterator[pb2.HttpRequestHookEvent],
         context: grpc.aio.ServicerContext,
-    ) -> pb2.HttpRequestResult:
-        return evaluate_http_request(request)
+    ) -> AsyncIterator[pb2.HttpRequestHookResult]:
+        async for event in request_iterator:
+            result = evaluate_http_request_event(event)
+            if result is not None:
+                yield result
 
 
 def create_server() -> grpc.aio.Server:
@@ -84,7 +147,9 @@ def create_server() -> grpc.aio.Server:
             ("grpc.max_send_message_length", MAX_MESSAGE_BYTES),
         )
     )
-    pb2_grpc.add_SupervisorMiddlewareServicer_to_server(Middleware(), server)
+    middleware = Middleware()
+    pb2_grpc.add_SupervisorMiddlewareServicer_to_server(middleware, server)
+    pb2_grpc.add_HttpHooksServicer_to_server(middleware, server)
     return server
 
 

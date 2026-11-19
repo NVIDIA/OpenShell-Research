@@ -34,6 +34,10 @@ Read `README.md` and `pyproject.toml` before changing this project.
 - Do not format, type-check, or edit generated Python protobuf and gRPC files.
 - After changing a template, generate a project in a temporary directory and
   run its documented checks when practical.
+- After changing a template or how the OpenShell contract is downloaded, run
+  `scripts/verify-openshell-release.sh` when Docker is available. It runs a
+  private gateway from a temporary directory and leaves any installed OpenShell
+  untouched.
 
 ## Tests
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 import ctypes
 import email.message
 import errno
+import hashlib
 import http.client
 import json
 import os
@@ -22,17 +23,52 @@ from openshell_middleware_manager.generator import ProjectError, create_project,
 
 PROTO = b"""syntax = "proto3";
 package openshell.middleware.v1;
+import "google/protobuf/struct.proto";
 service SupervisorMiddleware {
   rpc EvaluateHttpRequest(HttpRequestEvaluation) returns (HttpRequestResult);
 }
+service HttpHooks {
+  rpc EvaluateHttpRequestHook(stream HttpRequestHookEvent) returns (stream HttpRequestHookResult);
+}
 message HttpRequestEvaluation {}
 message HttpRequestResult {}
+message HttpRequestHookEvent {}
+message HttpRequestHookResult {}
 """
 UPDATED_PROTO = PROTO + b"// refreshed contract\n"
+IMPORTING_PROTO = PROTO.replace(
+    b'import "google/protobuf/struct.proto";',
+    b'import "google/protobuf/struct.proto";\nimport "extension.proto";',
+)
+EXTENSION_PROTO = b"""syntax = "proto3";
+package openshell.extension.v1;
+message PeerMetadata {}
+"""
 
 
-def local_proto(version: str) -> tuple[bytes, str]:
-    return PROTO, f"https://example.test/OpenShell/{version}/supervisor_middleware.proto"
+def local_proto(version: str, name: str) -> tuple[bytes, str]:
+    assert name == "supervisor_middleware.proto"
+    return PROTO, f"https://example.test/OpenShell/{version}/{name}"
+
+
+def contract_downloader(files: dict[str, bytes]) -> generator.DownloadProto:
+    def download(version: str, name: str) -> tuple[bytes, str]:
+        return files[name], f"https://example.test/OpenShell/{version}/proto/{name}"
+
+    return download
+
+
+def write_manifest(project: Path, *, proto_imports: list[str]) -> None:
+    (project / ".openshell-middleware-manifest.json").write_text(
+        json.dumps(
+            {
+                "generator": {"name": "openshell-middleware-manager"},
+                "languages": ["python"],
+                "python_package": "audit_headers",
+                "proto_imports": [{"name": name} for name in proto_imports],
+            }
+        )
+    )
 
 
 def no_op_runner(language: str, project: Path, package: str) -> None:
@@ -96,6 +132,126 @@ def test_generates_rust_project_with_normalized_crate_name(tmp_path: Path) -> No
     assert manifest["python_package"] is None
 
 
+def test_create_downloads_and_records_imported_contract_files(tmp_path: Path) -> None:
+    destination = tmp_path / "audit-headers"
+    requested: list[str] = []
+    files = {"supervisor_middleware.proto": IMPORTING_PROTO, "extension.proto": EXTENSION_PROTO}
+
+    def download(version: str, name: str) -> tuple[bytes, str]:
+        requested.append(name)
+        return contract_downloader(files)(version, name)
+
+    create_project(
+        name="audit-headers",
+        language="python",
+        requested_version="v1.2.3",
+        destination=destination,
+        download_proto=download,
+        command_runner=no_op_runner,
+    )
+
+    assert requested == ["supervisor_middleware.proto", "extension.proto"]
+    assert (destination / "proto/supervisor_middleware.proto").read_bytes() == IMPORTING_PROTO
+    assert (destination / "proto/extension.proto").read_bytes() == EXTENSION_PROTO
+    manifest = json.loads((destination / ".openshell-middleware-manifest.json").read_text())
+    assert manifest["proto_source"].endswith("/v1.2.3/proto/supervisor_middleware.proto")
+    assert manifest["proto_sha256"] == hashlib.sha256(IMPORTING_PROTO).hexdigest()
+    assert manifest["proto_imports"] == [
+        {
+            "name": "extension.proto",
+            "source": "https://example.test/OpenShell/v1.2.3/proto/extension.proto",
+            "sha256": hashlib.sha256(EXTENSION_PROTO).hexdigest(),
+        }
+    ]
+
+
+def test_contract_download_follows_each_openshell_import_once() -> None:
+    files = {
+        "supervisor_middleware.proto": PROTO + b'import "b.proto";\nimport public "a.proto";\n',
+        "a.proto": (
+            b'import "b.proto";\nimport "a.proto";\n// import "commented.proto";\n'
+            b'/* An example:\nimport "example.proto";\n*/\n'
+        ),
+        "b.proto": (
+            b'import "google/protobuf/duration.proto";\nimport "supervisor_middleware.proto";\n'
+        ),
+    }
+    requested: list[str] = []
+
+    def download(version: str, name: str) -> tuple[bytes, str]:
+        requested.append(name)
+        return contract_downloader(files)(version, name)
+
+    contract = generator._download_contract("v1.2.3", download)
+
+    assert [proto_file.name for proto_file in contract] == [
+        "supervisor_middleware.proto",
+        "a.proto",
+        "b.proto",
+    ]
+    assert sorted(requested) == ["a.proto", "b.proto", "supervisor_middleware.proto"]
+
+
+@pytest.mark.parametrize(
+    "imported",
+    ["../outside.proto", "nested/extension.proto", "/etc/extension.proto", "extension.txt"],
+)
+def test_create_rejects_unsupported_import_paths(tmp_path: Path, imported: str) -> None:
+    proto = PROTO + f'import "{imported}";\n'.encode()
+    requested: list[str] = []
+
+    def download(version: str, name: str) -> tuple[bytes, str]:
+        requested.append(name)
+        return proto, f"https://example.test/{version}/{name}"
+
+    with pytest.raises(ProjectError, match="unsupported proto path"):
+        create_project(
+            name="project",
+            language="rust",
+            requested_version="v1.2.3",
+            destination=tmp_path / "project",
+            download_proto=download,
+            command_runner=no_op_runner,
+        )
+
+    assert requested == ["supervisor_middleware.proto"]
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_create_requires_the_http_hooks_contract(tmp_path: Path) -> None:
+    legacy_proto = PROTO.replace(b"service HttpHooks", b"service LegacyHooks")
+
+    with pytest.raises(ProjectError, match=r"v0\.1\.8 predates the HTTP hooks.*v0\.1\.9 or newer"):
+        create_project(
+            name="project",
+            language="python",
+            requested_version="v0.1.8",
+            destination=tmp_path / "project",
+            download_proto=lambda version, name: (legacy_proto, f"https://example.test/{version}"),
+            command_runner=no_op_runner,
+        )
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_contract_validation_accepts_a_proto_without_the_legacy_rpc(tmp_path: Path) -> None:
+    legacy_rpc = b"  rpc EvaluateHttpRequest(HttpRequestEvaluation) returns (HttpRequestResult);\n"
+    assert legacy_rpc in PROTO
+    hooks_only_proto = PROTO.replace(legacy_rpc, b"")
+
+    result = create_project(
+        name="project",
+        language="python",
+        requested_version="v0.2.0",
+        destination=tmp_path / "project",
+        download_proto=lambda version, name: (hooks_only_proto, f"https://example.test/{version}"),
+        command_runner=no_op_runner,
+    )
+
+    assert result.openshell_version == "v0.2.0"
+    assert (tmp_path / "project/proto/supervisor_middleware.proto").read_bytes() == hooks_only_proto
+
+
 def test_updates_python_generated_artifacts_and_preserves_user_code(tmp_path: Path) -> None:
     destination = tmp_path / "audit-headers"
     create_project(
@@ -112,8 +268,8 @@ def test_updates_python_generated_artifacts_and_preserves_user_code(tmp_path: Pa
     old_binding.write_text("old generated code\n")
     project_inode = destination.stat().st_ino
 
-    def updated_proto(version: str) -> tuple[bytes, str]:
-        return UPDATED_PROTO, f"https://example.test/OpenShell/{version}/proto"
+    def updated_proto(version: str, name: str) -> tuple[bytes, str]:
+        return UPDATED_PROTO, f"https://example.test/OpenShell/{version}/proto/{name}"
 
     result = update_project(
         project_dir=destination,
@@ -135,6 +291,259 @@ def test_updates_python_generated_artifacts_and_preserves_user_code(tmp_path: Pa
     assert manifest["generator"]["name"] == "openshell-middleware-manager"
     assert not (tmp_path / ".audit-headers.openshell-middleware-manager.lock").exists()
     assert not list(tmp_path.glob(".audit-headers.openshell-middleware-manager.*"))
+
+
+def test_update_tracks_imported_contract_files(tmp_path: Path) -> None:
+    destination = tmp_path / "audit"
+    create_project(
+        name="audit",
+        language="rust",
+        requested_version="v0.0.86",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+    manifest_path = destination / ".openshell-middleware-manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    del manifest["proto_imports"]  # written by generators that predate imported contract files
+    manifest_path.write_text(json.dumps(manifest))
+    user_proto = destination / "proto/user_owned.proto"
+    user_proto.write_text("// user file\n")
+    user_proto_inode = user_proto.stat().st_ino
+    proto_directory_inode = (destination / "proto").stat().st_ino
+
+    def proto_files() -> list[str]:
+        return sorted(path.name for path in (destination / "proto").iterdir())
+
+    update_project(
+        project_dir=destination,
+        requested_version="v1.2.3",
+        download_proto=contract_downloader(
+            {"supervisor_middleware.proto": IMPORTING_PROTO, "extension.proto": EXTENSION_PROTO}
+        ),
+        command_runner=no_op_runner,
+    )
+
+    assert proto_files() == ["extension.proto", "supervisor_middleware.proto", "user_owned.proto"]
+    assert (destination / "proto/extension.proto").read_bytes() == EXTENSION_PROTO
+    manifest = json.loads(manifest_path.read_text())
+    assert [entry["name"] for entry in manifest["proto_imports"]] == ["extension.proto"]
+
+    def fail_runner(language: str, project: Path, package: str) -> None:
+        del language, project, package
+        raise ProjectError("validation failed")
+
+    replaced_import = {
+        "supervisor_middleware.proto": PROTO + b'import "options.proto";\n',
+        "options.proto": b"// options\n",
+    }
+    with pytest.raises(ProjectError, match="validation failed"):
+        update_project(
+            project_dir=destination,
+            requested_version="v1.2.4",
+            download_proto=contract_downloader(replaced_import),
+            command_runner=fail_runner,
+        )
+    assert proto_files() == ["extension.proto", "supervisor_middleware.proto", "user_owned.proto"]
+
+    update_project(
+        project_dir=destination,
+        requested_version="v1.2.4",
+        download_proto=contract_downloader(replaced_import),
+        command_runner=no_op_runner,
+    )
+
+    assert proto_files() == ["options.proto", "supervisor_middleware.proto", "user_owned.proto"]
+    assert user_proto.read_text() == "// user file\n"
+    assert user_proto.stat().st_ino == user_proto_inode
+    assert (destination / "proto").stat().st_ino == proto_directory_inode
+    assert not list(tmp_path.glob(".audit.openshell-middleware-manager.*"))
+    manifest = json.loads(manifest_path.read_text())
+    assert [entry["name"] for entry in manifest["proto_imports"]] == ["options.proto"]
+
+
+def test_failed_publication_restores_added_and_removed_proto_files(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    destination = tmp_path / "audit"
+    create_project(
+        name="audit",
+        language="rust",
+        requested_version="v0.1.9",
+        destination=destination,
+        download_proto=contract_downloader(
+            {"supervisor_middleware.proto": IMPORTING_PROTO, "extension.proto": EXTENSION_PROTO}
+        ),
+        command_runner=no_op_runner,
+    )
+    original_manifest = (destination / ".openshell-middleware-manifest.json").read_bytes()
+    original_exchange = generator._publish_exchange
+
+    def fail_lockfile_exchange(source: Path, target: Path) -> None:
+        if target.name == "Cargo.lock":
+            raise ProjectError("publication failed")
+        original_exchange(source, target)
+
+    monkeypatch.setattr(generator, "_publish_exchange", fail_lockfile_exchange)
+
+    with pytest.raises(ProjectError, match="publication failed"):
+        update_project(
+            project_dir=destination,
+            requested_version="v1.2.3",
+            download_proto=contract_downloader(
+                {
+                    "supervisor_middleware.proto": PROTO + b'import "options.proto";\n',
+                    "options.proto": b"// options\n",
+                }
+            ),
+            command_runner=no_op_runner,
+        )
+
+    assert sorted(path.name for path in (destination / "proto").iterdir()) == [
+        "extension.proto",
+        "supervisor_middleware.proto",
+    ]
+    assert (destination / "proto/extension.proto").read_bytes() == EXTENSION_PROTO
+    assert (destination / "proto/supervisor_middleware.proto").read_bytes() == IMPORTING_PROTO
+    assert (destination / ".openshell-middleware-manifest.json").read_bytes() == original_manifest
+
+
+@pytest.mark.parametrize("matches_contract", [True, False])
+def test_update_adopts_only_an_identical_unrecorded_proto_file(
+    tmp_path: Path, matches_contract: bool
+) -> None:
+    destination = tmp_path / "audit"
+    create_project(
+        name="audit",
+        language="rust",
+        requested_version="v0.0.86",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+    original_manifest = (destination / ".openshell-middleware-manifest.json").read_bytes()
+    user_proto = destination / "proto/extension.proto"
+    user_content = EXTENSION_PROTO if matches_contract else b"// the user's own file\n"
+    user_proto.write_bytes(user_content)
+
+    def update() -> None:
+        update_project(
+            project_dir=destination,
+            requested_version="v0.1.9",
+            download_proto=contract_downloader(
+                {"supervisor_middleware.proto": IMPORTING_PROTO, "extension.proto": EXTENSION_PROTO}
+            ),
+            command_runner=no_op_runner,
+        )
+
+    if matches_contract:
+        update()
+        manifest = json.loads((destination / ".openshell-middleware-manifest.json").read_text())
+        assert [entry["name"] for entry in manifest["proto_imports"]] == ["extension.proto"]
+    else:
+        with pytest.raises(
+            ProjectError, match=r"proto/extension\.proto already exists and differs"
+        ):
+            update()
+        assert (
+            destination / ".openshell-middleware-manifest.json"
+        ).read_bytes() == original_manifest
+        assert (destination / "proto/supervisor_middleware.proto").read_bytes() == PROTO
+    assert user_proto.read_bytes() == user_content
+
+
+def test_update_does_not_overwrite_a_proto_file_created_during_validation(tmp_path: Path) -> None:
+    destination = tmp_path / "audit"
+    create_project(
+        name="audit",
+        language="rust",
+        requested_version="v0.0.86",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+    original_manifest = (destination / ".openshell-middleware-manifest.json").read_bytes()
+    concurrent_proto = destination / "proto/extension.proto"
+
+    def create_file_during_validation(language: str, project: Path, package: str) -> None:
+        no_op_runner(language, project, package)
+        concurrent_proto.write_text("// created while omm validated the update\n")
+
+    with pytest.raises(ProjectError, match="appeared during update"):
+        update_project(
+            project_dir=destination,
+            requested_version="v0.1.9",
+            download_proto=contract_downloader(
+                {"supervisor_middleware.proto": IMPORTING_PROTO, "extension.proto": EXTENSION_PROTO}
+            ),
+            command_runner=create_file_during_validation,
+        )
+
+    assert concurrent_proto.read_text() == "// created while omm validated the update\n"
+    assert (destination / "proto/supervisor_middleware.proto").read_bytes() == PROTO
+    assert (destination / ".openshell-middleware-manifest.json").read_bytes() == original_manifest
+
+
+def test_update_does_not_require_the_http_hooks_contract(tmp_path: Path) -> None:
+    destination = tmp_path / "audit"
+    create_project(
+        name="audit",
+        language="rust",
+        requested_version="v0.1.9",
+        destination=destination,
+        download_proto=local_proto,
+        command_runner=no_op_runner,
+    )
+    legacy_proto = PROTO.replace(b"service HttpHooks", b"service LegacyHooks")
+
+    update_project(
+        project_dir=destination,
+        requested_version="v0.1.8",
+        download_proto=lambda version, name: (legacy_proto, f"https://example.test/{version}"),
+        command_runner=no_op_runner,
+    )
+
+    assert (destination / "proto/supervisor_middleware.proto").read_bytes() == legacy_proto
+
+
+@pytest.mark.parametrize("updated_contract_imports_extension", [True, False])
+def test_update_refuses_symlinked_imported_proto_without_touching_target(
+    tmp_path: Path, updated_contract_imports_extension: bool
+) -> None:
+    destination = tmp_path / "audit"
+    importing_contract = {
+        "supervisor_middleware.proto": IMPORTING_PROTO,
+        "extension.proto": EXTENSION_PROTO,
+    }
+    create_project(
+        name="audit",
+        language="rust",
+        requested_version="v0.1.9",
+        destination=destination,
+        download_proto=contract_downloader(importing_contract),
+        command_runner=no_op_runner,
+    )
+    external = tmp_path / "external.proto"
+    external.write_text("external contract\n")
+    imported_proto = destination / "proto/extension.proto"
+    imported_proto.unlink()
+    imported_proto.symlink_to(external)
+    updated_contract = (
+        importing_contract
+        if updated_contract_imports_extension
+        else {"supervisor_middleware.proto": UPDATED_PROTO}
+    )
+
+    with pytest.raises(ProjectError, match="must be a regular file"):
+        update_project(
+            project_dir=destination,
+            requested_version="v1.2.3",
+            download_proto=contract_downloader(updated_contract),
+            command_runner=no_op_runner,
+        )
+
+    assert external.read_text() == "external contract\n"
+    assert imported_proto.is_symlink()
 
 
 @pytest.mark.parametrize("fails", [False, True])
@@ -203,7 +612,7 @@ def test_failed_update_keeps_original_project_unchanged(tmp_path: Path) -> None:
         update_project(
             project_dir=destination,
             requested_version="v1.2.3",
-            download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
+            download_proto=lambda version, name: (UPDATED_PROTO, f"https://example.test/{version}"),
             command_runner=fail_runner,
         )
 
@@ -243,7 +652,7 @@ def test_publication_failure_rolls_back_exchanged_artifacts(
         update_project(
             project_dir=destination,
             requested_version="v1.2.3",
-            download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
+            download_proto=lambda version, name: (UPDATED_PROTO, f"https://example.test/{version}"),
             command_runner=no_op_runner,
         )
 
@@ -280,7 +689,7 @@ def test_failed_publication_rollback_preserves_recovery_artifacts(
         update_project(
             project_dir=destination,
             requested_version="v1.2.3",
-            download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
+            download_proto=lambda version, name: (UPDATED_PROTO, f"https://example.test/{version}"),
             command_runner=no_op_runner,
         )
 
@@ -341,6 +750,29 @@ def test_update_rejects_symlink_and_missing_project_paths(tmp_path: Path) -> Non
             '{"generator": {"name": "openshell-middleware-manager"}, '
             '"languages": ["rust"], "python_package": "unexpected"}',
             "must set python_package",
+        ),
+        (
+            '{"generator": {"name": "openshell-middleware-manager"}, '
+            '"languages": ["rust"], "python_package": null, "proto_imports": {}}',
+            "proto_imports must be a list",
+        ),
+        (
+            '{"generator": {"name": "openshell-middleware-manager"}, '
+            '"languages": ["rust"], "python_package": null, '
+            '"proto_imports": [{"name": "../escape.proto"}]}',
+            "invalid proto_imports entry",
+        ),
+        (
+            '{"generator": {"name": "openshell-middleware-manager"}, '
+            '"languages": ["rust"], "python_package": null, '
+            '"proto_imports": ["extension.proto"]}',
+            "invalid proto_imports entry",
+        ),
+        (
+            '{"generator": {"name": "openshell-middleware-manager"}, '
+            '"languages": ["rust"], "python_package": null, '
+            '"proto_imports": [{"name": "supervisor_middleware.proto"}]}',
+            "invalid proto_imports entry",
         ),
     ],
 )
@@ -424,7 +856,7 @@ def test_update_rejects_symlinked_proto_directory_without_touching_target(
         update_project(
             project_dir=destination,
             requested_version="v1.2.3",
-            download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
+            download_proto=lambda version, name: (UPDATED_PROTO, f"https://example.test/{version}"),
             command_runner=no_op_runner,
         )
 
@@ -456,7 +888,7 @@ def test_update_rejects_symlinked_python_package_without_touching_target(
         update_project(
             project_dir=destination,
             requested_version="v1.2.3",
-            download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
+            download_proto=lambda version, name: (UPDATED_PROTO, f"https://example.test/{version}"),
             command_runner=no_op_runner,
         )
 
@@ -495,7 +927,7 @@ def test_update_omits_disposable_directories_from_staging(tmp_path: Path) -> Non
     update_project(
         project_dir=destination,
         requested_version="v1.2.3",
-        download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
+        download_proto=lambda version, name: (UPDATED_PROTO, f"https://example.test/{version}"),
         command_runner=inspect_staging,
     )
 
@@ -532,7 +964,7 @@ def test_update_revalidates_symlink_ancestors_after_project_validation(
         update_project(
             project_dir=destination,
             requested_version="v1.2.3",
-            download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
+            download_proto=lambda version, name: (UPDATED_PROTO, f"https://example.test/{version}"),
             command_runner=replace_proto_ancestor,
         )
 
@@ -573,7 +1005,7 @@ def test_exchange_refuses_symlinked_parent_created_immediately_before_publish(
         update_project(
             project_dir=destination,
             requested_version="v1.2.3",
-            download_proto=lambda version: (UPDATED_PROTO, f"https://example.test/{version}"),
+            download_proto=lambda version, name: (UPDATED_PROTO, f"https://example.test/{version}"),
             command_runner=no_op_runner,
         )
 
@@ -838,8 +1270,8 @@ def test_failure_cleans_staging_and_owned_reservation(tmp_path: Path) -> None:
 
 
 def test_rejects_an_unexpected_proto(tmp_path: Path) -> None:
-    def invalid_proto(version: str) -> tuple[bytes, str]:
-        return b"not a proto", f"https://example.test/{version}"
+    def invalid_proto(version: str, name: str) -> tuple[bytes, str]:
+        return b"not a proto", f"https://example.test/{version}/{name}"
 
     with pytest.raises(ProjectError, match="not a supported"):
         create_project(
@@ -946,10 +1378,13 @@ def test_download_proto_returns_content_and_source(monkeypatch: pytest.MonkeyPat
     response = FakeResponse(body=PROTO)
     monkeypatch.setattr(generator.urllib.request, "urlopen", lambda *args, **kwargs: response)
 
-    content, source = generator._download_proto("v1.2.3")
+    content, source = generator._download_proto("v1.2.3", "supervisor_middleware.proto")
 
     assert content == PROTO
     assert source.endswith("/v1.2.3/proto/supervisor_middleware.proto")
+    assert generator._download_proto("v1.2.3", "extension.proto")[1] == (
+        "https://raw.githubusercontent.com/NVIDIA/OpenShell/v1.2.3/proto/extension.proto"
+    )
 
 
 def test_download_proto_translates_network_failure(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -961,7 +1396,7 @@ def test_download_proto_translates_network_failure(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(generator.time, "sleep", lambda _: None)
 
     with pytest.raises(ProjectError, match=r"could not download.*missing"):
-        generator._download_proto("v1.2.3")
+        generator._download_proto("v1.2.3", "supervisor_middleware.proto")
 
 
 def test_network_error_reason_handles_plain_os_error() -> None:
@@ -983,7 +1418,7 @@ def test_download_retries_transient_failures(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(generator.urllib.request, "urlopen", transient)
     monkeypatch.setattr(generator.time, "sleep", lambda _: None)
 
-    assert generator._download_proto("v1.2.3")[0] == PROTO
+    assert generator._download_proto("v1.2.3", "supervisor_middleware.proto")[0] == PROTO
     assert attempts == 3
 
 
@@ -1003,7 +1438,7 @@ def test_download_retries_interrupted_response_body(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(generator.urllib.request, "urlopen", interrupted_then_complete)
     monkeypatch.setattr(generator.time, "sleep", lambda _: None)
 
-    assert generator._download_proto("v1.2.3")[0] == PROTO
+    assert generator._download_proto("v1.2.3", "supervisor_middleware.proto")[0] == PROTO
     assert attempts == 2
 
 
@@ -1030,7 +1465,7 @@ def test_download_retries_only_retryable_http_statuses(
 
     expected_message = "middleware-capable release" if status == 404 else "HTTP 503"
     with pytest.raises(ProjectError, match=expected_message):
-        generator._download_proto("v1.2.3")
+        generator._download_proto("v1.2.3", "supervisor_middleware.proto")
 
     assert attempts == expected_attempts
 
@@ -1228,6 +1663,56 @@ def test_exchange_reverses_when_open_parent_is_detached(
     assert destination.read_text() == "concurrent replacement\n"
 
 
+def test_move_publishes_into_an_absent_destination_only(tmp_path: Path) -> None:
+    source = tmp_path / "staged/extension.proto"
+    destination = tmp_path / "project/extension.proto"
+    source.parent.mkdir()
+    destination.parent.mkdir()
+    source.write_text("new import\n")
+
+    generator._publish_move(source, destination)
+
+    assert not source.exists()
+    assert destination.read_text() == "new import\n"
+
+    source.write_text("newer import\n")
+    with pytest.raises(ProjectError, match="appeared during update"):
+        generator._publish_move(source, destination)
+
+    assert source.read_text() == "newer import\n"
+    assert destination.read_text() == "new import\n"
+
+
+def test_move_refuses_a_source_that_is_not_a_regular_file(tmp_path: Path) -> None:
+    source = tmp_path / "staged/extension.proto"
+    destination = tmp_path / "project/extension.proto"
+    source.mkdir(parents=True)
+    destination.parent.mkdir()
+
+    with pytest.raises(ProjectError, match="changed type during update"):
+        generator._publish_move(source, destination)
+
+    assert source.is_dir()
+    assert not destination.exists()
+
+
+def test_move_reverses_when_open_parent_is_detached(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    source = tmp_path / "staged/extension.proto"
+    destination = tmp_path / "project/extension.proto"
+    source.parent.mkdir()
+    destination.parent.mkdir()
+    source.write_text("new import\n")
+    monkeypatch.setattr(generator, "_directory_fd_matches_path", lambda path, descriptor: False)
+
+    with pytest.raises(ProjectError, match=r"parent changed.*move was reversed"):
+        generator._publish_move(source, destination)
+
+    assert source.read_text() == "new import\n"
+    assert not destination.exists()
+
+
 class FakeRename:
     def __init__(self, error_number: int) -> None:
         self.error_number = error_number
@@ -1320,7 +1805,9 @@ def test_prepare_python_generates_relative_import_and_smoke_checks(
     bindings = tmp_path / "src" / "audit_headers" / "bindings"
     bindings.mkdir(parents=True)
     (tmp_path / "proto").mkdir()
-    (tmp_path / "proto/supervisor_middleware.proto").write_bytes(PROTO)
+    (tmp_path / "proto/supervisor_middleware.proto").write_bytes(IMPORTING_PROTO)
+    (tmp_path / "proto/extension.proto").write_bytes(EXTENSION_PROTO)
+    write_manifest(tmp_path, proto_imports=["extension.proto"])
     calls: list[tuple[str, ...]] = []
 
     monkeypatch.setattr(generator, "_require_command", lambda command: f"/tools/{command}")
@@ -1333,15 +1820,40 @@ def test_prepare_python_generates_relative_import_and_smoke_checks(
         calls.append(tuple(command))
         if "grpc_tools.protoc" in command:
             (bindings / "supervisor_middleware_pb2_grpc.py").write_text(
-                "import supervisor_middleware_pb2 as supervisor__middleware__pb2\n"
+                "import grpc\nimport supervisor_middleware_pb2 as supervisor__middleware__pb2\n"
             )
+            (bindings / "supervisor_middleware_pb2.py").write_text(
+                "from google.protobuf import struct_pb2 as google_dot_protobuf_dot_struct__pb2\n"
+                "import extension_pb2 as extension__pb2\n"
+                "from extension_pb2 import *\n"
+            )
+            (bindings / "supervisor_middleware_pb2.pyi").write_text(
+                "import extension_pb2 as _extension_pb2\n"
+                "from extension_pb2 import PeerMetadata as PeerMetadata\n"
+            )
+            (bindings / "extension_pb2.py").write_text("DESCRIPTOR = None\n")
 
     monkeypatch.setattr(generator, "_run", fake_run)
 
     generator._prepare_python_project(tmp_path, "audit_headers", check_command=check_command)
 
-    generated = (bindings / "supervisor_middleware_pb2_grpc.py").read_text()
-    assert generated.startswith("from . import supervisor_middleware_pb2")
+    assert calls[0][-2:] == (
+        str(tmp_path / "proto/supervisor_middleware.proto"),
+        str(tmp_path / "proto/extension.proto"),
+    )
+    assert (bindings / "supervisor_middleware_pb2_grpc.py").read_text() == (
+        "import grpc\nfrom . import supervisor_middleware_pb2 as supervisor__middleware__pb2\n"
+    )
+    assert (bindings / "supervisor_middleware_pb2.py").read_text() == (
+        "from google.protobuf import struct_pb2 as google_dot_protobuf_dot_struct__pb2\n"
+        "from . import extension_pb2 as extension__pb2\n"
+        "from .extension_pb2 import *\n"
+    )
+    assert (bindings / "supervisor_middleware_pb2.pyi").read_text() == (
+        "from . import extension_pb2 as _extension_pb2\n"
+        "from .extension_pb2 import PeerMetadata as PeerMetadata\n"
+    )
+    assert (bindings / "extension_pb2.py").read_text() == "DESCRIPTOR = None\n"
     assert len(calls) == 3
     assert calls[1][1] == "sync"
     assert calls[2] == (
@@ -1360,6 +1872,7 @@ def test_prepare_python_rejects_unexpected_generated_import(
     bindings.mkdir(parents=True)
     (tmp_path / "proto").mkdir()
     (tmp_path / "proto/supervisor_middleware.proto").write_bytes(PROTO)
+    write_manifest(tmp_path, proto_imports=[])
     monkeypatch.setattr(generator, "_require_command", lambda command: f"/tools/{command}")
 
     def fake_run(command, *, cwd, environment=None) -> None:
