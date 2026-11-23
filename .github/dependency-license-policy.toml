@@ -56,7 +56,7 @@ ecosystem = "pypi"
 name = "gstreamer-bundle"
 source = '{"registry":"https://pypi.org/simple"}'
 reason = "Existing macOS runtime dependency reviewed for a security-only version update."
-evidence = "https://pypi.org/project/gstreamer-bundle/1.28.7/"
+evidence = "https://pypi.org/project/gstreamer-bundle/1.28.9/"
 reports = [
-    { version = "1.28.7", license = "LGPL-2.1-or-later" },
+    { version = "1.28.9", license = "LGPL-2.1-or-later" },
 ]

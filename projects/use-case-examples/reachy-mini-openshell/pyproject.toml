@@ -15,11 +15,11 @@ dependencies = [
  "brotli>=1.2.1,<2", # 1.2.1 fixes the Brotli decoder out-of-bounds write pulled in by Gradio.
  "certifi>=2026.10.23", # 2026.10.23 includes the 2026.10.19 emSign CA fix pulled in by requests and httpx.
  "cryptography>=50.0.1,<51", # 50.0.1 fixes cryptography security advisories pulled in by aiortc.
- "dnspython>=2.9.1,<3", # 2.9.1 includes the 2.9.0 name-parsing CPU fix pulled in by aioice.
+ "dnspython>=2.9.2,<3", # 2.9.2 fixes the WKS record memory and CPU advisory pulled in by aioice.
  "fastrtc>=0.0.34",
  "filelock>=4.2.4,<5", # 4.2.4 includes the 4.2.1 filelock security fixes pulled in by torch and huggingface-hub.
  "gradio==5.50.1.dev1",
- "gstreamer-bundle>=1.28.7,<1.29; sys_platform != 'linux'", # 1.28.7 fixes GStreamer advisories and supports Python 3.11-3.12 on macOS.
+ "gstreamer-bundle>=1.28.9,<1.29; sys_platform != 'linux'", # 1.28.9 fixes GStreamer advisories and supports Python 3.11-3.12 on macOS.
  "huggingface-hub>=1.5,<2",
  "msgpack>=1.2.4,<2", # 1.2.4 includes the 1.2.3 strict_map_key memory-leak fix pulled in by librosa.
  "multidict>=6.9.1,<7", # 6.9.1 fixes the items-view reference leak pulled in by aiohttp.
@@ -37,7 +37,7 @@ dependencies = [
  "gradio_client>=1.13.3",
  "setuptools>=84.2.1,<85", # 84.2.1 includes the 84.1.0 namespace_packages.txt path-escape fix pulled in by torch.
  "starlette>=1.6,<2", # 1.6.0 fixes Starlette security advisories pulled in by Gradio and reachy-mini.
- "tornado>=6.6,<7", # 6.6 fixes header-folding, redirect, and chunked-body advisories.
+ "tornado>=6.6.1,<7", # 6.6.1 fixes the triple-slash open-redirect advisory left open by 6.6.
  "urllib3>=2.8,<3", # 2.8.0 fixes proxy TLS and streaming decompression advisories.
 ]
 [[project.authors]]
@@ -62,7 +62,7 @@ environments = [
 # reachy-mini still carries obsolete upper/exact transitive pins. Keep
 # the audited versions authoritative until its published metadata catches up.
 override-dependencies = [
-    "gstreamer-bundle>=1.28.7,<1.29; sys_platform != 'linux'",
+    "gstreamer-bundle>=1.28.9,<1.29; sys_platform != 'linux'",
     "huggingface-hub>=1.5,<2",
     "pillow>=13,<14",
     "pydantic>=2.12.5,<3", # Reachy Mini requires 2.12.5; Gradio's conservative cap excludes it.
