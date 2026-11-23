@@ -134,9 +134,10 @@ go build ./cmd/...
 CVE-2026-97044 ([golang/go#82374](https://go.dev/issue/82374)), as is the copy
 of its `idna` package in the Go 1.26.8 standard library: converting a very long
 non-ASCII host name to Punycode takes quadratic CPU time. The exporter runs
-that code only as an HTTP client, on the host names of the endpoints it is
-configured to call and of any redirects they return. Upgrade `golang.org/x/net`
-and the Go toolchain when fixed releases ship.
+that code only for outbound HTTP and gRPC connections, on the host names of the
+endpoints and proxies it is configured to use, including `NO_PROXY` entries, and
+of any HTTP redirects they return. Upgrade `golang.org/x/net` and the Go
+toolchain when fixed releases ship.
 
 The source is extracted from exporter snapshot
 `6a440f05249ac05aa9b9ef8acada4c909ec86bc8`. This distribution retains the Go
