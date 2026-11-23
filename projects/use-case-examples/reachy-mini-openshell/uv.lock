@@ -11,7 +11,7 @@ supported-markers = [
 
 [manifest]
 overrides = [
-    { name = "gstreamer-bundle", marker = "sys_platform != 'linux'", specifier = ">=1.28.7,<1.29" },
+    { name = "gstreamer-bundle", marker = "sys_platform != 'linux'", specifier = ">=1.28.9,<1.29" },
     { name = "huggingface-hub", specifier = ">=1.5,<2" },
     { name = "pillow", specifier = ">=13,<14" },
     { name = "pydantic", specifier = ">=2.12.5,<3" },
@@ -355,11 +355,11 @@ wheels = [
 
 [[package]]
 name = "dnspython"
-version = "2.9.1"
+version = "2.9.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/91/21/7fcd6780f61e9756aafaea760560509bb4111375daa2e23c1be7a89f33f1/dnspython-2.9.1.tar.gz", hash = "sha256:9a6d30e55f8dc63e6052597666112bff0586b95a2474a9deda03afbbf820d37a", size = 455302, upload-time = "2026-10-29T18:05:12.156Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/76/49/900383b471c645a3c397f47b3211d1fcecb3a540c98f683494cdf86b33de/dnspython-2.9.2.tar.gz", hash = "sha256:8d4d39a513e649d634004ce4d39ade2352efcea472a0247535a5c2d18a9d7ba9", size = 455484, upload-time = "2026-11-03T23:56:53.601Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/61/55/f90405bbbbd3dd8f788e92cec2d39964f5c09783f0570fc35f3bb3381485/dnspython-2.9.1-py3-none-any.whl", hash = "sha256:7c81caf8de1ed57b8cfc7e0ad4f528a0b8ceace473c7eb946df195dc9def751f", size = 360364, upload-time = "2026-10-29T18:05:10.206Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/0c/5346358b3a20275d256978c35203ddc2c8617f78c1b23795b79ba22ced6d/dnspython-2.9.2-py3-none-any.whl", hash = "sha256:af15f7d385a6ae2fb35a796fde2138004c8c42c7389090e2addc83e3b3340fd8", size = 360455, upload-time = "2026-11-03T23:56:52.088Z" },
 ]
 
 [[package]]
@@ -614,7 +614,7 @@ wheels = [
 
 [[package]]
 name = "gstreamer-bundle"
-version = "1.28.7"
+version = "1.28.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gstreamer-cli", marker = "sys_platform == 'darwin'" },
@@ -627,110 +627,110 @@ dependencies = [
     { name = "gstreamer-python", marker = "sys_platform == 'darwin'" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/65/10/d798a7047e1cd5ad2941fd3961a6b96720b6055e5432b4c77eb988d3e7fd/gstreamer_bundle-1.28.7-py3-none-any.whl", hash = "sha256:376ad99169df00109879b9d3c6bfe95860634ef8efabd6cce5b87678f626a0da", size = 2572, upload-time = "2026-09-08T05:47:55.334Z" },
+    { url = "https://files.pythonhosted.org/packages/f6/55/840ec50ca7460de945ca80969f667b7fcc51e90e7bbd01c01675903f824d/gstreamer_bundle-1.28.9-py3-none-any.whl", hash = "sha256:64a744beb0ae5663313e133aa6cab6d086616415283f99a81978f4e53770ee47", size = 2572, upload-time = "2026-11-09T03:05:46.986Z" },
 ]
 
 [[package]]
 name = "gstreamer-cli"
-version = "1.28.7"
+version = "1.28.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gstreamer-libs", marker = "sys_platform == 'darwin'" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/93/f1/2b69e1ab84552a140f3f5ffd6b4801b74b0343e6135667e4339195d27122/gstreamer_cli-1.28.7-cp39-abi3-macosx_10_13_universal2.whl", hash = "sha256:1b2138761d355cd4c61e854a96a15fc010a732802302c2688459e607bd8c881a", size = 15777566, upload-time = "2026-09-08T05:18:48.458Z" },
+    { url = "https://files.pythonhosted.org/packages/0e/cf/9ed0155192985cd5c038c8b704c222048b0b56ac6968368751ca725da55f/gstreamer_cli-1.28.9-cp39-abi3-macosx_10_13_universal2.whl", hash = "sha256:4c8bcfe6cd48375135644f6ad52a0ad43a35f5ab0bb649dbd7288176522164f8", size = 15777714, upload-time = "2026-11-09T03:03:20.152Z" },
 ]
 
 [[package]]
 name = "gstreamer-ext-runtime"
-version = "1.28.7"
+version = "1.28.9"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8a/c8/ffffa044b674e63f33a1737f55df6367d8dc11c838767bc3804f32597f21/gstreamer_ext_runtime-1.28.7-cp39-abi3-macosx_10_13_universal2.whl", hash = "sha256:bd4227766ba0c8ba47d83adb969d6bd6f5da65b0a8827ba10cc4e79d54cb35b8", size = 2375, upload-time = "2026-09-08T05:19:04.347Z" },
+    { url = "https://files.pythonhosted.org/packages/59/4f/fba6a86730eff326e8f5c84d99a56b2b5640632069898840dc3064697ba7/gstreamer_ext_runtime-1.28.9-cp39-abi3-macosx_10_13_universal2.whl", hash = "sha256:9729715c7295434f01d47da9af423b2177957767e34275ef3b41f81666bd24c3", size = 2375, upload-time = "2026-11-09T03:03:32.918Z" },
 ]
 
 [[package]]
 name = "gstreamer-gtk"
-version = "1.28.7"
+version = "1.28.9"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/30/76/4c72ea8f7a250bd44fc472c9e6505fe160427afe18e1eab27793ab2aff07/gstreamer_gtk-1.28.7-cp39-abi3-macosx_10_15_universal2.whl", hash = "sha256:1bc61338ad286e6484e4f956bdef5e493ac33c074cb87a6b5dd758afc1c10c9b", size = 20498055, upload-time = "2026-09-08T05:19:10.668Z" },
+    { url = "https://files.pythonhosted.org/packages/4a/26/9f5ee2c1fb9c4666cff0bd0e90d4ad14a7ceb5c72143ce9e184e6543e459/gstreamer_gtk-1.28.9-cp39-abi3-macosx_10_15_universal2.whl", hash = "sha256:e6b0bfaeabb324d9167bbdae5e08a71981ba685a21a66b9790e18601f1d3a1ea", size = 20500469, upload-time = "2026-11-09T03:03:37.983Z" },
 ]
 
 [[package]]
 name = "gstreamer-libs"
-version = "1.28.7"
+version = "1.28.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gstreamer-ext-runtime", marker = "sys_platform == 'darwin'" },
     { name = "setuptools", marker = "sys_platform == 'darwin'" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/22/a3/969350d1f0708cb6a507d50531127c46930183f1422ad56adc96149e2416/gstreamer_libs-1.28.7-cp39-abi3-macosx_10_13_universal2.whl", hash = "sha256:5a181336d80f4be235a2a7a62deed2ef6a47846bad3bd76135bd6600774377af", size = 96346436, upload-time = "2026-09-08T05:19:35.842Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/3d/c77ad59f2fc7703d470ca201d87dfa28544fcb0cb8e878bc485e6689ccc3/gstreamer_libs-1.28.9-cp39-abi3-macosx_10_13_universal2.whl", hash = "sha256:95e7028e8e8a9f2974ac2fb41f3ff04d7608d2333915192b325ac2264aaa08f8", size = 96281967, upload-time = "2026-11-09T03:03:51.406Z" },
 ]
 
 [[package]]
 name = "gstreamer-plugins"
-version = "1.28.7"
+version = "1.28.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gstreamer-plugins-libs", marker = "sys_platform == 'darwin'" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0e/14/0296d360ab2e23dc2bec75f7582a5bf7afc14eac8ba322aa3ec44d450921/gstreamer_plugins-1.28.7-cp39-abi3-macosx_10_13_universal2.whl", hash = "sha256:8d39f567ce15447a884bdbd4c8f2be5f78f2abe125fba1928e80bbb5b22a9e2c", size = 101434618, upload-time = "2026-09-08T05:20:11.37Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/4d/4f2eaf7a516c10bce56d6eeb60e6ac28e06630eda73a50d403df6986ed42/gstreamer_plugins-1.28.9-cp39-abi3-macosx_10_13_universal2.whl", hash = "sha256:6efbb36d19ed14fd15bff983c30d631013b7a373f28a9792290f72e016ce890f", size = 108450853, upload-time = "2026-11-09T03:04:06.639Z" },
 ]
 
 [[package]]
 name = "gstreamer-plugins-gpl"
-version = "1.28.7"
+version = "1.28.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gstreamer-plugins-libs", marker = "sys_platform == 'darwin'" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fd/8f/eee90a9d202bf5ad33025d982fc5384c209a968c7b4c406bf6938ed5c0f6/gstreamer_plugins_gpl-1.28.7-cp39-abi3-macosx_10_13_universal2.whl", hash = "sha256:7f3254415f0b100f2611cfe1f7e5fcfb7448a02563d0880efb0f399dc84704e6", size = 1050672, upload-time = "2026-09-08T05:20:18.533Z" },
+    { url = "https://files.pythonhosted.org/packages/a9/76/57908f762a54011449b8ece7bf34ddd84a8ad9d50714a3a252d2e2ffb6b5/gstreamer_plugins_gpl-1.28.9-cp39-abi3-macosx_10_13_universal2.whl", hash = "sha256:c6fb94f57351a4a8ba58a5822c2895655dcb656e5e1649a477e8582dd9d4147c", size = 1050705, upload-time = "2026-11-09T03:04:13.557Z" },
 ]
 
 [[package]]
 name = "gstreamer-plugins-gpl-restricted"
-version = "1.28.7"
+version = "1.28.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gstreamer-plugins-libs", marker = "sys_platform == 'darwin'" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2f/4b/ac434298e49508c90c9ac8729c3a2e578ddc8b973e82c692b434577ef836/gstreamer_plugins_gpl_restricted-1.28.7-cp39-abi3-macosx_10_13_universal2.whl", hash = "sha256:7dcfb68ec48fc45764a398bc43124ba174a8f22dd53fc3c27c6b3f70224da2fe", size = 13453657, upload-time = "2026-09-08T05:20:22.654Z" },
+    { url = "https://files.pythonhosted.org/packages/13/a1/841de4196edf937a5e5a4dcb382e6f0d857acf0c5a2c797720cc36faa1be/gstreamer_plugins_gpl_restricted-1.28.9-cp39-abi3-macosx_10_13_universal2.whl", hash = "sha256:863393bd0ac70c621b8f0167a07b3fd87c7eba5dd53eed0e5d174f5fc5e04124", size = 13454322, upload-time = "2026-11-09T03:04:17.309Z" },
 ]
 
 [[package]]
 name = "gstreamer-plugins-libs"
-version = "1.28.7"
+version = "1.28.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gstreamer-libs", marker = "sys_platform == 'darwin'" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7d/8c/ea1a272ece86216ad2ff4f7a024cd0bfd74e37889f8e6bb983d3de37b512/gstreamer_plugins_libs-1.28.7-cp39-abi3-macosx_10_13_universal2.whl", hash = "sha256:3691f3c649b426e82fbad423619c9012e19446db7e09a3b298c4c4ab33434bda", size = 83541399, upload-time = "2026-09-08T05:20:44.293Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/d4/f012a4d992954e3771eb7557d95e3d6b3c23cc05d926d60bd782f399a0c3/gstreamer_plugins_libs-1.28.9-cp39-abi3-macosx_10_13_universal2.whl", hash = "sha256:13c9a67983cd32fa183c82395241fc6c002b51cdf38760be9bcac4e9ad187dc0", size = 83546462, upload-time = "2026-11-09T03:04:29.977Z" },
 ]
 
 [[package]]
 name = "gstreamer-plugins-restricted"
-version = "1.28.7"
+version = "1.28.9"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gstreamer-plugins-libs", marker = "sys_platform == 'darwin'" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b7/d8/b750310c32a238608a3451afb1de16f57cb302c2686e2707c9a974dc5a78/gstreamer_plugins_restricted-1.28.7-cp39-abi3-macosx_10_13_universal2.whl", hash = "sha256:72489fd5f15532811b1dcc8363b9c8bfa7dfb8a3a64271718805ff29d525f9cc", size = 6106223, upload-time = "2026-09-08T05:20:50.548Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/b1/969b8087b7bca3264bf7e3e3324b721764ccf8ce0b0fdaafe99eb071af16/gstreamer_plugins_restricted-1.28.9-cp39-abi3-macosx_10_13_universal2.whl", hash = "sha256:4de3ebd1ff51fc2d76a721dc1d079ffcc437b96c1d7a481e44b98014168af059", size = 6108614, upload-time = "2026-11-09T03:04:34.7Z" },
 ]
 
 [[package]]
 name = "gstreamer-python"
-version = "1.28.7"
+version = "1.28.9"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bb/52/2279b755c7a12b0f0857b9e2ee05c7eb3a9a138e1abd45b7c35b162e987f/gstreamer_python-1.28.7-cp311-cp311-macosx_10_13_universal2.whl", hash = "sha256:1aa991fe06a428277ad6b0e33e0ecd8083d4cf78a4d9c537f10ad8f7ed87c18f", size = 1187682, upload-time = "2026-09-08T05:48:00.549Z" },
-    { url = "https://files.pythonhosted.org/packages/50/90/51c8549565480d81d78a4e84c67870fdb1fa1813c4e53bc833b7136f4a47/gstreamer_python-1.28.7-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:27b64026d8672a2db58ce0027167c6c058b3abdf9cc5a0b288a7d1e2a84b047d", size = 1196708, upload-time = "2026-09-08T05:48:02.439Z" },
+    { url = "https://files.pythonhosted.org/packages/88/9a/a9eb966fc083b7844ece001ed522a4a0dd5f39bb6499f2d63dbf153c73d5/gstreamer_python-1.28.9-cp311-cp311-macosx_10_13_universal2.whl", hash = "sha256:dd99f2bf3b2df4b590b448a93590828f60d730590f8b486337607ee3d2790938", size = 1187669, upload-time = "2026-11-09T03:05:52.284Z" },
+    { url = "https://files.pythonhosted.org/packages/58/77/524f923dc2add220b789c7c57d077522a99f355dc339405593bc70638646/gstreamer_python-1.28.9-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:bde1711c1666ac1444e246efaae969b2328094ccd067c10b6a713884dcebf697", size = 1196711, upload-time = "2026-11-09T03:05:54.237Z" },
 ]
 
 [[package]]
@@ -1844,13 +1844,13 @@ requires-dist = [
     { name = "brotli", specifier = ">=1.2.1,<2" },
     { name = "certifi", specifier = ">=2026.10.23" },
     { name = "cryptography", specifier = ">=50.0.1,<51" },
-    { name = "dnspython", specifier = ">=2.9.1,<3" },
+    { name = "dnspython", specifier = ">=2.9.2,<3" },
     { name = "eclipse-zenoh", specifier = "~=1.7.0" },
     { name = "fastrtc", specifier = ">=0.0.34" },
     { name = "filelock", specifier = ">=4.2.4,<5" },
     { name = "gradio", specifier = "==5.50.1.dev1" },
     { name = "gradio-client", specifier = ">=1.13.3" },
-    { name = "gstreamer-bundle", marker = "sys_platform != 'linux'", specifier = ">=1.28.7,<1.29" },
+    { name = "gstreamer-bundle", marker = "sys_platform != 'linux'", specifier = ">=1.28.9,<1.29" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "huggingface-hub", specifier = ">=1.5,<2" },
     { name = "mediapipe", marker = "extra == 'all-vision'", specifier = ">=0.10.35,<0.11" },
@@ -1876,7 +1876,7 @@ requires-dist = [
     { name = "supervision", marker = "extra == 'yolo-vision'" },
     { name = "torch", marker = "extra == 'all-vision'", specifier = ">=2.13,<3" },
     { name = "torch", marker = "extra == 'local-vision'", specifier = ">=2.13,<3" },
-    { name = "tornado", specifier = ">=6.6,<7" },
+    { name = "tornado", specifier = ">=6.6.1,<7" },
     { name = "transformers", marker = "extra == 'all-vision'", specifier = ">=5.17,<6" },
     { name = "transformers", marker = "extra == 'local-vision'", specifier = ">=5.17,<6" },
     { name = "ultralytics", marker = "extra == 'all-vision'" },
@@ -2318,11 +2318,11 @@ wheels = [
 
 [[package]]
 name = "tornado"
-version = "6.6"
+version = "6.6.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/d0/02/5f549b1ad5da6267ed1e1fac2eef69257b1979cc812497002499b7895ff9/tornado-6.6.tar.gz", hash = "sha256:34c4aa916d7f2b2d5cadee2c6850f5a4a7f3d688cbf58399ea9bd3057af4abd5", size = 617998, upload-time = "2026-10-21T15:31:04.733Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/64/2b/8ff2b41620cbba0eeb0862fed21dcaa5a2ad36c6dd9bb465f9ff7a147be2/tornado-6.6.1.tar.gz", hash = "sha256:28e6311402af59c8b02e3fa0f5e7d8eb465b25081381803b127d97e6a4395d5a", size = 623388, upload-time = "2026-11-09T21:09:22.71Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/df/f5/d3e6f76b945f9812842db742d0708a3b6287e850e81be3ca10e290c103c6/tornado-6.6-cp311-abi3-macosx_10_9_universal2.whl", hash = "sha256:01abf15429d64f04ccfafc238b191cc2c177108b7a331f4461707ad77198c8c2", size = 528326, upload-time = "2026-10-21T15:30:05.528Z" },
+    { url = "https://files.pythonhosted.org/packages/77/d3/ef3a4d38d1a72c52ad07483ed760dbb93027d28f19c3a2d98148abdd63e1/tornado-6.6.1-cp311-abi3-macosx_10_9_universal2.whl", hash = "sha256:a8d3e6acde5a80d13b13b5e4c7c226ca682f31d0a62b6c33cea038714bc2de1b", size = 533249, upload-time = "2026-11-09T21:08:22.475Z" },
 ]
 
 [[package]]
