@@ -10,6 +10,7 @@ import errno
 import hashlib
 import http.client
 import json
+import keyword
 import os
 import re
 import secrets
@@ -123,6 +124,8 @@ _RUST_KEYWORDS = {
     "while",
     "yield",
 }
+# Top-level import packages the generated Python project depends on at runtime.
+_PYTHON_TEMPLATE_DEPENDENCY_PACKAGES = frozenset({"google", "grpc"})
 _RUST_RESERVED_IDENTIFIERS = _RUST_KEYWORDS | {
     "alloc",
     "build",
@@ -406,7 +409,11 @@ def _template_context(name: str, language: str, package_name: str | None) -> Tem
     distribution_name = re.sub(r"[._]+", "-", normalized_name)
     identifier = re.sub(r"[^a-z0-9]+", "_", normalized_name).strip("_")
     derived_package = identifier
-    if not derived_package or not derived_package[0].isalpha():
+    if (
+        not derived_package
+        or not derived_package[0].isalpha()
+        or _python_package_conflict(derived_package) is not None
+    ):
         derived_package = f"middleware_{derived_package}".rstrip("_")
     effective_package = package_name if package_name is not None else derived_package
     if not _PYTHON_PACKAGE_PATTERN.fullmatch(effective_package):
@@ -414,6 +421,9 @@ def _template_context(name: str, language: str, package_name: str | None) -> Tem
             "Python package name must start with a lowercase letter and contain only "
             "lowercase letters, digits, and underscores"
         )
+    conflict = _python_package_conflict(effective_package)
+    if conflict is not None:
+        raise ProjectError(f"Python package name '{effective_package}' {conflict}")
     service_name = normalized_name.replace("_", "-").replace(".", "-")
     rust_lib_name = identifier
     rust_crate_name = distribution_name
@@ -428,6 +438,17 @@ def _template_context(name: str, language: str, package_name: str | None) -> Tem
         rust_lib_name=rust_lib_name,
         service_name=service_name,
     )
+
+
+def _python_package_conflict(package: str) -> str | None:
+    """Explain why a top-level package name cannot be imported from the project."""
+    if keyword.iskeyword(package):
+        return "is a Python keyword"
+    if package in sys.stdlib_module_names:
+        return "shadows a Python standard-library module"
+    if package in _PYTHON_TEMPLATE_DEPENDENCY_PACKAGES:
+        return "shadows a package the generated project depends on"
+    return None
 
 
 def _normalize_version(requested: str) -> str:

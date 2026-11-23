@@ -23,6 +23,9 @@ dev = [
 requires = ["uv_build>=0.11.8,<0.12.0"]
 build-backend = "uv_build"
 
+[tool.uv.build-backend]
+module-name = "__PACKAGE_NAME__"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
