@@ -78,6 +78,13 @@ npm run build
 npm run verify:visual
 ```
 
+The `fflate` finding [CVE-2026-122146](https://www.cve.org/CVERecord?id=CVE-2026-122146)
+reports unbounded memory allocation in `unzipSync`. It has no fixed release, and
+the maintainer disputes it. `package.json` pins `fflate` 0.8.3, the latest
+release. Only `three-stdlib` loaders and exporters that this demo does not
+import use it, so the production build contains no `fflate` code. Recheck if the
+demo starts loading compressed assets.
+
 ## Benchmark the Policy Decision
 
 The benchmark calls the in-process policy decision directly in a release build.
